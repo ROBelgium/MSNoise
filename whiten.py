@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.fftpack
 
 def nextpow2(x):
     return np.ceil(np.log2(np.abs(x)))
@@ -28,7 +29,7 @@ def whiten(matsign, Npts, tau, frebas, frehaut,plot=False,tmp=False):
     high = J[-1] + Napod
     if high > len(matsign)/2 : high= len(matsign)/2
 
-    FFTRawSign = np.fft.fft(matsign)
+    FFTRawSign = scipy.fftpack.fft(matsign)
    
     if plot:
         plt.subplot(412)
@@ -77,7 +78,7 @@ def whiten(matsign, Npts, tau, frebas, frehaut,plot=False,tmp=False):
         plt.plot(axis,np.abs(FFTRawSign))
         plt.xlim(0,max(axis))
     
-    wmatsign = np.real(np.fft.ifft(FFTRawSign))
+    wmatsign = np.real(scipy.fftpack.ifft(FFTRawSign))
     
     del matsign, FFTRawSign
     if plot:
