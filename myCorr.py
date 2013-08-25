@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.fftpack
 
 def nextpow2(x):
     return np.ceil(np.log2(np.abs(x)))
@@ -23,7 +24,7 @@ def myCorr(data, maxlag, plot=False):
     Nc = 2* Nt - 1
     Nfft = 2**nextpow2(Nc)
    
-    corr = np.fft.fft(data,int(Nfft),axis=1)
+    corr = scipy.fftpack.fft(data,int(Nfft),axis=1)
     
     if plot:
             plt.subplot(211)
@@ -32,7 +33,7 @@ def myCorr(data, maxlag, plot=False):
             plt.plot(np.arange(len(corr[1]))*0.05,np.abs(corr[1]))
     
     corr = np.conj(corr[couples[0]]) * corr[couples[1]]
-    corr = np.real(np.fft.ifft(corr)) / Nt
+    corr = np.real(scipy.fftpack.ifft(corr)) / Nt
     corr = np.concatenate( (corr[-Nt+1:],corr[:Nt+1]) )
    
     if plot:
