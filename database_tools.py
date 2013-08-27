@@ -12,7 +12,6 @@ import os
 from msnoise_table_def import *
 
 def connect():
-    # engine = create_engine('mysql://root:ijen!!@seisvolc.oma.be/rc1',echo=True)
     engine = create_engine('sqlite:///msnoise.sqlite', echo=False)
     Session = sessionmaker(bind=engine)
     return Session()
