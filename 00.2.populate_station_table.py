@@ -1,4 +1,5 @@
-import glob
+import glob, os
+import numpy as np
 from database_tools import *
 
 db = connect()

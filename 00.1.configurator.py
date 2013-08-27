@@ -8,7 +8,10 @@ from traitsui.table_column \
 from traitsui.extras.checkbox_column \
     import CheckboxColumn
 
+from default import *
 from database_tools import *
+
+from msnoise_table_def import *
 
 class StationColumn ( ObjectColumn ):
     def get_text_color ( self, object ):
@@ -173,14 +176,14 @@ if __name__ == '__main__':
     db = connect()
 
     networks = []
-    for network in get_networks(db):
+    for network in get_networks(db,all=True):
         networks.append(TNetwork(name=network))
-        for s in get_stations(db,net=network):
+        for s in get_stations(db,net=network,all=True):
             station = TStation(ref=s.ref, net=s.net, sta=s.sta, X=s.X, Y=s.Y,altitude=s.altitude,used=s.used,instrument=s.instrument,coordinates=s.coordinates)
             networks[-1].stations.append(station)
     
     filters = []
-    for f in get_filters(db):
+    for f in get_filters(db,all=True):
         filters.append( TFilter(ref=f.ref, low=f.low,high=f.high,mwcs_low=f.mwcs_low, mwcs_high=f.mwcs_high,
                         rms_threshold=f.rms_threshold,mwcs_wlen=f.mwcs_wlen,mwcs_step=f.mwcs_step,used=f.used ) )
     
@@ -189,7 +192,7 @@ if __name__ == '__main__':
         value = get_config(db,name)
         configs.append( ConfigItem(name=name,value=value,info=default[name][0],default=default[name][1]) )
     
-    disconnect(db)
+    db.close()
     demo = StationConfigurator(
         name    = 'MSNoise',
         company = Software(
@@ -217,7 +220,7 @@ if __name__ == '__main__':
         for f in demo.company.filters:
             update_filter(db, f.ref, f.low, f.high, f.mwcs_low, f.mwcs_high, f.rms_threshold, f.mwcs_wlen, f.mwcs_step, f.used)
 
-        disconnect(db)        
+        db.close()
         print "Done !"
         
 #EOF
