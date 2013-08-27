@@ -1,5 +1,7 @@
 from database_tools import *
 import logging
+import numpy as np
+
 logging.basicConfig(level=logging.DEBUG,
                     filename="./new_jobs.log",
                     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -22,40 +24,34 @@ if get_config(db, name="autocorr") in ['Y','y','1',1]:
 else:
     AUTOCORR = False
 
-stations_to_analyse = [sta.sta for sta in get_stations(db,used=True)]
-new_files = get_new_files(db)
+stations_to_analyse = [sta.sta for sta in get_stations(db,all=False)]
+nfs = get_new_files(db)
 
 days = {}
 old_day = 0
 old_pair = ""
 day_pairs = []
-for new_file in new_files:
-    Mnet, Msta, comp, starttime, endtime, data_duration = new_file
+for nf in nfs:
     # logging.debug('%s.%s will be MASTER for %s-%s'% (Mnet, Msta, starttime, endtime))
-    if Msta in stations_to_analyse:
-        day = "%s" % (starttime.date())
-        # logging.debug("%s : %s" %(day, Msta))
+    if nf.sta in stations_to_analyse:
+        day = "%s" % (nf.starttime.date())
         if day != old_day:
             day_pairs = np.unique(day_pairs)
             for pair in day_pairs:
                 logging.debug('New Job for: %s - %s'%(day,pair))
-                add_job(db, day, pair,type='CC')
+                update_job(db, day, pair,type='CC',flag='T')
             day_pairs = []
             old_day = day
         
-        # print day,
-        # print '%s.%s' % (net,sta),
-        
         available_stations = []
-        for station in get_data_availability(db, starttime=starttime.date(), endtime=endtime.date()):
-            net, sta, comp, datetime, endtime, duration, gaps, samplerate, flag = station
-            if sta in stations_to_analyse:
-                if '%s.%s' % (net,sta) not in available_stations:
-                    available_stations.append('%s.%s'%(net,sta))
-        # print ":", ','.join(available_stations)
+        for station in get_data_availability(db, starttime=nf.starttime, endtime=nf.endtime):
+            if station.sta in stations_to_analyse:
+                if '%s.%s' % (station.net,station.sta) not in available_stations:
+                    available_stations.append('%s.%s'%(station.net,station.sta))
+
         stations = np.array([])
         pairs = []
-        nS = '%s.%s' % (Mnet,Msta)
+        nS = '%s.%s' % (nf.net,nf.sta)
         i = 0
         for aS in available_stations:
             if not AUTOCORR and nS == aS:
@@ -68,12 +64,13 @@ for new_file in new_files:
                 else:
                     pairs = np.vstack((pairs,':'.join(sorted([nS,aS]))))
                     # stations = np.append(stations, np.array([nS,aS]))
-
+        
         pairs = np.unique(pairs)
         for pair in pairs:
             day_pairs.append(pair)
+
 # update all _data_availability and mark files as "A"rchives
-for sta in get_stations(db,used=True):
-    mark_data_availability(db,condition='net="%s" and sta="%s"'%(sta.net, sta.sta), flag='A')
+for sta in get_stations(db,all=True):
+    mark_data_availability(db,sta.net,sta.sta, flag='A')
     
 logging.info('*** Finished: New Jobs ***')
