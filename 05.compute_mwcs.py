@@ -28,7 +28,7 @@ else:
 goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
 maxlag = float(get_config(db, "maxlag"))
 start, end, datelist = build_movstack_datelist(db)
-allow_large_concats(db)
+# allow_large_concats(db)
 
 # First we reset all DTT jobs to "T"odo if the REF is new for a given pair
 
@@ -36,16 +36,16 @@ for station1, station2 in get_station_pairs(db,used=True):
     sta1 = "%s.%s"%(station1.net, station1.sta)
     sta2 = "%s.%s"%(station2.net, station2.sta)
     pair = "%s:%s"%(sta1,sta2)
-    if is_dtt_ref_job(db,pair,type='DTT'):
+    if is_dtt_next_job(db,pair,type='DTT',ref=True):
         logging.info("We will recompute all MWCS based on the new REF for %s" % pair)
         reset_dtt_jobs(db,pair)
         update_job(db,"REF",pair,type='DTT',flag='D')
 
 # Then we compute the jobs
-while is_dtt_mov_job(db,type='DTT'):
+while is_dtt_next_job(db,flag='T',type='DTT'):
     pair,days, refs = get_dtt_next_job(db, flag='T', type='DTT')
     logging.info("There are MWCS jobs for some days to recompute for %s"%pair)
-    for day in days.split(','):
+    for day in days:
         for f in get_filters(db,all=False):
             filterid = int(f.ref)
             for components in components_to_compute:
