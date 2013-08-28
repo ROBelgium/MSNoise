@@ -147,15 +147,19 @@ def mark_data_availability(session,net,sta,flag):
 
 ############ JOBS ############
 
-def update_job(session,day,pair,type,flag):
+def update_job(session,day,pair,type,flag,commit=True,returnjob=True):
     job = session.query(Job).filter(Job.day==day).filter(Job.pair==pair).filter(Job.type==type).first()
     if job is None:
         job = Job(day,pair,type,'T')
-        session.add(job)
+        if not returnjob:
+            session.add(job)
     else:
         job.flag = flag
         job.lastmod = datetime.datetime.utcnow()
-    session.commit()
+    if commit:
+        session.commit()
+    if returnjob:
+        return job
 
 def is_next_job(session, flag = 'T',type='CC'):
     job = session.query(Job).filter(Job.type==type).filter(Job.flag==flag).first()
@@ -404,7 +408,8 @@ def azimuth(coordinates, x0, y0, x1, y1):
         return 0
 
 
-
+def nextpow2(x):
+    return np.ceil(np.log2(np.abs(x)))
 
 
 ################## TEST

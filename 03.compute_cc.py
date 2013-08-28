@@ -5,6 +5,7 @@ from obspy.signal.filter import lowpass, highpass
 from scikits.samplerate import resample
 import time, calendar, datetime
 import sys, os
+import scipy.fftpack
 
 from database_tools import *
 from myCorr import myCorr
@@ -294,7 +295,10 @@ while is_next_job(db,type='CC'):
                     high = float(filterdb.high)
                     rms_threshold = filterdb.rms_threshold
                     # print "Filter Bounds used:", filterid, low, high
-                    trames2hWb= np.zeros(np.shape(trame2h))
+                    Nfft = min30
+                    if Nfft / 2 %2 != 0:
+                        Nfft+=2
+                    trames2hWb= np.zeros((2,Nfft),dtype=np.complex)
                     for i, station in enumerate(pair):
                         # print "USING rms threshold = %f" % rms_threshold
                         # logging.debug("rmsmat[i] = %f" % rmsmat[i])
@@ -305,12 +309,14 @@ while is_next_job(db,type='CC'):
                                 trame2h[i][indexes] = (trame2h[i][indexes]/np.abs(trame2h[i][indexes])) * windsorizing * rmsmat[i]
                             
                             # logging.debug('whiten')
-                            trames2hWb[i] = whiten(trame2h[i],min30, dt, low, high, plot=False)
+                            
+                            trames2hWb[i] = whiten(trame2h[i],Nfft, dt, low, high, plot=False)
                         else:
                             # logging.debug("Station no %d, pas de pretraitement car rms < %f ou NaN"% (i, rms_threshold))
-                            trames2hWb[i] = trame2h[i]
-                            
+                            trames2hWb[i] = np.zeros(Nfft)
+                    
                     corr = myCorr(trames2hWb, np.ceil(maxlag/dt),plot=False)
+
                     thisdate = time.strftime("%Y-%m-%d",time.gmtime(basetime+itranche*min30/fe)) 
                     thistime = time.strftime("%H_%M",time.gmtime(basetime+itranche*min30/fe)) 
                     if keep_all:

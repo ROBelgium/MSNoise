@@ -39,10 +39,10 @@ db = connect()
 # PLOT= True
 PLOT= False
 
-lMlag = -50 #HARD
-lmlag = -5 #HARD
-rmlag = 5 #HARD
-rMlag = 50 #HARD
+lMlag = -30 #HARD
+lmlag = -10 #HARD
+rmlag = 10 #HARD
+rMlag = 30 #HARD
 minCoh = 0.5 #HARD
 maxErr = 0.1 #HARD
 maxDt = 0.5 #HARD

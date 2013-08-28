@@ -5,11 +5,11 @@ import scipy.fftpack
 def nextpow2(x):
     return np.ceil(np.log2(np.abs(x)))
 
-def whiten(matsign, Npts, tau, frebas, frehaut,plot=False,tmp=False):
+def whiten(matsign, Nfft, tau, frebas, frehaut,plot=False,tmp=False):
     
-    if len(matsign)/2 %2 != 0:
-        matsign = np.append(matsign,[0,0])
-    Npts = len(matsign)
+    # if len(matsign)/2 %2 != 0:
+        # matsign = np.append(matsign,[0,0])
+    
     
     if plot:
         plt.subplot(411)
@@ -19,7 +19,9 @@ def whiten(matsign, Npts, tau, frebas, frehaut,plot=False,tmp=False):
         
     Napod = 300
     
-    freqVec = np.arange(0.,Npts/2.0) / (tau * (Npts-1))
+    
+    
+    freqVec = np.arange(0.,Nfft/2.0) / (tau * (Nfft-1))
     J = np.where((freqVec >= frebas) & (freqVec <= frehaut))[0]
     low = J[0] - Napod
     if low < 0: low =0
@@ -27,10 +29,10 @@ def whiten(matsign, Npts, tau, frebas, frehaut,plot=False,tmp=False):
     porte1 = J[0]
     porte2 = J[-1]
     high = J[-1] + Napod
-    if high > len(matsign)/2 : high= len(matsign)/2
+    if high > Nfft/2 : high= Nfft/2
 
-    FFTRawSign = scipy.fftpack.fft(matsign)
-   
+    FFTRawSign = scipy.fftpack.fft(matsign,Nfft)
+
     if plot:
         plt.subplot(412)
         axis = np.arange(len(FFTRawSign))
@@ -60,7 +62,6 @@ def whiten(matsign, Npts, tau, frebas, frehaut,plot=False,tmp=False):
     FFTRawSign[high:-high] *= 0
     
     FFTRawSign[-1] *= 0.
-    
     if plot:
         plt.subplot(413)
         axis = np.arange(len(FFTRawSign))
@@ -69,24 +70,23 @@ def whiten(matsign, Npts, tau, frebas, frehaut,plot=False,tmp=False):
         plt.axvline(porte2,c='r')
         plt.axvline(high,c='r')
         
-        plt.axvline(Npts-high,c='r')
-        plt.axvline(Npts-porte2,c='r')
-        
-        plt.axvline(Npts-porte1,c='g')
-        plt.axvline(Npts-low,c='g')
+        plt.axvline(Nfft-high,c='r')
+        plt.axvline(Nfft-porte2,c='r')
+        plt.axvline(Nfft-porte1,c='g')
+        plt.axvline(Nfft-low,c='g')
         
         plt.plot(axis,np.abs(FFTRawSign))
         plt.xlim(0,max(axis))
     
     wmatsign = np.real(scipy.fftpack.ifft(FFTRawSign))
-    
-    del matsign, FFTRawSign
+    del matsign
     if plot:
         plt.subplot(414)
         plt.plot(np.arange(len(wmatsign))*tau,wmatsign)
         plt.xlim(0,len(wmatsign)*tau)
         plt.show()
-    return wmatsign
+    # return wmatsign
+    return FFTRawSign
     
     
 if __name__ == '__main__':

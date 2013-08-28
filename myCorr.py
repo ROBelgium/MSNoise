@@ -24,7 +24,8 @@ def myCorr(data, maxlag, plot=False):
     Nc = 2* Nt - 1
     Nfft = 2**nextpow2(Nc)
    
-    corr = scipy.fftpack.fft(data,int(Nfft),axis=1)
+    # corr = scipy.fftpack.fft(data,int(Nfft),axis=1)
+    corr = data
     
     if plot:
             plt.subplot(211)
@@ -40,7 +41,7 @@ def myCorr(data, maxlag, plot=False):
         plt.figure()
         plt.plot(corr)
     
-    E = np.sqrt(np.mean(data**2,axis=1))
+    E = np.sqrt(np.mean(scipy.fftpack.ifft(data,axis=1)**2,axis=1))
     normFact = E[0] * E[1]
     
     if normalized:
