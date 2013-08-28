@@ -112,6 +112,7 @@ def update_data_availability(session, net, sta, comp, path, file, starttime, end
         flag = "N"
         data = DataAvailability(net,sta,comp,path,file,starttime,endtime,data_duration,gaps_duration,samplerate,flag)
         session.add(data)
+        toreturn = True
     else:
         data.net = net
         data.sta = sta
@@ -121,7 +122,9 @@ def update_data_availability(session, net, sta, comp, path, file, starttime, end
         data.data_duration = data_duration
         data.gaps_duration = gaps_duration
         data.samplerate = samplerate
+        toreturn = False
     session.commit()
+    return toreturn
 
 def get_new_files(session):
     files = session.query(DataAvailability).filter(DataAvailability.flag != 'A')
