@@ -1,5 +1,5 @@
 # queries.py
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, Date, func
 from sqlalchemy.orm import sessionmaker
 import numpy as np
 import datetime
@@ -133,7 +133,7 @@ def get_data_availability(session, net=None, sta=None, comp=None, starttime=None
     if not net:
         data = session.query(DataAvailability).filter(DataAvailability.starttime <= starttime).filter(DataAvailability.endtime>=endtime).all()
     else:
-        data = session.query(DataAvailability).filter(DataAvailability.net==net).filter(DataAvailability.sta==sta).filter(DataAvailability.starttime <= starttime).filter(DataAvailability.endtime>=endtime).all()
+        data = session.query(DataAvailability).filter(DataAvailability.net==net).filter(DataAvailability.sta==sta).filter(func.DATE(DataAvailability.starttime) <= starttime.date()).filter(func.DATE(DataAvailability.endtime)>=endtime.date()).all()
     return data
 
 def mark_data_availability(session,net,sta,flag):

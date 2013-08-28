@@ -32,7 +32,7 @@ old_day = 0
 old_pair = ""
 day_pairs = []
 for nf in nfs:
-    # logging.debug('%s.%s will be MASTER for %s-%s'% (Mnet, Msta, starttime, endtime))
+    # logging.debug('%s.%s will be MASTER for %s-%s'% (nf.net, nf.sta, nf.starttime, nf.endtime))
     if nf.sta in stations_to_analyse:
         day = "%s" % (nf.starttime.date())
         if day != old_day:
@@ -68,6 +68,12 @@ for nf in nfs:
         pairs = np.unique(pairs)
         for pair in pairs:
             day_pairs.append(pair)
+
+if day_pairs != []:
+    day_pairs = np.unique(day_pairs)
+    for pair in day_pairs:
+        logging.debug('New Job for: %s - %s'%(day,pair))
+        update_job(db, day, pair,type='CC',flag='T')
 
 # update all _data_availability and mark files as "A"rchives
 for sta in get_stations(db,all=True):
