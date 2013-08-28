@@ -1,11 +1,12 @@
 from obspy.core import read
-import glob,sys
+import glob,sys,os,datetime
 import time
 import logging
 import threading
 from subprocess import Popen, PIPE
 
 from database_tools import *
+from data_structures import data_structure
 
 class ActivePool(object):
     def __init__(self):
@@ -46,17 +47,16 @@ def worker(s, pool):
                 for gap in gaps:
                     gaps_duration += gap[6]
                 data_duration = 0
-                start  = 1e20
-                stop = 0
-
+                start  = datetime.datetime.strptime('2100-01-01','%Y-%m-%d')
+                stop = datetime.datetime.strptime('1900-01-01','%Y-%m-%d')
                 for trace in data:
                     data_duration += trace.stats.delta * trace.stats.npts
-                    if trace.stats.starttime.timestamp < start:
+                    if trace.stats.starttime.datetime < start:
                         starttime = trace.stats.starttime
-                        start = trace.stats.starttime.timestamp
-                    if trace.stats.endtime.timestamp > stop:
+                        start = trace.stats.starttime.datetime
+                    if trace.stats.endtime.datetime > stop:
                         endtime = trace.stats.endtime
-                        stop = trace.stats.endtime.timestamp
+                        stop = trace.stats.endtime.datetime
                 
                 net = trace.stats.network
                 sta = trace.stats.station
@@ -64,7 +64,7 @@ def worker(s, pool):
                 path=folder.replace('\\','/')
                 r1 = time.time()
                 
-                result = update_data_availability(db, net, sta, comp, path, name, starttime, endtime,data_duration, gaps_duration, data[0].stats.sampling_rate)
+                result = update_data_availability(db, net, sta, comp, path, name, starttime.datetime, endtime.datetime,data_duration, gaps_duration, data[0].stats.sampling_rate)
                 
                 r2 = time.time()
                 if result :
@@ -74,7 +74,7 @@ def worker(s, pool):
         except Exception as e:
             print "Problem", e
         pool.makeInactive(Fname)
-        disconnect(db)
+        db.close()
 
 if __name__ == "__main__":
     db = connect()
@@ -121,7 +121,7 @@ if __name__ == "__main__":
     for year in range(startdate.year, min(datetime.datetime.now().year , enddate.year) + 1):
         for channel in channels:
             stafol = os.path.split(rawpath)[0].replace('YEAR',"%04i"%year).replace('DAY','*').replace('HOUR','*').replace('CHAN',channel).replace('TYPE','*').replace('LOC','*')
-            for sta in get_stations(db, used=True):
+            for sta in get_stations(db, all=False):
                 tmp = os.path.join( data_folder, stafol.replace('NET',sta.net).replace('STA',sta.sta))
                 folders_to_glob.append(os.path.join( data_folder, tmp))
     

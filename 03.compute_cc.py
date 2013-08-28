@@ -3,7 +3,8 @@ from obspy.core import read, utcdatetime, Stream
 from obspy.signal import cosTaper
 from obspy.signal.filter import lowpass, highpass
 from scikits.samplerate import resample
-import time, calendar
+import time, calendar, datetime
+import sys, os
 
 from database_tools import *
 from myCorr import myCorr
@@ -34,7 +35,7 @@ for comp in ['ZZ','RR','TT','TR','RT','ZR','RZ','TZ','ZT']:
 
 logging.info("Will compute %s" % " ".join(components_to_compute))
 
-allow_large_concats(db)
+# allow_large_concats(db)
 
 goal_sampling_rate = float(get_config(db, "cc_sampling_rate")) # was 20.0
 goal_duration = float(get_config(db, "analysis_duration")) #was 86400
@@ -56,18 +57,15 @@ if get_config(db, 'keep_days') in ['Y','y','1',1]:
 
 #Process !
 while is_next_job(db,type='CC'):
-    job = get_next_job(db,type='CC')
+    jobs = get_next_job(db,type='CC')
     stations = []
     
-    goal_day, pairs, refs = job
-    
-    
-    if pairs.count(',') != 0:
-        pairs = pairs.split(',')
-        refs = refs.split(',')
-    else:
-        pairs = [pairs,]
-        refs = [refs,]
+    pairs= []
+    refs=[]
+    for job in jobs:
+        refs.append(job.ref)
+        pairs.append(job.pair)
+        goal_day = job.day
     
     for pair in pairs:
         netsta1, netsta2 = pair.split(':')
@@ -77,6 +75,9 @@ while is_next_job(db,type='CC'):
         
     
     fi=len(get_filters(db,all=False))
+    if fi == 0:
+        logging.info("NO FILTERS DEFINED, exiting")
+        sys.exit()
     
     stations = np.unique(stations)
     
@@ -94,15 +95,17 @@ while is_next_job(db,type='CC'):
         datafilesE[station] = []
         datafilesN[station] = []
         net, sta = station.split('.')
-        files = get_filenames(db, goal_day, net, sta)
+        gd = datetime.datetime.strptime(goal_day,'%Y-%m-%d')
+        files = get_data_availability(db,net=net,sta=sta,starttime=gd,endtime=gd)
         for file in files:
-            net,sta,comp,path,file,datetime,endtime, duration,samplerate = file
+            comp = file.comp
+            fullpath = os.path.join(file.path,file.file)
             if comp[-1] == 'Z':
-                datafilesZ[station].append(os.path.join(path,file))
+                datafilesZ[station].append(fullpath)
             elif comp[-1] == 'E':
-                datafilesE[station].append(os.path.join(path,file))
+                datafilesE[station].append(fullpath)
             elif comp[-1] == 'N':
-                datafilesN[station].append(os.path.join(path,file))
+                datafilesN[station].append(fullpath)
    
     
     TimeVec = np.arange(0., goal_duration, 1./goal_sampling_rate)
@@ -160,7 +163,7 @@ while is_next_job(db,type='CC'):
                 if samplerate != goal_sampling_rate:
                     if resampling_method == "Resample":
                         logging.debug("%s.%s Downsample to %.1f Hz" % (station, comp,goal_sampling_rate))
-                        data = resample(data, goal_sampling_rate/trace.stats.sampling_rate, 'sinc_best')
+                        data = resample(data, goal_sampling_rate/trace.stats.sampling_rate, 'sinc_fastest')
                     elif resampling_method == "Decimate":
                         logging.debug("%s.%s Decimate by a factor of %i" % (station, comp,decimation_factor))
                         data = data[::decimation_factor]
@@ -306,7 +309,7 @@ while is_next_job(db,type='CC'):
                         else:
                             # logging.debug("Station no %d, pas de pretraitement car rms < %f ou NaN"% (i, rms_threshold))
                             trames2hWb[i] = trame2h[i]
-                    
+                            
                     corr = myCorr(trames2hWb, np.ceil(maxlag/dt),plot=False)
                     thisdate = time.strftime("%Y-%m-%d",time.gmtime(basetime+itranche*min30/fe)) 
                     thistime = time.strftime("%H_%M",time.gmtime(basetime+itranche*min30/fe)) 

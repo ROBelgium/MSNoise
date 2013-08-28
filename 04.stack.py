@@ -47,7 +47,8 @@ def stack(stype='day'):
             mov_stacks = [int(mov_stack),]
         else:
             mov_stacks = [int(mi) for mi in mov_stack.split(',')]
-        mov_stacks.remove(1) #remove 1 day stack, it should exist already
+        if 1 in mov_stacks:
+            mov_stacks.remove(1) #remove 1 day stack, it should exist already
     elif stype == "ref":
         start, end, datelist = build_ref_datelist(db)
         format = "stack"
@@ -59,11 +60,11 @@ def stack(stype='day'):
                 sta1 = "%s_%s"%(station1.net, station1.sta)
                 sta2 = "%s_%s"%(station2.net, station2.sta)
                 pair = "%s:%s"%(sta1,sta2)
-                if updated_days_for_dates(db,start,end,pair.replace('_','.'),type='CC',interval='1 DAY'):
+                if updated_days_for_dates(db,start,end,pair.replace('_','.'),type='CC',interval=datetime.timedelta(days=1)):
                     logging.debug("New Data for %s-%s-%i"%(pair,components,filterid))
                     if stype in ['mov','ref']:
                         nstack, stack_total = get_results(db,sta1,sta2,filterid,components,datelist,format=format)
-                        updated_days = updated_days_for_dates(db,start,end,pair.replace('_','.'),type='CC',interval='1 DAY',returndays=True)
+                        updated_days = updated_days_for_dates(db,start,end,pair.replace('_','.'),type='CC',interval=datetime.timedelta(days=1),returndays=True)
                         if nstack > 0:
                             if stype == "mov":
                                 for i, date in enumerate(datelist):
@@ -82,7 +83,6 @@ def stack(stype='day'):
                                                 break
                                         if newdata:
                                             corr = stack_total[low:high]
-                                                
                                             if not np.all(np.isnan(corr)):
                                                 day_name = "%s_%s"%(sta1,sta2)
                                                 logging.debug("%s %s [%s - %s] (%i day stack)" % (day_name, date, datelist[low],datelist[i],mov_stack))
@@ -96,7 +96,7 @@ def stack(stype='day'):
                                                     export_sac(db,filename,pair,components,filterid,corr)
                                                 day_name = "%s:%s"%(sta1,sta2)
                                                 if not jobadded:
-                                                    add_job(db,date,day_name.replace('_','.'),'DTT')
+                                                    update_job(db,date,day_name.replace('_','.'),'DTT','T')
                                                     jobadded= True
                                             del corr
                             
@@ -111,7 +111,7 @@ def stack(stype='day'):
                                 if sac:
                                     export_sac(db,filename,pair,components,filterid,stack_total)
                                 ref_name = "%s:%s"%(sta1,sta2)
-                                add_job(db,"REF",ref_name.replace('_','.'),'DTT')
+                                update_job(db,"REF",ref_name.replace('_','.'),'DTT','T')
                                 del stack_total
                     elif stype == 'day':
                         updated_days = updated_days_for_dates(db,start,end,pair.replace('_','.'),type='CC',interval='1 DAY',returndays=True)
