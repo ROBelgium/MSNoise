@@ -47,15 +47,14 @@ def worker(s, pool):
                 for gap in gaps:
                     gaps_duration += gap[6]
                 data_duration = 0
-                start  = 1e20
-                stop = 0
-
+                start  = datetime.datetime.strptime('2100-01-01','%Y-%m-%d')
+                stop = datetime.datetime.strptime('1900-01-01','%Y-%m-%d')
                 for trace in data:
                     data_duration += trace.stats.delta * trace.stats.npts
-                    if trace.stats.starttime.timestamp < start:
+                    if trace.stats.starttime.datetime < start:
                         starttime = trace.stats.starttime
                         start = trace.stats.starttime.datetime
-                    if trace.stats.endtime.timestamp > stop:
+                    if trace.stats.endtime.datetime > stop:
                         endtime = trace.stats.endtime
                         stop = trace.stats.endtime.datetime
                 
