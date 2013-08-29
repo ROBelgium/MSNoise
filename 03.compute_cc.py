@@ -6,7 +6,6 @@ from scikits.samplerate import resample
 import time, calendar, datetime
 import sys, os
 import scipy.fftpack
-
 from database_tools import *
 from myCorr import myCorr
 from whiten import whiten
@@ -295,9 +294,14 @@ while is_next_job(db,type='CC'):
                     high = float(filterdb.high)
                     rms_threshold = filterdb.rms_threshold
                     # print "Filter Bounds used:", filterid, low, high
+                    # Npts = min30
+                    # Nc = 2* Npts - 1
+                    # Nfft = 2**nextpow2(Nc)
+                    
                     Nfft = min30
-                    if Nfft / 2 %2 != 0:
-                        Nfft+=2
+                    if min30/2 %2 != 0:
+                        Nfft = min30+2
+                    
                     trames2hWb= np.zeros((2,Nfft),dtype=np.complex)
                     for i, station in enumerate(pair):
                         # print "USING rms threshold = %f" % rms_threshold
@@ -338,7 +342,7 @@ while is_next_job(db,type='CC'):
                         if ncorr > 0:
                             logging.debug("Saving daily CCF for filter %02i (stack of %02i CCF)"%(filterid,ncorr))
                             
-                            corr /= ncorr
+                            # corr /= ncorr
                             thisdate = time.strftime("%Y-%m-%d",time.gmtime(basetime)) 
                             thistime = time.strftime("%H_%M",time.gmtime(basetime))
                             add_corr(db, station1.replace('.','_'), station2.replace('.','_'),filterid, thisdate, thistime, min30/fe, components, corr, fe, day=True,ncorr=ncorr)
@@ -346,7 +350,7 @@ while is_next_job(db,type='CC'):
                 except Exception as e:
                     logging.debug(str(e))
             del trames, daycorr, ndaycorr
-                    
+        logging.debug("Updating Job")
         update_job(db, goal_day, orig_pair,'CC','D')
         
         logging.debug("Finished processing this pair. It took %.2f seconds"%(time.time()-tt))

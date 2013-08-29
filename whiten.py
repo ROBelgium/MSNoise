@@ -2,9 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.fftpack
 
+# from tempfile import mkdtemp
+# cachedir = mkdtemp()
+# from joblib import Memory
+# memory = Memory(cachedir=cachedir, verbose=0)
+
 def nextpow2(x):
     return np.ceil(np.log2(np.abs(x)))
 
+# @memory.cache
 def whiten(matsign, Nfft, tau, frebas, frehaut,plot=False,tmp=False):
     
     # if len(matsign)/2 %2 != 0:
@@ -97,5 +103,9 @@ if __name__ == '__main__':
     a = np.sin(a) + np.sin(a/4.) + np.sin(a/16.)
     
     t = time.time()
-    whiten(a, N, 0.05, 1.0, 5.9, plot=True)
+    whiten(a, N, 0.05, 1.0, 5.9, plot=False)
+    print time.time()-t
+    
+    t = time.time()
+    whiten(a, N, 0.05, 1.0, 5.9, plot=False)
     print time.time()-t

@@ -31,6 +31,8 @@ days = {}
 old_day = 0
 old_pair = ""
 day_pairs = []
+jobs = []
+i =0
 for nf in nfs:
     # logging.debug('%s.%s will be MASTER for %s-%s'% (nf.net, nf.sta, nf.starttime, nf.endtime))
     if nf.sta in stations_to_analyse:
@@ -39,7 +41,8 @@ for nf in nfs:
             day_pairs = np.unique(day_pairs)
             for pair in day_pairs:
                 logging.debug('New Job for: %s - %s'%(day,pair))
-                update_job(db, day, pair,type='CC',flag='T')
+                # add_job(db, day, pair,type='CC',flag='T',commit=False)
+                jobs.append([day,pair,'CC','T'])
             day_pairs = []
             old_day = day
         
@@ -73,8 +76,26 @@ if day_pairs != []:
     day_pairs = np.unique(day_pairs)
     for pair in day_pairs:
         logging.debug('New Job for: %s - %s'%(day,pair))
-        update_job(db, day, pair,type='CC',flag='T')
+        # add_job(db, day, pair,type='CC',flag='T')
+        jobs.append([day,pair,'CC','T'])
 
+count = len(jobs)
+logging.debug("Found %i new jobs to do"%count)
+alljobs = []
+for job in jobs:
+    day, pair,type,flag=job
+    job = update_job(db, day, pair,type,flag,commit=False,returnjob=True)
+    alljobs.append(job)
+    if i % 100 == 0:
+        logging.debug("Committing 100 jobs")
+        db.add_all(alljobs)
+        db.commit()
+        alljobs=[]
+    i+=1
+if len(alljobs) != 0:
+    db.add_all(alljobs)
+    db.commit()
+ 
 # update all _data_availability and mark files as "A"rchives
 for sta in get_stations(db,all=True):
     mark_data_availability(db,sta.net,sta.sta, flag='A')

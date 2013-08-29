@@ -114,14 +114,22 @@ def update_data_availability(session, net, sta, comp, path, file, starttime, end
         session.add(data)
         toreturn = True
     else:
-        data.net = net
-        data.sta = sta
-        data.comp = comp
-        data.path = path
-        data.starttime = starttime
-        data.data_duration = data_duration
-        data.gaps_duration = gaps_duration
-        data.samplerate = samplerate
+        modified = False
+        for item in ['net','sta','comp','path','starttime','data_duration','gaps_duration','samplerate']:
+            if eval("data.%s != %s"%(item,item)):
+                modified = True
+                break
+        if modified:
+            data.net = net
+            data.sta = sta
+            data.comp = comp
+            data.path = path
+            data.starttime = starttime
+            data.data_duration = data_duration
+            data.gaps_duration = gaps_duration
+            data.samplerate = samplerate
+            data.flag="M"
+        
         toreturn = False
     session.commit()
     return toreturn
@@ -151,7 +159,7 @@ def update_job(session,day,pair,type,flag,commit=True,returnjob=True):
     job = session.query(Job).filter(Job.day==day).filter(Job.pair==pair).filter(Job.type==type).first()
     if job is None:
         job = Job(day,pair,type,'T')
-        if not returnjob:
+        if commit:
             session.add(job)
     else:
         job.flag = flag

@@ -102,7 +102,17 @@ if __name__ == "__main__":
             init = True
     else:
         mtime = "%s"%mtime
-
+    
+    if len(sys.argv) >= 2:
+        try:
+            nthreads = int(sys.argv[2])
+        except:
+            nthreads=1
+    else:
+        nthreads = 1
+    print "will work on %i threads"%nthreads
+    
+    
     if os.name == "nt":
         find = "gnufind"
     else:
@@ -126,7 +136,7 @@ if __name__ == "__main__":
                 folders_to_glob.append(os.path.join( data_folder, tmp))
     
     pool = ActivePool()
-    s = threading.Semaphore(5)
+    s = threading.Semaphore(nthreads)
     for fi in sorted(folders_to_glob):
         folders = glob.glob(fi)
         for folder in sorted(folders):
