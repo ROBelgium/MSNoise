@@ -194,7 +194,7 @@ def is_dtt_next_job(session, flag = 'T',type='DTT',ref=False):
         return True
 
 def get_dtt_next_job(session, flag = 'T',type='DTT'):
-    pair = session.query(Job).filter(Job.flag==flag).filter(Job.type==type).first().pair
+    pair = session.query(Job).filter(Job.flag==flag).filter(Job.type==type).filter(Job.day!='REF').first().pair
     jobs = session.query(Job).filter(Job.flag==flag).filter(Job.type==type).filter(Job.day!='REF').filter(Job.pair==pair).all()
     refs = [job.ref for job in jobs]
     days = [job.day for job in jobs]
