@@ -1,5 +1,5 @@
 __author__ = "Thomas LECOCQ, Corentin CAUDRON and Florent BRENGUIER"
-__copyright__ = "Copyright 2013, The Authros"
+__copyright__ = "Copyright 2013, The Authors"
 __credits__ = []
 __license__ = "GPL"
 __version__ = "1.0.1"
