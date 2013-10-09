@@ -1,0 +1,26 @@
+{# Import the theme's layout. #}
+{% extends "!layout.html" %}
+
+{# Include our new CSS file into existing ones. #}
+{% set css_files = css_files + ['_static/msnoise.css']%}
+
+{# Add some extra stuff before and use existing with 'super()' call. #}
+{% block footer %}
+<hr>
+<div id="centerer">
+    <b>MSNoise is a project of</b>
+    <div id="clear"></div>
+    <div id="half_footer">
+        <img src='_static/ORB_logo.png'><br>Dr. Thomas Lecocq &amp; Dr. Corentin Caudron<br>
+        <a target="_blank"  href="http://www.seismology.be">Seismology.be</a><br>
+        Avenue Circulaire, 3<br>
+        B1180 Uccle (Brussels)<br>
+        Belgium
+    </div>
+    <div id="half_footer">
+        <img src='_static/isterre.png'><img src='_static/ipgp.png'><br>Dr. Florent Brenguier
+    </div>
+</div>
+<div id="clear"></div>
+  {{ super() }}
+{% endblock %}

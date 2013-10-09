@@ -1,0 +1,17 @@
+#centerer{
+    max-width:800px;
+    margin:auto;
+    text-align: center;
+}
+
+#half_footer{
+    width:50%;
+    float:left;
+    padding-bottom:40px;
+    text-align: center;
+    display: table-cell;
+}
+
+#clear {
+    clear:both;
+}
