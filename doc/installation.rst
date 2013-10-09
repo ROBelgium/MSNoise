@@ -146,7 +146,7 @@ This will also install apach2 and php, needed to run phpmyadmin. Once installed,
 
 
 Database Structure - Tables
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. warning:: In the sqlvolution branch, those tables are created on the fly !
 
 MSNoise will create the tables automatically upon running the installer script. If you prefer asking your network manager to install it, provide him the following SQL:
@@ -165,7 +165,7 @@ One has to install gnufind in order to be able to search for recently modified f
     link here
 
 MySQL  Apache  PhpMyAdmin
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The simplest option to install a MySQL server on your machine is to install EasyPHP, a small AMP (Apache, MySQL, PHP) server.
 
@@ -178,3 +178,22 @@ version provides the fantastic notebook, which will allow you to test the differ
 functions/calls of MSNoise interactively.
 
 
+Building this documentation
+-----------------------------
+
+To build this documentation, some modules are required:
+
+.. code-block:: sh
+
+    easy_install sphinx
+    easy_install sphinx_bootstrap_theme
+    
+Then, this should simply work:
+
+.. code-block:: sh
+
+    make html
+    
+it will create a .build folder containing the documentation.
+
+You can also build the doc to Latex and then use your favorite Latex-to-PDF tool.

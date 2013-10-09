@@ -1,5 +1,5 @@
 Core Functions
-==========
+===============
 
 .. module:: MSNoise
 
