@@ -54,6 +54,14 @@ is a table, with one row for each station pair.
     ...
     2013-01-06,-0.00225882255299991,0.00371411997707409,0.00010340935420880,9.19916693442618e-05, 0.0007363569140943659, 0.000762389133912101,ALL
 
+
+To run this script:
+
+.. code-block:: sh
+
+    python s06compute_dtt.py 
+
+
 Grouping Station Pairs
 ~~~~~~~~~~~~~~~~~~~~~~~
 Although not clearly visible on the figure above, the very last row of the

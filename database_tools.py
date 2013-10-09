@@ -1,6 +1,7 @@
 # queries.py
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 import numpy as np
 import datetime
 import itertools
@@ -13,7 +14,7 @@ from msnoise_table_def import *
 
 
 def connect():
-    engine = create_engine('sqlite:///msnoise.sqlite', echo=False)
+    engine = create_engine('sqlite:///msnoise.sqlite', echo=False,poolclass=NullPool)
     Session = sessionmaker(bind=engine)
     return Session()
 
@@ -48,7 +49,7 @@ def get_filters(session, all=False):
     if all:
         filters = session.query(Filter).all()
     else:
-        filters = session.query(Filter).filter(Filter.used is True).all()
+        filters = session.query(Filter).filter(Filter.used == True).all()
     return filters
 
 
@@ -77,7 +78,7 @@ def get_networks(session, all=False):
     if all:
         networks = session.query(Station).group_by(Station.net).all()
     else:
-        networks = session.query(Station).filter(Station.used is True).group_by(Station.net)
+        networks = session.query(Station).filter(Station.used == True).group_by(Station.net)
     return [net.net for net in networks]
 
 
@@ -88,7 +89,7 @@ def get_stations(session, all=False, net=None):
         else:
             stations = session.query(Station).all()
     else:
-        stations = session.query(Station).filter(Station.used is True)
+        stations = session.query(Station).filter(Station.used == True)
         if net is not None:
             stations = stations.filter(Station.net == net)
     return stations
