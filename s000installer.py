@@ -21,7 +21,7 @@ To run this script:
 
 .. code-block:: sh
 
-    python s03compute_cc.py
+    python s001installer.py
 
 """
 from sqlalchemy import create_engine

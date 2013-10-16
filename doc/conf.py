@@ -20,6 +20,18 @@ import sphinx_bootstrap_theme
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath('../../'))
+import MSNoise.myCorr
+import MSNoise.whiten
+import MSNoise.MWCS
+import MSNoise.s000installer
+import MSNoise.s001configurator
+import MSNoise.s002populate_station_table
+import MSNoise.s01scan_archive
+import MSNoise.s02new_jobs
+import MSNoise.s03compute_cc
+import MSNoise.s04stack
+import MSNoise.s05compute_mwcs
+import MSNoise.s06compute_dtt
 
 from MSNoise.default import default
 
