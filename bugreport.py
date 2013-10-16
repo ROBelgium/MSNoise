@@ -5,25 +5,28 @@ def ispresent(module):
     try:
         mod = __import__(module)
         if hasattr(mod, '__version__'):
-            print "ok",
-        try:
             print "[X] %s: %s"%(module,mod.__version__)
-        except:
+        else:
             print "[X] %s: present (no version)"%module
     except:
         print "[ ] %s: not found"%module
 
-import os
+import os, platform
+import sys
 
 if __name__ == "__main__":
 
     print "************* Computer Report *************"
     
     print 
-    print "----------------+PYTHON+-------------------"
-    import sys
-    print "Python",sys.version, "on",  sys.platform
+    print "----------------+SYSTEM+-------------------"
+    print "\n".join(platform.uname())
+    if platform.system() == "Linux":
+        print " - ".join(platform.linux_distribution())
     print 
+    print "----------------+PYTHON+-------------------"
+    print "Python:",sys.version
+    print
     print "---------------+MODULES+-------------------"
     ispresent('numpy')
     ispresent('scipy')
@@ -36,15 +39,11 @@ if __name__ == "__main__":
     ispresent('enable')
     ispresent('scikits.samplerate')
     ispresent('obspy')
-    
     ispresent('setuptools')
     ispresent('jinja2')
     ispresent('sphinx')
     ispresent('reportlab')
     ispresent('configobj')
-    ispresent('MySQLdb')
-    ispresent('PIL')
-    ispresent('py2exe')
     ispresent('pkg_resources')
     ispresent('paramiko')
     ispresent('ctypes')
@@ -53,10 +52,11 @@ if __name__ == "__main__":
     ispresent('IPython')
     ispresent('vtk')
     ispresent('wx')
-    ispresent('PyQt4')    
+    ispresent('PyQt4')
+    ispresent('PySide')
     
     print
-    print "------------------+SYS+--------------------"
+    print "------------------+ENV+--------------------"
     
     
     for key in os.environ.keys():
