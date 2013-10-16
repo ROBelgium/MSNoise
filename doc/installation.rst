@@ -65,7 +65,7 @@ Fast way
 
 Done !
 
-....
+
 
 Python Installation
 -------------------
@@ -207,10 +207,7 @@ Database Structure - Tables
 MSNoise will create the tables automatically upon running the installer script.
 
 
-Find command for Windows
--------------------------
 
-One has to install gnufind_ in order to be able to search for recently modified files in the data archive.
 
 
 Testing the Dependencies

@@ -15,3 +15,9 @@
 #clear {
     clear:both;
 }
+
+h2 {
+    border-top: solid 1px silver;
+    margin-top: 20px;
+    padding-top: 10px;
+}
