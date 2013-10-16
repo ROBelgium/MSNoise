@@ -30,38 +30,67 @@ To run MSNoise, you need:
 *   The `find` command: present by default on linux and available with gnufind_ on Windows.
 
 
-Fast way
----------
+Quick Start - Windows
+----------------------
 
 1. Download and install Anaconda_ for your machine, make sure Anaconda's Python is the default python for your user
-2. Execute the following command:
+
+2. Download MSNoise from `GitHub <https://github.com/ROBelgium/MSNoise>`_.
+
+3. Check which required packages you are still missing by executing the *bugreport.py* script. (See :ref:`testing`)
+
+4. Execute the following command to install the missing packages:
    
    .. code-block:: sh
     
         easy_install traitsui traits obspy
+   
+5. Download and install scikits.samplerate from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate
+
+6. Install a MySQL server: download and install EasyPHP_ (their "Dev" version is OK).
+
+7. Create a privileged user and a database:
+      
+   TODO
+
+8. Install gnufind_ and make sure its /bin directory is in the PATH (Control Panel -> Environment Variables -> PATH)
+
+9. Proceed to the :ref:`Workflow` description to start MSNoise!
+
+Done !
+
+
+Quick Start - Linux
+-------------------
+
+1. Download and install Anaconda_ for your machine, make sure Anaconda's Python is the default python for your user
+
+2. Download MSNoise from `GitHub <https://github.com/ROBelgium/MSNoise>`_.
+
+3. Check which required packages you are still missing by executing the *bugreport.py* script. (See :ref:`testing`)
+
+4. Execute the following commands to install the missing packages:
+   
+   .. code-block:: sh
+    
+        easy_install traitsui traits obspy
+ 
+   .. code-block:: sh
+        
+        sudo apt-get install libsamplerate0 libsamplerate0-dev
         easy_install scikits.samplerate
 
-   Note: on Windows the latter will probably not work! See :ref:`samplerate`.
-
-3. Install a MySQL server:
+5. Install a MySQL server:
    
-   a) Linux:
-      
-      .. code-block:: sh
-        
-            sudo apt-get install mysql-server mysql-client
+   .. code-block:: sh
+    
+        sudo apt-get install mysql-server mysql-client
    
-   b) Windows: Install EasyPHP_.
-
-   c) Create a privileged user and a database:
+6. Create a privileged user and a database:
       
-      TODO
+   TODO
 
-4. Windows-only: install gnufind_ and make sure its /bin directory is in the PATH (Control Panel -> Environment Variables -> PATH)
-
-5. Download MSNoise from `GitHub <https://github.com/ROBelgium/MSNoise>`_.
-
-6. Proceed to the :ref:`Workflow` description to start MSNoise!
+7. Proceed to the :ref:`Workflow` description to start MSNoise!
 
 Done !
 
@@ -205,9 +234,6 @@ This will also install apache2 and php, needed to run phpmyadmin. Once installed
 Database Structure - Tables
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 MSNoise will create the tables automatically upon running the installer script (see :ref:`Workflow`).
-
-
-
 
 
 Building this documentation
