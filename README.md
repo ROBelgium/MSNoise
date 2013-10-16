@@ -8,10 +8,16 @@ MSNoise is a fully-integrated solution that automatically scans data archives an
 
 MSNoise is a joint project of the Royal Observatory of Belgium (Thomas Lecocq and Corentin Caudron) and ISTerre + IPGP (Florent Brenguier)
 
-
 Documentation
 ---------------
 Currently, the full documentation can be found on: http://www.msnoise.org.
+
+
+Getting Help
+-------------
+The best way to get help is to subscribe to the Mailing List and ask your question directly there. It is available on 
+http://mailman-as.oma.be/mailman/listinfo/msnoise and the archive is either http://mailman-as.oma.be/pipermail/msnoise/ or 
+on http://news.gmane.org/gmane.science.geophysics.msnoise for a nice view.
 
 
 

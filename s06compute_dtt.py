@@ -113,7 +113,7 @@ formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 console.setFormatter(formatter)
 logging.getLogger('').addHandler(console)
 
-logging.info('*** Starting: Compute DT/T ***')
+
 
 
 def wavg_wstd(data, errors):
@@ -127,7 +127,8 @@ def wavg_wstd(data, errors):
 
 
 if __name__ == "__main__":
-
+    
+    logging.info('*** Starting: Compute DT/T ***')
     db = connect()
     
     # PLOT= True
