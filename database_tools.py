@@ -5,7 +5,7 @@ from sqlalchemy.pool import NullPool
 import numpy as np
 import datetime
 import itertools
-
+import cPickle
 from obspy.core import Stream, Trace, read
 from obspy.sac import SacIO
 import os
@@ -14,11 +14,27 @@ from msnoise_table_def import *
 
 
 def connect():
-    engine = create_engine('sqlite:///msnoise.sqlite', echo=False,poolclass=NullPool)
+    tech, hostname, database, username, password = read_database_inifile()
+    if tech == 1:
+        engine = create_engine('sqlite:///%s'%hostname, echo=False)
+    else:
+        engine = create_engine('mysql://%s:%s@%s/%s'%(username, password,
+                                                      hostname, database),
+                                                      echo=False, poolclass=NullPool)
     Session = sessionmaker(bind=engine)
     return Session()
 
 
+def create_database_inifile(tech, hostname ,database, username, password):
+    f = open('db.ini','w')
+    cPickle.dump([tech, hostname, database, username, password],f)
+    f.close()
+
+def read_database_inifile():
+    f = open('db.ini','r')
+    tech, hostname, database, username, password = cPickle.load(f)
+    f.close()
+    return [tech, hostname, database, username, password]
 ############ CONFIG ############
 
 
@@ -153,14 +169,14 @@ def update_data_availability(session, net, sta, comp, path, file, starttime, end
 
 
 def get_new_files(session):
-    files = session.query(DataAvailability).filter(DataAvailability.flag != 'A')
+    files = session.query(DataAvailability).filter(DataAvailability.flag != 'A').order_by(DataAvailability.starttime).all()
     return files
 
 def get_data_availability(session, net=None, sta=None, comp=None, starttime=None, endtime=None):
     if not starttime:
         data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(DataAvailability.comp == comp).all()
     if not net:
-        data = session.query(DataAvailability).filter(DataAvailability.starttime <= starttime).filter(DataAvailability.endtime >= endtime).all()
+        data = session.query(DataAvailability).filter(func.DATE(DataAvailability.starttime) <= starttime.date()).filter(func.DATE(DataAvailability.endtime) >= endtime.date()).all()
     else:
         data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(func.DATE(DataAvailability.starttime) <= starttime.date()).filter(func.DATE(DataAvailability.endtime) >= endtime.date()).all()
     return data
@@ -199,7 +215,7 @@ def is_next_job(session, flag='T', type='CC'):
 
 
 def get_next_job(session, flag='T', type='CC'):
-    day = session.query(Job).filter(Job.type == type).filter(Job.flag == flag).first().day
+    day = session.query(Job).filter(Job.type == type).filter(Job.flag == flag).order_by(Job.day).first().day
     # print day
     jobs = session.query(Job).filter(Job.type == type).filter(Job.flag == flag).filter(Job.day == day).all()
     return jobs

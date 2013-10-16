@@ -1,11 +1,28 @@
-"""This is the most important tool of the whole package. Configurator is a GUI that helps the user define the configuration for all the processing steps, plus configure the stations and filters to be used in the processes.
-
+"""This is the most important tool of the whole package. Configurator is a GUI
+that helps the user define the configuration for all the processing steps, plus
+configure the stations and filters to be used in the processes.
+The GUI presents a tree-like structure which contains three main items: the
+global MSNoise config, the Networks/Stations config and the Filters config.
 
 .. image:: .static/configurator1.png
 
-The GUI presents a tree-like structure which contains three main items: the global MSNoise config, the Networks/Stations config and the Filters config:
+
+Default Global Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. include:: defaults.rst
+
+
+Network-Station Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. note:: TODO: describe
+
+Filter Parameters
+~~~~~~~~~~~~~~~~~
+
+.. note:: TODO: describe
+
 """
 
 from traits.api import HasTraits, Str, List, Instance, Float, CInt, CBool, Enum

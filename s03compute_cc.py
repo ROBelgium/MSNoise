@@ -50,7 +50,7 @@ corresponding to ``maxlag`` in the acausal (negative lags) and causal
 (positive lags) parts.
 
 If configured (setting ``keep_all`` to 'Y'), each ``corr_duration`` CCF is
-saved to the hard disk. By default, the ``keep_day`` setting is set to True
+saved to the hard disk. By default, the ``keep_days`` setting is set to True
 and so "N = 1 day / corr_duration" CCF are stacked and saved to the hard disk
 in the STACKS/001_DAYS folder.
 
