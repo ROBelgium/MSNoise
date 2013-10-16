@@ -5,7 +5,7 @@
 
 The GUI presents a tree-like structure which contains three main items: the global MSNoise config, the Networks/Stations config and the Filters config:
 
-.. note :: prepare table of parameters + explanation
+.. include:: defaults.rst
 """
 
 from traits.api import HasTraits, Str, List, Instance, Float, CInt, CBool, Enum

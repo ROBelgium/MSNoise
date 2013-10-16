@@ -32,6 +32,23 @@ import MSNoise.s04stack
 import MSNoise.s05compute_mwcs
 import MSNoise.s06compute_dtt
 
+from MSNoise.default import default
+
+grid = [ [key, default[key][0], default[key][1]] for key in default.keys() ]
+
+numcolumns = len(grid[0])
+colsizes = [max(len(r[i]) for r in grid) for i in range(numcolumns)]
+formatter = ' '.join('{:<%d}' % c for c in colsizes)
+rowsformatted = [formatter.format(*row) for row in grid]
+headformatted = formatter.format(*['Parameter Name', 'Description', 'Default Value'])
+header = formatter.format(*['=' * c for c in colsizes])
+
+output = header +'\n' + headformatted +'\n' + header + '\n' + '\n'.join(rowsformatted) + '\n' + header
+
+f = open('defaults.rst','w')
+f.write(output)
+f.close()
+
 # -- General configuration -----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
