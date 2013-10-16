@@ -16,7 +16,7 @@ This section only presents the "installation" and configuration of MSNoise (read
 Installer
 ----------
 
-.. note:: TODO
+.. automodule:: MSNoise.s000installer
 
 ....
 
