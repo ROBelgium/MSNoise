@@ -86,7 +86,7 @@ if __name__ == "__main__":
             for pair in pairs:
                 day_pairs.append(pair)
     
-    if day_pairs != []:
+    if day != old_day and day_pairs != []:
         day_pairs = np.unique(day_pairs)
         for pair in day_pairs:
             logging.debug('New Job for: %s - %s' % (day, pair))
