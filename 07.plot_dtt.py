@@ -1,6 +1,6 @@
 # PARAMETERS FOR MATPLOTLIB :
 import matplotlib as mpl
-mpl.use('Agg')
+mpl.use('WxAgg')
 mpl.rcParams['axes.labelsize'] = 14.
 
 import pandas as pd
@@ -120,17 +120,17 @@ for i, mov_stack in enumerate(mov_stacks):
         data = detrend(py1_wmean)
 
         plt.subplot(gs[i])
-        plt.plot(alldf.index, alldf['M0'])
-        # plt.plot(ALL.index, ALL[dttname],c='r',label='ALL: $\delta v/v$ of the mean network')
+        # plt.plot(ALL.index, ALL['M0'])
+        plt.plot(ALL.index, ALL[dttname],c='r',label='ALL: $\delta v/v$ of the mean network')
         # ALL.to_csv('all.txt')
         # foruv01 = alldf[alldf['Pairs'] == "YA_FOR_YA_UV05"]
         # plt.plot(foruv01.index, foruv01['M'],c='b',label='foruv11')
-        # plt.fill_between(ALL.index,ALL[dttname]-ALL[errname],ALL[dttname]+ALL[errname],lw=1,color='red',zorder=-1,alpha=0.3)
-        # plt.plot(py1_wmean.index, data,c='g',lw=1,zorder=11,label='Weighted mean of $\delta v/v$ of individual pairs')
-        # plt.fill_between(py1_wmean.index, data+py1_wstd,data-py1_wstd,color='g',lw=1,zorder=-1,alpha=0.3)
+        plt.fill_between(ALL.index,ALL[dttname]-ALL[errname],ALL[dttname]+ALL[errname],lw=1,color='red',zorder=-1,alpha=0.3)
+        plt.plot(py1_wmean.index, data,c='g',lw=1,zorder=11,label='Weighted mean of $\delta v/v$ of individual pairs')
+        plt.fill_between(py1_wmean.index, data+py1_wstd,data-py1_wstd,color='g',lw=1,zorder=-1,alpha=0.3)
         plt.ylabel('$\delta v/v$ in %')
 
-        plt.ylim(0.2, -0.2)
+        plt.ylim(0.5, -0.5)
         # eruptions()
 
         if mov_stack == 1:
@@ -146,4 +146,4 @@ for i, mov_stack in enumerate(mov_stacks):
         del alldf
 
 plt.savefig('dtt_allmovstacksNEW_%s.png' % dttname, dpi=300)
-# plt.show()
+plt.show()

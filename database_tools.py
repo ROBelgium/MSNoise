@@ -243,7 +243,7 @@ def get_dtt_next_job(session, flag='T', type='DTT'):
     return pair, days, refs
     
 def reset_dtt_jobs(session, pair):
-    jobs = session.query(Job).filter(Job.pair == pair).all()
+    jobs = session.query(Job).filter(Job.pair == pair).filter(Job.type == "DTT").all()
     for job in jobs:
         job.flag = "T"
     session.commit()
