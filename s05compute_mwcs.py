@@ -86,7 +86,7 @@ if __name__ == "__main__":
         sta1 = "%s.%s" % (station1.net, station1.sta)
         sta2 = "%s.%s" % (station2.net, station2.sta)
         pair = "%s:%s" % (sta1, sta2)
-        if is_dtt_next_job(db, pair, type='DTT', ref=True):
+        if is_dtt_next_job(db, type='DTT', ref=pair):
             logging.info(
                 "We will recompute all MWCS based on the new REF for %s" % pair)
             reset_dtt_jobs(db, pair)

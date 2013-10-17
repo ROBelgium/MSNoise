@@ -223,7 +223,7 @@ def get_next_job(session, flag='T', type='CC'):
 
 def is_dtt_next_job(session, flag='T', type='DTT', ref=False):
     if ref:
-        job = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day == 'REF').first()
+        job = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.pair == ref).filter(Job.day == 'REF').first()
     else:
         job = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').first()
     if job is None:
@@ -242,7 +242,11 @@ def get_dtt_next_job(session, flag='T', type='DTT'):
     session.commit()
     return pair, days, refs
     
-
+def reset_dtt_jobs(session, pair):
+    jobs = session.query(Job).filter(Job.pair == pair).all()
+    for job in jobs:
+        job.flag = "T"
+    session.commit()
 
 ############ CORRELATIONS ############
 
