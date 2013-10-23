@@ -106,7 +106,10 @@ def stack(stype, interval=1):
     elif export_format == "MSEED":
         mseed = True
         sac = False
-
+    
+    maxlag = float(get_config(db, "maxlag"))
+    cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
+    
     if stype == "day":
         start, end, datelist = build_daystack_datelist(db)
         format = "stack"
@@ -131,13 +134,14 @@ def stack(stype, interval=1):
                 sta1 = "%s_%s" % (station1.net, station1.sta)
                 sta2 = "%s_%s" % (station2.net, station2.sta)
                 pair = "%s:%s" % (sta1, sta2)
-                if updated_days_for_dates(db, start, end, pair.replace('_', '.'), type='CC', interval=datetime.timedelta(days=interval)):
+                logging.debug('Processing %s-%s-%i' %
+                                  (pair, components, filterid))
+                updated_days = updated_days_for_dates(db, start, end, pair.replace('_', '.'), type='CC', interval=datetime.timedelta(days=interval),returndays=True)
+                if len(updated_days) != 0:
                     logging.debug("New Data for %s-%s-%i" %
                                   (pair, components, filterid))
                     nstack, stack_total = get_results(
                         db, sta1, sta2, filterid, components, datelist, format=format)
-                    updated_days = updated_days_for_dates(db, start, end, pair.replace(
-                        '_', '.'), type='CC', interval=datetime.timedelta(days=interval), returndays=True)
                     if nstack > 0:
                         if stype == "mov":
                             for i, date in enumerate(datelist):
@@ -150,8 +154,8 @@ def stack(stype, interval=1):
                                         low = i - mov_stack + 1
                                         high = i + 1
                                     newdata = False
-                                    for uday in updated_days:
-                                        if uday in datelist[low:high]:
+                                    for uday in datelist[low:high]:
+                                        if uday in updated_days:
                                             newdata = True
                                             break
                                     if newdata:
@@ -170,10 +174,10 @@ def stack(stype, interval=1):
                                                 stack_path, str(date))
                                             if mseed:
                                                 export_mseed(
-                                                    db, filename, pair, components, filterid, corr)
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
                                             if sac:
                                                 export_sac(
-                                                    db, filename, pair, components, filterid, corr)
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
                                             if not jobadded:

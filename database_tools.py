@@ -9,7 +9,7 @@ import cPickle
 from obspy.core import Stream, Trace, read
 from obspy.sac import SacIO
 import os
-
+import logging
 from msnoise_table_def import *
 
 
@@ -323,14 +323,17 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0, sac_form
     return
 
 
-def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0):
+def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0, maxlag=None, cc_sampling_rate=None):
     try:
         os.makedirs(os.path.split(filename)[0])
     except:
         pass
     filename += ".MSEED"
-    maxlag = float(get_config(db, "maxlag"))
-    cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
+    
+    if maxlag is None:
+        maxlag = float(get_config(db, "maxlag"))
+    if cc_sampling_rate is None:
+        cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
 
     mytrace = Trace(data=corr)
     mytrace.stats['station'] = pair[:11]
@@ -445,9 +448,12 @@ def build_daystack_datelist(session):
 
 def updated_days_for_dates(session, date1, date2, pair, type='CC', interval=datetime.timedelta(days=1), returndays=False):
     lastmod = datetime.datetime.now() - interval
-    days = session.query(Job).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.type == type).filter(Job.lastmod >= lastmod).all()
-    if returndays:
+    days = session.query(Job).filter(Job.pair == pair).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.type == type).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
+    logging.debug('Found %03i updated days' % len(days))
+    if returndays and len(days) != 0:
         return [datetime.datetime.strptime(day.day,'%Y-%m-%d').date() for day in days] ## RETURN DATE LIST !!!
+    elif returndays and len(days) == 0:
+        return []
     else:
         return True
 
