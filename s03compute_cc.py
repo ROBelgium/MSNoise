@@ -125,7 +125,11 @@ if __name__ == "__main__":
     keep_days = False
     if get_config(db, 'keep_days') in ['Y', 'y', '1', 1]:
         keep_days = True
-    
+     
+    correct_paz = False
+    if get_config(db, 'PAZ') in ['Y','y','1',1]:
+        correct_paz = True
+      
     # Process !
     while is_next_job(db, type='CC'):
         jobs = get_next_job(db, type='CC')
@@ -223,6 +227,18 @@ if __name__ == "__main__":
                     stream[0].trim(utcdatetime.UTCDateTime(goal_day.replace('-', '')), utcdatetime.UTCDateTime(
                         goal_day.replace('-', '')) + goal_duration - stream[0].stats.delta, pad=True, fill_value=0.0)
                     trace = stream[0]
+    
+                    # Paz correction based on file.paz (IRIS type)
+                    # Correct instrumental responce
+                    # All paz files must be in the 'paz' folder and renamed as instruement.paz (same instrument as set in the db)
+                    if correct_paz:
+                        try:
+                            logging.debug("%s.%s Removing instrumental responce" % (station, comp))
+                            poles, zeros, gain, sensitivity = read_paz('paz/%s.paz'%get_station(db, net, sta).instrument)
+                            paz = { 'poles' : poles, 'zeros': zeros, 'gain' : gain, 'sensitivity' : sensitivity }
+                            trace.simulate(paz_remove=paz)  
+                        except Exception as e:
+                            print "Error while removing instrumental responce : %s"% e
     
                     data = trace.data
                     freq = preprocess_lowpass
