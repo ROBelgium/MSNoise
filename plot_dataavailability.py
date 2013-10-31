@@ -15,7 +15,10 @@ for day in datelist:
     # print day
     data = get_data_availability(db,starttime=day, endtime=day)
     for di in data:
-        net, sta, comp, starttime, endtime, data_duration, gaps_duration, samplerate, flag = di
+        net=di.net; sta=di.sta; comp=di.comp;starttime=di.starttime;endtime=di.endtime 
+        data_duration=di.data_duration; gaps_duartion=di.gaps_duration 
+        samplerate=di.samplerate; flaf=di.flag
+        #net, sta, comp, starttime, endtime, data_duration, gaps_duration, samplerate, flag = di
         stations.append("%s.%s"%(net,sta))
         dates.append(starttime)
 
