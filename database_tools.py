@@ -354,6 +354,7 @@ def get_results(session, station1, station2, filterid, components, dates, format
         i = 0
         for date in dates:
             daystack = os.path.join("STACKS", "%02i" % filterid, "001_DAYS", components, "%s_%s"%(station1, station2), str(date))
+            # logging.debug('reading: %s' % daystack)
             if export_format == "BOTH":
                 daystack += ".MSEED"
             elif export_format == "SAC":
@@ -378,6 +379,7 @@ def get_results(session, station1, station2, filterid, components, dates, format
         i = 0
         for j, date in enumerate(dates):
             daystack = os.path.join("STACKS", "%02i"%filterid, "001_DAYS", components, "%s_%s"%(station1, station2), str(date))
+            # logging.debug('reading: %s' % daystack)
             if export_format == "BOTH":
                 daystack += ".MSEED"
             elif export_format == "SAC":
@@ -448,7 +450,10 @@ def build_daystack_datelist(session):
 
 def updated_days_for_dates(session, date1, date2, pair, type='CC', interval=datetime.timedelta(days=1), returndays=False):
     lastmod = datetime.datetime.now() - interval
-    days = session.query(Job).filter(Job.pair == pair).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.type == type).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
+    if pair == '%':
+        days = session.query(Job).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.type == type).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
+    else:
+        days = session.query(Job).filter(Job.pair == pair).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.type == type).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
     logging.debug('Found %03i updated days' % len(days))
     if returndays and len(days) != 0:
         return [datetime.datetime.strptime(day.day,'%Y-%m-%d').date() for day in days] ## RETURN DATE LIST !!!
