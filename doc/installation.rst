@@ -45,7 +45,7 @@ Quick Start - Windows
     
         easy_install traitsui traits obspy
    
-5. Download and install scikits.samplerate from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate
+5. Download and install scikits.samplerate and mysql-python from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate and http://www.lfd.uci.edu/~gohlke/pythonlibs/#mysql-python 
 
 6. Install a MySQL server: download and install EasyPHP_ (their "Dev" version is OK).
 
@@ -85,12 +85,20 @@ Quick Start - Linux
    .. code-block:: sh
     
         sudo apt-get install mysql-server mysql-client
+
+6. Install mysql-python:
+
+   .. code-block:: sh
    
-6. Create a privileged user and a database:
+        sudo apt-get build-dep python-mysqldb
+        sudo apt-get install libmysqlclient-dev
+        easy_install mysql-python
+
+7. Create a privileged user and a database:
       
    TODO
 
-7. Proceed to the :ref:`Workflow` description to start MSNoise!
+8. Proceed to the :ref:`Workflow` description to start MSNoise!
 
 Done !
 
