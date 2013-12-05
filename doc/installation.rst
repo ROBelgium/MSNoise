@@ -47,11 +47,12 @@ Quick Start - Windows
    
 5. Download and install scikits.samplerate and mysql-python from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate and http://www.lfd.uci.edu/~gohlke/pythonlibs/#mysql-python 
 
-6. Install a MySQL server: download and install EasyPHP_ (their "Dev" version is OK).
+6. Install a MySQL server: download and install EasyPHP_ (their "Dev" version is OK - read their installation page carefully, you need to install some Microsoft Visual C redistribuable manually too).
 
-7. Create a privileged user and a database:
+7. Start EasyPHP and create a privileged user and a database:
       
-   TODO
+    * Connect to your local host: http://localhost/phpmyadmin (or http://127.0.0.1/phpmyadmin)
+    * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
 
 8. Install gnufind_ and make sure its /bin directory is in the PATH (Control Panel -> Environment Variables -> PATH)
 
@@ -95,8 +96,9 @@ Quick Start - Linux
         easy_install mysql-python
 
 7. Create a privileged user and a database:
-      
-   TODO
+ 
+ * Connect to your local host: http://localhost/phpmyadmin (or http://127.0.0.1/phpmyadmin)
+ * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
 
 8. Proceed to the :ref:`Workflow` description to start MSNoise!
 
