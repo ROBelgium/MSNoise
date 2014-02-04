@@ -176,9 +176,9 @@ def get_data_availability(session, net=None, sta=None, comp=None, starttime=None
     if not starttime:
         data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(DataAvailability.comp == comp).all()
     if not net:
-        data = session.query(DataAvailability).filter(func.DATE(DataAvailability.starttime) <= starttime.date()).filter(func.DATE(DataAvailability.endtime) >= endtime.date()).all()
+        data = session.query(DataAvailability).filter(func.DATE(DataAvailability.starttime) <= starttime).filter(func.DATE(DataAvailability.endtime) >= endtime).all()
     else:
-        data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(func.DATE(DataAvailability.starttime) <= starttime.date()).filter(func.DATE(DataAvailability.endtime) >= endtime.date()).all()
+        data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(func.DATE(DataAvailability.starttime) <= starttime).filter(func.DATE(DataAvailability.endtime) >= endtime).all()
     return data
 
 
