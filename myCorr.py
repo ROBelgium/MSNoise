@@ -65,7 +65,7 @@ def myCorr(data, maxlag, plot=False):
     normFact = E[0] * E[1]
 
     if normalized:
-        corr /= normFact
+        corr /= np.real(normFact)
 
     if maxlag != Nt:
         tcorr = np.arange(-Nt + 1, Nt)
