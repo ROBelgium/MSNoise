@@ -69,7 +69,7 @@ def worker(s, pool):
             r0 = time.time()
             source = Fname
             name = os.path.split(source)[1]
-            data = read(source, quality=False)
+            data = read(source)
             # print data
             if data[0].stats.starttime.date < startdate:
                 r2 = time.time()
