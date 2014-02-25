@@ -96,8 +96,8 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
         cri -= np.mean(cri)
         cri *= tp
 
-        Fcur = scipy.fftpack.fft(cci, n=int(padd))[:padd/2]
-        Fref = scipy.fftpack.fft(cri, n=int(padd))[:padd/2]
+        Fcur = scipy.fftpack.fft(cci, n=int(padd))[:int(padd)/2]
+        Fref = scipy.fftpack.fft(cri, n=int(padd))[:int(padd)/2]
 
         Fcur2 = np.real(Fcur)**2 + np.imag(Fcur)**2
         Fref2 = np.real(Fref)**2 + np.imag(Fref)**2
@@ -111,7 +111,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
         dcs = np.abs(X)
 
         #Find the values the frequency range of interest
-        freqVec = scipy.fftpack.fftfreq(len(X)*2, 1./sampRate)[:padd/2]
+        freqVec = scipy.fftpack.fftfreq(len(X)*2, 1./sampRate)[:int(padd)/2]
         indRange = np.argwhere(np.logical_and(freqVec >= fmin,
                                               freqVec <= fmax))
 

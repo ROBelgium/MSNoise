@@ -1,4 +1,4 @@
-from tmp_database_tools import *
+from database_tools import *
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num
@@ -15,9 +15,8 @@ for day in datelist:
     # print day
     data = get_data_availability(db,starttime=day, endtime=day)
     for di in data:
-        net, sta, comp, starttime, endtime, data_duration, gaps_duration, samplerate, flag = di
-        stations.append("%s.%s"%(net,sta))
-        dates.append(starttime)
+        stations.append("%s.%s"%(di.net,di.sta))
+        dates.append(di.starttime)
 
 data = pd.DataFrame({"stations":stations},index=dates)
 data = data.groupby('stations')

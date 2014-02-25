@@ -207,10 +207,8 @@ if __name__ == "__main__":
                     for trace in stream:
                         data = trace.data
                         if len(data) > 2:
-                            tp = cosTaper(len(data), 0.01)
-                            data -= np.mean(data)
-                            data *= tp
-                            trace.data = data
+                            trace.detrend("demean")
+                            trace.taper(0.01)
                         else:
                             trace.data *= 0
                         del data
@@ -224,19 +222,15 @@ if __name__ == "__main__":
                         goal_day.replace('-', '')) + goal_duration - stream[0].stats.delta, pad=True, fill_value=0.0)
                     trace = stream[0]
     
+                    logging.debug(
+                        "%s.%s Lowpass at %.2f Hz" % (station, comp, preprocess_lowpass))
+                    trace.filter("lowpass", freq=preprocess_lowpass, zerophase=True)
+    
+                    logging.debug(
+                        "%s.%s Highpass at %.2f Hz" % (station, comp, preprocess_highpass))
+                    trace.filter("highpass", freq=preprocess_highpass, zerophase=True)
+                    
                     data = trace.data
-                    freq = preprocess_lowpass
-                    logging.debug(
-                        "%s.%s Lowpass at %.2f Hz" % (station, comp, freq))
-                    data = lowpass(
-                        trace.data, freq, trace.stats.sampling_rate, zerophase=True)
-    
-                    freq = preprocess_highpass
-                    logging.debug(
-                        "%s.%s Highpass at %.2f Hz" % (station, comp, freq))
-                    data = highpass(
-                        data, freq, trace.stats.sampling_rate, zerophase=True)
-    
                     samplerate = trace.stats['sampling_rate']
                     if samplerate != goal_sampling_rate:
                         if resampling_method == "Resample":
@@ -374,7 +368,7 @@ if __name__ == "__main__":
     
                 for itranche in range(0, tranches):
                     # print "Avancement: %#2d/%2d"% (itranche+1,tranches)
-                    trame2h = trames[:, itranche * min30:(itranche + 1) * min30]
+                    trame2h = trames[:, itranche * int(min30):(itranche + 1) * int(min30)]
                     rmsmat = np.std(np.abs(trame2h), axis=1)
                     for filterdb in get_filters(db, all=False):
                         filterid = filterdb.ref
@@ -390,7 +384,7 @@ if __name__ == "__main__":
                         if min30 / 2 % 2 != 0:
                             Nfft = min30 + 2
     
-                        trames2hWb = np.zeros((2, Nfft), dtype=np.complex)
+                        trames2hWb = np.zeros((2, int(Nfft)), dtype=np.complex)
                         for i, station in enumerate(pair):
                             # print "USING rms threshold = %f" % rms_threshold
                             # logging.debug("rmsmat[i] = %f" % rmsmat[i])
