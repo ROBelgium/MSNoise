@@ -35,49 +35,30 @@ import time
 import logging
 import threading
 from subprocess import Popen, PIPE
+from multiprocessing import Process
+import multiprocessing
+import argparse
 
 from database_tools import *
 from data_structures import data_structure
 
-
-class ActivePool(object):
-
-    def __init__(self):
-        super(ActivePool, self).__init__()
-        self.active = []
-        self.lock = threading.Lock()
-
-    def makeActive(self, name):
-        with self.lock:
-            self.active.append(name)
-            # logging.debug('Running: %s', self.active)
-
-    def makeInactive(self, name):
-        with self.lock:
-            self.active.remove(name)
-            # logging.debug('Finished: %s', self.active)
-
-
-def worker(s, pool):
+def worker(files, folder,startdate, enddate):
     # logging.debug('Waiting to join the pool')
-    with s:
-        Fname = threading.currentThread().getName()
-        folder = threading.currentThread().folder
-        pool.makeActive(Fname)
-        db = connect()
+    db = connect()
+    for file in files:
+        file = os.path.join(folder,file)
         try:
             r0 = time.time()
-            source = Fname
-            name = os.path.split(source)[1]
-            data = read(source)
+            name = os.path.split(file)[1]
+            data = read(file)
             # print data
             if data[0].stats.starttime.date < startdate:
                 r2 = time.time()
-                logging.debug(
+                logging.info(
                     '%s: Before Start-Date! (%.2f)' % (name, r2 - r0))
             elif data[-1].stats.endtime.date > enddate:
                 r2 = time.time()
-                logging.debug('%s: After End-Date! (%.2f)' % (name, r2 - r0))
+                logging.info('%s: After End-Date! (%.2f)' % (name, r2 - r0))
             else:
                 gaps = data.getGaps()
                 gaps_duration = 0
@@ -106,53 +87,57 @@ def worker(s, pool):
 
                 r2 = time.time()
                 if result:
-                    logging.debug(
+                    logging.info(
                         'Added: "%s" (read:%.2f (%.2f) seconds | save:%.4f seconds)' %
                         (name, r1 - r0, r2 - r0, r2 - r1))
                 else:
-                    logging.debug(
+                    logging.info(
                         'Already Exists: "%s" (read:%.2f (%.2f) seconds | save:%.4f seconds)' %
                         (name, r1 - r0, r2 - r0, r2 - r1))
         except Exception as e:
             print "Problem", e
-        pool.makeInactive(Fname)
         db.close()
 
 if __name__ == "__main__":
-    db = connect()
+    t = time.time()
+    parser = argparse.ArgumentParser(description='Scan the data archive and insert the\
+    metadata in the database')
+    parser.add_argument('-i', '--init', action="store_true",
+                        help='Initialize the archive: should only be done upon first run.\
+                        Will read all files in the archive that match the station/component\
+                        (check that)',
+                        default=False)
+    parser.add_argument('-t', '--threads',
+                        help='Number of parellel threads to use [default:1]', default=1, type=int)
+    args = parser.parse_args()
+    
+    
 
-    logging.basicConfig(level=logging.DEBUG,
-                        filename="./scan_archive_threaded.log",
-                        format='%(asctime)s [%(levelname)s] %(message)s',
-                        filemode='w')
-
-    console = logging.StreamHandler()
-    console.setLevel(logging.DEBUG)
+    multiprocessing.log_to_stderr()
+    global logger
+    logger = multiprocessing.get_logger()
+    logger.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
+    for handler in logger.handlers:
+        handler.setFormatter(formatter)
 
-    logging.info('*** Starting: Scan Archive ***')
-
+    logger.info('*** Starting: Scan Archive ***')
+    db = connect()
+    
     init = False
-    mtime = get_config(db, "crondays")
-    print "mtime:", mtime
-    if len(sys.argv) > 1:
-        if sys.argv[1] == 'init':
-            print "init man!"
-            mtime = "-20000"
-            init = True
+    mtime = -2
+    
+    if args.init:
+        logger.info("Initializing (should be run only once)")
+        mtime = "-20000"
+        init = True
     else:
         mtime = "%s" % mtime
-
-    if len(sys.argv) >= 2:
-        try:
-            nthreads = int(sys.argv[2])
-        except:
-            nthreads = 1
-    else:
-        nthreads = 1
-    print "will work on %i threads" % nthreads
+    
+    nthreads = 1
+    if args.threads:
+        nthreads = args.threads
+    logger.info("Will work on %i threads" % nthreads)
 
     if os.name == "nt":
         find = "gnufind"
@@ -178,29 +163,38 @@ if __name__ == "__main__":
                     'NET', sta.net).replace('STA', sta.sta))
                 folders_to_glob.append(os.path.join(data_folder, tmp))
 
-    pool = ActivePool()
-    s = threading.Semaphore(nthreads)
+    clients = []
     for fi in sorted(folders_to_glob):
         folders = glob.glob(fi)
         for folder in sorted(folders):
             if init:
-                proc = Popen(["ls", "-1", folder], stdout=PIPE, stderr=PIPE)
+                files = os.listdir(folder)
             else:
                 proc = Popen(
                     [find, folder, "-type", "f", "-mtime", mtime, "-print"], stdout=PIPE, stderr=PIPE)
+                stdout, stderr = proc.communicate()
 
-            stdout, stderr = proc.communicate()
+                if len(stdout) != 0:
+                    files = sorted(stdout.split('\n'))
+            
+            if len(files) != 0:
+                logger.info('Started: %s'%folder)
+                client = Process(target=worker, args=([files,folder,startdate,enddate]))
+                client.start()
+                clients.append(client)
+            while len(clients) >= nthreads:
+                for client in clients:
+                    client.join(0.01)
+                    if not client.is_alive():
+                        client.join(0.01)
+                        clients.remove(client)
+                
+    while len(clients) != 0:
+        for client in clients:
+            client.join(0.01)
+            if not client.is_alive():
+                client.join(0.01)
+                clients.remove(client)
 
-            if len(stdout) != 0:
-                sources = sorted(stdout.split('\n'))
-                for source in sources:
-                    if len(source) != 0:
-                        #.replace('\r','').replace('\n','').replace('\\','/')
-                        source = os.path.join(folder, source)
-                        t = threading.Thread(
-                            target=worker, name=source, args=(s, pool))
-                        t.folder = folder
-                        t.start()
-    while threading.activeCount() != 1:
-        time.sleep(0.1)
-    logging.info('*** Finished: Scan Archive ***')
+    logger.info('*** Finished: Scan Archive ***')
+    logger.info('It took %.2f seconds' % (time.time() - t))
