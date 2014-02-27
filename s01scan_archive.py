@@ -8,11 +8,11 @@ uses the find command (gnufind on Windows) with the -mtime argument to locate
 new or modified files. Once located, they are inserted (if new) or updated (if
 modified) in the data availability table.
 
-To run it, execute the following in console:
+To run the code on two Process, execute the following in console:
 
 .. code-block:: sh
 
-    python s01scan_archive.py
+    python s01scan_archive.py -t 2
 
 Special case: first run
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -21,10 +21,11 @@ This script is the same as for the routine, but one has to pass the init argumen
 
 .. code-block:: sh
 
-    python s01scan_archive.py init
+    python s01scan_archive.py --init -t 2
 
 This will scan the data_archive folder the configured stations and will insert
-all files found in the data_availability table in the database.
+all files found in the data_availability table in the database. As usual, calling the
+script with a --help argument will show its usage.
 """
 from obspy.core import read
 import glob
@@ -43,7 +44,6 @@ from database_tools import *
 from data_structures import data_structure
 
 def worker(files, folder,startdate, enddate):
-    # logging.debug('Waiting to join the pool')
     db = connect()
     for file in files:
         file = os.path.join(folder,file)
