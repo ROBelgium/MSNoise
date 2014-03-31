@@ -81,12 +81,21 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
     deltaMcoh = []
     Taxis = []
     padd = 2**(nextpow2(windL)+1)
+    
+    # Tentative checking if enough point are used to compute the FFT
+    freqVec = scipy.fftpack.fftfreq(int(padd), 1./sampRate)[:int(padd)/2]
+    indRange = np.argwhere(np.logical_and(freqVec >= fmin,
+                                          freqVec <= fmax))
+    if len(indRange) < 2:
+        padd = 2**(nextpow2(windL)+2)
+    
     tp = cosTaper(windL, 0.02)
     timeaxis = (np.arange(len(ccCurrent)) / float(sampRate))+tmin
-
     minind = 0
     maxind = windL
     while maxind <= len(ccCurrent):
+        # print 'maxind :', maxind
+        # print "data right of the selection:", maxind - len(ccCurrent)
         ind = minind
         cci = ccCurrent[ind:(ind+windL)].copy()
         cci -= np.mean(cci)
@@ -114,7 +123,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
         freqVec = scipy.fftpack.fftfreq(len(X)*2, 1./sampRate)[:int(padd)/2]
         indRange = np.argwhere(np.logical_and(freqVec >= fmin,
                                               freqVec <= fmax))
-
+        
         # Get Coherence and its mean value
         coh = getCoherence(dcs, dref, dcur)
         mcoh = np.mean(coh[indRange])
@@ -134,10 +143,8 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
         phi = np.angle(X)
         phi[0] = 0
         phi = np.unwrap(phi)
-        # print phi[0]
-        # phio = phi
         phi = phi[indRange]
-
+        
         #Calculate the slope with a weighted least square linear regression
         #forced through the origin
         #weights for the WLS must be the variance !
