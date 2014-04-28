@@ -12,26 +12,30 @@ import os
 import logging
 from msnoise_table_def import *
 
+def get_tech():
+    tech, hostname, database, username, password = read_database_inifile()
+    return tech
 
 def connect():
     tech, hostname, database, username, password = read_database_inifile()
     if tech == 1:
-        engine = create_engine('sqlite:///%s'%hostname, echo=False)
+        engine = create_engine('sqlite:///%s' % hostname, echo=False)
     else:
-        engine = create_engine('mysql://%s:%s@%s/%s'%(username, password,
-                                                      hostname, database),
-                                                      echo=False, poolclass=NullPool)
+        engine = create_engine('mysql://%s:%s@%s/%s' % (username, password,
+                                                        hostname, database),
+                               echo=False, poolclass=NullPool)
     Session = sessionmaker(bind=engine)
     return Session()
 
 
-def create_database_inifile(tech, hostname ,database, username, password):
-    f = open('db.ini','w')
-    cPickle.dump([tech, hostname, database, username, password],f)
+def create_database_inifile(tech, hostname, database, username, password):
+    f = open('db.ini', 'w')
+    cPickle.dump([tech, hostname, database, username, password], f)
     f.close()
 
+
 def read_database_inifile():
-    f = open('db.ini','r')
+    f = open('db.ini', 'r')
     tech, hostname, database, username, password = cPickle.load(f)
     f.close()
     return [tech, hostname, database, username, password]
@@ -149,7 +153,8 @@ def update_data_availability(session, net, sta, comp, path, file, starttime, end
         toreturn = True
     else:
         modified = False
-        for item in ['net', 'sta', 'comp', 'path', 'starttime', 'data_duration', 'gaps_duration', 'samplerate']:
+        for item in ['net', 'sta', 'comp', 'path', 'starttime', 'endtime',
+                     'data_duration', 'gaps_duration', 'samplerate']:
             if eval("data.%s != %s" % (item, item)):
                 modified = True
                 break
@@ -159,6 +164,7 @@ def update_data_availability(session, net, sta, comp, path, file, starttime, end
             data.comp = comp
             data.path = path
             data.starttime = starttime
+            data.endtime = endtime
             data.data_duration = data_duration
             data.gaps_duration = gaps_duration
             data.samplerate = samplerate
@@ -176,7 +182,7 @@ def get_data_availability(session, net=None, sta=None, comp=None, starttime=None
     if not starttime:
         data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(DataAvailability.comp == comp).all()
     if not net:
-        data = session.query(DataAvailability).filter(func.DATE(DataAvailability.starttime) <= endtime).filter(func.DATE(DataAvailability.endtime) >= starttime).all()
+        data = session.query(DataAvailability).filter(DataAvailability.starttime <= endtime).filter(DataAvailability.endtime >= starttime).all()
     else:
         data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(func.DATE(DataAvailability.starttime) <= starttime.date()).filter(func.DATE(DataAvailability.endtime) >= endtime.date()).all()
     return data

@@ -1,4 +1,4 @@
-"""One advantage of MSNoise is its ability to be used as an automated 
+"""One advantage of MSNoise is its ability to be used as an automated
 monitoring tool. To run every night on the data acquired during the
 previous day, MSNoise needs to check the data archive for new or modified
 files. Those files could have been acquired during the last day, but be data of
@@ -17,24 +17,24 @@ To run the code on two Process, execute the following in console:
 Special case: first run
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-This script is the same as for the routine, but one has to pass the init argument:
+This script is the same as for the routine, but one has to pass the init
+argument:
 
 .. code-block:: sh
 
     python s01scan_archive.py --init -t 2
 
 This will scan the data_archive folder the configured stations and will insert
-all files found in the data_availability table in the database. As usual, calling the
-script with a --help argument will show its usage.
+all files found in the data_availability table in the database. As usual,
+calling the script with a --help argument will show its usage.
 """
 from obspy.core import read
 import glob
-import sys
 import os
 import datetime
 import time
 import logging
-import threading
+import logging.handlers
 from subprocess import Popen, PIPE
 from multiprocessing import Process
 import multiprocessing
@@ -43,10 +43,13 @@ import argparse
 from database_tools import *
 from data_structures import data_structure
 
-def worker(files, folder,startdate, enddate):
+
+def worker(files, folder, startdate, enddate):
+    # logger = logging.getLogger('worker')
+
     db = connect()
     for file in files:
-        file = os.path.join(folder,file)
+        file = os.path.join(folder, file)
         try:
             r0 = time.time()
             name = os.path.split(file)[1]
@@ -83,7 +86,9 @@ def worker(files, folder,startdate, enddate):
                 r1 = time.time()
 
                 result = update_data_availability(
-                    db, net, sta, comp, path, name, starttime.datetime, endtime.datetime, data_duration, gaps_duration, data[0].stats.sampling_rate)
+                    db, net, sta, comp, path, name, starttime.datetime,
+                    endtime.datetime, data_duration, gaps_duration,
+                    data[0].stats.sampling_rate)
 
                 r2 = time.time()
                 if result:
@@ -110,8 +115,14 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--threads',
                         help='Number of parellel threads to use [default:1]', default=1, type=int)
     args = parser.parse_args()
-    
-    
+
+    # rootLogger = logging.getLogger('')
+    # rootLogger.setLevel(logging.DEBUG)
+    # socketHandler = logging.handlers.SocketHandler('localhost',
+                        # logging.handlers.DEFAULT_TCP_LOGGING_PORT)
+    # rootLogger.addHandler(socketHandler)
+    # global logger
+    # logger = logging.getLogger('main')
 
     multiprocessing.log_to_stderr()
     global logger
@@ -123,20 +134,25 @@ if __name__ == "__main__":
 
     logger.info('*** Starting: Scan Archive ***')
     db = connect()
-    
+
     init = False
     mtime = -2
-    
+
     if args.init:
         logger.info("Initializing (should be run only once)")
         mtime = "-20000"
         init = True
     else:
         mtime = "%s" % mtime
-    
+
     nthreads = 1
     if args.threads:
         nthreads = args.threads
+    if get_tech() == 1:
+        logger.info("You can not work on %i threads because SQLite only\
+ supports 1 connection at a time" % nthreads)
+        nthreads = 1
+
     logger.info("Will work on %i threads" % nthreads)
 
     if os.name == "nt":
@@ -176,10 +192,12 @@ if __name__ == "__main__":
 
                 if len(stdout) != 0:
                     files = sorted(stdout.split('\n'))
-            
+                else:
+                    files = []
+
             if '' in files:
                 files.remove('')
-            
+
             if len(files) != 0:
                 logger.info('Started: %s'%folder)
                 client = Process(target=worker, args=([files,folder,startdate,enddate]))

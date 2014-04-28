@@ -17,13 +17,13 @@ tapered and merged again to a 1-day long trace. If shorter than 1-day, the
 trace is padded with zeros. If longer, it is cut to match the start/end of the
 day.
 
-Each 1-day long trace is then low-passed (at ``preprocess_lowpass`` Hz), 
+Each 1-day long trace is then low-passed (at ``preprocess_lowpass`` Hz),
 high-passed (at ``preprocess_highpass`` Hz), then decimated/downsampled.
 Decimation/Downsampling are configurable (``resampling_method``) and users are
 advised testing both. One advantage of Downsampling over Decimation is that
 it is able to downsample the data by any factor, not only integer factors.
 
-.. warning:: 
+.. warning::
     For an unknown reason, the PAZ-correction has disappeard from the
     current sqlvolution on GitHub: CHECK!
 
@@ -65,15 +65,12 @@ To run this script:
 
 import numpy as np
 from obspy.core import read, utcdatetime, Stream
-from obspy.signal import cosTaper
-from obspy.signal.filter import lowpass, highpass
 from scikits.samplerate import resample
 import time
 import calendar
 import datetime
 import sys
 import os
-import scipy.fftpack
 from database_tools import *
 from myCorr import myCorr
 from whiten import whiten
@@ -402,7 +399,7 @@ if __name__ == "__main__":
                                     trame2h[i], Nfft, dt, low, high, plot=False)
                             else:
                                 # logging.debug("Station no %d, pas de pretraitement car rms < %f ou NaN"% (i, rms_threshold))
-                                trames2hWb[i] = np.zeros(Nfft)
+                                trames2hWb[i] = np.zeros(int(Nfft))
     
                         corr = myCorr(trames2hWb, np.ceil(maxlag / dt), plot=False)
     
