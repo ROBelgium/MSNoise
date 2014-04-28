@@ -177,6 +177,9 @@ if __name__ == "__main__":
                 if len(stdout) != 0:
                     files = sorted(stdout.split('\n'))
             
+            if '' in files:
+                files.remove('')
+            
             if len(files) != 0:
                 logger.info('Started: %s'%folder)
                 client = Process(target=worker, args=([files,folder,startdate,enddate]))

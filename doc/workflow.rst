@@ -37,7 +37,6 @@ Populate Station Table
 Scan Archive
 ---------------
 .. automodule:: MSNoise.s01scan_archive
-	:members:
 
 
 
@@ -58,8 +57,7 @@ Compute Cross-Correlations
 Stack
 --------
 .. automodule:: MSNoise.s04stack
-	:members:
-	
+
 	
 
 Compute MWCS
