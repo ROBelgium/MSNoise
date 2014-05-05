@@ -16,8 +16,8 @@ def get_tech():
     tech, hostname, database, username, password = read_database_inifile()
     return tech
 
-def connect():
-    tech, hostname, database, username, password = read_database_inifile()
+def connect(inifile='db.ini'):
+    tech, hostname, database, username, password = read_database_inifile(inifile)
     if tech == 1:
         engine = create_engine('sqlite:///%s' % hostname, echo=False)
     else:
@@ -34,8 +34,8 @@ def create_database_inifile(tech, hostname, database, username, password):
     f.close()
 
 
-def read_database_inifile():
-    f = open('db.ini', 'r')
+def read_database_inifile(inifile='db.ini'):
+    f = open(inifile, 'r')
     tech, hostname, database, username, password = cPickle.load(f)
     f.close()
     return [tech, hostname, database, username, password]
@@ -61,6 +61,7 @@ def update_config(session, name, value):
     config = session.query(Config).filter(Config.name == name).first()
     config.value = value
     session.commit()
+    return
 
 ############ FILTERS ############
 
@@ -90,6 +91,7 @@ def update_filter(session, ref, low, high, mwcs_low, mwcs_high,
         filter.mwcs_step = mwcs_step
         filter.used = used
     session.commit()
+    return
 
 ############ NETWORK AND STATION ############
 
@@ -129,9 +131,11 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM', instrum
         station.X = X
         station.Y = Y
         station.altitude = altitude
+        station.coordinates = coordinates
         station.instrument = instrument
         station.used = used
     session.commit()
+    return True
 
 
 def get_station_pairs(session, used=None, net=None):
@@ -181,7 +185,7 @@ def get_new_files(session):
 def get_data_availability(session, net=None, sta=None, comp=None, starttime=None, endtime=None):
     if not starttime:
         data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(DataAvailability.comp == comp).all()
-    if not net:
+    elif not net:
         data = session.query(DataAvailability).filter(DataAvailability.starttime <= endtime).filter(DataAvailability.endtime >= starttime).all()
     else:
         data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(func.DATE(DataAvailability.starttime) <= starttime.date()).filter(func.DATE(DataAvailability.endtime) >= endtime.date()).all()
@@ -253,6 +257,12 @@ def reset_dtt_jobs(session, pair):
     for job in jobs:
         job.flag = "T"
     session.commit()
+
+def get_job_types(session, type='CC'):
+    T = session.query(Job).filter(Job.type == type).filter(Job.flag == 'T').count()
+    I = session.query(Job).filter(Job.type == type).filter(Job.flag == 'I').count()
+    D = session.query(Job).filter(Job.type == type).filter(Job.flag == 'D').count()
+    return T, I, D
 
 ############ CORRELATIONS ############
 

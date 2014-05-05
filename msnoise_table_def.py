@@ -1,6 +1,6 @@
 # table_def.py
 from sqlalchemy import create_engine
-from sqlalchemy import Column, Date, Integer, String, Float, Boolean, DateTime, text, TIMESTAMP
+from sqlalchemy import Column, Date, Integer, String, Float, Boolean, DateTime, text, TIMESTAMP, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy import create_engine
@@ -70,7 +70,7 @@ class Station(Base):
     X = Column(Float)  
     Y = Column(Float)  
     altitude = Column(Float)  
-    coordinates = Column(String(3))  
+    coordinates = Column(Enum('DEG','UTM'))
     instrument = Column(String(20))  
     used = Column(Boolean)  
 

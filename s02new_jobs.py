@@ -13,8 +13,10 @@ To run it from the console:
 from database_tools import *
 import logging
 import numpy as np
+import os
 
-if __name__ == "__main__":
+
+def new_jobs():
     logging.basicConfig(level=logging.DEBUG,
                         filename="./new_jobs.log",
                         format='%(asctime)s [%(levelname)s] %(message)s',
@@ -28,7 +30,7 @@ if __name__ == "__main__":
 
     logging.info('*** Starting: New Jobs ***')
 
-    db = connect()
+    db = connect(inifile=os.path.join(os.path.dirname(os.path.realpath(__file__)),'db.ini'))
     if get_config(db, name="autocorr") in ['Y', 'y', '1', 1]:
         AUTOCORR = True
     else:
@@ -98,3 +100,8 @@ if __name__ == "__main__":
         mark_data_availability(db, sta.net, sta.sta, flag='A')
     
     logging.info('*** Finished: New Jobs ***')
+    return count
+
+
+if __name__ == "__main__":
+    new_jobs()

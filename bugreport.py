@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 #
 
+import os, platform
+import sys
+import argparse
+
 def ispresent(module):
     try:
         mod = __import__(module)
@@ -11,12 +15,11 @@ def ispresent(module):
     except:
         print "[ ] %s: not found"%module
 
-import os, platform
-import sys
-import argparse
 
-if __name__ == "__main__":
 
+
+
+def bugreport():
     parser = argparse.ArgumentParser(description='Helps determining what didn\'t work')
     parser.add_argument('-s', '--sys', action="store_true",
                         help='Outputs System info',
@@ -66,6 +69,12 @@ if __name__ == "__main__":
         ispresent('sphinx')
         ispresent('jinja2')
         
+        ispresent('flask')
+        ispresent('flask.ext.admin')
+        ispresent('wtforms')
+        ispresent('json')
+        ispresent('psutil')
+        
         print
         print "Backends: (at least one is required)"
         ispresent('wx')
@@ -84,6 +93,7 @@ if __name__ == "__main__":
         ispresent('distutils')
         ispresent('IPython')
         ispresent('vtk')
+        
         print
     
     if args.env or args.all:    
@@ -101,4 +111,5 @@ if __name__ == "__main__":
     
     
     
-    
+if __name__ == "__main__":
+        bugreport()
