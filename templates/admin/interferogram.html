@@ -1,0 +1,164 @@
+{% extends 'admin/master.html' %}
+
+{% block head %}
+<script type='text/javascript' src='//code.jquery.com/jquery-2.0.2.js'></script>
+<link rel="stylesheet" type="text/css" href="http://cdn.pydata.org/bokeh-0.4.4.css">
+<script type='text/javascript' src="/static/admin/bokeh-0.4.4.js"></script>
+<script type="text/coffeescript">
+
+#
+# Update the plot data on an interval
+# 
+Array::max=->
+  Math.max.apply(null, this)
+ 
+Array::min=->
+  Math.min.apply(null, this)
+  
+@update = (newdata) ->
+    if newdata['info'] == "No Data"
+        console.debug('No Data was received')
+    else
+        console.debug('This is the new data:')
+        console.debug('%o', newdata)
+        window.source = Bokeh.Collections('ColumnDataSource').create(
+            data:
+              image: [newdata['image']]
+        )
+
+        image = {
+          type: 'image',
+          x: 0
+          y: 0
+          dw: 20
+          dw_units: 'data'
+          dh: 10
+          dh_units: 'data'
+          image: 'image'
+          palette: 'RdBu-11'
+        }
+
+
+        options = {
+          title: "Interferogram"
+          dims: [1200, 600]
+          xrange: [0, 20]
+          yrange: [0, 10]
+          xaxes: "min"
+          yaxes: "min"
+          tools: "pan,wheel_zoom,box_zoom,resize,preview,reset"
+          legend: false
+        }
+
+        plot = Bokeh.Plotting.make_plot(image, window.source, options)
+        Bokeh.Plotting.show(plot,'#CCF')
+        $('#loading').hide();
+</script>
+<script type="text/javascript" src="/static/admin/coffeescript.js"></script>
+
+<script>
+
+function get_CCF(callback, arg) {
+    $.ajax({
+        url:'/admin/all_results.json',
+        type:'POST',
+        dataType: 'json',
+        contentTtupe: 'application/json',
+        data: JSON.stringify(arg),
+        success: callback
+        });
+    };
+
+function get_pairs(callback) {
+    $.ajax({
+        url:'/admin/pairs.json',
+        type:'GET',
+        dataType: 'json',
+        success: callback
+        });
+    };
+
+function populate_pair(data) {
+    $.each(data, function(i, value) {
+        $('#pair').append($('<option>').text(value).attr('value', value));
+    });
+    $('#pair').change();
+}
+
+
+function get_filters(callback) {
+    $.ajax({
+        url:'/admin/filters.json',
+        type:'GET',
+        dataType: 'json',
+        success: callback
+        });
+    };
+
+function populate_filter(data) {
+    console.debug("%o",data);
+    $.each(data, function(i, value) {
+        $('#filter').append($('<option>').text(value).attr('value', i));
+    });
+    $('#filter').change();
+}
+
+function get_components(callback) {
+    $.ajax({
+        url:'/admin/components.json',
+        type:'GET',
+        dataType: 'json',
+        success: callback
+        });
+    };
+
+function populate_component(data) {
+    console.debug("%o",data);
+    $.each(data, function(i, value) {
+        $('#component').append($('<option>').text(value).attr('value', i));
+    });
+    $('#component').change();
+}
+
+
+
+function updateplot() {
+    var pair = $('#pair option:selected').text()
+    var filter = $('#filter option:selected').val()
+    var component = $('#component option:selected').text()
+    var format = "matrix"
+    var arg = {"pair": pair,"component": component,"filter":filter,"format":format}
+    console.debug(arg);
+    get_CCF(update, arg);
+    }
+
+$(document).ready(function() {
+    $('#loading').hide();
+    get_filters(populate_filter);
+    get_components(populate_component);
+    get_pairs(populate_pair);
+    
+    $('#update').click(function() {
+       $('#CCF').empty();
+       $('#loading').show();
+       updateplot();
+       
+    });
+    
+});
+</script>
+{% endblock %}
+
+{% block body %}
+{{ super() }}
+
+<h1 class="page-header">{{ admin_view.view_title }}</h1>
+  <label for="filter">Filter:</label><select id="filter" name="filter" ></select><br>
+  <label for="component">Component:</label><select id="component" name="component" ></select><br>
+  <label for="pair">Pair:</label><select id="pair" name="pair" ></select><br>
+  <button id="update" type="submit" class="btn btn-default">Plot</button>
+  <div id='loading' name='loading'><img src="/static/admin/ajax-loader.gif"></div>
+  <div id="CCF" name="CCF"></div>
+
+
+{% endblock body %}
