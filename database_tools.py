@@ -198,6 +198,10 @@ def mark_data_availability(session,net,sta,flag):
         d.flag = flag
     session.commit()
 
+def count_data_availability_flags(session):
+    return session.query(func.count(DataAvailability.flag),DataAvailability.flag).group_by(DataAvailability.flag).all()
+    
+
 ############ JOBS ############
 
 
@@ -251,18 +255,18 @@ def get_dtt_next_job(session, flag='T', type='DTT'):
         job.flag = 'I'
     session.commit()
     return pair, days, refs
-    
+
+
 def reset_dtt_jobs(session, pair):
     jobs = session.query(Job).filter(Job.pair == pair).filter(Job.type == "DTT").all()
     for job in jobs:
         job.flag = "T"
     session.commit()
 
+
 def get_job_types(session, type='CC'):
-    T = session.query(Job).filter(Job.type == type).filter(Job.flag == 'T').count()
-    I = session.query(Job).filter(Job.type == type).filter(Job.flag == 'I').count()
-    D = session.query(Job).filter(Job.type == type).filter(Job.flag == 'D').count()
-    return T, I, D
+    return session.query(func.count(Job.flag),Job.flag).filter(Job.type == type).group_by(Job.flag).all()
+
 
 ############ CORRELATIONS ############
 
