@@ -1,0 +1,97 @@
+{% extends 'admin/master.html' %}
+{% block head %}
+<link rel="stylesheet" href="/static/admin/style.css">
+{% endblock %}
+
+{% block body %}
+<h1 class="page-header">{{ admin_view.view_title }}</h1>
+
+<div id="heartbeat">♥</div>
+		<div id="fqdn">&nbsp;</div>
+		<div id="uptime">&nbsp;</div>
+		
+        <div class="module nograph">
+			<div class="title">Responses/errors</div>
+			<div class="value" id="requests"></div>
+		</div><div class="module yesgraph">
+			<div class="title">Latency</div>
+			<div class="value" id="latency"></div>
+			<div class="graph">
+				<canvas id="c_latency" width="120" height="56">
+				</canvas>
+			</div>
+		</div><div class="module yesgraph">
+			<div class="title">RAM</div>
+			<div class="value" id="ramusage"></div>
+			<div class="graph">
+				<canvas id="c_ramusage" width="120" height="56">
+				</canvas>
+			</div>
+		</div><div class="module twovalues">
+			<div class="title">Disk reads/writes</div>
+			<div class="value" id="diskr"></div>
+			<div class="value" id="diskw"></div>
+		</div><div class="module yesgraph">
+			<div class="title">Disk read</div>
+			<div class="value" id="diskrs"></div>
+			<div class="graph">
+				<canvas id="c_diskrs" width="120" height="56">
+				</canvas>
+			</div>
+		</div><div class="module yesgraph">
+			<div class="title">Disk write</div>
+			<div class="value" id="diskws"></div>
+			<div class="graph">
+				<canvas id="c_diskws" width="120" height="56">
+				</canvas>
+			</div>
+		</div><div class="module twovalues">
+			<div class="title">Disk used/total</div>
+			<div class="value" id="disku"></div>
+			<div class="value" id="diskt"></div>
+		</div><div class="module twovalues">
+			<div class="title">Network TX/RX</div>
+			<div class="value" id="nett"></div>
+			<div class="value" id="netr"></div>
+		</div><div class="module yesgraph">
+			<div class="title">Net TX</div>
+			<div class="value" id="netts"></div>
+			<div class="graph">
+				<canvas id="c_netts" width="120" height="56">
+				</canvas>
+			</div>
+		</div><div class="module yesgraph">
+			<div class="title">Net RX</div>
+			<div class="value" id="netrs"></div>
+			<div class="graph">
+				<canvas id="c_netrs" width="120" height="56">
+				</canvas>
+			</div>
+		</div><div class="module yesgraph">
+			<div class="title">Swap</div>
+			<div class="value" id="swapusage"></div>
+			<div class="graph">
+				<canvas id="c_swapusage" width="120"
+					height="56"></canvas>
+			</div>
+		</div>
+        <hr>
+        <h2>CPU</h2>
+        {% for op in range(cpucount) %}
+        <div class="module yesgraph">
+			<div class="title">CPU {{op}}</div>
+			<div class="value" id="cpuusage{{op}}"></div>
+			<div class="graph">
+               <canvas id="c_cpuusage{{op}}" width="120" height="56"></canvas>
+			</div>
+		</div>
+        {% endfor %}
+
+        <script>
+        cpucount = {{cpucount}};
+        </script>
+		<script src="/static/admin/jquery-1.9.1.min.js"></script>
+		<script src="/static/admin/smoothie.js"></script>
+		<script src="/static/admin/script.js"></script>
+
+{% endblock body %}

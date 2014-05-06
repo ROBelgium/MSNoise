@@ -1,0 +1,196 @@
+{% extends 'admin/master.html' %}
+
+{% block head %}
+<script type='text/javascript' src='http://code.jquery.com/jquery-2.0.2.js'></script>
+<style>
+
+.easyPieChart {
+    position: relative;
+    text-align: center;
+}
+
+.easyPieChart canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+chart_DA,
+chart_jobs_DTT,
+.chart_jobs_CC {
+    margin: 10px;
+}
+
+.percentage,
+.label {
+    text-align: center;
+    color: #333;
+    font-weight: 100;
+    font-size: 1.2em;
+    margin-bottom: 0.3em;
+}
+
+</style>
+<script src="http://rendro.github.io/easy-pie-chart/javascripts/jquery.easy-pie-chart.js"></script>
+<script type='text/javascript'>
+
+function data_availability_flags(callback, error) {
+    $.ajax({
+        url:'/admin/data_availability_flags.json',
+        type:'GET',
+        dataType: 'json',
+        success: callback,
+    });
+};
+
+function get_num_jobs(type, callback, error) {
+    $.ajax({
+        url:'/admin/jobs_list.json',
+        type:'GET',
+        dataType: 'json',
+        data: {'type':type},
+        success: callback,
+    });
+};
+
+function update_CC_jobs(res) {
+    total = res['T'] + res['I'] + res['D'];
+    text = total + " CC jobs in the database: " + res['T'] + " todo, ";
+    text = text + res['I'] + " in progress and " + res['D'] + " done";
+    $("#jobs_CC").text(text);
+    var x = Math.floor(100*res['D']/total);
+  $('#chart_jobs_CC').data('easyPieChart').update(x);
+};
+
+function update_DTT_jobs(res) {
+    total = res['T'] + res['I'] + res['D'];
+    text = total + " DTT jobs in the database: " + res['T'] + " todo, ";
+    text = text + res['I'] + " in progress and " + res['D'] + " done";
+    $("#jobs_DTT").text(text);
+    var x = Math.floor(100.0*res['D']/parseFloat(total));
+  $('#chart_jobs_DTT').data('easyPieChart').update(x);
+  
+};
+
+function update_DA(res) {
+    total = res['N'] + res['M'] + res['A'];
+    text = total + " files identified in the archive: " + res['N'] + " new, ";
+    text = text + res['M'] + " modified and " + res['A'] + " archived";
+    $("#DA").text(text);
+    var x = Math.floor(100*res['A']/total);
+  $('#chart_DA').data('easyPieChart').update(x);
+  console.debug(x);
+};
+
+
+function update_all() {
+
+   get_num_jobs('CC', update_CC_jobs); 
+   get_num_jobs('DTT', update_DTT_jobs); 
+   data_availability_flags(update_DA); 
+   
+   }
+
+  $(document).ready(function() {
+    $('#new_jobs').click(function() {
+        $("#new_jobs_console").text("Processing...");
+        $("#login-error").show();
+        $.ajax({
+            url:'/admin/new_jobs_TRIG.json',
+            type:'GET',
+            dataType: 'json',
+            success: function (res) {
+              console.debug('%o', res);
+              text = res['count']+ " new job(s) added to the queue";
+              $("#new_jobs_console").text(text);
+              },
+            error: function (res) {
+                $("#new_jobs_console").text("error...?");
+                }
+        });
+    });
+    $('#login-error').on("click", '.close', function(e) {
+        $(this).parent().hide();
+    });
+    
+   get_num_jobs('CC', update_CC_jobs); 
+   get_num_jobs('DTT', update_DTT_jobs); 
+   data_availability_flags(update_DA); 
+   
+
+
+    });
+
+</script>
+ {% endblock %}
+
+{% block body %}
+{{ super() }}
+<h1 class="page-header">MSNoise Dashboard</h1>
+  <p class="lead">
+  Where things can be configured... and more...
+  </p>
+
+  <p>
+  <h2>Status</h2>
+  <div style='width:25%;float:left;text-align:center;border-right:solid 0.5px black;'>
+      <div id='chart_DA' data-percent="0"><span>0</span>%</div><br>
+      of the have been marked "A"rchive<br>
+      (<span id='DA'></span>)
+  </div>
+  <div style='width:25%;float:left;text-align:center;border-right:solid 0.5px black;'>
+      <div id='chart_jobs_CC' data-percent="0"><span>0</span>%</div><br>
+       of the CC jobs are "D"one<br>
+       (<span id='jobs_CC'></span>)
+  </div>
+  <div style='width:25%;float:left;text-align:center'>
+    <div id='chart_jobs_DTT' data-percent="0"><span>0</span>%</div> <br>
+    of the DTT jobs are "D"one <br>
+    (<span id='jobs_DTT'></span>)
+  </div>
+  
+  <div style='clear:both'></div>
+  
+  
+  <p>
+  
+    <p>
+  <h2>Actions ?</h2>
+  <div id='new_jobs_div'>
+  <button id='new_jobs' value='New Jobs?' class="btn btn-warning">Check for New Jobs</button>
+  </div>
+  <div class="alert fade in" id="login-error" style="display:none;width:300px;">
+    <button type="button" class="close">x</button>
+    <div id='new_jobs_console'></div>
+  </div>
+  </p>
+
+
+
+<script type="text/javascript">
+    $(document).ready(function() {
+        
+        $('#chart_jobs_CC').easyPieChart({
+            animate: 1000,
+            onStep: function(value) {
+          this.$el.find('span').text(~~value);
+        }
+        });
+        $('#chart_jobs_DTT').easyPieChart({
+            animate: 1000,
+            onStep: function(value) {
+          this.$el.find('span').text(~~value);
+        }
+        });
+        $('#chart_DA').easyPieChart({
+            animate: 1000,
+            onStep: function(value) {
+          this.$el.find('span').text(~~value);
+        }
+        });
+        
+      setInterval(update_all, 5000);
+    });
+</script>
+{% endblock body %}
+
