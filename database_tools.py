@@ -107,13 +107,13 @@ def get_networks(session, all=False):
 def get_stations(session, all=False, net=None):
     if all:
         if net is not None:
-            stations = session.query(Station).filter(Station.net == net)
+            stations = session.query(Station).filter(Station.net == net).order_by(Station.net).order_by(Station.sta)
         else:
-            stations = session.query(Station).all()
+            stations = session.query(Station).order_by(Station.net).order_by(Station.sta).all()
     else:
-        stations = session.query(Station).filter(Station.used == True)
+        stations = session.query(Station).filter(Station.used == True).order_by(Station.net).order_by(Station.sta)
         if net is not None:
-            stations = stations.filter(Station.net == net)
+            stations = stations.filter(Station.net == net).order_by(Station.net).order_by(Station.sta)
     return stations
 
 
