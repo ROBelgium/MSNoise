@@ -65,6 +65,7 @@ To run this script:
 
 import numpy as np
 from obspy.core import read, utcdatetime, Stream
+from obspy.signal import cosTaper
 from scikits.samplerate import resample
 import time
 import calendar
@@ -196,7 +197,7 @@ if __name__ == "__main__":
                                   (station, comp, len(files)))
                     stream = Stream()
                     for file in sorted(files):
-                        st = read(file, format="MSEED")
+                        st = read(file)
                         stream += st
                         del st
                     stream.merge()
@@ -386,6 +387,8 @@ if __name__ == "__main__":
                             # print "USING rms threshold = %f" % rms_threshold
                             # logging.debug("rmsmat[i] = %f" % rmsmat[i])
                             if rmsmat[i] > rms_threshold:
+                                cp = cosTaper(len(trame2h[i]),0.04)
+                                
                                 if windsorizing != 0:
                                     indexes = np.where(
                                         np.abs(trame2h[i]) > (windsorizing * rmsmat[i]))[0]
@@ -396,7 +399,7 @@ if __name__ == "__main__":
                                 # logging.debug('whiten')
     
                                 trames2hWb[i] = whiten(
-                                    trame2h[i], Nfft, dt, low, high, plot=False)
+                                    trame2h[i]*cp, Nfft, dt, low, high, plot=False)
                             else:
                                 # logging.debug("Station no %d, pas de pretraitement car rms < %f ou NaN"% (i, rms_threshold))
                                 trames2hWb[i] = np.zeros(int(Nfft))
