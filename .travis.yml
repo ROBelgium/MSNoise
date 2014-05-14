@@ -20,6 +20,8 @@ before_install:
   - conda update --yes conda
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib statsmodels pandas
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION sqlalchemy sphinx jinja2
+  - easy_install obspy
+  - easy_install scikits.samplerate
   # install obspy too
   #~ - pip install -q --use-mirrors coverage coveralls
   # Test the docs build before installing because sphinx breaks on Cython modules
