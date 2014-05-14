@@ -46,6 +46,6 @@ install:
   - cd MSNoise
 
 script:
-  - python bugreport.py
+  - python bugreport.py -a
   - cd tests
-  - ./run_tests.sh
+  - python ../tests.py
