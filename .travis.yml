@@ -43,7 +43,7 @@ before_install:
 
   
 install:
-  - ls
+  - cd MSNoise
 
 script:
   - python bugreport.py
