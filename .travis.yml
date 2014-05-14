@@ -12,6 +12,9 @@ virtualenv:
   system_site_packages: true
 
 before_install:
+  - lsb_release -a # get info on the operating system
+  - sudo apt-get update
+  - sudo apt-get install -qq gfortran
   - wget http://repo.continuum.io/miniconda/Miniconda-2.2.2-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
   - ./miniconda.sh -b
