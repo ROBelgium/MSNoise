@@ -78,8 +78,9 @@ from whiten import whiten
 
 import logging
 
-if __name__ == "__main__":
+
     
+def main():
     logging.basicConfig(level=logging.DEBUG,
                         filename="./compute_cc.log",
                         format='%(asctime)s [%(levelname)s] %(message)s',
@@ -452,5 +453,6 @@ if __name__ == "__main__":
         logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
     logging.info('*** Finished: Compute CC ***')
     
-    
-    # EOF
+if __name__ == "__main__":
+    main()    
+

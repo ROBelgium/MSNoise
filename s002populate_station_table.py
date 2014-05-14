@@ -33,7 +33,7 @@ import os
 import numpy as np
 from database_tools import *
 
-if __name__ == "__main__":
+def main():
     db = connect()
     print
     print ">> Populating the Station table"
@@ -81,3 +81,7 @@ if __name__ == "__main__":
         instrument = 'N/A'
         update_station(db, net, sta, X, Y, altitude,
                        coordinates=coordinates, instrument=instrument)
+    return True
+
+if __name__ == "__main__":
+    main()

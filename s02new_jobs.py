@@ -30,7 +30,7 @@ def new_jobs():
 
     logging.info('*** Starting: New Jobs ***')
 
-    db = connect(inifile=os.path.join(os.path.dirname(os.path.realpath(__file__)),'db.ini'))
+    db = connect()
     if get_config(db, name="autocorr") in ['Y', 'y', '1', 1]:
         AUTOCORR = True
     else:

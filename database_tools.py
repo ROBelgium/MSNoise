@@ -12,11 +12,13 @@ import os
 import logging
 from msnoise_table_def import *
 
+
 def get_tech():
     tech, hostname, database, username, password = read_database_inifile()
     return tech
 
-def connect(inifile='db.ini'):
+
+def connect(inifile=os.path.join(os.getcwd(), 'db.ini')):
     tech, hostname, database, username, password = read_database_inifile(inifile)
     if tech == 1:
         engine = create_engine('sqlite:///%s' % hostname, echo=False)
@@ -29,12 +31,12 @@ def connect(inifile='db.ini'):
 
 
 def create_database_inifile(tech, hostname, database, username, password):
-    f = open('db.ini', 'w')
+    f = open(os.path.join(os.getcwd(), 'db.ini'), 'w')
     cPickle.dump([tech, hostname, database, username, password], f)
     f.close()
 
 
-def read_database_inifile(inifile='db.ini'):
+def read_database_inifile(inifile=os.path.join(os.getcwd(), 'db.ini')):
     f = open(inifile, 'r')
     tech, hostname, database, username, password = cPickle.load(f)
     f.close()
