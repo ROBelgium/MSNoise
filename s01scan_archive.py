@@ -53,7 +53,7 @@ def worker(files, folder, startdate, enddate):
         try:
             r0 = time.time()
             name = os.path.split(file)[1]
-            data = read(file)
+            data = read(file, headonly=True)
             # print data
             if data[0].stats.starttime.date < startdate:
                 r2 = time.time()

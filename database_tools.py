@@ -8,6 +8,7 @@ import itertools
 import cPickle
 from obspy.core import Stream, Trace, read
 from obspy.sac import SacIO
+from obspy.core.util import gps2DistAzimuth
 import os
 import logging
 from msnoise_table_def import *
@@ -182,6 +183,7 @@ def get_new_files(session):
     files = session.query(DataAvailability).filter(DataAvailability.flag != 'A').order_by(DataAvailability.starttime).all()
     return files
 
+
 def get_data_availability(session, net=None, sta=None, comp=None, starttime=None, endtime=None):
     if not starttime:
         data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(DataAvailability.comp == comp).all()
@@ -197,6 +199,7 @@ def mark_data_availability(session,net,sta,flag):
     for d in data:
         d.flag = flag
     session.commit()
+
 
 def count_data_availability_flags(session):
     return session.query(func.count(DataAvailability.flag),DataAvailability.flag).group_by(DataAvailability.flag).all()

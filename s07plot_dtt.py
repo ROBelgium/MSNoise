@@ -62,6 +62,7 @@ datatype = 'msnoise'
 gs = gridspec.GridSpec(len(mov_stacks), 1)
 plt.figure(figsize=(15, 20))
 plt.subplots_adjust(bottom=0.06, hspace=0.3)
+first_plot = True
 for i, mov_stack in enumerate(mov_stacks):
     current = start
     first = True
@@ -103,11 +104,15 @@ for i, mov_stack in enumerate(mov_stacks):
 
         plt.ylim(0.5, -0.5)
 
-        if mov_stack == 1:
+        if first_plot == 1:
             plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=4,
                        ncol=1, borderaxespad=0.)
             left, right = plt.xlim()
-            plt.title('1 Day')
+            if mov_stack == 1:
+                plt.title('1 Day')
+            else:
+                plt.title('%i Days Moving Window' % mov_stack)
+            first_plot = False
         else:
             plt.xlim(left, right)
             plt.title('%i Days Moving Window' % mov_stack)
