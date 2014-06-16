@@ -10,7 +10,7 @@ Introduction
 MSNoise is a set of Python codes that use a database (sqlite or MySQL) and
 the `find` command. 
 
-Currently, MSNoise is *NOT* a regulare Python Package, which means:
+Currently, MSNoise is *NOT* a regular Python Package, which means:
 
 * It doesn't have a setup.py file.
 * It should not be installed in the lib/site-packages folder of the current python installation.
