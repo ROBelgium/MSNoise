@@ -1,37 +1,8 @@
 {% extends 'admin/master.html' %}
 
 {% block head %}
-<script type='text/javascript' src='http://code.jquery.com/jquery-2.0.2.js'></script>
-<style>
+    <script src="/static/admin/vendor/jquery-2.1.1.min.js" type="text/javascript"></script>
 
-.easyPieChart {
-    position: relative;
-    text-align: center;
-}
-
-.easyPieChart canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-}
-
-chart_DA,
-chart_jobs_DTT,
-.chart_jobs_CC {
-    margin: 10px;
-}
-
-.percentage,
-.label {
-    text-align: center;
-    color: #333;
-    font-weight: 100;
-    font-size: 1.2em;
-    margin-bottom: 0.3em;
-}
-
-</style>
-<script src="http://rendro.github.io/easy-pie-chart/javascripts/jquery.easy-pie-chart.js"></script>
 <script type='text/javascript'>
 
 function data_availability_flags(callback, error) {
@@ -59,7 +30,8 @@ function update_CC_jobs(res) {
     text = text + res['I'] + " in progress and " + res['D'] + " done";
     $("#jobs_CC").text(text);
     var x = Math.floor(100*res['D']/total);
-  $('#chart_jobs_CC').data('easyPieChart').update(x);
+  $('#CC').css('width', x+'%').attr('aria-valuenow', x);
+    $('#CC').text(x+'%');
 };
 
 function update_DTT_jobs(res) {
@@ -68,7 +40,8 @@ function update_DTT_jobs(res) {
     text = text + res['I'] + " in progress and " + res['D'] + " done";
     $("#jobs_DTT").text(text);
     var x = Math.floor(100.0*res['D']/parseFloat(total));
-  $('#chart_jobs_DTT').data('easyPieChart').update(x);
+   $('#DTT').css('width', x+'%').attr('aria-valuenow', x);
+    $('#DTT').text(x+'%');
   
 };
 
@@ -76,9 +49,10 @@ function update_DA(res) {
     total = res['N'] + res['M'] + res['A'];
     text = total + " files identified in the archive: " + res['N'] + " new, ";
     text = text + res['M'] + " modified and " + res['A'] + " archived";
-    $("#DA").text(text);
+    $("#jobs_DA").text(text);
     var x = Math.floor(100*res['A']/total);
-  $('#chart_DA').data('easyPieChart').update(x);
+    $('#DA').css('width', x+'%').attr('aria-valuenow', x);
+    $('#DA').text(x+'%');
   console.debug(x);
 };
 
@@ -133,28 +107,28 @@ function update_all() {
 
   <p>
   <h2>Status</h2>
-  <div style='width:25%;float:left;text-align:center;border-right:solid 0.5px black;'>
-      <div id='chart_DA' data-percent="0"><span>0</span>%</div><br>
-      of the have been marked "A"rchive<br>
-      (<span id='DA'></span>)
-  </div>
-  <div style='width:25%;float:left;text-align:center;border-right:solid 0.5px black;'>
-      <div id='chart_jobs_CC' data-percent="0"><span>0</span>%</div><br>
-       of the CC jobs are "D"one<br>
-       (<span id='jobs_CC'></span>)
-  </div>
-  <div style='width:25%;float:left;text-align:center'>
-    <div id='chart_jobs_DTT' data-percent="0"><span>0</span>%</div> <br>
-    of the DTT jobs are "D"one <br>
-    (<span id='jobs_DTT'></span>)
-  </div>
-  
-  <div style='clear:both'></div>
   
   
+<h3>Data Availability Scan</h3>
+<span id='jobs_DA'></span>
+<div class="progress">
+  <div id='DA' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+</div>
+
+<h3>Cross-Correlation Jobs</h3>
+<span id='jobs_CC'></span>
+<div class="progress">
+  <div id='CC' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+</div>
+
+
+<h3>Relative Travel Time Jobs</h3>
+<span id='jobs_DTT'></span>
+<div class="progress">
+  <div id='DTT' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+</div>
+
   <p>
-  
-    <p>
   <h2>Actions ?</h2>
   <div id='new_jobs_div'>
   <button id='new_jobs' value='New Jobs?' class="btn btn-warning">Check for New Jobs</button>
@@ -166,28 +140,8 @@ function update_all() {
   </p>
 
 
-
 <script type="text/javascript">
     $(document).ready(function() {
-        
-        $('#chart_jobs_CC').easyPieChart({
-            animate: 1000,
-            onStep: function(value) {
-          this.$el.find('span').text(~~value);
-        }
-        });
-        $('#chart_jobs_DTT').easyPieChart({
-            animate: 1000,
-            onStep: function(value) {
-          this.$el.find('span').text(~~value);
-        }
-        });
-        $('#chart_DA').easyPieChart({
-            animate: 1000,
-            onStep: function(value) {
-          this.$el.find('span').text(~~value);
-        }
-        });
         
       setInterval(update_all, 5000);
     });
