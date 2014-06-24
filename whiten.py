@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.fftpack
-
+import warnings
+warnings.simplefilter("ignore")
 # from tempfile import mkdtemp
 # cachedir = mkdtemp()
 # from joblib import Memory
