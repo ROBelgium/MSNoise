@@ -1,9 +1,6 @@
 import unittest
 import traceback
 
-# Here's our "unit".
-def IsOdd(n):
-    return n % 2 == 1
 
 # Here's our "unit tests".
 class InitTests(unittest.TestCase):
@@ -139,7 +136,7 @@ class InitTests(unittest.TestCase):
         jobs = get_next_job(db)
         self.failUnlessEqual(isinstance(jobs[0], Job), True)
     
-    def test_012_s03scan_archive(self):
+    def test_012_s03compute_cc(self):
         from s03compute_cc import main
         try:
             main()
