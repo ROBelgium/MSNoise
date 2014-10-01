@@ -101,7 +101,6 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
 
     
 if __name__ == '__main__':
-    import timeit
     import time
     N = 2048
     np.random.seed(1234)

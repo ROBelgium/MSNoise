@@ -158,8 +158,6 @@ def main():
         datafilesE = {}
         datafilesN = {}
     
-        durations = []
-    
         for station in stations:
             datafilesZ[station] = []
             datafilesE[station] = []
@@ -201,19 +199,62 @@ def main():
                         st = read(file)
                         stream += st
                         del st
-                    stream.merge()
-                    stream = stream.split()
+                    
+                    #TLQ Add quality/sps check
+                    for i, trace in enumerate(stream):
+                        stream[i] = check_and_phase_shift(trace)
+                    print "Done checking sample alignment"
+                    stream.sort()
+                    if len(getGaps(stream)) > 0:
+                        for gap in getGaps(stream):
+                            print "Gap between traces %i and %i is %.6f seconds long, %i sample(s) are missing" % (gap[0], gap[1], gap[-2], gap[-1])
+                        print "INPUT:"
+                        print stream
+
+                        max_gap = 10
+                        only_too_long=False
+                        while getGaps(stream) and not only_too_long:
+                            too_long = 0
+                            gaps = getGaps(stream)
+                            for gap in gaps:
+                                if int(gap[-1]) <= max_gap:
+                                    stream[gap[0]] = stream[gap[0]].__add__(stream[gap[1]], method=0, fill_value="interpolate")
+                                    stream.remove(stream[gap[1]])
+                                    break
+                                else:
+                                    too_long += 1
+                            if too_long == len(gaps):
+                                only_too_long = True
+
+                        print "OUTPUT:"
+                        print stream
+
+                    taper_length = 20.0 #seconds
                     for trace in stream:
-                        data = trace.data
-                        if len(data) > 2:
-                            trace.detrend("demean")
-                            trace.taper(0.01)
+                        if trace.stats.npts < 4 * taper_length*trace.stats.sampling_rate:
+                            trace.data = np.zeros(trace.stats.npts)
                         else:
-                            trace.data *= 0
-                        del data
-                    logging.debug("%s.%s Merging Stream" % (station, comp))
-                    #fills gaps with 0s and gives only one 'Trace'
-                    stream.merge(fill_value=0)
+                            trace.detrend(type="demean")
+                            trace.detrend(type="linear")
+                            taper_1s = taper_length * float(trace.stats.sampling_rate) / trace.stats.npts
+                            cp = cosTaper(trace.stats.npts, taper_1s)
+                            trace.data *= cp
+                    stream.merge(method=0, fill_value=0.0)
+                    
+                    #TLQ end
+                    
+                    # stream.merge()
+                    # stream = stream.split()
+                    # for trace in stream:
+                        # data = trace.data
+                        # if len(data) > 2:
+                            # trace.detrend("demean")
+                            # trace.taper(0.01)
+                        # else:
+                            # trace.data *= 0
+                        # del data
+                    # logging.debug("%s.%s Merging Stream" % (station, comp))
+                    # stream.merge(fill_value=0)
                     logging.debug("%s.%s Slicing Stream to %s:%s" % (station, comp, utcdatetime.UTCDateTime(
                         goal_day.replace('-', '')), utcdatetime.UTCDateTime(goal_day.replace('-', '')) + goal_duration - stream[0].stats.delta))
     
@@ -254,31 +295,9 @@ def main():
                     trame = data
     
                     if j == 0:
-                        FirstFile_TimeSecDebFic = hourf * \
-                            60 * 60 + minf * 60 + secf
                         t = time.strptime("%04i:%02i:%02i:%02i:%02i:%02i" %
                                           (year, month, day, hourf, minf, secf), "%Y:%m:%d:%H:%M:%S")
                         basetime = calendar.timegm(t)
-    
-                    # TimeSecDebFic = hourf*60*60+minf*60+secf
-                    # Relative_TimeSecDebFic = TimeSecDebFic - FirstFile_TimeSecDebFic
-    
-                    # VecDiff=Relative_TimeSecDebFic-TimeVec
-                    # Valdmin = np.amin(abs(VecDiff))
-                    # Indmin = np.where(VecDiff==Valdmin)[0][0]
-                    # if np.round(Valdmin*1e5)/1e5 != 0:
-                        # print "Correction decalage en temps"
-                        # FFTdata = np.fft.fft(data)
-                        # FFTdata[np.ceil(len(data)/2):] *= 0.
-                        # VecFre = np.arange(0,len(data)-1) / (samplerate/ (len(data)-1))
-                        # FFTcorr = FFTdata * np.exp(1j * 2. * np.pi * VecFre * Valdmin).T
-                        # datac=2. * np.real(np.fft.ifft(FFTcorr))
-    
-                        # trame[Indmin:len(datac)+Indmin-1]=datac
-                    # else:
-                        # trame[Indmin:Indmin+len(data)]=data
-    
-                    # del VecDiff
     
                     if len(trame) % 2 != 0:
                         trame = np.append(trame, 0.)
@@ -323,7 +342,7 @@ def main():
                     for ifilter, filter in enumerate(get_filters(db, all=False)):
                         whitened_slices[istation, ifilter, itranche,:] = whiten(tmp, Nfft, dt, float(filter.low), float(filter.high), plot=False)
                     del tmp
-            
+            del tramef_Z
             logging.info("Processing CC")
             for ifilter, filter in enumerate(get_filters(db, all=False)):
                 for pair in pairs:
