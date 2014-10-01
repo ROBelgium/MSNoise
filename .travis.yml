@@ -24,10 +24,14 @@ before_install:
   - export PATH=/home/travis/miniconda/bin:$PATH
   # Update conda itself
   - conda update --yes conda
+  # Installed required packages
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib statsmodels pandas
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION sqlalchemy sphinx jinja2
+  - conda install --yes pip python=$TRAVIS_PYTHON_VERSION flask flask-admin
+  # Update remaining packages not available via conda
   - easy_install obspy
   - easy_install mysql-python
+  # Special install for scikits.samplerate
   - cd ..
   - sudo dpkg -L libsamplerate0
   - sudo dpkg -L libsamplerate0-dev
@@ -39,6 +43,7 @@ before_install:
   - echo "include_dirs=/usr/include" >> site.cfg
   - python setup.py build
   - python setup.py install
+  # Finished procedure, going to root folder
   - cd ..
   - ls -la
 
@@ -47,6 +52,6 @@ install:
   - cd MSNoise
 
 script:
-  - python bugreport.py -a
+  - python bugreport.py -s -m
   - cd tests
   - python ../tests.py
