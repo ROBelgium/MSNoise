@@ -5,7 +5,8 @@ A Python Package for Monitoring Seismic Velocity Changes using Ambient Seismic N
 
 
 [![Build Status](https://travis-ci.org/ROBelgium/MSNoise.png)](https://travis-ci.org/ROBelgium/MSNoise)
-[![Analytics](https://ga-beacon.appspot.com/UA-55331253-1/MSNoise/readme)]
+
+[![Analytics](https://ga-beacon.appspot.com/UA-55331253-1/MSNoise/readme)](https://github.com/ROBelgium/MSNoise)
 
 MSNoise is the first complete software package for computing and monitoring relative velocity variations using ambient seismic noise. 
 MSNoise is a fully-integrated solution that automatically scans data archives and determines which jobs need to be done whenever the scheduled task is executed. 
