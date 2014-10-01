@@ -6,3 +6,7 @@ __version__ = "1.0.1"
 __maintainer__ = "Thomas LECOCQ"
 __email__ = "Thomas.Lecocq at seismology.be"
 __status__ = "Production"
+
+import os
+
+MSNoisePATH = os.path.realpath(os.path.dirname(__file__))
