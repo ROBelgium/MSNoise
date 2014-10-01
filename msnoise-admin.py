@@ -13,8 +13,6 @@ from flask.ext.admin.actions import action
 from flask.ext.admin.babel import gettext, ngettext, lazy_gettext
 import webbrowser
 
-MSNoise_PATH=r'./'
-# sys.path.append(MSNoise_PATH)
 from database_tools import *
 from default import *
 from msnoise_table_def import *
