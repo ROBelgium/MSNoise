@@ -15,6 +15,7 @@ import scipy.fftpack
 from obspy.core import Stream, Trace, read
 from obspy.signal import cosTaper
 from obspy.sac import SacIO
+from obspy.core.util import gps2DistAzimuth
 
 from msnoise_table_def import *
 
