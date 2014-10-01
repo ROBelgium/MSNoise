@@ -2,71 +2,60 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.fftpack
 
-# from tempfile import mkdtemp
-# cachedir = mkdtemp()
-# from joblib import Memory
-# memory = Memory(cachedir=cachedir, verbose=0)
-
-
 def nextpow2(x):
     return np.ceil(np.log2(np.abs(x)))
 
 
-# @memory.cache
-def whiten(matsign, Nfft, tau, frebas, frehaut, plot=False, tmp=False):
-    """This function takes 1-dimensional *matsign* timeseries array,
+def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
+    """This function takes 1-dimensional *data* timeseries array,
     goes to frequency domain using fft, whitens the amplitude of the spectrum
-    in frequency domain between *frebas* and *frehaut*
+    in frequency domain between *freqmin* and *freqmax*
     and returns the whitened fft.
 
     Parameters
     ----------
-    matsign : numpy.ndarray
+    data : numpy.ndarray
         Contains the 1D time series to whiten
     Nfft : int
         The number of points to compute the FFT
-    tau : int
-        The sampling frequency of the `matsign`
-    frebas : int
+    delta : int
+        The sampling frequency of the `data`
+    freqmin : int
         The lower frequency bound
-    frehaut : int
+    freqmax : int
         The upper frequency bound
     plot : bool
         Whether to show a raw plot of the action (default: False)
-    tmp : int
-        unused.
-
 
     Returns
     -------
     data : numpy.ndarray
         The FFT of the input trace, whitened between the frequency bounds
 """
-    # if len(matsign)/2 %2 != 0:
-        # matsign = np.append(matsign,[0,0])
 
     if plot:
         plt.subplot(411)
-        plt.plot(np.arange(len(matsign)) * tau, matsign)
-        plt.xlim(0, len(matsign) * tau)
+        plt.plot(np.arange(len(data)) * delta, data)
+        plt.xlim(0, len(data) * delta)
         plt.title('Input trace')
 
-    Napod = 300
-
-    freqVec = np.arange(0., Nfft / 2.0) / (tau * (Nfft - 1))
-    J = np.where((freqVec >= frebas) & (freqVec <= frehaut))[0]
+    Napod = 100
+    Nfft = int(Nfft)
+    freqVec = scipy.fftpack.fftfreq(Nfft,d=delta)[:Nfft/2]
+    
+    J = np.where((freqVec >= freqmin) & (freqVec <= freqmax))[0]
     low = J[0] - Napod
-    if low < 0:
-        low = 0
+    if low <= 0:
+        low = 1
 
     porte1 = J[0]
     porte2 = J[-1]
     high = J[-1] + Napod
     if high > Nfft / 2:
-        high = Nfft / 2
+        high = Nfft // 2
 
-    FFTRawSign = scipy.fftpack.fft(matsign, Nfft)
-
+    FFTRawSign = scipy.fftpack.fft(data, Nfft)
+    
     if plot:
         plt.subplot(412)
         axis = np.arange(len(FFTRawSign))
@@ -74,34 +63,18 @@ def whiten(matsign, Nfft, tau, frebas, frehaut, plot=False, tmp=False):
         plt.xlim(0, max(axis))
         plt.title('FFTRawSign')
 
-    # Apodisation a gauche en cos2
+    # Left tapering:
     FFTRawSign[0:low] *= 0
-    FFTRawSign[low:porte1] = np.cos(np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2 * np.exp(
-        1j * np.angle(FFTRawSign[low:porte1]))
-    # Porte
-    FFTRawSign[porte1:porte2] = np.exp(
-        1j * np.angle(FFTRawSign[porte1:porte2]))
-    # Apodisation a droite en cos2
-    FFTRawSign[porte2:high] = np.cos(np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(
-        1j * np.angle(FFTRawSign[porte2:high]))
+    FFTRawSign[low:porte1] = np.cos(np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2 * np.exp(1j * np.angle(FFTRawSign[low:porte1]))
+    # Pass band:
+    FFTRawSign[porte1:porte2] = np.exp(1j * np.angle(FFTRawSign[porte1:porte2]))
+    # Right tapering:
+    FFTRawSign[porte2:high] = np.cos(np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(1j * np.angle(FFTRawSign[porte2:high]))
+    FFTRawSign[high:Nfft+1] *= 0
+    
+    # Hermitian symmetry (because the input is real)
+    FFTRawSign[-Nfft/2+1:] = FFTRawSign[1:Nfft/2].conjugate()[::-1]
 
-    if low == 0:
-        low = 1
-
-    FFTRawSign[-low:] *= 0
-    # Apodisation a gauche en cos2
-    FFTRawSign[-porte1:-low] = np.cos(np.linspace(0., np.pi / 2., porte1 - low)) ** 2 * np.exp(
-        1j * np.angle(FFTRawSign[-porte1:-low]))
-    # Porte
-    FFTRawSign[-porte2:-porte1] = np.exp(
-        1j * np.angle(FFTRawSign[-porte2:-porte1]))
-    # ~ # Apodisation a droite en cos2
-    FFTRawSign[-high:-porte2] = np.cos(np.linspace(np.pi / 2., np.pi, high - porte2)) ** 2 * np.exp(
-        1j * np.angle(FFTRawSign[-high:-porte2]))
-
-    FFTRawSign[high:-high] *= 0
-
-    FFTRawSign[-1] *= 0.
     if plot:
         plt.subplot(413)
         axis = np.arange(len(FFTRawSign))
@@ -118,28 +91,23 @@ def whiten(matsign, Nfft, tau, frebas, frehaut, plot=False, tmp=False):
         plt.plot(axis, np.abs(FFTRawSign))
         plt.xlim(0, max(axis))
 
-    wmatsign = np.real(scipy.fftpack.ifft(FFTRawSign))
-    del matsign
-    if plot:
+        wdata = np.real(scipy.fftpack.ifft(FFTRawSign))
         plt.subplot(414)
-        plt.plot(np.arange(len(wmatsign)) * tau, wmatsign)
-        plt.xlim(0, len(wmatsign) * tau)
+        plt.plot(np.arange(len(wdata)) * delta, wdata)
+        plt.xlim(0, len(wdata) * delta)
         plt.show()
-    # return wmatsign
+    
     return FFTRawSign
 
-
+    
 if __name__ == '__main__':
     import time
-    N = 86438
-
+    N = 2048
+    np.random.seed(1234)
     a = np.random.random(N)
     a = np.sin(a) + np.sin(a / 4.) + np.sin(a / 16.)
-
-    t = time.time()
-    whiten(a, N, 0.05, 1.0, 5.9, plot=False)
-    print time.time() - t
-
-    t = time.time()
-    whiten(a, N, 0.05, 1.0, 5.9, plot=False)
-    print time.time() - t
+    a -= a.mean()
+    t = time.clock()
+    for i in range(1000):
+        whiten(a.copy(), N, 0.05, 1.0, 5.9, plot=False)
+    print "1000 loops:", (time.clock()-t) * 1000, "ms"

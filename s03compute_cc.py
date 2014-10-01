@@ -78,8 +78,9 @@ from whiten import whiten
 
 import logging
 
-if __name__ == "__main__":
-    
+
+# @profile    
+def main():
     logging.basicConfig(level=logging.DEBUG,
                         filename="./compute_cc.log",
                         format='%(asctime)s [%(levelname)s] %(message)s',
@@ -157,8 +158,6 @@ if __name__ == "__main__":
         datafilesE = {}
         datafilesN = {}
     
-        durations = []
-    
         for station in stations:
             datafilesZ[station] = []
             datafilesE[station] = []
@@ -200,19 +199,62 @@ if __name__ == "__main__":
                         st = read(file)
                         stream += st
                         del st
-                    stream.merge()
-                    stream = stream.split()
+                    
+                    #TLQ Add quality/sps check
+                    for i, trace in enumerate(stream):
+                        stream[i] = check_and_phase_shift(trace)
+                    print "Done checking sample alignment"
+                    stream.sort()
+                    if len(getGaps(stream)) > 0:
+                        for gap in getGaps(stream):
+                            print "Gap between traces %i and %i is %.6f seconds long, %i sample(s) are missing" % (gap[0], gap[1], gap[-2], gap[-1])
+                        print "INPUT:"
+                        print stream
+
+                        max_gap = 10
+                        only_too_long=False
+                        while getGaps(stream) and not only_too_long:
+                            too_long = 0
+                            gaps = getGaps(stream)
+                            for gap in gaps:
+                                if int(gap[-1]) <= max_gap:
+                                    stream[gap[0]] = stream[gap[0]].__add__(stream[gap[1]], method=0, fill_value="interpolate")
+                                    stream.remove(stream[gap[1]])
+                                    break
+                                else:
+                                    too_long += 1
+                            if too_long == len(gaps):
+                                only_too_long = True
+
+                        print "OUTPUT:"
+                        print stream
+
+                    taper_length = 20.0 #seconds
                     for trace in stream:
-                        data = trace.data
-                        if len(data) > 2:
-                            trace.detrend("demean")
-                            trace.taper(0.01)
+                        if trace.stats.npts < 4 * taper_length*trace.stats.sampling_rate:
+                            trace.data = np.zeros(trace.stats.npts)
                         else:
-                            trace.data *= 0
-                        del data
-                    logging.debug("%s.%s Merging Stream" % (station, comp))
-                    #fills gaps with 0s and gives only one 'Trace'
-                    stream.merge(fill_value=0)
+                            trace.detrend(type="demean")
+                            trace.detrend(type="linear")
+                            taper_1s = taper_length * float(trace.stats.sampling_rate) / trace.stats.npts
+                            cp = cosTaper(trace.stats.npts, taper_1s)
+                            trace.data *= cp
+                    stream.merge(method=0, fill_value=0.0)
+                    
+                    #TLQ end
+                    
+                    # stream.merge()
+                    # stream = stream.split()
+                    # for trace in stream:
+                        # data = trace.data
+                        # if len(data) > 2:
+                            # trace.detrend("demean")
+                            # trace.taper(0.01)
+                        # else:
+                            # trace.data *= 0
+                        # del data
+                    # logging.debug("%s.%s Merging Stream" % (station, comp))
+                    # stream.merge(fill_value=0)
                     logging.debug("%s.%s Slicing Stream to %s:%s" % (station, comp, utcdatetime.UTCDateTime(
                         goal_day.replace('-', '')), utcdatetime.UTCDateTime(goal_day.replace('-', '')) + goal_duration - stream[0].stats.delta))
     
@@ -253,31 +295,9 @@ if __name__ == "__main__":
                     trame = data
     
                     if j == 0:
-                        FirstFile_TimeSecDebFic = hourf * \
-                            60 * 60 + minf * 60 + secf
                         t = time.strptime("%04i:%02i:%02i:%02i:%02i:%02i" %
                                           (year, month, day, hourf, minf, secf), "%Y:%m:%d:%H:%M:%S")
                         basetime = calendar.timegm(t)
-    
-                    # TimeSecDebFic = hourf*60*60+minf*60+secf
-                    # Relative_TimeSecDebFic = TimeSecDebFic - FirstFile_TimeSecDebFic
-    
-                    # VecDiff=Relative_TimeSecDebFic-TimeVec
-                    # Valdmin = np.amin(abs(VecDiff))
-                    # Indmin = np.where(VecDiff==Valdmin)[0][0]
-                    # if np.round(Valdmin*1e5)/1e5 != 0:
-                        # print "Correction decalage en temps"
-                        # FFTdata = np.fft.fft(data)
-                        # FFTdata[np.ceil(len(data)/2):] *= 0.
-                        # VecFre = np.arange(0,len(data)-1) / (samplerate/ (len(data)-1))
-                        # FFTcorr = FFTdata * np.exp(1j * 2. * np.pi * VecFre * Valdmin).T
-                        # datac=2. * np.real(np.fft.ifft(FFTcorr))
-    
-                        # trame[Indmin:len(datac)+Indmin-1]=datac
-                    # else:
-                        # trame[Indmin:Indmin+len(data)]=data
-    
-                    # del VecDiff
     
                     if len(trame) % 2 != 0:
                         trame = np.append(trame, 0.)
@@ -296,161 +316,224 @@ if __name__ == "__main__":
         # Calculate the number of slices
         tranches = int(goal_duration * fe / min30)
         # print
-        # print '##### ITERATING OVER PAIRS #####'
-    
-        for pair in pairs:
-            orig_pair = pair
-            logging.debug('Processing pair: %s' % pair.replace(':', ' vs '))
-            tt = time.time()
-            # print ">PROCESSING PAIR %s"%pair.replace(':',' vs ')
-            station1, station2 = pair.split(':')
-            pair = (np.where(stations == station1)
-                    [0][0], np.where(stations == station2)[0][0])
-    
-            s1 = get_station(db, station1.split('.')[0], station1.split('.')[1])
-            s2 = get_station(db, station2.split('.')[0], station2.split('.')[1])
-    
-            X0 = s1.X
-            Y0 = s1.Y
-            c0 = s1.coordinates
-    
-            X1 = s2.X
-            Y1 = s2.Y
-            c1 = s2.coordinates
-    
-            if c0 == c1:
-                if c0 == 'DEG':
-                    # print "> I will compute the azimut based on degrees"
-                    coordinates = 'DEG'
-                else:
-                    # print "> I will compute the azimut based on meters"
-                    coordinates = 'UTM'
-            else:
-                # print "> Coordinates type don't match, I will need to compute
-                # more stuff !!"
-                coordinates = 'MIX'
-            # print "X0,Y0 ; X1,Y1:", X0, Y0, X1, Y1
-            cplAz = azimuth(coordinates, X0, Y0, X1, Y1)
-    
-            for components in components_to_compute:
-                # we create the two parts of the correlation array checking for the
-                # right components :
-                if components[0] == "Z":
-                    t1 = tramef_Z[pair[0]]
-                elif components[0] == "R":
-                    t1 = tramef_N[pair[0]] * np.cos(cplAz * np.pi / 180.) + tramef_E[
-                        pair[0]] * np.sin(cplAz * np.pi / 180.)
-                elif components[0] == "T":
-                    t1 = tramef_N[pair[0]] * np.sin(cplAz * np.pi / 180.) - tramef_E[
-                        pair[0]] * np.cos(cplAz * np.pi / 180.)
-    
-                if components[1] == "Z":
-                    t2 = tramef_Z[pair[1]]
-                elif components[1] == "R":
-                    t2 = tramef_N[pair[1]] * np.cos(cplAz * np.pi / 180.) + tramef_E[
-                        pair[1]] * np.sin(cplAz * np.pi / 180.)
-                elif components[1] == "T":
-                    t2 = tramef_N[pair[1]] * np.sin(cplAz * np.pi / 180.) - tramef_E[
-                        pair[1]] * np.cos(cplAz * np.pi / 180.)
-    
-                trames = np.vstack((t1, t2))
-                del t1, t2
-                ncorr = 0
-    
-                daycorr = {}
-                ndaycorr = {}
-                for filterdb in get_filters(db, all=False):
-                    filterid = filterdb.ref
-                    daycorr[filterid] = np.zeros(get_maxlag_samples(db,))
-                    ndaycorr[filterid] = 0
-    
-                for itranche in range(0, tranches):
-                    # print "Avancement: %#2d/%2d"% (itranche+1,tranches)
-                    trame2h = trames[:, itranche * int(min30):(itranche + 1) * int(min30)]
-                    rmsmat = np.std(np.abs(trame2h), axis=1)
-                    for filterdb in get_filters(db, all=False):
-                        filterid = filterdb.ref
-                        low = float(filterdb.low)
-                        high = float(filterdb.high)
-                        rms_threshold = filterdb.rms_threshold
-                        # print "Filter Bounds used:", filterid, low, high
-                        # Npts = min30
-                        # Nc = 2* Npts - 1
-                        # Nfft = 2**nextpow2(Nc)
-    
-                        Nfft = min30
-                        if min30 / 2 % 2 != 0:
-                            Nfft = min30 + 2
-    
-                        trames2hWb = np.zeros((2, int(Nfft)), dtype=np.complex)
-                        for i, station in enumerate(pair):
-                            # print "USING rms threshold = %f" % rms_threshold
-                            # logging.debug("rmsmat[i] = %f" % rmsmat[i])
-                            if rmsmat[i] > rms_threshold:
-                                cp = cosTaper(len(trame2h[i]),0.04)
-                                
-                                if windsorizing != 0:
-                                    indexes = np.where(
-                                        np.abs(trame2h[i]) > (windsorizing * rmsmat[i]))[0]
-                                    # clipping at windsorizing*rms
-                                    trame2h[i][indexes] = (trame2h[i][indexes] / np.abs(
-                                        trame2h[i][indexes])) * windsorizing * rmsmat[i]
-    
-                                # logging.debug('whiten')
-    
-                                trames2hWb[i] = whiten(
-                                    trame2h[i]*cp, Nfft, dt, low, high, plot=False)
-                            else:
-                                # logging.debug("Station no %d, pas de pretraitement car rms < %f ou NaN"% (i, rms_threshold))
-                                trames2hWb[i] = np.zeros(int(Nfft))
-    
-                        corr = myCorr(trames2hWb, np.ceil(maxlag / dt), plot=False)
-    
-                        thisdate = time.strftime(
-                            "%Y-%m-%d", time.gmtime(basetime + itranche * min30 / fe))
-                        thistime = time.strftime(
-                            "%H_%M", time.gmtime(basetime + itranche * min30 / fe))
+        
+        ###
+        ### Computing only ZZ components ? Then we can be much faster:
+        ###
+        
+        # if False:
+        if len(components_to_compute) == 1 and components_to_compute[0] == "ZZ":
+            Nfft = min30
+            if min30 / 2 % 2 != 0:
+                Nfft = min30 + 2
+            cp = cosTaper(int(min30), 0.04)
+            
+            logging.info("Pre-Whitening Traces")
+            whitened_slices = np.zeros((len(stations), len(get_filters(db, all=False)), tranches, int(Nfft)), dtype=np.complex)
+            for istation, station in enumerate(stations):
+                for itranche in range(tranches):
+                    tmp = tramef_Z[istation, itranche * int(min30):(itranche + 1) * int(min30)]
+                    rmsmat = np.std(np.abs(tmp))
+                    indexes = np.where(
+                        np.abs(tmp) > (windsorizing * rmsmat))[0]
+                    tmp[indexes] = (tmp[indexes] / np.abs(
+                        tmp[indexes])) * windsorizing * rmsmat
+                    tmp *= cp
+                    for ifilter, filter in enumerate(get_filters(db, all=False)):
+                        whitened_slices[istation, ifilter, itranche,:] = whiten(tmp, Nfft, dt, float(filter.low), float(filter.high), plot=False)
+                    del tmp
+            del tramef_Z
+            logging.info("Processing CC")
+            for ifilter, filter in enumerate(get_filters(db, all=False)):
+                for pair in pairs:
+                    orig_pair = pair
+                    if keep_days:
+                        daycorr = np.zeros(get_maxlag_samples(db,))
+                        ndaycorr = 0
+                    station1, station2 = pair.split(':')
+                    pair = (np.where(stations == station1)
+                            [0][0], np.where(stations == station2)[0][0])
+                    for itranche in range(0, tranches):
+                        tmp = np.vstack((whitened_slices[pair[0], ifilter, itranche], whitened_slices[pair[1], ifilter, itranche]))
+                        corr = myCorr(tmp, np.ceil(maxlag / dt), plot=False)
+                        #ADD KEEP_ALL !
                         if keep_all:
                             add_corr(db, station1.replace('.', '_'), station2.replace(
-                                '.', '_'), filterid, thisdate, thistime, min30 / fe, components, corr, fe)
-    
+                                    '.', '_'), filter.ref, thisdate, thistime, min30 / fe, "ZZ", corr, fe)
                         if keep_days:
                             if not np.any(np.isnan(corr)) and not np.any(np.isinf(corr)):
-                                daycorr[filterid] += corr
-                                ndaycorr[filterid] += 1
-    
-                        del corr, thistime, trames2hWb
-    
-                if keep_days:
-                    try:
+                                daycorr += corr
+                                ndaycorr += 1
+
+                    if keep_days:
+                        thisdate = time.strftime(
+                            "%Y-%m-%d", time.gmtime(basetime))
+                        thistime = time.strftime(
+                            "%H_%M", time.gmtime(basetime))
+                        add_corr(
+                            db, station1.replace(
+                                '.', '_'), station2.replace('.', '_'), filter.ref,
+                            thisdate, thistime, min30 / fe, 'ZZ', daycorr, fe, day=True, ncorr=ndaycorr)
+                    update_job(db, goal_day, orig_pair, 'CC', 'D')
+            logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
+                    
+        else:
+        # if 1:
+        # print '##### ITERATING OVER PAIRS #####'
+            for pair in pairs:
+                orig_pair = pair
+                logging.debug('Processing pair: %s' % pair.replace(':', ' vs '))
+                tt = time.time()
+                # print ">PROCESSING PAIR %s"%pair.replace(':',' vs ')
+                station1, station2 = pair.split(':')
+                pair = (np.where(stations == station1)
+                        [0][0], np.where(stations == station2)[0][0])
+        
+                s1 = get_station(db, station1.split('.')[0], station1.split('.')[1])
+                s2 = get_station(db, station2.split('.')[0], station2.split('.')[1])
+        
+                X0 = s1.X
+                Y0 = s1.Y
+                c0 = s1.coordinates
+        
+                X1 = s2.X
+                Y1 = s2.Y
+                c1 = s2.coordinates
+        
+                if c0 == c1:
+                    if c0 == 'DEG':
+                        # print "> I will compute the azimut based on degrees"
+                        coordinates = 'DEG'
+                    else:
+                        # print "> I will compute the azimut based on meters"
+                        coordinates = 'UTM'
+                else:
+                    # print "> Coordinates type don't match, I will need to compute
+                    # more stuff !!"
+                    coordinates = 'MIX'
+                # print "X0,Y0 ; X1,Y1:", X0, Y0, X1, Y1
+                cplAz = azimuth(coordinates, X0, Y0, X1, Y1)
+        
+                for components in components_to_compute:
+                    # we create the two parts of the correlation array checking for the
+                    # right components :
+                    if components[0] == "Z":
+                        t1 = tramef_Z[pair[0]]
+                    elif components[0] == "R":
+                        t1 = tramef_N[pair[0]] * np.cos(cplAz * np.pi / 180.) + tramef_E[
+                            pair[0]] * np.sin(cplAz * np.pi / 180.)
+                    elif components[0] == "T":
+                        t1 = tramef_N[pair[0]] * np.sin(cplAz * np.pi / 180.) - tramef_E[
+                            pair[0]] * np.cos(cplAz * np.pi / 180.)
+        
+                    if components[1] == "Z":
+                        t2 = tramef_Z[pair[1]]
+                    elif components[1] == "R":
+                        t2 = tramef_N[pair[1]] * np.cos(cplAz * np.pi / 180.) + tramef_E[
+                            pair[1]] * np.sin(cplAz * np.pi / 180.)
+                    elif components[1] == "T":
+                        t2 = tramef_N[pair[1]] * np.sin(cplAz * np.pi / 180.) - tramef_E[
+                            pair[1]] * np.cos(cplAz * np.pi / 180.)
+        
+                    trames = np.vstack((t1, t2))
+                    del t1, t2
+                    ncorr = 0
+        
+                    daycorr = {}
+                    ndaycorr = {}
+                    for filterdb in get_filters(db, all=False):
+                        filterid = filterdb.ref
+                        daycorr[filterid] = np.zeros(get_maxlag_samples(db,))
+                        ndaycorr[filterid] = 0
+        
+                    for itranche in range(0, tranches):
+                        # print "Avancement: %#2d/%2d"% (itranche+1,tranches)
+                        trame2h = trames[:, itranche * int(min30):(itranche + 1) * int(min30)]
+                        rmsmat = np.std(np.abs(trame2h), axis=1)
                         for filterdb in get_filters(db, all=False):
                             filterid = filterdb.ref
-                            corr = daycorr[filterid]
-                            ncorr = ndaycorr[filterid]
-                            if ncorr > 0:
-                                logging.debug(
-                                    "Saving daily CCF for filter %02i (stack of %02i CCF)" % (filterid, ncorr))
-    
-                                # corr /= ncorr
-                                thisdate = time.strftime(
-                                    "%Y-%m-%d", time.gmtime(basetime))
-                                thistime = time.strftime(
-                                    "%H_%M", time.gmtime(basetime))
-                                add_corr(
-                                    db, station1.replace(
-                                        '.', '_'), station2.replace('.', '_'), filterid,
-                                    thisdate, thistime, min30 / fe, components, corr, fe, day=True, ncorr=ncorr)
-                            del corr, ncorr
-                    except Exception as e:
-                        logging.debug(str(e))
-                del trames, daycorr, ndaycorr
-            logging.debug("Updating Job")
-            update_job(db, goal_day, orig_pair, 'CC', 'D')
-    
-            logging.debug("Finished processing this pair. It took %.2f seconds" %
-                          (time.time() - tt))
-        logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
+                            low = float(filterdb.low)
+                            high = float(filterdb.high)
+                            rms_threshold = filterdb.rms_threshold
+                            # print "Filter Bounds used:", filterid, low, high
+                            # Npts = min30
+                            # Nc = 2* Npts - 1
+                            # Nfft = 2**nextpow2(Nc)
+        
+                            Nfft = min30
+                            if min30 / 2 % 2 != 0:
+                                Nfft = min30 + 2
+        
+                            trames2hWb = np.zeros((2, int(Nfft)), dtype=np.complex)
+                            for i, station in enumerate(pair):
+                                # print "USING rms threshold = %f" % rms_threshold
+                                # logging.debug("rmsmat[i] = %f" % rmsmat[i])
+                                if rmsmat[i] > rms_threshold:
+                                    cp = cosTaper(len(trame2h[i]),0.04)
+                                    
+                                    if windsorizing != 0:
+                                        indexes = np.where(
+                                            np.abs(trame2h[i]) > (windsorizing * rmsmat[i]))[0]
+                                        # clipping at windsorizing*rms
+                                        trame2h[i][indexes] = (trame2h[i][indexes] / np.abs(
+                                            trame2h[i][indexes])) * windsorizing * rmsmat[i]
+        
+                                    # logging.debug('whiten')
+        
+                                    trames2hWb[i] = whiten(
+                                        trame2h[i]*cp, Nfft, dt, low, high, plot=False)
+                                else:
+                                    # logging.debug("Station no %d, pas de pretraitement car rms < %f ou NaN"% (i, rms_threshold))
+                                    trames2hWb[i] = np.zeros(int(Nfft))
+        
+                            corr = myCorr(trames2hWb, np.ceil(maxlag / dt), plot=False)
+        
+                            thisdate = time.strftime(
+                                "%Y-%m-%d", time.gmtime(basetime + itranche * min30 / fe))
+                            thistime = time.strftime(
+                                "%H_%M", time.gmtime(basetime + itranche * min30 / fe))
+                            if keep_all:
+                                add_corr(db, station1.replace('.', '_'), station2.replace(
+                                    '.', '_'), filterid, thisdate, thistime, min30 / fe, components, corr, fe)
+        
+                            if keep_days:
+                                if not np.any(np.isnan(corr)) and not np.any(np.isinf(corr)):
+                                    daycorr[filterid] += corr
+                                    ndaycorr[filterid] += 1
+        
+                            del corr, thistime, trames2hWb
+        
+                    if keep_days:
+                        try:
+                            for filterdb in get_filters(db, all=False):
+                                filterid = filterdb.ref
+                                corr = daycorr[filterid]
+                                ncorr = ndaycorr[filterid]
+                                if ncorr > 0:
+                                    logging.debug(
+                                        "Saving daily CCF for filter %02i (stack of %02i CCF)" % (filterid, ncorr))
+        
+                                    # corr /= ncorr
+                                    thisdate = time.strftime(
+                                        "%Y-%m-%d", time.gmtime(basetime))
+                                    thistime = time.strftime(
+                                        "%H_%M", time.gmtime(basetime))
+                                    add_corr(
+                                        db, station1.replace(
+                                            '.', '_'), station2.replace('.', '_'), filterid,
+                                        thisdate, thistime, min30 / fe, components, corr, fe, day=True, ncorr=ncorr)
+                                del corr, ncorr
+                        except Exception as e:
+                            logging.debug(str(e))
+                    del trames, daycorr, ndaycorr
+                logging.debug("Updating Job")
+                update_job(db, goal_day, orig_pair, 'CC', 'D')
+        
+                logging.debug("Finished processing this pair. It took %.2f seconds" %
+                              (time.time() - tt))
+            logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
     logging.info('*** Finished: Compute CC ***')
     
-    
-    # EOF
+if __name__ == "__main__":
+    main()    
+

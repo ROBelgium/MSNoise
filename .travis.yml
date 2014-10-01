@@ -1,0 +1,58 @@
+# Miniconda stuff shamelessly copied from
+# https://gist.github.com/dan-blanchard/7045057
+# and
+# https://github.com/Jorge-C/ordination/blob/master/.travis.yml
+language: python
+
+python:
+  - 2.7
+
+# Need to set this so that packages installed with apt-get are available
+virtualenv:
+  system_site_packages: true
+
+before_install:
+  - lsb_release -a # get info on the operating system
+  - sudo apt-get update
+  - sudo apt-get install -qq gfortran
+  - sudo apt-get install libsamplerate0 libsamplerate0-dev
+  - sudo apt-get build-dep python-mysqldb
+  - sudo apt-get install libmysqlclient-dev
+  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+  - chmod +x miniconda.sh
+  - ./miniconda.sh -b
+  - export PATH=/home/travis/miniconda/bin:$PATH
+  # Update conda itself
+  - conda update --yes conda
+  # Installed required packages
+  - conda install --yes pip python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib statsmodels pandas
+  - conda install --yes pip python=$TRAVIS_PYTHON_VERSION sqlalchemy sphinx jinja2
+  - conda install --yes pip python=$TRAVIS_PYTHON_VERSION flask
+  # Update remaining packages not available via conda
+  - easy_install flask-admin
+  - easy_install obspy
+  - easy_install mysql-python
+  # Special install for scikits.samplerate
+  - cd ..
+  - sudo dpkg -L libsamplerate0
+  - sudo dpkg -L libsamplerate0-dev
+  - wget https://pypi.python.org/packages/source/s/scikits.samplerate/scikits.samplerate-0.3.3.tar.gz#md5=96c8d8ba3aa95a9db15994f78792efb4
+  - tar -xvf scikits.samplerate-0.3.3.tar.gz
+  - cd scikits.samplerate-0.3.3
+  - echo "[samplerate]" >> site.cfg
+  - echo "library_dirs=/usr/lib/x86_64-linux-gnu" >> site.cfg
+  - echo "include_dirs=/usr/include" >> site.cfg
+  - python setup.py build
+  - python setup.py install
+  # Finished procedure, going to root folder
+  - cd ..
+  - ls -la
+
+  
+install:
+  - cd MSNoise
+
+script:
+  - python bugreport.py -s -m
+  - cd tests
+  - python ../tests.py

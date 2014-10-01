@@ -103,26 +103,9 @@ def worker(files, folder, startdate, enddate):
             print "Problem", e
         db.close()
 
-if __name__ == "__main__":
-    t = time.time()
-    parser = argparse.ArgumentParser(description='Scan the data archive and insert the\
-    metadata in the database')
-    parser.add_argument('-i', '--init', action="store_true",
-                        help='Initialize the archive: should only be done upon first run.\
-                        Will read all files in the archive that match the station/component\
-                        (check that)',
-                        default=False)
-    parser.add_argument('-t', '--threads',
-                        help='Number of parellel threads to use [default:1]', default=1, type=int)
-    args = parser.parse_args()
 
-    # rootLogger = logging.getLogger('')
-    # rootLogger.setLevel(logging.DEBUG)
-    # socketHandler = logging.handlers.SocketHandler('localhost',
-                        # logging.handlers.DEFAULT_TCP_LOGGING_PORT)
-    # rootLogger.addHandler(socketHandler)
-    # global logger
-    # logger = logging.getLogger('main')
+def main(init=False, threads=1):
+    t = time.time()
 
     multiprocessing.log_to_stderr()
     global logger
@@ -135,10 +118,9 @@ if __name__ == "__main__":
     logger.info('*** Starting: Scan Archive ***')
     db = connect()
 
-    init = False
     mtime = -2
 
-    if args.init:
+    if init:
         logger.info("Initializing (should be run only once)")
         mtime = "-20000"
         init = True
@@ -146,8 +128,8 @@ if __name__ == "__main__":
         mtime = "%s" % mtime
 
     nthreads = 1
-    if args.threads:
-        nthreads = args.threads
+    if threads:
+        nthreads = threads
     if get_tech() == 1:
         logger.info("You can not work on %i threads because SQLite only\
  supports 1 connection at a time" % nthreads)
@@ -167,7 +149,6 @@ if __name__ == "__main__":
     data_folder = get_config(db, 'data_folder')
     data_struc = get_config(db, 'data_structure')
     channels = [c for c in get_config(db, 'channels').split(',')]
-
     folders_to_glob = []
     rawpath = data_structure[data_struc]
     for year in range(startdate.year, min(datetime.datetime.now().year, enddate.year) + 1):
@@ -177,7 +158,7 @@ if __name__ == "__main__":
             for sta in get_stations(db, all=False):
                 tmp = os.path.join(data_folder, stafol.replace(
                     'NET', sta.net).replace('STA', sta.sta))
-                folders_to_glob.append(os.path.join(data_folder, tmp))
+                folders_to_glob.append(tmp)
 
     clients = []
     for fi in sorted(folders_to_glob):
@@ -219,3 +200,16 @@ if __name__ == "__main__":
 
     logger.info('*** Finished: Scan Archive ***')
     logger.info('It took %.2f seconds' % (time.time() - t))
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Scan the data archive and insert the\
+    metadata in the database')
+    parser.add_argument('-i', '--init', action="store_true",
+                        help='Initialize the archive: should only be done upon first run.\
+                        Will read all files in the archive that match the station/component\
+                        (check that)',
+                        default=False)
+    parser.add_argument('-t', '--threads',
+                        help='Number of parellel threads to use [default:1]', default=1, type=int)
+    args = parser.parse_args()
+    main(args.init, args.threads)

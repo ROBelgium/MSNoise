@@ -1,23 +1,30 @@
-# queries.py
+# database_tools.py
+import os
+import logging
+import copy
+import datetime
+import itertools
+import cPickle
+
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 import numpy as np
-import datetime
-import itertools
-import cPickle
+import scipy.fftpack
+
 from obspy.core import Stream, Trace, read
+from obspy.signal import cosTaper
 from obspy.sac import SacIO
 from obspy.core.util import gps2DistAzimuth
-import os
-import logging
+
 from msnoise_table_def import *
 
 def get_tech():
     tech, hostname, database, username, password = read_database_inifile()
     return tech
 
-def connect(inifile='db.ini'):
+
+def connect(inifile=os.path.join(os.getcwd(), 'db.ini')):
     tech, hostname, database, username, password = read_database_inifile(inifile)
     if tech == 1:
         engine = create_engine('sqlite:///%s' % hostname, echo=False)
@@ -30,12 +37,12 @@ def connect(inifile='db.ini'):
 
 
 def create_database_inifile(tech, hostname, database, username, password):
-    f = open('db.ini', 'w')
+    f = open(os.path.join(os.getcwd(), 'db.ini'), 'w')
     cPickle.dump([tech, hostname, database, username, password], f)
     f.close()
 
 
-def read_database_inifile(inifile='db.ini'):
+def read_database_inifile(inifile=os.path.join(os.getcwd(), 'db.ini')):
     f = open(inifile, 'r')
     tech, hostname, database, username, password = cPickle.load(f)
     f.close()
@@ -183,7 +190,6 @@ def get_new_files(session):
     files = session.query(DataAvailability).filter(DataAvailability.flag != 'A').order_by(DataAvailability.starttime).all()
     return files
 
-
 def get_data_availability(session, net=None, sta=None, comp=None, starttime=None, endtime=None):
     if not starttime:
         data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(DataAvailability.comp == comp).all()
@@ -199,7 +205,6 @@ def mark_data_availability(session,net,sta,flag):
     for d in data:
         d.flag = flag
     session.commit()
-
 
 def count_data_availability_flags(session):
     return session.query(func.count(DataAvailability.flag),DataAvailability.flag).group_by(DataAvailability.flag).all()
@@ -504,6 +509,88 @@ def azimuth(coordinates, x0, y0, x1, y1):
 
 def nextpow2(x):
     return np.ceil(np.log2(np.abs(x)))
+
+
+def check_and_phase_shift(trace):
+    print trace
+    taper_length = 20.0
+    if trace.stats.npts < 4 * taper_length*trace.stats.sampling_rate:
+        trace.data = np.zeros(trace.stats.npts)
+        return trace
+    
+    dt = np.mod(trace.stats.starttime.datetime.microsecond*1.0e-6, trace.stats.delta)
+    if (trace.stats.delta -dt) <= np.finfo(float).eps:
+        dt = 0
+    if dt != 0:
+        if dt <= (trace.stats.delta / 2.):
+            dt = -dt
+            direction = "left"
+        else:
+            dt = (trace.stats.delta - dt)
+            direction = "right"
+        trace.detrend(type="demean")
+        trace.detrend(type="simple")
+        taper_1s = taper_length * float(trace.stats.sampling_rate) / trace.stats.npts
+        cp = cosTaper(trace.stats.npts, taper_1s)
+        trace.data *= cp
+        print "Trace is offset by %.6f s from closest delta (%s)" % (dt, direction)
+        n = int(2**nextpow2(len(trace.data)))
+        FFTdata = scipy.fftpack.fft(trace.data, n=n)
+        fftfreq = scipy.fftpack.fftfreq(n,d=trace.stats.delta)
+        FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
+        trace.data = np.real(scipy.fftpack.ifft(FFTdata, n=n)[:len(trace.data)])
+        trace.stats.starttime += dt
+        return trace
+    else: 
+        print "No Offset"
+        return trace
+    
+
+def getGaps(stream, min_gap=None, max_gap=None):
+    # Create shallow copy of the traces to be able to sort them later on.
+    copied_traces = copy.copy(stream.traces)
+    stream.sort()
+    gap_list = []
+    for _i in xrange(len(stream.traces) - 1):
+        # skip traces with different network, station, location or channel
+        if stream.traces[_i].id != stream.traces[_i + 1].id:
+            continue
+        # different sampling rates should always result in a gap or overlap
+        if stream.traces[_i].stats.delta == stream.traces[_i + 1].stats.delta:
+            flag = True
+        else:
+            flag = False
+        stats = stream.traces[_i].stats
+        stime = stats['endtime']
+        etime = stream.traces[_i + 1].stats['starttime']
+        delta = etime.timestamp - stime.timestamp
+        # Check that any overlap is not larger than the trace coverage
+        if delta < 0:
+            temp = stream.traces[_i + 1].stats['endtime'].timestamp - \
+                etime.timestamp
+            if (delta * -1) > temp:
+                delta = -1 * temp
+        # Check gap/overlap criteria
+        if min_gap and delta < min_gap:
+            continue
+        if max_gap and delta > max_gap:
+            continue
+        # Number of missing samples
+        nsamples = int(round(math.fabs(delta) * stats['sampling_rate']))
+        # skip if is equal to delta (1 / sampling rate)
+        if flag and nsamples == 1:
+            continue
+        elif delta > 0:
+            nsamples -= 1
+        else:
+            nsamples += 1
+        gap_list.append([_i,_i+1, 
+                        stats['network'], stats['station'],
+                        stats['location'], stats['channel'],
+                        stime, etime, delta, nsamples])
+    # Set the original traces to not alter the stream object.
+    stream.traces = copied_traces
+    return gap_list
 
 
 ################## TEST
