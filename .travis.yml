@@ -27,8 +27,9 @@ before_install:
   # Installed required packages
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib statsmodels pandas
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION sqlalchemy sphinx jinja2
-  - conda install --yes pip python=$TRAVIS_PYTHON_VERSION flask flask-admin
+  - conda install --yes pip python=$TRAVIS_PYTHON_VERSION flask
   # Update remaining packages not available via conda
+  - easy_install flask-admin
   - easy_install obspy
   - easy_install mysql-python
   # Special install for scikits.samplerate
