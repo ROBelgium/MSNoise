@@ -18,8 +18,8 @@ Contents:
    installation
    workflow
    core
+   how_tos
    about_db_performances
-   troubleshooting
    references
 
 

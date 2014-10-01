@@ -85,7 +85,7 @@ Quick Start - Linux
    
    .. code-block:: sh
     
-        easy_install traitsui traits obspy
+        easy_install traitsui traits obspy enable
  
    .. code-block:: sh
         
@@ -94,11 +94,11 @@ Quick Start - Linux
     
    If this fails, follow those instructions: :ref:`samplerate`.
 
-5. Install a MySQL server:
+5. Install a MySQL server and phpMyAdmin:
    
    .. code-block:: sh
     
-        sudo apt-get install mysql-server mysql-client
+        sudo apt-get install mysql-server mysql-client phpmyadmin
 
 6. Install mysql-python:
 

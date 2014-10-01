@@ -6,6 +6,12 @@ global MSNoise config, the Networks/Stations config and the Filters config.
 
 .. image:: .static/configurator1.png
 
+To run this script:
+
+.. code-block:: sh
+
+    python s001configurator.py
+
 
 Default Global Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

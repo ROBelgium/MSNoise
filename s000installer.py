@@ -21,7 +21,7 @@ To run this script:
 
 .. code-block:: sh
 
-    python s001installer.py
+    python s000installer.py
 
 """
 from sqlalchemy import create_engine
