@@ -10,6 +10,17 @@ Introduction
 MSNoise is a set of Python codes that use a database (sqlite or MySQL) and
 the `find` command. 
 
+Currently, MSNoise is *NOT* a regular Python Package, which means:
+
+* It doesn't have a setup.py file.
+* It should not be installed in the lib/site-packages folder of the current python installation.
+* It will create folder *within* its root folder (CROSS_CORRELATION, STACKS, MWCS, DTT folders). Thus:
+* It should be installed in a folder that is writable to the user.
+
+This should change in the future. Until then, when multiple users want to use MSNoise on the same machine, it would be better to have a copy of MSNoise for each (even: one copy for each "project").
+
+
+
 To run MSNoise, you need:
 
 *   A recent version of Python (2.7.x recommended). We suggest using Anaconda_ with extra modules ([+] modules are already distributed with Anaconda_):
@@ -74,18 +85,20 @@ Quick Start - Linux
    
    .. code-block:: sh
     
-        easy_install traitsui traits obspy
+        easy_install traitsui traits obspy enable
  
    .. code-block:: sh
         
         sudo apt-get install libsamplerate0 libsamplerate0-dev
         easy_install scikits.samplerate
+    
+   If this fails, follow those instructions: :ref:`samplerate`.
 
-5. Install a MySQL server:
+5. Install a MySQL server and phpMyAdmin:
    
    .. code-block:: sh
     
-        sudo apt-get install mysql-server mysql-client
+        sudo apt-get install mysql-server mysql-client phpmyadmin
 
 6. Install mysql-python:
 

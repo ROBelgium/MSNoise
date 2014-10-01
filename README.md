@@ -16,6 +16,19 @@ Documentation
 Currently, the full documentation can be found on: http://www.msnoise.org.
 
 
+Packaging
+----------
+Currently, MSNoise is *NOT* a regular Python Package, which means:
+
+* It doesn't have a setup.py file.
+* It should not be installed in the lib/site-packages folder of the current python installation.
+* It will create folder *within* its root folder (CROSS_CORRELATION, STACKS, MWCS, DTT folders). Thus:
+* It should be installed in a folder that is writable to the user.
+
+This should change in the future. Until then, when multiple users want to use MSNoise on the same machine, it would be better to have a copy of MSNoise for each (even: one copy for each "project").
+
+
+
 Getting Help
 -------------
 The best way to get help is to subscribe to the Mailing List and ask your question directly there. It is available on 
