@@ -52,7 +52,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     porte2 = J[-1]
     high = J[-1] + Napod
     if high > Nfft / 2:
-        high = Nfft / 2
+        high = Nfft // 2
 
     FFTRawSign = scipy.fftpack.fft(data, Nfft)
     
