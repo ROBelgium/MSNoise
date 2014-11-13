@@ -126,7 +126,7 @@ def wavg_wstd(data, errors):
     return wavg, wstd
 
 
-if __name__ == "__main__":
+def main():
     
     logging.info('*** Starting: Compute DT/T ***')
     db = connect()
@@ -460,3 +460,7 @@ if __name__ == "__main__":
     
     
     logging.info('*** Finished: Compute DT/T ***')
+
+
+if __name__ == "__main__":
+    main()

@@ -26,8 +26,8 @@ before_install:
   - conda update --yes conda
   # Installed required packages
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib statsmodels pandas
-  - conda install --yes pip python=$TRAVIS_PYTHON_VERSION sqlalchemy sphinx jinja2
-  - conda install --yes pip python=$TRAVIS_PYTHON_VERSION flask
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION sqlalchemy sphinx jinja2
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION flask
   # Update remaining packages not available via conda
   - easy_install flask-admin
   - easy_install obspy
@@ -51,8 +51,11 @@ before_install:
   
 install:
   - cd MSNoise
+  - python setup.py install
+  - cd
 
 script:
-  - python bugreport.py -s -m
+  - msnoise --help
+  - msnoise bugreport -s -m
   - cd tests
   - python ../tests.py

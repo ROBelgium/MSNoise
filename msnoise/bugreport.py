@@ -19,27 +19,27 @@ def ispresent(module):
 
 
 
-def bugreport():
-    parser = argparse.ArgumentParser(description='Helps determining what didn\'t work')
-    parser.add_argument('-s', '--sys', action="store_true",
-                        help='Outputs System info',
-                        default=False)
-    parser.add_argument('-m', '--modules', action="store_true",
-                        help='Outputs Python Modules Presence/Version',
-                        default=False)
-    parser.add_argument('-e', '--env', action="store_true",
-                        help='Outputs System Environment Variables',
-                        default=False)
-    parser.add_argument('-a', '--all', action="store_true",
-                        help='Outputs all of the above',
-                        default=False)
+def main(system=False, modules=False, env=False, all=False):
+    # parser = argparse.ArgumentParser(description='Helps determining what didn\'t work')
+    # parser.add_argument('-s', '--sys', action="store_true",
+                        # help='Outputs System info',
+                        # default=False)
+    # parser.add_argument('-m', '--modules', action="store_true",
+                        # help='Outputs Python Modules Presence/Version',
+                        # default=True)
+    # parser.add_argument('-e', '--env', action="store_true",
+                        # help='Outputs System Environment Variables',
+                        # default=False)
+    # parser.add_argument('-a', '--all', action="store_true",
+                        # help='Outputs all of the above',
+                        # default=False)
                                                 
-    args = parser.parse_args()
+    # args = parser.parse_args()
 
 
     print "************* Computer Report *************"
     
-    if args.sys or args.all:
+    if system or all:
         print 
         print "----------------+SYSTEM+-------------------"
         print "\n".join(platform.uname())
@@ -50,7 +50,7 @@ def bugreport():
     print "----------------+PYTHON+-------------------"
     print "Python:",sys.version
     print
-    if args.modules or args.all:
+    if modules or all:
         print "---------------+MODULES+-------------------"
         print
         print "Required:"
@@ -96,7 +96,7 @@ def bugreport():
         
         print
     
-    if args.env or args.all:    
+    if env or all:    
         print "------------------+ENV+--------------------"
         
         
@@ -112,4 +112,4 @@ def bugreport():
     
     
 if __name__ == "__main__":
-        bugreport()
+    main()
