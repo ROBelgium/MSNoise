@@ -28,7 +28,9 @@ before_install:
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib statsmodels pandas
   - conda install --yes python=$TRAVIS_PYTHON_VERSION sqlalchemy sphinx jinja2
   - conda install --yes python=$TRAVIS_PYTHON_VERSION flask
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION traitsui enable
   # Update remaining packages not available via conda
+  - easy_install click
   - easy_install flask-admin
   - easy_install obspy
   - easy_install mysql-python

@@ -5,7 +5,7 @@ import os, platform
 import sys
 import argparse
 
-def ispresent(module):
+def ispresent(module, how=None):
     try:
         mod = __import__(module)
         if hasattr(mod, '__version__'):
@@ -13,29 +13,30 @@ def ispresent(module):
         else:
             print "[X] %s: present (no version)"%module
     except:
-        print "[ ] %s: not found"%module
+        print "[ ] %s: not found (install via %s)"% (module, how)
 
 
 
 
 
 def main(system=False, modules=False, env=False, all=False):
-    # parser = argparse.ArgumentParser(description='Helps determining what didn\'t work')
-    # parser.add_argument('-s', '--sys', action="store_true",
-                        # help='Outputs System info',
-                        # default=False)
-    # parser.add_argument('-m', '--modules', action="store_true",
-                        # help='Outputs Python Modules Presence/Version',
-                        # default=True)
-    # parser.add_argument('-e', '--env', action="store_true",
-                        # help='Outputs System Environment Variables',
-                        # default=False)
-    # parser.add_argument('-a', '--all', action="store_true",
-                        # help='Outputs all of the above',
-                        # default=False)
+    #~ parser = argparse.ArgumentParser(description='Helps determining what didn\'t work')
+    #~ parser.add_argument('-s', '--sys', action="store_true",
+                        #~ help='Outputs System info',
+                        #~ default=False)
+    #~ parser.add_argument('-m', '--modules', action="store_true",
+                        #~ help='Outputs Python Modules Presence/Version',
+                        #~ default=True)
+    #~ parser.add_argument('-e', '--env', action="store_true",
+                        #~ help='Outputs System Environment Variables',
+                        #~ default=False)
+    #~ parser.add_argument('-a', '--all', action="store_true",
+                        #~ help='Outputs all of the above',
+                        #~ default=False)
                                                 
-    # args = parser.parse_args()
-
+    #~ args = parser.parse_args()
+    #~ if args.modules:
+        #~ modules=True
 
     print "************* Computer Report *************"
     
@@ -54,6 +55,8 @@ def main(system=False, modules=False, env=False, all=False):
         print "---------------+MODULES+-------------------"
         print
         print "Required:"
+        ispresent('setuptools')
+        ispresent('click', 'easy_install click')
         ispresent('numpy')
         ispresent('scipy')
         ispresent('pandas')
@@ -70,7 +73,7 @@ def main(system=False, modules=False, env=False, all=False):
         ispresent('jinja2')
         
         ispresent('flask')
-        ispresent('flask.ext.admin')
+        ispresent('flask.ext.admin', 'easy_install flask-admin')
         ispresent('wtforms')
         ispresent('json')
         ispresent('psutil')
@@ -83,7 +86,6 @@ def main(system=False, modules=False, env=False, all=False):
         
         print
         print "Not required, just checking:"
-        ispresent('setuptools')
         ispresent('reportlab')
         ispresent('configobj')
         ispresent('pkg_resources')
