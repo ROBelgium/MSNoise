@@ -35,7 +35,7 @@ def get_wavgwstd(data):
     h = grouped.apply(wstd)
     return g, h
 
-def main():
+def main(all=True, mov_stack=None, savefig=False, show=False):
     db = connect()
 
     if get_config(db, name="autocorr") in ['Y', 'y', '1', 1]:
@@ -45,12 +45,14 @@ def main():
 
     start, end, datelist = build_movstack_datelist(db)
 
-
-    mov_stack = get_config(db, "mov_stack")
-    if mov_stack.count(',') == 0:
-        mov_stacks = [int(mov_stack), ]
+    if mov_stack != 0:
+        mov_stacks = [mov_stack,]
     else:
-        mov_stacks = [int(mi) for mi in mov_stack.split(',')]
+        mov_stack = get_config(db, "mov_stack")
+        if mov_stack.count(',') == 0:
+            mov_stacks = [int(mov_stack), ]
+        else:
+            mov_stacks = [int(mi) for mi in mov_stack.split(',')]
 
     filterid = 1
     components = "ZZ"
@@ -116,8 +118,8 @@ def main():
 
             plt.grid()
             del alldf
-
-    plt.savefig('dtt_allmovstacksNEW_%s.png' % dttname, dpi=300)
+    if savefig:
+        plt.savefig('dtt_allmovstacksNEW_%s.png' % dttname, dpi=300)
     plt.show()
 
 if __name__ == "__main__":

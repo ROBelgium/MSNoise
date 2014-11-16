@@ -101,7 +101,7 @@ def compute_dtt():
 @click.argument('jobtype')
 def reset(jobtype):
     """Resets the job to "T"odo. ARG is [CC] or [DTT]"""
-    from ..msnoise_table_def import *
+    from ..msnoise_table_def import Job
     from ..database_tools import connect
     
     session = connect()
@@ -129,15 +129,30 @@ def data_availability():
 
 
 @click.command()
-def dvv():
+@click.option('-a', '--all', default=True, help='Plot All mov stacks')
+@click.option('-m', '--mov_stack', default=0,  help='Plot specific mov stacks')
+@click.option('-s', '--savefig', is_flag=True, help='Save figure to disk (PNG)')
+def dvv(all, mov_stack, savefig):
     """Plots the dv/v (parses the dt/t results)"""
     from ..plots.dvv import main
-    main()
+    main(all, mov_stack, savefig)
+
+
+@click.command()
+@click.option('--sta1', help='Plot All mov stacks')
+@click.option('--sta2',  help='Plot specific mov stacks')
+@click.option('-f', '--filterid', default=1, help='Save figure to disk (PNG)')
+@click.option('-c', '--comp', default="ZZ", help='Save figure to disk (PNG)')
+def interferogram(sta1, sta2, filterid, comp):
+    """Plots the dv/v (parses the dt/t results)"""
+    from ..plots.interferogram import main
+    main(sta1, sta2, filterid, comp)
 
 
 # Add plot commands to the plot group:
 plot.add_command(data_availability)
 plot.add_command(dvv)
+plot.add_command(interferogram)
 
 
 # Add all commands to the cli group:
