@@ -47,7 +47,7 @@ default['mov_stack'] = ["Number of days to stack for the Moving-window stacks ([
 default['export_format'] = ["Export stacks in which format(s) ? SAC/MSEED/[BOTH]","MSEED"]
 default['sac_format'] = ["Format for SAC stacks ? [doublets]/clarke","doublets"]
 
-default['dtt_lag'] = ["How is the lag window defined [dynamic]/static","dynamic"]
+default['dtt_lag'] = ["How is the lag window defined [dynamic]/static","static"]
 default['dtt_v'] = ["If dtt_lag=dynamic: what velocity to use to avoid ballistic waves [1.0]km/s","1.0"]
 default['dtt_minlag'] = ["If dtt_lag=static: min lag time","5.0"]
 default['dtt_width'] = ["Width of the time lag window [30]s","30.0"]
