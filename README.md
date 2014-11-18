@@ -17,6 +17,12 @@ Documentation
 ---------------
 Currently, the full documentation can be found on: http://www.msnoise.org.
 
+Installation
+-------------
+
+Users are recommended to download the latest RELEASE https://github.com/ROBelgium/MSNoise/releases/latest ! Up to now, MSNoise is *not* a regular package, so please follow instructions in the documentation (and read below).
+
+The current *master* is not yet stable !
 
 Packaging
 ----------
