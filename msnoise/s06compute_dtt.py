@@ -103,9 +103,7 @@ import logging
 
 
 logging.basicConfig(level=logging.DEBUG,
-                    filename="/dev/null",
-                    format='%(asctime)s [%(levelname)s] %(message)s',
-                    filemode='w')
+                    format='%(asctime)s [%(levelname)s] %(message)s')
 
 console = logging.StreamHandler()
 console.setLevel(logging.DEBUG)
@@ -131,26 +129,14 @@ def main():
     logging.info('*** Starting: Compute DT/T ***')
     db = connect()
     
-    #~ PLOT= True
-    PLOT = False
-    
     dtt_lag = get_config(db, "dtt_lag")
     dtt_v = float(get_config(db, "dtt_v"))
     dtt_minlag = float(get_config(db, "dtt_minlag"))
     dtt_width = float(get_config(db, "dtt_width"))
     dtt_sides = get_config(db, "dtt_sides")
-    minCoh = get_config(db, "dtt_mincoh")
-    maxErr = get_config(db, "dtt_maxerr")
-    maxDt = get_config(db, "dtt_maxdt")
-    
-    # lMlag = -100  # HARD
-    # lmlag = -10  # HARD
-    # rmlag = 10  # HARD
-    # rMlag = 100  # HARD
-    # minCoh = 0.5  # HARD
-    # maxErr = 0.1  # HARD
-    # maxDt = 1.0  # HARD
-    # lagmethod="rel"
+    minCoh = float(get_config(db, "dtt_mincoh"))
+    maxErr = float(get_config(db, "dtt_maxerr"))
+    maxDt = float(get_config(db, "dtt_maxdt"))
     
     start, end, datelist = build_movstack_datelist(db)
     
@@ -312,53 +298,6 @@ def main():
                                 del new_cohArray, new_dtArray, new_errArray, cohindex, errindex, dtindex, wavg, wstd
                                 # END OF GROUP HANDLING
     
-                        if PLOT:
-                            plt.figure(figsize=(15, 10))
-                            gs = gridspec.GridSpec(
-                                1, 6, width_ratios=[3, 3, 3, 3, 3, 3])
-                            plt.subplots_adjust(
-                                hspace=0.005, wspace=0.15, bottom=0.05, top=0.92, left=0.07, right=0.95)
-                            plt.subplot(gs[0])
-                            ymax = dtArray.shape[0]
-                            extent = (-117.5, 117.5, ymax + 0.5, -0.5)  # HARD
-    
-                            plt.imshow(
-                                dtArray, interpolation='none', aspect='auto',
-                                vmin=-maxDt, vmax=maxDt, cmap='bwr', extent=extent)
-                            for item in [lMlag, lmlag, rmlag, rMlag]:
-                                plt.axvline(item, ls='--', zorder=15, c='k', lw=2)
-                            plt.title('Delays')
-                            cb = plt.colorbar(
-                                orientation='horizontal', pad=0.08, shrink=0.8)
-                            cb.set_label('Delay (seconds)')
-                            cb.set_ticks([-maxDt, 0, maxDt])
-                            plt.xlabel('Time Lag')
-                            plt.ylabel('Pair Number')
-                            plt.subplot(gs[1])
-                            plt.title('Errors')
-                            plt.imshow(
-                                errArray, interpolation='none', aspect='auto', vmax=0.1, extent=extent, cmap='hot')
-                            for item in [lMlag, lmlag, rmlag, rMlag]:
-                                plt.axvline(item, ls='--', zorder=15, c='k', lw=2)
-                            plt.yticks([], [])
-                            cb = plt.colorbar(
-                                orientation='horizontal', pad=0.08, shrink=0.8)
-                            cb.set_label('Error (seconds)')
-                            cb.set_ticks([-0.1, 0, 0.1])
-                            plt.xlabel('Time Lag')
-                            plt.subplot(gs[2])
-                            plt.title('Phase Coherences')
-                            plt.imshow(
-                                cohArray, interpolation='none', aspect='auto', extent=extent, cmap='hot')
-                            for item in [lMlag, lmlag, rmlag, rMlag]:
-                                plt.axvline(item, ls='--', zorder=15, c='k', lw=2)
-                            cb = plt.colorbar(
-                                orientation='horizontal', pad=0.08, shrink=0.8)
-                            cb.set_label('Coherence Coefficient')
-                            cb.set_ticks([0.0, 0.25, 0.5, 0.75, 1.0])
-                            plt.yticks([], [])
-                            plt.xlabel('Time Lag')
-    
                         # then process all pairs + the ALL
                         if len(dtArray.shape) == 1:  # if there is only one pair:
                             dtArray = dtArray.reshape((1, dtArray.shape[0]))
@@ -411,120 +350,6 @@ def main():
                                 del res, res0, B
                             del VecXfilt, VecYfilt, w
                             del index, cohindex, errindex, dtindex
-    
-                        if PLOT:
-                            plt.subplot(gs[3])
-                            plt.title('Data Selection')
-                            plt.imshow(
-                                used, extent=extent, cmap='binary', interpolation='none', aspect='auto')
-                            cb = plt.colorbar(
-                                orientation='horizontal', pad=0.08, shrink=0.8)
-                            cb.set_label('Selected')
-                            cb.set_ticks([0.0, 1.0],)
-                            cb.set_ticklabels(['No', 'Yes'])
-                            plt.yticks([], [])
-                            plt.xlabel('Time Lag')
-    
-                            plt.subplot(gs[4])
-                            plt.title('Delay Time Variations\nNo Forcing')
-                            Ma = np.array(M)
-                            EMa = np.array(EM)
-                            plt.errorbar(
-                                100 * Ma, np.arange(len(Ma)), xerr=EMa * 100, c='k', lw=0, elinewidth=2.0)
-                            plt.scatter(100 * Ma, np.arange(len(Ma)), c=Ma * 100,
-                                        edgecolor='k', vmin=-0.2, vmax=0.2, zorder=100, s=75)
-    
-                            cb = plt.colorbar(
-                                orientation='horizontal', pad=0.08, shrink=0.8,)
-                            cb.set_ticks([-0.2, 0.2],)
-                            cb.set_label('dt/t in %')
-                            plt.axvline(0, c='k')
-                            plt.axvline(
-                                100 * Ma[-1], c='r', lw=2, label="ALL: %.2e" % Ma[-1])
-                            plt.axvspan(100 * Ma[-1] - 100 * EM[-1], 100 * Ma[
-                                        -1] + 100 * EM[-1], color='r', alpha=0.2)
-                            # print "M,EM", 100*M[-1],100*EM[-1]
-    
-                            wdtt, werr = wavg_wstd(
-                                np.array(Ma[:-1]), np.array(EMa[:-1]))
-                            plt.axvline(
-                                100 * wdtt, c='g', lw=3, label="Weighted $\overline{x}$: %.2e" % wdtt)
-                            plt.axvspan(
-                                100 * wdtt - 100 * werr, 100 * wdtt + 100 * werr, color='g', alpha=0.2)
-                            # print 'wdtt, werr', 100*wdtt, 100*werr
-    
-                            plt.xlim(-0.2, 0.2)
-                            plt.xticks([-0.2, 0.0, 0.2])
-                            plt.xlabel('dt/t in %')
-                            plt.ylim(len(Ma), 0)
-                            plt.yticks([], [])
-    
-                            plt.subplot(gs[5])
-                            plt.title('Delay Time Variations\nForcing Origin')
-                            Ma = np.array(M0)
-                            EMa = np.array(EM0)
-                            plt.errorbar(
-                                100 * Ma, np.arange(len(Ma)), xerr=EMa * 100, c='k', lw=0, elinewidth=2.0)
-                            plt.scatter(100 * Ma, np.arange(len(Ma)), c=Ma * 100,
-                                        edgecolor='k', vmin=-0.2, vmax=0.2, zorder=100, s=75)
-    
-                            cb = plt.colorbar(
-                                orientation='horizontal', pad=0.08, shrink=0.8,)
-                            cb.set_ticks([-0.2, 0.2],)
-                            cb.set_label('dt/t in %')
-                            plt.axvline(0, c='k')
-                            plt.axvline(
-                                100 * Ma[-1], c='r', lw=2, label="ALL: %.2e" % Ma[-1])
-                            plt.axvspan(100 * Ma[-1] - 100 * EM0[-1], 100 * Ma[
-                                        -1] + 100 * EM0[-1], color='r', alpha=0.2)
-                            # print "M0,EM0", 100*M0[-1],100*EM0[-1]
-    
-                            wdtt, werr = wavg_wstd(
-                                np.array(Ma[:-1]), np.array(EMa[:-1]))
-                            plt.axvline(
-                                100 * wdtt, c='g', lw=3, label="Weighted $\overline{x}$: %.2e" % wdtt)
-                            plt.axvspan(
-                                100 * wdtt - 100 * werr, 100 * wdtt + 100 * werr, color='g', alpha=0.2)
-                            # print 'wdtt0, werr0', 100*wdtt, 100*werr
-    
-                            plt.xlim(-0.2, 0.2)
-                            plt.xticks([-0.2, 0.0, 0.2])
-                            plt.xlabel('dt/t in %')
-                            plt.ylim(len(Ma), 0)
-                            plt.yticks([], [])
-    
-                            plt.savefig('dttmatrix_%02i_%03iDAYS_%s-%s.png' %
-                                        (filterid, mov_stack, components, current), dpi=300)
-    
-                            #~ stations = get_stations(db, all=False).all()
-                            #~ nstations = len(stations)
-                            #~ dttmatrix = np.zeros((nstations, nstations))
-                            #~ for station1, station2 in get_station_pairs(db, used=True):
-                                #~ sta1 = "%s_%s" % (station1.net, station1.sta)
-                                #~ sta2 = "%s_%s" % (station2.net, station2.sta)
-                                #~ pair = "%s_%s" % (sta1, sta2)
-                                #~ if pair in pairArray:
-                                    #~ id = pairArray.index(pair)
-                                    #~ dttmatrix[i, j] = M[id] * 100
-                            #~ plt.figure(figsize=(8, 8))
-                            #~ plt.subplots_adjust(
-                                #~ hspace=0.005, wspace=0.1, bottom=0.05, top=0.90, left=0.1, right=0.90)
-                            #~ plt.imshow(
-                                #~ dttmatrix, interpolation='none', vmin=-0.2, vmax=0.2, cmap='bwr')
-                            #~ cb = plt.colorbar(shrink=0.8, pad=0.05)
-                            #~ cb.set_label('dt/t in %')
-                            #~ plt.yticks(np.arange(nstations), [
-                                       #~ "%s.%s" % (st.net, st.sta) for st in stations])
-                            #~ plt.xticks(np.arange(nstations), ["%s.%s" % (st.net, st.sta)
-                                       #~ for st in stations], rotation=90, verticalalignment='bottom')
-                            #~ for tick in plt.gca().xaxis.iter_ticks():
-                                #~ tick[0].label2On = True
-                                #~ tick[0].label1On = False
-                                #~ tick[0].label2.set_rotation('vertical')
-                            #~ plt.grid()
-                            #~ plt.savefig('dttmatrix2_%02i_%03iDAYS_%s-%s.png' %
-                                        #~ (filterid, mov_stack, components, current), dpi=300)
-                            plt.show()
     
                         logging.debug(
                             "%s: exporting: %i pairs" % (current, len(pairArray)))
