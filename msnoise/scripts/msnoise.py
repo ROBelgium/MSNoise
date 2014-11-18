@@ -1,3 +1,4 @@
+import os
 import click
 
 
@@ -9,6 +10,30 @@ def cli(ctx, threads):
     ctx.obj['MSNOISE_threads'] = threads
     pass
 
+
+@click.command()
+def info():
+    from ..database_tools import connect, get_config
+    from ..default import default
+    
+    if os.path.isfile('db.ini'):
+        present = True
+        click.secho('db.ini is present', fg='green')
+    else:
+        present = False
+        click.secho('db.ini is not present', fg='red')
+        return
+    
+    db = connect()
+    click.echo('')
+    click.echo('Configuration:')
+    for key in default.keys():
+        tmp = get_config(db, key)
+        if tmp == default[key][1]:
+            click.secho("%s: %s" %(key, tmp ), fg='cyan')
+        else:
+            click.secho("%s: %s" %(key, tmp ), fg='green')
+    
 
 @click.command()
 def install():
@@ -156,6 +181,7 @@ plot.add_command(interferogram)
 
 
 # Add all commands to the cli group:
+cli.add_command(info)
 cli.add_command(install)
 cli.add_command(config)
 cli.add_command(populate)
