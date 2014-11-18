@@ -172,22 +172,22 @@ def main():
                             df = pd.read_csv(
                                 day, delimiter=' ', header=None, index_col=0, names=['t', 'dt', 'err', 'coh'])
                             tArray = df.index.values
-                            if dtt_lag == "dynamic":
-                                tindex = np.where(((tArray >= lMlag) & (tArray <= lmlag)) | (
-                                (tArray >= rmlag) & (tArray <= rMlag)))[0]
+                            if dtt_lag == "static":
+                                lmlag = -dtt_minlag
+                                rmlag = dtt_minlag
                             else:
-                                # TLQ: artificially set error to very high value where lag time < dtt_v propagation time
                                 dist = get_interstation_distance(station1, station2)
                                 lmlag = -dist * dtt_v
                                 rmlag =  dist * dtt_v
-                                lMlag = lmlag - dtt_width
-                                rMlag = rmlag + dtt_width
-                                if dtt_sides == "both":
-                                    tindex = np.where(((tArray >= lMlag) & (tArray <= lmlag)) | ((tArray >= rmlag) & (tArray <= rMlag)))[0]
-                                elif dtt_sides == "left":
-                                    tindex = np.where((tArray >= lMlag) & (tArray <= lmlag))[0]
-                                else:
-                                    tindex = np.where((tArray >= rmlag) & (tArray <= rMlag))[0]
+                            lMlag = lmlag - dtt_width
+                            rMlag = rmlag + dtt_width
+
+                            if dtt_sides == "both":
+                                tindex = np.where(((tArray >= lMlag) & (tArray <= lmlag)) | ((tArray >= rmlag) & (tArray <= rMlag)))[0]
+                            elif dtt_sides == "left":
+                                tindex = np.where((tArray >= lMlag) & (tArray <= lmlag))[0]
+                            else:
+                                tindex = np.where((tArray >= rmlag) & (tArray <= rMlag))[0]
                             
                             tmp = np.setdiff1d(np.arange(len(tArray)),tindex)
                             df['err'][tmp] = 1.0
