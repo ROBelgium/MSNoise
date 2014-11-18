@@ -25,14 +25,14 @@ default['crondays'] = ["Number of days to monitors with cron [-1]",'-1']
 
 
 default['ZZ'] = ["Compute ZZ correlation [Y]/N",'Y']
-default['ZR'] = ["Compute ZR correlation [Y]/N",'Y']
-default['ZT'] = ["Compute ZT correlation [Y]/N",'Y']
-default['RZ'] = ["Compute RZ correlation [Y]/N",'Y']
-default['RR'] = ["Compute RR correlation [Y]/N",'Y']
-default['RT'] = ["Compute RT correlation [Y]/N",'Y']
-default['TZ'] = ["Compute TZ correlation [Y]/N",'Y']
-default['TR'] = ["Compute TR correlation [Y]/N",'Y']
-default['TT'] = ["Compute TT correlation [Y]/N",'Y']
+default['ZR'] = ["Compute ZR correlation [Y]/N",'N']
+default['ZT'] = ["Compute ZT correlation [Y]/N",'N']
+default['RZ'] = ["Compute RZ correlation [Y]/N",'N']
+default['RR'] = ["Compute RR correlation [Y]/N",'N']
+default['RT'] = ["Compute RT correlation [Y]/N",'N']
+default['TZ'] = ["Compute TZ correlation [Y]/N",'N']
+default['TR'] = ["Compute TR correlation [Y]/N",'N']
+default['TT'] = ["Compute TT correlation [Y]/N",'N']
 
 default['autocorr'] = ["Compute Auto correlation [Y]/N",'N']
 default['PAZ'] = ["Correct instrumental responce from paz [Y]/N",'N']
@@ -46,4 +46,14 @@ default['mov_stack'] = ["Number of days to stack for the Moving-window stacks ([
 
 default['export_format'] = ["Export stacks in which format(s) ? SAC/MSEED/[BOTH]","MSEED"]
 default['sac_format'] = ["Format for SAC stacks ? [doublets]/clarke","doublets"]
+
+default['dtt_lag'] = ["How is the lag window defined [dynamic]/static","dynamic"]
+default['dtt_v'] = ["If dtt_lag=dynamic: what velocity to use to avoid ballistic waves [1.0]km/s","1.0"]
+default['dtt_minlag'] = ["If dtt_lag=static: min lag time","5.0"]
+default['dtt_width'] = ["Width of the time lag window [30]s","30.0"]
+default['dtt_sides'] = ["Which sides to use [both]/left/right","both"]
+default['dtt_mincoh'] = ["Minimum coherence on dt measurement","0.65"]
+default['dtt_maxerr'] = ["Maximum error on dt measurement","0.1"]
+default['dtt_maxdt'] = ["Maximum dt values","0.1"]
+
 
