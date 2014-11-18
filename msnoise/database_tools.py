@@ -154,6 +154,15 @@ def get_station_pairs(session, used=None, net=None):
     else:
         return itertools.combinations(stations, 2)
 
+
+def get_interstation_distance(station1, station2, coordinates="DEG"):
+    if coordinates == "DEG":
+        dist, azim, bazim = gps2DistAzimuth(station1.Y, station1.X, station2.Y, station2.X)
+        return dist /1.e3
+    else:
+        print "woooooow, UTM system distance not computed"
+        return 0
+
 ############ DATA AVAILABILITY ############
 
 

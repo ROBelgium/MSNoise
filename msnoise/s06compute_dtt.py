@@ -103,7 +103,7 @@ import logging
 
 
 logging.basicConfig(level=logging.DEBUG,
-                    filename="./compute_dtt.log",
+                    filename="/dev/null",
                     format='%(asctime)s [%(levelname)s] %(message)s',
                     filemode='w')
 
@@ -126,21 +126,31 @@ def wavg_wstd(data, errors):
     return wavg, wstd
 
 
-def main():
+if __name__ == "__main__":
     
     logging.info('*** Starting: Compute DT/T ***')
     db = connect()
     
-    # PLOT= True
+    #~ PLOT= True
     PLOT = False
     
-    lMlag = -30  # HARD
-    lmlag = -10  # HARD
-    rmlag = 10  # HARD
-    rMlag = 30  # HARD
-    minCoh = 0.5  # HARD
-    maxErr = 0.1  # HARD
-    maxDt = 0.5  # HARD
+    dtt_lag = get_config(db, "dtt_lag")
+    dtt_v = float(get_config(db, "dtt_v"))
+    dtt_minlag = float(get_config(db, "dtt_minlag"))
+    dtt_width = float(get_config(db, "dtt_width"))
+    dtt_sides = get_config(db, "dtt_sides")
+    minCoh = get_config(db, "dtt_mincoh")
+    maxErr = get_config(db, "dtt_maxerr")
+    maxDt = get_config(db, "dtt_maxdt")
+    
+    # lMlag = -100  # HARD
+    # lmlag = -10  # HARD
+    # rmlag = 10  # HARD
+    # rMlag = 100  # HARD
+    # minCoh = 0.5  # HARD
+    # maxErr = 0.1  # HARD
+    # maxDt = 1.0  # HARD
+    # lagmethod="rel"
     
     start, end, datelist = build_movstack_datelist(db)
     
@@ -152,7 +162,7 @@ def main():
     
     components_to_compute = get_components_to_compute(db)
     updated_dtt = updated_days_for_dates(
-        db, start, end, '%', type='DTT', returndays=True)
+        db, start, end, '%', type='DTT', returndays=True,interval=datetime.timedelta(days=0.1))
     
     for f in get_filters(db, all=False):
         filterid = int(f.ref)
@@ -161,7 +171,9 @@ def main():
                 logging.info('Loading mov=%i days for filter=%02i' %
                              (mov_stack, filterid))
                 for current in updated_dtt:
-                    logging.debug("Processing %s" % current)
+                    if current > datetime.date.today():
+                        break
+                    logging.debug("Processing %s - %02i - %02i mov" % (current, filterid, mov_stack))
                     first = True
                     for station1, station2 in get_station_pairs(db, used=True):
                         sta1 = "%s_%s" % (station1.net, station1.sta)
@@ -170,8 +182,32 @@ def main():
                         day = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" %
                                            mov_stack, components, pair, '%s.txt' % current)
                         if os.path.isfile(day):
+                            #~ print day
                             df = pd.read_csv(
                                 day, delimiter=' ', header=None, index_col=0, names=['t', 'dt', 'err', 'coh'])
+                            tArray = df.index.values
+                            if dtt_lag == "dynamic":
+                                tindex = np.where(((tArray >= lMlag) & (tArray <= lmlag)) | (
+                                (tArray >= rmlag) & (tArray <= rMlag)))[0]
+                            else:
+                                # TLQ: artificially set error to very high value where lag time < dtt_v propagation time
+                                dist = get_interstation_distance(station1, station2)
+                                lmlag = -dist * dtt_v
+                                rmlag =  dist * dtt_v
+                                lMlag = lmlag - dtt_width
+                                rMlag = rmlag + dtt_width
+                                if dtt_sides == "both":
+                                    tindex = np.where(((tArray >= lMlag) & (tArray <= lmlag)) | ((tArray >= rmlag) & (tArray <= rMlag)))[0]
+                                elif dtt_sides == "left":
+                                    tindex = np.where((tArray >= lMlag) & (tArray <= lmlag))[0]
+                                else:
+                                    tindex = np.where((tArray >= rmlag) & (tArray <= rMlag))[0]
+                            
+                            tmp = np.setdiff1d(np.arange(len(tArray)),tindex)
+                            df['err'][tmp] = 1.0
+                            df['coh'][tmp] = 0.0
+                            
+                            #END TLQ
                             if first:
                                 tArray = df.index.values
                                 dtArray = df['dt']
@@ -188,8 +224,8 @@ def main():
                         del day
     
                     if not first:
-                        tindex = np.where(((tArray >= lMlag) & (tArray <= lmlag)) | (
-                            (tArray >= rmlag) & (tArray <= rMlag)))[0]
+                        #~ tindex = np.tindwhere(((tArray >= lMlag) & (tArray <= lmlag)) | (
+                            #~ (tArray >= rmlag) & (tArray <= rMlag)))[0]
     
                         Dates = []
                         Pairs = []
@@ -206,7 +242,8 @@ def main():
                             new_errArray = np.zeros(len(tArray)) + 9999
                             new_cohArray = np.zeros(len(tArray))
                             for i in range(len(tArray)):
-                                if i in tindex:
+                                #~ if i in tindex:
+                                if 1:
                                     cohindex = np.where(
                                         cohArray[:, i] >= minCoh)[0]
                                     errindex = np.where(
@@ -228,6 +265,52 @@ def main():
                             cohArray = np.vstack((cohArray, new_cohArray))
                             pairArray.append("ALL")
                             del new_cohArray, new_dtArray, new_errArray, cohindex, errindex, dtindex, wavg, wstd
+                            
+                            # then stack selected pais to GROUPS:
+                            groups = {}
+                            # groups['CRATER'] = ["CSS","FJS","BON","SNE","FLR","RVL","FOR",]
+                            # groups['GPENTES'] = ["CRA","GPN","GPS","HDL","GBS"]
+                            # groups['VOLCAN'] = groups['CRATER'] + groups['GPENTES'] + ['HIM','VIL']
+                            # groups['NORD'] = ['PRO','MVL','RSL','MAT','PCR','OBS','CIL','CAM']
+                            npairs = len(pairArray)-1
+                            for group in groups.keys():
+                                new_dtArray = np.zeros(len(tArray))
+                                new_errArray = np.zeros(len(tArray)) + 9999
+                                new_cohArray = np.zeros(len(tArray))
+                                pairindex = []
+                                for j, pair in enumerate(pairArray[:npairs]):
+                                    net1, sta1, net2, sta2 = pair.split('_')
+                                    if sta1 in groups[group] and sta2 in groups[group]:
+                                        pairindex.append(j)
+                                pairindex = np.array(pairindex)
+                                #~ print "found", len(pairindex), " pairs for group", group
+                                for i in range(len(tArray)):
+                                    #~ if i in tindex:
+                                    if 1:
+                                        cohindex = np.where(
+                                            cohArray[:, i] >= minCoh)[0]
+                                        errindex = np.where(
+                                            errArray[:, i] <= maxErr)[0]
+                                        dtindex = np.where(
+                                            np.abs(dtArray[:, i]) <= maxDt)[0]
+        
+                                        index = np.intersect1d(cohindex, errindex)
+                                        index = np.intersect1d(index, dtindex)
+                                        index = np.intersect1d(index, pairindex)
+                                        
+        
+                                        wavg, wstd = wavg_wstd(
+                                            dtArray[:, i][index], errArray[:, i][index])
+                                        new_dtArray[i] = wavg
+                                        new_errArray[i] = wstd
+                                        new_cohArray[i] = 1.0
+        
+                                dtArray = np.vstack((dtArray, new_dtArray))
+                                errArray = np.vstack((errArray, new_errArray))
+                                cohArray = np.vstack((cohArray, new_cohArray))
+                                pairArray.append(group)
+                                del new_cohArray, new_dtArray, new_errArray, cohindex, errindex, dtindex, wavg, wstd
+                                # END OF GROUP HANDLING
     
                         if PLOT:
                             plt.figure(figsize=(15, 10))
@@ -289,8 +372,8 @@ def main():
                             errindex = np.where(errArray[i] <= maxErr)[0]
                             dtindex = np.where(np.abs(dtArray[i]) <= maxDt)[0]
     
-                            index = np.intersect1d(tindex, cohindex)
-                            index = np.intersect1d(index, errindex)
+                            #~ index = np.intersect1d(tindex, cohindex)
+                            index = np.intersect1d(cohindex, errindex)
                             index = np.intersect1d(index, dtindex)
     
                             used[i][index] = 1.0
@@ -413,34 +496,34 @@ def main():
                             plt.savefig('dttmatrix_%02i_%03iDAYS_%s-%s.png' %
                                         (filterid, mov_stack, components, current), dpi=300)
     
-                            stations = get_stations(db, used=True)
-                            nstations = len(stations)
-                            dttmatrix = np.zeros((nstations, nstations))
-                            for station1, station2 in get_station_pairs(db, used=True):
-                                sta1 = "%s_%s" % (station1.net, station1.sta)
-                                sta2 = "%s_%s" % (station2.net, station2.sta)
-                                pair = "%s_%s" % (sta1, sta2)
-                                if pair in pairArray:
-                                    id = pairArray.index(pair)
-                                    dttmatrix[i, j] = M[id] * 100
-                            plt.figure(figsize=(8, 8))
-                            plt.subplots_adjust(
-                                hspace=0.005, wspace=0.1, bottom=0.05, top=0.90, left=0.1, right=0.90)
-                            plt.imshow(
-                                dttmatrix, interpolation='none', vmin=-0.2, vmax=0.2, cmap='bwr')
-                            cb = plt.colorbar(shrink=0.8, pad=0.05)
-                            cb.set_label('dt/t in %')
-                            plt.yticks(np.arange(nstations), [
-                                       "%s.%s" % (st.net, st.sta) for st in stations])
-                            plt.xticks(np.arange(nstations), ["%s.%s" % (st.net, st.sta)
-                                       for st in stations], rotation=90, verticalalignment='bottom')
-                            for tick in plt.gca().xaxis.iter_ticks():
-                                tick[0].label2On = True
-                                tick[0].label1On = False
-                                tick[0].label2.set_rotation('vertical')
-                            plt.grid()
-                            plt.savefig('dttmatrix2_%02i_%03iDAYS_%s-%s.png' %
-                                        (filterid, mov_stack, components, current), dpi=300)
+                            #~ stations = get_stations(db, all=False).all()
+                            #~ nstations = len(stations)
+                            #~ dttmatrix = np.zeros((nstations, nstations))
+                            #~ for station1, station2 in get_station_pairs(db, used=True):
+                                #~ sta1 = "%s_%s" % (station1.net, station1.sta)
+                                #~ sta2 = "%s_%s" % (station2.net, station2.sta)
+                                #~ pair = "%s_%s" % (sta1, sta2)
+                                #~ if pair in pairArray:
+                                    #~ id = pairArray.index(pair)
+                                    #~ dttmatrix[i, j] = M[id] * 100
+                            #~ plt.figure(figsize=(8, 8))
+                            #~ plt.subplots_adjust(
+                                #~ hspace=0.005, wspace=0.1, bottom=0.05, top=0.90, left=0.1, right=0.90)
+                            #~ plt.imshow(
+                                #~ dttmatrix, interpolation='none', vmin=-0.2, vmax=0.2, cmap='bwr')
+                            #~ cb = plt.colorbar(shrink=0.8, pad=0.05)
+                            #~ cb.set_label('dt/t in %')
+                            #~ plt.yticks(np.arange(nstations), [
+                                       #~ "%s.%s" % (st.net, st.sta) for st in stations])
+                            #~ plt.xticks(np.arange(nstations), ["%s.%s" % (st.net, st.sta)
+                                       #~ for st in stations], rotation=90, verticalalignment='bottom')
+                            #~ for tick in plt.gca().xaxis.iter_ticks():
+                                #~ tick[0].label2On = True
+                                #~ tick[0].label1On = False
+                                #~ tick[0].label2.set_rotation('vertical')
+                            #~ plt.grid()
+                            #~ plt.savefig('dttmatrix2_%02i_%03iDAYS_%s-%s.png' %
+                                        #~ (filterid, mov_stack, components, current), dpi=300)
                             plt.show()
     
                         logging.debug(
@@ -460,7 +543,3 @@ def main():
     
     
     logging.info('*** Finished: Compute DT/T ***')
-
-
-if __name__ == "__main__":
-    main()
