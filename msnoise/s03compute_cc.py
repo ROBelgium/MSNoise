@@ -264,18 +264,17 @@ def main():
                     stream[0].trim(utcdatetime.UTCDateTime(goal_day.replace('-', '')), utcdatetime.UTCDateTime(
                         goal_day.replace('-', '')) + goal_duration - stream[0].stats.delta, pad=True, fill_value=0.0)
                     trace = stream[0]
-    
-                    logging.debug(
-                        "%s.%s Lowpass at %.2f Hz" % (station, comp, preprocess_lowpass))
-                    trace.filter("lowpass", freq=preprocess_lowpass, zerophase=True)
-    
-                    logging.debug(
-                        "%s.%s Highpass at %.2f Hz" % (station, comp, preprocess_highpass))
-                    trace.filter("highpass", freq=preprocess_highpass, zerophase=True)
                     
-                    data = trace.data
                     samplerate = trace.stats['sampling_rate']
                     if samplerate != goal_sampling_rate:
+                        logging.debug(
+                            "%s.%s Lowpass at %.2f Hz" % (station, comp, preprocess_lowpass))
+                        trace.filter("lowpass", freq=preprocess_lowpass, zerophase=True)
+    
+                        logging.debug(
+                            "%s.%s Highpass at %.2f Hz" % (station, comp, preprocess_highpass))
+                        trace.filter("highpass", freq=preprocess_highpass, zerophase=True)
+                        data = trace.data
                         if resampling_method == "Resample":
                             logging.debug("%s.%s Downsample to %.1f Hz" %
                                           (station, comp, goal_sampling_rate))
@@ -285,7 +284,8 @@ def main():
                             logging.debug("%s.%s Decimate by a factor of %i" %
                                           (station, comp, decimation_factor))
                             data = data[::decimation_factor]
-    
+                    else:
+                        data = trace.data
                     # logging.debug('Data for %s: %s - %s' % (station, trace.stats.starttime , trace.stats.endtime))
                     # print 'Data for %s: %s - %s' % (station,
                     # trace.stats.starttime , trace.stats.endtime)

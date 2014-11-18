@@ -16,17 +16,40 @@ def info():
     from ..database_tools import connect, get_config
     from ..default import default
     
+    click.echo('')
+    click.echo('General:')
+    
     if os.path.isfile('db.ini'):
         present = True
-        click.secho('db.ini is present', fg='green')
+        click.echo(' - db.ini is present')
     else:
         present = False
-        click.secho('db.ini is not present', fg='red')
+        click.secho(' - db.ini is not present, is MSNoise installed here ?', fg='red')
         return
     
     db = connect()
     click.echo('')
     click.echo('Configuration:')
+    
+    data_folder = get_config(db, "data_folder")
+    if os.path.isdir(data_folder):
+        click.echo(" - %s exists" % data_folder)
+    else:
+        click.secho(" - %s does not exists !" % data_folder)
+    
+    output_folder = get_config(db, "output_folder")
+    if os.path.isdir(output_folder):
+        click.echo(" - %s exists" % output_folder)
+    else:
+        if get_config(db, 'keep_all') in ['Y','y']:
+            click.secho(" - %s does not exists\n   (but that is maybe not a problem)" % output_folder)
+        else:
+            click.secho(" - %s does not exists\n   (and that is normal (keep_all=False)" % output_folder)
+    
+    
+    
+    
+    click.echo('')
     for key in default.keys():
         tmp = get_config(db, key)
         if tmp == default[key][1]:
