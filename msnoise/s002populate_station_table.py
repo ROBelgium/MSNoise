@@ -29,6 +29,7 @@ To run this script:
 """
 
 import glob
+import sys
 import os
 import numpy as np
 from database_tools import *
@@ -67,7 +68,17 @@ def main():
             net = get_config(db, 'network')
             stations.append("%s_%s" % (net, sta))
         del datalist
-    
+    else:
+        print "Can't parse the archive for format %s !" % data_structure
+        print "trying to import local parser (should return a station list)"
+        print 
+        try:
+            sys.path.append(os.getcwd())
+            from custom import populate
+            stations = populate(data_folder)
+        except:
+            print "No file named custom.py in the %s folder" % os.getcwd()
+            return
     stations = np.unique(stations)
     
     db = connect()

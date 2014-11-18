@@ -31,6 +31,7 @@ calling the script with a --help argument will show its usage.
 from obspy.core import read
 import glob
 import os
+import sys
 import datetime
 import time
 import logging
@@ -39,6 +40,7 @@ from subprocess import Popen, PIPE
 from multiprocessing import Process
 import multiprocessing
 import argparse
+import traceback
 
 from database_tools import *
 from data_structures import data_structure
@@ -150,7 +152,20 @@ def main(init=False, threads=1):
     data_struc = get_config(db, 'data_structure')
     channels = [c for c in get_config(db, 'channels').split(',')]
     folders_to_glob = []
-    rawpath = data_structure[data_struc]
+    if data_struc in data_structure.keys():
+        rawpath = data_structure[data_struc]
+    else:
+        print "Can't parse the archive for format %s !" % data_struc
+        print "trying to import local parser (should return a station list)"
+        print 
+        try:
+            sys.path.append(os.getcwd())
+            from custom import data_structure as d
+            rawpath = d
+        except:
+            traceback.print_exc()
+            print "No file named custom.py in the %s folder" % os.getcwd()
+            return
     for year in range(startdate.year, min(datetime.datetime.now().year, enddate.year) + 1):
         for channel in channels:
             stafol = os.path.split(rawpath)[0].replace('YEAR', "%04i" % year).replace('DAY', '*').replace(

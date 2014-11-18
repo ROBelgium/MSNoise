@@ -13,7 +13,7 @@ def cli(ctx, threads):
 
 @click.command()
 def info():
-    from ..database_tools import connect, get_config
+    from ..database_tools import connect, get_config, get_job_types
     from ..default import default
     
     click.echo('')
@@ -35,27 +35,31 @@ def info():
     if os.path.isdir(data_folder):
         click.echo(" - %s exists" % data_folder)
     else:
-        click.secho(" - %s does not exists !" % data_folder)
+        click.secho(" - %s does not exists !" % data_folder, fg='red')
     
     output_folder = get_config(db, "output_folder")
     if os.path.isdir(output_folder):
         click.echo(" - %s exists" % output_folder)
     else:
         if get_config(db, 'keep_all') in ['Y','y']:
-            click.secho(" - %s does not exists\n   (but that is maybe not a problem)" % output_folder)
+            for job in get_job_types(db):
+                if job[1] == 'D':
+                    if job[0] > 0:
+                        click.secho(" - %s does not exists and that is not normal (%i CC jobs done)" % (output_folder, job[0]), fg='red')
+                    else:
+                        click.secho(" - %s does not exists and that is normal (%i CC jobs done)" % (output_folder, job[0]))
         else:
-            click.secho(" - %s does not exists\n   (and that is normal (keep_all=False)" % output_folder)
-    
-    
+            click.secho(" - %s does not exists (and that is normal because keep_all=False)" % output_folder)
     
     
     click.echo('')
+    click.echo('Raw config bits: (white = default, green = modified)')
     for key in default.keys():
         tmp = get_config(db, key)
         if tmp == default[key][1]:
-            click.secho("%s: %s" %(key, tmp ), fg='cyan')
+            click.secho(" D %s: %s" %(key, tmp ))
         else:
-            click.secho("%s: %s" %(key, tmp ), fg='green')
+            click.secho(" M %s: %s" %(key, tmp ), fg='green')
     
 
 @click.command()
