@@ -193,7 +193,6 @@ def main():
                             df['err'][tmp] = 1.0
                             df['coh'][tmp] = 0.0
                             
-                            #END TLQ
                             if first:
                                 tArray = df.index.values
                                 dtArray = df['dt']
