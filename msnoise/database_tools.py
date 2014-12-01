@@ -385,13 +385,13 @@ def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0, maxlag
     return
 
 
-def get_results(session, station1, station2, filterid, components, dates, format="stack"):
+def get_results(session, station1, station2, filterid, components, dates, mov_stack = 1, format="stack"):
     export_format = get_config(session, 'export_format')
     if format == "stack":
         stack = np.zeros(get_maxlag_samples(session))
         i = 0
         for date in dates:
-            daystack = os.path.join("STACKS", "%02i" % filterid, "001_DAYS", components, "%s_%s"%(station1, station2), str(date))
+            daystack = os.path.join("STACKS", "%02i" % filterid, "%03i_DAYS"%mov_stack, components, "%s_%s"%(station1, station2), str(date))
             # logging.debug('reading: %s' % daystack)
             if export_format == "BOTH":
                 daystack += ".MSEED"
@@ -416,7 +416,7 @@ def get_results(session, station1, station2, filterid, components, dates, format
         stack = np.zeros((len(dates), get_maxlag_samples(session)))
         i = 0
         for j, date in enumerate(dates):
-            daystack = os.path.join("STACKS", "%02i"%filterid, "001_DAYS", components, "%s_%s"%(station1, station2), str(date))
+            daystack = os.path.join("STACKS", "%02i"%filterid, "%03i_DAYS"%mov_stack, components, "%s_%s"%(station1, station2), str(date))
             # logging.debug('reading: %s' % daystack)
             if export_format == "BOTH":
                 daystack += ".MSEED"

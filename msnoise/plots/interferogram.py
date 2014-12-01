@@ -16,13 +16,13 @@ from obspy.core import read, Stream, Trace
 from ..database_tools import *
 
 
-def main(sta1, sta2, filterid, components):
+def main(sta1, sta2, filterid, components, mov_stack=1):
     db = connect()
     components_to_compute = get_components_to_compute(db)
     maxlag = float(get_config(db,'maxlag'))
     cc_sampling_rate = float(get_config(db,'cc_sampling_rate'))
     start, end, datelist = build_movstack_datelist(db)
-    mov_stack = get_config(db,"mov_stack")
+    # mov_stack = get_config(db,"mov_stack")
  
    
     plt.figure(figsize=(16,16))
@@ -31,9 +31,9 @@ def main(sta1, sta2, filterid, components):
     if sta2 > sta1: # alphabetical order filtering!
         pair = "%s:%s"%(sta1,sta2)
         
-        print "New Data for %s-%s-%i"%(pair,components,filterid)
+        print "New Data for %s-%s-%i-%i"%(pair,components,filterid, mov_stack)
         format = "matrix"
-        nstack, stack_total = get_results(db,sta1,sta2,filterid,components,datelist,format=format)
+        nstack, stack_total = get_results(db,sta1,sta2,filterid,components,datelist,mov_stack, format=format)
         # vmax = scoreatpercentile(np.abs(stack_total[np.isnan(stack_total)==False]) , 98)
         # for i in range(stack_total.shape[0]):
             # if not np.all( np.isnan(stack_total[i,:])):
@@ -42,7 +42,7 @@ def main(sta1, sta2, filterid, components):
         # stack_total /= np.max(stack_total, axis=0)
         xextent = (date2num(start), date2num(end),-120,120)
         ax = plt.subplot(111)
-        plt.imshow(stack_total.T, extent=xextent, aspect="auto",interpolation='none',origin='lower',cmap='seismic')
+        plt.imshow(stack_total.T, extent=xextent, aspect="auto",interpolation='none',origin='lower',cmap='seismic',vmin=-0.1,vmax=0.1)
         plt.ylabel("Lag Time (s)")
         plt.axhline(0,lw=0.5,c='k')
         plt.grid()
@@ -50,8 +50,8 @@ def main(sta1, sta2, filterid, components):
         ax.xaxis.set_major_locator( YearLocator() )
         ax.xaxis.set_major_formatter(  DateFormatter('%Y-%m') )
 
-        ax.xaxis.set_minor_locator( MonthLocator(interval=2) )
-        ax.xaxis.set_minor_formatter(  DateFormatter('%Y-%m-%d') )
+        # ax.xaxis.set_minor_locator( MonthLocator(interval=2) )
+        # ax.xaxis.set_minor_formatter(  DateFormatter('%Y-%m-%d') )
         
         lag = 120
         plt.ylim(-lag,lag)

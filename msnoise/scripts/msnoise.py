@@ -191,14 +191,15 @@ def dvv(all, mov_stack, savefig):
 
 
 @click.command()
-@click.option('--sta1', help='Plot All mov stacks')
-@click.option('--sta2',  help='Plot specific mov stacks')
-@click.option('-f', '--filterid', default=1, help='Save figure to disk (PNG)')
-@click.option('-c', '--comp', default="ZZ", help='Save figure to disk (PNG)')
-def interferogram(sta1, sta2, filterid, comp):
+@click.option('--sta1', help='Station 1: NET.STA (e.g. BE.MEM)')
+@click.option('--sta2',  help='Station 2')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
+def interferogram(sta1, sta2, filterid, comp, mov_stack):
     """Plots the dv/v (parses the dt/t results)"""
     from ..plots.interferogram import main
-    main(sta1, sta2, filterid, comp)
+    main(sta1, sta2, filterid, comp, mov_stack)
 
 
 # Add plot commands to the plot group:
