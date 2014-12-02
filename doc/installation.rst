@@ -8,18 +8,8 @@ Introduction
 ------------
 
 MSNoise is a set of Python codes that use a database (sqlite or MySQL) and
-the `find` command. 
-
-Currently, MSNoise is *NOT* a regular Python Package, which means:
-
-* It doesn't have a setup.py file.
-* It should not be installed in the lib/site-packages folder of the current python installation.
-* It will create folder *within* its root folder (CROSS_CORRELATION, STACKS, MWCS, DTT folders). Thus:
-* It should be installed in a folder that is writable to the user.
-
-This should change in the future. Until then, when multiple users want to use MSNoise on the same machine, it would be better to have a copy of MSNoise for each (even: one copy for each "project").
-
-
+the `find` command. When installed, it provides a top level command `msnoise`
+in the console. 
 
 To run MSNoise, you need:
 
@@ -48,7 +38,7 @@ Quick Start - Windows
 
 2. Download MSNoise from `GitHub <https://github.com/ROBelgium/MSNoise>`_.
 
-3. Check which required packages you are still missing by executing the *bugreport.py* script. (See :ref:`testing`)
+3. Check which required packages you are still missing by executing the *bugreport* script. (See :ref:`testing`)
 
 4. Execute the following command to install the missing packages:
    
@@ -79,7 +69,7 @@ Quick Start - Linux
 
 2. Download MSNoise from `GitHub <https://github.com/ROBelgium/MSNoise>`_.
 
-3. Check which required packages you are still missing by executing the *bugreport.py* script. (See :ref:`testing`)
+3. Check which required packages you are still missing by executing the *bugreport* script. (See :ref:`testing`)
 
 4. Execute the following commands to install the missing packages:
    

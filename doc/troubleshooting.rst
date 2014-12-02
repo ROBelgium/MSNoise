@@ -16,9 +16,9 @@ The usage is such:
 
 .. code-block:: sh
 
-    $ python bugreport.py -h
+    $ msnoise bugreport -h
 
-    usage: bugreport.py [-h] [-s] [-m] [-e] [-a]
+    usage: msnoise bugreport [-h] [-s] [-m] [-e] [-a]
     
     Helps determining what didn't work
     
@@ -34,7 +34,7 @@ On my Windows machine, the execution of
 
 .. code-block:: sh
 
-    $ python bugreport.py -s -m
+    $ msnoise bugreport -s -m
 
 results in:
 
