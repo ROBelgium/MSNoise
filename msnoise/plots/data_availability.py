@@ -1,3 +1,14 @@
+"""MSNoise is ...
+
+Usage:
+~~~~~~
+
+.. code-block:: sh
+
+    $ msnoise plot data_availability
+
+"""
+
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num

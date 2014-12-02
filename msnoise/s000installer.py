@@ -21,7 +21,7 @@ To run this script:
 
 .. code-block:: sh
 
-    python s000installer.py
+    $ msnoise install
 
 """
 from sqlalchemy import create_engine

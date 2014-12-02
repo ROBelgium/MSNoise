@@ -1,7 +1,7 @@
 Core Functions
 ===============
 
-.. module:: MSNoise
+.. module:: msnoise
 
 
 .. _whiten:
@@ -9,14 +9,14 @@ Core Functions
 Whitening
 -----------
 
-.. automethod:: whiten.whiten
+.. automethod:: msnoise.whiten.whiten
 
 .. _mycorr:
 
 Correlation
 ------------
 
-.. automethod:: myCorr.myCorr
+.. automethod:: msnoise.myCorr.myCorr
 
 .. plot:: pyplots/corr.py
    :include-source:
@@ -27,5 +27,5 @@ Correlation
 Moving-Window Cross-Spectral method
 ---------------------------------------------
 
-.. automethod:: MWCS.mwcs
+.. automethod:: msnoise.MWCS.mwcs
 

@@ -61,11 +61,12 @@ reprocess all CC jobs, but not for filters already existing. The recipe is:
 
 * Add a new filter, be sure to mark 'used'=1
 * Set all other filters 'used' value to 0
-* Redefine the flag of the CC jobs, from 'D'one to 'T'odo (see how)
-* Run $python s03compute_cc.py
+* Redefine the flag of the CC jobs, from 'D'one to 'T'odo with the following:
+* Run $ msnoise reset CC
+* Run $ msnoise compute_cc
 * Set back the other filters 'used' value to 1
 
-The s03compute_cc.py will only compute the CC's for the new filter(s) and
+The compute_cc will only compute the CC's for the new filter(s) and
 output the results in the STACKS/ folder, in a subfolder named by a formatted
 integer from the filter ID. For example: STACKS/01 for 'filter id'=1, STACKS/02
 for 'filter id'=2, etc.
@@ -137,9 +138,9 @@ The usage is such:
 
 .. code-block:: sh
 
-    $ python bugreport.py -h
+    $ msnoise bugreport -h
 
-    usage: bugreport.py [-h] [-s] [-m] [-e] [-a]
+    usage: msnoise bugreport [-h] [-s] [-m] [-e] [-a]
     
     Helps determining what didn't work
     
@@ -155,7 +156,7 @@ On my Windows machine, the execution of
 
 .. code-block:: sh
 
-    $ python bugreport.py -s -m
+    $ msnoise bugreport -s -m
 
 results in:
 

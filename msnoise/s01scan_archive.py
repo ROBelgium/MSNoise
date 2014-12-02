@@ -12,7 +12,7 @@ To run the code on two Process, execute the following in console:
 
 .. code-block:: sh
 
-    python s01scan_archive.py -t 2
+    $ msnoise scan_archive -t 2
 
 Special case: first run
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -22,11 +22,14 @@ argument:
 
 .. code-block:: sh
 
-    python s01scan_archive.py --init -t 2
+    $ msnoise scan_archive --init -t 2
 
 This will scan the data_archive folder the configured stations and will insert
 all files found in the data_availability table in the database. As usual,
 calling the script with a --help argument will show its usage.
+
+.. note:: TODO: change -t 2 position to global msnoise param !
+
 """
 from obspy.core import read
 import glob

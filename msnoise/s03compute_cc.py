@@ -60,7 +60,7 @@ To run this script:
 
 .. code-block:: sh
 
-    python s03compute_cc.py
+    $ msnoise compute_cc
 """
 
 import numpy as np

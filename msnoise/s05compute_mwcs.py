@@ -40,7 +40,7 @@ To run this script:
 
 .. code-block:: sh
 
-    python s05compute_mwcs.py
+    $ msnoise compute_mwcs
 
 """
 

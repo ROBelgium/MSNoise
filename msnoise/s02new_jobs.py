@@ -7,7 +7,7 @@ To run it from the console:
 
 .. code-block:: sh
 
-    $ python s02new_jobs.py
+    $ msnoise new_jobs
 """
 
 from database_tools import *

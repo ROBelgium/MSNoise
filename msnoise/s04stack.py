@@ -30,8 +30,9 @@ help)
 
 .. code-block:: sh
 
-    $ s04stack.py -h
-    usage: s04stack.py [-h] [-r] [-m] [-i INTERVAL]
+    $ msnoise stack -h
+    UPDATE HERE !!!!
+    usage: .py [-h] [-r] [-m] [-i INTERVAL]
 
     Compute [REF,MOV] stacks if jobs have been modified in the last i days.
     optional arguments:
@@ -48,7 +49,7 @@ stacks:
 
 .. code-block:: sh
 
-    python s04stack.py -r -m
+    $ msnoise stack -r -m
 
 While, when playing around with data, and surely on the first run, one should
 define the *-i INTERVAL*, as jobs might have been marked "Done" more than 24
@@ -57,7 +58,7 @@ for jobs marked in the last 10 days:
 
 .. code-block:: sh
 
-    python s04stack.py -r -m -i 10
+    $ msnoise stack -r -m -i 10
 """
 
 import os

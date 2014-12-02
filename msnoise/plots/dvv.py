@@ -1,3 +1,13 @@
+"""MSNoise is ...
+
+Usage:
+~~~~~~
+
+.. code-block:: sh
+
+    $ msnoise plot dvv
+
+"""
 # PARAMETERS FOR MATPLOTLIB :
 import pandas as pd
 

@@ -17,6 +17,7 @@ Contents:
    
    installation
    workflow
+   plotting
    core
    how_tos
    about_db_performances

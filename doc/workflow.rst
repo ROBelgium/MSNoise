@@ -16,54 +16,54 @@ This section only presents the "installation" and configuration of MSNoise (read
 Installer
 ----------
 
-.. automodule:: MSNoise.s000installer
+.. automodule:: msnoise.s000installer
 
 
 
 Configurator
 -------------
 
-.. automodule:: MSNoise.s001configurator
+.. automodule:: msnoise.s001configurator
 
 
 
 Populate Station Table
 -----------------------
 
-.. automodule:: MSNoise.s002populate_station_table
+.. automodule:: msnoise.s002populate_station_table
 
 
 
 Scan Archive
 ---------------
-.. automodule:: MSNoise.s01scan_archive
+.. automodule:: msnoise.s01scan_archive
 
 
 
 New Jobs
 -----------
 
-.. automodule:: MSNoise.s02new_jobs
+.. automodule:: msnoise.s02new_jobs
 
 
 
 Compute Cross-Correlations
 ----------------------------
 
-.. automodule:: MSNoise.s03compute_cc
+.. automodule:: msnoise.s03compute_cc
 
 
 
 Stack
 --------
-.. automodule:: MSNoise.s04stack
+.. automodule:: msnoise.s04stack
 
 	
 
 Compute MWCS
 -----------------
 
-.. automodule::  MSNoise.s05compute_mwcs
+.. automodule::  msnoise.s05compute_mwcs
 
 
 
@@ -71,9 +71,5 @@ Compute MWCS
 Compute dt/t
 ---------------
 
-.. automodule::  MSNoise.s06compute_dtt
+.. automodule::  msnoise.s06compute_dtt
 
-
-
-Plot dt/t
-----------

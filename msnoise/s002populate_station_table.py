@@ -24,7 +24,9 @@ To run this script:
 
 .. code-block:: sh
 
-    python s002populate_station_table.py
+    $ msnoise populate
+    
+.. note:: TODO: add explanation how to make custom data_structure and parser
 
 """
 

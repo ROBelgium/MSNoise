@@ -1,3 +1,13 @@
+"""MSNoise is ...
+
+Usage:
+~~~~~~
+
+.. code-block:: sh
+
+    $ msnoise plot interferogram
+
+"""
 # plot interferogram
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator, YearLocator

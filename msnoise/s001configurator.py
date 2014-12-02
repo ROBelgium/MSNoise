@@ -10,7 +10,7 @@ To run this script:
 
 .. code-block:: sh
 
-    python s001configurator.py
+    $ msnoise config
 
 
 Default Global Parameters

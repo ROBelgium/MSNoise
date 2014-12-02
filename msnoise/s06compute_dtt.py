@@ -59,7 +59,7 @@ To run this script:
 
 .. code-block:: sh
 
-    python s06compute_dtt.py 
+    msnoise compute_dtt
 
 
 Grouping Station Pairs
