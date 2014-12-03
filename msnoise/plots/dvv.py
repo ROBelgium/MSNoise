@@ -110,7 +110,9 @@ def main(all=True, mov_stack=None, savefig=False, show=False):
             plt.plot(py1_wmean.index, data,c='g',lw=1,zorder=11,label='Weighted mean of $\delta v/v$ of individual pairs')
             plt.fill_between(py1_wmean.index, data+py1_wstd,data-py1_wstd,color='g',lw=1,zorder=-1,alpha=0.3)
             plt.ylabel('$\delta v/v$ in %')
-
+            # for pair in allbut['Pairs']:
+                # tmp = allbut[allbut['Pairs']==pair]
+                # plt.plot(tmp.index, tmp[dttname],lw=0.5)
             plt.ylim(0.5, -0.5)
 
             if first_plot == 1:

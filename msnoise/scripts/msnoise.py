@@ -192,8 +192,8 @@ def dvv(all, mov_stack, savefig):
 
 
 @click.command()
-@click.option('--sta1', help='Station 1: NET.STA (e.g. BE.MEM)')
-@click.option('--sta2',  help='Station 2')
+@click.argument('sta1')
+@click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
@@ -202,11 +202,26 @@ def interferogram(sta1, sta2, filterid, comp, mov_stack):
     from ..plots.interferogram import main
     main(sta1, sta2, filterid, comp, mov_stack)
 
+@click.command()
+@click.argument('sta1')
+@click.argument('sta2')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
+@click.option('-a', '--ampli', default=5, help='Amplification')
+@click.option('-s', '--seismic', is_flag=True, help='Seismic style')
+def ccftime(sta1, sta2, filterid, comp, mov_stack, ampli, seismic):
+    """Plots the dv/v (parses the dt/t results)"""
+    from ..plots.ccftime import main
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic)
+
+
 
 # Add plot commands to the plot group:
 plot.add_command(data_availability)
 plot.add_command(dvv)
 plot.add_command(interferogram)
+plot.add_command(ccftime)
 
 
 # Add all commands to the cli group:

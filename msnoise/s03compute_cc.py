@@ -131,13 +131,16 @@ def main():
         for job in jobs:
             refs.append(job.ref)
             pairs.append(job.pair)
-            goal_day = job.day
-    
-        for pair in pairs:
-            netsta1, netsta2 = pair.split(':')
+            netsta1, netsta2 = job.pair.split(':')
             stations.append(netsta1)
             stations.append(netsta2)
-            update_job(db, goal_day, pair, 'CC', 'I')
+            goal_day = job.day
+    
+        # for pair in pairs:
+            # netsta1, netsta2 = pair.split(':')
+            # stations.append(netsta1)
+            # stations.append(netsta2)
+            # update_job(db, goal_day, pair, 'CC', 'I')
     
         fi = len(get_filters(db, all=False))
         if fi == 0:

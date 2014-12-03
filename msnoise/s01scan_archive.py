@@ -132,7 +132,7 @@ def main(init=False, threads=1):
     nthreads = 1
     if threads:
         nthreads = threads
-    if get_tech() == 1:
+    if get_tech() == 1 and nthreads > 1:
         logging.info("You can not work on %i threads because SQLite only\
  supports 1 connection at a time" % nthreads)
         nthreads = 1

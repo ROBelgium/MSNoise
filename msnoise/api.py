@@ -248,8 +248,7 @@ def massive_insert_job(jobs):
     engine = get_engine()
     engine.execute(
         Job.__table__.insert(),
-        jobs
-    )
+        jobs)
 
 
 def is_next_job(session, flag='T', type='CC'):
@@ -262,8 +261,11 @@ def is_next_job(session, flag='T', type='CC'):
 
 def get_next_job(session, flag='T', type='CC'):
     day = session.query(Job).filter(Job.type == type).filter(Job.flag == flag).order_by(Job.day).first().day
-    jobs = session.query(Job).filter(Job.type == type).filter(Job.flag == flag).filter(Job.day == day).all()
-    return jobs
+    jobs = session.query(Job).filter(Job.type == type).filter(Job.flag == flag).filter(Job.day == day)
+    tmp = jobs.all()
+    jobs.update({Job.flag: 'I'})
+    session.commit()
+    return tmp
 
 
 def is_dtt_next_job(session, flag='T', type='DTT', ref=False):
