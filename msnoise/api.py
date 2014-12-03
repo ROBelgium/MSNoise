@@ -280,8 +280,7 @@ def is_dtt_next_job(session, flag='T', type='DTT', ref=False):
 def get_dtt_next_job(session, flag='T', type='DTT'):
     pair = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').first().pair
     jobs = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').filter(Job.pair == pair)
-    refs = [job.ref for job in jobs.all()]
-    days = [job.day for job in jobs.all()]
+    refs, days = zip(*[[job.ref,job.day] for job in jobs.all()])
     jobs.update({Job.flag: 'I'})
     session.commit()
     return pair, days, refs
