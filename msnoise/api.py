@@ -217,10 +217,9 @@ def get_data_availability(session, net=None, sta=None, comp=None, starttime=None
     return data
 
 
-def mark_data_availability(session,net,sta,flag):
-    data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).all()
-    for d in data:
-        d.flag = flag
+def mark_data_availability(session, net, sta, flag):
+    data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta)
+    data.update({DataAvailability.flag: flag})
     session.commit()
 
 def count_data_availability_flags(session):
@@ -263,7 +262,6 @@ def is_next_job(session, flag='T', type='CC'):
 
 def get_next_job(session, flag='T', type='CC'):
     day = session.query(Job).filter(Job.type == type).filter(Job.flag == flag).order_by(Job.day).first().day
-    # print day
     jobs = session.query(Job).filter(Job.type == type).filter(Job.flag == flag).filter(Job.day == day).all()
     return jobs
 
@@ -281,19 +279,17 @@ def is_dtt_next_job(session, flag='T', type='DTT', ref=False):
 
 def get_dtt_next_job(session, flag='T', type='DTT'):
     pair = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').first().pair
-    jobs = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').filter(Job.pair == pair).all()
-    refs = [job.ref for job in jobs]
-    days = [job.day for job in jobs]
-    for job in jobs:
-        job.flag = 'I'
+    jobs = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').filter(Job.pair == pair)
+    refs = [job.ref for job in jobs.all()]
+    days = [job.day for job in jobs.all()]
+    jobs.update({Job.flag: 'I'})
     session.commit()
     return pair, days, refs
 
 
 def reset_dtt_jobs(session, pair):
-    jobs = session.query(Job).filter(Job.pair == pair).filter(Job.type == "DTT").all()
-    for job in jobs:
-        job.flag = "T"
+    jobs = session.query(Job).filter(Job.pair == pair).filter(Job.type == "DTT")
+    jobs.update({Job.flag: 'T'})
     session.commit()
 
 

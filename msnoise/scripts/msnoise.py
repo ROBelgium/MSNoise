@@ -157,9 +157,10 @@ def reset(jobtype):
     from ..api import connect
     
     session = connect()
-    jobs = session.query(Job).filter(Job.type == jobtype).all()
-    for job in jobs:
-        job.flag = 'T'
+    jobs = session.query(Job).filter(Job.type == jobtype)
+    jobs.update({Job.flag: 'T'})
+    # for job in jobs:
+        # job.flag = 'T'
     session.commit()
     session.close()
 
