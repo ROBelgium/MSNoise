@@ -17,7 +17,7 @@ class InitTests(unittest.TestCase):
             self.fail()
     
     def test_002_ConnectToDB(self):
-        from database_tools import connect
+        from api import connect
         try:
             db = connect()
             db.close()
@@ -25,7 +25,7 @@ class InitTests(unittest.TestCase):
             self.fail("Can't connect to MSNoise DB")
     
     def test_003_set_and_config(self):
-        from database_tools import connect, get_config, update_config
+        from api import connect, get_config, update_config
         db = connect()
         totests = []
         totests.append(['data_folder', 'data'])
@@ -49,7 +49,7 @@ class InitTests(unittest.TestCase):
 
     def test_004_set_and_get_filters(self):
         from msnoise_table_def import Filter
-        from database_tools import connect, update_filter, get_filters
+        from api import connect, update_filter, get_filters
         db = connect()
         filters = []
         filters.append(Filter(0.01, 0.12, 0.98, 1.0, 0, 10, 5, 1))
@@ -73,14 +73,14 @@ class InitTests(unittest.TestCase):
             self.fail()
     
     def test_006_get_stations(self):
-        from database_tools import connect, get_stations
+        from api import connect, get_stations
         db = connect()
         stations = get_stations(db).all()
         self.failUnlessEqual(len(stations), 3)
         db.close()
         
     def test_007_update_stations(self):
-        from database_tools import connect, get_stations, update_station
+        from api import connect, get_stations, update_station
         import pandas as pd
         db = connect()
         stations = pd.read_csv('extra/stations.csv',header=None, index_col = 0, names =['X','Y','altitude'])
@@ -104,7 +104,7 @@ class InitTests(unittest.TestCase):
             self.fail()
     
     def test_009_control_data_availability(self):
-        from database_tools import connect, get_new_files, get_data_availability, count_data_availability_flags, get_stations
+        from api import connect, get_new_files, get_data_availability, count_data_availability_flags, get_stations
         
         db = connect()
         files = get_new_files(db)
@@ -128,7 +128,7 @@ class InitTests(unittest.TestCase):
             self.fail()
     
     def test_011_control_jobs(self):
-        from database_tools import connect, is_next_job, get_next_job
+        from api import connect, is_next_job, get_next_job
         from msnoise_table_def import Job
         db = connect()
         

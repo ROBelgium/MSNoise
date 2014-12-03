@@ -10,7 +10,7 @@ To run it from the console:
     $ msnoise new_jobs
 """
 
-from database_tools import *
+from api import *
 import logging
 import numpy as np
 import os

@@ -41,7 +41,7 @@ from traitsui.extras.checkbox_column \
     import CheckboxColumn
 
 from default import *
-from database_tools import *
+from api import *
 
 from msnoise_table_def import *
 

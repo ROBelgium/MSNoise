@@ -47,7 +47,7 @@ To run this script:
 
 from obspy.core import read
 
-from database_tools import *
+from api import *
 from MWCS import mwcs
 import logging
 

@@ -23,7 +23,7 @@ import sys
 import scipy.signal
 from obspy.core import read, Stream, Trace
 
-from ..database_tools import *
+from ..api import *
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1):

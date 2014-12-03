@@ -20,7 +20,7 @@ import matplotlib.gridspec as gridspec
 
 from statsmodels.tsa.tsatools import detrend
 
-from ..database_tools import *
+from ..api import *
 
 def wavg(group):
     d = group[dttname]

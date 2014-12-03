@@ -13,7 +13,7 @@ def cli(ctx, threads):
 
 @click.command()
 def info():
-    from ..database_tools import connect, get_config, get_job_types
+    from ..api import connect, get_config, get_job_types
     from ..default import default
     
     click.echo('')
@@ -154,7 +154,7 @@ def compute_dtt():
 def reset(jobtype):
     """Resets the job to "T"odo. ARG is [CC] or [DTT]"""
     from ..msnoise_table_def import Job
-    from ..database_tools import connect
+    from ..api import connect
     
     session = connect()
     jobs = session.query(Job).filter(Job.type == jobtype).all()

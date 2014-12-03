@@ -17,7 +17,7 @@ import numpy as np
 import matplotlib.gridspec as gridspec
 import datetime
 
-from ..database_tools import *
+from ..api import *
 
 def main():
     db = connect()

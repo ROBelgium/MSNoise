@@ -34,7 +34,7 @@ import glob
 import sys
 import os
 import numpy as np
-from database_tools import *
+from api import *
 
 def main():
     db = connect()
