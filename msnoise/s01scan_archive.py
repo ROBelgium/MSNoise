@@ -50,7 +50,7 @@ from data_structures import data_structure
 
 
 def worker(files, folder, startdate, enddate):
-    # logger = logging.getLogger('worker')
+    # logging = logging.getlogging('worker')
 
     db = connect()
     for file in files:
@@ -113,20 +113,17 @@ def main(init=False, threads=1):
     t = time.time()
 
     multiprocessing.log_to_stderr()
-    global logger
-    logger = multiprocessing.get_logger()
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-    for handler in logger.handlers:
-        handler.setFormatter(formatter)
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)s [%(levelname)s] %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
 
-    logger.info('*** Starting: Scan Archive ***')
+    logging.info('*** Starting: Scan Archive ***')
     db = connect()
 
     mtime = -2
 
     if init:
-        logger.info("Initializing (should be run only once)")
+        logging.info("Initializing (should be run only once)")
         mtime = "-20000"
         init = True
     else:
@@ -136,11 +133,11 @@ def main(init=False, threads=1):
     if threads:
         nthreads = threads
     if get_tech() == 1:
-        logger.info("You can not work on %i threads because SQLite only\
+        logging.info("You can not work on %i threads because SQLite only\
  supports 1 connection at a time" % nthreads)
         nthreads = 1
 
-    logger.info("Will work on %i threads" % nthreads)
+    logging.info("Will work on %i threads" % nthreads)
 
     if os.name == "nt":
         find = "gnufind"
@@ -190,7 +187,7 @@ def main(init=False, threads=1):
                 stdout, stderr = proc.communicate()
 
                 if len(stdout) != 0:
-                    files = sorted(stdout.split('\n'))
+                    files = sorted(stdout.replace('\r','').split('\n'))
                 else:
                     files = []
 
@@ -198,7 +195,7 @@ def main(init=False, threads=1):
                 files.remove('')
 
             if len(files) != 0:
-                logger.info('Started: %s'%folder)
+                logging.info('Started: %s'%folder)
                 client = Process(target=worker, args=([files,folder,startdate,enddate]))
                 client.start()
                 clients.append(client)
@@ -216,8 +213,8 @@ def main(init=False, threads=1):
                 client.join(0.01)
                 clients.remove(client)
 
-    logger.info('*** Finished: Scan Archive ***')
-    logger.info('It took %.2f seconds' % (time.time() - t))
+    logging.info('*** Finished: Scan Archive ***')
+    logging.info('It took %.2f seconds' % (time.time() - t))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Scan the data archive and insert the\

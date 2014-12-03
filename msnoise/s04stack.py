@@ -71,18 +71,6 @@ from database_tools import *
 import logging
 
 
-logging.basicConfig(level=logging.DEBUG,
-                    filename="./stack.log",
-                    format='%(asctime)s [%(levelname)s] %(message)s',
-                    filemode='w')
-
-console = logging.StreamHandler()
-console.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-console.setFormatter(formatter)
-logging.getLogger('').addHandler(console)
-
-
 def main(stype, interval=1):
     """Computes the REF/MOV stacks.
     
@@ -94,6 +82,11 @@ def main(stype, interval=1):
         Number of days before now to search for modified CC jobs
 
     """
+    logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s [%(levelname)s] %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')
+
+    
     logging.debug('Starting the %s stack' % stype)
     db = connect()
     components_to_compute = get_components_to_compute(db)
@@ -216,6 +209,10 @@ def movstack(interval):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s [%(levelname)s] %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')
+
     parser = argparse.ArgumentParser(description='Compute [REF,MOV] stacks if\
                                 jobs have been modified in the last i days.',
                                      epilog=__doc__)

@@ -102,18 +102,6 @@ import statsmodels.api as sm
 import logging
 
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s [%(levelname)s] %(message)s')
-
-console = logging.StreamHandler()
-console.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-console.setFormatter(formatter)
-logging.getLogger('').addHandler(console)
-
-
-
-
 def wavg_wstd(data, errors):
     d = data
     errors[errors == 0] = 1e-6
@@ -125,7 +113,10 @@ def wavg_wstd(data, errors):
 
 
 def main():
-    
+    logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s [%(levelname)s] %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')
+
     logging.info('*** Starting: Compute DT/T ***')
     db = connect()
     

@@ -82,15 +82,8 @@ import logging
 # @profile    
 def main():
     logging.basicConfig(level=logging.DEBUG,
-                        filename="./compute_cc.log",
                         format='%(asctime)s [%(levelname)s] %(message)s',
-                        filemode='w')
-    
-    console = logging.StreamHandler()
-    console.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
+                        datefmt='%Y-%m-%d %H:%M:%S')
     
     logging.info('*** Starting: Compute CC ***')
     

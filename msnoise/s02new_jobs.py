@@ -18,15 +18,8 @@ import os
 
 def main():
     logging.basicConfig(level=logging.DEBUG,
-                        filename="./new_jobs.log",
                         format='%(asctime)s [%(levelname)s] %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S',
-                        filemode='w')
-    console = logging.StreamHandler()
-    console.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
+                        datefmt='%Y-%m-%d %H:%M:%S')
 
     logging.info('*** Starting: New Jobs ***')
 
