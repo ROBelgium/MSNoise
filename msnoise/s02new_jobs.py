@@ -44,6 +44,7 @@ def main():
     old_pair = ""
     day_pairs = []
     jobs = []
+    all_jobs = []
     i = 0
     for nf in nfs:
         # logging.debug('%s.%s will be MASTER for %s-%s'% (nf.net, nf.sta, nf.starttime, nf.endtime))
@@ -76,25 +77,17 @@ def main():
             for pair in pairs:
                 daypair = "%s=%s" % (day, pair)
                 if daypair not in jobs:
+                    all_jobs.append({"day":day,"pair":pair,"type":"CC","flag":"T"})
                     jobs.append(daypair)
     
     count = len(jobs)
     logging.debug("Found %i new jobs to do" % count)
-    alljobs = []
-    for job in jobs:
-        day, pair = job.split("=")
-        job = update_job(db, day, pair, type='CC', flag='T', commit=False, returnjob=True)
-        alljobs.append(job)
-        if i % 100 == 0:
-            logging.debug("Committing 100 jobs")
-            db.add_all(alljobs)
-            db.commit()
-            alljobs = []
-        i += 1
-    if len(alljobs) != 0:
-        db.add_all(alljobs)
-        db.commit()
     
+    # for job in jobs:
+        # day, pair = job.split("=")
+        # alljobs.append({"day":day,"pair":pair,"type":"CC","flag":"T"})
+
+    massive_insert_job(all_jobs)
     # update all _data_availability and mark files as "A"rchives
     for sta in get_stations(db, all=True):
         mark_data_availability(db, sta.net, sta.sta, flag='A')

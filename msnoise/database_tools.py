@@ -25,7 +25,7 @@ def get_tech():
     return tech
 
 
-def connect(inifile=os.path.join(os.getcwd(), 'db.ini')):
+def get_engine(inifile=os.path.join(os.getcwd(), 'db.ini')):
     tech, hostname, database, username, password = read_database_inifile(inifile)
     if tech == 1:
         engine = create_engine('sqlite:///%s' % hostname, echo=False)
@@ -33,6 +33,11 @@ def connect(inifile=os.path.join(os.getcwd(), 'db.ini')):
         engine = create_engine('mysql://%s:%s@%s/%s' % (username, password,
                                                         hostname, database),
                                echo=False, poolclass=NullPool)
+    return engine
+
+
+def connect(inifile=os.path.join(os.getcwd(), 'db.ini')):
+    engine = get_engine(inifile)
     Session = sessionmaker(bind=engine)
     return Session()
 
@@ -48,6 +53,8 @@ def read_database_inifile(inifile=os.path.join(os.getcwd(), 'db.ini')):
     tech, hostname, database, username, password = cPickle.load(f)
     f.close()
     return [tech, hostname, database, username, password]
+
+
 ############ CONFIG ############
 
 
@@ -236,6 +243,14 @@ def update_job(session, day, pair, type, flag, commit=True, returnjob=True):
         session.commit()
     if returnjob:
         return job
+
+
+def massive_insert_job(jobs):
+    engine = get_engine()
+    engine.execute(
+        Job.__table__.insert(),
+        jobs
+    )
 
 
 def is_next_job(session, flag='T', type='CC'):
