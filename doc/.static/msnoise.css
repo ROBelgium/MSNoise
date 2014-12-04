@@ -21,3 +21,7 @@ h2 {
     margin-top: 20px;
     padding-top: 10px;
 }
+
+blockquote p{
+	font-size:0.8em;
+}

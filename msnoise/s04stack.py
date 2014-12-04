@@ -105,10 +105,7 @@ def main(stype, interval=1):
     maxlag = float(get_config(db, "maxlag"))
     cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
     
-    if stype == "day":
-        start, end, datelist = build_daystack_datelist(db)
-        format = "stack"
-    elif stype == "mov":
+    if stype == "mov":
         start, end, datelist = build_movstack_datelist(db)
         format = "matrix"
         mov_stack = get_config(db, "mov_stack")

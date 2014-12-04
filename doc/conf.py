@@ -23,6 +23,10 @@ import sphinx_bootstrap_theme
 import msnoise.myCorr
 import msnoise.whiten
 import msnoise.MWCS
+import msnoise.api
+
+# from msnoise.msnoise_table_def import Filter
+
 #import msnoise.s000installer
 #import msnoise.s001configurator
 #import msnoise.s002populate_station_table
@@ -120,19 +124,20 @@ pygments_style = 'sphinx'
 
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
-
+autodoc_member_order = 'bysource'
 
 # -- Options for HTML output ---------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-#~ html_theme = 'sphinxdoc'
+# html_theme = 'sphinxdoc'
 html_theme = 'bootstrap'
 html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
+# html_theme_options = {}
 html_theme_options = {'bootswatch_theme': "cosmo",
                     "navbar_site_name":"Menu",
                     "navbar_sidebarrel":True,

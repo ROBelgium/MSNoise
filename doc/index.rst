@@ -22,6 +22,8 @@ Contents:
    how_tos
    about_db_performances
    references
+   table_def
+   api
 
 
 Indices and tables

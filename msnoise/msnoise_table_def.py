@@ -10,7 +10,30 @@ import datetime
 Base = declarative_base()
 ########################################################################
 class Filter(Base):
-    """"""
+    """
+    Filter base class.
+    
+    ref : int
+        The id of the Filter in the database
+    low : float
+        The lower frequency bound of the Whiten function (in Hz)
+    high : float
+        The upper frequency bound of the Whiten function (in Hz)
+    mwcs_low : float
+        The lower frequency bound of the linear regression done in MWCS (in Hz)
+    mwcs_high : float
+        The upper frequency bound of the linear regression done in MWCS (in Hz)
+    rms_threshold : float
+        Not used anymore
+    mwcs_wlen : float
+        Window length (in seconds) to perform MWCS
+    mwcs_step : float
+        Step (in seconds) of the windowing procedure in MWCS
+    used : bool
+        Is the filter activated for the processing
+        
+    """
+    
     __tablename__ = "filters"
  
     ref = Column(Integer, primary_key=True)
@@ -38,7 +61,19 @@ class Filter(Base):
 ########################################################################
 
 class Job(Base):
-    """"""
+    """
+    Job Object
+    
+    ref : int
+        The Job ID in the database
+    day : string
+        The day in YYYY-MM-DD format
+    pair : string
+    type : {'CC', 'DTT'}
+    flag : {'T', 'I', 'D'}
+        Status of the Job: "T"odo, "I"n Progress, "D"one.
+    
+    """
     __tablename__ = "jobs"
  
     ref = Column(Integer, primary_key=True)
@@ -62,7 +97,29 @@ class Job(Base):
 ########################################################################
 
 class Station(Base):
-    """"""
+    """
+    Station Object
+    
+    ref : int
+        The Station ID in the database
+    net : string
+        The network code of the Station
+    sta : string
+        The station code
+    X : float
+        The X coordinate of the station
+    Y : float
+        The Y coordinate of the station
+    altitude : float
+        The altitude of the station
+    coordinates : {'DEG', 'UTM'}
+        The coordinates system. DEG is WGS84 latitude/longitude in degrees. 
+        UTM is expressed in meters.
+    instrument : string
+        The instrument code, useful with PAZ correction
+    used : bool
+        Whether this station must be used in the computations.
+    """
     __tablename__ = "stations"
     ref = Column(Integer, primary_key=True)
     net = Column(String(10))  
@@ -90,7 +147,12 @@ class Station(Base):
 ########################################################################
 
 class Config(Base):
-    """"""
+    """
+    Config Object
+    
+    name : string
+    value : string
+    """
     __tablename__ = "config"
     name = Column(String(255), primary_key=True)  
     value = Column(String(255))  
@@ -104,7 +166,33 @@ class Config(Base):
 ########################################################################
 
 class DataAvailability(Base):
-    """"""
+    """
+    DataAvailability Object
+    
+    ref : int
+        The Station ID in the database
+    net : string
+        The network code of the Station
+    sta : string
+        The station code
+    comp : string
+        The component (channel)
+    path : string
+    file : string
+    starttime : datetime
+        Start time of the file
+    endtime : datetime
+        End time of the file
+    data_duration : float
+        Cumulative duration of available data in the file
+    gaps_duration : float
+        Cumulative duration of gaps in the file
+    samplerate : float
+        Sample rate of the data in the file (in Hz)
+    flag : {'N', 'M', 'A'}
+        Status of the DataAvailability object: New, Modified or Archive
+    
+    """
     __tablename__ = "data_availability"
     ref = Column(Integer, primary_key=True,autoincrement=True)
     net = Column(String(10))  

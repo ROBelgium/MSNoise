@@ -89,8 +89,8 @@ def main(all=True, mov_stack=None, savefig=False, show=False):
             current += datetime.timedelta(days=1)
         if 'alldf' in locals():
             global dttname, errname
-            dttname = "M0"
-            errname = "EM0"
+            dttname = "M"
+            errname = "EM"
 
             alldf[dttname] *= -100
             alldf[errname] *= -100
