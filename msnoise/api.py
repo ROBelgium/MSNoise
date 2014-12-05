@@ -55,7 +55,7 @@ def get_engine(inifile=os.path.join(os.getcwd(), 'db.ini')):
 
 
 def connect(inifile=os.path.join(os.getcwd(), 'db.ini')):
-    """Returns the a SQLAlchemy Engine
+    """Returns the a SQLAlchemy Session
     
     Parameters
     ----------
@@ -64,7 +64,7 @@ def connect(inifile=os.path.join(os.getcwd(), 'db.ini')):
     
     Returns
     -------
-    engine : object
+    session : object
     """
     engine = get_engine(inifile)
     Session = sessionmaker(bind=engine)
