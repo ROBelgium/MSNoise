@@ -153,16 +153,16 @@ def compute_dtt():
 @click.argument('jobtype')
 def reset(jobtype):
     """Resets the job to "T"odo. ARG is [CC] or [DTT]"""
-    from ..msnoise_table_def import Job
-    from ..api import connect
-    
+    from ..api import connect, reset_jobs
     session = connect()
-    jobs = session.query(Job).filter(Job.type == jobtype)
-    jobs.update({Job.flag: 'T'})
-    # for job in jobs:
-        # job.flag = 'T'
-    session.commit()
+    reset_jobs(session, jobtype)
     session.close()
+
+@click.command()
+def ipython():
+    """Launches an ipython notebook in the current folder"""
+    os.system("ipython notebook --pylab inline")
+
 
 ###
 ### PLOT GROUP
@@ -175,20 +175,22 @@ def plot():
 
 
 @click.command()
-def data_availability():
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+def data_availability(show):
     """Plots the Data Availability vs time"""
     from ..plots.data_availability import main
-    main()
+    main(show)
 
 
 @click.command()
 @click.option('-a', '--all', default=True, help='Plot All mov stacks')
 @click.option('-m', '--mov_stack', default=0,  help='Plot specific mov stacks')
 @click.option('-s', '--savefig', is_flag=True, help='Save figure to disk (PNG)')
-def dvv(all, mov_stack, savefig):
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+def dvv(all, mov_stack, savefig, show):
     """Plots the dv/v (parses the dt/t results)"""
     from ..plots.dvv import main
-    main(all, mov_stack, savefig)
+    main(all, mov_stack, savefig, show)
 
 
 @click.command()
@@ -197,10 +199,11 @@ def dvv(all, mov_stack, savefig):
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
-def interferogram(sta1, sta2, filterid, comp, mov_stack):
-    """Plots the dv/v (parses the dt/t results)"""
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+def interferogram(sta1, sta2, filterid, comp, mov_stack,show):
+    """Plots the interferogram between sta1 and sta2 (parses the CCFs)"""
     from ..plots.interferogram import main
-    main(sta1, sta2, filterid, comp, mov_stack)
+    main(sta1, sta2, filterid, comp, mov_stack, show)
 
 @click.command()
 @click.argument('sta1')
@@ -209,11 +212,12 @@ def interferogram(sta1, sta2, filterid, comp, mov_stack):
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
 @click.option('-a', '--ampli', default=5, help='Amplification')
-@click.option('-s', '--seismic', is_flag=True, help='Seismic style')
-def ccftime(sta1, sta2, filterid, comp, mov_stack, ampli, seismic):
+@click.option('-S', '--seismic', is_flag=True, help='Seismic style')
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+def ccftime(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show):
     """Plots the dv/v (parses the dt/t results)"""
     from ..plots.ccftime import main
-    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic)
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show)
 
 
 
@@ -237,6 +241,7 @@ cli.add_command(stack)
 cli.add_command(compute_mwcs)
 cli.add_command(compute_dtt)
 cli.add_command(reset)
+cli.add_command(ipython)
 
 # Finally add the plot group too:
 cli.add_command(plot)
