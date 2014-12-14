@@ -333,10 +333,13 @@ def main():
                 for itranche in range(tranches):
                     tmp = tramef_Z[istation, itranche * int(min30):(itranche + 1) * int(min30)]
                     rmsmat = np.std(np.abs(tmp))
-                    indexes = np.where(
-                        np.abs(tmp) > (windsorizing * rmsmat))[0]
-                    tmp[indexes] = (tmp[indexes] / np.abs(
-                        tmp[indexes])) * windsorizing * rmsmat
+                    if windsorizing == -1:
+                        tmp = np.sign(tmp)
+                    else:
+                        indexes = np.where(
+                            np.abs(tmp) > (windsorizing * rmsmat))[0]
+                        tmp[indexes] = (tmp[indexes] / np.abs(
+                            tmp[indexes])) * windsorizing * rmsmat
                     tmp *= cp
                     for ifilter, filter in enumerate(get_filters(db, all=False)):
                         whitened_slices[istation, ifilter, itranche,:] = whiten(tmp, Nfft, dt, float(filter.low), float(filter.high), plot=False)
@@ -474,7 +477,9 @@ def main():
                                 if rmsmat[i] > rms_threshold:
                                     cp = cosTaper(len(trame2h[i]),0.04)
                                     
-                                    if windsorizing != 0:
+                                    if windsorizing == -1:
+                                        trame2h[i] = np.sign(trame2h[i])
+                                    elif windsorizing != 0:
                                         indexes = np.where(
                                             np.abs(trame2h[i]) > (windsorizing * rmsmat[i]))[0]
                                         # clipping at windsorizing*rms
