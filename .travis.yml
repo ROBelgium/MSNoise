@@ -32,7 +32,8 @@ before_install:
   # Update remaining packages not available via conda
   - easy_install click
   - easy_install flask-admin
-  - easy_install obspy
+  - pip install -i https://pypi.binstar.org/pypi/simple obspy
+  #- easy_install obspy
   - easy_install mysql-python
   # Special install for scikits.samplerate
   - cd ..
