@@ -140,6 +140,12 @@ def compute_mwcs():
     """Computes the MWCS based on the new stacked data"""
     from ..s05compute_mwcs import main
     main()
+    
+@click.command()
+def compute_stretching():
+    """Computes the MWCS based on the new stacked data"""
+    from ..stretch import main
+    main()
 
 
 @click.command()
@@ -235,6 +241,7 @@ cli.add_command(new_jobs)
 cli.add_command(compute_cc)
 cli.add_command(stack)
 cli.add_command(compute_mwcs)
+cli.add_command(compute_stretching)
 cli.add_command(compute_dtt)
 cli.add_command(reset)
 

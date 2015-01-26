@@ -52,7 +52,8 @@ def main(sta1, sta2, filterid, components, mov_stack=1):
         # stack_total /= np.max(stack_total, axis=0)
         xextent = (date2num(start), date2num(end),-120,120)
         ax = plt.subplot(111)
-        plt.imshow(stack_total.T, extent=xextent, aspect="auto",interpolation='none',origin='lower',cmap='seismic',vmin=-0.1,vmax=0.1)
+        plt.imshow(stack_total.T, extent=xextent, aspect="auto",interpolation='none',origin='lower',cmap='seismic',
+                vmin=-1e-1,vmax=1e-1)
         plt.ylabel("Lag Time (s)")
         plt.axhline(0,lw=0.5,c='k')
         plt.grid()
@@ -69,7 +70,14 @@ def main(sta1, sta2, filterid, components, mov_stack=1):
         name = '%i.%s_%s.png'%(filterid,sta1,sta2)
 
         #~ plt.savefig('interfero_publi.png',dpi=300)
+        # plt.figure()
+        # maxx = np.argmax(stack_total, axis=0)
+        # plt.plot(maxx)
+        
+        
         plt.show()
+        
+        
                             
 
 if __name__ == "__main__":

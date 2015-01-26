@@ -16,6 +16,8 @@ from scipy.stats.stats import nanmean
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.dates as mdates
+from matplotlib.widgets import Cursor
 
 import os
 import numpy as np
@@ -30,12 +32,15 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False):
     db = connect()
     components_to_compute = get_components_to_compute(db)
     maxlag = float(get_config(db,'maxlag'))
+    samples = get_maxlag_samples(db)
     cc_sampling_rate = float(get_config(db,'cc_sampling_rate'))
     start, end, datelist = build_movstack_datelist(db)
-   
-    plt.figure(figsize=(16,16))
+    base = mdates.date2num(start) 
+    fig = plt.figure(figsize=(16,16))
     sta1 = sta1.replace('.','_')
     sta2 = sta2.replace('.','_')
+    t = np.arange(samples)/cc_sampling_rate - maxlag
+
     if sta2 > sta1: # alphabetical order filtering!
         pair = "%s:%s"%(sta1,sta2)
         
@@ -45,18 +50,37 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False):
         ax = plt.subplot(111)
         for i, line in enumerate(stack_total):
             line /= line.max()
-            plt.plot(line * ampli + i, c='k')
+            plt.plot(t, line * ampli + i + base , c='k')
             if seismic:
                 y1 = np.ones(len(line)) * i
-                y2 = line*ampli + i
-                plt.fill_between(np.arange(len(line)), y1, y2, where=y2>=y1, facecolor='k', interpolate=True)
+                y2 = line*ampli + i + base
+                plt.fill_between(t, y1, y2, where=y2>=y1, facecolor='k', interpolate=True)
 
         plt.ylabel("Lag Time (s)")
         plt.axhline(0,lw=0.5,c='k')
         plt.grid()
         plt.title('%s : %s'%(sta1,sta2))
         name = '%i.%s_%s.png'%(filterid,sta1,sta2)
+        plt.scatter(0,[start,])
+        plt.ylim(start, end)
+        plt.xlim(-maxlag, maxlag)
+        ax.fmt_ydata = mdates.DateFormatter('%Y-%m-%d')
+        cursor = Cursor(ax, useblit=True, color='red', linewidth=1.2)
+        # ax.yaxis.auto_
+        # ax.yaxis.set_major_locator( YearLocator() )
+        # ax.yaxis.set_major_formatter(  DateFormatter('%Y-%m') )
+        # ax.yaxis.set_minor_locator( MonthLocator(interval=2) )
+        # ax.yaxis.set_minor_formatter(  DateFormatter('%Y-%m-%d') )
+        
+        
+        # fig.canvas.draw()
+        # labels = [item.get_text() for item in ax.get_yticklabels()]
+        # for i, label in enumerate(labels):
+            # if label != '':
+                # labels[i] = datelist[int(label)].strftime('%Y-%m-%d')
 
+        # ax.set_yticklabels(labels)
+        
         #~ plt.savefig('interfero_publi.png',dpi=300)
         plt.show()
                             

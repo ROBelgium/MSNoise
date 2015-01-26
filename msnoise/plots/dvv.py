@@ -97,7 +97,8 @@ def main(all=True, mov_stack=None, savefig=False, show=False):
 
             ALL = alldf[alldf['Pairs'] == 'ALL'].copy()
             allbut = alldf[alldf['Pairs'] != 'ALL'].copy()
-
+            
+            pair1 = alldf[alldf['Pairs'] == 'YA_UV02_YA_UV06'].copy()
             py1_wmean, py1_wstd = get_wavgwstd(allbut)
             py1_wmean = py1_wmean.resample('D', how='mean')
             py1_wstd = py1_wstd.resample('D', how='mean').fillna(0.0)
@@ -106,14 +107,15 @@ def main(all=True, mov_stack=None, savefig=False, show=False):
 
             plt.subplot(gs[i])
             plt.plot(ALL.index, ALL[dttname],c='r',label='ALL: $\delta v/v$ of the mean network')
+            plt.plot(pair1.index, pair1[dttname], c='b',label='pair')
             #plt.fill_between(ALL.index,ALL[dttname]-ALL[errname],ALL[dttname]+ALL[errname],lw=1,color='red',zorder=-1,alpha=0.3)
-            plt.plot(py1_wmean.index, data,c='g',lw=1,zorder=11,label='Weighted mean of $\delta v/v$ of individual pairs')
-            plt.fill_between(py1_wmean.index, data+py1_wstd,data-py1_wstd,color='g',lw=1,zorder=-1,alpha=0.3)
+            # plt.plot(py1_wmean.index, data,c='g',lw=1,zorder=11,label='Weighted mean of $\delta v/v$ of individual pairs')
+            # plt.fill_between(py1_wmean.index, data+py1_wstd,data-py1_wstd,color='g',lw=1,zorder=-1,alpha=0.3)
             plt.ylabel('$\delta v/v$ in %')
             # for pair in allbut['Pairs']:
                 # tmp = allbut[allbut['Pairs']==pair]
                 # plt.plot(tmp.index, tmp[dttname],lw=0.5)
-            plt.ylim(0.5, -0.5)
+            # plt.ylim(0.5, -0.5)
 
             if first_plot == 1:
                 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=4,
