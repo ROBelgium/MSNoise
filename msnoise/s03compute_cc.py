@@ -284,7 +284,7 @@ def main():
         dt = 1. / params.goal_sampling_rate
         # Calculate the number of slices
         
-        tranches = int(params.goal_duration * params.goal_sampling_rate / params.min30)
+        slices = int(params.goal_duration * params.goal_sampling_rate / params.min30)
         begins = []
         ends = []
         i = 0
@@ -295,22 +295,22 @@ def main():
         
         # print "begins", begins
         # print "ends", ends
-        tranches = len(begins)
+        slices = len(begins)
         ###
         ### Computing only ZZ components ? Then we can be much faster:
         ###
         
-        # if False:
-        if len(params.components_to_compute) == 1 and params.components_to_compute[0] == "ZZ":
+        if False:
+        # if len(params.components_to_compute) == 1 and params.components_to_compute[0] == "ZZ":
             Nfft = params.min30
             if params.min30 / 2 % 2 != 0:
                 Nfft = params.min30 + 2
             cp = cosTaper(int(params.min30), 0.04)
             
             logging.info("Pre-Whitening Traces")
-            whitened_slices = np.zeros((len(stations), len(get_filters(db, all=False)), tranches, int(Nfft)), dtype=np.complex)
+            whitened_slices = np.zeros((len(stations), len(get_filters(db, all=False)), slices, int(Nfft)), dtype=np.complex)
             for istation, station in enumerate(stations):
-                for itranche, (begin, end) in enumerate(zip(begins,ends)):
+                for islice, (begin, end) in enumerate(zip(begins,ends)):
                     tmp = tramef_Z[istation, begin:end]
                     rmsmat = np.std(np.abs(tmp))
                     if params.windsorizing == -1:
@@ -322,7 +322,7 @@ def main():
                             tmp[indexes])) * params.windsorizing * rmsmat
                     tmp *= cp
                     for ifilter, filter in enumerate(get_filters(db, all=False)):
-                        whitened_slices[istation, ifilter, itranche,:] = whiten(tmp, Nfft, dt, float(filter.low), float(filter.high), plot=False)
+                        whitened_slices[istation, ifilter, islice,:] = whiten(tmp, Nfft, dt, float(filter.low), float(filter.high), plot=False)
                     del tmp
             del tramef_Z
             logging.info("Processing CC")
@@ -336,14 +336,14 @@ def main():
                     station1, station2 = pair.split(':')
                     pair = (np.where(stations == station1)
                             [0][0], np.where(stations == station2)[0][0])
-                    for itranche in range(0, tranches):
-                        tmp = np.vstack((whitened_slices[pair[0], ifilter, itranche], whitened_slices[pair[1], ifilter, itranche]))
+                    for islice in range(0, slices):
+                        tmp = np.vstack((whitened_slices[pair[0], ifilter, islice], whitened_slices[pair[1], ifilter, islice]))
                         corr = myCorr(tmp, np.ceil(params.maxlag / dt), plot=False)
                         if params.keep_all:
                             thisdate = time.strftime(
-                                "%Y-%m-%d", time.gmtime(basetime + itranche * params.min30 / params.goal_sampling_rate))
+                                "%Y-%m-%d", time.gmtime(basetime + islice * params.min30 / params.goal_sampling_rate))
                             thistime = time.strftime(
-                                "%H_%M", time.gmtime(basetime + itranche * params.min30 / params.goal_sampling_rate))
+                                "%H_%M", time.gmtime(basetime + islice * params.min30 / params.goal_sampling_rate))
                             add_corr(db, station1.replace('.', '_'), station2.replace(
                                     '.', '_'), filter.ref, thisdate, thistime, params.min30 / params.goal_sampling_rate, "ZZ", corr, params.goal_sampling_rate)
                         if params.keep_days:
@@ -441,9 +441,11 @@ def main():
                         daycorr[filterid] = np.zeros(get_maxlag_samples(db,))
                         ndaycorr[filterid] = 0
         
-                    for itranche in range(0, tranches):
-                        # print "Avancement: %#2d/%2d"% (itranche+1,tranches)
-                        trame2h = trames[:, itranche * int(params.min30):(itranche + 1) * int(params.min30)]
+                    # for islice in range(0, slices):
+                    for islice, (begin, end) in enumerate(zip(begins,ends)):
+                        # print "Avancement: %#2d/%2d"% (islice+1,slices)
+                        trame2h = trames[:, begin:end]
+                        
                         rmsmat = np.std(np.abs(trame2h), axis=1)
                         for filterdb in get_filters(db, all=False):
                             filterid = filterdb.ref
@@ -477,9 +479,9 @@ def main():
                             corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False)
         
                             thisdate = time.strftime(
-                                "%Y-%m-%d", time.gmtime(basetime + itranche * params.min30 / params.goal_sampling_rate))
+                                "%Y-%m-%d", time.gmtime(basetime + islice * params.min30 / params.goal_sampling_rate))
                             thistime = time.strftime(
-                                "%H_%M", time.gmtime(basetime + itranche * params.min30 / params.goal_sampling_rate))
+                                "%H_%M", time.gmtime(basetime + islice * params.min30 / params.goal_sampling_rate))
                             if params.keep_all:
                                 add_corr(db, station1.replace('.', '_'), station2.replace(
                                     '.', '_'), filterid, thisdate, thistime, params.min30 / params.goal_sampling_rate, components, corr, params.goal_sampling_rate)
