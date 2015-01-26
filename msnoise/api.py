@@ -123,7 +123,7 @@ def read_database_inifile(inifile=os.path.join(os.getcwd(), 'db.ini')):
 ############ CONFIG ############
 
 
-def get_config(session, name=None):
+def get_config(session, name=None, bool=False):
     """Get the value of one or all config bits from the database.
     
     Parameters
@@ -144,7 +144,13 @@ def get_config(session, name=None):
     if name:
         config = session.query(Config).filter(Config.name == name).first()
         if config is not None:
-            config = config.value
+            if bool:
+                if config.value in [True,'true','Y','y','1',1]:
+                    config = True
+                else:
+                    config = False
+            else:
+                config = config.value
         else:
             config = ''
     else:
@@ -786,9 +792,45 @@ def get_job_types(session, type='CC'):
 ############ CORRELATIONS ############
 
 
-def add_corr(db,station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
-    output_folder = get_config(db, 'output_folder')
-    export_format = get_config(db, 'export_format')
+def add_corr(session,station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
+    """
+    Adds a CCF to the data archive on disk.
+    
+    Parameters
+    ----------
+    session : object
+        A Session object, as obtained using `connect()`
+    station1 : str
+        The name of station 1 (formatted NET.STA)
+    station2 : str
+        The name of station 2 (formatted NET.STA)
+    filterid : int
+        The ID (ref) of the filter
+    date : datetime.date or str
+        The date of the CCF
+    time : datetime.time or str
+        The time of the CCF
+    duration : float
+        The total duration of the exported CCF
+    components : str
+        The name of the components used (ZZ, ZR, ...)
+    sampling_rate : float
+        The sampling rate of the exported CCF
+    day : bool
+        Whether this function is called to export a daily stack (True) or each
+        CCF (when keep_all parameter is set to True in the configuration).
+        Defaults to True.
+    ncorr : int
+        Number of CCF that have been stacked for this CCF.
+        
+    
+    Returns
+    -------
+    None
+    """
+    
+    output_folder = get_config(session, 'output_folder')
+    export_format = get_config(session, 'export_format')
     if export_format == "BOTH":
         mseed = True
         sac = True
@@ -803,9 +845,9 @@ def add_corr(db,station1, station2, filterid, date, time, duration, components, 
         path = os.path.join("STACKS", "%02i" % filterid, "001_DAYS", components, "%s_%s" % (station1, station2), str(date))
         pair = "%s:%s" % (station1, station2)
         if mseed:
-            export_mseed(db, path, pair, components, filterid, CF/ncorr, ncorr)
+            export_mseed(session, path, pair, components, filterid, CF/ncorr, ncorr)
         if sac:
-            export_sac(db, path, pair, components, filterid, CF/ncorr, ncorr)
+            export_sac(session, path, pair, components, filterid, CF/ncorr, ncorr)
 
     else:
         file = '%s.cc' % time
@@ -1131,8 +1173,7 @@ def nextpow2(x):
 
 
 def check_and_phase_shift(trace):
-    
-    print trace
+    # print trace
     taper_length = 20.0
     if trace.stats.npts < 4 * taper_length*trace.stats.sampling_rate:
         trace.data = np.zeros(trace.stats.npts)
@@ -1153,7 +1194,7 @@ def check_and_phase_shift(trace):
         taper_1s = taper_length * float(trace.stats.sampling_rate) / trace.stats.npts
         cp = cosTaper(trace.stats.npts, taper_1s)
         trace.data *= cp
-        print "Trace is offset by %.6f s from closest delta (%s)" % (dt, direction)
+        # print "Trace is offset by %.6f s from closest delta (%s)" % (dt, direction)
         n = int(2**nextpow2(len(trace.data)))
         FFTdata = scipy.fftpack.fft(trace.data, n=n)
         fftfreq = scipy.fftpack.fftfreq(n,d=trace.stats.delta)
@@ -1162,7 +1203,7 @@ def check_and_phase_shift(trace):
         trace.stats.starttime += dt
         return trace
     else: 
-        print "No Offset"
+        # print "No Offset"
         return trace
     
 
