@@ -283,8 +283,19 @@ def main():
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.goal_sampling_rate
         # Calculate the number of slices
-        tranches = int(params.goal_duration * params.goal_sampling_rate / params.min30)
         
+        tranches = int(params.goal_duration * params.goal_sampling_rate / params.min30)
+        begins = []
+        ends = []
+        i = 0
+        while i <=  (params.goal_duration - params.min30/params.goal_sampling_rate):
+            begins.append(int(i * params.goal_sampling_rate))
+            ends.append(int(i * params.goal_sampling_rate + params.min30))
+            i += int(params.min30/params.goal_sampling_rate * 0.25)
+        
+        # print "begins", begins
+        # print "ends", ends
+        tranches = len(begins)
         ###
         ### Computing only ZZ components ? Then we can be much faster:
         ###
@@ -299,8 +310,8 @@ def main():
             logging.info("Pre-Whitening Traces")
             whitened_slices = np.zeros((len(stations), len(get_filters(db, all=False)), tranches, int(Nfft)), dtype=np.complex)
             for istation, station in enumerate(stations):
-                for itranche in range(tranches):
-                    tmp = tramef_Z[istation, itranche * int(params.min30):(itranche + 1) * int(params.min30)]
+                for itranche, (begin, end) in enumerate(zip(begins,ends)):
+                    tmp = tramef_Z[istation, begin:end]
                     rmsmat = np.std(np.abs(tmp))
                     if params.windsorizing == -1:
                         tmp = np.sign(tmp)
