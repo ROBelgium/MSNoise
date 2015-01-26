@@ -30,7 +30,7 @@ from sqlalchemy.exc import  *
 from getpass import getpass
 from msnoise_table_def import *
 from default import default
-from database_tools import create_database_inifile
+from api import create_database_inifile
 import argparse
 
 def main(tech=None, hostname="localhost", username="msnoise", password="msnoise", database="msnoise", filename="msnoise.sqlite"):

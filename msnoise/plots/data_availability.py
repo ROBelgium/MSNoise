@@ -19,7 +19,7 @@ import datetime
 
 from ..api import *
 
-def main():
+def main(show=False):
     db = connect()
     start, end, datelist = build_movstack_datelist(db)
     dates = []
@@ -41,14 +41,14 @@ def main():
     start = datetime.datetime.combine(start, datetime.time(0, 0, 0))
 
     for i, group in enumerate(sorted(data.groups.keys())):
-        print group
         new = True
         for di in data.groups[group]:
             if new:
-                print group, di
+                print group, di,
                 new = False
             dt = (di-start).days
             matrix[i, dt] = 1
+        print di
 
     gs = gridspec.GridSpec(2, 1, height_ratios=[4, 1])
 
@@ -75,8 +75,8 @@ def main():
     plt.ylabel('N stations')
     plt.gcf().autofmt_xdate()
     plt.grid()
-
-    plt.show()
+    if show:
+        plt.show()
 
 if __name__ == "__main__":
     main()

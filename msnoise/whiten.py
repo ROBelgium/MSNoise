@@ -111,3 +111,4 @@ if __name__ == '__main__':
     for i in range(1000):
         whiten(a.copy(), N, 0.05, 1.0, 5.9, plot=False)
     print "1000 loops:", (time.clock()-t) * 1000, "ms"
+    whiten(a.copy(), N, 0.05, 1.0, 5.9, plot=True)

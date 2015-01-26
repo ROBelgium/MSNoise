@@ -754,6 +754,19 @@ def get_dtt_next_job(session, flag='T', type='DTT'):
     return pair, days, refs
 
 
+def reset_jobs(session, jobtype):
+    """
+    Sets the flag of all `jobtype` Jobs to "T"odo.
+    
+    Parameters
+    ----------
+    jobtype : string
+        The type to reset: CC or DTT
+    """
+    jobs = session.query(Job).filter(Job.type == jobtype)
+    jobs.update({Job.flag: 'T'})
+    session.commit()
+
 def reset_dtt_jobs(session, pair):
     """
     Sets the flag of all DTT Jobs of one `pair` to "T"odo.

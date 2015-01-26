@@ -28,7 +28,7 @@ from obspy.core import read, Stream, Trace
 from ..api import *
 
 
-def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False):
+def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False, show=False):
     db = connect()
     components_to_compute = get_components_to_compute(db)
     maxlag = float(get_config(db,'maxlag'))
