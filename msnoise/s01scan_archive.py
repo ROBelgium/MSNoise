@@ -157,13 +157,11 @@ def main(init=False, threads=1):
     else:
         print "Can't parse the archive for format %s !" % data_struc
         print "trying to import local parser (should return a station list)"
-        print 
-        try:
+        print
+        if os.path.isfile(os.path.join(os.getcwd(),'custom.py')):
             sys.path.append(os.getcwd())
-            from custom import data_structure as d
-            rawpath = d
-        except:
-            traceback.print_exc()
+            from custom import data_structure as rawpath
+        else:
             print "No file named custom.py in the %s folder" % os.getcwd()
             return
     for year in range(startdate.year, min(datetime.datetime.now().year, enddate.year) + 1):

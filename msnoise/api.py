@@ -1,24 +1,25 @@
 # database_tools.py
+
 import os
 import logging
 import copy
 import datetime
 import itertools
 import cPickle
+import math
 
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 import numpy as np
 import scipy.fftpack
-import math
-
 from obspy.core import Stream, Trace, read
 from obspy.signal import cosTaper
 from obspy.sac import SacIO
 from obspy.core.util import gps2DistAzimuth
 
 from msnoise_table_def import Filter, Job, Station, Config, DataAvailability
+
 
 def get_tech():
     """Returns the current DB technology used (reads from the db.ini file)
@@ -805,7 +806,7 @@ def get_job_types(session, type='CC'):
 ############ CORRELATIONS ############
 
 
-def add_corr(session,station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
+def add_corr(session, station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
     """
     Adds a CCF to the data archive on disk.
     
@@ -871,7 +872,7 @@ def add_corr(session,station1, station2, filterid, date, time, duration, compone
         t = Trace()
         t.data = CF
         t.stats.sampling_rate = sampling_rate
-        t.stats.starttime = -float(get_config(db, 'maxlag'))
+        t.stats.starttime = -float(get_config(session, 'maxlag'))
         t.stats.components = components
         # if ncorr != 0:
             # t.stats.location = "%02i"%ncorr
