@@ -12,6 +12,7 @@ from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 import numpy as np
+import pandas as pd
 import scipy.fftpack
 from obspy.core import Stream, Trace, read
 from obspy.signal import cosTaper
@@ -45,12 +46,12 @@ def get_engine(inifile=os.path.join(os.getcwd(), 'db.ini')):
     -------
     engine : object
     """
-    tech, hostname, database, username, password = read_database_inifile(inifile)
+    tech, hostname, database, user, passwd = read_database_inifile(inifile)
     if tech == 1:
         engine = create_engine('sqlite:///%s' % hostname, echo=False)
     else:
-        engine = create_engine('mysql://%s:%s@%s/%s' % (username, password,
-                                                        hostname, database),
+        engine = create_engine('mysql://%s:%s@%s/%s' % (user, passwd, hostname,
+                                                        database),
                                echo=False, poolclass=NullPool)
     return engine
 
@@ -124,7 +125,7 @@ def read_database_inifile(inifile=os.path.join(os.getcwd(), 'db.ini')):
 ############ CONFIG ############
 
 
-def get_config(session, name=None, bool=False):
+def get_config(session, name=None, isbool=False):
     """Get the value of one or all config bits from the database.
     
     Parameters
@@ -145,7 +146,7 @@ def get_config(session, name=None, bool=False):
     if name:
         config = session.query(Config).filter(Config.name == name).first()
         if config is not None:
-            if bool:
+            if isbool:
                 if config.value in [True,'true','Y','y','1',1]:
                     config = True
                 else:
@@ -181,7 +182,7 @@ def update_config(session, name, value):
     session.commit()
     return
 
-############ FILTERS ############
+# FILTERS PART
 
 
 def get_filters(session, all=False):
@@ -259,7 +260,7 @@ def update_filter(session, ref, low, high, mwcs_low, mwcs_high,
     session.commit()
     return
 
-############ NETWORK AND STATION ############
+# NETWORK AND STATION
 
 
 def get_networks(session, all=False):
@@ -406,7 +407,7 @@ def get_station_pairs(session, used=None, net=None):
         Iterable of Station object pairs.
     """
     stations = get_stations(session, all=False, net=net)
-    if get_config(session, name="autocorr") in ['Y', 'y', '1', 1]:
+    if get_config(session, name="autocorr", isbool=True):
         return itertools.combinations_with_replacement(stations, 2)
     else:
         return itertools.combinations(stations, 2)
@@ -800,10 +801,26 @@ def get_job_types(session, type='CC'):
     data : list of [count, flag] pairs
     """
     
-    return session.query(func.count(Job.flag),Job.flag).filter(Job.type == type).group_by(Job.flag).all()
+    return session.query(func.count(Job.flag), Job.flag).filter(Job.type == type).group_by(Job.flag).all()
 
 
-############ CORRELATIONS ############
+# CORRELATIONS
+
+
+def export_allcorr(session, ccfid, data):
+    output_folder = get_config(session, 'output_folder')
+    station1, station2, filterid, components, date = ccfid.split('_')
+
+    path = os.path.join(output_folder, "%02i" % int(filterid),
+                        station1, station2, components)
+    if not os.path.isdir(path):
+        os.makedirs(path)
+
+    df = pd.DataFrame().from_dict(data).T
+    df.columns = get_t_axis(session)
+    df.to_hdf(os.path.join(path, date+'.h5'), 'data')
+    del df
+    return
 
 
 def add_corr(session, station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
@@ -845,27 +862,30 @@ def add_corr(session, station1, station2, filterid, date, time, duration, compon
     
     output_folder = get_config(session, 'output_folder')
     export_format = get_config(session, 'export_format')
+    sac, mseed = False, False
     if export_format == "BOTH":
         mseed = True
         sac = True
     elif export_format == "SAC":
-        mseed = False
         sac = True
     elif export_format == "MSEED":
         mseed = True
-        sac = False
 
     if day:
-        path = os.path.join("STACKS", "%02i" % filterid, "001_DAYS", components, "%s_%s" % (station1, station2), str(date))
+        path = os.path.join("STACKS", "%02i" % filterid, "001_DAYS", components,
+                            "%s_%s" % (station1, station2), str(date))
         pair = "%s:%s" % (station1, station2)
         if mseed:
-            export_mseed(session, path, pair, components, filterid, CF/ncorr, ncorr)
+            export_mseed(session, path, pair, components, filterid, CF/ncorr,
+                         ncorr)
         if sac:
-            export_sac(session, path, pair, components, filterid, CF/ncorr, ncorr)
+            export_sac(session, path, pair, components, filterid, CF/ncorr,
+                       ncorr)
 
     else:
         file = '%s.cc' % time
-        path = os.path.join(output_folder, "%02i" % filterid, station1, station2, components, date)
+        path = os.path.join(output_folder, "%02i" % filterid, station1,
+                            station2, components, date)
         if not os.path.isdir(path):
             os.makedirs(path)
 
@@ -881,7 +901,8 @@ def add_corr(session, station1, station2, filterid, date, time, duration, compon
         del t, st
 
 
-def export_sac(db, filename, pair, components, filterid, corr, ncorr=0, sac_format=None, maxlag=None, cc_sampling_rate=None):
+def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
+               sac_format=None, maxlag=None, cc_sampling_rate=None):
     if sac_format is None:
         sac_format = get_config(db, "sac_format")
     if maxlag is None:
@@ -914,7 +935,8 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0, sac_form
     return
 
 
-def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0, maxlag=None, cc_sampling_rate=None):
+def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
+                 maxlag=None, cc_sampling_rate=None):
     try:
         os.makedirs(os.path.split(filename)[0])
     except:
@@ -938,7 +960,8 @@ def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0, maxlag
     return
 
 
-def get_results(session, station1, station2, filterid, components, dates, mov_stack = 1, format="stack"):
+def get_results(session, station1, station2, filterid, components, dates,
+                mov_stack = 1, format="stack"):
     export_format = get_config(session, 'export_format')
     if format == "stack":
         stack = np.zeros(get_maxlag_samples(session))
@@ -969,7 +992,9 @@ def get_results(session, station1, station2, filterid, components, dates, mov_st
         stack = np.zeros((len(dates), get_maxlag_samples(session)))
         i = 0
         for j, date in enumerate(dates):
-            daystack = os.path.join("STACKS", "%02i"%filterid, "%03i_DAYS"%mov_stack, components, "%s_%s"%(station1, station2), str(date))
+            daystack = os.path.join("STACKS", "%02i"%filterid,
+                                    "%03i_DAYS"%mov_stack, components,
+                                    "%s_%s"%(station1, station2), str(date))
             # logging.debug('reading: %s' % daystack)
             if export_format == "BOTH":
                 daystack += ".MSEED"
@@ -985,6 +1010,23 @@ def get_results(session, station1, station2, filterid, components, dates, mov_st
                 stack[j] *= np.nan
         return i, stack
 
+
+def get_results_all(session, station1, station2, filterid, components, dates,
+                mov_stack = 1, format="stack"):
+
+    output_folder = get_config(session, 'output_folder')
+    path = os.path.join(output_folder, "%02i" % int(filterid),
+                        station1, station2, components)
+    results = []
+    for date in dates:
+        fname = os.path.join(path, date.strftime('%Y-%m-%d.h5'))
+        if os.path.isfile(fname):
+            df = pd.read_hdf(fname, 'data', parse_dates=True)
+            df.index = pd.to_datetime(df.index)
+            results.append(df)
+    result = pd.concat(results)
+    del results
+    return result
 
 ############ session MISC ############
 
@@ -1005,7 +1047,28 @@ def get_maxlag_samples(session):
     """
     
     maxlag = float(get_config(session, 'maxlag'))
-    return int(2*maxlag*float(get_config(session, 'cc_sampling_rate'))+1)
+    cc_sampling_rate = float(get_config(session, 'cc_sampling_rate'))
+    return int(2*maxlag*cc_sampling_rate)+1
+
+
+def get_t_axis(session):
+    """
+    Returns the time axis (in seconds) of the CC functions.
+    Gets the maxlag from the database and uses `get_maxlag_samples` function.
+
+    Parameters
+    ----------
+    session : object
+        A Session object, as obtained using `connect()`
+
+    Returns
+    -------
+    time_axis : array
+    """
+
+    maxlag = float(get_config(session, 'maxlag'))
+    samples = get_maxlag_samples(session)
+    return np.linspace(-maxlag, maxlag, samples)
 
 
 def get_components_to_compute(session):
@@ -1024,7 +1087,7 @@ def get_components_to_compute(session):
     
     components_to_compute = []
     for comp in ['ZZ', 'RR', 'TT', 'TR', 'RT', 'ZR', 'RZ', 'TZ', 'ZT']:
-        if get_config(session, comp) in ['Y', 'y', '1', 1]:
+        if get_config(session, comp, isbool=True):
             components_to_compute.append(comp)
     return components_to_compute
 
