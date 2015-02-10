@@ -45,7 +45,7 @@ def get_wavgwstd(data):
     h = grouped.apply(wstd)
     return g, h
 
-def main(all=True, mov_stack=None, savefig=False, show=False):
+def main(all=True, mov_stack=None, filterid, components, savefig=False, show=False):
     db = connect()
 
     if get_config(db, name="autocorr") in ['Y', 'y', '1', 1]:
@@ -64,8 +64,8 @@ def main(all=True, mov_stack=None, savefig=False, show=False):
         else:
             mov_stacks = [int(mi) for mi in mov_stack.split(',')]
 
-    filterid = 1
-    components = "ZZ"
+    #filterid = 1
+    #components = "ZZ"
     datatype = 'msnoise'
 
     gs = gridspec.GridSpec(len(mov_stacks), 1)
