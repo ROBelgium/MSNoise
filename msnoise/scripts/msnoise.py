@@ -123,9 +123,10 @@ def compute_cc():
 @click.command()
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
+@click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
 @click.option('-i', '--interval', default=1, help='Number of days before now to\
  search for modified Jobs')
-def stack(ref, mov, interval):
+def stack(ref, mov, step, interval):
     """Stacks the [REF] and/or [MOV] windows"""
     click.secho('Lets STACK !', fg='green')
     from ..s04stack import main
@@ -133,7 +134,8 @@ def stack(ref, mov, interval):
         main('ref', interval)
     if mov:
         main('mov', interval)
-
+    if step:
+        main('step', interval)
 
 @click.command()
 def compute_mwcs():
@@ -157,17 +159,20 @@ def compute_dtt():
 
 @click.command()
 @click.argument('jobtype')
-def reset(jobtype):
-    """Resets the job to "T"odo. ARG is [CC] or [DTT]"""
+@click.option('-a', '--all', is_flag=True, help='Reset all jobs')
+def reset(jobtype, all):
+    """Resets the job to "T"odo. ARG is [CC] or [DTT]. By default
+    only resets jobs "I"n progress. --all resets all jobs, whatever
+    the flag value"""
     from ..api import connect, reset_jobs
     session = connect()
-    reset_jobs(session, jobtype)
+    reset_jobs(session, jobtype, all)
     session.close()
 
 @click.command()
 def ipython():
     """Launches an ipython notebook in the current folder"""
-    os.system("ipython notebook --pylab inline")
+    os.system("ipython notebook --pylab inline --ip 0.0.0.0")
 
 
 ###
@@ -217,7 +222,7 @@ def interferogram(sta1, sta2, filterid, comp, mov_stack,show):
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
-@click.option('-a', '--ampli', default=5, help='Amplification')
+@click.option('-a', '--ampli', default=5.0, help='Amplification')
 @click.option('-S', '--seismic', is_flag=True, help='Seismic style')
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
 def ccftime(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show):
@@ -226,12 +231,50 @@ def ccftime(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show):
     main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show)
 
 
+@click.command()
+@click.argument('sta1')
+@click.argument('sta2')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+def mwcs(sta1, sta2, filterid, comp, mov_stack,show):
+    """Plots the interferogram between sta1 and sta2 (parses the CCFs)"""
+    from ..plots.mwcs import main
+    main(sta1, sta2, filterid, comp, mov_stack, show)
+
+
+
+@click.command()
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
+@click.option('-a', '--ampli', default=1.0, help='Amplification')
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+def distance(filterid, comp, mov_stack, ampli, show):
+    """Plots the interferogram between sta1 and sta2 (parses the CCFs)"""
+    from ..plots.distance import main
+    main(filterid, comp, mov_stack, ampli, show)
+
+
+@click.command()
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+def station_map(show):
+    """Plots the interferogram between sta1 and sta2 (parses the CCFs)"""
+    from ..plots.station_map import main
+    main(show)
+
+
+
 
 # Add plot commands to the plot group:
 plot.add_command(data_availability)
 plot.add_command(dvv)
 plot.add_command(interferogram)
 plot.add_command(ccftime)
+plot.add_command(mwcs)
+plot.add_command(distance)
+plot.add_command(station_map)
 
 
 # Add all commands to the cli group:
