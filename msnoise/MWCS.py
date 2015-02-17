@@ -20,7 +20,6 @@ def nextpow2(x):
 
 def smooth(x, window='boxcar', half_win=3):
     """ some window smoothing """
-    #half_win = 5
     window_len = 2*half_win+1
     # extending the data at beginning and at the end
     # to apply the window at the borders
@@ -34,10 +33,8 @@ def smooth(x, window='boxcar', half_win=3):
 
 
 def getCoherence(dcs, ds1, ds2):
-    # ! number of data
     n = len(dcs)
     coh = np.zeros(n).astype('complex')
-    # ! calculate coherence
     valids = np.argwhere(np.logical_and(np.abs(ds1) > 0, np.abs(ds2 > 0)))
     coh[valids] = dcs[valids]/(ds1[valids]*ds2[valids])
     coh[coh > (1.0+0j)] = 1.0+0j
@@ -86,17 +83,16 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step, plot=F
     indRange = np.argwhere(np.logical_and(freqVec >= fmin,
                                           freqVec <= fmax))
     if len(indRange) < 2:
-        padd = 2**(nextpow2(windL)+1)
-    
-    
+        padd = 2**(nextpow2(windL)+3)
+
     tp = cosTaper(windL, .85)
+
     timeaxis = (np.arange(len(ccCurrent)) / float(sampRate))+tmin
     minind = 0
     maxind = windL
     while maxind <= len(ccCurrent):
-        # print 'maxind :', maxind
-        # print "data right of the selection:", maxind - len(ccCurrent)
         ind = minind
+
         cci = ccCurrent[ind:(ind+windL)].copy()
         cci = scipy.signal.detrend(cci, type='linear')
         cci -= cci.min()
@@ -113,7 +109,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step, plot=F
         
         Fcur = scipy.fftpack.fft(cci, n=int(padd))[:int(padd)/2]
         Fref = scipy.fftpack.fft(cri, n=int(padd))[:int(padd)/2]
-
+        
         Fcur2 = np.real(Fcur)**2 + np.imag(Fcur)**2
         Fref2 = np.real(Fref)**2 + np.imag(Fref)**2
         
@@ -123,7 +119,6 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step, plot=F
         dref = np.sqrt(smooth(Fref2, window='hanning',half_win=smoother))
         
         #Calculate the cross-spectrum
-        
         X = Fref*(Fcur.conj())
         X = smooth(X, window='hanning', half_win=smoother)
         dcs = np.abs(X)
@@ -165,6 +160,11 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step, plot=F
         #forced through the origin
         #weights for the WLS must be the variance !
         res = sm.regression.linear_model.WLS(phi, v, w**2).fit()
+        
+        
+        #print "forced", np.real(res.params[0])
+        #print "!forced", np.real(res2.params[0])
+        
         m = np.real(res.params[0])
         deltaT.append(m)
 
