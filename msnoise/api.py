@@ -37,14 +37,10 @@ def get_tech():
 def get_engine(inifile=os.path.join(os.getcwd(), 'db.ini')):
     """Returns the a SQLAlchemy Engine
     
-    Parameters
-    ----------
-    inifile : string
-        The path to the db.ini file to use. Defaults to os.cwd()
+    :type inifile: string
+    :param inifile: The path to the db.ini file to use. Defaults to os.cwd()
     
-    Returns
-    -------
-    engine : object
+    :returns: The Engine Object
     """
     tech, hostname, database, user, passwd = read_database_inifile(inifile)
     if tech == 1:
@@ -56,18 +52,18 @@ def get_engine(inifile=os.path.join(os.getcwd(), 'db.ini')):
     return engine
 
 
-def connect(inifile=os.path.join(os.getcwd(), 'db.ini')):
-    """Returns the a SQLAlchemy Session
+def connect(inifile=None):
+    """Establishes a connection to the database and returns a Session object.
+
+    :type inifile: string
+    :param inifile: The path to the db.ini file to use. Defaults to os.cwd() +
+        db.ini
     
-    Parameters
-    ----------
-    inifile : string
-        The path to the db.ini file to use. Defaults to os.cwd()
-    
-    Returns
-    -------
-    session : object
+    :rtype: `SQLAlchemy.Session`
+    :returns: A Session object, needed for many of the other API methods.
     """
+    if not inifile:
+        inifile=os.path.join(os.getcwd(), 'db.ini')
     engine = get_engine(inifile)
     Session = sessionmaker(bind=engine)
     return Session()
@@ -76,18 +72,19 @@ def connect(inifile=os.path.join(os.getcwd(), 'db.ini')):
 def create_database_inifile(tech, hostname, database, username, password):
     """Creates the db.ini file based on supplied parameters.
     
-    Parameters
-    ----------
-    tech : int
-        The database technology used: 1=sqlite 2=mysql
-    hostname : string
-        The hostname of the server (if tech=2) or the name of the sqlite file
-        if tech=1)
-    database : string
-        The database name
-    username : string
-    password : string
+    :type tech: int
+    :param tech: The database technology used: 1=sqlite 2=mysql
+    :type hostname: string
+    :param hostname: The hostname of the server (if tech=2) or the name of the 
+        sqlite file if tech=1)
+    :type database: string
+    :param database: The database name
+    :type username: string
+    :param username: The user name
+    :type password: string
+    :param password: The password of `user` 
     
+    :return: None
     """
     f = open(os.path.join(os.getcwd(), 'db.ini'), 'w')
     cPickle.dump([tech, hostname, database, username, password], f)

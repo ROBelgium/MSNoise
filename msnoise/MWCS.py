@@ -18,9 +18,9 @@ def nextpow2(x):
     return np.ceil(np.log2(np.abs(x)))
 
 
-def smooth(x, window='boxcar'):
+def smooth(x, window='boxcar', half_win=3):
     """ some window smoothing """
-    half_win = 11
+    #half_win = 5
     window_len = 2*half_win+1
     # extending the data at beginning and at the end
     # to apply the window at the borders
@@ -29,7 +29,6 @@ def smooth(x, window='boxcar'):
         w = scipy.signal.boxcar(window_len).astype('complex')
     else:
         w = scipy.signal.hanning(window_len).astype('complex')
-
     y = np.convolve(w/w.sum(), s, mode='valid')
     return y[half_win:len(y)-half_win]
 
@@ -45,7 +44,7 @@ def getCoherence(dcs, ds1, ds2):
     return coh
 
 
-def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
+def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step, plot=False):
     """...
 
     Parameters
@@ -80,16 +79,17 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
     deltaErr = []
     deltaMcoh = []
     Taxis = []
-    padd = 2**(nextpow2(windL)+1)
+    padd = 2**(nextpow2(windL)+2)
     
     # Tentative checking if enough point are used to compute the FFT
     freqVec = scipy.fftpack.fftfreq(int(padd), 1./sampRate)[:int(padd)/2]
     indRange = np.argwhere(np.logical_and(freqVec >= fmin,
                                           freqVec <= fmax))
     if len(indRange) < 2:
-        padd = 2**(nextpow2(windL)+2)
+        padd = 2**(nextpow2(windL)+1)
     
-    tp = cosTaper(windL, 0.02)
+    
+    tp = cosTaper(windL, .85)
     timeaxis = (np.arange(len(ccCurrent)) / float(sampRate))+tmin
     minind = 0
     maxind = windL
@@ -98,27 +98,36 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
         # print "data right of the selection:", maxind - len(ccCurrent)
         ind = minind
         cci = ccCurrent[ind:(ind+windL)].copy()
+        cci = scipy.signal.detrend(cci, type='linear')
+        cci -= cci.min()
+        cci /= cci.max()
         cci -= np.mean(cci)
         cci *= tp
 
         cri = ccReference[ind:(ind+windL)].copy()
+        cri = scipy.signal.detrend(cri, type='linear')
+        cri -= cri.min()
+        cri /= cri.max()
         cri -= np.mean(cri)
         cri *= tp
-
+        
         Fcur = scipy.fftpack.fft(cci, n=int(padd))[:int(padd)/2]
         Fref = scipy.fftpack.fft(cri, n=int(padd))[:int(padd)/2]
 
         Fcur2 = np.real(Fcur)**2 + np.imag(Fcur)**2
         Fref2 = np.real(Fref)**2 + np.imag(Fref)**2
-
-        dcur = np.sqrt(smooth(Fcur2, window='hanning'))
-        dref = np.sqrt(smooth(Fref2, window='hanning'))
-
+        
+        smoother = 5
+        
+        dcur = np.sqrt(smooth(Fcur2, window='hanning',half_win=smoother))
+        dref = np.sqrt(smooth(Fref2, window='hanning',half_win=smoother))
+        
         #Calculate the cross-spectrum
+        
         X = Fref*(Fcur.conj())
-        X = smooth(X, window='hanning')
+        X = smooth(X, window='hanning', half_win=smoother)
         dcs = np.abs(X)
-
+        
         #Find the values the frequency range of interest
         freqVec = scipy.fftpack.fftfreq(len(X)*2, 1./sampRate)[:int(padd)/2]
         indRange = np.argwhere(np.logical_and(freqVec >= fmin,
@@ -129,27 +138,33 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
         mcoh = np.mean(coh[indRange])
 
         #Get Weights
-        w = 1.0 / (1.0 / (coh[indRange]**2) - 1.0)
-        w[coh[indRange] >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
+        #w = 1.0 / (1.0 / (coh[indRange]**2) - 1.0)
+        w = coh[indRange]
+        #w[coh[indRange] >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
+        
         w = np.sqrt(w * np.sqrt(dcs[indRange]))
         # w /= (np.sum(w)/len(w)) #normalize
         w = np.real(w)
+        #w -= w.min()
+        #w /= w.max()
+        
 
         #Frequency array:
         v = np.real(freqVec[indRange]) * 2 * np.pi
-        # vo = np.real(freqVec) * 2 * np.pi
+        vo = np.real(freqVec) * 2 * np.pi
 
         #Phase:
         phi = np.angle(X)
-        phi[0] = 0
+        phi -= phi[0]
         phi = np.unwrap(phi)
+        phio = phi.copy()
         phi = phi[indRange]
+        
         
         #Calculate the slope with a weighted least square linear regression
         #forced through the origin
         #weights for the WLS must be the variance !
         res = sm.regression.linear_model.WLS(phi, v, w**2).fit()
-
         m = np.real(res.params[0])
         deltaT.append(m)
 
@@ -159,15 +174,26 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
         sx2 = np.sum(w * v**2)
         e = np.sqrt(e*s2x2 / sx2**2)
         # print w.shape
-        # plt.plot(vo, phio)
-        # plt.scatter(v,phi,c=w)
-        # plt.plot(vo,vo*m)
-        # plt.xlim(-1,10)
-        # plt.ylim(-5,5)
-        # plt.show()
+        if plot:
+            plt.figure()
+            plt.suptitle('%.1fs' % (timeaxis[ind + windL/2]))
+            plt.subplot(311)
+            plt.plot(cci)
+            plt.plot(cri)
+            ax = plt.subplot(312)
+            plt.plot(vo/(2*np.pi), phio)
+            plt.scatter(v/(2*np.pi),phi,c=w,edgecolor='none',vmin=0.6,vmax=1)
+            #plt.plot(vo,vo*m)
+            #plt.ylim(-5,5)
+            plt.subplot(313, sharex= ax)
+            plt.plot(v/(2*np.pi), coh[indRange])
+            plt.axhline(mcoh, c='r')
+            plt.axhline(1.0, c='k',ls='--')
+            plt.xlim(-0.1,1.5)
+            plt.ylim(0,1.5)
+            plt.show()
 
         deltaErr.append(e)
-        # print m, e, res.bse[0]
         deltaMcoh.append(np.real(mcoh))
         Taxis.append(timeaxis[ind + windL/2])
         count = count + 1
