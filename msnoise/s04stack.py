@@ -64,8 +64,10 @@ for jobs marked in the last 10 days:
 import os
 import argparse
 import numpy as np
+import pandas as pd
+
 import scipy.signal
-from scipy.stats.stats import nanmean
+from numpy import nanmean
 from api import *
 
 import logging
@@ -105,7 +107,7 @@ def main(stype, interval=1):
     maxlag = float(get_config(db, "maxlag"))
     cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
     
-    if stype == "mov":
+    if stype == "mov" or stype == "step":
         start, end, datelist = build_movstack_datelist(db)
         format = "matrix"
         mov_stack = get_config(db, "mov_stack")
@@ -115,9 +117,24 @@ def main(stype, interval=1):
             mov_stacks = [int(mi) for mi in mov_stack.split(',')]
         if 1 in mov_stacks:
             mov_stacks.remove(1)  # remove 1 day stack, it should exist already
+    
     elif stype == "ref":
         start, end, datelist = build_ref_datelist(db)
         format = "stack"
+    
+    if stype == "step":
+        datelists = {}
+        for mov_stack in mov_stacks:
+            if mov_stack == 7:
+                rng = pd.date_range(start, end, freq="W")
+            elif mov_stack == 31:
+                rng = pd.date_range(start, end, freq="M")
+            elif mov_stack == 91:
+                rng = pd.date_range(start, end, freq="Q")
+            else:
+                rng = pd.date_range(start, end, freq="%iD"%mov_stack)
+            datelists[mov_stack] = rng.map(lambda t: t.date())
+        #~ print datelists
 
     for f in get_filters(db, all=False):
         filterid = int(f.ref)
@@ -132,6 +149,7 @@ def main(stype, interval=1):
                 if len(updated_days) != 0:
                     logging.debug("New Data for %s-%s-%i" %
                                   (pair, components, filterid))
+                    #~ print updated_days
                     nstack, stack_total = get_results(
                         db, sta1, sta2, filterid, components, datelist, format=format)
                     if nstack > 0:
@@ -177,7 +195,60 @@ def main(stype, interval=1):
                                                     db, date, day_name.replace('_', '.'), 'DTT', 'T')
                                                 jobadded = True
                                         del corr
-
+                        elif stype == "step":
+                            jobs = []
+                            for mov_stack in mov_stacks:
+                                for i, date in enumerate(datelists[mov_stack]):
+                                    if date not in datelist:
+                                        continue
+                                    if i < mov_stack:
+                                        low = 0
+                                        high = mov_stack
+                                    else:
+                                        low = datelist.index(date) - mov_stack + 1
+                                        high = datelist.index(date) + 1
+                                    newdata = False
+                                    for uday in datelist[low:high]:
+                                        if uday in updated_days:
+                                            newdata = True
+                                            break
+                                    if newdata:
+                                        corr = stack_total[low:high]
+                                        if not np.all(np.isnan(corr)):
+                                            day_name = "%s_%s" % (
+                                                sta1, sta2)
+                                            logging.debug("%s %s [%s - %s] (%i day stack)" % (
+                                                day_name, date, datelist[low], datelist[high-1], mov_stack))
+                                            corr = nanmean(corr, axis=0)
+                                            corr = scipy.signal.detrend(
+                                                corr)
+                                            stack_path = os.path.join(
+                                                "STACKS", "%02i" % filterid, "%03i_DAYS" % mov_stack, components, day_name)
+                                            filename = os.path.join(
+                                                stack_path, str(date))
+                                            if mseed:
+                                                export_mseed(
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                            if sac:
+                                                export_sac(
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                            day_name = "%s:%s" % (
+                                                sta1, sta2)
+                                            job = "%s %s" % (date, day_name)
+                                            if job not in jobs:
+                                                update_job(
+                                                    db, date, day_name.replace('_', '.'), 'DTT', 'T')
+                                                jobs.append(job)
+                                        del corr
+                            #~ for date in datelist:
+                                #~ day_name = "%s:%s" % (
+                                                    #~ sta1, sta2)
+                                #~ job = "%s %s" % (date, day_name)
+                                #~ if job not in jobs:
+                                    #~ update_job(
+                                        #~ db, date, day_name.replace('_', '.'), 'DTT', 'T')
+                                    #~ jobs.append(job)
+                        
                         elif stype == "ref":
                             stack_path = os.path.join(
                                 "STACKS", "%02i" % filterid, "REF", components)
