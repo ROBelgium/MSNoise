@@ -138,7 +138,7 @@ html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
 # further.  For a list of options available for each theme, see the
 # documentation.
 # html_theme_options = {}
-html_theme_options = {'bootswatch_theme': "cosmo",
+html_theme_options = {'bootswatch_theme': "simplex",
                     "navbar_site_name":"Menu",
                     "navbar_sidebarrel":True,
                     "source_link_position":"footer",
