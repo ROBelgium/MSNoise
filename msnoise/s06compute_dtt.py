@@ -139,7 +139,7 @@ def main():
     
     components_to_compute = get_components_to_compute(db)
     updated_dtt = updated_days_for_dates(
-        db, start, end, '%', type='DTT', returndays=True,interval=datetime.timedelta(days=0.1))
+        db, start, end, '%', type='DTT', returndays=True,interval=datetime.timedelta(days=1))
     
     for f in get_filters(db, all=False):
         filterid = int(f.ref)
@@ -150,7 +150,7 @@ def main():
                 for current in updated_dtt:
                     if current > datetime.date.today():
                         break
-                    logging.debug("Processing %s - %02i - %02i mov" % (current, filterid, mov_stack))
+                    #~ logging.debug("Processing %s - %02i - %02i mov" % (current, filterid, mov_stack))
                     first = True
                     for station1, station2 in get_station_pairs(db, used=True):
                         sta1 = "%s_%s" % (station1.net, station1.sta)
@@ -167,9 +167,9 @@ def main():
                                 lmlag = -dtt_minlag
                                 rmlag = dtt_minlag
                             else:
-                                dist = get_interstation_distance(station1, station2)
-                                lmlag = -dist * dtt_v
-                                rmlag =  dist * dtt_v
+                                dist = get_interstation_distance(station1, station2, station1.coordinates)
+                                lmlag = -dist / dtt_v
+                                rmlag =  dist / dtt_v
                             lMlag = lmlag - dtt_width
                             rMlag = rmlag + dtt_width
 
