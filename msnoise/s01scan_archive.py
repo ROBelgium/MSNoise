@@ -84,9 +84,9 @@ def worker(files, folder, startdate, enddate):
                         endtime = trace.stats.endtime
                         stop = trace.stats.endtime.datetime
 
-                net = trace.stats.network
-                sta = trace.stats.station
-                comp = trace.stats.channel
+                net = trace.stats.network.upper()
+                sta = trace.stats.station.upper()
+                comp = trace.stats.channel.upper()
                 path = folder.replace('\\', '/')
                 r1 = time.time()
 
@@ -94,16 +94,17 @@ def worker(files, folder, startdate, enddate):
                     db, net, sta, comp, path, name, starttime.datetime,
                     endtime.datetime, data_duration, gaps_duration,
                     data[0].stats.sampling_rate)
+                time.sleep(0.01)
 
-                r2 = time.time()
-                if result:
-                    logging.info(
-                        'Added: "%s" (read:%.2f (%.2f) seconds | save:%.4f seconds)' %
-                        (name, r1 - r0, r2 - r0, r2 - r1))
-                else:
-                    logging.info(
-                        'Already Exists: "%s" (read:%.2f (%.2f) seconds | save:%.4f seconds)' %
-                        (name, r1 - r0, r2 - r0, r2 - r1))
+                #~ r2 = time.time()
+                #~ if result:
+                    #~ logging.info(
+                        #~ 'Added: "%s" (read:%.2f (%.2f) seconds | save:%.4f seconds)' %
+                        #~ (name, r1 - r0, r2 - r0, r2 - r1))
+                #~ else:
+                    #~ logging.info(
+                        #~ 'Already Exists: "%s" (read:%.2f (%.2f) seconds | save:%.4f seconds)' %
+                        #~ (name, r1 - r0, r2 - r0, r2 - r1))
         except Exception as e:
             print "Problem", e
         db.close()
@@ -170,7 +171,7 @@ def main(init=False, threads=1):
                 'HOUR', '*').replace('CHAN', channel).replace('TYPE', '*').replace('LOC', '*')
             for sta in get_stations(db, all=False):
                 tmp = os.path.join(data_folder, stafol.replace(
-                    'NET', sta.net).replace('STA', sta.sta))
+                'NET', sta.net).replace('STA', sta.sta))
                 folders_to_glob.append(tmp)
 
     clients = []
