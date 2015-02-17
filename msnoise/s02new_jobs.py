@@ -72,6 +72,10 @@ def main():
                 if daypair not in jobs:
                     all_jobs.append({"day":day,"pair":pair,"type":"CC","flag":"T"})
                     jobs.append(daypair)
+        if len(all_jobs) > 1e5:
+            logging.debug('Already 100.000 jobs, inserting')
+            massive_insert_job(all_jobs)
+            all_jobs = []
     
     count = len(jobs)
     logging.debug("Found %i new jobs to do" % count)
