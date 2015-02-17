@@ -85,19 +85,21 @@ def main():
             reset_dtt_jobs(db, pair)
             update_job(db, "REF", pair, type='DTT', flag='D')
     
+    logging.debug('Ready to compute')
     # Then we compute the jobs
+    outfolders = []
     while is_dtt_next_job(db, flag='T', type='DTT'):
         pair, days, refs = get_dtt_next_job(db, flag='T', type='DTT')
         logging.info(
             "There are MWCS jobs for some days to recompute for %s" % pair)
-        for day in days:
-            for f in get_filters(db, all=False):
-                filterid = int(f.ref)
-                for components in components_to_compute:
-                    ref_name = pair.replace('.', '_').replace(':', '_')
-                    rf = os.path.join("STACKS", "%02i" %
-                                      filterid, "REF", components, ref_name + ".MSEED")
-                    ref = read(rf)[0].data
+        for f in get_filters(db, all=False):
+            filterid = int(f.ref)
+            for components in components_to_compute:
+                ref_name = pair.replace('.', '_').replace(':', '_')
+                rf = os.path.join("STACKS", "%02i" %
+                                  filterid, "REF", components, ref_name + ".MSEED")
+                ref = read(rf)[0].data
+                for day in days:
                     for mov_stack in mov_stacks:
                         df = os.path.join(
                             "STACKS", "%02i" % filterid, "%03i_DAYS" %
@@ -111,11 +113,13 @@ def main():
                                 cur, ref, f.mwcs_low, f.mwcs_high, goal_sampling_rate, -maxlag, f.mwcs_wlen, f.mwcs_step)
                             outfolder = os.path.join(
                                 'MWCS', "%02i" % filterid, "%03i_DAYS" % mov_stack, components, ref_name)
-                            if not os.path.isdir(outfolder):
-                                os.makedirs(outfolder)
-                            np.savetxt(
-                                os.path.join(outfolder, "%s.txt" % str(day)), output)
-                            del output
+                            if outfolder not in outfolders:
+                                if not os.path.isdir(outfolder):
+                                    os.makedirs(outfolder)
+                                outfolders.append(outfolder)
+                            np.savetxt(os.path.join(outfolder, "%s.txt" % str(day)), output)
+                            del output, cur
+        for day in days:
             update_job(db, day, pair, type='DTT', flag='D')
     
     logging.info('*** Finished: Compute MWCS ***')
