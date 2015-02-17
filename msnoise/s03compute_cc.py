@@ -75,7 +75,7 @@ from myCorr import myCorr
 from whiten import whiten
 
 
-def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = None, tramef_N = None):
+def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.array([]), tramef_N = np.array([])):
 
     datafilesZ = {}
     datafilesE = {}
@@ -128,7 +128,6 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = None,
                         gaps = getGaps(stream)
                         for gap in gaps:
                             if int(gap[-1]) <= max_gap:
-                                print stream[gap[0]].data.dtype, stream[gap[1]].data.dtype
                                 stream[gap[0]] = stream[gap[0]].__add__(stream[gap[1]], method=0, fill_value="interpolate")
                                 stream.remove(stream[gap[1]])
                                 break
@@ -155,15 +154,17 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = None,
                     goal_day.replace('-', '')) + params.goal_duration - stream[0].stats.delta, pad=True, fill_value=0.0,
                     nearest_sample=False)
                 trace = stream[0]
-
+                
+                logging.debug(
+                    "%s.%s Highpass at %.2f Hz" % (station, comp, params.preprocess_highpass))
+                trace.filter("highpass", freq=params.preprocess_highpass, zerophase=True)
+                
                 if trace.stats.sampling_rate != params.goal_sampling_rate:
                     logging.debug(
                         "%s.%s Lowpass at %.2f Hz" % (station, comp, params.preprocess_lowpass))
                     trace.filter("lowpass", freq=params.preprocess_lowpass, zerophase=True)
 
-                    logging.debug(
-                        "%s.%s Highpass at %.2f Hz" % (station, comp, params.preprocess_highpass))
-                    trace.filter("highpass", freq=params.preprocess_highpass, zerophase=True)
+                    
 
                     if params.resampling_method == "Resample":
                         logging.debug("%s.%s Downsample to %.1f Hz" %
@@ -195,7 +196,7 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = None,
                     tramef_N[istation] = trace.data
 
                 del trace, stream
-    if tramef_E:
+    if len(tramef_E) != 0:
         return basetime, tramef_Z, tramef_E, tramef_N
     else:
         return basetime, tramef_Z
@@ -205,7 +206,7 @@ class Params():
 
 
 def main():
-    logging.basicConfig(level=logging.DEBUG,
+    logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s [%(levelname)s] %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -372,7 +373,7 @@ def main():
             for pair in pairs:
                 orig_pair = pair
 
-                logging.debug('Processing pair: %s' % pair.replace(':', ' vs '))
+                logging.info('Processing pair: %s' % pair.replace(':', ' vs '))
                 tt = time.time()
                 station1, station2 = pair.split(':')
                 pair = (np.where(stations == station1)
@@ -396,11 +397,30 @@ def main():
                         coordinates = 'MIX'
 
                     cplAz = np.deg2rad(azimuth(coordinates, X0, Y0, X1, Y1))
+                    logging.debug("Azimuth=%.1f"%np.rad2deg(cplAz))
                 else:
                     # logging.debug('No Coordinates found! Skipping azimuth calculation!')
                     cplAz = 0.
 
                 for components in params.components_to_compute:
+                    
+                    if components == "ZZ":
+                        t1 = tramef_Z[pair[0]]
+                        t2 = tramef_Z[pair[1]]
+                    elif components[0] == "Z":
+                        t1 = tramef_Z[pair[0]]
+                        t2 = tramef_E[pair[1]]
+                    elif components[1] == "Z":
+                        t1 = tramef_E[pair[0]]
+                        t2 = tramef_Z[pair[1]]
+                    else:
+                        t1 = tramef_E[pair[0]]
+                        t2 = tramef_E[pair[1]]
+                    if np.all(t1 == 0) or np.all(t2 == 0):
+                        logging.debug("%s contains empty trace(s), skipping"%components)
+                        continue
+                    del t1, t2
+                    
                     if components[0] == "Z":
                         t1 = tramef_Z[pair[0]]
                     elif components[0] == "R":
@@ -459,10 +479,12 @@ def main():
                                 Nfft = params.min30 + 2
 
                             trames2hWb = np.zeros((2, int(Nfft)), dtype=np.complex)
+                            skip = False
                             for i, station in enumerate(pair):
                                 if rmsmat[i] > rms_threshold:
                                     cp = cosTaper(len(trame2h[i]),0.04)
-
+                                    trame2h[i] -= trame2h[i].mean()
+                                    
                                     if params.windsorizing == -1:
                                         trame2h[i] = np.sign(trame2h[i])
                                     elif params.windsorizing != 0:
@@ -476,28 +498,30 @@ def main():
                                         trame2h[i]*cp, Nfft, dt, low, high, plot=False)
                                 else:
                                     trames2hWb[i] = np.zeros(int(Nfft))
+                                    skip = True
+                                    logging.debug('Slice is Zeros!')
+                            if not skip:
+                                corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False)
+                                tmptime = time.gmtime(basetime + begin /
+                                                      params.goal_sampling_rate)
+                                thisdate = time.strftime("%Y-%m-%d", tmptime)
+                                thistime = time.strftime("%Y-%m-%d %H:%M:%S",
+                                                         tmptime)
+                                if params.keep_all:
+                                    ccfid = "%s_%s_%s_%s_%s" % (station1, station2,
+                                                             filterid, components,
+                                                             thisdate)
+                                    if ccfid not in allcorr:
+                                        allcorr[ccfid] = {}
+                                    allcorr[ccfid][thistime] = corr
 
-                            corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False)
-                            tmptime = time.gmtime(basetime + begin /
-                                                  params.goal_sampling_rate)
-                            thisdate = time.strftime("%Y-%m-%d", tmptime)
-                            thistime = time.strftime("%Y-%m-%d %H:%M:%S",
-                                                     tmptime)
-                            if params.keep_all:
-                                ccfid = "%s_%s_%s_%s_%s" % (station1, station2,
-                                                         filterid, components,
-                                                         thisdate)
-                                if ccfid not in allcorr:
-                                    allcorr[ccfid] = {}
-                                allcorr[ccfid][thistime] = corr
+                                if params.keep_days:
+                                    if not np.any(np.isnan(corr)) and \
+                                            not np.any(np.isinf(corr)):
+                                        daycorr[filterid] += corr
+                                        ndaycorr[filterid] += 1
 
-                            if params.keep_days:
-                                if not np.any(np.isnan(corr)) and \
-                                        not np.any(np.isinf(corr)):
-                                    daycorr[filterid] += corr
-                                    ndaycorr[filterid] += 1
-
-                            del corr, thistime, trames2hWb
+                                del corr, thistime, trames2hWb
 
                     if params.keep_all:
                         for ccfid in allcorr.keys():
@@ -511,7 +535,7 @@ def main():
                                 ncorr = ndaycorr[filterid]
                                 if ncorr > 0:
                                     logging.debug(
-                                        "Saving daily CCF for filter %02i (stack of %02i CCF)" % (filterid, ncorr))
+                                        "Saving daily CCF for filter %02i, comp %s (stack of %02i CCF)" % (filterid, components, ncorr))
 
                                     thisdate = time.strftime(
                                         "%Y-%m-%d", time.gmtime(basetime))
@@ -532,7 +556,7 @@ def main():
                 logging.debug("Updating Job")
                 update_job(db, goal_day, orig_pair, 'CC', 'D')
 
-                logging.debug("Finished processing this pair. It took %.2f seconds" %
+                logging.info("Finished processing this pair. It took %.2f seconds" %
                               (time.time() - tt))
             logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
     logging.info('*** Finished: Compute CC ***')
