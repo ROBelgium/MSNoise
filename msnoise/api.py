@@ -430,9 +430,9 @@ def get_interstation_distance(station1, station2, coordinates="DEG"):
         dist, azim, bazim = gps2DistAzimuth(station1.Y, station1.X, station2.Y, station2.X)
         return dist /1.e3
     else:
-        print "woooooow, UTM system distance not computed"
-        return 0
-
+        dist = np.hypot( float(station1.X - station2.X), float(station1.Y - station2.Y) ) / 1.e3
+        #print "woooooow, UTM system distance not computed"
+        return dist
 ############ DATA AVAILABILITY ############
 
 
@@ -713,10 +713,10 @@ def is_dtt_next_job(session, flag='T', type='DTT', ref=False):
         True if at least one Job matches, False otherwise.
     """
     if ref:
-        job = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.pair == ref).filter(Job.day == 'REF').first()
+        job = session.query(Job.ref).filter(Job.flag == flag).filter(Job.type == type).filter(Job.pair == ref).filter(Job.day == 'REF').count()
     else:
-        job = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').first()
-    if job is None:
+        job = session.query(Job.ref).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').count()
+    if job == 0:
         return False
     else:
         return True
@@ -746,14 +746,15 @@ def get_dtt_next_job(session, flag='T', type='DTT'):
         Job IDs (for later being able to update their flag)
     """
     pair = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').first().pair
-    jobs = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').filter(Job.pair == pair)
-    refs, days = zip(*[[job.ref,job.day] for job in jobs.all()])
-    jobs.update({Job.flag: 'I'})
+    jobs = session.query(Job.ref, Job.day).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').filter(Job.pair == pair)
+    tmp = list(jobs)
+    jobs.update({Job.flag: 'I'}, synchronize_session=False)
     session.commit()
+    refs, days = zip(*[[job.ref,job.day] for job in tmp])
     return pair, days, refs
 
 
-def reset_jobs(session, jobtype):
+def reset_jobs(session, jobtype, all=False):
     """
     Sets the flag of all `jobtype` Jobs to "T"odo.
     
@@ -761,8 +762,12 @@ def reset_jobs(session, jobtype):
     ----------
     jobtype : string
         The type to reset: CC or DTT
+    inprogress_only: bool
+        Reset only jobs "in progress" to Todo. Default True
     """
     jobs = session.query(Job).filter(Job.type == jobtype)
+    if not all:
+        jobs = jobs.filter(Job.flag == "I")
     jobs.update({Job.flag: 'T'})
     session.commit()
 
@@ -972,39 +977,38 @@ def get_results(session, station1, station2, filterid, components, dates,
                 daystack += ".SAC"
             elif export_format == "MSEED":
                 daystack += ".MSEED"
-            if os.path.isfile(daystack):
+            try:
                 st = read(daystack)
                 if not np.any(np.isnan(st[0].data)) and not np.any(np.isinf(st[0].data)):
                     stack += st[0].data
                     i += 1
-                else:
-                    # print "NaN ! or Inf"
-                    pass
+            except:
+                pass
         if i > 0:
             return i, stack / i
         else:
             return 0, None
 
     elif format=="matrix":
-        stack = np.zeros((len(dates), get_maxlag_samples(session)))
+        from multiprocessing import Pool
+        stack = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
         i = 0
-        for j, date in enumerate(dates):
-            daystack = os.path.join("STACKS", "%02i"%filterid,
+        base = os.path.join("STACKS", "%02i"%filterid,
                                     "%03i_DAYS"%mov_stack, components,
-                                    "%s_%s"%(station1, station2), str(date))
-            # logging.debug('reading: %s' % daystack)
-            if export_format == "BOTH":
-                daystack += ".MSEED"
-            elif export_format == "SAC":
-                daystack += ".SAC"
-            elif export_format == "MSEED":
-                daystack += ".MSEED"
-            if os.path.isfile(daystack):
-                st = read(daystack)
-                stack[j] = st[0].data
+                                    "%s_%s"%(station1, station2), "%s")
+        if export_format == "BOTH":
+            base += ".MSEED"
+        elif export_format == "SAC":
+            base += ".SAC"
+        elif export_format == "MSEED":
+            base += ".MSEED"
+        for j, date in enumerate(dates):
+            daystack = base % str(date)
+            try:
+                stack[j][:] = read(daystack)[0].data
                 i += 1
-            else:
-                stack[j] *= np.nan
+            except:
+                pass
         return i, stack
 
 
