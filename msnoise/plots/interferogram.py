@@ -26,7 +26,7 @@ from obspy.core import read, Stream, Trace
 from ..api import *
 
 
-def main(sta1, sta2, filterid, components, mov_stack=1):
+def main(sta1, sta2, filterid, components, mov_stack=1, show=True):
     db = connect()
     components_to_compute = get_components_to_compute(db)
     maxlag = float(get_config(db,'maxlag'))
@@ -50,10 +50,10 @@ def main(sta1, sta2, filterid, components, mov_stack=1):
                 # print np.max(stack_total[i,:])
                 # stack_total[i,:] /= np.max(stack_total[i,:])
         # stack_total /= np.max(stack_total, axis=0)
-        xextent = (date2num(start), date2num(end),-120,120)
+        xextent = (date2num(start), date2num(end),-maxlag,maxlag)
         ax = plt.subplot(111)
         plt.imshow(stack_total.T, extent=xextent, aspect="auto",interpolation='none',origin='lower',cmap='seismic',
-                vmin=-1e-1,vmax=1e-1)
+                vmin=-1e-2,vmax=1e-2)
         plt.ylabel("Lag Time (s)")
         plt.axhline(0,lw=0.5,c='k')
         plt.grid()
