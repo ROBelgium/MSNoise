@@ -166,7 +166,7 @@ def main():
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
     unittest.TextTestRunner().run(suite)
 
-    r = unittest.TestResults()
+    r = unittest.TestResult()
     if not r.wasSuccessful():
         sys.exit(1)
 
