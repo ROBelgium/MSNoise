@@ -2,9 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.fftpack
 
-def nextpow2(x):
-    return np.ceil(np.log2(np.abs(x)))
-
+from api import nextpow2
 
 def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     """This function takes 1-dimensional *data* timeseries array,
@@ -12,25 +10,21 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     in frequency domain between *freqmin* and *freqmax*
     and returns the whitened fft.
 
-    Parameters
-    ----------
-    data : numpy.ndarray
-        Contains the 1D time series to whiten
-    Nfft : int
-        The number of points to compute the FFT
-    delta : float
-        The sampling frequency of the `data`
-    freqmin : float
-        The lower frequency bound
-    freqmax : float
-        The upper frequency bound
-    plot : bool
-        Whether to show a raw plot of the action (default: False)
+    :type data: :class:`numpy.ndarray`
+    :param data: Contains the 1D time series to whiten
+    :type Nfft: int
+    :para Nfft: The number of points to compute the FFT
+    :type delta: float
+    :param delta: The sampling frequency of the `data`
+    :type freqmin: float
+    :param freqmin: The lower frequency bound
+    :type freqmax: float
+    :param freqmax: The upper frequency bound
+    :type plot: bool
+    :param plot: Whether to show a raw plot of the action (default: False)
 
-    Returns
-    -------
-    data : numpy.ndarray
-        The FFT of the input trace, whitened between the frequency bounds
+    :rtype: :class:`numpy.ndarray`
+    :returns: The FFT of the input trace, whitened between the frequency bounds
 """
 
     if plot:

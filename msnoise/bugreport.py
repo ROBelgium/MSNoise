@@ -4,7 +4,6 @@
 import os
 import platform
 import sys
-import argparse
 
 def ispresent(module, how=None):
     try:

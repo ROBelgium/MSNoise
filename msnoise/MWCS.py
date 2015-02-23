@@ -13,10 +13,7 @@ import matplotlib.pyplot as plt
 import logging
 import scipy.fftpack
 
-
-def nextpow2(x):
-    return np.ceil(np.log2(np.abs(x)))
-
+from api import nextpow2
 
 def smooth(x, window='boxcar', half_win=3):
     """ some window smoothing """
@@ -49,17 +46,17 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
     :param ccCurrent: The "Current" timeseries
     :type ccReference: :class:`numpy.ndarray`
     :param ccReference: The "Reference" timeseries
-    :type fmin: int
+    :type fmin: float
     :param fmin: The lower frequency bound to compute the dephasing
-    :type fmax: int
+    :type fmax: float
     :param fmax: The higher frequency bound to compute the dephasing
-    :type sampRate: int
+    :type sampRate: float
     :param sampRate: The sample rate of the input timeseries
-    :type tmin: int
+    :type tmin: float
     :param tmin: The leftmost time lag (used to compute the "time lags array")
-    :type windL: int
+    :type windL: float
     :param windL: The moving window length
-    :type step: int
+    :type step: float
     :param step: The step to jump for the moving window
     :type plot: bool
     :param plot: If True, plots the MWCS result for each window. Defaults to

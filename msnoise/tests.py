@@ -119,10 +119,10 @@ class InitTests(unittest.TestCase):
         
     
     def test_010_new_jobs(self):
-        from s02new_jobs import new_jobs
+        from s02new_jobs import main
         
         try:
-            new_jobs()
+            main()
         except:
             traceback.print_exc()
             self.fail()

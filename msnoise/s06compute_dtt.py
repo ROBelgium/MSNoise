@@ -139,7 +139,7 @@ def main():
     
     components_to_compute = get_components_to_compute(db)
     updated_dtt = updated_days_for_dates(
-        db, start, end, '%', type='DTT', returndays=True,interval=datetime.timedelta(days=1))
+        db, start, end, '%', type='DTT', returndays=True, interval=datetime.timedelta(days=1))
     
     for f in get_filters(db, all=False):
         filterid = int(f.ref)
