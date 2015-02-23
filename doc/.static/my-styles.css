@@ -1,0 +1,42 @@
+body {
+    background: url(grid.png) repeat-x;
+    background-attachment: fixed;
+}
+
+dl .attribute {
+    margin-left: 50px;
+}
+
+dl .method {
+    margin-left: 50px;
+}
+
+dl .classmethod {
+    margin-left: 50px;
+}
+
+dl .staticmethod {
+    margin-left: 50px;
+}
+
+dd > p {
+    padding-left: 20px;
+}
+
+.property {
+    font-weight: 100;
+    padding-right: 2px;
+}
+
+dl > dt {
+    background-color: #DDDDDD;
+    border-radius: 5px;
+    padding: 5px;
+    color: #222222;
+}
+
+.admonition {
+    background-color: #FFE3E3;
+    border-color: #FFC4C4;
+    color: #555555;
+}
