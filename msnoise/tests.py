@@ -166,8 +166,7 @@ def main():
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
     unittest.TextTestRunner().run(suite)
 
-    r = unittest.TestResult()
-    if not r.wasSuccessful():
+    if not suite.wasSuccessful():
         sys.exit(1)
 
 if __name__ == '__main__':
