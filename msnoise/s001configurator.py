@@ -22,33 +22,27 @@ Default Global Parameters
 Network-Station Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. note:: TODO: describe
+.. todo:: describe
 
 Filter Parameters
 ~~~~~~~~~~~~~~~~~
 
-.. note:: TODO: describe
+.. todo:: describe
 
 """
 
 
+from traits.api import HasTraits, Str, List, Instance, Float, CInt, CBool, Enum
 from traitsui.api import Item, View, TreeEditor, TreeNode, TableEditor
-
-from traitsui.table_column \
-    import ObjectColumn
-
-from traitsui.extras.checkbox_column \
-    import CheckboxColumn
+from traitsui.table_column import ObjectColumn
+from traitsui.extras.checkbox_column import CheckboxColumn
 
 from default import *
 from api import *
-
 from msnoise_table_def import *
 
-from traits.api import HasTraits, Str, List, Instance, Float, CInt, CBool, Enum
 
 class StationColumn (ObjectColumn):
-
     def get_text_color(self, obj):
         return ['light grey', 'black'][obj.used]
 
@@ -63,12 +57,12 @@ class TFilter(HasTraits):
     mwcs_wlen = Float
     mwcs_step = Float
     used = CBool
-    traits_view = View('low', 'high', 'rms_threshold', 'used',buttons = [ 'OK', 'Cancel' ])
+    traits_view = View('low', 'high', 'rms_threshold', 'used',
+                       buttons=['OK', 'Cancel'])
 
 
 class TStation(HasTraits):
-
-    """ Defines a company employee. """
+    """ Defines a Station"""
     ref = CInt
     net = Str
     sta = Str
@@ -102,7 +96,7 @@ filter_editor = TableEditor(
     auto_size=False,
     row_factory=TFilter,
     auto_add=False,
-    show_toolbar = True,
+    show_toolbar=True,
     columns=[StationColumn(name='ref', editable=False),
              CheckboxColumn(name='used', label='Used ?'),
              StationColumn(name='low'),
@@ -127,8 +121,7 @@ config_editor = TableEditor(
 
 
 class TNetwork(HasTraits):
-
-    """ Defines a department with employees. """
+    """ Defines a Network with stations."""
 
     name = Str('<unknown>')
     stations = List(TStation)
@@ -143,7 +136,7 @@ class ConfigItem(HasTraits):
 
 class Software(HasTraits):
 
-    """ Defines a company with departments and employees. """
+    """ Defines an MSNoise configuration instance. """
 
     name = Str('<unknown>')
     networks = List(TNetwork)
@@ -179,7 +172,8 @@ tree_editor = TreeEditor(
                  auto_open=True,
                  label='sta',
                  view=View(
-                     ['net', 'sta', 'X', 'Y', 'altitude', 'coordinates', 'used', 'instrument'])),
+                     ['net', 'sta', 'X', 'Y', 'altitude', 'coordinates',
+                      'used', 'instrument'])),
 
         TreeNode(node_for=[Software],
                  auto_open=True,
@@ -213,7 +207,6 @@ class StationConfigurator(HasTraits):
     )
 
 
-
 def main():
     db = connect()
 
@@ -222,21 +215,25 @@ def main():
         networks.append(TNetwork(name=network))
         for s in get_stations(db, net=network, all=True):
             station = TStation(ref=s.ref, net=s.net, sta=s.sta, X=s.X, Y=s.Y,
-                               altitude=s.altitude, used=s.used, instrument=s.instrument, coordinates=s.coordinates)
+                               altitude=s.altitude, used=s.used,
+                               instrument=s.instrument,
+                               coordinates=s.coordinates)
             networks[-1].stations.append(station)
 
     filters = []
     for f in get_filters(db, all=True):
         filters.append(
             TFilter(
-                ref=f.ref, low=f.low, high=f.high, mwcs_low=f.mwcs_low, mwcs_high=f.mwcs_high,
-                rms_threshold=f.rms_threshold, mwcs_wlen=f.mwcs_wlen, mwcs_step=f.mwcs_step, used=f.used))
+                ref=f.ref, low=f.low, high=f.high, mwcs_low=f.mwcs_low,
+                mwcs_high=f.mwcs_high, rms_threshold=f.rms_threshold,
+                mwcs_wlen=f.mwcs_wlen, mwcs_step=f.mwcs_step, used=f.used))
 
     configs = []
     for name in default.keys():
         value = get_config(db, name)
         configs.append(
-            ConfigItem(name=name, value=value, info=default[name][0], default=default[name][1]))
+            ConfigItem(name=name, value=value, info=default[name][0],
+                       default=default[name][1]))
 
     db.close()
     demo = StationConfigurator(
@@ -260,12 +257,14 @@ def main():
         for network in demo.company.networks:
             for s in network.stations:
                 update_station(
-                    db, s.net, s.sta, s.X, s.Y, s.altitude, s.coordinates, s.instrument, s.used)
+                    db, s.net, s.sta, s.X, s.Y, s.altitude, s.coordinates,
+                    s.instrument, s.used)
 
         print "Updating Filter Table"
         for f in demo.company.filters:
             update_filter(db, f.ref, f.low, f.high, f.mwcs_low,
-                          f.mwcs_high, f.rms_threshold, f.mwcs_wlen, f.mwcs_step, f.used)
+                          f.mwcs_high, f.rms_threshold, f.mwcs_wlen,
+                          f.mwcs_step, f.used)
 
         db.close()
         print "Done !"

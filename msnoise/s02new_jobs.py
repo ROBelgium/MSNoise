@@ -70,7 +70,7 @@ def main():
             for pair in pairs:
                 daypair = "%s=%s" % (day, pair)
                 if daypair not in jobs:
-                    all_jobs.append({"day":day,"pair":pair,"type":"CC","flag":"T"})
+                    all_jobs.append({"day":day,"pair":pair,"jobtype":"CC","flag":"T"})
                     jobs.append(daypair)
         if len(all_jobs) > 1e5:
             logging.debug('Already 100.000 jobs, inserting')

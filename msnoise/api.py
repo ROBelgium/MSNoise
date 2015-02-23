@@ -443,7 +443,7 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
     :type endtime: datetime
     :param endtime: End time of the file
     :type data_duration: float
-    :param data_duation: Cumulative duration of available data in the file
+    :param data_duration: Cumulative duration of available data in the file
     :type gaps_duration: float
     :param gaps_duration: Cumulative duration of gaps in the file
     :type samplerate: float
@@ -594,7 +594,7 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     :returns: If returnjob is True, returns the modified/inserted Job.
     """
     
-    job = session.query(Job).filter(Job.day == day).filter(Job.pair == pair).filter(Job.type == jobtype).first()
+    job = session.query(Job).filter(Job.day == day).filter(Job.pair == pair).filter(Job.jobtype == jobtype).first()
     if job is None:
         job = Job(day, pair, jobtype, 'T')
         if commit:
@@ -626,7 +626,7 @@ def massive_insert_job(jobs):
 def is_next_job(session, flag='T', jobtype='CC'):
     """
     Are there any :class:`~msnoise.msnoise_table_def.Job` in the database,
-    with flag=`flag` and type=`type`
+    with flag=`flag` and jobtype=`type`
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
@@ -640,7 +640,7 @@ def is_next_job(session, flag='T', jobtype='CC'):
     :returns: True if at least one :class:`~msnoise.msnoise_table_def.Job`
         matches, False otherwise.
     """
-    job = session.query(Job).filter(Job.type == jobtype).filter(Job.flag == flag).first()
+    job = session.query(Job).filter(Job.jobtype == jobtype).filter(Job.flag == flag).first()
     if job is None:
         return False
     else:
@@ -650,7 +650,7 @@ def is_next_job(session, flag='T', jobtype='CC'):
 def get_next_job(session, flag='T', jobtype='CC'):
     """
     Get the next :class:`~msnoise.msnoise_table_def.Job` in the database,
-    with flag=`flag` and type=`type`. Jobs of the same `type` are grouped per
+    with flag=`flag` and jobtype=`jobtype`. Jobs of the same `type` are grouped per
     day. This function also sets the flag of all selected Jobs to "I"n progress.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -664,8 +664,8 @@ def get_next_job(session, flag='T', jobtype='CC'):
     :rtype: list
     :returns: list of :class:`~msnoise.msnoise_table_def.Job`
     """
-    day = session.query(Job).filter(Job.type == jobtype).filter(Job.flag == flag).order_by(Job.day).first().day
-    jobs = session.query(Job).filter(Job.type == jobtype).filter(Job.flag == flag).filter(Job.day == day)
+    day = session.query(Job).filter(Job.jobtype == jobtype).filter(Job.flag == flag).order_by(Job.day).first().day
+    jobs = session.query(Job).filter(Job.jobtype == jobtype).filter(Job.flag == flag).filter(Job.day == day)
     tmp = jobs.all()
     jobs.update({Job.flag: 'I'})
     session.commit()
@@ -675,7 +675,7 @@ def get_next_job(session, flag='T', jobtype='CC'):
 def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
     """
     Are there any DTT :class:`~msnoise.msnoise_table_def.Job` in the database,
-    with flag=`flag` and type=`type`. If `ref` is provided, checks if a DTT
+    with flag=`flag` and jobtype=`jobtype`. If `ref` is provided, checks if a DTT
     "REF" job is present.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -692,9 +692,9 @@ def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
     :returns: True if at least one Job matches, False otherwise.
     """
     if ref:
-        job = session.query(Job.ref).filter(Job.flag == flag).filter(Job.type == jobtype).filter(Job.pair == ref).filter(Job.day == 'REF').count()
+        job = session.query(Job.ref).filter(Job.flag == flag).filter(Job.jobtype == jobtype).filter(Job.pair == ref).filter(Job.day == 'REF').count()
     else:
-        job = session.query(Job.ref).filter(Job.flag == flag).filter(Job.type == jobtype).filter(Job.day != 'REF').count()
+        job = session.query(Job.ref).filter(Job.flag == flag).filter(Job.jobtype == jobtype).filter(Job.day != 'REF').count()
     if job == 0:
         return False
     else:
@@ -704,7 +704,7 @@ def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
 def get_dtt_next_job(session, flag='T', jobtype='DTT'):
     """
     Get the next DTT :class:`~msnoise.msnoise_table_def.Job` in the database,
-    with flag=`flag` and type=`type`. Jobs are then grouped per station pair.
+    with flag=`flag` and jobtype=`jobtype`. Jobs are then grouped per station pair.
     This function also sets the flag of all selected Jobs to "I"n progress.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -721,8 +721,8 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
         Days of the next DTT jobs -
         Job IDs (for later being able to update their flag).
     """
-    pair = session.query(Job).filter(Job.flag == flag).filter(Job.type == jobtype).filter(Job.day != 'REF').first().pair
-    jobs = session.query(Job.ref, Job.day).filter(Job.flag == flag).filter(Job.type == jobtype).filter(Job.day != 'REF').filter(Job.pair == pair)
+    pair = session.query(Job).filter(Job.flag == flag).filter(Job.jobtype == jobtype).filter(Job.day != 'REF').first().pair
+    jobs = session.query(Job.ref, Job.day).filter(Job.flag == flag).filter(Job.jobtype == jobtype).filter(Job.day != 'REF').filter(Job.pair == pair)
     tmp = list(jobs)
     jobs.update({Job.flag: 'I'}, synchronize_session=False)
     session.commit()
@@ -743,7 +743,7 @@ def reset_jobs(session, jobtype, alljobs=False):
     :param aljobs: If True, resets all jobs. If False (default), only resets
         jobs "I"n progress.
     """
-    jobs = session.query(Job).filter(Job.type == jobtype)
+    jobs = session.query(Job).filter(Job.jobtype == jobtype)
     if not alljobs:
         jobs = jobs.filter(Job.flag == "I")
     jobs.update({Job.flag: 'T'})
@@ -761,7 +761,7 @@ def reset_dtt_jobs(session, pair):
     :param pair: The pair to update
     """
 
-    jobs = session.query(Job).filter(Job.pair == pair).filter(Job.type == "DTT")
+    jobs = session.query(Job).filter(Job.pair == pair).filter(Job.jobtype == "DTT")
     jobs.update({Job.flag: 'T'})
     session.commit()
 
@@ -781,7 +781,7 @@ def get_job_types(session, jobtype='CC'):
     :returns: list of [count, flag] pairs
     """
 
-    return session.query(func.count(Job.flag), Job.flag).filter(Job.type == jobtype).group_by(Job.flag).all()
+    return session.query(func.count(Job.flag), Job.flag).filter(Job.jobtype == jobtype).group_by(Job.flag).all()
 
 
 # CORRELATIONS
@@ -1121,8 +1121,8 @@ def updated_days_for_dates(session, date1, date2, pair, jobtype='CC',
                            interval=datetime.timedelta(days=1),
                            returndays=False):
     """
-    Determines if any Job of type=`type` and for pair=`pair`, concerning a date
-    between `date1` and `date2` has been modified in the last
+    Determines if any Job of jobtype=`jobtype` and for pair=`pair`,
+    concerning a date between `date1` and `date2` has been modified in the last
     interval=`interval`.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -1148,9 +1148,9 @@ def updated_days_for_dates(session, date1, date2, pair, jobtype='CC',
     """
     lastmod = datetime.datetime.now() - interval
     if pair == '%':
-        days = session.query(Job).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.type == jobtype).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
+        days = session.query(Job).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.jobtype == jobtype).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
     else:
-        days = session.query(Job).filter(Job.pair == pair).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.type == jobtype).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
+        days = session.query(Job).filter(Job.pair == pair).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.jobtype == jobtype).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
     logging.debug('Found %03i updated days' % len(days))
     if returndays and len(days) != 0:
         return [datetime.datetime.strptime(day.day,'%Y-%m-%d').date() for day in days] ## RETURN DATE LIST !!!
@@ -1215,34 +1215,34 @@ def check_and_phase_shift(trace):
     if trace.stats.npts < 4 * taper_length*trace.stats.sampling_rate:
         trace.data = np.zeros(trace.stats.npts)
         return trace
-    
-    dt = np.mod(trace.stats.starttime.datetime.microsecond*1.0e-6, trace.stats.delta)
-    if (trace.stats.delta -dt) <= np.finfo(float).eps:
+
+    dt = np.mod(trace.stats.starttime.datetime.microsecond*1.0e-6,
+                trace.stats.delta)
+    if (trace.stats.delta - dt) <= np.finfo(float).eps:
         dt = 0
     if dt != 0:
         if dt <= (trace.stats.delta / 2.):
             dt = -dt
-            direction = "left"
+#            direction = "left"
         else:
             dt = (trace.stats.delta - dt)
-            direction = "right"
+#            direction = "right"
         trace.detrend(type="demean")
         trace.detrend(type="simple")
         taper_1s = taper_length * float(trace.stats.sampling_rate) / trace.stats.npts
         cp = cosTaper(trace.stats.npts, taper_1s)
         trace.data *= cp
-        # print "Trace is offset by %.6f s from closest delta (%s)" % (dt, direction)
+
         n = int(2**nextpow2(len(trace.data)))
         FFTdata = scipy.fftpack.fft(trace.data, n=n)
-        fftfreq = scipy.fftpack.fftfreq(n,d=trace.stats.delta)
+        fftfreq = scipy.fftpack.fftfreq(n, d=trace.stats.delta)
         FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
         trace.data = np.real(scipy.fftpack.ifft(FFTdata, n=n)[:len(trace.data)])
         trace.stats.starttime += dt
         return trace
-    else: 
-        # print "No Offset"
+    else:
         return trace
-    
+
 
 def getGaps(stream, min_gap=None, max_gap=None):
     # Create shallow copy of the traces to be able to sort them later on.
@@ -1289,7 +1289,6 @@ def getGaps(stream, min_gap=None, max_gap=None):
     # Set the original traces to not alter the stream object.
     stream.traces = copied_traces
     return gap_list
-
 
 
 if __name__ == "__main__":

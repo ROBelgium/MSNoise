@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 #
 
-import os, platform
+import os
+import platform
 import sys
 import argparse
 
@@ -14,9 +15,6 @@ def ispresent(module, how=None):
             print "[X] %s: present (no version)"%module
     except:
         print "[ ] %s: not found (install via %s)"% (module, how)
-
-
-
 
 
 def main(system=False, modules=False, env=False, all=False):
@@ -110,8 +108,7 @@ def main(system=False, modules=False, env=False, all=False):
                 else:
                     dir = "[ ]"
                 print " ", dir, value
-    
-    
+
     
 if __name__ == "__main__":
     main()

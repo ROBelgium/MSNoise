@@ -15,6 +15,7 @@ import matplotlib
 matplotlib.use('Agg')
 
 import sphinx_bootstrap_theme
+import datetime
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -61,10 +62,16 @@ f.close()
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.intersphinx','sphinx.ext.autodoc', 'sphinx.ext.todo', 'sphinx.ext.coverage', 'sphinx.ext.pngmath', 'sphinx.ext.mathjax','numpydoc',
-      'matplotlib.sphinxext.mathmpl',
-    'matplotlib.sphinxext.only_directives',
-          'matplotlib.sphinxext.plot_directive',]
+extensions = ['sphinx.ext.intersphinx',
+              'sphinx.ext.autodoc',
+              'sphinx.ext.todo',
+              'sphinx.ext.coverage',
+              'sphinx.ext.pngmath',
+              'sphinx.ext.mathjax',
+              'numpydoc',
+              'matplotlib.sphinxext.mathmpl',
+              'matplotlib.sphinxext.only_directives',
+              'matplotlib.sphinxext.plot_directive',]
 
 todo_include_todos = True
 # Add any paths that contain templates here, relative to this directory.
@@ -81,7 +88,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'MSNoise'
-copyright = u'2013, Lecocq, Caudron and Brenguier'
+copyright = u'%i, Lecocq, Caudron and Brenguier' % datetime.datetime.now().year
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.

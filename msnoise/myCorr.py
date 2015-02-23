@@ -2,28 +2,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.fftpack
 
-
-def nextpow2(x):
-    return np.ceil(np.log2(np.abs(x)))
-
+from api import nextpow2
 
 def myCorr(data, maxlag, plot=False):
     """This function takes ndimensional *data* array, computes the cross-correlation in the frequency domain
     and returns the cross-correlation function between [-*maxlag*:*maxlag*].
-    !add a line on the +++++----- to -----++++++
 
-    Parameters
-    ----------
-    data : numpy.ndarray
-        This array contains the fft of each timeseries to be cross-correlated.
-    maxlag : int
-        This number defines the number of samples (N=2*maxlag + 1) of the CCF that will be returned.
+    .. todo:: add a line on the +++++----- to -----++++++
 
-    Returns
-    -------
-    CCF : numpy.ndarray
-        The cross-correlation function between [-maxlag:maxlag]
-"""
+    :type data: :class:`numpy.ndarray`
+    :param data: This array contains the fft of each timeseries to be cross-correlated.
+    :type maxlag: int
+    :param maxlag: This number defines the number of samples (N=2*maxlag + 1) of the CCF that will be returned.
+
+    :rtype: :class:`numpy.ndarray`
+    :returns: The cross-correlation function between [-maxlag:maxlag]
+    """
 
     normalized = True
     allCpl = False
