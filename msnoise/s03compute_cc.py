@@ -319,7 +319,6 @@ def main():
             logging.info("Processing CC")
             for ifilter, filter in enumerate(get_filters(db, all=False)):
                 for pair in pairs:
-                    print "processing pair:" , pair
                     orig_pair = pair
                     if params.keep_all:
                         allcorr = {}

@@ -690,10 +690,11 @@ def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
     :rtype: bool
     :returns: True if at least one Job matches, False otherwise.
     """
+    q = session.query(Job.ref).filter(Job.flag == flag).filter(Job.jobtype == jobtype)
     if ref:
-        job = session.query(Job.ref).filter(Job.flag == flag).filter(Job.jobtype == jobtype).filter(Job.pair == ref).filter(Job.day == 'REF').count()
+        job = q.filter(Job.pair == ref).filter(Job.day == 'REF').count()
     else:
-        job = session.query(Job.ref).filter(Job.flag == flag).filter(Job.jobtype == jobtype).filter(Job.day != 'REF').count()
+        job = q.filter(Job.day != 'REF').count()
     if job == 0:
         return False
     else:

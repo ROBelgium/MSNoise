@@ -1,13 +1,12 @@
 import unittest
 import traceback
+import os
 
 
 # Here's our "unit tests".
-class InitTests(unittest.TestCase):
-
-    
+class MSNoiseTests(unittest.TestCase):
     def test_001_S01installer(self):
-        from s000installer import main
+        from .s000installer import main
         try:
             ret = main(tech=1)
             msg = "Installation Done! - Go to Configuration Step!"
@@ -17,7 +16,7 @@ class InitTests(unittest.TestCase):
             self.fail()
     
     def test_002_ConnectToDB(self):
-        from api import connect
+        from .api import connect
         try:
             db = connect()
             db.close()
@@ -25,10 +24,11 @@ class InitTests(unittest.TestCase):
             self.fail("Can't connect to MSNoise DB")
     
     def test_003_set_and_config(self):
-        from api import connect, get_config, update_config
+        from .api import connect, get_config, update_config
         db = connect()
         totests = []
-        totests.append(['data_folder', 'data'])
+        path = os.path.split(os.path.abspath(os.path.dirname(__file__)))[0]
+        totests.append(['data_folder', os.path.join(path,'tests','data')])
         totests.append(['data_structure', 'PDF'])
         totests.append(['network', 'YA'])
         totests.append(['ZR', 'N'])
@@ -48,8 +48,8 @@ class InitTests(unittest.TestCase):
         db.close()
 
     def test_004_set_and_get_filters(self):
-        from msnoise_table_def import Filter
-        from api import connect, update_filter, get_filters
+        from .msnoise_table_def import Filter
+        from .api import connect, update_filter, get_filters
         db = connect()
         filters = []
         filters.append(Filter(0.01, 0.12, 1.0, 0.98, 0, 10, 5, 1))
@@ -67,7 +67,7 @@ class InitTests(unittest.TestCase):
                                      eval("filters[i].%s"%param))
     
     def test_005_populate_station_table(self):
-        from s002populate_station_table import main
+        from .s002populate_station_table import main
         try:
             ret = main()
             self.failUnlessEqual(ret, True)
@@ -75,17 +75,18 @@ class InitTests(unittest.TestCase):
             self.fail()
     
     def test_006_get_stations(self):
-        from api import connect, get_stations
+        from .api import connect, get_stations
         db = connect()
         stations = get_stations(db).all()
         self.failUnlessEqual(len(stations), 3)
         db.close()
         
     def test_007_update_stations(self):
-        from api import connect, get_stations, update_station
+        from .api import connect, get_stations, update_station
         import pandas as pd
         db = connect()
-        stations = pd.read_csv('extra/stations.csv',header=None, index_col = 0, names =['X','Y','altitude'])
+        path = os.path.split(os.path.abspath(os.path.dirname(__file__)))[0]
+        stations = pd.read_csv(os.path.join(path, 'tests','extra','stations.csv'),header=None, index_col = 0, names =['X','Y','altitude'])
         for station in get_stations(db):
             fullname = "%s.%s" % (station.net, station.sta,)
             try:
@@ -98,7 +99,7 @@ class InitTests(unittest.TestCase):
             del s
         
     def test_008_scan_archive(self):
-        from s01scan_archive import main
+        from .s01scan_archive import main
         try:
             main(init=True,threads=1)
         except:
@@ -106,7 +107,7 @@ class InitTests(unittest.TestCase):
             self.fail()
     
     def test_009_control_data_availability(self):
-        from api import connect, get_new_files, get_data_availability, count_data_availability_flags, get_stations
+        from .api import connect, get_new_files, get_data_availability, count_data_availability_flags, get_stations
         
         db = connect()
         files = get_new_files(db)
@@ -121,7 +122,7 @@ class InitTests(unittest.TestCase):
         
     
     def test_010_new_jobs(self):
-        from s02new_jobs import main
+        from .s02new_jobs import main
         
         try:
             main()
@@ -130,31 +131,39 @@ class InitTests(unittest.TestCase):
             self.fail()
     
     def test_011_control_jobs(self):
-        from api import connect, is_next_job, get_next_job
-        from msnoise_table_def import Job
+        from .api import connect, is_next_job, get_next_job
+        from .msnoise_table_def import Job
         db = connect()
         
         self.failUnlessEqual(is_next_job(db), True)
         jobs = get_next_job(db)
         self.failUnlessEqual(isinstance(jobs[0], Job), True)
-    
-    def test_012_s03compute_cc(self):
-        from s03compute_cc import main
+
+    def test_012_reset_jobs(self):
+        from .api import connect, reset_jobs
+        db = connect()
+        reset_jobs(db, 'CC')
+        db.close()
+
+    def test_013_s03compute_cc(self):
+        from .s03compute_cc import main
         try:
             main()
         except:
             traceback.print_exc()
             self.fail()
 
-    def test_013_check_done_jobs(self):
-        from api import connect, get_job_types
+    def test_014_check_done_jobs(self):
+        from .api import connect, get_job_types
         db = connect()
         jobs = get_job_types(db, 'CC')
-        print jobs
-    
+        self.failUnlessEqual(jobs[0][0], 3)
+        self.failUnlessEqual(jobs[0][1], 'D')
+
     
 def main():
-    unittest.main()
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
+    unittest.TextTestRunner().run(suite)
 
 if __name__ == '__main__':
     main()

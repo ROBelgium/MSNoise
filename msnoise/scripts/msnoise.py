@@ -10,6 +10,11 @@ def cli(ctx, threads):
     ctx.obj['MSNOISE_threads'] = threads
     pass
 
+@click.command()
+def test():
+    from ..tests import main
+    main()
+
 
 @click.command()
 def info():
@@ -292,7 +297,7 @@ cli.add_command(compute_stretching)
 cli.add_command(compute_dtt)
 cli.add_command(reset)
 cli.add_command(ipython)
-
+cli.add_command(test)
 # Finally add the plot group too:
 cli.add_command(plot)
 
