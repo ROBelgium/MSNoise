@@ -320,6 +320,7 @@ def main():
             logging.info("Processing CC")
             for ifilter, filter in enumerate(get_filters(db, all=False)):
                 for pair in pairs:
+                    print "processing pair:" , pair
                     orig_pair = pair
                     if params.keep_all:
                         allcorr = {}
@@ -364,6 +365,7 @@ def main():
                             db, station1.replace(
                                 '.', '_'), station2.replace('.', '_'), filter.ref,
                             thisdate, thistime, params.min30 / params.goal_sampling_rate, 'ZZ', daycorr, params.goal_sampling_rate, day=True, ncorr=ndaycorr)
+                    print orig_pair
                     update_job(db, goal_day, orig_pair, 'CC', 'D')
             logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
 

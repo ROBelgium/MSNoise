@@ -52,11 +52,11 @@ class InitTests(unittest.TestCase):
         from api import connect, update_filter, get_filters
         db = connect()
         filters = []
-        filters.append(Filter(0.01, 0.12, 0.98, 1.0, 0, 10, 5, 1))
-        filters.append(Filter(0.1, 0.12, 0.98, 1.0, 0, 10, 5, 1))
+        filters.append(Filter(0.01, 0.12, 1.0, 0.98, 0, 10, 5, 1))
+        filters.append(Filter(0.1, 0.12, 1.0, 0.98, 0, 10, 5, 1))
         
         for f in filters:
-            update_filter(db, f.ref, f.low, f.high, f.mwcs_low, f.mwcs_high,
+            update_filter(db, f.ref, f.low, f.mwcs_low, f.high, f.mwcs_high,
                   f.rms_threshold, f.mwcs_wlen, f.mwcs_step, f.used)
         
         dbfilters = get_filters(db)
@@ -142,7 +142,12 @@ class InitTests(unittest.TestCase):
         except:
             traceback.print_exc()
             self.fail()
-        
+
+    def test_013_check_done_jobs(self):
+        from api import connect, get_job_types
+        db = connect()
+        jobs = get_job_types(db, 'CC')
+        print jobs
     
     
 def main():
