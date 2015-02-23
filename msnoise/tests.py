@@ -1,6 +1,7 @@
 import unittest
 import traceback
 import os
+import sys
 
 
 # Here's our "unit tests".
@@ -164,6 +165,10 @@ class MSNoiseTests(unittest.TestCase):
 def main():
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
     unittest.TextTestRunner().run(suite)
+
+    r = unittest.TestResults()
+    if len(r.failures) > 0:
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
