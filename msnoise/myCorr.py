@@ -24,17 +24,17 @@ def myCorr(data, maxlag, plot=False):
 
     maxlag = np.round(maxlag)
     #~ print "np.shape(data)",np.shape(data)
-    if np.shape(data)[0] == 2:
+    if data.shape[0] == 2:
         #~ print "2 matrix to correlate"
         if allCpl:
             # Skipped this unused part
             pass
         else:
-            K = np.shape(data)[0]
+            K = data.shape[0]
             #couples de stations
             couples = np.concatenate((np.arange(0, K), K + np.arange(0, K)))
 
-    Nt = np.shape(data)[1]
+    Nt = data.shape[1]
     Nc = 2 * Nt - 1
     Nfft = 2 ** nextpow2(Nc)
 

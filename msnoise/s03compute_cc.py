@@ -239,8 +239,8 @@ def main():
             params.components_to_compute.append(comp)
     logging.info("Will compute %s" % " ".join(params.components_to_compute))
 
-    while is_next_job(db, type='CC'):
-        jobs = get_next_job(db, type='CC')
+    while is_next_job(db, jobtype='CC'):
+        jobs = get_next_job(db, jobtype='CC')
         stations = []
         pairs = []
         refs = []

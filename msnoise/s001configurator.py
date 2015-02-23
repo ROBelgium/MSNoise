@@ -44,7 +44,7 @@ from msnoise_table_def import *
 
 class StationColumn (ObjectColumn):
     def get_text_color(self, obj):
-        return ['light grey', 'black'][obj.used]
+        return ['red', 'black'][obj.used]
 
 
 class TFilter(HasTraits):
@@ -262,7 +262,7 @@ def main():
 
         print "Updating Filter Table"
         for f in demo.company.filters:
-            update_filter(db, f.ref, f.low, f.high, f.mwcs_low,
+            update_filter(db, f.ref, f.low, f.mwcs_low, f.high,
                           f.mwcs_high, f.rms_threshold, f.mwcs_wlen,
                           f.mwcs_step, f.used)
 

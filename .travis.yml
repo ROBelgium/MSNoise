@@ -60,5 +60,5 @@ install:
 script:
   - msnoise --help
   - msnoise bugreport -s -m
-#  - cd tests
-#  - python ../tests.py
+  - cd MSNoise/tests
+  - python ../msnoise/tests.py

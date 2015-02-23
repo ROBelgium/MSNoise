@@ -60,7 +60,6 @@ class InitTests(unittest.TestCase):
                   f.rms_threshold, f.mwcs_wlen, f.mwcs_step, f.used)
         
         dbfilters = get_filters(db)
-        
         for i, filter in enumerate(dbfilters):
             self.failUnlessEqual(filter.low, filters[i].low)
     

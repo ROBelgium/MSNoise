@@ -197,7 +197,7 @@ def get_filters(session, all=False):
     return filters
 
 
-def update_filter(session, ref, low, high, mwcs_low, mwcs_high,
+def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
                   rms_threshold, mwcs_wlen, mwcs_step, used):
     """Updates or Insert a new Filter in the database.
 
@@ -437,9 +437,9 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
     :param path: The full path to the folder containing the file
     :type file: str
     :param file: The name of the file
-    :type starttime: datetime
+    :type starttime: datetime.datetime
     :param starttime: Start time of the file
-    :type endtime: datetime
+    :type endtime: datetime.datetime
     :param endtime: End time of the file
     :type data_duration: float
     :param data_duration: Cumulative duration of available data in the file
@@ -507,9 +507,9 @@ def get_data_availability(session, net=None, sta=None, comp=None,
     :param net: Network code
     :type sta: str
     :param sta: Station code
-    :type starttime: datetime
+    :type starttime: datetime.datetime
     :param starttime: Start time of the search
-    :type endtime: datetime
+    :type endtime: datetime.datetime
     :param endtime: End time of the search
 
     :rtype: list
@@ -1127,9 +1127,9 @@ def updated_days_for_dates(session, date1, date2, pair, jobtype='CC',
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
-    :type date1: datetime
+    :type date1: datetime.datetime
     :param date1: Beginning of the period of interest
-    :type date2: datetime
+    :type date2: datetime.datetime
     :param date2: End of the period of interest
     :type pair: str
     :param pair: Pair of interest
@@ -1167,7 +1167,6 @@ def azimuth(coordinates, x0, y0, x1, y1):
 
     :type coordinates: str
     :param coordinates: {'DEG', 'UTM', 'MIX'}
-
     :type x0: float
     :param x0: X coordinate of station 1
     :type y0: float
@@ -1182,11 +1181,9 @@ def azimuth(coordinates, x0, y0, x1, y1):
     """
     if coordinates == "DEG":
         dist, azim, bazim = gps2DistAzimuth(y0, x0, y1, x1)
-        # print dist, azim, bazi
         return azim
     elif coordinates == 'UTM':
         azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
-        # print azim
         return azim
     else:
         print "woooooow, please consider having a single coordinate system for\

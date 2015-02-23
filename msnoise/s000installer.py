@@ -33,7 +33,8 @@ from default import default
 from api import create_database_inifile
 import argparse
 
-def main(tech=None, hostname="localhost", username="msnoise", password="msnoise", database="msnoise", filename="msnoise.sqlite"):
+def main(tech=None, hostname="localhost", username="msnoise",
+         password="msnoise", database="msnoise", filename="msnoise.sqlite"):
     if tech is None:
         print "Welcome to MSNoise"
         print
@@ -96,7 +97,6 @@ def main(tech=None, hostname="localhost", username="msnoise", password="msnoise"
     return msg
     
 if __name__ == "__main__":
-        
     parser = argparse.ArgumentParser(description='Creates the database connection file (db.ini)',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-t', '--tech', type=int, default=None,
