@@ -164,9 +164,10 @@ class MSNoiseTests(unittest.TestCase):
     
 def main():
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
-    unittest.TextTestRunner().run(suite)
+    result = unittest.TestResult()
+    suite.run(result)
 
-    if not suite.wasSuccessful():
+    if not result.wasSuccessful():
         sys.exit(1)
 
 if __name__ == '__main__':
