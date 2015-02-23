@@ -61,4 +61,5 @@ script:
   - msnoise --help
   - msnoise bugreport -s -m
   - cd -
+  - cd tests
   - python ../msnoise/tests.py

@@ -61,7 +61,10 @@ class InitTests(unittest.TestCase):
         
         dbfilters = get_filters(db)
         for i, filter in enumerate(dbfilters):
-            self.failUnlessEqual(filter.low, filters[i].low)
+            for param in ['low', 'mwcs_low', 'high', 'mwcs_high',
+                          'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used']:
+                self.failUnlessEqual(eval("filter.%s"%param),
+                                     eval("filters[i].%s"%param))
     
     def test_005_populate_station_table(self):
         from s002populate_station_table import main

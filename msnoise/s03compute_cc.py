@@ -76,7 +76,6 @@ from whiten import whiten
 
 
 def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.array([]), tramef_N = np.array([])):
-
     datafilesZ = {}
     datafilesE = {}
     datafilesN = {}
@@ -365,7 +364,6 @@ def main():
                             db, station1.replace(
                                 '.', '_'), station2.replace('.', '_'), filter.ref,
                             thisdate, thistime, params.min30 / params.goal_sampling_rate, 'ZZ', daycorr, params.goal_sampling_rate, day=True, ncorr=ndaycorr)
-                    print orig_pair
                     update_job(db, goal_day, orig_pair, 'CC', 'D')
             logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
 
