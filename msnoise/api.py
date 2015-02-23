@@ -24,24 +24,26 @@ from msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
 def get_tech():
     """Returns the current DB technology used (reads from the db.ini file)
-    
-    Returns
-    -------
-    tech : int
-        The database technology used: 1=sqlite 2=mysql
+
+    :rtype: int
+    :returns: The database technology used: 1=sqlite 2=mysql
     """
     tech, hostname, database, username, password = read_database_inifile()
     return tech
 
 
-def get_engine(inifile=os.path.join(os.getcwd(), 'db.ini')):
+def get_engine(inifile=None):
     """Returns the a SQLAlchemy Engine
-    
-    :type inifile: string
-    :param inifile: The path to the db.ini file to use. Defaults to os.cwd()
-    
-    :returns: The Engine Object
+
+    :type inifile: str
+    :param inifile: The path to the db.ini file to use. Defaults to os.cwd() +
+        db.ini
+
+    :rtype: :class:`sqlalchemy.engine.Engine`
+    :returns: An :class:`~sqlalchemy.engine.Engine` Object
     """
+    if not inifile:
+        inifile = os.path.join(os.getcwd(), 'db.ini')
     tech, hostname, database, user, passwd = read_database_inifile(inifile)
     if tech == 1:
         engine = create_engine('sqlite:///%s' % hostname, echo=False)
@@ -58,12 +60,13 @@ def connect(inifile=None):
     :type inifile: string
     :param inifile: The path to the db.ini file to use. Defaults to os.cwd() +
         db.ini
-    
-    :rtype: `SQLAlchemy.Session`
-    :returns: A Session object, needed for many of the other API methods.
+
+    :rtype: :class:`sqlalchemy.orm.session.Session`
+    :returns: A :class:`~sqlalchemy.orm.session.Session` object, needed for
+        many of the other API methods.
     """
     if not inifile:
-        inifile=os.path.join(os.getcwd(), 'db.ini')
+        inifile = os.path.join(os.getcwd(), 'db.ini')
     engine = get_engine(inifile)
     Session = sessionmaker(bind=engine)
     return Session()
@@ -71,19 +74,19 @@ def connect(inifile=None):
 
 def create_database_inifile(tech, hostname, database, username, password):
     """Creates the db.ini file based on supplied parameters.
-    
+
     :type tech: int
     :param tech: The database technology used: 1=sqlite 2=mysql
     :type hostname: string
-    :param hostname: The hostname of the server (if tech=2) or the name of the 
+    :param hostname: The hostname of the server (if tech=2) or the name of the
         sqlite file if tech=1)
     :type database: string
     :param database: The database name
     :type username: string
     :param username: The user name
     :type password: string
-    :param password: The password of `user` 
-    
+    :param password: The password of `user`
+
     :return: None
     """
     f = open(os.path.join(os.getcwd(), 'db.ini'), 'w')
@@ -91,60 +94,50 @@ def create_database_inifile(tech, hostname, database, username, password):
     f.close()
 
 
-def read_database_inifile(inifile=os.path.join(os.getcwd(), 'db.ini')):
+def read_database_inifile(inifile=None):
     """Reads the parameters from the db.ini file.
-    
-    Parameters
-    ----------
-    inifile : string
-        The path to the db.ini file to use. Defaults to os.cwd()
-    
-    
-    Returns
-    ----------
-    tech : int
-        The database technology used: 1=sqlite 2=mysql
-    hostname : string
-        The hostname of the server (if tech=2) or the name of the sqlite file
-        if tech=1)
-    database : string
-        The database name
-    username : string
-    password : string
-    
+
+    :type inifile: string
+    :param inifile: The path to the db.ini file to use. Defaults to os.cwd() +
+        db.ini
+
+    :rtype: tuple
+    :returns: tech, hostname, database, username, password
     """
+    if not inifile:
+        inifile = os.path.join(os.getcwd(), 'db.ini')
+
     f = open(inifile, 'r')
     tech, hostname, database, username, password = cPickle.load(f)
     f.close()
     return [tech, hostname, database, username, password]
 
 
-############ CONFIG ############
+# CONFIG
 
 
 def get_config(session, name=None, isbool=False):
     """Get the value of one or all config bits from the database.
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    name : string, optional
-        The name of the config bit to get. If omitted, a dictionnary with all
-        config items will be returned
-    
-    
-    Returns
-    ----------
-    config : string or dict
-    
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type name: str
+    :param name: The name of the config bit to get. If omitted, a dictionnary
+        with all config items will be returned
+    :type isbool: bool
+    :param isbool: if True, returns True/False for config `name`. Defaults to
+        False
+
+    :rtype: str, bool or dict
+    :returns: the value for `name` or a dict of all config values
     """
-    
+
     if name:
         config = session.query(Config).filter(Config.name == name).first()
         if config is not None:
             if isbool:
-                if config.value in [True,'true','Y','y','1',1]:
+                if config.value in [True, 'true', 'Y', 'y', '1', 1]:
                     config = True
                 else:
                     config = False
@@ -162,18 +155,19 @@ def get_config(session, name=None, isbool=False):
 
 def update_config(session, name, value):
     """Update one config bit in the database.
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    name : string
-        The name of the config bit to set.
-    value : string
-        The value of the config bit to set.
-    
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :type name: str
+    :param name: The name of the config bit to set.
+
+    :type value: str
+    :param value: The value of parameter `name`
+
     """
-    
+
     config = session.query(Config).filter(Config.name == name).first()
     config.value = value
     session.commit()
@@ -184,21 +178,19 @@ def update_config(session, name, value):
 
 def get_filters(session, all=False):
     """Get Filters from the database.
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    all : bool, optional
-        Returns all filters from the database if True, or only filters where
-        `used` = 1 if False (default)
-    
-    
-    Returns
-    ----------
-    filters : list of Filter
-    
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :type all: bool
+    :param all: Returns all filters from the database if True, or only filters
+        where `used` = 1 if False (default)
+
+    :rtype: list of :class:`~msnoise.msnoise_table_def.Filter`
+    :returns: a list of Filter
     """
+
     if all:
         filters = session.query(Filter).all()
     else:
@@ -209,36 +201,33 @@ def get_filters(session, all=False):
 def update_filter(session, ref, low, high, mwcs_low, mwcs_high,
                   rms_threshold, mwcs_wlen, mwcs_step, used):
     """Updates or Insert a new Filter in the database.
-    
-    See also
-    --------
-    :class:`msnoise.msnoise_table_def.Filter`
 
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    ref : int
-        The id of the Filter in the database
-    low : float
-        The lower frequency bound of the Whiten function (in Hz)
-    high : float
-        The upper frequency bound of the Whiten function (in Hz)
-    mwcs_low : float
-        The lower frequency bound of the linear regression done in MWCS (in Hz)
-    mwcs_high : float
-        The upper frequency bound of the linear regression done in MWCS (in Hz)
-    rms_threshold : float
-        Not used anymore
-    mwcs_wlen : float
-        Window length (in seconds) to perform MWCS
-    mwcs_step : float
-        Step (in seconds) of the windowing procedure in MWCS
-    used : bool
-        Is the filter activated for the processing
-    
-    
+    .. seealso:: :class:`msnoise.msnoise_table_def.Filter`
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :type ref: int
+    :param ref: The id of the Filter in the database
+    :type low: float
+    :param low: The lower frequency bound of the Whiten function (in Hz)
+    :type high: float
+    :param high: The upper frequency bound of the Whiten function (in Hz)
+    :type mwcs_low: float
+    :type mwcs_low: The lower frequency bound of the linear regression done in
+        MWCS (in Hz)
+    :type mwcs_high: float
+    :type mwcs_high: The upper frequency bound of the linear regression done in
+        WCS (in Hz)
+    :type rms_threshold: float
+    :param rms_threshold: Not used anymore
+    :type mwcs_wlen: float
+    :param mwcs_wlen: Window length (in seconds) to perform MWCS
+    :type mwcs_step: float
+    :param mwcs_step: Step (in seconds) of the windowing procedure in MWCS
+    :type used: bool
+    :param used: Is the filter activated for the processing
     """
     filter = session.query(Filter).filter(Filter.ref == ref).first()
     if filter is None:
@@ -262,20 +251,16 @@ def update_filter(session, ref, low, high, mwcs_low, mwcs_high,
 
 def get_networks(session, all=False):
     """Get Networks from the database.
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    all : bool, optional
-        Returns all networks from the database if True, or only networks where
-        at least one station has `used` = 1 if False (default)
-    
-    
-    Returns
-    ----------
-    networks : list of string
-    
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type all: bool
+    :param all: Returns all networks from the database if True, or only
+        networks at least one station has `used` = 1 if False (default)
+
+    :rtype: list of str
+    :returns: a list of network codes
     """
     if all:
         networks = session.query(Station).group_by(Station.net).all()
@@ -286,30 +271,27 @@ def get_networks(session, all=False):
 
 def get_stations(session, all=False, net=None):
     """Get Stations from the database.
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    all : bool, optional
-        Returns all stations from the database if True, or only stations where
-        `used` = 1 if False (default)
-    net : string, optional
-        if set, limits the stations returned to this network
-    
-    
-    Returns
-    ----------
-    stations : list of Station
-    
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type all: bool
+    :param all: Returns all stations from the database if True, or only
+        stations where `used` = 1 if False (default)
+    :type net: str
+    :param net: if set, limits the stations returned to this network
+
+    :rtype: list of :class:`msnoise.msnoise_table_def.Station`
+    :returns: list of :class:`~msnoise.msnoise_table_def.Station`
     """
+    q = session.query(Station)
     if all:
         if net is not None:
-            stations = session.query(Station).filter(Station.net == net).order_by(Station.net).order_by(Station.sta)
+            stations = q.filter(Station.net == net).order_by(Station.net).order_by(Station.sta)
         else:
-            stations = session.query(Station).order_by(Station.net).order_by(Station.sta).all()
+            stations = q.order_by(Station.net).order_by(Station.sta).all()
     else:
-        stations = session.query(Station).filter(Station.used == True).order_by(Station.net).order_by(Station.sta)
+        stations = q.filter(Station.used == True).order_by(Station.net).order_by(Station.sta)
         if net is not None:
             stations = stations.filter(Station.net == net).order_by(Station.net).order_by(Station.sta)
     return stations
@@ -318,55 +300,50 @@ def get_stations(session, all=False, net=None):
 def get_station(session, net, sta):
     """Get one Station from the database.
     
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    net : string
-        The network code
-    sta : string
-        The station code
-    
-    
-    Returns
-    ----------
-    station : Station
-    
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type net: str
+    :param net: the network code
+    :type sta: str
+    :param sta: the station code
+
+    :rtype: :class:`msnoise.msnoise_table_def.Station`
+    :returns: a :class:`~msnoise.msnoise_table_def.Station` Object
+
     """
     station = session.query(Station).filter(Station.net == net).filter(Station.sta == sta).first()
     return station
 
 
-def update_station(session, net, sta, X, Y, altitude, coordinates='UTM', instrument='N/A', used=1):
+def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
+                   instrument='N/A', used=1):
     """Updates or Insert a new Station in the database.
+
+    .. seealso :: :class:`msnoise.msnoise_table_def.Station`
     
-    See also
-    --------
-    :class:`msnoise.msnoise_table_def.Station`
-    
-    Parameters
-    -----------
-    session : object
-        A Session object, as obtained using `connect()`
-    ref : int
-        The Station ID in the database
-    net : string
-        The network code of the Station
-    sta : string
-        The station code
-    X : float
-        The X coordinate of the station
-    Y : float
-        The Y coordinate of the station
-    altitude : float
-        The altitude of the station
-    coordinates : {'DEG', 'UTM'}
-        The coordinates system. DEG is WGS84 latitude/longitude in degrees. 
-        UTM is expressed in meters.
-    instrument : string
-        The instrument code, useful with PAZ correction
-    used : bool
-        Whether this station must be used in the computations.
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type ref: int
+    :param ref: The Station ID in the database
+    :type net: str
+    :param net: The network code of the Station
+    :type sta: str
+    :param sta: The station code
+    :type X: float
+    :param X: The X coordinate of the station
+    :type Y: float
+    :param Y: The Y coordinate of the station
+    :type altitude: float
+    :param altitude: The altitude of the station
+    :type coordinates: str
+    :param coordinates: The coordinates system. "DEG" is WGS84 latitude/
+        longitude in degrees. "UTM" is expressed in meters.
+    :type instrument: str
+    :param instrument: The instrument code, useful with PAZ correction
+    :type used: bool
+    :param used: Whether this station must be used in the computations.
     """
     station = session.query(Station).filter(Station.net == net).filter(Station.sta == sta).first()
     if station is None:
@@ -387,21 +364,19 @@ def get_station_pairs(session, used=None, net=None):
     """Returns an iterator over all possible station pairs.
     If auto-correlation is configured in the database, returns N*N pairs,
     otherwise returns N*(N-1)/2 pairs.
-    
-    Parameters
-    -----------
-    session : object
-        A Session object, as obtained using `connect()`
-    used : bool
-        Select only stations marked used if False (default) or all stations
-        present in the database if True
-    net : string
-        Network code to filter for the pairs.
-        
-    Returns
-    -------
-    iterable
-        Iterable of Station object pairs.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type used: bool
+    :param used: Select only stations marked used if False (default) or all
+        stations present in the database if True
+    :type net: str
+    :param net: Network code to filter for the pairs.
+
+    :rtype: iterable
+    :returns: An iterable of :class:`~msnoise.msnoise_table_def.Station` object
+        pairs
     """
     stations = get_stations(session, all=False, net=net)
     if get_config(session, name="autocorr", isbool=True):
@@ -412,61 +387,69 @@ def get_station_pairs(session, used=None, net=None):
 
 def get_interstation_distance(station1, station2, coordinates="DEG"):
     """Returns the distance in km between `station1` and `station2`.
-    
-    Parameters
-    ----------
-    station1 : Station object
-    station2 : Station object
-    coordinates : str
-        The coordinate system.
-    
-    Returns
-    -------
-    float
-        the distance in km.
+
+    .. warning:: Currently the stations coordinates system have to be the same!
+
+    :type station1: :class:`~msnoise.msnoise_table_def.Station`
+    :param station1: A Station object
+    :type station2: :class:`~msnoise.msnoise_table_def.Station`
+    :param station2: A Station object
+    :type coordinates: str
+    :param coordinates: The coordinates system. "DEG" is WGS84 latitude/
+        longitude in degrees. "UTM" is expressed in meters.
+
+
+
+    :rtype: float
+    :returns: The interstation distance in km
     """
-    
+
     if coordinates == "DEG":
-        dist, azim, bazim = gps2DistAzimuth(station1.Y, station1.X, station2.Y, station2.X)
-        return dist /1.e3
+        dist, azim, bazim = gps2DistAzimuth(station1.Y, station1.X,
+                                            station2.Y, station2.X)
+        return dist / 1.e3
     else:
-        dist = np.hypot( float(station1.X - station2.X), float(station1.Y - station2.Y) ) / 1.e3
-        #print "woooooow, UTM system distance not computed"
+        dist = np.hypot(float(station1.X - station2.X),
+                        float(station1.Y - station2.Y)) / 1.e3
         return dist
-############ DATA AVAILABILITY ############
 
 
-def update_data_availability(session, net, sta, comp, path, file, starttime, endtime, data_duration, gaps_duration, samplerate):
+# DATA AVAILABILITY
+
+
+def update_data_availability(session, net, sta, comp, path, file, starttime,
+                             endtime, data_duration, gaps_duration,
+                             samplerate):
     """
     Updates a DataAvailability object in the database
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    ref : int
-        The Station ID in the database
-    net : string
-        The network code of the Station
-    sta : string
-        The station code
-    comp : string
-        The component (channel)
-    path : string
-    file : string
-    starttime : datetime
-        Start time of the file
-    endtime : datetime
-        End time of the file
-    data_duration : float
-        Cumulative duration of available data in the file
-    gaps_duration : float
-        Cumulative duration of gaps in the file
-    samplerate : float
-        Sample rate of the data in the file (in Hz)
 
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type ref: int
+    :param ref: The Station ID in the database
+    :type net: str
+    :param net: The network code of the Station
+    :type sta: str
+    :param sta: The station code
+    :type comp: str
+    :param comp: The component (channel)
+    :type path: str
+    :param path: The full path to the folder containing the file
+    :type file: str
+    :param file: The name of the file
+    :type starttime: datetime
+    :param starttime: Start time of the file
+    :type endtime: datetime
+    :param endtime: End time of the file
+    :type data_duration: float
+    :param data_duation: Cumulative duration of available data in the file
+    :type gaps_duration: float
+    :param gaps_duration: Cumulative duration of gaps in the file
+    :type samplerate: float
+    :param samplerate: Sample rate of the data in the file (in Hz)
     """
-    
+
     data = session.query(DataAvailability).filter(DataAvailability.file == file).first()
     if data is None:
         flag = "N"
@@ -499,42 +482,41 @@ def update_data_availability(session, net, sta, comp, path, file, starttime, end
 def get_new_files(session):
     """
     Returns the files marked "N"ew or "M"odified in the database
-    
-    Parameters
-    -----------
-    session : object
-        A Session object, as obtained using `connect()`
-        
-    Returns
-    -------
-    files : list of DataAvailability
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :rtype: list
+    :returns: list of :class:`~msnoise.msnoise_table_def.DataAvailability`
     """
-    
+
     files = session.query(DataAvailability).filter(DataAvailability.flag != 'A').order_by(DataAvailability.starttime).all()
     return files
 
-def get_data_availability(session, net=None, sta=None, comp=None, starttime=None, endtime=None):
-    """
-    Returns the DataAvailability objects for specific `net`, `sta`, `starttime` or `endtime`
-    
-    Parameters
-    -----------
-    session : object
-        A Session object, as obtained using `connect()`
-    net : string
-        Network code
-    sta : string
-        Station code
-    starttime : datetime
-        Start time of the search
-    endtime : datetime
-        End time of the search
 
-    Returns
-    -------
-    data : list of DataAvailability
+def get_data_availability(session, net=None, sta=None, comp=None,
+                          starttime=None, endtime=None):
     """
-    
+    Returns the :class:`~msnoise.msnoise_table_def.DataAvailability` objects
+    for specific `net`, `sta`, `starttime` or `endtime`
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type net: str
+    :param net: Network code
+    :type sta: str
+    :param sta: Station code
+    :type starttime: datetime
+    :param starttime: Start time of the search
+    :type endtime: datetime
+    :param endtime: End time of the search
+
+    :rtype: list
+    :returns: list of :class:`~msnoise.msnoise_table_def.DataAvailability`
+    """
+
     if not starttime:
         data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(DataAvailability.comp == comp).all()
     elif not net:
@@ -546,74 +528,75 @@ def get_data_availability(session, net=None, sta=None, comp=None, starttime=None
 
 def mark_data_availability(session, net, sta, flag):
     """
-    Updates the flag of all DataAvailability objects matching `net`.`sta` in the database
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    net : string
-        The network code of the Station
-    sta : string
-        The station code
-    flag : {'N', 'M', 'A'}
-        Status of the DataAvailability object: New, Modified or Archive
+    Updates the flag of all
+    :class:`~msnoise.msnoise_table_def.DataAvailability` objects matching
+    `net.sta` in the database
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type net: str
+    :param net: Network code
+    :type sta: str
+    :param sta: Station code
+    :type flag: str
+    :param flag: Status of the DataAvailability object: New, Modified or
+        Archive. Values accepted are {'N', 'M', 'A'}
     """
-    
+
     data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta)
     data.update({DataAvailability.flag: flag})
     session.commit()
 
+
 def count_data_availability_flags(session):
     """
-    Count the number of DataAvailability, grouped by `flag`
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    
-    Returns
-    -------
-    data : list of [count, flag] pairs
+    Count the number of :class:`~msnoise.msnoise_table_def.DataAvailability`,
+    grouped by `flag`
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :rtype: list
+    :returns: list of [count, flag] pairs
     """
-    
+
     return session.query(func.count(DataAvailability.flag),DataAvailability.flag).group_by(DataAvailability.flag).all()
-    
-
-############ JOBS ############
 
 
-def update_job(session, day, pair, type, flag, commit=True, returnjob=True):
+# Jobs
+
+
+def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     """
-    Updates or Inserts a new job in the database.
-    
-    Parameters
-    ----------
-    
-    ref : int
-        The Job ID in the database
-    day : string
-        The day in YYYY-MM-DD format
-    pair : string
-    type : {'CC', 'DTT'}
-    flag : {'T', 'I', 'D'}
-        Status of the Job: "T"odo, "I"n Progress, "D"one.
-    commit : bool
-        Whether to directly commit (True, default) or not (False)
-    returnjob : bool
-        Return the modified/inserted Job (True, default) or not (False)
-        
-    Return
-    ------
-    
-    job : Job
-        If returnjob is True, returns the modified/inserted Job.
-    
+    Updates or Inserts a new :class:`~msnoise.msnoise_table_def.Job` in the
+    database.
+
+    :type ref: int
+    :param ref: The Job ID in the database
+    :type day: str
+    :param day: The day in YYYY-MM-DD format
+    :type pair: str
+    :param pair: the name of the pair (EXAMPLE?)
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type flag: str
+    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+    :type commit: bool
+    :param commit: Whether to directly commit (True, default) or not (False)
+    :type returnjob: bool
+    :param returnjob: Return the modified/inserted Job (True, default) or not
+        (False)
+
+
+    :rtype: :class:`~msnoise.msnoise_table_def.Job` or None
+    :returns: If returnjob is True, returns the modified/inserted Job.
     """
-    job = session.query(Job).filter(Job.day == day).filter(Job.pair == pair).filter(Job.type == type).first()
+    
+    job = session.query(Job).filter(Job.day == day).filter(Job.pair == pair).filter(Job.type == jobtype).first()
     if job is None:
-        job = Job(day, pair, type, 'T')
+        job = Job(day, pair, jobtype, 'T')
         if commit:
             session.add(job)
     else:
@@ -627,14 +610,12 @@ def update_job(session, day, pair, type, flag, commit=True, returnjob=True):
 
 def massive_insert_job(jobs):
     """
-    Routine to use a low level function to insert much faster a list of jobs.
-    
-    Parameters
-    ----------
-    
-    jobs : list of Job
-        A list of Job to insert
-    
+    Routine to use a low level function to insert much faster a list of
+    :class:`~msnoise.msnoise_table_def.Job`. This method uses the Engine
+    directly, no need to pass a Session object.
+
+    :type jobs: list
+    :param jobs: a list of :class:`~msnoise.msnoise_table_def.Job` to insert.
     """
     engine = get_engine()
     engine.execute(
@@ -642,111 +623,106 @@ def massive_insert_job(jobs):
         jobs)
 
 
-def is_next_job(session, flag='T', type='CC'):
+def is_next_job(session, flag='T', jobtype='CC'):
     """
-    Are there any Job in the database, with flag=`flag` and type=`type`
-    
-    Parameters
-    -----------
-    session : object
-        A Session object, as obtained using `connect()`
-    flag : {'T', 'I', 'D'}
-        Status of the Job: "T"odo, "I"n Progress, "D"one.
-    type : {'CC', 'DTT'}
-    
-    Returns
-    -------
-    bool
-        True if at least one Job matches, False otherwise.
+    Are there any :class:`~msnoise.msnoise_table_def.Job` in the database,
+    with flag=`flag` and type=`type`
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type flag: str
+    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+
+    :rtype: bool
+    :returns: True if at least one :class:`~msnoise.msnoise_table_def.Job`
+        matches, False otherwise.
     """
-    job = session.query(Job).filter(Job.type == type).filter(Job.flag == flag).first()
+    job = session.query(Job).filter(Job.type == jobtype).filter(Job.flag == flag).first()
     if job is None:
         return False
     else:
         return True
 
 
-def get_next_job(session, flag='T', type='CC'):
+def get_next_job(session, flag='T', jobtype='CC'):
     """
-    Get the next Job in the database, with flag=`flag` and type=`type`. Jobs
-    of the same `type` are grouped per day. This function also sets the flag of
-    all selected Jobs to "I"n progress.
-    
-    Parameters
-    -----------
-    session : object
-        A Session object, as obtained using `connect()`
-    flag : {'T', 'I', 'D'}
-        Status of the Job: "T"odo, "I"n Progress, "D"one.
-    type : {'CC', 'DTT'}
-    
-    Returns
-    -------
-    jobs : list of Job
+    Get the next :class:`~msnoise.msnoise_table_def.Job` in the database,
+    with flag=`flag` and type=`type`. Jobs of the same `type` are grouped per
+    day. This function also sets the flag of all selected Jobs to "I"n progress.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type flag: str
+    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+
+    :rtype: list
+    :returns: list of :class:`~msnoise.msnoise_table_def.Job`
     """
-    day = session.query(Job).filter(Job.type == type).filter(Job.flag == flag).order_by(Job.day).first().day
-    jobs = session.query(Job).filter(Job.type == type).filter(Job.flag == flag).filter(Job.day == day)
+    day = session.query(Job).filter(Job.type == jobtype).filter(Job.flag == flag).order_by(Job.day).first().day
+    jobs = session.query(Job).filter(Job.type == jobtype).filter(Job.flag == flag).filter(Job.day == day)
     tmp = jobs.all()
     jobs.update({Job.flag: 'I'})
     session.commit()
     return tmp
 
 
-def is_dtt_next_job(session, flag='T', type='DTT', ref=False):
+def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
     """
-    Are there any DTT Job in the database, with flag=`flag` and type=`type`. If
-    `ref` is provided, checks if a DTT "REF" job is present.
-    
-    Parameters
-    -----------
-    session : object
-        A Session object, as obtained using `connect()`
-    flag : {'T', 'I', 'D'}
-        Status of the Job: "T"odo, "I"n Progress, "D"one.
-    type : {'CC', 'DTT'}
-    ref : bool
-        Whether to check for a REF job (True) or not (False, default)
-    
-    Returns
-    -------
-    bool
-        True if at least one Job matches, False otherwise.
+    Are there any DTT :class:`~msnoise.msnoise_table_def.Job` in the database,
+    with flag=`flag` and type=`type`. If `ref` is provided, checks if a DTT
+    "REF" job is present.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type flag: str
+    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+    :type ref: bool
+    :param ref: Whether to check for a REF job (True) or not (False, default)
+
+    :rtype: bool
+    :returns: True if at least one Job matches, False otherwise.
     """
     if ref:
-        job = session.query(Job.ref).filter(Job.flag == flag).filter(Job.type == type).filter(Job.pair == ref).filter(Job.day == 'REF').count()
+        job = session.query(Job.ref).filter(Job.flag == flag).filter(Job.type == jobtype).filter(Job.pair == ref).filter(Job.day == 'REF').count()
     else:
-        job = session.query(Job.ref).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').count()
+        job = session.query(Job.ref).filter(Job.flag == flag).filter(Job.type == jobtype).filter(Job.day != 'REF').count()
     if job == 0:
         return False
     else:
         return True
 
 
-def get_dtt_next_job(session, flag='T', type='DTT'):
+def get_dtt_next_job(session, flag='T', jobtype='DTT'):
     """
-    Get the next DTT Job in the database, with flag=`flag` and type=`type`. Jobs
-    are then grouped per pair. This function also sets the flag of
-    all selected Jobs to "I"n progress.
-    
-    Parameters
-    -----------
-    session : object
-        A Session object, as obtained using `connect()`
-    flag : {'T', 'I', 'D'}
-        Status of the Job: "T"odo, "I"n Progress, "D"one.
-    type : {'CC', 'DTT'}
-    
-    Returns
-    -------
-    pairs : list
-        List of station pair names
-    days : list of string
-        Days of the next DTT jobs
-    refs : list of int
-        Job IDs (for later being able to update their flag)
+    Get the next DTT :class:`~msnoise.msnoise_table_def.Job` in the database,
+    with flag=`flag` and type=`type`. Jobs are then grouped per station pair.
+    This function also sets the flag of all selected Jobs to "I"n progress.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type flag: str
+    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+
+    :rtype: tuple
+    :returns: (pairs, days, refs):
+        List of station pair names -
+        Days of the next DTT jobs -
+        Job IDs (for later being able to update their flag).
     """
-    pair = session.query(Job).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').first().pair
-    jobs = session.query(Job.ref, Job.day).filter(Job.flag == flag).filter(Job.type == type).filter(Job.day != 'REF').filter(Job.pair == pair)
+    pair = session.query(Job).filter(Job.flag == flag).filter(Job.type == jobtype).filter(Job.day != 'REF').first().pair
+    jobs = session.query(Job.ref, Job.day).filter(Job.flag == flag).filter(Job.type == jobtype).filter(Job.day != 'REF').filter(Job.pair == pair)
     tmp = list(jobs)
     jobs.update({Job.flag: 'I'}, synchronize_session=False)
     session.commit()
@@ -754,56 +730,58 @@ def get_dtt_next_job(session, flag='T', type='DTT'):
     return pair, days, refs
 
 
-def reset_jobs(session, jobtype, all=False):
+def reset_jobs(session, jobtype, alljobs=False):
     """
     Sets the flag of all `jobtype` Jobs to "T"odo.
-    
-    Parameters
-    ----------
-    jobtype : string
-        The type to reset: CC or DTT
-    inprogress_only: bool
-        Reset only jobs "in progress" to Todo. Default True
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type alljobs: bool
+    :param aljobs: If True, resets all jobs. If False (default), only resets
+        jobs "I"n progress.
     """
     jobs = session.query(Job).filter(Job.type == jobtype)
-    if not all:
+    if not alljobs:
         jobs = jobs.filter(Job.flag == "I")
     jobs.update({Job.flag: 'T'})
     session.commit()
 
+
 def reset_dtt_jobs(session, pair):
     """
     Sets the flag of all DTT Jobs of one `pair` to "T"odo.
-    
-    Parameters
-    ----------
-    pair : string
-        The pair to update
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type pair: str
+    :param pair: The pair to update
     """
-    
+
     jobs = session.query(Job).filter(Job.pair == pair).filter(Job.type == "DTT")
     jobs.update({Job.flag: 'T'})
     session.commit()
 
 
-def get_job_types(session, type='CC'):
+def get_job_types(session, jobtype='CC'):
     """
-    Count the number of DataAvailability of a specific `type`,
+    Count the number of Jobs of a specific `type`,
     grouped by `flag`.
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    type : {'CC', 'DTT'}
-        
-    
-    Returns
-    -------
-    data : list of [count, flag] pairs
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+
+    :rtype: list
+    :returns: list of [count, flag] pairs
     """
-    
-    return session.query(func.count(Job.flag), Job.flag).filter(Job.type == type).group_by(Job.flag).all()
+
+    return session.query(func.count(Job.flag), Job.flag).filter(Job.type == jobtype).group_by(Job.flag).all()
 
 
 # CORRELATIONS

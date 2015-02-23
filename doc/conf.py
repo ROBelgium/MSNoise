@@ -61,7 +61,7 @@ f.close()
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.todo', 'sphinx.ext.coverage', 'sphinx.ext.pngmath', 'sphinx.ext.mathjax','numpydoc',
+extensions = ['sphinx.ext.intersphinx','sphinx.ext.autodoc', 'sphinx.ext.todo', 'sphinx.ext.coverage', 'sphinx.ext.pngmath', 'sphinx.ext.mathjax','numpydoc',
       'matplotlib.sphinxext.mathmpl',
     'matplotlib.sphinxext.only_directives',
           'matplotlib.sphinxext.plot_directive',]
@@ -262,6 +262,14 @@ man_pages = [
     ('index', 'msnoise', u'MSNoise Documentation',
      [u'Lecocq, Caudron, Brenguier'], 1)
 ]
+
+intersphinx_mapping = {
+'python': ('https://docs.python.org/2.7/', None),
+'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
+'matplotlib': ('http://matplotlib.org/', None),
+'sqlalchemy': ('http://docs.sqlalchemy.org/en/latest/', None),
+}
 
 # If true, show URL addresses after external links.
 #man_show_urls = False
