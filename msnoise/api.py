@@ -807,39 +807,33 @@ def add_corr(session, station1, station2, filterid, date, time, duration, compon
     """
     Adds a CCF to the data archive on disk.
     
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    station1 : str
-        The name of station 1 (formatted NET.STA)
-    station2 : str
-        The name of station 2 (formatted NET.STA)
-    filterid : int
-        The ID (ref) of the filter
-    date : datetime.date or str
-        The date of the CCF
-    time : datetime.time or str
-        The time of the CCF
-    duration : float
-        The total duration of the exported CCF
-    components : str
-        The name of the components used (ZZ, ZR, ...)
-    sampling_rate : float
-        The sampling rate of the exported CCF
-    day : bool
-        Whether this function is called to export a daily stack (True) or each
-        CCF (when keep_all parameter is set to True in the configuration).
-        Defaults to True.
-    ncorr : int
-        Number of CCF that have been stacked for this CCF.
-        
-    
-    Returns
-    -------
-    None
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type station1: str
+    :param station1: The name of station 1 (formatted NET.STA)
+    :type station2: str
+    :param statin2: The name of station 2 (formatted NET.STA)
+    :type filterid: int
+    :param filterid: The ID (ref) of the filter
+    :type date: datetime.date or str
+    :param date: The date of the CCF
+    :type time: datetime.time or str
+    :param time: The time of the CCF
+    :type duration: float
+    :param duration: The total duration of the exported CCF
+    :type components: str
+    :param components: The name of the components used (ZZ, ZR, ...)
+    :type sampling_rate: float
+    :param sampling_rate: The sampling rate of the exported CCF
+    :type day: bool
+    :param day: Whether this function is called to export a daily stack (True)
+        or each CCF (when keep_all parameter is set to True in the
+        configuration). Defaults to True.
+    :type ncorr: int
+    :param ncorr: Number of CCF that have been stacked for this CCF.
     """
-    
+
     output_folder = get_config(session, 'output_folder')
     export_format = get_config(session, 'export_format')
     sac, mseed = False, False
@@ -1007,24 +1001,23 @@ def get_results_all(session, station1, station2, filterid, components, dates,
     del results
     return result
 
-############ session MISC ############
+# Some helper functions
 
 
 def get_maxlag_samples(session):
     """
     Returns the length of the CC functions. Gets the maxlag and sampling rate
     from the database.
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    
-    Returns
-    -------
-    maxlag_samples : int
+
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :rtype: int
+    :returns: the length of the CCF
     """
-    
+
     maxlag = float(get_config(session, 'maxlag'))
     cc_sampling_rate = float(get_config(session, 'cc_sampling_rate'))
     return int(2*maxlag*cc_sampling_rate)+1
@@ -1035,14 +1028,12 @@ def get_t_axis(session):
     Returns the time axis (in seconds) of the CC functions.
     Gets the maxlag from the database and uses `get_maxlag_samples` function.
 
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
 
-    Returns
-    -------
-    time_axis : array
+    :rtype: :class:`numpy.array`
+    :returns: the time axis
     """
 
     maxlag = float(get_config(session, 'maxlag'))
@@ -1053,17 +1044,15 @@ def get_t_axis(session):
 def get_components_to_compute(session):
     """
     Returns the components configured in the database.
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    
-    Returns
-    -------
-    components_to_compute : list of string
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :rtype: list of str
+    :returns: a list of components to compute
     """
-    
+
     components_to_compute = []
     for comp in ['ZZ', 'RR', 'TT', 'TR', 'RT', 'ZR', 'RZ', 'TZ', 'ZT']:
         if get_config(session, comp, isbool=True):
@@ -1073,21 +1062,19 @@ def get_components_to_compute(session):
 
 def build_ref_datelist(session):
     """
-    Creates a date array for the REF
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    
-    Returns
-    -------
-    start : datetime
-        Start of the REF
-    end : datetime
-        End of the REF
-    datelist : list of datetime
-        All dates between start and end
+    Creates a date array for the REF.
+    The returned tuple contains a start and an end date, and a list of
+    individual dates between the two.
+
+    .. todo:: rewrite this using pandas, merge with
+        :func:`build_movstack_datelist`
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :rtype: tuple
+    :returns: (start, end, datelist)
     """
     begin = get_config(session, "ref_begin")
     end = get_config(session, "ref_end")
@@ -1104,21 +1091,18 @@ def build_ref_datelist(session):
 
 def build_movstack_datelist(session):
     """
-    Creates a date array for the analyse period
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    
-    Returns
-    -------
-    start : datetime
-        Start of the analyse
-    end : datetime
-        End of the analyse
-    datelist : list of datetime
-        All dates between start and end
+    Creates a date array for the analyse period.
+    The returned tuple contains a start and an end date, and a list of
+    individual dates between the two.
+
+    .. todo:: rewrite this using pandas, merge with :func:`build_ref_datelist`
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :rtype: tuple
+    :returns: (start, end, datelist)
     """
     begin = get_config(session, "startdate")
     end = get_config(session, "enddate")
@@ -1133,38 +1117,40 @@ def build_movstack_datelist(session):
     return start, end, [start+datetime.timedelta(days=i) for i in range(r)]
 
 
-def updated_days_for_dates(session, date1, date2, pair, type='CC', interval=datetime.timedelta(days=1), returndays=False):
+def updated_days_for_dates(session, date1, date2, pair, jobtype='CC',
+                           interval=datetime.timedelta(days=1),
+                           returndays=False):
     """
     Determines if any Job of type=`type` and for pair=`pair`, concerning a date
-    between `date1` and `date2` has been modified in the last interval=`interval`.
-    
-    
-    Parameters
-    ----------
-    session : object
-        A Session object, as obtained using `connect()`
-    date1 : datetime
-        Beginning of the period of interest
-    date2 : datetime
-        End of the period of interest
-    pair : string
-        Pair of interest
-    type : {'CC', 'DTT'}
-    interval : datetime.timedelta
-        Interval of time before now to search for updated days
-    returndays : bool
-        Whether to return a list of days (True) or not (False, default)
-    
-    Returns
-    -------
-    return : list or bool
-        List of days if returndays is True, True if not. (not clear!)
+    between `date1` and `date2` has been modified in the last
+    interval=`interval`.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type date1: datetime
+    :param date1: Beginning of the period of interest
+    :type date2: datetime
+    :param date2: End of the period of interest
+    :type pair: str
+    :param pair: Pair of interest
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type interval: datetime.timedelta
+    :param interval: Interval of time before now to search for updated days
+    :type returndays: bool
+    :param returndays: Whether to return a list of days (True) or not (False,
+        default)
+
+    :rtype: list or bool
+    :returns: List of days if returndays is True, only "True" if not.
+        (not clear!)
     """
     lastmod = datetime.datetime.now() - interval
     if pair == '%':
-        days = session.query(Job).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.type == type).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
+        days = session.query(Job).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.type == jobtype).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
     else:
-        days = session.query(Job).filter(Job.pair == pair).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.type == type).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
+        days = session.query(Job).filter(Job.pair == pair).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.type == jobtype).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
     logging.debug('Found %03i updated days' % len(days))
     if returndays and len(days) != 0:
         return [datetime.datetime.strptime(day.day,'%Y-%m-%d').date() for day in days] ## RETURN DATE LIST !!!
@@ -1173,31 +1159,27 @@ def updated_days_for_dates(session, date1, date2, pair, type='CC', interval=date
     else:
         return True
 
-############ MISCS ############
+# MISC
 
 
 def azimuth(coordinates, x0, y0, x1, y1):
     """
     Returns the azimuth between two coordinate sets.
-    
-    Parameters
-    ----------
-    
-    coordinates : {'DEG', 'UTM', 'MIX'}
-    x0 : float
-        X coordinate of station 1
-    y0 : float
-        Y coordinate of station 1
-    x1 : float
-        X coordinate of station 2
-    y1 : float
-        Y coordinate of station 2
-    
-    
-    Returns
-    -------
-    azimuth : float
-        Azimuth in degrees
+
+    :type coordinates: str
+    :param coordinates: {'DEG', 'UTM', 'MIX'}
+
+    :type x0: float
+    :param x0: X coordinate of station 1
+    :type y0: float
+    :param y0: Y coordinate of station 1
+    :type x1: float
+    :param x1: X coordinate of station 2
+    :type y1: float
+    :param y1: Y coordinate of station 2
+
+    :rtype: float
+    :returns: The azimuth in degrees
     """
     if coordinates == "DEG":
         dist, azim, bazim = gps2DistAzimuth(y0, x0, y1, x1)
@@ -1208,23 +1190,22 @@ def azimuth(coordinates, x0, y0, x1, y1):
         # print azim
         return azim
     else:
-        print "woooooow, please consider having a single coordinate system for all stations"
+        print "woooooow, please consider having a single coordinate system for\
+            all stations"
         return 0
 
 
 def nextpow2(x):
     """
     Returns the next power of 2 of `x`.
-    
-    Parameters
-    ----------
-    x : int
-    
-    Returns
-    -------
-    nextpow2 : int
+
+    :type x: int
+    :param x: any value
+
+    :rtype: int
+    :returns: the next power of 2 of `x`
     """
-    
+
     return np.ceil(np.log2(np.abs(x)))
 
 
@@ -1301,7 +1282,7 @@ def getGaps(stream, min_gap=None, max_gap=None):
             nsamples -= 1
         else:
             nsamples += 1
-        gap_list.append([_i,_i+1, 
+        gap_list.append([_i, _i+1,
                         stats['network'], stats['station'],
                         stats['location'], stats['channel'],
                         stime, etime, delta, nsamples])
@@ -1310,7 +1291,7 @@ def getGaps(stream, min_gap=None, max_gap=None):
     return gap_list
 
 
-################## TEST
+
 if __name__ == "__main__":
     s = connect()
     for filter in get_filters(s, False):
