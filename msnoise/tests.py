@@ -167,7 +167,7 @@ def main():
     unittest.TextTestRunner().run(suite)
 
     r = unittest.TestResults()
-    if len(r.failures) > 0:
+    if not r.wasSuccessful():
         sys.exit(1)
 
 if __name__ == '__main__':
