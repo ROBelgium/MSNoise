@@ -7,7 +7,7 @@ import sys
 # Here's our "unit tests".
 class MSNoiseTests(unittest.TestCase):
     def test_001_S01installer(self):
-        from .s000installer import main
+        from ..s000installer import main
         try:
             ret = main(tech=1)
             msg = "Installation Done! - Go to Configuration Step!"
@@ -17,7 +17,7 @@ class MSNoiseTests(unittest.TestCase):
             self.fail()
     
     def test_002_ConnectToDB(self):
-        from .api import connect
+        from ..api import connect
         try:
             db = connect()
             db.close()
@@ -25,11 +25,11 @@ class MSNoiseTests(unittest.TestCase):
             self.fail("Can't connect to MSNoise DB")
     
     def test_003_set_and_config(self):
-        from .api import connect, get_config, update_config
+        from ..api import connect, get_config, update_config
         db = connect()
         totests = []
-        path = os.path.split(os.path.abspath(os.path.dirname(__file__)))[0]
-        totests.append(['data_folder', os.path.join(path,'tests','data')])
+        path = os.path.abspath(os.path.dirname(__file__))
+        totests.append(['data_folder', os.path.join(path,'data')])
         totests.append(['data_structure', 'PDF'])
         totests.append(['network', 'YA'])
         totests.append(['ZR', 'N'])
@@ -49,8 +49,8 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
 
     def test_004_set_and_get_filters(self):
-        from .msnoise_table_def import Filter
-        from .api import connect, update_filter, get_filters
+        from ..msnoise_table_def import Filter
+        from ..api import connect, update_filter, get_filters
         db = connect()
         filters = []
         filters.append(Filter(0.01, 0.12, 1.0, 0.98, 0, 10, 5, 1))
@@ -68,7 +68,7 @@ class MSNoiseTests(unittest.TestCase):
                                      eval("filters[i].%s"%param))
     
     def test_005_populate_station_table(self):
-        from .s002populate_station_table import main
+        from ..s002populate_station_table import main
         try:
             ret = main()
             self.failUnlessEqual(ret, True)
@@ -76,18 +76,18 @@ class MSNoiseTests(unittest.TestCase):
             self.fail()
     
     def test_006_get_stations(self):
-        from .api import connect, get_stations
+        from ..api import connect, get_stations
         db = connect()
         stations = get_stations(db).all()
         self.failUnlessEqual(len(stations), 3)
         db.close()
         
     def test_007_update_stations(self):
-        from .api import connect, get_stations, update_station
+        from ..api import connect, get_stations, update_station
         import pandas as pd
         db = connect()
         path = os.path.split(os.path.abspath(os.path.dirname(__file__)))[0]
-        stations = pd.read_csv(os.path.join(path, 'tests','extra','stations.csv'),header=None, index_col = 0, names =['X','Y','altitude'])
+        stations = pd.read_csv(os.path.join(path, 'test','extra','stations.csv'),header=None, index_col = 0, names =['X','Y','altitude'])
         for station in get_stations(db):
             fullname = "%s.%s" % (station.net, station.sta,)
             try:
@@ -100,7 +100,7 @@ class MSNoiseTests(unittest.TestCase):
             del s
         
     def test_008_scan_archive(self):
-        from .s01scan_archive import main
+        from ..s01scan_archive import main
         try:
             main(init=True,threads=1)
         except:
@@ -108,7 +108,7 @@ class MSNoiseTests(unittest.TestCase):
             self.fail()
     
     def test_009_control_data_availability(self):
-        from .api import connect, get_new_files, get_data_availability, count_data_availability_flags, get_stations
+        from ..api import connect, get_new_files, get_data_availability, count_data_availability_flags, get_stations
         
         db = connect()
         files = get_new_files(db)
@@ -123,7 +123,7 @@ class MSNoiseTests(unittest.TestCase):
         
     
     def test_010_new_jobs(self):
-        from .s02new_jobs import main
+        from ..s02new_jobs import main
         
         try:
             main()
@@ -132,8 +132,8 @@ class MSNoiseTests(unittest.TestCase):
             self.fail()
     
     def test_011_control_jobs(self):
-        from .api import connect, is_next_job, get_next_job
-        from .msnoise_table_def import Job
+        from ..api import connect, is_next_job, get_next_job
+        from ..msnoise_table_def import Job
         db = connect()
         
         self.failUnlessEqual(is_next_job(db), True)
@@ -141,13 +141,13 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(isinstance(jobs[0], Job), True)
 
     def test_012_reset_jobs(self):
-        from .api import connect, reset_jobs
+        from ..api import connect, reset_jobs
         db = connect()
         reset_jobs(db, 'CC')
         db.close()
 
     def test_013_s03compute_cc(self):
-        from .s03compute_cc import main
+        from ..s03compute_cc import main
         try:
             main()
         except:
@@ -155,20 +155,72 @@ class MSNoiseTests(unittest.TestCase):
             self.fail()
 
     def test_014_check_done_jobs(self):
-        from .api import connect, get_job_types
+        from ..api import connect, get_job_types
         db = connect()
         jobs = get_job_types(db, 'CC')
         self.failUnlessEqual(jobs[0][0], 3)
         self.failUnlessEqual(jobs[0][1], 'D')
 
-    
+    def test_015_check_cc_files(self, format="MSEED"):
+        from ..api import connect, get_filters, get_station_pairs, \
+            get_components_to_compute
+        db =connect()
+        for filter in get_filters(db):
+            for components in get_components_to_compute(db):
+                for (sta1, sta2) in get_station_pairs(db):
+                    pair = "%s_%s_%s_%s" % (sta1.net, sta1.sta,
+                                            sta2.net, sta2.sta)
+                    tmp = os.path.join("STACKS",
+                                        "%02i"%filter.ref,
+                                        "001_DAYS",
+                                        components,
+                                        pair,
+                                        "2010-09-01.%s"%format)
+                    print "checking", tmp
+                    if not os.path.isfile(tmp):
+                        self.fail()
+
+    def test_016_update_config(self):
+        from ..api import connect, update_config
+        db = connect()
+        update_config(db,"export_format", "SAC")
+
+    def test_017_reset_cc_jobs(self):
+        from ..api import connect, reset_jobs
+        db = connect()
+        reset_jobs(db, 'CC', alljobs=True)
+
+    def test_018_recompute_cc(self):
+        self.test_013_s03compute_cc()
+
+    def test_019_check_SACS(self):
+        self.test_015_check_cc_files(format='SAC')
+
+
+    def test_020_update_config(self):
+        from ..api import connect, update_config
+        import shutil
+        shutil.rmtree("STACKS")
+        db = connect()
+        update_config(db,"export_format", "BOTH")
+
+    def test_021_reprocess_BOTH(self):
+        self.test_017_reset_cc_jobs()
+        self.test_013_s03compute_cc()
+        self.test_015_check_cc_files(format='MSEED')
+        self.test_015_check_cc_files(format='SAC')
+        
+
+
+
 def main():
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
     result = unittest.TestResult()
-    suite.run(result)
+    runner = unittest.TextTestRunner(verbosity=2)
+    runner.run(suite)
 
-    if not result.wasSuccessful():
-        sys.exit(1)
+    #if not result.wasSuccessful():
+    #    sys.exit(1)
 
 if __name__ == '__main__':
     main()

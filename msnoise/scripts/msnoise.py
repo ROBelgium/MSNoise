@@ -12,7 +12,7 @@ def cli(ctx, threads):
 
 @click.command()
 def test():
-    from ..tests import main
+    from ..test.tests import main
     main()
 
 
