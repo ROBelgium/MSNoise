@@ -145,7 +145,7 @@ def main(stype, interval=1):
                 pair = "%s:%s" % (sta1, sta2)
                 logging.debug('Processing %s-%s-%i' %
                                   (pair, components, filterid))
-                updated_days = updated_days_for_dates(db, start, end, pair.replace('_', '.'), type='CC', interval=datetime.timedelta(days=interval),returndays=True)
+                updated_days = updated_days_for_dates(db, start, end, pair.replace('_', '.'), jobtype='CC', interval=datetime.timedelta(days=interval),returndays=True)
                 if len(updated_days) != 0:
                     logging.debug("New Data for %s-%s-%i" %
                                   (pair, components, filterid))
