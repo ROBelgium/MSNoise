@@ -79,7 +79,7 @@ def main():
         sta1 = "%s.%s" % (station1.net, station1.sta)
         sta2 = "%s.%s" % (station2.net, station2.sta)
         pair = "%s:%s" % (sta1, sta2)
-        if is_dtt_next_job(db, type='DTT', ref=pair):
+        if is_dtt_next_job(db, jobtype='DTT', ref=pair):
             logging.info(
                 "We will recompute all MWCS based on the new REF for %s" % pair)
             reset_dtt_jobs(db, pair)
@@ -88,8 +88,8 @@ def main():
     logging.debug('Ready to compute')
     # Then we compute the jobs
     outfolders = []
-    while is_dtt_next_job(db, flag='T', type='DTT'):
-        pair, days, refs = get_dtt_next_job(db, flag='T', type='DTT')
+    while is_dtt_next_job(db, flag='T', jobtype='DTT'):
+        pair, days, refs = get_dtt_next_job(db, flag='T', jobtype='DTT')
         logging.info(
             "There are MWCS jobs for some days to recompute for %s" % pair)
         for f in get_filters(db, all=False):
@@ -120,7 +120,7 @@ def main():
                             np.savetxt(os.path.join(outfolder, "%s.txt" % str(day)), output)
                             del output, cur
         for day in days:
-            update_job(db, day, pair, type='DTT', flag='D')
+            update_job(db, day, pair, jobtype='DTT', flag='D')
     
     logging.info('*** Finished: Compute MWCS ***')
 
