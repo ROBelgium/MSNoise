@@ -241,6 +241,21 @@ class MSNoiseTests(unittest.TestCase):
                     tmp2 = read(tmp2)
                     assert_allclose(tmp1[0].data, tmp2[0].data)
 
+    def test_023_stack(self):
+        from ..s04stack import main
+        interval = 1.
+        main('ref', interval)
+        main('mov', interval)
+        main('step', interval)
+
+    def test_024_mwcs(self):
+        from ..s05compute_mwcs import main
+        main()
+
+    def test_025_dtt(self):
+        from ..s06compute_dtt import main
+        main()
+
 
 def main():
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)

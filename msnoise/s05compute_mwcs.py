@@ -83,7 +83,7 @@ def main():
             logging.info(
                 "We will recompute all MWCS based on the new REF for %s" % pair)
             reset_dtt_jobs(db, pair)
-            update_job(db, "REF", pair, type='DTT', flag='D')
+            update_job(db, "REF", pair, jobtype='DTT', flag='D')
     
     logging.debug('Ready to compute')
     # Then we compute the jobs
