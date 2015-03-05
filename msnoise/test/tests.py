@@ -242,7 +242,14 @@ class MSNoiseTests(unittest.TestCase):
                     assert_allclose(tmp1[0].data, tmp2[0].data)
 
     def test_023_stack(self):
+        from ..api import connect, update_config
         from ..s04stack import main
+        db = connect()
+        update_config(db, 'ref_begin', '2009-01-01')
+        update_config(db, 'ref_end', '2011-01-01')
+        update_config(db, 'startdate', '2009-01-01')
+        update_config(db, 'enddate', '2011-01-01')
+        db.close()
         interval = 1.
         main('ref', interval)
         main('mov', interval)
