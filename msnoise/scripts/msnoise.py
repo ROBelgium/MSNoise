@@ -201,12 +201,14 @@ def data_availability(show):
 @click.command()
 @click.option('-a', '--all', default=True, help='Plot All mov stacks')
 @click.option('-m', '--mov_stack', default=0,  help='Plot specific mov stacks')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-s', '--savefig', is_flag=True, help='Save figure to disk (PNG)')
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-def dvv(all, mov_stack, savefig, show):
+def dvv(all, mov_stack, filterid, comp, savefig, show):
     """Plots the dv/v (parses the dt/t results)"""
     from ..plots.dvv import main
-    main(all, mov_stack, savefig, show)
+    main(all, mov_stack, filterid, comp, savefig, show)
 
 
 @click.command()

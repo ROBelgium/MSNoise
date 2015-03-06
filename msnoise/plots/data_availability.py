@@ -22,6 +22,12 @@ from ..api import *
 def main(show=False):
     db = connect()
     start, end, datelist = build_movstack_datelist(db)
+    ## if end date later than today, adjust end and datelist
+    end = min(end, datetime.date.today())
+    after_today = [days for days in range(len(datelist)) if datelist[days] > end]
+    if after_today:
+        del datelist[after_today[0]:]
+    ##
     dates = []
     stations = []
     for day in datelist:

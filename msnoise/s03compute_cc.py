@@ -115,6 +115,10 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.ar
 
                 logging.debug("Checking sample alignment")
                 for i, trace in enumerate(stream):
+                    ## when traces are read as ints and some are modified in check_and_phase_shift
+                    ## data types differ and traces can't be concatenated
+                    trace.data = trace.data.astype(np.float64, copy=False)
+                    ##
                     stream[i] = check_and_phase_shift(trace)
 
                 stream.sort()

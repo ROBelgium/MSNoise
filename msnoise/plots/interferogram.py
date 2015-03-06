@@ -34,6 +34,13 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True):
     start, end, datelist = build_movstack_datelist(db)
     # mov_stack = get_config(db,"mov_stack")
  
+    ## if end date later than today, adjust end and datelist
+    end = min(end, datetime.date.today())
+    after_today = [days for days in range(len(datelist)) if datelist[days] > end]
+    if after_today:
+        del datelist[after_today[0]:]
+    ##
+
    
     plt.figure(figsize=(16,16))
     sta1 = sta1.replace('.','_')
