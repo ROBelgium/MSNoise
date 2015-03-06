@@ -425,8 +425,6 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
-    :type ref: int
-    :param ref: The Station ID in the database
     :type net: str
     :param net: The network code of the Station
     :type sta: str
@@ -452,7 +450,8 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
     data = session.query(DataAvailability).filter(DataAvailability.file == file).first()
     if data is None:
         flag = "N"
-        data = DataAvailability(net, sta, comp, path, file, starttime, endtime, data_duration, gaps_duration, samplerate, flag)
+        data = DataAvailability(net, sta, comp, path, file, starttime, endtime,
+                                data_duration, gaps_duration, samplerate, flag)
         session.add(data)
         toreturn = True
     else:
@@ -1084,9 +1083,9 @@ def build_ref_datelist(session):
     else:
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
-
-    r = (end+datetime.timedelta(days=1)-start).days
-    return start, end, [start+datetime.timedelta(days=i) for i in range(r)]
+    end = min(end, datetime.date.today())
+    datelist = pd.date_range(start, end)
+    return start, end, datelist
 
 
 def build_movstack_datelist(session):
@@ -1112,9 +1111,9 @@ def build_movstack_datelist(session):
     else:
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
-
-    r = (end+datetime.timedelta(days=1)-start).days
-    return start, end, [start+datetime.timedelta(days=i) for i in range(r)]
+    end = min(end, datetime.date.today())
+    datelist = pd.date_range(start, end)
+    return start, end, datelist
 
 
 def updated_days_for_dates(session, date1, date2, pair, jobtype='CC',

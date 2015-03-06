@@ -75,46 +75,69 @@ def main(all=True, mov_stack=None, savefig=False, show=False):
     for i, mov_stack in enumerate(mov_stacks):
         current = start
         first = True
+        alldf = []
         while current <= end:
             day = os.path.join('DTT', "%02i" % filterid, "%03i_DAYS" %
                                mov_stack, components, '%s.txt' % current)
             if os.path.isfile(day):
                 df = pd.read_csv(day, header=0, index_col=0, parse_dates=True)
-                if first:
-                    alldf = df
-                    first = False
-                else:
-                    alldf = alldf.append(df)
-                del df
+                alldf.append(df)
             current += datetime.timedelta(days=1)
+        alldf = pd.concat(alldf)
         if 'alldf' in locals():
             global dttname, errname
-            dttname = "M"
-            errname = "EM"
+            dttname = "M0"
+            errname = "EM0"
 
             alldf[dttname] *= -100
             alldf[errname] *= -100
 
             ALL = alldf[alldf['Pairs'] == 'ALL'].copy()
             allbut = alldf[alldf['Pairs'] != 'ALL'].copy()
+
+            groups = {}
+            groups['CRATER'] = ["UV11","UV15","FJS","FLR","SNE","UV12","FOR","RVL","UV06"]
+            groups['GPENTES'] = ["UV03","UV08","UV04","UV02","HDL"]
+            groups['VOLCAN'] = groups['CRATER'] + groups['GPENTES'] + ['HIM','VIL']
             
-            pair1 = alldf[alldf['Pairs'] == 'YA_UV02_YA_UV06'].copy()
+            
+            plt.subplot(gs[i])
+            x = {}
+            for group in groups.keys():
+                pairindex = []
+                for j, pair in enumerate(allbut['Pairs']):
+                    net1, sta1, net2, sta2 = pair.split('_')
+                    if sta1 in groups[group] and sta2 in groups[group]:
+                        pairindex.append(j)
+                tmp = allbut.iloc[np.array(pairindex)]
+                tmp = tmp.resample('D', how='mean')
+                #~ plt.plot(tmp.index, tmp[dttname], label=group)
+                x[group] = tmp
+            
+            tmp = x["CRATER"] - x["VOLCAN"]
+            #~ plt.plot(tmp.index, tmp[dttname], label="Crater - Volcan")
+            
             py1_wmean, py1_wstd = get_wavgwstd(allbut)
-            py1_wmean = py1_wmean.resample('D', how='mean')
+            py1_wmean = py1_wmean.resample('D', how='median')
             py1_wstd = py1_wstd.resample('D', how='mean').fillna(0.0)
 
             data = detrend(py1_wmean)
 
-            plt.subplot(gs[i])
-            plt.plot(ALL.index, ALL[dttname],c='r',label='ALL: $\delta v/v$ of the mean network')
+            pair1 = alldf[alldf['Pairs'] == 'YA_FJS_YA_SNE'].copy()
+            
+            #~ plt.plot(ALL.index, ALL[dttname],c='r',label='ALL: $\delta v/v$ of the mean network')
             plt.plot(pair1.index, pair1[dttname], c='b',label='pair')
+            #~ plt.plot(pair2.index, pair2[dttname], c='magenta',label='pair')
+            #~ r = pd.rolling_mean(pair1[dttname], 30)
+            #~ plt.plot(r.index, r, c='k')
             #plt.fill_between(ALL.index,ALL[dttname]-ALL[errname],ALL[dttname]+ALL[errname],lw=1,color='red',zorder=-1,alpha=0.3)
-            # plt.plot(py1_wmean.index, data,c='g',lw=1,zorder=11,label='Weighted mean of $\delta v/v$ of individual pairs')
-            # plt.fill_between(py1_wmean.index, data+py1_wstd,data-py1_wstd,color='g',lw=1,zorder=-1,alpha=0.3)
+            #~ plt.plot(py1_wmean.index, data,c='g',lw=1,zorder=11,label='Weighted mean of $\delta v/v$ of individual pairs')
+            #~ plt.fill_between(py1_wmean.index, data+py1_wstd,data-py1_wstd,color='g',lw=1,zorder=-1,alpha=0.3)
+            #~ plt.fill_between(py1_wmean.index, data+3*py1_wstd,data-3*py1_wstd,color='g',lw=1,zorder=-1,alpha=0.1)
             plt.ylabel('$\delta v/v$ in %')
-            # for pair in allbut['Pairs']:
-                # tmp = allbut[allbut['Pairs']==pair]
-                # plt.plot(tmp.index, tmp[dttname],lw=0.5)
+            #~ for pair in allbut['Pairs']:
+                #~ tmp = allbut[allbut['Pairs']==pair]
+                #~ plt.plot(tmp.index, tmp[dttname],lw=0.5)
             # plt.ylim(0.5, -0.5)
 
             if first_plot == 1:

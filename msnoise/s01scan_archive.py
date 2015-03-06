@@ -157,7 +157,7 @@ def main(init=False, threads=1):
         print "Can't parse the archive for format %s !" % data_struc
         print "trying to import local parser (should return a station list)"
         print
-        if os.path.isfile(os.path.join(os.getcwd(),'custom.py')):
+        if os.path.isfile(os.path.join(os.getcwd(), 'custom.py')):
             sys.path.append(os.getcwd())
             from custom import data_structure as rawpath
         else:
@@ -180,11 +180,12 @@ def main(init=False, threads=1):
                 files = os.listdir(folder)
             else:
                 proc = Popen(
-                    [find, folder, "-type", "f", "-mtime", mtime, "-print"], stdout=PIPE, stderr=PIPE)
+                    [find, folder, "-type", "f", "-mtime", mtime, "-print"],
+                    stdout=PIPE, stderr=PIPE)
                 stdout, stderr = proc.communicate()
 
                 if len(stdout) != 0:
-                    files = sorted(stdout.replace('\r','').split('\n'))
+                    files = sorted(stdout.replace('\r', '').split('\n'))
                 else:
                     files = []
 
@@ -192,8 +193,9 @@ def main(init=False, threads=1):
                 files.remove('')
 
             if len(files) != 0:
-                logging.info('Started: %s'%folder)
-                client = Process(target=worker, args=([files,folder,startdate,enddate]))
+                logging.info('Started: %s' % folder)
+                client = Process(target=worker, args=([files, folder,
+                                                       startdate, enddate]))
                 client.start()
                 clients.append(client)
             while len(clients) >= nthreads:
@@ -222,6 +224,7 @@ if __name__ == "__main__":
                         (check that)',
                         default=False)
     parser.add_argument('-t', '--threads',
-                        help='Number of parellel threads to use [default:1]', default=1, type=int)
+                        help='Number of parellel threads to use [default:1]',
+                        default=1, type=int)
     args = parser.parse_args()
     main(args.init, args.threads)

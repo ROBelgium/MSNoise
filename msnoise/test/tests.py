@@ -1,7 +1,7 @@
 import unittest
 import traceback
 import os
-import sys
+import datetime
 
 
 # Here's our "unit tests".
@@ -262,6 +262,23 @@ class MSNoiseTests(unittest.TestCase):
     def test_025_dtt(self):
         from ..s06compute_dtt import main
         main()
+
+    def test_xxx_build_ref_datelist(self):
+        from ..api import connect, build_ref_datelist
+        db = connect()
+        start, end, datelist = build_ref_datelist(db)
+        self.failUnlessEqual(start, datetime.date(2009, 1, 1))
+        self.failUnlessEqual(end, datetime.date(2011, 1, 1))
+        self.failUnlessEqual(len(datelist), 731)
+
+    def test_xxx_build_movstack_datelist(self):
+        from ..api import connect, build_movstack_datelist
+        db = connect()
+        start, end, datelist = build_movstack_datelist(db)
+        self.failUnlessEqual(start, datetime.date(2009, 1, 1))
+        self.failUnlessEqual(end, datetime.date(2011, 1, 1))
+        self.failUnlessEqual(len(datelist), 731)
+
 
 
 def main():

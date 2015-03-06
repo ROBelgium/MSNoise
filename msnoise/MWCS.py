@@ -133,8 +133,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
 
         # Get Weights
         w = 1.0 / (1.0 / (coh[indRange]**2) - 1.0)
-        # w = coh[indRange]
-        # w[coh[indRange] >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
+        w[coh[indRange] >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
         w = np.sqrt(w * np.sqrt(dcs[indRange]))
         # w /= (np.sum(w)/len(w)) #normalize
         w = np.real(w)
@@ -145,9 +144,9 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
 
         # Phase:
         phi = np.angle(X)
-        phi -= phi[0]
+        phi[0] = 0.
         phi = np.unwrap(phi)
-        phio = phi.copy()
+        #phio = phi.copy()
         phi = phi[indRange]
 
         # Calculate the slope with a weighted least square linear regression

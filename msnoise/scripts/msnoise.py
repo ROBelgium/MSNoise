@@ -270,8 +270,6 @@ def station_map(show):
     main(show)
 
 
-
-
 # Add plot commands to the plot group:
 plot.add_command(data_availability)
 plot.add_command(dvv)
