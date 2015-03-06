@@ -64,7 +64,7 @@ def main(all=True, mov_stack=None, savefig=False, show=False):
         else:
             mov_stacks = [int(mi) for mi in mov_stack.split(',')]
 
-    filterid = 1
+    filterid = 2
     components = "ZZ"
     datatype = 'msnoise'
 
@@ -103,30 +103,38 @@ def main(all=True, mov_stack=None, savefig=False, show=False):
             
             plt.subplot(gs[i])
             x = {}
-            for group in groups.keys():
-                pairindex = []
-                for j, pair in enumerate(allbut['Pairs']):
-                    net1, sta1, net2, sta2 = pair.split('_')
-                    if sta1 in groups[group] and sta2 in groups[group]:
-                        pairindex.append(j)
-                tmp = allbut.iloc[np.array(pairindex)]
-                tmp = tmp.resample('D', how='mean')
-                #~ plt.plot(tmp.index, tmp[dttname], label=group)
-                x[group] = tmp
-            
-            tmp = x["CRATER"] - x["VOLCAN"]
+            # for group in groups.keys():
+            #     pairindex = []
+            #     for j, pair in enumerate(allbut['Pairs']):
+            #         net1, sta1, net2, sta2 = pair.split('_')
+            #         if sta1 in groups[group] and sta2 in groups[group]:
+            #             pairindex.append(j)
+            #     tmp = allbut.iloc[np.array(pairindex)]
+            #     tmp = tmp.resample('D', how='mean')
+            #     #~ plt.plot(tmp.index, tmp[dttname], label=group)
+            #     x[group] = tmp
+            #
+            #tmp = x["CRATER"] - x["VOLCAN"]
             #~ plt.plot(tmp.index, tmp[dttname], label="Crater - Volcan")
-            
-            py1_wmean, py1_wstd = get_wavgwstd(allbut)
-            py1_wmean = py1_wmean.resample('D', how='median')
-            py1_wstd = py1_wstd.resample('D', how='mean').fillna(0.0)
 
-            data = detrend(py1_wmean)
+            tmp2 = allbut[dttname].resample('D', how='mean')
+            tmp2.plot(label='mean')
 
-            pair1 = alldf[alldf['Pairs'] == 'YA_FJS_YA_SNE'].copy()
+            tmp3 = allbut[dttname].resample('D', how='median')
+            tmp3.plot(label='median')
+
+            #tmp2 = allbut.resample('D', 'median')
+
+            #py1_wmean, py1_wstd = get_wavgwstd(allbut)
+            #py1_wmean = py1_wmean.resample('D', how='median')
+            #py1_wstd = py1_wstd.resample('D', how='mean').fillna(0.0)
+
+            #data = detrend(py1_wmean)
+
+            #pair1 = alldf[alldf['Pairs'] == 'YA_FJS_YA_SNE'].copy()
             
             #~ plt.plot(ALL.index, ALL[dttname],c='r',label='ALL: $\delta v/v$ of the mean network')
-            plt.plot(pair1.index, pair1[dttname], c='b',label='pair')
+            #plt.plot(pair1.index, pair1[dttname], c='b',label='pair')
             #~ plt.plot(pair2.index, pair2[dttname], c='magenta',label='pair')
             #~ r = pd.rolling_mean(pair1[dttname], 30)
             #~ plt.plot(r.index, r, c='k')

@@ -1084,7 +1084,7 @@ def build_ref_datelist(session):
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
     end = min(end, datetime.date.today())
-    datelist = pd.date_range(start, end)
+    datelist = pd.date_range(start, end).map(lambda x: x.date())
     return start, end, datelist
 
 
@@ -1112,7 +1112,7 @@ def build_movstack_datelist(session):
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
     end = min(end, datetime.date.today())
-    datelist = pd.date_range(start, end)
+    datelist = pd.date_range(start, end).map(lambda x: x.date())
     return start, end, datelist
 
 

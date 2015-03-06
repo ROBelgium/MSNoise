@@ -46,22 +46,24 @@ def main(filterid, components, mov_stack=1, ampli=1, show=True):
         sta1 = "%s.%s" % (station1.net, station1.sta)
         sta2 = "%s.%s" % (station2.net, station2.sta)
         pair = "%s:%s" % (sta1, sta2)
+        print pair, dist
         ref_name = pair.replace('.', '_').replace(':', '_')
         rf = os.path.join("STACKS", "%02i" %
                           filterid, "REF", components, ref_name + ".MSEED")
-        ref = read(rf)[0]
-        ref.normalize()
-        ref = ref.data * ampli
-
-        plt.plot(t, ref+dist,c='k')
+        if os.path.isfile(rf):
+            ref = read(rf)[0]
+            ref.normalize()
+            ref = ref.data * ampli
+            plt.plot(t, ref+dist, c='k')
         
     plt.ylabel("Interstation Distance in km")
     plt.xlabel("Lag Time")
     plt.title("Filter = %02i" % filterid)
     
     for velocity in [3.0, 2.0, 1.0]:
-        plt.plot([0,-max(dists)/velocity,], [0, max(dists)],c='r',label='%.1f $km s^{-1}$'%velocity)
-        plt.plot([0,max(dists)/velocity,], [0, max(dists)],c='r',)
+        plt.plot([0,-max(dists)/velocity], [0, max(dists)], c='r',
+                 label='%.1f $km s^{-1}$' % velocity)
+        plt.plot([0,max(dists)/velocity], [0, max(dists)], c='r')
     
     
 

@@ -15,6 +15,7 @@ import scipy.fftpack
 
 from api import nextpow2
 
+
 def smooth(x, window='boxcar', half_win=3):
     """ some window smoothing """
     window_len = 2*half_win+1
@@ -187,7 +188,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
         deltaErr.append(e)
         deltaMcoh.append(np.real(mcoh))
         Taxis.append(timeaxis[ind + windL/2])
-        count = count + 1
+        count += 1
 
         minind += step
         maxind += step
