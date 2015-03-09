@@ -65,7 +65,17 @@ def info():
             click.secho(" D %s: %s" %(key, tmp ))
         else:
             click.secho(" M %s: %s" %(key, tmp ), fg='green')
-    
+
+    click.echo('')
+    click.echo('CC Jobs:')
+    for (n,jobtype) in get_job_types(db,'CC'):
+        click.echo(" %s : %i" % (jobtype, n))
+
+    click.echo('')
+    click.echo('DTT Jobs:')
+    for (n,jobtype) in get_job_types(db,'DTT'):
+        click.echo(" %s : %i" % (jobtype, n))
+
 
 @click.command()
 def install():
