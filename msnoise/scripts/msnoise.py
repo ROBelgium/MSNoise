@@ -10,10 +10,27 @@ def cli(ctx, threads):
     ctx.obj['MSNOISE_threads'] = threads
     pass
 
+
 @click.command()
 def test():
     from ..test.tests import main
     main()
+
+
+@click.command()
+def upgrade_db():
+    from sqlalchemy.exc import IntegrityError
+    from ..api import connect, Config, get_config
+    from ..default import default
+    db = connect()
+    try:
+        for name in ['overlap', 'dtt_lag', 'dtt_v', 'dtt_minlag', 'dtt_width',
+                     'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt']:
+            db.add(Config(name=name, value=default[name][-1]))
+        db.commit()
+    except IntegrityError:
+        print "The DB seems already up-to-date, exiting."
+    db.close()
 
 
 @click.command()
@@ -25,10 +42,8 @@ def info():
     click.echo('General:')
     
     if os.path.isfile('db.ini'):
-        present = True
         click.echo(' - db.ini is present')
     else:
-        present = False
         click.secho(' - db.ini is not present, is MSNoise installed here ?', fg='red')
         return
     
@@ -106,11 +121,13 @@ def bugreport(ctx, sys, modules, env, all):
     from ..bugreport import main
     main(sys, modules, env, all)
 
+
 @click.command()
 def populate():
     """Rapidly scan the archive filenames and find Network/Stations"""
     from ..s002populate_station_table import main
     main()
+
 
 @click.command()
 @click.option('-i', '--init', is_flag=True, help='First run ?')
@@ -152,12 +169,14 @@ def stack(ref, mov, step, interval):
     if step:
         main('step', interval)
 
+
 @click.command()
 def compute_mwcs():
     """Computes the MWCS based on the new stacked data"""
     from ..s05compute_mwcs import main
     main()
-    
+
+
 @click.command()
 def compute_stretching():
     """Computes the MWCS based on the new stacked data"""
@@ -184,15 +203,16 @@ def reset(jobtype, all):
     reset_jobs(session, jobtype, all)
     session.close()
 
+
 @click.command()
 def ipython():
     """Launches an ipython notebook in the current folder"""
     os.system("ipython notebook --pylab inline --ip 0.0.0.0")
 
 
-###
-### PLOT GROUP
-###
+#
+# PLOT GROUP
+#
 
 @click.group()
 def plot():
@@ -209,14 +229,15 @@ def data_availability(show):
 
 
 @click.command()
-@click.option('-a', '--all', default=True, help='Plot All mov stacks')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=0,  help='Plot specific mov stacks')
 @click.option('-s', '--savefig', is_flag=True, help='Save figure to disk (PNG)')
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-def dvv(all, mov_stack, savefig, show):
+def dvv(mov_stack, comp, filterid, savefig, show):
     """Plots the dv/v (parses the dt/t results)"""
     from ..plots.dvv import main
-    main(all, mov_stack, savefig, show)
+    main(mov_stack, comp, filterid, savefig, show)
 
 
 @click.command()
@@ -292,6 +313,7 @@ plot.add_command(station_map)
 
 # Add all commands to the cli group:
 cli.add_command(info)
+cli.add_command(upgrade_db)
 cli.add_command(install)
 cli.add_command(config)
 cli.add_command(populate)

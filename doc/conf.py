@@ -55,6 +55,17 @@ f = open('defaults.rst','w')
 f.write(output)
 f.close()
 
+output = ""
+for key in default.keys():
+    descr, defvalue = default[key]
+    output += ".. |%s| replace:: ``%s``: %s (default=%s)\n" % (key, key, descr,
+                                                            defvalue)
+
+output = output.replace('*','&#42;')
+f = open('configs.hrst','w')
+f.write(output)
+f.close()
+
 # -- General configuration -----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.

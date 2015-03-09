@@ -22,7 +22,7 @@ class Filter(Base):
         MWCS (in Hz)
     :type mwcs_high: float
     :type mwcs_high: The upper frequency bound of the linear regression done in
-        WCS (in Hz)
+        MWCS (in Hz)
     :type rms_threshold: float
     :param rms_threshold: Not used anymore
     :type mwcs_wlen: float

@@ -367,7 +367,7 @@ def get_station_pairs(session, used=None, net=None):
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
-    :type used: bool
+    :type used: bool, int
     :param used: Select only stations marked used if False (default) or all
         stations present in the database if True
     :type net: str

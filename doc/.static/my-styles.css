@@ -1,8 +1,3 @@
-body {
-    background: url(grid.png) repeat-x;
-    background-attachment: fixed;
-}
-
 dl .attribute {
     margin-left: 50px;
 }
@@ -39,4 +34,36 @@ dl > dt {
     background-color: #FFE3E3;
     border-color: #FFC4C4;
     color: #555555;
+}
+
+a {
+    color:#006bbe;
+}
+
+#centerer{
+    max-width:800px;
+    margin:auto;
+    text-align: center;
+}
+
+#half_footer{
+    max-width:50%;
+    float:left;
+    padding-bottom:40px;
+    text-align: center;
+    display: table-cell;
+}
+
+#clear {
+    clear:both;
+}
+
+h2 {
+    border-top: solid 1px silver;
+    margin-top: 20px;
+    padding-top: 10px;
+}
+
+blockquote p{
+	font-size:0.8em;
 }

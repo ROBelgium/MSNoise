@@ -13,8 +13,6 @@ To run it from the console:
 from api import *
 import logging
 import numpy as np
-import os
-
 
 def main():
     logging.basicConfig(level=logging.DEBUG,
@@ -29,67 +27,57 @@ def main():
     else:
         AUTOCORR = False
 
-    stations_to_analyse = [sta.sta for sta in get_stations(db, all=False)]
-    nfs = get_new_files(db)
-
-    days = {}
-    old_day = 0
-    old_pair = ""
-    day_pairs = []
-    jobs = []
+    stations_to_analyse = ["%s.%s" % (sta.net, sta.sta) for sta in get_stations(db, all=False)]
     all_jobs = []
-    i = 0
+    updated_days = []
+    nfs = get_new_files(db)
     for nf in nfs:
-        # logging.debug('%s.%s will be MASTER for %s-%s'% (nf.net, nf.sta, nf.starttime, nf.endtime))
-        if nf.sta in stations_to_analyse:
-            day = "%s" % (nf.starttime.date())
-    
-            available_stations = []
-            for station in get_data_availability(db, starttime=nf.starttime, endtime=nf.endtime):
-                if station.sta in stations_to_analyse:
-                    if '%s.%s' % (station.net, station.sta) not in available_stations:
-                        available_stations.append(
-                            '%s.%s' % (station.net, station.sta))
-                    # logging.debug('Will process %s.%s vs %s.%s'% (nf.net, nf.sta, station.net, station.sta))
-    
-            stations = np.array([])
-            pairs = []
-            nS = '%s.%s' % (nf.net, nf.sta)
-            i = 0
-            for aS in available_stations:
-                if not AUTOCORR and nS == aS:
-                    pass
-                else:
-                    if i == 0:
-                        pairs = np.array(':'.join(sorted([nS, aS])))
-                        i += 1
-                    else:
-                        pairs = np.vstack((pairs, ':'.join(sorted([nS, aS]))))
-    
-            pairs = np.unique(pairs)
-            for pair in pairs:
-                daypair = "%s=%s" % (day, pair)
-                if daypair not in jobs:
-                    all_jobs.append({"day":day,"pair":pair,"jobtype":"CC","flag":"T"})
-                    jobs.append(daypair)
+        start, end = nf.starttime.date(), nf.endtime.date()
+        updated_days.append(start)
+        updated_days.append(end)
+
+    updated_days = np.asarray(updated_days)
+    updated_days = np.unique(updated_days)
+
+    count = 0
+    for day in updated_days:
+        jobs = []
+        print "Day=", day
+        modified = []
+        available = []
+        for data in get_data_availability(db, starttime=day, endtime=day+datetime.timedelta(days=1)):
+            sta = "%s.%s" % (data.net, data.sta)
+            print sta
+            if sta in stations_to_analyse:
+                available.append(sta)
+                if data.flag in ["N", "M"]:
+                    modified.append(sta)
+
+        for m in modified:
+            for a in available:
+                if m != a or AUTOCORR:
+                    pair = ':'.join(sorted([m, a]))
+                    if pair not in jobs:
+                        all_jobs.append({"day":day,"pair":pair,"jobtype":"CC","flag":"T","lastmod":None})
+                        jobs.append(pair)
+
         if len(all_jobs) > 1e5:
             logging.debug('Already 100.000 jobs, inserting')
             massive_insert_job(all_jobs)
             all_jobs = []
-    
-    count = len(jobs)
-    logging.debug("Found %i new jobs to do" % count)
-    
-    # for job in jobs:
-        # day, pair = job.split("=")
-        # alljobs.append({"day":day,"pair":pair,"type":"CC","flag":"T"})
+            count += 1e5
 
-    massive_insert_job(all_jobs)
-    # update all _data_availability and mark files as "A"rchives
+    logging.debug('Inserting remaining jobs')
+    if len(all_jobs) != 0:
+        massive_insert_job(all_jobs)
+    count += len(all_jobs)
+
     for sta in get_stations(db, all=True):
         mark_data_availability(db, sta.net, sta.sta, flag='A')
-    
+
+    db.commit()
     logging.info('*** Finished: New Jobs ***')
+
     return count
 
 

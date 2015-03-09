@@ -2,29 +2,54 @@
 This code is responsible for the calculation of dt/t using the result of the
 MWCS calculations.
 
-.. warning:: Currently, all pairs are analysed using the same parameters, which
-    are hard-coded in this file. This should change in the future, as different
-    inter-station distances should/could be treated with different parameters.
+.. warning:: Previously, all pairs were analysed using the same parameters,
+    which were hard-coded in the s06compute_dtt.py file.
+    This has changed now, and MSNoise uses parameters set in the database via
+    the configurator. Pre-1.3 users should upgrade their database using the
+    "$ msnoise upgrade_db" command.
+
+
+Configuration Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+* |dtt_lag|
+* |dtt_v|
+* |dtt_minlag|
+* |dtt_width|
+* |dtt_sides|
+* |dtt_mincoh|
+* |dtt_maxerr|
+* |dtt_maxdt|
 
 The dt/t is determined as the slope of the delays vs time lags. The slope is
-calculated a weighted linear regression (WLS) through selected points. The selection
-of points is based on criteria:
+calculated a weighted linear regression (WLS) through selected points.
 
-* ``lMlag``: Max time lag on the Left side (ex: -30)
-* ``lmlag``: Min time lag on the left side (ex: -10)
-* ``rmlag``: Min time lag on the right side (ex: 10)
-* ``rMlag``: Max time lag on the right side (ex: 30)
-* ``minCoh``: Minimum coherence (ex: 0.5)
-* ``maxErr``: Maximum error on the delay value (ex:0.1)
-* ``maxDt``: Maximum absolute delay value (ex: 0.5)
+1. The selection of points is first based on the time lag criteria.
+The minimum time lag can either be defined absolutely or dynamically.
+When ``dtt_lag`` is set to "dynamic" in the database, the inter-station distance
+is used to determine the minimum time lag. This lag is calculated from the
+distance and a velocity configured (``dtt_v``). The velocity is determined by
+the user so that the minlag doesn't include the ballistic waves. For example,
+if ballistic waves are visible with a velocity of 2 km/s, one could configure
+dtt_v=1.0.
+This way, if stations are located 15 km apart, the minimum lag time will be
+set to 15 s. The ``dtt_width`` determines the width of the lag window used. A
+value of 30.0 means the process will use time lags between 15 and 45 s in the
+example above, on both sides if configured (``dtt_sides``), or only causal or
+acausal parts of the CCF.
 
-Using example values above, we chose to use only 10-30 s coda part of the
-signal, neglecting direct waves in the 0-10 seconds range. Graphically, this
-data selection looks like:
+
+2. Using example values above, we chose to use only 15-45 s coda part of the
+signal, neglecting direct waves in the 0-15 seconds range. We then select data
+which match three other thresholds: ``dtt_mincoh``, ``dtt_maxerr`` and
+``dtt_maxdt``.
+
+...
 
 .. image:: .static/Figure04_dttmatrix_01_005DAYS_ZZ-2010-10-12_cmyk.png
 
-Each of the 4 left subplot of this figure shows a colormapper matrix of which each row
+Each of the 4 left subplot of this figure shows a colormapper matrix of which
+each row
 corresponds to the data of 1 station pair and each column corresponds to
 different time lags. The cells are then colored using, from left to right:
 Delays, Errors, Phase Coherence and Data Selection. 
@@ -40,19 +65,19 @@ is a table, with one row for each station pair.
 
 .. code-block:: python
 
-    Date,               A,                  EA,                 EM,                     EM0,                M,                  M0,                 Pairs
-    2013-01-06,-0.16837287183494098,0.05266069549188657,0.00208377243783003,0.000965214393762639, 0.0068202122517553850, 0.000377577217283868,BE_GES_BE_HOU
-    2013-01-06,-0.00804644347723505,0.05779368290438131,0.00291327704047938,0.000972986173494356,-0.0022691002608228083,-0.002643541217653975,BE_GES_BE_MEM
-    2013-01-06, 0.10074727166431066,0.01446482303784344,0.00179566184493113,0.004541720342080022,-0.0014573842288369784, 0.007414785762726537,BE_GES_BE_RCHB
-    2013-01-06,-0.05568112085310946,0.00989268830665443,0.00057839595252212,0.001081021896160096,-0.0032896527406604500,-0.001360750598930064,BE_GES_BE_SKQ
-    2013-01-06, 0.01508666636244094,0.02022437208406759,0.00096543261879024,0.000898329875688285, 0.0008371422712720330, 0.001045072240756187,BE_GES_BE_STI
-    2013-01-06, 0.02683099320453874,0.03289970421407011,0.00153137352293737,0.001502611018541102, 0.0030233174200087437, 0.003024510068343402,BE_GES_BE_UCC
-    2013-01-06,-0.01212934374358136,0.00433513329889883,0.00039019542460264,0.000413471992144575, 0.0002583635832057903,-0.000427090531110851,BE_HOU_BE_MEM
-    2013-01-06, 0.10762476137331067,0.01886622600766513,0.00076824344993628,0.002163833958287798,-0.0003079139649344223, 0.001126925437222496,BE_HOU_BE_RCHB
-    2013-01-06,-0.04684857637025102,0.01944924279920320,0.00069968472500258,0.000782078143903881,-0.0006613328679275146, 0.000271023281627172,BE_HOU_BE_SKQ
-    2013-01-06, 0.02030579417237702,0.01613165714957967,0.00131522430756707,0.001311822061778742, 0.0005162635594570485,-3.103066113367655e-0,BE_HOU_BE_STI
+    Date,          A,        EA,        EM,       EM0,         M,          M0,       Pairs
+    2013-01-06,-0.1683728,0.0526606,0.00208377,0.00096521, 0.00682021, 0.00037757,BE_GES_BE_HOU
+    2013-01-06,-0.0080464,0.0577936,0.00291327,0.00097298,-0.00226910,-0.00264354,BE_GES_BE_MEM
+    2013-01-06, 0.1007472,0.0144648,0.00179566,0.00454172,-0.00145738, 0.00741478,BE_GES_BE_RCHB
+    2013-01-06,-0.0556811,0.0098926,0.00057839,0.00108102,-0.00328965,-0.00136075,BE_GES_BE_SKQ
+    2013-01-06, 0.0150866,0.0202243,0.00096543,0.00089832, 0.00083714, 0.00104507,BE_GES_BE_STI
+    2013-01-06, 0.0268309,0.0328997,0.00153137,0.00150261, 0.00302331, 0.00302451,BE_GES_BE_UCC
+    2013-01-06,-0.0121293,0.0043351,0.00039019,0.00041347, 0.00025836,-0.00042709,BE_HOU_BE_MEM
+    2013-01-06, 0.1076247,0.0188662,0.00076824,0.00216383,-0.00030791, 0.00112692,BE_HOU_BE_RCHB
+    2013-01-06,-0.0468485,0.0194492,0.00069968,0.00078207,-0.00066133, 0.00027102,BE_HOU_BE_SKQ
+    2013-01-06, 0.0203057,0.0161316,0.00131522,0.00131182, 0.00051626,-3.10306611,BE_HOU_BE_STI
     ...
-    2013-01-06,-0.00225882255299991,0.00371411997707409,0.00010340935420880,9.19916693442618e-05, 0.0007363569140943659, 0.000762389133912101,ALL
+    2013-01-06,-0.0022588,0.0037141,0.00010340,9.1996e-05, 0.00073635, 0.00076238,ALL
 
 
 To run this script:
@@ -169,7 +194,7 @@ def main():
                             else:
                                 dist = get_interstation_distance(station1, station2, station1.coordinates)
                                 lmlag = -dist / dtt_v
-                                rmlag =  dist / dtt_v
+                                rmlag = dist / dtt_v
                             lMlag = lmlag - dtt_width
                             rMlag = rmlag + dtt_width
 

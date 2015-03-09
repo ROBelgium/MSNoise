@@ -8,7 +8,7 @@ Usage:
     $ msnoise plot dvv
 
 """
-# PARAMETERS FOR MATPLOTLIB :
+
 import pandas as pd
 
 import numpy as np
@@ -22,12 +22,14 @@ from statsmodels.tsa.tsatools import detrend
 
 from ..api import *
 
+
 def wavg(group):
     d = group[dttname]
     group[errname][group[errname] == 0] = 1e-6
     w = 1. / group[errname]
     wavg = (d * w).sum() / w.sum()
     return wavg
+
 
 def wstd(group):
     d = group[dttname]
@@ -45,7 +47,8 @@ def get_wavgwstd(data):
     h = grouped.apply(wstd)
     return g, h
 
-def main(all=True, mov_stack=None, savefig=False, show=False):
+
+def main(mov_stack=None, components='ZZ', filterid=1, savefig=False, show=False):
     db = connect()
 
     if get_config(db, name="autocorr") in ['Y', 'y', '1', 1]:
@@ -63,10 +66,6 @@ def main(all=True, mov_stack=None, savefig=False, show=False):
             mov_stacks = [int(mov_stack), ]
         else:
             mov_stacks = [int(mi) for mi in mov_stack.split(',')]
-
-    filterid = 2
-    components = "ZZ"
-    datatype = 'msnoise'
 
     gs = gridspec.GridSpec(len(mov_stacks), 1)
     plt.figure(figsize=(15, 20))

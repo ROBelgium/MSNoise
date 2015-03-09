@@ -7,6 +7,18 @@ to study the relative dephasing between Moving-Window stacks ("Current") and a
 Reference using Moving-Window Cross-Spectral analysis. The *jobs* "T"o do have
 been inserted in the datavase during the stack procedure.
 
+
+Filter Configuration Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* ``mwcs_low``: The lower frequency bound of the linear regression done in
+  MWCS (in Hz)
+* ``mwcs_high``: The upper frequency bound of the linear regression done in
+  MWCS (in Hz)
+* ``mwcs_wlen``: Window length (in seconds) to perform MWCS
+* ``mwcs_step``: Step (in seconds) of the windowing procedure in MWCS
+
+
 In short, both time series are sliced in several overlapping windows and
 preprocessed. The similarity of the two time-series is assessed using the
 cross-coherence between energy densities in the frequency domain. The time
@@ -25,18 +37,18 @@ In this case, the window length was 10 seconds with an overlap of 5 seconds.
 
 .. code-block:: python
 
-            LAG_TIME                    DELAY                   ERROR                  MEAN COHERENCE
-    -1.150000000000000000e+02 -1.478114638393185076e-01 5.372711913598642725e-02 2.758524391177089585e-01
-    -1.100000000000000000e+02 -6.820752699231921734e-02 2.054664431127230587e-02 3.162099935286825647e-01
-    -1.050000000000000000e+02 -1.033702957794639388e-01 8.664515540289926751e-03 4.243926988068138506e-01
-    -1.000000000000000000e+02 -2.866877569687806965e-02 6.252221598805602840e-03 5.715984952889150428e-01
-    -9.500000000000000000e+01  4.180394100884333997e-02 1.510228578922533961e-02 4.123855778998536947e-01
-    -9.000000000000000000e+01  4.813940023363388887e-02 3.270065701850408124e-02 3.058618779249135389e-01
+          LAG_TIME          DELAY           ERROR         MEAN COHERENCE
+    -1.1500000000e+02 -1.4781146383e-01 5.3727119135e-02 2.7585243911e-01
+    -1.1000000000e+02 -6.8207526992e-02 2.0546644311e-02 3.1620999352e-01
+    -1.0500000000e+02 -1.0337029577e-01 8.6645155402e-03 4.2439269880e-01
+    -1.0000000000e+02 -2.8668775696e-02 6.2522215988e-03 5.7159849528e-01
+    -9.5000000000e+01  4.1803941008e-02 1.5102285789e-02 4.1238557789e-01
+    -9.0000000000e+01  4.8139400233e-02 3.2700657018e-02 3.0586187792e-01
 
 This process is job-based, so it is possible to run several instances in
 parallel.
 
-To run this script:
+To run this step:
 
 .. code-block:: sh
 
@@ -70,11 +82,8 @@ def main():
     
     goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
     maxlag = float(get_config(db, "maxlag"))
-    start, end, datelist = build_movstack_datelist(db)
-    # allow_large_concats(db)
-    
+
     # First we reset all DTT jobs to "T"odo if the REF is new for a given pair
-    
     for station1, station2 in get_station_pairs(db, used=True):
         sta1 = "%s.%s" % (station1.net, station1.sta)
         sta2 = "%s.%s" % (station2.net, station2.sta)

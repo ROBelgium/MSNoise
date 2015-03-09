@@ -130,7 +130,7 @@ http://www.obspy.org (Beyreuther et al., 2010; Megies et al., 2011)
 
 .. code-block:: sh
 
-	easy_install obspy
+    easy_install obspy
 
 Enthought Tools Suite
 ~~~~~~~~~~~~~~~~~~~~~
@@ -140,7 +140,7 @@ Most of the suite should be present, one just needs to install the traitsui pack
 
 .. code-block:: sh
 
-	easy_install traitsui
+    easy_install traitsui
 
 .. _samplerate:
 

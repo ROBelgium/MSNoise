@@ -1,3 +1,5 @@
+.. include:: configs.hrst
+
 .. _workflow:
 
 Workflow
