@@ -853,7 +853,7 @@ def add_corr(s1, s2, session, station1, station2, filterid, date, time, duration
             export_mseed(session, path, pair, components, filterid, CF/ncorr,
                          ncorr)
                          
-        #add info about s1, s2                 
+                        
         if sac:
             export_sac(s1, s2, session, path, pair, components, filterid, CF/ncorr,
                        ncorr)
@@ -876,7 +876,7 @@ def add_corr(s1, s2, session, station1, station2, filterid, date, time, duration
         st.write(os.path.join(path, file), format='mseed')
         del t, st
 
-#add info about s1, s2
+
 def export_sac(s1, s2, db, filename, pair, components, filterid, corr, ncorr=0,
                sac_format=None, maxlag=None, cc_sampling_rate=None):
     if sac_format is None:
@@ -886,7 +886,7 @@ def export_sac(s1, s2, db, filename, pair, components, filterid, corr, ncorr=0,
     if cc_sampling_rate is None:
         cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
         
-    #compute dist,azim,bazim
+    
     dist, azim, bazim = gps2DistAzimuth(s1.Y, s1.X, s2.Y, s2.X)
     
     try:
@@ -911,7 +911,6 @@ def export_sac(s1, s2, db, filename, pair, components, filterid, corr, ncorr=0,
         tr.SetHvalue('SCALE', 1)
         tr.SetHvalue('NPTS', len(corr))
         
-    #add info in the headers:
         tr.SetHvalue('DIST', dist)
         tr.SetHvalue('AZ', azim)
         tr.SetHvalue('BAZ', bazim)
