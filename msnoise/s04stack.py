@@ -231,7 +231,7 @@ def main(stype, interval=1):
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
                                             if sac:
                                                 export_sac(
-                                                    station1, station2, db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                                    db, station1, station2, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
                                             job = "%s %s" % (date, day_name)
@@ -261,7 +261,7 @@ def main(stype, interval=1):
                                     db, filename, pair, components, filterid, stack_total)
                             if sac:
                                 export_sac(
-                                    station1, station2, db, filename, pair, components, filterid, stack_total)
+                                    db, station1, station2, filename, pair, components, filterid, stack_total)
                             ref_name = "%s:%s" % (sta1, sta2)
                             update_job(
                                 db, "REF", ref_name.replace('_', '.'), 'DTT', 'T')
