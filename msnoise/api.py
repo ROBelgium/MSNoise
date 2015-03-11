@@ -803,7 +803,7 @@ def export_allcorr(session, ccfid, data):
     return
 
 
-def add_corr(session, station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
+def add_corr(s1, s2, session, station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
     """
     Adds a CCF to the data archive on disk.
     
@@ -853,7 +853,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration, compon
             export_mseed(session, path, pair, components, filterid, CF/ncorr,
                          ncorr)
         if sac:
-            export_sac(session, path, pair, components, filterid, CF/ncorr,
+            export_sac(s1, s2, session, path, pair, components, filterid, CF/ncorr,
                        ncorr)
 
     else:
@@ -875,7 +875,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration, compon
         del t, st
 
 
-def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
+def export_sac(s1, s2, db, filename, pair, components, filterid, corr, ncorr=0,
                sac_format=None, maxlag=None, cc_sampling_rate=None):
     if sac_format is None:
         sac_format = get_config(db, "sac_format")
@@ -883,6 +883,9 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
         maxlag = float(get_config(db, "maxlag"))
     if cc_sampling_rate is None:
         cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
+        
+        dist, azim, bazim = gps2DistAzimuth(s1.Y, s1.X, s2.Y, s2.X)
+        
     try:
         os.makedirs(os.path.split(filename)[0])
     except:
@@ -904,6 +907,11 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
         tr.SetHvalue('DEPMEN', np.mean(corr))
         tr.SetHvalue('SCALE', 1)
         tr.SetHvalue('NPTS', len(corr))
+        
+        tr.SetHvalue('DIST', dist)
+        tr.SetHvalue('AZ', azim)
+        tr.SetHvalue('BAZ', bazim)
+        
     tr.WriteSacBinary(filename)
     del st, tr
     return
