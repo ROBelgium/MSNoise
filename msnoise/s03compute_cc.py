@@ -524,7 +524,7 @@ def main():
 
                     if params.keep_all:
                         for ccfid in allcorr.keys():
-                            export_allcorr(db, ccfid, allcorr[ccfid])
+                            export_allcorr(s1, s2, db, ccfid, allcorr[ccfid])   #add s1, s2
 
                     if params.keep_days:
                         try:
@@ -541,7 +541,7 @@ def main():
                                     thistime = time.strftime(
                                         "%H_%M", time.gmtime(basetime))
                                     add_corr(
-                                        db, station1.replace('.', '_'),
+                                        s1, s2, db, station1.replace('.', '_'),       #add s1, s2
                                         station2.replace('.', '_'), filterid,
                                         thisdate, thistime,  params.min30 /
                                         params.goal_sampling_rate,
