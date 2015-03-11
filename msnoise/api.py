@@ -802,8 +802,8 @@ def export_allcorr(session, ccfid, data):
     del df
     return
 
-
-def add_corr(session, station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
+#Add info about s1 and s2 like show in s03compute_CC:
+def add_corr(s1, s2, session, station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
     """
     Adds a CCF to the data archive on disk.
     
@@ -852,8 +852,10 @@ def add_corr(session, station1, station2, filterid, date, time, duration, compon
         if mseed:
             export_mseed(session, path, pair, components, filterid, CF/ncorr,
                          ncorr)
+                         
+        #add info about s1, s2                 
         if sac:
-            export_sac(session, path, pair, components, filterid, CF/ncorr,
+            export_sac(s1, s2, session, path, pair, components, filterid, CF/ncorr,
                        ncorr)
 
     else:
@@ -874,8 +876,8 @@ def add_corr(session, station1, station2, filterid, date, time, duration, compon
         st.write(os.path.join(path, file), format='mseed')
         del t, st
 
-
-def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
+#add info about s1, s2
+def export_sac(s1, s2, db, filename, pair, components, filterid, corr, ncorr=0,
                sac_format=None, maxlag=None, cc_sampling_rate=None):
     if sac_format is None:
         sac_format = get_config(db, "sac_format")
@@ -883,6 +885,10 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
         maxlag = float(get_config(db, "maxlag"))
     if cc_sampling_rate is None:
         cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
+        
+    #compute dist,azim,bazim
+    dist, azim, bazim = gps2DistAzimuth(s1.Y, s1.X, s2.Y, s2.X)
+    
     try:
         os.makedirs(os.path.split(filename)[0])
     except:
@@ -904,7 +910,13 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
         tr.SetHvalue('DEPMEN', np.mean(corr))
         tr.SetHvalue('SCALE', 1)
         tr.SetHvalue('NPTS', len(corr))
-    tr.WriteSacBinary(filename)
+        
+    #add info in the headers:
+        tr.SetHvalue('DIST', dist)
+        tr.SetHvalue('AZ', azim)
+        tr.SetHvalue('BAZ', bazim)
+        
+        tr.WriteSacBinary(filename)
     del st, tr
     return
 
