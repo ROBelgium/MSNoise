@@ -73,7 +73,7 @@ def info():
     
     
     click.echo('')
-    click.echo('Raw config bits: (white = default, green = modified)')
+    click.echo('Raw config bits: "D"efault or "M"odified (green)')
     for key in default.keys():
         tmp = get_config(db, key)
         if tmp == default[key][1]:
@@ -232,12 +232,15 @@ def data_availability(show):
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=0,  help='Plot specific mov stacks')
+@click.option('-p', '--pair', default=None,  help='Plot a specific pair',
+              multiple=True)
+@click.option('-M', '--dttname', default="M",  help='Plot M or M0?')
 @click.option('-s', '--savefig', is_flag=True, help='Save figure to disk (PNG)')
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-def dvv(mov_stack, comp, filterid, savefig, show):
+def dvv(mov_stack, comp, dttname, filterid, pair, savefig, show):
     """Plots the dv/v (parses the dt/t results)"""
     from ..plots.dvv import main
-    main(mov_stack, comp, filterid, savefig, show)
+    main(mov_stack, dttname, comp, filterid, pair, savefig, show)
 
 
 @click.command()

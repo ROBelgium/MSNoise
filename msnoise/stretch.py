@@ -87,8 +87,8 @@ def main():
     
     # Then we compute the jobs
     
-    while is_dtt_next_job(db, flag='T', type='DTT'):
-        pair, days, refs = get_dtt_next_job(db, flag='T', type='DTT')
+    while is_dtt_next_job(db, flag='T', jobtype='DTT'):
+        pair, days, refs = get_dtt_next_job(db, flag='T', jobtype='DTT')
         logging.info(
             "There are MWCS jobs for some days to recompute for %s" % pair)
         alldays = []
@@ -119,7 +119,7 @@ def main():
         print "betweeen", minlag, "and", maxlag2
         
         rf = os.path.join("STACKS", "%02i" %
-                          1, "REF", "ZZ", ref_name + ".MSEED")
+                          3, "REF", "ZZ", ref_name + ".MSEED")
         if os.path.isfile(rf):
             ref = read(rf)[0].data
             mid = int(goal_sampling_rate*maxlag)
@@ -133,14 +133,14 @@ def main():
             ref_stretched, deltas = stretch_mat_creation(ref,str_range=str_range, nstr=nstr)
             for day in days:
                 # logging.debug('Day=%s'%day)
-                filters =get_filters(db, all=False) 
+                filters = get_filters(db, all=False)
                 if 1:
-                    f = filters[0]
+                    f = filters[2]
                     filterid = int(f.ref)
                     for components in components_to_compute:
                         #removed ref from here
                         
-                        for mov_stack in [7,]:
+                        for mov_stack in [20,]:
                             df = os.path.join(
                                 "STACKS", "%02i" % filterid, "%03i_DAYS" %
                                 mov_stack, components, ref_name, str(day) + ".MSEED")
@@ -167,14 +167,14 @@ def main():
                                     # os.path.join(outfolder, "%s.txt" % str(day)), output)
                                 # del output
 
-                                if mov_stack == 7:
+                                if mov_stack == 20:
                                     tday = datetime.datetime.strptime(day, "%Y-%m-%d")
                                     # print type(day), day
                                     alldays.append(tday)
                                     alldeltas.append(deltas[np.argmax(coeffs)])
                                     allcoefs.append(np.max(coeffs))
-                                    # print day, deltas[np.argmax(coeffs)]
-                                
+                                    #print day, deltas[np.argmax(coeffs)]
+
                                 # plt.subplot(211)
                                 # plt.figure()
                                 # plt.plot(ref)
@@ -193,12 +193,12 @@ def main():
                                 # plt.grid()
                                 # plt.show()
                             
-                update_job(db, day, pair, type='DTT', flag='D')
+                update_job(db, day, pair, jobtype='DTT', flag='D')
             #~ print np.array(alldeltas).shape
             #~ print allcoefs
             df = pd.DataFrame(np.array([alldeltas,allcoefs]).T, index=alldays)
             print df.head()
-            df.to_csv(os.path.join("STR", "\%s.csv"%ref_name))
+            df.to_csv(os.path.join("STR", "%s.csv"%ref_name))
             #~ p = plt.plot(alldays, np.array(alldeltas).flatten(), c='k')
             #~ plt.scatter(alldays, np.array(alldeltas).flatten(), c=allcoefs,s=200)
             #~ plt.colorbar()

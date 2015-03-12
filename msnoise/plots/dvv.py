@@ -23,7 +23,7 @@ from statsmodels.tsa.tsatools import detrend
 from ..api import *
 
 
-def wavg(group):
+def wavg(group, dttname, errname):
     d = group[dttname]
     group[errname][group[errname] == 0] = 1e-6
     w = 1. / group[errname]
@@ -31,7 +31,7 @@ def wavg(group):
     return wavg
 
 
-def wstd(group):
+def wstd(group, dttname, errname):
     d = group[dttname]
     group[errname][group[errname] == 0] = 1e-6
     w = 1. / group[errname]
@@ -41,17 +41,18 @@ def wstd(group):
     return wstd
 
 
-def get_wavgwstd(data):
+def get_wavgwstd(data, dttname, errname):
     grouped = data.groupby(level=0)
-    g = grouped.apply(wavg)
-    h = grouped.apply(wstd)
+    g = grouped.apply(wavg, dttname=dttname, errname=errname)
+    h = grouped.apply(wstd, dttname=dttname, errname=errname)
     return g, h
 
 
-def main(mov_stack=None, components='ZZ', filterid=1, savefig=False, show=False):
+def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
+         pairs=[], savefig=False, show=False):
     db = connect()
 
-    if get_config(db, name="autocorr") in ['Y', 'y', '1', 1]:
+    if get_config(db, name="autocorr", isbool=True):
         condition = "sta2 >= sta1"
     else:
         condition = "sta2 > sta1"
@@ -68,7 +69,7 @@ def main(mov_stack=None, components='ZZ', filterid=1, savefig=False, show=False)
             mov_stacks = [int(mi) for mi in mov_stack.split(',')]
 
     gs = gridspec.GridSpec(len(mov_stacks), 1)
-    plt.figure(figsize=(15, 20))
+    plt.figure(figsize=(15, 10))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
     first_plot = True
     for i, mov_stack in enumerate(mov_stacks):
@@ -84,9 +85,7 @@ def main(mov_stack=None, components='ZZ', filterid=1, savefig=False, show=False)
             current += datetime.timedelta(days=1)
         alldf = pd.concat(alldf)
         if 'alldf' in locals():
-            global dttname, errname
-            dttname = "M0"
-            errname = "EM0"
+            errname = "E" + dttname
 
             alldf[dttname] *= -100
             alldf[errname] *= -100
@@ -98,7 +97,6 @@ def main(mov_stack=None, components='ZZ', filterid=1, savefig=False, show=False)
             groups['CRATER'] = ["UV11","UV15","FJS","FLR","SNE","UV12","FOR","RVL","UV06"]
             groups['GPENTES'] = ["UV03","UV08","UV04","UV02","HDL"]
             groups['VOLCAN'] = groups['CRATER'] + groups['GPENTES'] + ['HIM','VIL']
-            
             
             plt.subplot(gs[i])
             x = {}
@@ -116,40 +114,47 @@ def main(mov_stack=None, components='ZZ', filterid=1, savefig=False, show=False)
             #tmp = x["CRATER"] - x["VOLCAN"]
             #~ plt.plot(tmp.index, tmp[dttname], label="Crater - Volcan")
 
+
+                
+            for pair in pairs:
+                print pair
+                pair1 = alldf[alldf['Pairs'] == pair].copy()
+                print pair1.head()
+                plt.plot(pair1.index, pair1[dttname], label=pair)
+                plt.fill_between(pair1.index, pair1[dttname]-pair1[errname],
+                                 pair1[dttname]+pair1[errname], zorder=-1,
+                                 alpha=0.5)
+                pair1.to_csv('%s-m%i-f%i.csv'%(pair, mov_stack, filterid))
+
             tmp2 = allbut[dttname].resample('D', how='mean')
             tmp2.plot(label='mean')
 
             tmp3 = allbut[dttname].resample('D', how='median')
             tmp3.plot(label='median')
 
+            #YA_FJS_YA_SNE
             #tmp2 = allbut.resample('D', 'median')
 
-            #py1_wmean, py1_wstd = get_wavgwstd(allbut)
+            py1_wmean, py1_wstd = get_wavgwstd(allbut, dttname, errname)
             #py1_wmean = py1_wmean.resample('D', how='median')
             #py1_wstd = py1_wstd.resample('D', how='mean').fillna(0.0)
 
-            #data = detrend(py1_wmean)
+            data = detrend(py1_wmean)
 
-            #pair1 = alldf[alldf['Pairs'] == 'YA_FJS_YA_SNE'].copy()
-            
             #~ plt.plot(ALL.index, ALL[dttname],c='r',label='ALL: $\delta v/v$ of the mean network')
             #plt.plot(pair1.index, pair1[dttname], c='b',label='pair')
             #~ plt.plot(pair2.index, pair2[dttname], c='magenta',label='pair')
             #~ r = pd.rolling_mean(pair1[dttname], 30)
             #~ plt.plot(r.index, r, c='k')
             #plt.fill_between(ALL.index,ALL[dttname]-ALL[errname],ALL[dttname]+ALL[errname],lw=1,color='red',zorder=-1,alpha=0.3)
-            #~ plt.plot(py1_wmean.index, data,c='g',lw=1,zorder=11,label='Weighted mean of $\delta v/v$ of individual pairs')
-            #~ plt.fill_between(py1_wmean.index, data+py1_wstd,data-py1_wstd,color='g',lw=1,zorder=-1,alpha=0.3)
-            #~ plt.fill_between(py1_wmean.index, data+3*py1_wstd,data-3*py1_wstd,color='g',lw=1,zorder=-1,alpha=0.1)
+            plt.plot(py1_wmean.index, data, c='g', lw=1, zorder=11,
+                     label='Weighted mean of $\delta v/v$ of individual pairs')
+            plt.fill_between(py1_wmean.index, data+py1_wstd,data-py1_wstd,color='g',lw=1,zorder=-1,alpha=0.3)
             plt.ylabel('$\delta v/v$ in %')
-            #~ for pair in allbut['Pairs']:
-                #~ tmp = allbut[allbut['Pairs']==pair]
-                #~ plt.plot(tmp.index, tmp[dttname],lw=0.5)
-            # plt.ylim(0.5, -0.5)
 
             if first_plot == 1:
                 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=4,
-                           ncol=1, borderaxespad=0.)
+                           ncol=2, borderaxespad=0.)
                 left, right = plt.xlim()
                 if mov_stack == 1:
                     plt.title('1 Day')
@@ -160,7 +165,7 @@ def main(mov_stack=None, components='ZZ', filterid=1, savefig=False, show=False)
                 plt.xlim(left, right)
                 plt.title('%i Days Moving Window' % mov_stack)
 
-            plt.grid()
+            plt.grid(True)
             del alldf
     if savefig:
         plt.savefig('dtt_allmovstacksNEW_%s.png' % dttname, dpi=300)

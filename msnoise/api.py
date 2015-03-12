@@ -136,7 +136,7 @@ def get_config(session, name=None, isbool=False):
         config = session.query(Config).filter(Config.name == name).first()
         if config is not None:
             if isbool:
-                if config.value in [True, 'true', 'Y', 'y', '1', 1]:
+                if config.value in [True, 'True', 'true', 'Y', 'y', '1', 1]:
                     config = True
                 else:
                     config = False
@@ -324,8 +324,6 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
-    :type ref: int
-    :param ref: The Station ID in the database
     :type net: str
     :param net: The network code of the Station
     :type sta: str
@@ -506,9 +504,9 @@ def get_data_availability(session, net=None, sta=None, comp=None,
     :param net: Network code
     :type sta: str
     :param sta: Station code
-    :type starttime: datetime.datetime
+    :type starttime: datetime.datetime, datetime.date
     :param starttime: Start time of the search
-    :type endtime: datetime.datetime
+    :type endtime: datetime.datetime, datetime.date
     :param endtime: End time of the search
 
     :rtype: list
@@ -571,8 +569,6 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     Updates or Inserts a new :class:`~msnoise.msnoise_table_def.Job` in the
     database.
 
-    :type ref: int
-    :param ref: The Job ID in the database
     :type day: str
     :param day: The day in YYYY-MM-DD format
     :type pair: str
@@ -739,7 +735,7 @@ def reset_jobs(session, jobtype, alljobs=False):
     :type jobtype: str
     :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
     :type alljobs: bool
-    :param aljobs: If True, resets all jobs. If False (default), only resets
+    :param alljobs: If True, resets all jobs. If False (default), only resets
         jobs "I"n progress.
     """
     jobs = session.query(Job).filter(Job.jobtype == jobtype)
@@ -812,7 +808,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration, compon
     :type station1: str
     :param station1: The name of station 1 (formatted NET.STA)
     :type station2: str
-    :param statin2: The name of station 2 (formatted NET.STA)
+    :param station2: The name of station 2 (formatted NET.STA)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type date: datetime.date or str
@@ -960,8 +956,7 @@ def get_results(session, station1, station2, filterid, components, dates,
         else:
             return 0, None
 
-    elif format=="matrix":
-        from multiprocessing import Pool
+    elif format == "matrix":
         stack = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
         i = 0
         base = os.path.join("STACKS", "%02i"%filterid,

@@ -14,6 +14,7 @@ from api import *
 import logging
 import numpy as np
 
+
 def main():
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s [%(levelname)s] %(message)s',
@@ -22,10 +23,7 @@ def main():
     logging.info('*** Starting: New Jobs ***')
 
     db = connect()
-    if get_config(db, name="autocorr") in ['Y', 'y', '1', 1]:
-        AUTOCORR = True
-    else:
-        AUTOCORR = False
+    autocorr = get_config(db, name="autocorr", isbool=True)
 
     stations_to_analyse = ["%s.%s" % (sta.net, sta.sta) for sta in get_stations(db, all=False)]
     all_jobs = []
@@ -42,12 +40,10 @@ def main():
     count = 0
     for day in updated_days:
         jobs = []
-        print "Day=", day
         modified = []
         available = []
         for data in get_data_availability(db, starttime=day, endtime=day+datetime.timedelta(days=1)):
             sta = "%s.%s" % (data.net, data.sta)
-            print sta
             if sta in stations_to_analyse:
                 available.append(sta)
                 if data.flag in ["N", "M"]:
@@ -55,10 +51,12 @@ def main():
 
         for m in modified:
             for a in available:
-                if m != a or AUTOCORR:
+                if m != a or autocorr:
                     pair = ':'.join(sorted([m, a]))
                     if pair not in jobs:
-                        all_jobs.append({"day":day,"pair":pair,"jobtype":"CC","flag":"T","lastmod":None})
+                        all_jobs.append({"day": day, "pair": pair,
+                                         "jobtype": "CC", "flag": "T",
+                                         "lastmod": None})
                         jobs.append(pair)
 
         if len(all_jobs) > 1e5:

@@ -65,24 +65,25 @@ def main(system=False, modules=False, env=False, all=False):
         ispresent('enable')
         ispresent('scikits.samplerate')
         ispresent('obspy')
-        
+
+        print
+        print "Only necessary if you plan to build the doc locally:"
         ispresent('sphinx')
         ispresent('jinja2')
-        
-        ispresent('flask')
-        ispresent('flask.ext.admin', 'easy_install flask-admin')
-        ispresent('wtforms')
-        ispresent('json')
-        ispresent('psutil')
-        
+
         print
-        print "Backends: (at least one is required)"
+        print "Graphical Backends: (at least one is required)"
         ispresent('wx')
         ispresent('PyQt4')
         ispresent('PySide')
         
         print
         print "Not required, just checking:"
+        ispresent('json')
+        ispresent('psutil')
+        ispresent('flask')
+        ispresent('flask.ext.admin', 'easy_install flask-admin')
+        ispresent('wtforms')
         ispresent('reportlab')
         ispresent('configobj')
         ispresent('pkg_resources')
