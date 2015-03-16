@@ -1060,9 +1060,6 @@ def build_ref_datelist(session):
     The returned tuple contains a start and an end date, and a list of
     individual dates between the two.
 
-    .. todo:: rewrite this using pandas, merge with
-        :func:`build_movstack_datelist`
-
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
@@ -1088,8 +1085,6 @@ def build_movstack_datelist(session):
     Creates a date array for the analyse period.
     The returned tuple contains a start and an end date, and a list of
     individual dates between the two.
-
-    .. todo:: rewrite this using pandas, merge with :func:`build_ref_datelist`
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as

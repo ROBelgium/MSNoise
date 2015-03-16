@@ -23,8 +23,29 @@ To run this script:
 .. code-block:: sh
 
     $ msnoise populate
-    
-.. note:: TODO: add explanation how to make custom data_structure and parser
+
+Custom data structure & station table population
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If one's data structure is not one of the pre-defined, MSNoise expects to find
+a file named ``custom.py`` in the current folder. This python file will contain
+the data_structure (here ``data_structure`` = "TOM" in the configuration and a
+function called ``populate`` wich will accept one
+argument and return a list of stations in the format ``NET_STA``:
+
+.. code-block:: python
+
+    data_structure['TOM'] = "YEAR/NET/STA/CHAN/YEAR.DAY"
+
+    def populate(data_folder):
+        datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*")))
+        stations = []
+        for di in datalist
+            tmp = os.path.split(di)
+            sta = tmp[1]
+            net = os.path.split(tmp[0])[1]
+            stations.append("%s_%s" % (net, sta))
+        return stations
 
 """
 

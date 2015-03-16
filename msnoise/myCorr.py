@@ -8,8 +8,6 @@ def myCorr(data, maxlag, plot=False):
     """This function takes ndimensional *data* array, computes the cross-correlation in the frequency domain
     and returns the cross-correlation function between [-*maxlag*:*maxlag*].
 
-    .. todo:: add a line on the +++++----- to -----++++++
-
     :type data: :class:`numpy.ndarray`
     :param data: This array contains the fft of each timeseries to be cross-correlated.
     :type maxlag: int

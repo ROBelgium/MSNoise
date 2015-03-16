@@ -1,5 +1,3 @@
-.. _workflow:
-
 Plotting
 ========
 MSNoise comes with some default plotting tools.

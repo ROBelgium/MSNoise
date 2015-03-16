@@ -1,10 +1,10 @@
 .. _how_tos:
 
 How To's
-================
+========
 
 Reprocess data
-------------------------------------
+--------------
 
 When starting to use MSNoise, one will most probably need to re-run different
 parts of the Workflow more than one time. By default, MSNoise is designed to
@@ -13,7 +13,7 @@ we present cases that will cover most of the re-run techniques:
 
 
 When adding a new filter
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 If new filter are added to the filters list in the Configurator, one has to
 reprocess all CC jobs, but not for filters already existing. The recipe is:
@@ -33,7 +33,7 @@ for 'filter id'=2, etc.
 
 
 When changing the REF
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 When changing the REF, the REF stack has to be re-computed:
 
@@ -43,7 +43,7 @@ days are checked for modification. The REF will then be re-output.
 
 
 When changing the MWCS parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If the MWCS parameters are changed in the database, all MWCS jobs need to be
 reprocessed.
@@ -57,7 +57,7 @@ shoud do the trick.
 
 
 When changing the dt/t parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 ``msnoise compute_dtt --i 999`` will ensure all MWCS jobs marked done in the
@@ -66,32 +66,31 @@ last 999 days are checked for modification.
 
 
 Define one's own data structure of the waveform archive
----------------------------------------------------------
+-------------------------------------------------------
 
 The data_structure.py file contains the known data archive formats. If another
 data format needs to be defined, it will be done in the ``custom.py`` file
 in the current project folder:
 
-.. todo:: Explain custom.py format.
+.. seealso:: Check the "Populate Station Table" step in the :doc:`workflow`.
 
 
 How to have MSNoise work with 2+ data structures at the same time
--------------------------------------------------------------------
+-----------------------------------------------------------------
 
 Not yet implemented.
 
 
 How to duplicate/dump the MSNoise configuration
-------------------------------------------------
+-----------------------------------------------
 
 Not yet implemented.
 
 
-
-
 .. _testing:
+
 Testing the Dependencies
-------------------------------------
+------------------------
 
 Once installed, you should be able to import the python packages in a python console. 
 MSNoise comes with a little script called `bugreport.py` that can be useful

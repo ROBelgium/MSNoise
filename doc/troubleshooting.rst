@@ -3,8 +3,6 @@
 Troubleshooting
 ================
 
-.. _testing:
-
 Testing the Dependencies - Debugging
 ------------------------------------
 

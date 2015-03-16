@@ -2,7 +2,7 @@
 
 
 Installation
-=============
+============
 
 Introduction
 ------------
@@ -151,108 +151,109 @@ scikits.samplerate
 https://pypi.python.org/pypi/scikits.samplerate is a wrapper to the Secret Rabbit Code (aka libsamplerate) (de Castro Lopo, 2013)
 
 Windows
-++++++++
++++++++
 
 Download and install the right version from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate
 
 Linux
-+++++++
++++++
 
 You first need to install the SRC library:
 
 .. code-block:: sh
 
-	sudo apt-get install libsamplerate0 libsamplerate0-dev
+    sudo apt-get install libsamplerate0 libsamplerate0-dev
 
 This python package will probably be the most tricky to install. If you are lucky, you can just
 
 .. code-block:: sh
 
-	easy_install scikits.samplerate
+    easy_install scikits.samplerate
 
 On my Ubuntu 12.04, this results in an error because the SRC library path is not found. The reason is that the setup searches SRC in /usr/lib and not in /usr/lib/x86_64-linux-gnu where the library is actually present. To install, you need to download the archive from pypi and edit some configuration file:
 
 .. code-block:: sh
 
-	wget https://pypi.python.org/packages/source/s/scikits.samplerate/scikits.samplerate-0.3.3.tar.gz#md5=96c8d8ba3aa95a9db15994f78792efb4
-	tar -xvf scikits.samplerate-0.3.3.tar.gz
-	cd scikits.samplerate-0.3.3
+    wget https://pypi.python.org/packages/source/s/scikits.samplerate/scikits.samplerate-0.3.3.tar.gz#md5=96c8d8ba3aa95a9db15994f78792efb4
+    tar -xvf scikits.samplerate-0.3.3.tar.gz
+    cd scikits.samplerate-0.3.3
 
 then edit the site.cfg example file and insert the following lines:
 
 .. code-block:: sh
 
-	[samplerate]
-	library_dirs=/usr/lib/x86_64-linux-gnu
-	include_dirs=/usr/include
+    [samplerate]
+    library_dirs=/usr/lib/x86_64-linux-gnu
+    include_dirs=/usr/include
 
 To know where the SRC library is on you machine:
 
 .. code-block:: sh
 
-	sudo dpkg -L libsamplerate0
-	sudo dpkg -L libsamplerate0-dev
+    sudo dpkg -L libsamplerate0
+    sudo dpkg -L libsamplerate0-dev
 
 then, build and install:
 
 .. code-block:: sh
 
-	python setup.py build
-	python setup.py install
+    python setup.py build
+    python setup.py install
 
 
 SQLAlchemy
 ~~~~~~~~~~
 Windows
-++++++++
++++++++
 Download and install the right version from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#sqlalchemy
 
 
 Linux:
-+++++++
+++++++
 
 .. code-block:: sh
 
-	easy_install sqlalchemy
+    easy_install sqlalchemy
 
 .. _mysql:
 
 MySQL Server
--------------
+------------
 .. warning:: MySQL is not compulsory, one *can* work only using sqlite database. See :ref:`aboutdbandperformances`. for more info.
+
 MSNoise requires a database in order to store waveform metadata, configuration bits and jobs.
 If you choose to use MySQL, a running MySQL server must be available, either on the network or on localhost and have a privileged user and a database.
 
 Windows
-~~~~~~~~~~
+~~~~~~~
 The simplest option to install a MySQL server on your machine is to install EasyPHP_, a small AMP (Apache, MySQL, PHP) server.
 
 Linux
-~~~~~~~~~~
+~~~~~
 
 If you don't have a MySQL server on the network, you need to install one locally on your computer.
 MySQL is usually prepackaged for every distribution, on Ubuntu/Debian you should:
 
 .. code-block:: sh
 
-	sudo apt-get install mysql-server mysql-client
+    sudo apt-get install mysql-server mysql-client
 
 We recommend to install phpmyadmin too, as it is a handy tool to edit the database directly
 
 .. code-block:: sh
 
-	sudo apt-get install phpmyadmin
+    sudo apt-get install phpmyadmin
 
 This will also install apache2 and php, needed to run phpmyadmin. Once installed, it should be available through http://localhost/phpmyadmin.
 
 
 Database Structure - Tables
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 MSNoise will create the tables automatically upon running the installer script (see :ref:`Workflow`).
 
 
 Building this documentation
------------------------------
+---------------------------
 
 To build this documentation, some modules are required:
 
