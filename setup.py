@@ -15,7 +15,6 @@ setup(
         'sqlalchemy',
         'traits',       
         'traitsui',
-        'enable',
         'obspy',
         'Click',
     ],

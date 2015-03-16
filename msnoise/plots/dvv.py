@@ -66,7 +66,7 @@ def get_wavgwstd(data, dttname, errname):
 
 
 def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
-         pairs=[], savefig=False, show=False):
+         pairs=[], output=None, show=False):
     db = connect()
 
     if get_config(db, name="autocorr", isbool=True):
@@ -184,8 +184,9 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
 
             plt.grid(True)
             del alldf
-    if savefig:
-        plt.savefig('dtt_allmovstacksNEW_%s.png' % dttname, dpi=300)
+    if output:
+        plt.savefig(output)
+
     plt.show()
 
 if __name__ == "__main__":

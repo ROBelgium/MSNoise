@@ -255,12 +255,12 @@ def data_availability(show):
 @click.option('-p', '--pair', default=None,  help='Plot a specific pair',
               multiple=True)
 @click.option('-M', '--dttname', default="M",  help='Plot M or M0?')
-@click.option('-s', '--savefig', is_flag=True, help='Save figure to disk (PNG)')
+@click.option('-o', '--output', default=None, help='Filename to save figure to disk')
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-def dvv(mov_stack, comp, dttname, filterid, pair, savefig, show):
+def dvv(mov_stack, comp, dttname, filterid, pair, output, show):
     """Plots the dv/v (parses the dt/t results)"""
     from ..plots.dvv import main
-    main(mov_stack, dttname, comp, filterid, pair, savefig, show)
+    main(mov_stack, dttname, comp, filterid, pair, output, show)
 
 
 @click.command()

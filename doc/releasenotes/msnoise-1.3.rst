@@ -1,7 +1,9 @@
+.. include:: ../configs.hrst
+
 MSNoise 1.3
 =============
 
-Release date: 22 March 2015
+Release date: 20 March 2015
 
 Release notes:
 
@@ -13,8 +15,8 @@ Introduction
 
 8 months after the last release, we are proud to announce the new MSNoise 1.3.
 It is a major release, introducing a brand new way of executing the workflow.
-The workflow in itself doesn't change, so experienced users as well as new users
-reading the SRL publication will find their way easily!
+The workflow in itself doesn't change, so experienced users as well as new
+users reading the SRL publication will find their way easily!
 
 MSNoise is now a Python Package, allowing a single (and easy) install for all
 your projects and/or all users. The new top-level ``msnoise`` command contains
@@ -61,8 +63,8 @@ MSNoise is a real Python Package
 --------------------------------
 
 This is probably the most important change since the original release of
-MSNoise 1.0 (August 2013), it represents a massive amount of work since the last
-release (1.2.5 in June 2014), and is probably the most needed by users!
+MSNoise 1.0 (August 2013), it represents a massive amount of work since the
+last release (1.2.5 in June 2014), and is probably the most needed by users!
 
 In practice, what does change ?
 
@@ -75,7 +77,7 @@ In practice, what does change ?
 
 MSNoise being installed in the standard lib directories means it shouldn't
 write or output anything in those folders. To facilitate the launch of commnands
-a new top level `msnoise` command has been created, and should be available
+a new top level ``msnoise`` command has been created, and should be available
 right after installing.
 
 
@@ -128,8 +130,8 @@ All the commands are visible using the ``--help`` argument:
       test                Runs the test suite, should be executed in an...
       upgrade_db          Upgrade the database from pre-1.3 to MSNoise...
 
-The parameters/arguments of each command are explained using its own ``--help``,
-for example:
+The parameters/arguments of each command are explained using its own ``--help``
+, for example:
 
 .. code-block:: sh
 
@@ -195,6 +197,40 @@ Same as above, sub-commands have their own ``--help``:
       --help                   Show this message and exit.
 
 .. image:: ../.static/13newplots.png
+
+New functionality: Dynamic time lags
+------------------------------------
+As before, the dt/t is determined as the slope of the delays vs time lags.
+the slope is calculated a weighted linear regression (WLS) through selected
+points.
+The selection of points is first based on the time lag criteria.
+The minimum time lag can either be defined absolutely or dynamically.
+When ``dtt_lag`` is set to "dynamic" in the database, the inter-station
+distance is used to determine the minimum time lag. This lag is calculated from
+the distance and a velocity configured (``dtt_v``). The velocity is determined
+by the user so that the minlag doesn't include the ballistic waves. For example
+if ballistic waves are visible with a velocity of 2 km/s, one could configure
+dtt_v=1.0.
+This way, if stations are located 15 km apart, the minimum lag time will be
+set to 15 s. The ``dtt_width`` determines the width of the lag window used. A
+value of 30.0 means the process will use time lags between 15 and 45 s in the
+example above, on both sides if configured (``dtt_sides``), or only causal or
+acausal parts of the CCF.
+
+New parameters have been added to the configuration:
+
+* |dtt_lag|
+* |dtt_v|
+* |dtt_minlag|
+* |dtt_width|
+* |dtt_sides|
+* |dtt_mincoh|
+* |dtt_maxerr|
+* |dtt_maxdt|
+
+
+.. seealso:: The description of the :ref:`workflowcomputedtt` step in the
+   workflow.
 
 Math updates & bugfixes
 -----------------------

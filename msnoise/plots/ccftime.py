@@ -8,7 +8,7 @@ background (very heavy !).
 
 .. code-block:: sh
 
-    msnoise plot ccftime --hel
+    msnoise plot ccftime --help
     Usage: msnoise-script.py plot ccftime [OPTIONS] STA1 STA2
 
       Plots the dv/v (parses the dt/t results)
