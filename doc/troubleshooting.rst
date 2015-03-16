@@ -1,7 +1,7 @@
 .. _troubleshooting:
 
 Troubleshooting
-================
+===============
 
 Testing the Dependencies - Debugging
 ------------------------------------

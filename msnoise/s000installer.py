@@ -26,7 +26,7 @@ To run this script:
 """
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import  *
+from sqlalchemy.exc import *
 from getpass import getpass
 from msnoise_table_def import *
 from default import default

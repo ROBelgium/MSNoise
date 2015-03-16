@@ -6,7 +6,6 @@ Workflow
 ==========
 
 
-
 .. image:: .static/Figure01_workflow_summary_cmyk.png
 
 
@@ -21,57 +20,50 @@ Installer
 .. automodule:: msnoise.s000installer
 
 
-
 Configurator
--------------
+------------
 
 .. automodule:: msnoise.s001configurator
 
 
-
 Populate Station Table
------------------------
+----------------------
 
 .. automodule:: msnoise.s002populate_station_table
 
 
-
 Scan Archive
----------------
+------------
+
 .. automodule:: msnoise.s01scan_archive
 
 
-
 New Jobs
------------
+--------
 
 .. automodule:: msnoise.s02new_jobs
 
 
-
 Compute Cross-Correlations
-----------------------------
+--------------------------
 
 .. automodule:: msnoise.s03compute_cc
 
 
-
 Stack
---------
+-----
+
 .. automodule:: msnoise.s04stack
 
-	
 
 Compute MWCS
------------------
+------------
 
 .. automodule::  msnoise.s05compute_mwcs
 
 
-
-
 Compute dt/t
----------------
+------------
 
 .. automodule::  msnoise.s06compute_dtt
 

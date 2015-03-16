@@ -1,7 +1,7 @@
 MSNoise 1.3
 =============
 
-Release date: 22 Mars 2015
+Release date: 22 March 2015
 
 Release notes:
 
@@ -44,6 +44,8 @@ several users:
 * Jean Battaglia
 * Sébastien Carniato
 * Xiao Wang
+* Lion Krisher
+* Tobias Megies
 * all participants to the 2014 Pre-AGU MSNoise workshop
 * all others (don't be mad :-) )
 

@@ -1,4 +1,3 @@
-# table_def.py
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime,\
     text, TIMESTAMP, Enum
 from sqlalchemy.ext.declarative import declarative_base

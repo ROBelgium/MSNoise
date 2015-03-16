@@ -1,4 +1,3 @@
-# database_tools.py
 import os
 import logging
 import copy
