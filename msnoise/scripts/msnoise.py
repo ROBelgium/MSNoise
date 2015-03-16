@@ -13,14 +13,17 @@ def cli(ctx, threads):
 
 @click.command()
 def test():
+    """Runs the test suite, should be executed in an empty folder!"""
     from ..test.tests import main
     main()
 
 
 @click.command()
 def upgrade_db():
-    from sqlalchemy.exc import IntegrityError
-    from ..api import connect, Config, get_config
+    """Upgrade the database from pre-1.3 to MSNoise 1.3. This should only
+    be ran once."""
+    from sqlalchemy.exc import IntegrityError, OperationalError
+    from ..api import connect, Config, get_tech, get_engine
     from ..default import default
     db = connect()
     try:
@@ -32,9 +35,23 @@ def upgrade_db():
         print "The DB seems already up-to-date, exiting."
     db.close()
 
+    if get_tech() == 2:
+        try:
+            e = get_engine()
+            e.execute('ALTER TABLE `jobs` CHANGE `type` `jobtype` VARCHAR( 10 )')
+        except OperationalError:
+            print "The jobs table seems already up-to-date, exiting."
+    else:
+        print "OK, the new config parameters have been inserted, but you need" \
+              "to edit the `jobs` table manually in oder to match the new" \
+              "columns naming."
+        print "Please read http://msnoise.org/doc/releasenotes/msnoise-1.3.html"
+
 
 @click.command()
 def info():
+    """Outputs general information about the current install and config, plus
+    information about jobs and their status."""
     from ..api import connect, get_config, get_job_types
     from ..default import default
     
@@ -44,7 +61,8 @@ def info():
     if os.path.isfile('db.ini'):
         click.echo(' - db.ini is present')
     else:
-        click.secho(' - db.ini is not present, is MSNoise installed here ?', fg='red')
+        click.secho(' - db.ini is not present, is MSNoise installed here ?',
+                    fg='red')
         return
     
     db = connect()
@@ -110,14 +128,14 @@ def config():
 
 @click.command()
 @click.option('-s', '--sys', is_flag=True, help='System Info')
-@click.option('-m', '--modules', is_flag=True, help='Modules Info')
+@click.option('-m', '--modules', is_flag=True, default=True, help='Modules Info')
 @click.option('-e', '--env', is_flag=True, help='Environment Info')
 @click.option('-a', '--all', is_flag=True, help='All Info')
 @click.pass_context
 def bugreport(ctx, sys, modules, env, all):
     """This command launches the Bug Report script."""
     click.echo('Let\'s Bug Report MSNoise !')
-    click.echo('Working on %i threads' % ctx.obj['MSNOISE_threads'])
+    #click.echo('Working on %i threads' % ctx.obj['MSNOISE_threads'])
     from ..bugreport import main
     main(sys, modules, env, all)
 
@@ -135,7 +153,7 @@ def populate():
 def scan_archive(ctx, init):
     """Scan the archive and insert into the Data Availability table."""
     from ..s01scan_archive import main
-    main(init, ctx.obj['MSNOISE_threads'])
+    main(init, threads=ctx.obj['MSNOISE_threads'])
 
 
 @click.command()
@@ -179,16 +197,18 @@ def compute_mwcs():
 
 @click.command()
 def compute_stretching():
-    """Computes the MWCS based on the new stacked data"""
+    """[experimental] Computes the stretching based on the new stacked data"""
     from ..stretch import main
     main()
 
 
 @click.command()
-def compute_dtt():
+@click.option('-i', '--interval', default=1, help='Number of days before now to\
+ search for modified Jobs')
+def compute_dtt(interval):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt import main
-    main()
+    main(interval)
 
 
 @click.command()
@@ -278,7 +298,7 @@ def ccftime(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show):
 @click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
 def mwcs(sta1, sta2, filterid, comp, mov_stack,show):
-    """Plots the interferogram between sta1 and sta2 (parses the CCFs)"""
+    """Plots the mwcs results between sta1 and sta2 (parses the CCFs)"""
     from ..plots.mwcs import main
     main(sta1, sta2, filterid, comp, mov_stack, show)
 
@@ -291,7 +311,7 @@ def mwcs(sta1, sta2, filterid, comp, mov_stack,show):
 @click.option('-a', '--ampli', default=1.0, help='Amplification')
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
 def distance(filterid, comp, mov_stack, ampli, show):
-    """Plots the interferogram between sta1 and sta2 (parses the CCFs)"""
+    """Plots the REFs of all pairs vs distance"""
     from ..plots.distance import main
     main(filterid, comp, mov_stack, ampli, show)
 
@@ -299,7 +319,7 @@ def distance(filterid, comp, mov_stack, ampli, show):
 @click.command()
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
 def station_map(show):
-    """Plots the interferogram between sta1 and sta2 (parses the CCFs)"""
+    """Plots the station map (very basic)"""
     from ..plots.station_map import main
     main(show)
 

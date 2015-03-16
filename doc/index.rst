@@ -14,17 +14,28 @@ Contents:
 
 .. toctree::
    :maxdepth: 2
-   
+
    installation
+
    workflow
    plotting
+   api
    core
+   table_def
    how_tos
    about_db_performances
    references
-   table_def
-   api
    todos
+
+
+Release Notes:
+
+.. toctree::
+   :maxdepth: 1
+
+   releasenotes/msnoise-1.3
+   releasenotes/msnoise-1.2.5
+   releasenotes/msnoise-1.2.4
 
 
 Indices and tables

@@ -26,7 +26,7 @@ setup(
     author = "Thomas Lecocq & MSNoise dev team",
     author_email = "Thomas.Lecocq@seismology.be",
     description = "A Python Package for Monitoring Seismic Velocity Changes using Ambient Seismic Noise",
-    licence = "EUPL-1.1",
+    license = "EUPL-1.1",
     url = "http://www.msnoise.org",
     keywords="noise monitoring seismic velocity change dvv dtt doublet stretching cross-correlation acoustics seismology"
 )

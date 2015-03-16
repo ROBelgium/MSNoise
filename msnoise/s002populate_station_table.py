@@ -18,8 +18,6 @@ the reader in this script.
 
 By default, station coordinates are initialized at 0.
 
-.. note:: TODO: create a parser for stationXML and/or dataless SEED.
-
 To run this script:
 
 .. code-block:: sh

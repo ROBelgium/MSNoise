@@ -1,11 +1,25 @@
-"""MSNoise is ...
+"""
+This plots a very raw station map (needs improvement). This plot requires
+cartopy !
 
-Usage:
-~~~~~~
 
 .. code-block:: sh
 
-    $ msnoise plot interferogram
+    msnoise plot station_map --help
+
+    Usage: msnoise-script.py plot station_map [OPTIONS]
+
+      Plots the station map (very basic)
+
+    Options:
+      -s, --show BOOLEAN  Show interactively?
+      --help              Show this message and exit.
+
+Example:
+
+``msnoise plot station_map`` :
+
+.. image:: .static/station_map.png
 
 """
 # plot interferogram
@@ -28,11 +42,11 @@ def main(show=True):
     
     plt.figure()
     ax = plt.subplot(111, projection=ccrs.PlateCarree())
-    
-    coords = [(sta.X, sta.Y) for sta in stations]
-    print coords
-    
     ax.coastlines()
+
+    coords = [(sta.X, sta.Y) for sta in stations]
+    coords = np.array(coords)
+    plt.scatter(coords[:,0], coords[:,1], transform=ccrs.Geodetic())
 
     plt.show()
             

@@ -1,11 +1,25 @@
-"""MSNoise is ...
+"""
+Plots the data availability, as contained in the database. Every day which
+has a least some data will be coloured in red. Days with no data remain blank.
 
-Usage:
-~~~~~~
 
 .. code-block:: sh
 
-    $ msnoise plot data_availability
+    msnoise plot dvv --help
+
+    Usage: msnoise-script.py plot data_availability [OPTIONS]
+
+      Plots the Data Availability vs time
+
+    Options:
+      -s, --show BOOLEAN  Show interactively?
+      --help              Show this message and exit.
+
+Example:
+
+``msnoise plot data_availability`` :
+
+.. image:: .static/data_availability.png
 
 """
 

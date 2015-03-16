@@ -10,19 +10,30 @@
 {% block footer %}
 <hr>
 <div id="centerer">
-    <b>MSNoise is a project of</b>
-    <div id="clear"></div>
-    <div id="half_footer">
-        <img src='_static/ORB_logo.png'><br>Dr. Thomas Lecocq &amp; Dr. Corentin Caudron<br>
+    <div class="third_footer">
+    <b>MSNoise is primarily maintained by</b><br>
+        <img src='{{ pathto('_static/ORB_logo.png', 1) }}'><br>Dr. Thomas Lecocq<br>
         <a target="_blank"  href="http://www.seismology.be">Seismology.be</a><br>
         Avenue Circulaire, 3<br>
         B1180 Uccle (Brussels)<br>
         Belgium
     </div>
-    <div id="half_footer">
-        <img src='_static/isterre.png'><img src='_static/ipgp.png'><br>Dr. Florent Brenguier
+
+
+    <div class="third_footer">
+    <b>And developed since 2010 with</b><br>
+     <img src='{{ pathto('_static/eos.png', 1) }}'><br>Dr. Corentin Caudron<br>
+    <i>Formerly at R.O.Belgium (2009-2013)</i>
+
+    </div>
+
+    <div class="third_footer">
+    <b>Based on original codes from</b><br>
+     <img src='{{ pathto('_static/isterre.png', 1) }}'><img src='{{ pathto('_static/ipgp.png', 1) }}'><br>Dr. Florent Brenguier
     </div>
 </div>
+
+
 <div id="clear"></div>
 <script>
   (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){

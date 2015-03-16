@@ -282,6 +282,13 @@ class MSNoiseTests(unittest.TestCase):
 
 
 def main():
+    import os
+    import sys
+    c = len(os.listdir(os.getcwd()))
+    if c > 0:
+        print "Directory is not empty, can't run tests here!"
+        sys.exit()
+
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
     result = unittest.TestResult()
     runner = unittest.TextTestRunner(verbosity=2)

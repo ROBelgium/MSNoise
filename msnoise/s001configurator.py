@@ -22,12 +22,12 @@ Default Global Parameters
 Network-Station Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: describe
+.. seealso :: :class:`msnoise.msnoise_table_def.Station`
 
 Filter Parameters
 ~~~~~~~~~~~~~~~~~
 
-.. todo:: describe
+.. seealso :: :class:`msnoise.msnoise_table_def.Filter`
 
 """
 

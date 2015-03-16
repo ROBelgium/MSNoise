@@ -1,11 +1,28 @@
-"""MSNoise is ...
-
-Usage:
-~~~~~~
+"""
+Plots the REF stacks vs interstation distance. This could help deciding which
+parameters to use in the dt/t calculation step.
 
 .. code-block:: sh
 
-    $ msnoise plot interferogram
+    msnoise plot distance --help
+
+    Usage: msnoise-script.py plot distance [OPTIONS]
+
+      Plots the REFs of all pairs vs distance
+
+    Options:
+      -f, --filterid INTEGER   Filter ID
+      -c, --comp TEXT          Components (ZZ, ZR,...)
+      -m, --mov_stack INTEGER  Mov Stack to read from disk
+      -a, --ampli FLOAT        Amplification
+      -s, --show BOOLEAN       Show interactively?
+      --help                   Show this message and exit.
+
+Example:
+
+``msnoise plot distance`` will plot all defaults:
+
+.. image:: .static/distance.png
 
 """
 # plot interferogram

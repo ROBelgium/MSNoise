@@ -1,12 +1,32 @@
-"""MSNoise is ...
+"""
+This plot shows the cross-correlation functions (CCF) vs time. The parameters
+allow to plot the daily or the mov-stacked CCF. Filters and components are
+selectable too. The ``--ampli`` argument allows to increase the vertical scale
+of the CCFs. The ``--seismic`` shows the up-going wiggles with a black-filled
+background (very heavy !).
 
-Usage:
-~~~~~~
 
 .. code-block:: sh
 
-    $ msnoise plot ccftime
+    msnoise plot ccftime --hel
+    Usage: msnoise-script.py plot ccftime [OPTIONS] STA1 STA2
 
+      Plots the dv/v (parses the dt/t results)
+
+    Options:
+      -f, --filterid INTEGER   Filter ID
+      -c, --comp TEXT          Components (ZZ, ZR,...)
+      -m, --mov_stack INTEGER  Mov Stack to read from disk
+      -a, --ampli FLOAT        Amplification
+      -S, --seismic            Seismic style
+      -s, --show BOOLEAN       Show interactively?
+      --help                   Show this message and exit.
+
+Example:
+
+``msnoise plot ccftime ID.KWUI ID.POSI`` will plot all defaults:
+
+.. image:: .static/ccftime.png
 """
 # plot interferogram
 import matplotlib.pyplot as plt

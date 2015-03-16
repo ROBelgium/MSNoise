@@ -30,19 +30,19 @@ help)
 
 .. code-block:: sh
 
-    $ msnoise stack -h
-    UPDATE HERE !!!!
-    usage: .py [-h] [-r] [-m] [-i INTERVAL]
+    $ msnoise stack --help
 
-    Compute [REF,MOV] stacks if jobs have been modified in the last i days.
-    optional arguments:
-      -h, --help            show this help message and exit
-      -r, --ref             Triggers the computation of REF stacks
-      -m, --mov             Triggers the computation of MOV stacks
-      -i INTERVAL, --interval INTERVAL
-                            Number of days before now to search for modified CC
-                            jobs [default:1]
+    Usage: msnoise-script.py stack [OPTIONS]
 
+      Stacks the [REF] and/or [MOV] windows
+
+    Options:
+      -r, --ref               Compute the REF Stack
+      -m, --mov               Compute the MOV Stacks
+      -s, --step              Compute the STEP Stacks
+      -i, --interval INTEGER  Number of days before now to search for modified
+                              Jobs
+      --help                  Show this message and exit.
 
 On a routine basis, one should thus run the following to compute REF *and* MOV
 stacks:

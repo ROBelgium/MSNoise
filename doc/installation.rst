@@ -8,28 +8,30 @@ Introduction
 ------------
 
 MSNoise is a set of Python codes that use a database (sqlite or MySQL) and
-the `find` command. When installed, it provides a top level command `msnoise`
+the `find` command. When installed, it provides a top level command ``msnoise``
 in the console. 
 
 To run MSNoise, you need:
 
-*   A recent version of Python (2.7.x recommended). We suggest using Anaconda_ with extra modules ([+] modules are already distributed with Anaconda_):
+* A recent version of Python (2.7.x recommended). We suggest using Anaconda_
+  with extra modules ([+] modules are already distributed with Anaconda_):
     
-    * numpy [+]
-    * scipy [+]
-    * pandas [+]
-    * matplotlib [+]
-    * statsmodels [+]
-    * SqlAlchemy [+]
-    * Enthought Tool Suite
-    * scikits.samplerate
-    * obspy
+  * numpy [+]
+  * scipy [+]
+  * pandas [+]
+  * matplotlib [+]
+  * statsmodels [+]
+  * SqlAlchemy [+]
+  * Enthought Tool Suite
+  * scikits.samplerate
+  * obspy
 
-*   MySQL: if you want to use MySQL, you need to install and configure a :ref:`mysql` beforehand. This is not needed for sqlite.
-    Read :ref:`aboutdbandperformances` for more information. We recommend using MySQL.
+* MySQL: if you want to use MySQL, you need to install and configure a :ref:`mysql` beforehand. This is not needed for sqlite.
+  Read :ref:`aboutdbandperformances` for more information. We recommend using MySQL.
 
-*   The `find` command: present by default on linux and available with gnufind_ on Windows.
+* The `find` command: present by default on linux and available with gnufind_ on Windows.
 
+.. warning:: Python 3 is **not** supported!
 
 Quick Start - Windows
 ----------------------

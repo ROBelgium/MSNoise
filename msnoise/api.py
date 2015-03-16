@@ -1181,7 +1181,7 @@ def azimuth(coordinates, x0, y0, x1, y1):
         azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
         return azim
     else:
-        print "woooooow, please consider having a single coordinate system for\
+        print "Please consider having a single coordinate system for\
             all stations"
         return 0
 

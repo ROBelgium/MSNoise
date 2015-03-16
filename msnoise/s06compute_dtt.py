@@ -36,15 +36,23 @@ This way, if stations are located 15 km apart, the minimum lag time will be
 set to 15 s. The ``dtt_width`` determines the width of the lag window used. A
 value of 30.0 means the process will use time lags between 15 and 45 s in the
 example above, on both sides if configured (``dtt_sides``), or only causal or
-acausal parts of the CCF.
+acausal parts of the CCF. The following figure shows the static time lags of
+``dtt_width`` = 40s starting at ``dtt_minlag`` = 10s and the dynamic time lags
+for a ``dtt_v`` = 1.0 km/s for the Piton de La Fournaise network (including
+stations *not* on the volcano),
 
+
+.. image:: .static/static.png
+
+.. image:: .static/dynamic.png
+
+.. warning:: In order to use the dynamic time lags, one has to provide the
+   station coordinates !
 
 2. Using example values above, we chose to use only 15-45 s coda part of the
 signal, neglecting direct waves in the 0-15 seconds range. We then select data
 which match three other thresholds: ``dtt_mincoh``, ``dtt_maxerr`` and
 ``dtt_maxdt``.
-
-...
 
 .. image:: .static/Figure04_dttmatrix_01_005DAYS_ZZ-2010-10-12_cmyk.png
 
@@ -137,10 +145,10 @@ def wavg_wstd(data, errors):
     return wavg, wstd
 
 
-def main():
+def main(interval=1):
     logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s [%(levelname)s] %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S')
+                        format='%(asctime)s [%(levelname)s] %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
 
     logging.info('*** Starting: Compute DT/T ***')
     db = connect()
@@ -164,7 +172,7 @@ def main():
     
     components_to_compute = get_components_to_compute(db)
     updated_dtt = updated_days_for_dates(
-        db, start, end, '%', jobtype='DTT', returndays=True, interval=datetime.timedelta(days=1))
+        db, start, end, '%', jobtype='DTT', returndays=True, interval=datetime.timedelta(days=interval))
     
     for f in get_filters(db, all=False):
         filterid = int(f.ref)
@@ -183,8 +191,10 @@ def main():
                         pair = "%s_%s" % (sta1, sta2)
                         day = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" %
                                            mov_stack, components, pair, '%s.txt' % current)
+                        dist = get_interstation_distance(station1, station2, station1.coordinates)
+                        if dist == 0.:
+                            logging.debug('%s: Distance is Zero?!' % pair)
                         if os.path.isfile(day):
-                            #~ print day
                             df = pd.read_csv(
                                 day, delimiter=' ', header=None, index_col=0, names=['t', 'dt', 'err', 'coh'])
                             tArray = df.index.values
@@ -192,7 +202,6 @@ def main():
                                 lmlag = -dtt_minlag
                                 rmlag = dtt_minlag
                             else:
-                                dist = get_interstation_distance(station1, station2, station1.coordinates)
                                 lmlag = -dist / dtt_v
                                 rmlag = dist / dtt_v
                             lMlag = lmlag - dtt_width

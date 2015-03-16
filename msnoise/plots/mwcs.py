@@ -1,14 +1,38 @@
-"""MSNoise is ...
+"""
+This plot shows the result of the MWCS calculations in two superposed images.
+One is the dt calculated vs time lag and the other one is the coherence. The
+image is constructed by horizontally stacking the MWCS of different days. The
+two right panels show the mean and standard deviation per time lag of the whole
+image. The selected time lags for the dt/t calculation are presented with green
+horizontal lines, and the minimum coherence or the maximum dt are in red.
 
-Usage:
-~~~~~~
+The ``filterid``, ``comp`` and ``mov_stack`` allow filtering the data used.
 
 .. code-block:: sh
 
-    $ msnoise plot interferogram
+    msnoise plot mwcs --help
+
+    Usage: msnoise-script.py plot mwcs [OPTIONS] STA1 STA2
+
+      Plots the mwcs results between sta1 and sta2 (parses the CCFs)
+
+    Options:
+      -f, --filterid INTEGER   Filter ID
+      -c, --comp TEXT          Components (ZZ, ZR,...)
+      -m, --mov_stack INTEGER  Mov Stack to read from disk
+      -s, --show BOOLEAN       Show interactively?
+      --help                   Show this message and exit.
+
+
+Example:
+
+``msnoise plot mwcs ID.KWUI ID.POSI -m 3`` will plot all defaults with the
+mov_stack = 3:
+
+.. image:: .static/mwcs.png
 
 """
-# plot interferogram
+
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator, YearLocator
 from scipy.stats import scoreatpercentile

@@ -1,11 +1,28 @@
-"""MSNoise is ...
-
-Usage:
-~~~~~~
+"""
+This plot shows the final output of MSNoise.
 
 .. code-block:: sh
 
-    $ msnoise plot dvv
+    msnoise plot dvv --help
+    Usage: msnoise-script.py plot dvv [OPTIONS]
+
+      Plots the dv/v (parses the dt/t results)
+
+    Options:
+      -f, --filterid INTEGER   Filter ID
+      -c, --comp TEXT          Components (ZZ, ZR,...)
+      -m, --mov_stack INTEGER  Plot specific mov stacks
+      -p, --pair TEXT          Plot a specific pair
+      -M, --dttname TEXT       Plot M or M0?
+      -s, --savefig            Save figure to disk (PNG)
+      -s, --show BOOLEAN       Show interactively?
+      --help                   Show this message and exit.
+
+Example:
+
+``msnoise plot dvv`` will plot all defaults:
+
+.. image:: .static/dvv.png
 
 """
 

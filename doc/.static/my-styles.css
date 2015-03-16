@@ -54,6 +54,15 @@ a {
     display: table-cell;
 }
 
+div .third_footer{
+    max-width:33%;
+    float:left;
+    padding-bottom:40px;
+    text-align: center;
+    display: table-cell;
+}
+
+
 #clear {
     clear:both;
 }

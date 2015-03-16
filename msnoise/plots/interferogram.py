@@ -1,11 +1,31 @@
-"""MSNoise is ...
+"""
+This plot shows the cross-correlation functions (CCF) vs time in a very similar
+manner as on the *ccftime* plot above, but shows an image instead of wiggles.
+The parameters allow to plot the daily or the mov-stacked CCF. Filters and
+components are selectable too.
 
-Usage:
-~~~~~~
 
 .. code-block:: sh
 
-    $ msnoise plot interferogram
+    msnoise plot interferogram --help
+    Usage: msnoise-script.py plot interferogram [OPTIONS] STA1 STA2
+
+      Plots the dv/v (parses the dt/t results)
+
+    Options:
+      -f, --filterid INTEGER   Filter ID
+      -c, --comp TEXT          Components (ZZ, ZR,...)
+      -m, --mov_stack INTEGER  Mov Stack to read from disk
+      -s, --show BOOLEAN       Show interactively?
+      --help                   Show this message and exit.
+
+
+Example:
+
+``msnoise plot interferogram YA.UV06 YA.UV10 -m5`` will plot the ZZ component
+(default), filter 1 (default) and mov_stack 5:
+
+.. image:: .static/interferogram.png
 
 """
 # plot interferogram

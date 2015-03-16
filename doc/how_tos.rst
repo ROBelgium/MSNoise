@@ -1,48 +1,7 @@
-.. warning:: This page is under construction, ...
-
 .. _how_tos:
 
 How To's
 ================
-
-.. _multiproject:
-
-Multi-Project
-------------------------------------
-
-Currently, MSNoise is NOT a regular Python Package, which means:
-
-* It doesn’t have a setup.py file.
-* It should not be installed in the lib/site-packages folder of the current python installation.
-* It will create folder within its root folder (CROSS_CORRELATION, STACKS, MWCS, DTT folders). Thus:
-* It should be installed in a folder that is writable to the user.
-
-This should change in the future. Until then, when multiple users want to use MSNoise on the same machine, 
-it would be better to have a copy of MSNoise for each (even: one copy for each "project").
-
-Practically, for each "project", one has to download (or git fetch) the sources
-of MSNoise in a new folder and run the installer there. If one's database
-choice is MySQL, a new database must be created on the database server before
-running the installer script. Depending on security recommandations from your
-sysadmins, you might want to create specific users for specific databases. If
-you are the only user and/or only running on your local machine, simply use the
-same credentials for all databases.
-
-The folder structure could look like this:
-
-:: 
-
-    .
-    `-- MSNoiseProjects/
-        |-- Project1/
-        |   `-- STACKS/
-        |   `-- s01scan_archive.py
-        |   `-- ...
-        `-- Project2/
-        |   `-- STACKS/
-        |   `-- s01scan_archive.py
-        |   `-- ...
-        `-- ..
 
 Reprocess data
 ------------------------------------
@@ -62,8 +21,9 @@ reprocess all CC jobs, but not for filters already existing. The recipe is:
 * Add a new filter, be sure to mark 'used'=1
 * Set all other filters 'used' value to 0
 * Redefine the flag of the CC jobs, from 'D'one to 'T'odo with the following:
-* Run $ msnoise reset CC
-* Run $ msnoise compute_cc
+* Run ``msnoise reset CC --all``
+* Run ``msnoise compute_cc``
+* Run next commands if needed (stack, mwcs, dtt)
 * Set back the other filters 'used' value to 1
 
 The compute_cc will only compute the CC's for the new filter(s) and
@@ -75,7 +35,10 @@ for 'filter id'=2, etc.
 When changing the REF
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-TODO
+When changing the REF, the REF stack has to be re-computed:
+
+``msnoise stack -r -i 999`` will ensure all jobs marked done in the last 999
+days are checked for modification. The REF will then be re-output.
 
 
 
@@ -86,43 +49,43 @@ If the MWCS parameters are changed in the database, all MWCS jobs need to be
 reprocessed.
 
 
-TODO
+``msnoise reset DTT --all``
+
+``msnoise compute_mwcs``
+
+shoud do the trick.
 
 
 When changing the dt/t parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-TODO
+
+``msnoise compute_dtt --i 999`` will ensure all MWCS jobs marked done in the
+last 999 days are checked for modification.
 
 
-Process workflow with more than 24 hours between steps
---------------------------------------------------------
-
-TODO
 
 Define one's own data structure of the waveform archive
 ---------------------------------------------------------
 
-The data_structure.py file contains the known data archive formats.
+The data_structure.py file contains the known data archive formats. If another
+data format needs to be defined, it will be done in the ``custom.py`` file
+in the current project folder:
 
-.. note:: could this go to ObsPy somehow ?
+.. todo:: Explain custom.py format.
 
-TODO
 
 How to have MSNoise work with 2+ data structures at the same time
 -------------------------------------------------------------------
 
-TODO
+Not yet implemented.
+
 
 How to duplicate/dump the MSNoise configuration
 ------------------------------------------------
 
-TODO
+Not yet implemented.
 
-Get the plots from the MSNoise SRL paper
-------------------------------------------
-
-TODO
 
 
 
