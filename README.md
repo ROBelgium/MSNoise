@@ -14,35 +14,28 @@ MSNoise is a fully-integrated solution that automatically scans data archives an
 MSNoise is a joint project of the Royal Observatory of Belgium (Thomas Lecocq and Corentin Caudron) and ISTerre + IPGP (Florent Brenguier)
 
 Documentation
----------------
-Currently, the full documentation can be found on: http://www.msnoise.org.
+-------------
+The full documentation can be found on: http://www.msnoise.org.
+
 
 Installation
--------------
+------------
 
-Users are recommended to download the latest RELEASE https://github.com/ROBelgium/MSNoise/releases/latest ! Up to now, MSNoise is *not* a regular package, so please follow instructions in the documentation (and read below).
+Users are recommended to download the latest RELEASE https://github.com/ROBelgium/MSNoise/releases/latest !
 
-The current *master* is not yet stable !
+Remember, always consider the the current *master* as not stable!
+
 
 Packaging
-----------
-Currently, MSNoise is *NOT* a regular Python Package, which means:
-
-* It doesn't have a setup.py file.
-* It should not be installed in the lib/site-packages folder of the current python installation.
-* It will create folder *within* its root folder (CROSS_CORRELATION, STACKS, MWCS, DTT folders). Thus:
-* It should be installed in a folder that is writable to the user.
-
-This should change in the future. Until then, when multiple users want to use MSNoise on the same machine, it would be better to have a copy of MSNoise for each (even: one copy for each "project").
-
+---------
+Starting at release 1.3, MSNoise **is** a regular Python Package ! No need to copy/paste MSNoise sources .py everywhere!
 
 
 Getting Help
--------------
+------------
 The best way to get help is to subscribe to the Mailing List and ask your question directly there. It is available on 
 http://mailman-as.oma.be/mailman/listinfo/msnoise and the archive is either http://mailman-as.oma.be/pipermail/msnoise/ or 
 on http://news.gmane.org/gmane.science.geophysics.msnoise for a nice view.
-
 
 
 Disclaimer
@@ -51,6 +44,6 @@ Disclaimer
 Although we have cross-checked the whole code, we cannot warranty it is exempt of bugs. The package is provided as-is, we will not be held responsible for any use you make of it, nor for the results and conclusions you may find using MSNoise.
 
 Licence
-----------
+-------
 
 Although MSNoise is provided freely on the internet and every individual may use it, we do not allow anyone to provide commercial service (read -paid in any way-), like training or teaching without contacting the original authors first. The authors and the contact email address are in the __init__.py file of the package.

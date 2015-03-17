@@ -312,7 +312,7 @@ part for SQLite:
 The second part is a little different if you are using SQLite as it
 can't be done automatically. This is because SQLite doesn't support "ALTER"
 commands. Ultimately we want the ``jobs.type`` to be renamed to
-```jobs.jobtype``. You will have to do this operation manually:
+``jobs.jobtype``. You will have to do this operation manually:
 
 * Open SQLite database browser (`SQLiteManager <https://addons.mozilla.org/firefox/addon/sqlite-manager/>`_
   extension for Firefox, for example)

@@ -87,10 +87,11 @@ def worker(files, folder, startdate, enddate):
                 comp = trace.stats.channel.upper()
                 path = folder.replace('\\', '/')
                 r1 = time.time()
-
+                starttime = starttime.datetime.replace(microsecond=0)
+                endtime = endtime.datetime.replace(microsecond=0)
                 result = update_data_availability(
-                    db, net, sta, comp, path, name, starttime.datetime,
-                    endtime.datetime, data_duration, gaps_duration,
+                    db, net, sta, comp, path, name, starttime,
+                    endtime, data_duration, gaps_duration,
                     data[0].stats.sampling_rate)
                 time.sleep(0.01)
 
