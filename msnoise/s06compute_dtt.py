@@ -41,6 +41,8 @@ acausal parts of the CCF. The following figure shows the static time lags of
 for a ``dtt_v`` = 1.0 km/s for the Piton de La Fournaise network (including
 stations *not* on the volcano),
 
+.. note:: It seems obvious that these parameters are frequency-dependent, but
+    they are currently common for all filters !
 
 .. image:: .static/static.png
 
@@ -48,6 +50,7 @@ stations *not* on the volcano),
 
 .. warning:: In order to use the dynamic time lags, one has to provide the
    station coordinates !
+
 
 2. Using example values above, we chose to use only 15-45 s coda part of the
 signal, neglecting direct waves in the 0-15 seconds range. We then select data

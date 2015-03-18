@@ -19,7 +19,7 @@ default['preprocess_highpass'] = ["Preprocessing High-pass value in Hz [0.01]",'
 
 default['maxlag'] = ["Maximum lag (in seconds) [120.0]",'120.']
 default['corr_duration'] = ["Data windows to correlate (in seconds) [1800.]",'1800.']
-default['overlap'] = ["Amount of overlap between data windows in % [0.]",'0.0']
+default['overlap'] = ["Amount of overlap between data windows [0:1[ [0.]",'0.0']
 default['windsorizing'] = ["Windsorizing at N time RMS (in unit), 0 disables windsorizing [3]",'3']
 
 default['crondays'] = ["Number of days to monitors with cron [-1]",'-1']

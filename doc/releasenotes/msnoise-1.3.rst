@@ -206,6 +206,10 @@ value of 30.0 means the process will use time lags between 15 and 45 s in the
 example above, on both sides if configured (``dtt_sides``), or only causal or
 acausal parts of the CCF.
 
+.. note:: It seems obvious that these parameters are frequency-dependent, but
+    they are currently common for all filters !
+
+
 New parameters have been added to the configuration:
 
 * |dtt_lag|

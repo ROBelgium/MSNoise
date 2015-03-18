@@ -49,57 +49,60 @@ def upgrade_db():
 
 
 @click.command()
-def info():
+@click.option('-j', '--jobs', is_flag=True, help='Jobs Info only')
+def info(jobs):
     """Outputs general information about the current install and config, plus
     information about jobs and their status."""
     from ..api import connect, get_config, get_job_types
     from ..default import default
-    
+
     click.echo('')
     click.echo('General:')
-    
+
     if os.path.isfile('db.ini'):
         click.echo(' - db.ini is present')
     else:
         click.secho(' - db.ini is not present, is MSNoise installed here ?',
                     fg='red')
         return
-    
+    click.echo('')
     db = connect()
-    click.echo('')
-    click.echo('Configuration:')
-    
-    data_folder = get_config(db, "data_folder")
-    if os.path.isdir(data_folder):
-        click.echo(" - %s exists" % data_folder)
-    else:
-        click.secho(" - %s does not exists !" % data_folder, fg='red')
-    
-    output_folder = get_config(db, "output_folder")
-    if os.path.isdir(output_folder):
-        click.echo(" - %s exists" % output_folder)
-    else:
-        if get_config(db, 'keep_all') in ['Y','y']:
-            for job in get_job_types(db):
-                if job[1] == 'D':
-                    if job[0] > 0:
-                        click.secho(" - %s does not exists and that is not normal (%i CC jobs done)" % (output_folder, job[0]), fg='red')
-                    else:
-                        click.secho(" - %s does not exists and that is normal (%i CC jobs done)" % (output_folder, job[0]))
-        else:
-            click.secho(" - %s does not exists (and that is normal because keep_all=False)" % output_folder)
-    
-    
-    click.echo('')
-    click.echo('Raw config bits: "D"efault or "M"odified (green)')
-    for key in default.keys():
-        tmp = get_config(db, key)
-        if tmp == default[key][1]:
-            click.secho(" D %s: %s" %(key, tmp ))
-        else:
-            click.secho(" M %s: %s" %(key, tmp ), fg='green')
 
-    click.echo('')
+
+    if not jobs:
+        click.echo('')
+        click.echo('Configuration:')
+
+        data_folder = get_config(db, "data_folder")
+        if os.path.isdir(data_folder):
+            click.echo(" - %s exists" % data_folder)
+        else:
+            click.secho(" - %s does not exists !" % data_folder, fg='red')
+
+        output_folder = get_config(db, "output_folder")
+        if os.path.isdir(output_folder):
+            click.echo(" - %s exists" % output_folder)
+        else:
+            if get_config(db, 'keep_all') in ['Y','y']:
+                for job in get_job_types(db):
+                    if job[1] == 'D':
+                        if job[0] > 0:
+                            click.secho(" - %s does not exists and that is not normal (%i CC jobs done)" % (output_folder, job[0]), fg='red')
+                        else:
+                            click.secho(" - %s does not exists and that is normal (%i CC jobs done)" % (output_folder, job[0]))
+            else:
+                click.secho(" - %s does not exists (and that is normal because keep_all=False)" % output_folder)
+
+
+        click.echo('')
+        click.echo('Raw config bits: "D"efault or "M"odified (green)')
+        for key in default.keys():
+            tmp = get_config(db, key)
+            if tmp == default[key][1]:
+                click.secho(" D %s: %s" %(key, tmp ))
+            else:
+                click.secho(" M %s: %s" %(key, tmp ), fg='green')
+
     click.echo('CC Jobs:')
     for (n,jobtype) in get_job_types(db,'CC'):
         click.echo(" %s : %i" % (jobtype, n))
