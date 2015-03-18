@@ -803,7 +803,7 @@ def export_allcorr(session, ccfid, data):
     return
 
 
-def add_corr(session, s1, s2, station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
+def add_corr(s1, s2, session, station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
     """
     Adds a CCF to the data archive on disk.
     
@@ -853,7 +853,7 @@ def add_corr(session, s1, s2, station1, station2, filterid, date, time, duration
             export_mseed(session, path, pair, components, filterid, CF/ncorr,
                          ncorr)
         if sac:
-            export_sac(session, s1, s2, path, pair, components, filterid, CF/ncorr,
+            export_sac(s1, s2, session, path, pair, components, filterid, CF/ncorr,
                        ncorr)
 
     else:
@@ -875,7 +875,7 @@ def add_corr(session, s1, s2, station1, station2, filterid, date, time, duration
         del t, st
 
 
-def export_sac(db, s1, s2, filename, pair, components, filterid, corr, ncorr=0,
+def export_sac(s1, s2, db, filename, pair, components, filterid, corr, ncorr=0,
                sac_format=None, maxlag=None, cc_sampling_rate=None):
     if sac_format is None:
         sac_format = get_config(db, "sac_format")
