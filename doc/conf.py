@@ -16,6 +16,7 @@ matplotlib.use('Agg')
 
 import sphinx_bootstrap_theme
 import datetime
+import click
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -65,6 +66,30 @@ output = output.replace('*','&#42;')
 f = open('configs.hrst','w')
 f.write(output)
 f.close()
+
+space = "    "
+# Generate the help files
+
+from msnoise.scripts import msnoise as M
+
+for plot in ['ccftime', 'distance', 'data_availability', 'dvv',
+             'station_map', 'mwcs', 'interferogram']:
+
+    c = click.Context(command=eval("M.%s"%plot))
+    data = c.get_help()
+
+    out = ".. code-block:: sh\n"
+    out += "\n"
+    out += space+"msnoise plot %s --help"%plot
+    out += "\n"
+    out += "\n"
+    for line in data.split('\n'):
+        line = line.replace('\r','').replace('\n','')
+        out += space+line+"\n"
+    f = open('clickhelp/msnoise-plot-%s.rst'%plot, 'w')
+    f.write(out)
+    f.close()
+
 
 # -- General configuration -----------------------------------------------------
 

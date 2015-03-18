@@ -62,7 +62,6 @@ def main(system=False, modules=False, env=False, all=False):
         ispresent('sqlalchemy')
         ispresent('traitsui')
         ispresent('traits')
-        ispresent('enable')
         ispresent('scikits.samplerate')
         ispresent('obspy')
 
@@ -93,6 +92,7 @@ def main(system=False, modules=False, env=False, all=False):
         ispresent('distutils')
         ispresent('IPython')
         ispresent('vtk')
+        ispresent('enable')
         
         print
     

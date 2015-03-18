@@ -1,22 +1,9 @@
 """
 This plot shows the final output of MSNoise.
 
-.. code-block:: sh
 
-    msnoise plot dvv --help
-    Usage: msnoise-script.py plot dvv [OPTIONS]
+.. include:: clickhelp/msnoise-plot-dvv.rst
 
-      Plots the dv/v (parses the dt/t results)
-
-    Options:
-      -f, --filterid INTEGER   Filter ID
-      -c, --comp TEXT          Components (ZZ, ZR,...)
-      -m, --mov_stack INTEGER  Plot specific mov stacks
-      -p, --pair TEXT          Plot a specific pair
-      -M, --dttname TEXT       Plot M or M0?
-      -s, --savefig            Save figure to disk (PNG)
-      -s, --show BOOLEAN       Show interactively?
-      --help                   Show this message and exit.
 
 Example:
 
@@ -66,7 +53,7 @@ def get_wavgwstd(data, dttname, errname):
 
 
 def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
-         pairs=[], output=None, show=False):
+         pairs=[], show=False, outfile=None):
     db = connect()
 
     if get_config(db, name="autocorr", isbool=True):
@@ -184,10 +171,21 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
 
             plt.grid(True)
             del alldf
-    if output:
-        plt.savefig(output)
-
-    plt.show()
-
+    if outfile:
+        if outfile.startswith("?"):
+            if len(mov_stacks) == 1:
+                outfile = outfile.replace('?', '%s-f%i-m%i-M%s' % (components,
+                                                                   filterid,
+                                                                   mov_stack,
+                                                                   dttname))
+            else:
+                outfile = outfile.replace('?', '%s-f%i-M%s' % (components,
+                                                               filterid,
+                                                               dttname))
+        outfile = "dvv " + outfile
+        print "output to:", outfile
+        plt.savefig(outfile)
+    if show:
+        plt.show()
 if __name__ == "__main__":
     main()

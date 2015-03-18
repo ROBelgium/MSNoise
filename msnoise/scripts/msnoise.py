@@ -241,11 +241,15 @@ def plot():
 
 
 @click.command()
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-def data_availability(show):
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+
+def data_availability(show, outfile):
     """Plots the Data Availability vs time"""
     from ..plots.data_availability import main
-    main(show)
+    main(show, outfile)
 
 
 @click.command()
@@ -255,12 +259,14 @@ def data_availability(show):
 @click.option('-p', '--pair', default=None,  help='Plot a specific pair',
               multiple=True)
 @click.option('-M', '--dttname', default="M",  help='Plot M or M0?')
-@click.option('-o', '--output', default=None, help='Filename to save figure to disk')
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-def dvv(mov_stack, comp, dttname, filterid, pair, output, show):
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+def dvv(mov_stack, comp, dttname, filterid, pair, show, outfile):
     """Plots the dv/v (parses the dt/t results)"""
     from ..plots.dvv import main
-    main(mov_stack, dttname, comp, filterid, pair, output, show)
+    main(mov_stack, dttname, comp, filterid, pair, show, outfile)
 
 
 @click.command()
@@ -269,11 +275,14 @@ def dvv(mov_stack, comp, dttname, filterid, pair, output, show):
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-def interferogram(sta1, sta2, filterid, comp, mov_stack,show):
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+def interferogram(sta1, sta2, filterid, comp, mov_stack, show, outfile):
     """Plots the interferogram between sta1 and sta2 (parses the CCFs)"""
     from ..plots.interferogram import main
-    main(sta1, sta2, filterid, comp, mov_stack, show)
+    main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
 
 @click.command()
 @click.argument('sta1')
@@ -283,11 +292,15 @@ def interferogram(sta1, sta2, filterid, comp, mov_stack,show):
 @click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
 @click.option('-a', '--ampli', default=5.0, help='Amplification')
 @click.option('-S', '--seismic', is_flag=True, help='Seismic style')
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-def ccftime(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show):
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+def ccftime(sta1, sta2, filterid, comp, mov_stack,
+            ampli, seismic, show, outfile):
     """Plots the dv/v (parses the dt/t results)"""
     from ..plots.ccftime import main
-    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show)
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile)
 
 
 @click.command()
@@ -296,32 +309,40 @@ def ccftime(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show):
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-def mwcs(sta1, sta2, filterid, comp, mov_stack,show):
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+def mwcs(sta1, sta2, filterid, comp, mov_stack, show, outfile):
     """Plots the mwcs results between sta1 and sta2 (parses the CCFs)"""
     from ..plots.mwcs import main
-    main(sta1, sta2, filterid, comp, mov_stack, show)
+    main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
 
 
 
 @click.command()
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
 @click.option('-a', '--ampli', default=1.0, help='Amplification')
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-def distance(filterid, comp, mov_stack, ampli, show):
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+def distance(filterid, comp,  ampli, show, outfile):
     """Plots the REFs of all pairs vs distance"""
     from ..plots.distance import main
-    main(filterid, comp, mov_stack, ampli, show)
+    main(filterid, comp, ampli, show, outfile)
 
 
 @click.command()
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-def station_map(show):
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+def station_map(show, outfile):
     """Plots the station map (very basic)"""
     from ..plots.station_map import main
-    main(show)
+    main(show, outfile)
 
 
 # Add plot commands to the plot group:

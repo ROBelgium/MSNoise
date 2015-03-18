@@ -8,21 +8,7 @@ horizontal lines, and the minimum coherence or the maximum dt are in red.
 
 The ``filterid``, ``comp`` and ``mov_stack`` allow filtering the data used.
 
-.. code-block:: sh
-
-    msnoise plot mwcs --help
-
-    Usage: msnoise-script.py plot mwcs [OPTIONS] STA1 STA2
-
-      Plots the mwcs results between sta1 and sta2 (parses the CCFs)
-
-    Options:
-      -f, --filterid INTEGER   Filter ID
-      -c, --comp TEXT          Components (ZZ, ZR,...)
-      -m, --mov_stack INTEGER  Mov Stack to read from disk
-      -s, --show BOOLEAN       Show interactively?
-      --help                   Show this message and exit.
-
+.. include:: clickhelp/msnoise-plot-mwcs.rst
 
 Example:
 
@@ -93,11 +79,9 @@ def cmap_center_point_adjust(cmap, range, center):
     return cmap_center_adjust(cmap,
         abs(center - range[0]) / abs(range[1] - range[0]))
 
-def main(sta1, sta2, filterid, components, mov_stack=1, show=True):
+def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None):
     db = connect()
-    components_to_compute = get_components_to_compute(db)
     maxlag = float(get_config(db,'maxlag'))
-    cc_sampling_rate = float(get_config(db,'cc_sampling_rate'))
     start, end, datelist = build_movstack_datelist(db)
     
     dtt_lag = get_config(db, "dtt_lag")
@@ -217,19 +201,23 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True):
         plt.xlabel('Coherence')
         plt.ylabel("Lag Time (s)")
         
-        name = '%s-%s f%i m%i'%(sta1,sta2, filterid, mov_stack)
+        name = '%s-%s f%i m%i' % (sta1,sta2, filterid, mov_stack)
+        name = name.replace('_', '.')
         
         plt.suptitle(name)
-        
-        
 
-        #~ plt.savefig('interfero_publi.png',dpi=300)
-        # plt.figure()
-        # maxx = np.argmax(stack_total, axis=0)
-        # plt.plot(maxx)
-        
-        
-        plt.show()
+        if outfile:
+            if outfile.startswith("?"):
+                pair = pair.replace(':','-')
+                outfile = outfile.replace('?', '%s-%s-f%i-m%i' % (pair,
+                                                                  components,
+                                                                  filterid,
+                                                                  mov_stack))
+            outfile = "mwcs " + outfile
+            print "output to:", outfile
+            plt.savefig(outfile)
+        if show:
+            plt.show()
         
         
                             

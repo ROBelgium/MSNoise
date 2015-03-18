@@ -4,21 +4,7 @@ manner as on the *ccftime* plot above, but shows an image instead of wiggles.
 The parameters allow to plot the daily or the mov-stacked CCF. Filters and
 components are selectable too.
 
-
-.. code-block:: sh
-
-    msnoise plot interferogram --help
-    Usage: msnoise-script.py plot interferogram [OPTIONS] STA1 STA2
-
-      Plots the dv/v (parses the dt/t results)
-
-    Options:
-      -f, --filterid INTEGER   Filter ID
-      -c, --comp TEXT          Components (ZZ, ZR,...)
-      -m, --mov_stack INTEGER  Mov Stack to read from disk
-      -s, --show BOOLEAN       Show interactively?
-      --help                   Show this message and exit.
-
+.. include:: clickhelp/msnoise-plot-interferogram.rst
 
 Example:
 
@@ -46,7 +32,7 @@ from obspy.core import read, Stream, Trace
 from ..api import *
 
 
-def main(sta1, sta2, filterid, components, mov_stack=1, show=True):
+def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None):
     db = connect()
     components_to_compute = get_components_to_compute(db)
     maxlag = float(get_config(db,'maxlag'))
@@ -94,9 +80,18 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True):
         # maxx = np.argmax(stack_total, axis=0)
         # plt.plot(maxx)
         
-        
-        plt.show()
-        
+        if outfile:
+            if outfile.startswith("?"):
+                pair = pair.replace(':','-')
+                outfile = outfile.replace('?', '%s-%s-f%i-m%i' % (pair,
+                                                                  components,
+                                                                  filterid,
+                                                                  mov_stack))
+            outfile = "interferogram " + outfile
+            print "output to:", outfile
+            plt.savefig(outfile)
+        if show:
+            plt.show()
         
                             
 

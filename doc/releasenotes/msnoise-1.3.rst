@@ -181,20 +181,9 @@ All the available plots are listed using the ``--help`` argument:
 
 Same as above, sub-commands have their own ``--help``:
 
-.. code-block:: sh
 
-    msnoise plot interferogram --help
+.. include:: ../clickhelp/msnoise-plot-interferogram.rst
 
-    Usage: msnoise-script.py plot interferogram [OPTIONS] STA1 STA2
-
-      Plots the interferogram between sta1 and sta2 (parses the CCFs)
-
-    Options:
-      -f, --filterid INTEGER   Filter ID
-      -c, --comp TEXT          Components (ZZ, ZR,...)
-      -m, --mov_stack INTEGER  Mov Stack to read from disk
-      -s, --show BOOLEAN       Show interactively?
-      --help                   Show this message and exit.
 
 .. image:: ../.static/13newplots.png
 
@@ -291,6 +280,7 @@ the next versions of MSNoise doesn't break anything.
 `Travis-CI <https://travis-ci.org/ROBelgium/MSNoise>`_ runs automatically on
 every push or pull request made on GitHub.
 
+.. _upgradingto13:
 
 Upgrading an existing project to MSNoise 1.3
 --------------------------------------------

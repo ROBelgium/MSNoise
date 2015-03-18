@@ -3,17 +3,8 @@ Plots the data availability, as contained in the database. Every day which
 has a least some data will be coloured in red. Days with no data remain blank.
 
 
-.. code-block:: sh
+.. include:: clickhelp/msnoise-plot-data_availability.rst
 
-    msnoise plot dvv --help
-
-    Usage: msnoise-script.py plot data_availability [OPTIONS]
-
-      Plots the Data Availability vs time
-
-    Options:
-      -s, --show BOOLEAN  Show interactively?
-      --help              Show this message and exit.
 
 Example:
 
@@ -33,7 +24,7 @@ import datetime
 
 from ..api import *
 
-def main(show=False):
+def main(show=False, outfile=None):
     db = connect()
     start, end, datelist = build_movstack_datelist(db)
     dates = []
@@ -89,6 +80,13 @@ def main(show=False):
     plt.ylabel('N stations')
     plt.gcf().autofmt_xdate()
     plt.grid()
+    if outfile:
+        if outfile.startswith("?"):
+            now = datetime.datetime.now()
+            now = now.strftime('data availability on %Y-%m-%d %H.%M.%S')
+            outfile = outfile.replace('?', now)
+        print "output to:", outfile
+        plt.savefig(outfile)
     if show:
         plt.show()
 

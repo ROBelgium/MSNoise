@@ -2,21 +2,7 @@
 Plots the REF stacks vs interstation distance. This could help deciding which
 parameters to use in the dt/t calculation step.
 
-.. code-block:: sh
-
-    msnoise plot distance --help
-
-    Usage: msnoise-script.py plot distance [OPTIONS]
-
-      Plots the REFs of all pairs vs distance
-
-    Options:
-      -f, --filterid INTEGER   Filter ID
-      -c, --comp TEXT          Components (ZZ, ZR,...)
-      -m, --mov_stack INTEGER  Mov Stack to read from disk
-      -a, --ampli FLOAT        Amplification
-      -s, --show BOOLEAN       Show interactively?
-      --help                   Show this message and exit.
+.. include:: clickhelp/msnoise-plot-distance.rst
 
 Example:
 
@@ -43,7 +29,7 @@ from obspy.core import read, Stream, Trace
 from ..api import *
 
 
-def main(filterid, components, mov_stack=1, ampli=1, show=True):
+def main(filterid, components, ampli=1, show=True, outfile=None):
     db = connect()
 
     pairs = get_station_pairs(db, used=1)
@@ -57,7 +43,6 @@ def main(filterid, components, mov_stack=1, ampli=1, show=True):
         station1, station2 = pair
 
         dist = get_interstation_distance(station1, station2, station1.coordinates)
-        #~ print station1.sta, station2.sta, dist
         dists.append(dist)
 
         sta1 = "%s.%s" % (station1.net, station1.sta)
@@ -76,18 +61,24 @@ def main(filterid, components, mov_stack=1, ampli=1, show=True):
     plt.ylabel("Interstation Distance in km")
     plt.xlabel("Lag Time")
     plt.title("Filter = %02i" % filterid)
-    
-    for velocity in [3.0, 2.0, 1.0]:
-        plt.plot([0,-max(dists)/velocity], [0, max(dists)], c='r',
+
+    colors = ['r', 'g', 'b']
+    for i, velocity in enumerate([3.0, 2.0, 1.0]):
+        plt.plot([0,-max(dists)/velocity], [0, max(dists)], c=colors[i],
                  label='%.1f $km s^{-1}$' % velocity)
-        plt.plot([0,max(dists)/velocity], [0, max(dists)], c='r')
-    
-    
+        plt.plot([0,max(dists)/velocity], [0, max(dists)], c=colors[i])
 
     plt.xlim(-maxlag, maxlag)
     plt.legend(loc=4)
-    plt.show()
-            
+    if outfile:
+        if outfile.startswith("?"):
+            newname = 'distance %s-f%i' % (components,
+                                           filterid)
+            outfile = outfile.replace('?', newname)
+        print "output to:", outfile
+        plt.savefig(outfile)
+    if show:
+        plt.show()
         
                             
 

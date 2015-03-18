@@ -16,7 +16,9 @@ setup(
         'traits',       
         'traitsui',
         'obspy',
-        'Click',
+        'click',
+        'scikits.samplerate',
+        'mysql-python'
     ],
     entry_points='''
         [console_scripts]

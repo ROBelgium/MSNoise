@@ -4,62 +4,92 @@
 Installation
 ============
 
+
+.. contents::
+    :local:
+
 Introduction
 ------------
 
 MSNoise is a set of Python codes that use a database (sqlite or MySQL) and
 the `find` command. When installed, it provides a top level command ``msnoise``
-in the console. 
+in the console.
+
+.. note:: From version 1.3, MSNoise is a regular Python Package. Before, it was
+    a collection of Python scripts that needed to be executed sequentially. All
+    changes introduced in MSNoise 1.3 are decribed in the Release Notes of
+    :doc:`releasenotes/msnoise-1.3`. If you plan to upgrade your projects to
+    the latest version, please read the :ref:`upgradingto13` part.
 
 To run MSNoise, you need:
 
 * A recent version of Python (2.7.x recommended). We suggest using Anaconda_
   with extra modules ([+] modules are already distributed with Anaconda_):
-    
+
+  * setuptools [+]
   * numpy [+]
   * scipy [+]
   * pandas [+]
   * matplotlib [+]
   * statsmodels [+]
-  * SqlAlchemy [+]
-  * Enthought Tool Suite
+  * sqlalchemy [+]
+  * traits
+  * traitsui
+  * click
   * scikits.samplerate
   * obspy
+  * mysql-python
 
-* MySQL: if you want to use MySQL, you need to install and configure a :ref:`mysql` beforehand. This is not needed for sqlite.
-  Read :ref:`aboutdbandperformances` for more information. We recommend using MySQL.
+* MySQL: if you want to use MySQL, you need to install and configure a
+  :ref:`mysql` beforehand. This is not needed for sqlite.
+  Read :ref:`aboutdbandperformances` for more information.
+  We recommend using MySQL.
 
-* The `find` command: present by default on linux and available with gnufind_ on Windows.
+* The `find` command: present by default on linux and available with gnufind_
+  on Windows.
 
 .. warning:: Python 3 is **not** supported!
+
 
 Quick Start - Windows
 ----------------------
 
 1. Download and install Anaconda_ for your machine, make sure Anaconda's Python is the default python for your user
 
-2. Download MSNoise from `GitHub <https://github.com/ROBelgium/MSNoise>`_.
-
-3. Check which required packages you are still missing by executing the *bugreport* script. (See :ref:`testing`)
-
-4. Execute the following command to install the missing packages:
+2. Execute the following command to install the missing packages:
    
    .. code-block:: sh
     
-        easy_install traitsui traits obspy
+        conda traitsui traits
+        easy_install obspy click
    
-5. Download and install scikits.samplerate and mysql-python from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate and http://www.lfd.uci.edu/~gohlke/pythonlibs/#mysql-python 
+3. Download and install scikits.samplerate and mysql-python from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate and http://www.lfd.uci.edu/~gohlke/pythonlibs/#mysql-python
+   see examples below (filenames might be different):
 
-6. Install a MySQL server: download and install EasyPHP_ (their "Dev" version is OK - read their installation page carefully, you need to install some Microsoft Visual C redistribuable manually too).
+   .. code-block:: sh
 
-7. Start EasyPHP and create a privileged user and a database:
+        pip install MySQL_python-1.2.5-cp27-none-win_amd64.whl
+        pip install scikits.samplerate-0.3.3-cp27-none-win_amd64.whl
+
+4. Install a MySQL server: download and install EasyPHP_ (their "Dev" version is OK - read their installation page carefully, you need to install some Microsoft Visual C redistribuable manually too).
+
+5. Start EasyPHP and create a privileged user and a database:
       
-    * Connect to your local host: http://localhost/phpmyadmin (or http://127.0.0.1/phpmyadmin)
-    * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
+   * Connect to your local host: http://localhost/phpmyadmin (or http://127.0.0.1/phpmyadmin)
+   * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
 
-8. Install gnufind_ and make sure its /bin directory is in the PATH (Control Panel -> Environment Variables -> PATH)
+6. Install gnufind_ and make sure its /bin directory is in the PATH (Control Panel -> Environment Variables -> PATH)
+
+7. Install MSNoise:
+
+   .. code-block:: sh
+
+        easy_install msnoise
+
+8. Check which required packages you are still missing by executing the ``msnoise bugreport`` command. (See :ref:`testing`)
 
 9. Proceed to the :ref:`Workflow` description to start MSNoise!
+
 
 Done !
 
@@ -69,15 +99,12 @@ Quick Start - Linux
 
 1. Download and install Anaconda_ for your machine, make sure Anaconda's Python is the default python for your user
 
-2. Download MSNoise from `GitHub <https://github.com/ROBelgium/MSNoise>`_.
-
-3. Check which required packages you are still missing by executing the *bugreport* script. (See :ref:`testing`)
-
-4. Execute the following commands to install the missing packages:
+2. Execute the following commands to install the missing packages:
    
    .. code-block:: sh
     
-        easy_install traitsui traits obspy enable
+        conda install traitsui traits
+        easy_install obspy click
  
    .. code-block:: sh
         
@@ -86,13 +113,13 @@ Quick Start - Linux
     
    If this fails, follow those instructions: :ref:`samplerate`.
 
-5. Install a MySQL server and phpMyAdmin:
+3. Install a MySQL server and phpMyAdmin:
    
    .. code-block:: sh
     
         sudo apt-get install mysql-server mysql-client phpmyadmin
 
-6. Install mysql-python:
+4. Install mysql-python:
 
    .. code-block:: sh
    
@@ -100,15 +127,38 @@ Quick Start - Linux
         sudo apt-get install libmysqlclient-dev
         easy_install mysql-python
 
-7. Create a privileged user and a database:
+5. Create a privileged user and a database:
  
- * Connect to your local host: http://localhost/phpmyadmin (or http://127.0.0.1/phpmyadmin)
- * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
+   * Connect to your local host: http://localhost/phpmyadmin (or http://127.0.0.1/phpmyadmin)
+   * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
+
+6. Install MSNoise:
+
+   .. code-block:: sh
+
+        easy_install msnoise
+
+7. Check which required packages you are still missing by executing the ``msnoise bugreport`` command. (See :ref:`testing`)
 
 8. Proceed to the :ref:`Workflow` description to start MSNoise!
 
 Done !
 
+UltraFast Start on Linux
+------------------------
+If one starts with a vanilla fresh Linux install (e.g. on a new virtual machine)
+, the install can be eased with an installer script we have prepared. Indeed,
+to run de tests on TravisCI, we had to prepare a pre-install script. This is
+only valid for linux x86_64 (Debian or Ubuntu):
+
+.. code-block:: sh
+
+    wget https://raw.githubusercontent.com/ROBelgium/MSNoise/master/misc/install_debian_x86_64.sh
+    chmod +x install_debian_x86_64.sh
+    ./install_debian_x86_64.sh
+    pip install msnoise
+
+Done !
 
 
 Python and Packages Installation

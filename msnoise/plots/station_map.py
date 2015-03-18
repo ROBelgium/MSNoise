@@ -3,17 +3,8 @@ This plots a very raw station map (needs improvement). This plot requires
 cartopy !
 
 
-.. code-block:: sh
+.. include:: clickhelp/msnoise-plot-station_map.rst
 
-    msnoise plot station_map --help
-
-    Usage: msnoise-script.py plot station_map [OPTIONS]
-
-      Plots the station map (very basic)
-
-    Options:
-      -s, --show BOOLEAN  Show interactively?
-      --help              Show this message and exit.
 
 Example:
 
@@ -22,7 +13,7 @@ Example:
 .. image:: .static/station_map.png
 
 """
-# plot interferogram
+
 import matplotlib.pyplot as plt
 
 import matplotlib.gridspec as gridspec
@@ -36,7 +27,7 @@ import sys
 from ..api import *
 
 
-def main(show=True):
+def main(show=True, outfile=None):
     db = connect()
     stations  = get_stations(db, all=False)
     
@@ -47,11 +38,15 @@ def main(show=True):
     coords = [(sta.X, sta.Y) for sta in stations]
     coords = np.array(coords)
     plt.scatter(coords[:,0], coords[:,1], transform=ccrs.Geodetic())
-
-    plt.show()
-            
-        
-                            
+    if outfile:
+        if outfile.startswith("?"):
+            now = datetime.datetime.now()
+            now = now.strftime('station map on %Y-%m-%d %H.%M.%S')
+            outfile = outfile.replace('?', now)
+        print "output to:", outfile
+        plt.savefig(outfile)
+    if show:
+        plt.show()
 
 if __name__ == "__main__":
     main()
