@@ -503,10 +503,15 @@ def main():
                                 thisdate = time.strftime("%Y-%m-%d", tmptime)
                                 thistime = time.strftime("%Y-%m-%d %H:%M:%S",
                                                          tmptime)
+                                                         
+                                                         ##########################???
                                 if params.keep_all:
                                     ccfid = "%s_%s_%s_%s_%s" % (station1, station2,
                                                              filterid, components,
                                                              thisdate)
+                                                             #######################???
+                                                             
+                                                             
                                     if ccfid not in allcorr:
                                         allcorr[ccfid] = {}
                                     allcorr[ccfid][thistime] = corr
@@ -518,10 +523,12 @@ def main():
                                         ndaycorr[filterid] += 1
 
                                 del corr, thistime, trames2hWb
+                                    ############################  s1, s2 ??
 
                     if params.keep_all:
                         for ccfid in allcorr.keys():
-                            export_allcorr(db, ccfid, allcorr[ccfid])
+                            export_allcorr(s1, s2, db, ccfid, allcorr[ccfid])
+                              #############################
 
                     if params.keep_days:
                         try:
@@ -537,7 +544,9 @@ def main():
                                         "%Y-%m-%d", time.gmtime(basetime))
                                     thistime = time.strftime(
                                         "%H_%M", time.gmtime(basetime))
-                                    add_corr(
+                                        
+                                        ###################################
+                                    add_corr(s1, s2,
                                         db, station1.replace('.', '_'),
                                         station2.replace('.', '_'), filterid,
                                         thisdate, thistime,  params.min30 /
@@ -545,6 +554,10 @@ def main():
                                         components, corr,
                                         params.goal_sampling_rate, day=True,
                                         ncorr=ncorr)
+                                
+                                ######################################################
+                                
+                                
                                 del corr, ncorr
                         except Exception as e:
                             logging.debug(str(e))
