@@ -889,7 +889,7 @@ def export_sac(s1, s2, db, filename, pair, components, filterid, corr, ncorr=0,
 # Compute dist,azim,bazim
 
     dist, azim, bazim = gps2DistAzimuth(s1.Y, s1.X, s2.Y, s2.X)
-#############################################################################################
+############################################################################################
 
     try:
         os.makedirs(os.path.split(filename)[0])
