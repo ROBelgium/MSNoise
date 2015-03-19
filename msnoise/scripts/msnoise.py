@@ -261,12 +261,13 @@ def data_availability(show, outfile):
 @click.option('-m', '--mov_stack', default=0,  help='Plot specific mov stacks')
 @click.option('-p', '--pair', default=None,  help='Plot a specific pair',
               multiple=True)
+@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
 @click.option('-M', '--dttname', default="M",  help='Plot M or M0?')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-def dvv(mov_stack, comp, dttname, filterid, pair, show, outfile):
+def dvv(mov_stack, comp, dttname, filterid, pair, all, show, outfile):
     """Plots the dv/v (parses the dt/t results)\n
     Individual pairs can be plotted extra using the -p flag one or more times.\n
     Example: msnoise plot dvv -p ID_KWUI_ID_POSI\n
@@ -274,7 +275,7 @@ def dvv(mov_stack, comp, dttname, filterid, pair, show, outfile):
     Remember to order stations alphabetically !
     """
     from ..plots.dvv import main
-    main(mov_stack, dttname, comp, filterid, pair, show, outfile)
+    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
 
 
 @click.command()

@@ -1,5 +1,5 @@
 References
-===========
+==========
 
 * Jones, Eric, Travis Oliphant, Pearu Peterson, et others. 2001. SciPy: Open source scientific tools for Python.
 * Oliphant, Travis E. 2006. Guide to NumPy. Provo, UT: Brigham Young University.

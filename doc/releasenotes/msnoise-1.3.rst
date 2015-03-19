@@ -30,13 +30,14 @@ new users reading the SRL publication will find their way easily!
 **MSNoise is now a Python Package**, allowing a single (and easy) install for
 all your projects and/or all users. The new top-level ``msnoise`` command
 contains all the steps of the workflow, plus new additions, as the very useful
-``reset`` command to easily mark all jobs "T"odo. The command group ``plot``
-which includes seven plots, all directly callable from the command line, without
-needing to hack/edit the source codes. About hacking: MSNoise has now a proper
-documented API which allows pythonistas to write their own plots, computation
-steps, ..., while interacting with the database and the data archive! The
-"dynamic time lag" allows to use parts of the coda that is dependent from the
-interstation distance (provided station coordinates are defined).
+``reset`` command to easily mark all jobs "T"odo. The ``msnoise plot`` command
+group which includes seven plots, all directly callable from the command line,
+without needing to hack/edit the source codes. About hacking: MSNoise has now a
+proper documented API which allows pythonistas to write their own plots,
+computation steps, ..., while interacting with the database and the data
+archive! The "dynamic time lag" allows to use parts of the coda that is
+dependent from the interstation distance (provided station coordinates are
+defined).
 Finally, MSNoise is now *tested* and automatically checked by Travis-CI!
 
 
