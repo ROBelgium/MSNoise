@@ -232,10 +232,8 @@ def main():
     params.preprocess_highpass = float(get_config(db, "preprocess_highpass"))
     params.keep_all = get_config(db, 'keep_all', isbool=True)
     params.keep_days = get_config(db, 'keep_days', isbool=True)
-    params.components_to_compute = []
-    for comp in ['ZZ', 'RR', 'TT', 'TR', 'RT', 'ZR', 'RZ', 'TZ', 'ZT']:
-        if get_config(db, comp, isbool=True):
-            params.components_to_compute.append(comp)
+    params.components_to_compute = get_components_to_compute(db)
+
     logging.info("Will compute %s" % " ".join(params.components_to_compute))
 
     while is_next_job(db, jobtype='CC'):
@@ -367,8 +365,7 @@ def main():
             logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
 
         else:
-        # if 1:
-        # print '##### ITERATING OVER PAIRS #####'
+            # ITERATING OVER PAIRS #####
             for pair in pairs:
                 orig_pair = pair
 
@@ -473,7 +470,7 @@ def main():
                             high = float(filterdb.high)
                             rms_threshold = filterdb.rms_threshold
 
-                            Nfft = params.min30
+                            Nfft = int(params.min30)
                             if params.min30 / 2 % 2 != 0:
                                 Nfft = params.min30 + 2
 
@@ -524,7 +521,7 @@ def main():
 
                     if params.keep_all:
                         for ccfid in allcorr.keys():
-                            export_allcorr(s1, s2, db, ccfid, allcorr[ccfid])
+                            export_allcorr(db, ccfid, allcorr[ccfid])
 
                     if params.keep_days:
                         try:
@@ -540,8 +537,8 @@ def main():
                                         "%Y-%m-%d", time.gmtime(basetime))
                                     thistime = time.strftime(
                                         "%H_%M", time.gmtime(basetime))
-                                    add_corr(
-                                        s1, s2, db, station1.replace('.', '_'),
+                                    add_corr(s1, s2,
+                                        db, station1.replace('.', '_'),
                                         station2.replace('.', '_'), filterid,
                                         thisdate, thistime,  params.min30 /
                                         params.goal_sampling_rate,
