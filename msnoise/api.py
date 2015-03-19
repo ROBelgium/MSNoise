@@ -779,9 +779,11 @@ def get_job_types(session, jobtype='CC'):
 
 
 # CORRELATIONS
+##################################################################   s1, s2 ???
 
-
-def export_allcorr(session, ccfid, data):
+def export_allcorr(s1, s2, session, ccfid, data):
+    #Insert S1 S2 ???
+    #############################################################
     output_folder = get_config(session, 'output_folder')
     station1, station2, filterid, components, date = ccfid.split('_')
 
@@ -795,9 +797,10 @@ def export_allcorr(session, ccfid, data):
     df.to_hdf(os.path.join(path, date+'.h5'), 'data')
     del df
     return
-
-
-def add_corr(session, station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
+####################################################
+#Insert S1 S2
+def add_corr(s1, s2, session, station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
+    #######################################################
     """
     Adds a CCF to the data archive on disk.
     
@@ -846,10 +849,11 @@ def add_corr(session, station1, station2, filterid, date, time, duration, compon
         if mseed:
             export_mseed(session, path, pair, components, filterid, CF/ncorr,
                          ncorr)
+        ################################################################
         if sac:
-            export_sac(session, path, pair, components, filterid, CF/ncorr,
-                       ncorr)
-
+            export_sac(s1, s2, session, path, pair, components, filterid, CF/ncorr,
+                       ncorr)                                                             #Insert S1 S2
+####################################################################################
     else:
         file = '%s.cc' % time
         path = os.path.join(output_folder, "%02i" % filterid, station1,
@@ -867,16 +871,26 @@ def add_corr(session, station1, station2, filterid, date, time, duration, compon
         st = Stream(traces=[t, ])
         st.write(os.path.join(path, file), format='mseed')
         del t, st
-
-
-def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
+#############################################################################################
+#Insert S1 S2
+def export_sac(s1, s2, db, filename, pair, components, filterid, corr, ncorr=0,
                sac_format=None, maxlag=None, cc_sampling_rate=None):
+    ####################################################################################
+    
+    
     if sac_format is None:
         sac_format = get_config(db, "sac_format")
     if maxlag is None:
         maxlag = float(get_config(db, "maxlag"))
     if cc_sampling_rate is None:
         cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
+#######################################################################################
+
+# Compute dist,azim,bazim
+
+    dist, azim, bazim = gps2DistAzimuth(s1.Y, s1.X, s2.Y, s2.X)
+#############################################################################################
+
     try:
         os.makedirs(os.path.split(filename)[0])
     except:
@@ -898,6 +912,18 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
         tr.SetHvalue('DEPMEN', np.mean(corr))
         tr.SetHvalue('SCALE', 1)
         tr.SetHvalue('NPTS', len(corr))
+
+#########################################################################################################################
+
+# Add info in the headers
+
+    tr.SetHvalue('DIST', dist)
+       tr.SetHvalue('AZ', azim)
+       tr.SetHvalue('BAZ', bazim)
+    
+##########################################################################################################################
+
+
     tr.WriteSacBinary(filename)
     del st, tr
     return
