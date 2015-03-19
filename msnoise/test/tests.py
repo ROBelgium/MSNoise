@@ -290,7 +290,6 @@ def main():
         sys.exit()
 
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
-    result = unittest.TestResult()
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
     if not result.wasSuccessful():

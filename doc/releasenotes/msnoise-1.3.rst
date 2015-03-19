@@ -5,6 +5,10 @@ MSNoise 1.3
 
 Release date: 20 March 2015
 
+
+Release type: major
+
+
 Release notes:
 
 .. contents::
@@ -13,16 +17,21 @@ Release notes:
 Introduction
 ------------
 
-8 months after the last release, we are proud to announce the new MSNoise 1.3.
-It is a major release, introducing a brand new way of executing the workflow.
-The workflow in itself doesn't change, so experienced users as well as new
-users reading the SRL publication will find their way easily!
+8 months after the last bugfix release (:doc:`msnoise-1.2.5`), and
+17 months after the last major release (:doc:`msnoise-1.2`) we are
+proud to announce the new :doc:`msnoise-1.3`.
+It is a **major** release, with a massive amount of work since the
+last release: in `GitHub numbers <https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2014-06-28&to=2015-03-19&type=c>`_
+, it's over 100 commits and about 3500 new lines of code and documentation
+added ! MSNoise 1.3 introduces a **brand new** way of executing the
+workflow. The workflow in itself doesn't change, so experienced users as well as
+new users reading the SRL publication will find their way easily!
 
-MSNoise is now a Python Package, allowing a single (and easy) install for all
-your projects and/or all users. The new top-level ``msnoise`` command contains
-all the steps of the workflow, plus new additions, as the very useful ``reset``
-command to easily mark all jobs "T"odo. The command group ``plot`` which
-includes seven plots, all directly callable from the command line, without
+**MSNoise is now a Python Package**, allowing a single (and easy) install for
+all your projects and/or all users. The new top-level ``msnoise`` command
+contains all the steps of the workflow, plus new additions, as the very useful
+``reset`` command to easily mark all jobs "T"odo. The command group ``plot``
+which includes seven plots, all directly callable from the command line, without
 needing to hack/edit the source codes. About hacking: MSNoise has now a proper
 documented API which allows pythonistas to write their own plots, computation
 steps, ..., while interacting with the database and the data archive! The
@@ -65,6 +74,9 @@ MSNoise is a real Python Package
 This is probably the most important change since the original release of
 MSNoise 1.0 (August 2013), it represents a massive amount of work since the
 last release (1.2.5 in June 2014), and is probably the most needed by users!
+In  `GitHub numbers <https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2014-06-28&to=2015-03-19&type=c>`_
+, it's over 100 commits and about 3500 new lines of code (and of documentation!)
+added !
 
 In practice, what does change ?
 
@@ -82,7 +94,7 @@ right after installing.
 
 
 ``msnoise`` is now a top-level command
----------------------------------------
+--------------------------------------
 
 Users of MSNoise will have to change the way they call the steps, i.e.:
 

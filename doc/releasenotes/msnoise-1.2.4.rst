@@ -3,8 +3,13 @@ MSNoise 1.2.4
 
 Release date: 28 April 2014
 
+
+Release type: bugfix & improvements
+
 Release notes:
 
+BugFix - Improvement of scan_archive and new_jobs
+-------------------------------------------------
 
 Thanks to some great early MSNoise adopters who reported problems using the mailing-list, we have identified a few bugs and tricky situations where some steps failed. This is the case for
 

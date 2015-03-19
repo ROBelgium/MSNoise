@@ -267,7 +267,12 @@ def data_availability(show, outfile):
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
 def dvv(mov_stack, comp, dttname, filterid, pair, show, outfile):
-    """Plots the dv/v (parses the dt/t results)"""
+    """Plots the dv/v (parses the dt/t results)\n
+    Individual pairs can be plotted extra using the -p flag one or more times.\n
+    Example: msnoise plot dvv -p ID_KWUI_ID_POSI\n
+    Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
+    Remember to order stations alphabetically !
+    """
     from ..plots.dvv import main
     main(mov_stack, dttname, comp, filterid, pair, show, outfile)
 
@@ -283,7 +288,8 @@ def dvv(mov_stack, comp, dttname, filterid, pair, show, outfile):
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
 def interferogram(sta1, sta2, filterid, comp, mov_stack, show, outfile):
-    """Plots the interferogram between sta1 and sta2 (parses the CCFs)"""
+    """Plots the interferogram between sta1 and sta2 (parses the CCFs)\n
+    STA1 and STA2 must be provided with this format: NET.STA !"""
     from ..plots.interferogram import main
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
 
@@ -301,7 +307,8 @@ def interferogram(sta1, sta2, filterid, comp, mov_stack, show, outfile):
               default=None, type=str)
 def ccftime(sta1, sta2, filterid, comp, mov_stack,
             ampli, seismic, show, outfile):
-    """Plots the dv/v (parses the dt/t results)"""
+    """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
+    STA1 and STA2 must be provided with this format: NET.STA !"""
     from ..plots.ccftime import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile)
 
@@ -317,7 +324,8 @@ def ccftime(sta1, sta2, filterid, comp, mov_stack,
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
 def mwcs(sta1, sta2, filterid, comp, mov_stack, show, outfile):
-    """Plots the mwcs results between sta1 and sta2 (parses the CCFs)"""
+    """Plots the mwcs results between sta1 and sta2 (parses the CCFs)\n
+    STA1 and STA2 must be provided with this format: NET.STA !"""
     from ..plots.mwcs import main
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
 
@@ -343,7 +351,7 @@ def distance(filterid, comp,  ampli, show, outfile):
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
 def station_map(show, outfile):
-    """Plots the station map (very basic)"""
+    """Plots the station map (very very basic)"""
     from ..plots.station_map import main
     main(show, outfile)
 

@@ -36,6 +36,11 @@ Release Notes:
    releasenotes/msnoise-1.3
    releasenotes/msnoise-1.2.5
    releasenotes/msnoise-1.2.4
+   releasenotes/msnoise-1.2.3
+   releasenotes/msnoise-1.2.2
+   releasenotes/msnoise-1.2.1
+   releasenotes/msnoise-1.2
+   releasenotes/msnoise-1.0
 
 
 Indices and tables

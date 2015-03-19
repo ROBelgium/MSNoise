@@ -3,7 +3,12 @@ MSNoise 1.2.5
 
 Release date: 16 June 2014
 
+Release type: bugfix & improvements
+
 Release notes:
+
+BugFixes + Improvements
+-----------------------
 
 Some bugfixes (thanks to all reporters) and improvements for this release:
 
