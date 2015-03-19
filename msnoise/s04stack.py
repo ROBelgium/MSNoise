@@ -187,7 +187,7 @@ def main(stype, interval=1):
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
                                             ########################################## Add station1, station2
                                             if sac:
-                                                export_sac(station1, station2,
+                                                export_sac(s1, s2,
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
                                                     ####################################
                                             day_name = "%s:%s" % (
@@ -233,7 +233,7 @@ def main(stype, interval=1):
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
                                             ######################################## ???
                                             if sac:
-                                                export_sac(station1, station2,
+                                                export_sac(s1, s2,
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
                                                     #################################### ???
                                             day_name = "%s:%s" % (
@@ -265,7 +265,7 @@ def main(stype, interval=1):
                                     db, filename, pair, components, filterid, stack_total)
                             ################################################### Add Station1, station2
                             if sac:
-                                export_sac(station1, station2,
+                                export_sac(s1, s2,
                                     db, filename, pair, components, filterid, stack_total)
                                     ##########################################
                             ref_name = "%s:%s" % (sta1, sta2)
