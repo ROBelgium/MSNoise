@@ -30,19 +30,19 @@ help)
 
 .. code-block:: sh
 
-    $ msnoise stack -h
-    UPDATE HERE !!!!
-    usage: .py [-h] [-r] [-m] [-i INTERVAL]
+    $ msnoise stack --help
 
-    Compute [REF,MOV] stacks if jobs have been modified in the last i days.
-    optional arguments:
-      -h, --help            show this help message and exit
-      -r, --ref             Triggers the computation of REF stacks
-      -m, --mov             Triggers the computation of MOV stacks
-      -i INTERVAL, --interval INTERVAL
-                            Number of days before now to search for modified CC
-                            jobs [default:1]
+    Usage: msnoise-script.py stack [OPTIONS]
 
+      Stacks the [REF] and/or [MOV] windows
+
+    Options:
+      -r, --ref               Compute the REF Stack
+      -m, --mov               Compute the MOV Stacks
+      -s, --step              Compute the STEP Stacks
+      -i, --interval INTEGER  Number of days before now to search for modified
+                              Jobs
+      --help                  Show this message and exit.
 
 On a routine basis, one should thus run the following to compute REF *and* MOV
 stacks:
@@ -145,7 +145,7 @@ def main(stype, interval=1):
                 pair = "%s:%s" % (sta1, sta2)
                 logging.debug('Processing %s-%s-%i' %
                                   (pair, components, filterid))
-                updated_days = updated_days_for_dates(db, start, end, pair.replace('_', '.'), type='CC', interval=datetime.timedelta(days=interval),returndays=True)
+                updated_days = updated_days_for_dates(db, start, end, pair.replace('_', '.'), jobtype='CC', interval=datetime.timedelta(days=interval),returndays=True)
                 if len(updated_days) != 0:
                     logging.debug("New Data for %s-%s-%i" %
                                   (pair, components, filterid))
@@ -186,7 +186,7 @@ def main(stype, interval=1):
                                                 export_mseed(
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
                                             if sac:
-                                                export_sac(
+                                                export_sac(station1, station2,
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
@@ -231,7 +231,7 @@ def main(stype, interval=1):
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
                                             if sac:
                                                 export_sac(
-                                                    station1, station2, db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
                                             job = "%s %s" % (date, day_name)
@@ -260,8 +260,8 @@ def main(stype, interval=1):
                                 export_mseed(
                                     db, filename, pair, components, filterid, stack_total)
                             if sac:
-                                export_sac(
-                                    station1, station2, db, filename, pair, components, filterid, stack_total)
+                                export_sac(station1, station2, 
+                                    db, filename, pair, components, filterid, stack_total)
                             ref_name = "%s:%s" % (sta1, sta2)
                             update_job(
                                 db, "REF", ref_name.replace('_', '.'), 'DTT', 'T')
