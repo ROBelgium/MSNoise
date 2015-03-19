@@ -1,4 +1,3 @@
-# database_tools.py
 import os
 import logging
 import copy
@@ -136,7 +135,7 @@ def get_config(session, name=None, isbool=False):
         config = session.query(Config).filter(Config.name == name).first()
         if config is not None:
             if isbool:
-                if config.value in [True, 'true', 'Y', 'y', '1', 1]:
+                if config.value in [True, 'True', 'true', 'Y', 'y', '1', 1]:
                     config = True
                 else:
                     config = False
@@ -324,8 +323,6 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
-    :type ref: int
-    :param ref: The Station ID in the database
     :type net: str
     :param net: The network code of the Station
     :type sta: str
@@ -367,7 +364,7 @@ def get_station_pairs(session, used=None, net=None):
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
-    :type used: bool
+    :type used: bool, int
     :param used: Select only stations marked used if False (default) or all
         stations present in the database if True
     :type net: str
@@ -425,8 +422,6 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
-    :type ref: int
-    :param ref: The Station ID in the database
     :type net: str
     :param net: The network code of the Station
     :type sta: str
@@ -452,7 +447,8 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
     data = session.query(DataAvailability).filter(DataAvailability.file == file).first()
     if data is None:
         flag = "N"
-        data = DataAvailability(net, sta, comp, path, file, starttime, endtime, data_duration, gaps_duration, samplerate, flag)
+        data = DataAvailability(net, sta, comp, path, file, starttime, endtime,
+                                data_duration, gaps_duration, samplerate, flag)
         session.add(data)
         toreturn = True
     else:
@@ -507,9 +503,9 @@ def get_data_availability(session, net=None, sta=None, comp=None,
     :param net: Network code
     :type sta: str
     :param sta: Station code
-    :type starttime: datetime.datetime
+    :type starttime: datetime.datetime, datetime.date
     :param starttime: Start time of the search
-    :type endtime: datetime.datetime
+    :type endtime: datetime.datetime, datetime.date
     :param endtime: End time of the search
 
     :rtype: list
@@ -572,8 +568,6 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     Updates or Inserts a new :class:`~msnoise.msnoise_table_def.Job` in the
     database.
 
-    :type ref: int
-    :param ref: The Job ID in the database
     :type day: str
     :param day: The day in YYYY-MM-DD format
     :type pair: str
@@ -740,7 +734,7 @@ def reset_jobs(session, jobtype, alljobs=False):
     :type jobtype: str
     :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
     :type alljobs: bool
-    :param aljobs: If True, resets all jobs. If False (default), only resets
+    :param alljobs: If True, resets all jobs. If False (default), only resets
         jobs "I"n progress.
     """
     jobs = session.query(Job).filter(Job.jobtype == jobtype)
@@ -813,7 +807,7 @@ def add_corr(s1, s2, session, station1, station2, filterid, date, time, duration
     :type station1: str
     :param station1: The name of station 1 (formatted NET.STA)
     :type station2: str
-    :param statin2: The name of station 2 (formatted NET.STA)
+    :param station2: The name of station 2 (formatted NET.STA)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type date: datetime.date or str
@@ -850,11 +844,9 @@ def add_corr(s1, s2, session, station1, station2, filterid, date, time, duration
                             "%s_%s" % (station1, station2), str(date))
         pair = "%s:%s" % (station1, station2)
         if mseed:
-            export_mseed(session, path, pair, components, filterid, CF/ncorr,
-                         ncorr)
+            export_mseed(session, path, pair, components, filterid, CF/ncorr, ncorr)
         if sac:
-            export_sac(s1, s2, session, path, pair, components, filterid, CF/ncorr,
-                       ncorr)
+            export_sac(s1, s2, session, path, pair, components, filterid, CF/ncorr, ncorr)
 
     else:
         file = '%s.cc' % time
@@ -883,9 +875,12 @@ def export_sac(s1, s2, db, filename, pair, components, filterid, corr, ncorr=0,
         maxlag = float(get_config(db, "maxlag"))
     if cc_sampling_rate is None:
         cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-        
-        dist, azim, bazim = gps2DistAzimuth(s1.Y, s1.X, s2.Y, s2.X)
-        
+
+
+    dist, azim, bazim = gps2DistAzimuth(s1.Y, s1.X, s2.Y, s2.X)
+
+
+
     try:
         os.makedirs(os.path.split(filename)[0])
     except:
@@ -907,11 +902,17 @@ def export_sac(s1, s2, db, filename, pair, components, filterid, corr, ncorr=0,
         tr.SetHvalue('DEPMEN', np.mean(corr))
         tr.SetHvalue('SCALE', 1)
         tr.SetHvalue('NPTS', len(corr))
-        
+
+
         tr.SetHvalue('DIST', dist)
         tr.SetHvalue('AZ', azim)
         tr.SetHvalue('BAZ', bazim)
-        
+
+
+
+
+
+
     tr.WriteSacBinary(filename)
     del st, tr
     return
@@ -969,8 +970,7 @@ def get_results(session, station1, station2, filterid, components, dates,
         else:
             return 0, None
 
-    elif format=="matrix":
-        from multiprocessing import Pool
+    elif format == "matrix":
         stack = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
         i = 0
         base = os.path.join("STACKS", "%02i"%filterid,
@@ -1074,9 +1074,6 @@ def build_ref_datelist(session):
     The returned tuple contains a start and an end date, and a list of
     individual dates between the two.
 
-    .. todo:: rewrite this using pandas, merge with
-        :func:`build_movstack_datelist`
-
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
@@ -1092,9 +1089,9 @@ def build_ref_datelist(session):
     else:
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
-
-    r = (end+datetime.timedelta(days=1)-start).days
-    return start, end, [start+datetime.timedelta(days=i) for i in range(r)]
+    end = min(end, datetime.date.today())
+    datelist = pd.date_range(start, end).map(lambda x: x.date())
+    return start, end, datelist.tolist()
 
 
 def build_movstack_datelist(session):
@@ -1102,8 +1099,6 @@ def build_movstack_datelist(session):
     Creates a date array for the analyse period.
     The returned tuple contains a start and an end date, and a list of
     individual dates between the two.
-
-    .. todo:: rewrite this using pandas, merge with :func:`build_ref_datelist`
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
@@ -1120,9 +1115,9 @@ def build_movstack_datelist(session):
     else:
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
-
-    r = (end+datetime.timedelta(days=1)-start).days
-    return start, end, [start+datetime.timedelta(days=i) for i in range(r)]
+    end = min(end, datetime.date.today())
+    datelist = pd.date_range(start, end).map(lambda x: x.date())
+    return start, end, datelist.tolist()
 
 
 def updated_days_for_dates(session, date1, date2, pair, jobtype='CC',
@@ -1195,7 +1190,7 @@ def azimuth(coordinates, x0, y0, x1, y1):
         azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
         return azim
     else:
-        print "woooooow, please consider having a single coordinate system for\
+        print "Please consider having a single coordinate system for\
             all stations"
         return 0
 
