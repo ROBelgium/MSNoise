@@ -185,9 +185,11 @@ def main(stype, interval=1):
                                             if mseed:
                                                 export_mseed(
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                            ########################################## Add station1, station2
                                             if sac:
-                                                export_sac(
+                                                export_sac(station1, station2,
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                                    ####################################
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
                                             if not jobadded:
@@ -229,9 +231,11 @@ def main(stype, interval=1):
                                             if mseed:
                                                 export_mseed(
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                            ######################################## ???
                                             if sac:
-                                                export_sac(
+                                                export_sac(station1, station2,
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                                    #################################### ???
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
                                             job = "%s %s" % (date, day_name)
@@ -259,9 +263,11 @@ def main(stype, interval=1):
                             if mseed:
                                 export_mseed(
                                     db, filename, pair, components, filterid, stack_total)
+                            ################################################### Add Station1, station2
                             if sac:
-                                export_sac(
+                                export_sac(station1, station2,
                                     db, filename, pair, components, filterid, stack_total)
+                                    ###########################################
                             ref_name = "%s:%s" % (sta1, sta2)
                             update_job(
                                 db, "REF", ref_name.replace('_', '.'), 'DTT', 'T')
