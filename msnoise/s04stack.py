@@ -267,7 +267,7 @@ def main(stype, interval=1):
                             if sac:
                                 export_sac(station1, station2,
                                     db, filename, pair, components, filterid, stack_total)
-                                    ###########################################
+                                    ##########################################
                             ref_name = "%s:%s" % (sta1, sta2)
                             update_job(
                                 db, "REF", ref_name.replace('_', '.'), 'DTT', 'T')
