@@ -28,18 +28,17 @@ workflow. The workflow in itself doesn't change, so experienced users as well as
 new users reading the SRL publication will find their way easily!
 
 **MSNoise is now a Python Package**, allowing a single (and easy) install for
-all your projects and/or all users. The new top-level ``msnoise`` command
-contains all the steps of the workflow, plus new additions, as the very useful
-``reset`` command to easily mark all jobs "T"odo. The ``msnoise plot`` command
-group which includes seven plots, all directly callable from the command line,
-without needing to hack/edit the source codes. About hacking: MSNoise has now a
-proper documented API which allows pythonistas to write their own plots,
+all your projects and/or all users using ``pip``. The new top-level ``msnoise``
+command contains all the steps of the workflow, plus new additions, as the very
+useful ``reset`` command to easily mark all jobs "T"odo. The ``msnoise plot``
+command group which includes seven plots, all directly callable from the command
+line, without needing to hack/edit the source codes. About hacking: MSNoise has
+now a proper documented API which allows pythonistas to write their own plots,
 computation steps, ..., while interacting with the database and the data
 archive! The "dynamic time lag" allows to use parts of the coda that is
 dependent from the interstation distance (provided station coordinates are
 defined).
 Finally, MSNoise is now *tested* and automatically checked by Travis-CI!
-
 
 This version has benefited from outputs/ideas/pull requests/questions from
 several users:
@@ -62,10 +61,20 @@ several users:
 * all others (don't be mad :-) )
 
 
-Thanks to all for using MSNoise, and please, let us know why/how you use it!
+Thanks to all for using MSNoise, and please, let us know why/how you use it
+(and please cite it!)!
 
 
 *Thomas Lecocq & Corentin Caudron*
+
+~~~~
+
+PS: if you use MSNoise for your research and prepare publications, please
+consider citing it:
+
+**Lecocq, T., C. Caudron, et F. Brenguier (2014)**, MSNoise, a Python Package
+for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
+*Seismological Research Letters*, 85(3), 715‑726, doi:10.1785/0220130073.
 
 
 

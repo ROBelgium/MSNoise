@@ -60,7 +60,7 @@ Quick Start - Windows
    
    .. code-block:: sh
     
-        conda traitsui traits
+        conda install traitsui traits
         easy_install obspy click
    
 3. Download and install scikits.samplerate and mysql-python from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate and http://www.lfd.uci.edu/~gohlke/pythonlibs/#mysql-python
@@ -84,7 +84,7 @@ Quick Start - Windows
 
    .. code-block:: sh
 
-        easy_install msnoise
+        pip install msnoise
 
 8. Check which required packages you are still missing by executing the ``msnoise bugreport`` command. (See :ref:`testing`)
 
@@ -136,7 +136,7 @@ Quick Start - Linux
 
    .. code-block:: sh
 
-        easy_install msnoise
+        pip install msnoise
 
 7. Check which required packages you are still missing by executing the ``msnoise bugreport`` command. (See :ref:`testing`)
 

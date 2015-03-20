@@ -20,7 +20,7 @@ default['preprocess_highpass'] = ["Preprocessing High-pass value in Hz [0.01]",'
 default['maxlag'] = ["Maximum lag (in seconds) [120.0]",'120.']
 default['corr_duration'] = ["Data windows to correlate (in seconds) [1800.]",'1800.']
 default['overlap'] = ["Amount of overlap between data windows [0:1[ [0.]",'0.0']
-default['windsorizing'] = ["Windsorizing at N time RMS (in unit), 0 disables windsorizing [3]",'3']
+default['windsorizing'] = ["Windsorizing at N time RMS , 0 disables windsorizing, -1 enables 1-bit normalization [3]",'3']
 
 default['crondays'] = ["Number of days to monitors with cron [-1]",'-1']
 
@@ -43,7 +43,7 @@ default['keep_days'] = ["Keep all daily cross-corr [Y]/N",'Y']
 default['ref_begin'] = ["Beginning or REF stacks. Can be absolute (2012-01-01) or relative (-100) days",'-100']
 default['ref_end'] = ["End or REF stacks. Same as ref_begin",'0']
 
-default['mov_stack'] = ["Number of days to stack for the Moving-window stacks ([5]= [day-4:day]), can be a comma-separated list 2,5,10","5"]
+default['mov_stack'] = ["Number of days to stack for the Moving-window stacks ([5]= [day-4:day]), can be a comma-separated list 1,2,5,10","5"]
 
 default['export_format'] = ["Export stacks in which format(s) ? SAC/MSEED/[BOTH]","MSEED"]
 default['sac_format'] = ["Format for SAC stacks ? [doublets]/clarke","doublets"]
