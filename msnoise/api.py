@@ -12,9 +12,9 @@ from sqlalchemy.pool import NullPool
 import numpy as np
 import pandas as pd
 import scipy.fftpack
-from obspy.core import Stream, Trace, read
+from obspy.core import Stream, Trace, read, AttribDict
 from obspy.signal import cosTaper
-from obspy.sac import SacIO
+
 from obspy.core.util import gps2DistAzimuth
 
 from msnoise_table_def import Filter, Job, Station, Config, DataAvailability
@@ -885,21 +885,18 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
     mytrace = Trace(data=corr)
     mytrace.stats['station'] = pair
     mytrace.stats['sampling_rate'] = cc_sampling_rate
+    mytrace.stats.sac = AttribDict()
+
+    mytrace.stats.sac.b = -maxlag
+    mytrace.stats.sac.depmin = np.min(corr)
+    mytrace.stats.sac.depmax = np.max(corr)
+    mytrace.stats.sac.depmen = np.mean(corr)
+    mytrace.stats.sac.scale = 1
+    mytrace.stats.sac.npts = len(corr)
 
     st = Stream(traces=[mytrace, ])
     st.write(filename, format='SAC')
-    tr = SacIO(filename)
-    if sac_format == "doublets":
-        tr.SetHvalue('A', 120)
-    else:
-        tr.SetHvalue('B', -maxlag)
-        tr.SetHvalue('DEPMIN', np.min(corr))
-        tr.SetHvalue('DEPMAX', np.max(corr))
-        tr.SetHvalue('DEPMEN', np.mean(corr))
-        tr.SetHvalue('SCALE', 1)
-        tr.SetHvalue('NPTS', len(corr))
-    tr.WriteSacBinary(filename)
-    del st, tr
+    del st
     return
 
 
