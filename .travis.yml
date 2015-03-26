@@ -30,10 +30,9 @@ before_install:
   - conda install --yes python=$TRAVIS_PYTHON_VERSION flask
   - conda install --yes python=$TRAVIS_PYTHON_VERSION traitsui enable lxml
   # Update remaining packages not available via conda
-  - easy_install click
-  - easy_install flask-admin
-  - pip install -i https://pypi.binstar.org/pypi/simple obspy
-  #- easy_install obspy
+  - pip install click
+  - pip install flask-admin
+  - pip install obspy
   - easy_install mysql-python
   # Special install for scikits.samplerate
   - cd ..
