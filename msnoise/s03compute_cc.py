@@ -345,8 +345,8 @@ def main():
                                 allcorr[ccfid][thistime] = corr
 
                             if params.keep_days:
-                                    daycorr += corr
-                                    ndaycorr += 1
+                                daycorr += corr
+                                ndaycorr += 1
 
                     if params.keep_all:
                         for ccfid in allcorr.keys():

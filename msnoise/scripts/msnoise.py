@@ -160,10 +160,11 @@ def scan_archive(ctx, init):
 
 
 @click.command()
-def new_jobs():
+@click.option('-i', '--init', is_flag=True, help='First run ?')
+def new_jobs(init):
     """Determines if new CC jobs are to be defined"""
     from ..s02new_jobs import main
-    main()
+    main(init)
 
 
 @click.command()

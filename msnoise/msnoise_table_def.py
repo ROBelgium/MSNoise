@@ -81,14 +81,14 @@ class Job(Base):
     flag = Column(String(1))
     lastmod = Column(TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP'))
 
-    def __init__(self, day, pair, jobtype, flag, lastmod=None):
+    def __init__(self, day, pair, jobtype, flag,
+                 lastmod=datetime.datetime.utcnow()):
         """"""
         self.day = day
         self.pair = pair
         self.jobtype = jobtype
         self.flag = flag
-        if lastmod is None:
-            self.lastmod = datetime.datetime.utcnow()
+        self.lastmod = lastmod
 
 
 class Station(Base):

@@ -8,6 +8,10 @@ To run it from the console:
 .. code-block:: sh
 
     $ msnoise new_jobs
+
+.. warning:: Upon first run, if the number of jobs, pass the ``--init``
+    parameter to optimize the insert. Only use this flag once, otherwise
+    problems will arise from duplicate entries in the jobs table.
 """
 
 from api import *
@@ -15,7 +19,7 @@ import logging
 import numpy as np
 
 
-def main():
+def main(init=False):
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s [%(levelname)s] %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
@@ -56,18 +60,23 @@ def main():
                     if pair not in jobs:
                         all_jobs.append({"day": day, "pair": pair,
                                          "jobtype": "CC", "flag": "T",
-                                         "lastmod": None})
+                                         "lastmod": datetime.datetime.utcnow()})
                         jobs.append(pair)
 
-        if len(all_jobs) > 1e5:
+        if init and len(all_jobs) > 1e5:
             logging.debug('Already 100.000 jobs, inserting')
             massive_insert_job(all_jobs)
             all_jobs = []
             count += 1e5
 
-    logging.debug('Inserting remaining jobs')
     if len(all_jobs) != 0:
-        massive_insert_job(all_jobs)
+        logging.debug('Inserting %i jobs' % len(all_jobs))
+        if init:
+            massive_insert_job(all_jobs)
+        else:
+            for job in all_jobs:
+                update_job(db, job['day'], job['pair'],
+                           job['jobtype'], job['flag'])
     count += len(all_jobs)
 
     for sta in get_stations(db, all=True):
