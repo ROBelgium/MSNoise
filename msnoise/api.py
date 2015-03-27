@@ -46,7 +46,7 @@ def get_engine(inifile=None):
     if tech == 1:
         engine = create_engine('sqlite:///%s' % hostname, echo=False)
     else:
-        engine = create_engine('mysql://%s:%s@%s/%s' % (user, passwd, hostname,
+        engine = create_engine('mysql+pymysql://%s:%s@%s/%s' % (user, passwd, hostname,
                                                         database),
                                echo=False, poolclass=NullPool)
     return engine

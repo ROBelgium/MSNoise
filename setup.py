@@ -18,7 +18,7 @@ setup(
         'obspy',
         'click',
         'scikits.samplerate',
-        'mysql-python'
+        'pymysql'
     ],
     entry_points='''
         [console_scripts]

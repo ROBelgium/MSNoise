@@ -16,8 +16,6 @@ before_install:
   - sudo apt-get update
   - sudo apt-get install -qq gfortran
   - sudo apt-get install libsamplerate0 libsamplerate0-dev
-  - sudo apt-get build-dep python-mysqldb
-  - sudo apt-get install libmysqlclient-dev
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
   - ./miniconda.sh -b
@@ -27,13 +25,12 @@ before_install:
   # Installed required packages
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib statsmodels pandas
   - conda install --yes python=$TRAVIS_PYTHON_VERSION sqlalchemy sphinx jinja2
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION flask
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION traitsui enable lxml
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION flask pymysql
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION traitsui traits lxml
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION obspy
   # Update remaining packages not available via conda
   - pip install click
   - pip install flask-admin
-  - pip install obspy
-  - easy_install mysql-python
   # Special install for scikits.samplerate
   - cd ..
   - sudo dpkg -L libsamplerate0
@@ -63,3 +60,4 @@ script:
   - mkdir MSNoiseTest
   - cd MSNoiseTest
   - msnoise test
+
