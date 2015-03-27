@@ -26,10 +26,10 @@ before_install:
   - conda update --yes conda
   # Installed required packages
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib statsmodels pandas
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION sqlalchemy sphinx jinja2
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION flask pymysql
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION traitsui traits lxml
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION -c obpsy obspy
+  - conda install --yes sqlalchemy sphinx jinja2
+  - conda install --yes flask pymysql
+  - conda install --yes traitsui traits lxml
+  - conda install --yes -c obspy obspy
   # Update remaining packages not available via conda
   - pip install click
   - pip install flask-admin
