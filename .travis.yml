@@ -41,7 +41,7 @@ before_install:
   - tar -xvf scikits.samplerate-0.3.3.tar.gz
   - cd scikits.samplerate-0.3.3
   - echo "[samplerate]" >> site.cfg
-  - echo "library_dirs=/usr/lib/x86_64-linux-gnu" >> site.cfg
+  - echo "library_dirs=/usr/lib:/usr/lib/x86_64-linux-gnu" >> site.cfg
   - echo "include_dirs=/usr/include" >> site.cfg
   - python setup.py build
   - python setup.py install

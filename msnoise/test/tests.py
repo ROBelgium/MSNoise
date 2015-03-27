@@ -263,7 +263,7 @@ class MSNoiseTests(unittest.TestCase):
         from ..s06compute_dtt import main
         main()
 
-    def test_xxx_build_ref_datelist(self):
+    def test_026_build_ref_datelist(self):
         from ..api import connect, build_ref_datelist
         db = connect()
         start, end, datelist = build_ref_datelist(db)
@@ -271,7 +271,7 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(end, datetime.date(2011, 1, 1))
         self.failUnlessEqual(len(datelist), 731)
 
-    def test_xxx_build_movstack_datelist(self):
+    def test_027_build_movstack_datelist(self):
         from ..api import connect, build_movstack_datelist
         db = connect()
         start, end, datelist = build_movstack_datelist(db)
@@ -279,6 +279,18 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(end, datetime.date(2011, 1, 1))
         self.failUnlessEqual(len(datelist), 731)
 
+    def test_028_S01installer(self):
+        import shutil
+        shutil.move('db.ini','db.bak')
+        from ..s000installer import main
+        try:
+            ret = main(tech=2, username="root", password="",
+                       hostname="localhost", database="msnoise")
+            msg = "Installation Done! - Go to Configuration Step!"
+            self.failUnlessEqual(ret, msg)
+        except:
+            traceback.print_exc()
+            self.fail()
 
 
 def main():
