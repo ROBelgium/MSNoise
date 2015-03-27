@@ -16,18 +16,20 @@ before_install:
   - sudo apt-get update
   - sudo apt-get install -qq gfortran
   - sudo apt-get install libsamplerate0 libsamplerate0-dev
+  # MySQL database
+  - mysql -e 'create database msnoise;'
+  # Python and related stuff
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
   - ./miniconda.sh -b
   - export PATH=/home/travis/miniconda/bin:$PATH
-  # Update conda itself
   - conda update --yes conda
   # Installed required packages
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib statsmodels pandas
   - conda install --yes python=$TRAVIS_PYTHON_VERSION sqlalchemy sphinx jinja2
   - conda install --yes python=$TRAVIS_PYTHON_VERSION flask pymysql
   - conda install --yes python=$TRAVIS_PYTHON_VERSION traitsui traits lxml
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION obspy
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION -c obpsy obspy
   # Update remaining packages not available via conda
   - pip install click
   - pip install flask-admin
