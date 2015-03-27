@@ -68,9 +68,11 @@ def main(tech=None, hostname="localhost", username="msnoise",
         password = None
         hostname = filename
     else:
-        create_engine('mysql+pymysql://%s:%s@%s/%s' % (username, password, hostname,
-                                                       database),
-                      echo=False)
+        engine = create_engine('mysql+pymysql://%s:%s@%s/%s' % (username,
+                                                                password,
+                                                                hostname,
+                                                                database),
+                               echo=False)
     
     create_database_inifile(tech, hostname, database, username, password)
     
