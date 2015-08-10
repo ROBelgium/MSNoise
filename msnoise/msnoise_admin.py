@@ -1,12 +1,12 @@
 from flask import Flask, redirect, request
 from flask.ext.admin import Admin, BaseView, expose
 import flask, time, json, socket
-import psutil
+
 from flask.ext.admin.contrib.sqla import ModelView
 from flask import flash
 from wtforms.validators import ValidationError
 from flask.ext.admin.actions import action
-from flask.ext.admin.babel import gettext, ngettext, lazy_gettext
+from flask.ext.admin.babel import ngettext, lazy_gettext
 
 from bokeh.embed import components
 from bokeh.plotting import figure
@@ -14,7 +14,6 @@ from bokeh.resources import INLINE, CDN
 from bokeh.templates import RESOURCES
 
 from .api import *
-from .default import *
 from .msnoise_table_def import *
 
 
