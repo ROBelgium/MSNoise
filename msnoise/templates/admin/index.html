@@ -1,0 +1,166 @@
+{% extends 'admin/master.html' %}
+
+{% block head %}
+    <script src="/static/admin/vendor/jquery-2.1.1.min.js" type="text/javascript"></script>
+
+<script type='text/javascript'>
+
+function data_availability_flags(callback, error) {
+    $.ajax({
+        url:'/admin/data_availability_flags.json',
+        type:'GET',
+        dataType: 'json',
+        success: callback,
+    });
+};
+
+function get_num_jobs(type, callback, error) {
+    $.ajax({
+        url:'/admin/jobs_list.json',
+        type:'GET',
+        dataType: 'json',
+        data: {'type':type},
+        success: callback,
+    });
+};
+
+function update_CC_jobs(res) {
+    total = res['T'] + res['I'] + res['D'];
+    text = total + " CC jobs in the database: " + res['T'] + " todo, ";
+    text = text + res['I'] + " in progress and " + res['D'] + " done";
+    $("#jobs_CC").text(text);
+    var x = Math.floor(100*res['D']/total);
+  $('#CC').css('width', x+'%').attr('aria-valuenow', x);
+    $('#CC').text(x+'%');
+};
+
+function update_DTT_jobs(res) {
+    total = res['T'] + res['I'] + res['D'];
+    text = total + " DTT jobs in the database: " + res['T'] + " todo, ";
+    text = text + res['I'] + " in progress and " + res['D'] + " done";
+    $("#jobs_DTT").text(text);
+    var x = Math.floor(100.0*res['D']/parseFloat(total));
+   $('#DTT').css('width', x+'%').attr('aria-valuenow', x);
+    $('#DTT').text(x+'%');
+  
+};
+
+function update_DA(res) {
+    total = res['N'] + res['M'] + res['A'];
+    text = total + " files identified in the archive: " + res['N'] + " new, ";
+    text = text + res['M'] + " modified and " + res['A'] + " archived";
+    $("#jobs_DA").text(text);
+    var x = Math.floor(100*res['A']/total);
+    $('#DA').css('width', x+'%').attr('aria-valuenow', x);
+    $('#DA').text(x+'%');
+  console.debug(x);
+};
+
+
+function update_all() {
+
+   get_num_jobs('CC', update_CC_jobs); 
+   get_num_jobs('DTT', update_DTT_jobs); 
+   data_availability_flags(update_DA); 
+   
+   }
+
+  $(document).ready(function() {
+    $('#new_jobs').click(function() {
+        $("#new_jobs_console").text("Processing...");
+        $("#login-error").show();
+        $.ajax({
+            url:'/admin/new_jobs_TRIG.json',
+            type:'GET',
+            dataType: 'json',
+            success: function (res) {
+              console.debug('%o', res);
+              text = res['count']+ " new job(s) added to the queue";
+              $("#new_jobs_console").text(text);
+              },
+            error: function (res) {
+                $("#new_jobs_console").text("error...?");
+                }
+        });
+    });
+    $('#shutdown').click(function() {
+        $.ajax({
+            url:'/shutdown',
+            type:'GET',
+            dataType: 'json',
+            success: function (res) {
+              console.debug('%o', res);
+              },
+            error: function (res) {
+                $("#new_jobs_console").text("error...?");
+                }
+        });
+    });
+    $('#login-error').on("click", '.close', function(e) {
+        $(this).parent().hide();
+    });
+    
+   get_num_jobs('CC', update_CC_jobs); 
+   get_num_jobs('DTT', update_DTT_jobs); 
+   data_availability_flags(update_DA); 
+   
+
+
+    });
+
+</script>
+ {% endblock %}
+
+{% block body %}
+{{ super() }}
+<h1 class="page-header">MSNoise Dashboard</h1>
+  <p class="lead">
+  Where things can be configured... and more...
+  </p>
+
+  <p>
+  <h2>Status</h2>
+  
+  
+<h3>Data Availability Scan</h3>
+<span id='jobs_DA'></span>
+<div class="progress">
+  <div id='DA' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+</div>
+
+<h3>Cross-Correlation Jobs</h3>
+<span id='jobs_CC'></span>
+<div class="progress">
+  <div id='CC' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+</div>
+
+
+<h3>Relative Travel Time Jobs</h3>
+<span id='jobs_DTT'></span>
+<div class="progress">
+  <div id='DTT' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+</div>
+
+  <p>
+  <h2>Actions ?</h2>
+  <div id='new_jobs_div'>
+  <button id='new_jobs' value='New Jobs?' class="btn btn-warning">Check for New Jobs</button>
+  </div>
+  <div class="alert fade in" id="login-error" style="display:none;width:300px;">
+    <button type="button" class="close">x</button>
+    <div id='new_jobs_console'></div>
+  </div>
+<div id='new_jobs_div'>
+  <button id='shutdown' value='Shutdown' class="btn btn-danger">Shutdown Admin Web Interface</button>
+  </div>
+  </p>
+
+
+<script type="text/javascript">
+    $(document).ready(function() {
+        
+      setInterval(update_all, 5000);
+    });
+</script>
+{% endblock body %}
+
