@@ -1,0 +1,45 @@
+{% extends 'admin/master.html' %}
+
+{% block head %}
+<script type='text/javascript' src='//code.jquery.com/jquery-2.0.2.js'></script>
+ {% endblock %}
+
+{% block body %}
+{{ super() }}
+<h1 class="page-header">About MSNoise</h1>
+  <p class="lead">
+  A Python Package for Monitoring Seismic Velocity Changes using Ambient Seismic Noise.
+  </p>
+
+<p>
+MSNoise is the first complete software package for computing and monitoring relative velocity variations using ambient seismic noise. MSNoise is a fully-integrated solution that automatically scans data archives and determines which jobs need to be done whenever the scheduled task is executed.
+</p>
+
+<p>
+<h2>Documentation</h2>
+Currently, the full documentation can be found on: <a href='http://www.msnoise.org'>http://www.msnoise.org</a>.
+</p><p>
+<h2>Getting Help</h2>
+The best way to get help is to subscribe to the Mailing List and ask your question directly there. It is available on <a href='http://http://mailman-as.oma.be/mailman/listinfo/msnoise'>http://http://mailman-as.oma.be/mailman/listinfo/msnoise</a> and the archive is either <a href='http://mailman-as.oma.be/pipermail/msnoise/'>http://mailman-as.oma.be/pipermail/msnoise/</a> or on <a href="http://news.gmane.org/gmane.science.geophysics.msnoise">http://news.gmane.org/gmane.science.geophysics.msnoise</a> for a nice view.
+</p><p>
+<h2>
+Disclaimer</h2>
+
+Although we have cross-checked the whole code, we cannot warranty it is exempt of bugs. The package is provided as-is, we will not be held responsible for any use you make of it, nor for the results and conclusions you may find using MSNoise.
+
+</p><p>
+<h2>Licence</h2>
+
+Although MSNoise is provided freely on the internet and every individual may use it, we do not allow anyone to provide commercial service (read -paid in any way-), like training or teaching without contacting the original authors first. The authors and the contact email address are in the init.py file of the package.
+</p>
+
+<br><br>
+    <div id="footer">
+      <div class="container">
+        <p class="muted credit">MSNoise is a project of ROB and ISTerre.</p>
+      </div>
+    </div>
+
+
+{% endblock body %}
+

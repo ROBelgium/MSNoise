@@ -44,17 +44,16 @@ class Filter(Base):
     mwcs_step = Column(Float)
     used = Column(Boolean)
 
-    def __init__(self, low, mwcs_low, high, mwcs_high, rms_threshold,
-                 mwcs_wlen, mwcs_step, used):
+    def __init__(self, **kwargs):
         """"""
-        self.low = low
-        self.mwcs_low = mwcs_low
-        self.high = high
-        self.mwcs_high = mwcs_high
-        self.rms_threshold = rms_threshold
-        self.mwcs_wlen = mwcs_wlen
-        self.mwcs_step = mwcs_step
-        self.used = used
+        # self.low = low
+        # self.mwcs_low = mwcs_low
+        # self.high = high
+        # self.mwcs_high = mwcs_high
+        # self.rms_threshold = rms_threshold
+        # self.mwcs_wlen = mwcs_wlen
+        # self.mwcs_step = mwcs_step
+        # self.used = used
 
 
 class Job(Base):

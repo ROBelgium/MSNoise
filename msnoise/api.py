@@ -46,8 +46,9 @@ def get_engine(inifile=None):
     if tech == 1:
         engine = create_engine('sqlite:///%s' % hostname, echo=False)
     else:
-        engine = create_engine('mysql+pymysql://%s:%s@%s/%s' % (user, passwd, hostname,
-                                                        database),
+        engine = create_engine('mysql+pymysql://%s:%s@%s/%s' % (user, passwd,
+                                                                hostname,
+                                                                database),
                                echo=False, poolclass=NullPool)
     return engine
 
@@ -229,8 +230,15 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
     """
     filter = session.query(Filter).filter(Filter.ref == ref).first()
     if filter is None:
-        filter = Filter(low, mwcs_low, high, mwcs_high, rms_threshold,
-                        mwcs_wlen, mwcs_step, used)
+        filter = Filter()
+        filter.low = low
+        filter.high = high
+        filter.mwcs_low = mwcs_low
+        filter.mwcs_high = mwcs_high
+        filter.rms_threshold = rms_threshold
+        filter.mwcs_wlen = mwcs_wlen
+        filter.mwcs_step = mwcs_step
+        filter.used = used
         session.add(filter)
     else:
         filter.low = low

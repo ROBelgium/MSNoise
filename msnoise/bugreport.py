@@ -9,106 +9,92 @@ def ispresent(module, how=None):
     try:
         mod = __import__(module)
         if hasattr(mod, '__version__'):
-            print "[X] %s: %s"%(module,mod.__version__)
+            return "[X] %s: %s"%(module,mod.__version__)
         else:
-            print "[X] %s: present (no version)"%module
+            return "[X] %s: present (no version)"%module
     except:
-        print "[ ] %s: not found (install via %s)"% (module, how)
+        return "[ ] %s: not found (install via %s)"% (module, how)
 
 
-def main(system=False, modules=False, env=False, all=False):
-    #~ parser = argparse.ArgumentParser(description='Helps determining what didn\'t work')
-    #~ parser.add_argument('-s', '--sys', action="store_true",
-                        #~ help='Outputs System info',
-                        #~ default=False)
-    #~ parser.add_argument('-m', '--modules', action="store_true",
-                        #~ help='Outputs Python Modules Presence/Version',
-                        #~ default=True)
-    #~ parser.add_argument('-e', '--env', action="store_true",
-                        #~ help='Outputs System Environment Variables',
-                        #~ default=False)
-    #~ parser.add_argument('-a', '--all', action="store_true",
-                        #~ help='Outputs all of the above',
-                        #~ default=False)
-                                                
-    #~ args = parser.parse_args()
-    #~ if args.modules:
-        #~ modules=True
-
-    print "************* Computer Report *************"
+def main(system=False, modules=False, env=False, all=False, show=True):
+    output = []
+    output += "\n" + "************* Computer Report *************"
     
     if system or all:
-        print 
-        print "----------------+SYSTEM+-------------------"
-        print "\n".join(platform.uname())
+        output += "\n"
+        output += "\n" + "----------------+SYSTEM+-------------------"
+        output += "\n" + "\n".join(platform.uname())
         if platform.system() == "Linux":
-            print " - ".join(platform.linux_distribution())
-        print 
+            output += "\n" + " - ".join(platform.linux_distribution())
+        output += "\n"
 
-    print "----------------+PYTHON+-------------------"
-    print "Python:",sys.version
-    print
+    output += "\n" + "----------------+PYTHON+-------------------"
+    output += "\n" + "Python:" + sys.version
+    output += "\n"
     if modules or all:
-        print "---------------+MODULES+-------------------"
-        print
-        print "Required:"
-        ispresent('setuptools')
-        ispresent('click', 'easy_install click')
-        ispresent('numpy')
-        ispresent('scipy')
-        ispresent('pandas')
-        ispresent('matplotlib')
-        ispresent('statsmodels')
-        ispresent('sqlalchemy')
-        ispresent('traitsui')
-        ispresent('traits')
-        ispresent('scikits.samplerate')
-        ispresent('obspy')
+        output += "\n" + "---------------+MODULES+-------------------"
+        output += "\n"
+        output += "\n" + "Required:"
+        output += "\n" + ispresent('setuptools')
+        output += "\n" + ispresent('click', 'easy_install click')
+        output += "\n" + ispresent('numpy')
+        output += "\n" + ispresent('scipy')
+        output += "\n" + ispresent('pandas')
+        output += "\n" + ispresent('matplotlib')
+        output += "\n" + ispresent('statsmodels')
+        output += "\n" + ispresent('sqlalchemy')
+        output += "\n" + ispresent('traitsui')
+        output += "\n" + ispresent('traits')
+        output += "\n" + ispresent('scikits.samplerate')
+        output += "\n" + ispresent('obspy')
 
-        print
-        print "Only necessary if you plan to build the doc locally:"
-        ispresent('sphinx')
-        ispresent('jinja2')
+        output += "\n"
+        output += "\n" + "Only necessary if you plan to build the doc locally:"
+        output += "\n" + ispresent('sphinx')
+        output += "\n" + ispresent('jinja2')
 
-        print
-        print "Graphical Backends: (at least one is required)"
-        ispresent('wx')
-        ispresent('PyQt4')
-        ispresent('PySide')
+        output += "\n"
+        output += "\n" + "Graphical Backends: (at least one is required)"
+        output += "\n" + ispresent('wx')
+        output += "\n" + ispresent('PyQt4')
+        output += "\n" + ispresent('PySide')
         
-        print
-        print "Not required, just checking:"
-        ispresent('json')
-        ispresent('psutil')
-        ispresent('flask')
-        ispresent('flask.ext.admin', 'easy_install flask-admin')
-        ispresent('wtforms')
-        ispresent('reportlab')
-        ispresent('configobj')
-        ispresent('pkg_resources')
-        ispresent('paramiko')
-        ispresent('ctypes')
-        ispresent('pyparsing')
-        ispresent('distutils')
-        ispresent('IPython')
-        ispresent('vtk')
-        ispresent('enable')
+        output += "\n"
+        output += "\n" + "Not required, just checking:"
+        output += "\n" + ispresent('json')
+        output += "\n" + ispresent('psutil')
+        output += "\n" + ispresent('flask')
+        output += "\n" + ispresent('flask.ext.admin', 'easy_install flask-admin')
+        output += "\n" + ispresent('wtforms')
+        output += "\n" + ispresent('reportlab')
+        output += "\n" + ispresent('configobj')
+        output += "\n" + ispresent('pkg_resources')
+        output += "\n" + ispresent('paramiko')
+        output += "\n" + ispresent('ctypes')
+        output += "\n" + ispresent('pyparsing')
+        output += "\n" + ispresent('distutils')
+        output += "\n" + ispresent('IPython')
+        output += "\n" + ispresent('vtk')
+        output += "\n" + ispresent('enable')
         
-        print
+        output += "\n"
     
     if env or all:    
-        print "------------------+ENV+--------------------"
-        
-        
+        output += "\n" + "------------------+ENV+--------------------"
+
         for key in os.environ.keys():
-            print key
+            output += "\n" + key
             for value in os.environ[key].split(';'):
                 if os.path.isdir(value) or os.path.isfile(value) :
                     dir = "[X]"
                 else:
                     dir = "[ ]"
-                print " ", dir, value
-
+                output += "\n" + " ", dir, value
+    output = "".join(output)
+    if show:
+        print output
+    else:
+        return output.split("\n")
     
 if __name__ == "__main__":
     main()

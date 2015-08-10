@@ -53,8 +53,26 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, update_filter, get_filters
         db = connect()
         filters = []
-        filters.append(Filter(0.01, 0.12, 1.0, 0.98, 0, 10, 5, 1))
-        filters.append(Filter(0.1, 0.12, 1.0, 0.98,  0, 10, 5, 1))
+        f = Filter()
+        f.low = 0.01
+        f.mwcs_low = 0.12
+        f.high = 1.0
+        f.mwcs_high = 0.98
+        f.rms_threshold = 0
+        f.mwcs_wlen = 10
+        f.mwcs_step = 5
+        f.used = True
+        filters.append(f)
+        f = Filter()
+        f.low = 0.1
+        f.mwcs_low = 0.12
+        f.high = 1.0
+        f.mwcs_high = 0.98
+        f.rms_threshold = 0
+        f.mwcs_wlen = 10
+        f.mwcs_step = 5
+        f.used = True
+        filters.append(f)
 
         for f in filters:
             update_filter(db, f.ref, f.low, f.mwcs_low, f.high, f.mwcs_high,

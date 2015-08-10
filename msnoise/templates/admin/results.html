@@ -1,0 +1,32 @@
+{% extends 'admin/master.html' %}
+{% block body %}
+{{ super() }}
+
+    {{ plot_resources|indent(4)|safe }}
+    {{ plot_script|indent(4)|safe }}
+
+<h1 class="page-header">{{ admin_view.view_title }}</h1>
+
+
+<form name="color_button" method='GET'>
+    <label for="filter">Filter:</label>
+    <select name="filter" id="filter" width="300px">
+        {% for f in filter_list %}
+            <option name="{{ f.optid }}" value="{{f.optid}}">{{ f.text }}</option>
+
+        {% endfor %}
+        </select>
+    <br>
+    <label for="pair">Pair:</label>
+    <select name="pair" id="pair" width="300px">
+        {% for p in pair_list %}
+            <option name="{{ p.optid }}" value="{{p.optid}}">{{ p.text }}</option>
+        {% endfor %}
+        </select>
+
+  <button id="update" type="submit" class="btn btn-default">Update</button>
+</form>
+
+{{ plot_div|indent(4)|safe }}
+
+{% endblock body %}

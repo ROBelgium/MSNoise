@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='msnoise',
-    version='1.3.1',
+    version='1.4',
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
@@ -18,7 +18,10 @@ setup(
         'obspy',
         'click',
         'scikits.samplerate',
-        'pymysql'
+        'pymysql',
+        'flask',
+        'flask-admin',
+        'bokeh'
     ],
     entry_points='''
         [console_scripts]

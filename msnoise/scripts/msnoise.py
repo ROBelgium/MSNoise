@@ -17,6 +17,10 @@ def test():
     from ..test.tests import main
     main()
 
+@click.command()
+def admin():
+    from ..msnoise_admin import main
+    main()
 
 @click.command()
 def upgrade_db():
@@ -370,6 +374,7 @@ plot.add_command(station_map)
 
 # Add all commands to the cli group:
 cli.add_command(info)
+cli.add_command(admin)
 cli.add_command(upgrade_db)
 cli.add_command(install)
 cli.add_command(config)
