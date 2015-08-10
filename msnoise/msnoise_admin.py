@@ -205,15 +205,6 @@ class ConfigView(ModelView):
         # You can pass name and other parameters if you want to
         super(ConfigView, self).__init__(Config, session, **kwargs)
 
-class PSUtils(BaseView):
-    name = "MSNoise"
-    view_title = "Some Real Time Statistics"
-    @expose('/')
-    def index(self):
-        cpucount = len(psutil.cpu_percent(0,True))
-        return self.render('admin/psutils.html',cpucount=cpucount)
-
-
 def getitem(obj, item, default):
     if item not in obj:
         return default
@@ -526,17 +517,17 @@ def main():
     admin.add_view(FilterView(db,endpoint='filters', category='Configuration'))
     admin.add_view(ConfigView(db,endpoint='config', category='Configuration'))
 
-    admin.add_view(DataAvailabilityView(db,endpoint='data_availability',category='Analytics'))
-    admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',category='Analytics'))
-    admin.add_view(JobView(db,endpoint='jobs',category='Analytics'))
-    admin.add_view(PSUtils(name='PS Utils', endpoint='psutils', category='Analytics'))
-    admin.add_view(BugReport(name='Bug Report', endpoint='bugreport', category='Analytics'))
+    admin.add_view(DataAvailabilityView(db,endpoint='data_availability',category='Database'))
 
+    admin.add_view(JobView(db,endpoint='jobs',category='Database'))
+
+
+    admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',category='Results'))
     admin.add_view(ResultPlotter(endpoint='results',category='Results'))
     admin.add_view(InterferogramPlotter(endpoint='interferogram',category='Results'))
-    a = GenericView(endpoint='about',category='Help')
-    a.page = 'about'
-    a.name = 'About'
+    a = GenericView(endpoint='about',category='Help', name='About')
+    a.page = "about"
     admin.add_view(a)
+    admin.add_view(BugReport(name='Bug Report', endpoint='bugreport', category='Help'))
 
     app.run(host='0.0.0.0', debug=True)

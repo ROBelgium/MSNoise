@@ -95,6 +95,10 @@ function update_all() {
                 $("#new_jobs_console").text("error...?");
                 }
         });
+        window.location.replace("about:blank")
+        document.write('OK, MSNoise Admin is stopped, ' +
+                'you can close this window')
+
     });
     $('#login-error').on("click", '.close', function(e) {
         $(this).parent().hide();
@@ -150,6 +154,7 @@ function update_all() {
     <button type="button" class="close">x</button>
     <div id='new_jobs_console'></div>
   </div>
+<br>
 <div id='new_jobs_div'>
   <button id='shutdown' value='Shutdown' class="btn btn-danger">Shutdown Admin Web Interface</button>
   </div>
