@@ -61,7 +61,7 @@ class MSNoiseTests(unittest.TestCase):
         f.rms_threshold = 0
         f.mwcs_wlen = 10
         f.mwcs_step = 5
-        f.used = 1
+        f.used = True
         filters.append(f)
         f = Filter()
         f.low = 0.1
@@ -71,7 +71,7 @@ class MSNoiseTests(unittest.TestCase):
         f.rms_threshold = 0
         f.mwcs_wlen = 10
         f.mwcs_step = 5
-        f.used = 1
+        f.used = True
         filters.append(f)
 
         for f in filters:
