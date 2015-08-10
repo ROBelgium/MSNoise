@@ -1,5 +1,6 @@
 import os
 import click
+import pkg_resources
 
 
 @click.group()
@@ -11,16 +12,24 @@ def cli(ctx, threads):
     pass
 
 
+@click.group()
+def plugin():
+    """Runs a command in a named plugin"""
+    pass
+
+
 @click.command()
 def test():
     """Runs the test suite, should be executed in an empty folder!"""
     from ..test.tests import main
     main()
 
+
 @click.command()
 def admin():
     from ..msnoise_admin import main
     main()
+
 
 @click.command()
 def upgrade_db():
@@ -392,6 +401,12 @@ cli.add_command(ipython)
 cli.add_command(test)
 # Finally add the plot group too:
 cli.add_command(plot)
+
+
+# Then the Plugins group
+for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.commands'):
+    plugin.add_command(ep.load())
+cli.add_command(plugin)
 
 
 def run():
