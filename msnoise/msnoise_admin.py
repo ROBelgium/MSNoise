@@ -312,32 +312,6 @@ app = Flask(__name__, template_folder='templates')
 app.secret_key = 'why would I tell you my secret key?'
 
 
-@app.route('/admin/rawps')
-def rawps():
-    diskused = 0
-    disktotal = 0
-    for i in psutil.disk_partitions():
-        try:
-            x = psutil.disk_usage(i.mountpoint)
-            diskused += x.used
-            disktotal += x.total
-        except OSError:
-            pass
-    data = {
-        'uptime':	time.time() - psutil.BOOT_TIME,
-        'fqdn':		socket.getfqdn(),
-        'cpuusage':	psutil.cpu_percent(0,True),
-        'cpu_count': len(psutil.cpu_percent(0,True)),
-        'ramusage':	psutil.virtual_memory(),
-        'diskio':	psutil.disk_io_counters(),
-        'diskusage':	[diskused, disktotal],
-        'netio':	psutil.net_io_counters(),
-        'swapusage':	psutil.swap_memory()
-    }
-    o = json.dumps(data)
-    return flask.Response(o, mimetype='application/json')
-
-
 @app.route('/admin/networks.json')
 def networksJSON():
     db = connect()
