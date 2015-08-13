@@ -57,4 +57,4 @@ default['dtt_mincoh'] = ["Minimum coherence on dt measurement","0.65"]
 default['dtt_maxerr'] = ["Maximum error on dt measurement","0.1"]
 default['dtt_maxdt'] = ["Maximum dt values","0.1"]
 
-
+default['plugins'] = ["Comma separated list of plugin names",""]

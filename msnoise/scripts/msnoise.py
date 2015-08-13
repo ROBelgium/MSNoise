@@ -402,10 +402,20 @@ cli.add_command(test)
 # Finally add the plot group too:
 cli.add_command(plot)
 
+try:
+    from ..api import connect, get_config
+    db = connect()
+    plugins = get_config(db, "plugins")
+except:
+    plugins = None
 
-# Then the Plugins group
-for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.commands'):
-    plugin.add_command(ep.load())
+if plugins:
+    plugins = plugins.split(",")
+    for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.commands'):
+        module_name = ep.module_name.split(".")[0]
+        if module_name in plugins:
+            plugin.add_command(ep.load())
+
 cli.add_command(plugin)
 
 

@@ -5,6 +5,7 @@ import datetime
 import itertools
 import cPickle
 import math
+import pkg_resources
 
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
@@ -18,6 +19,10 @@ from obspy.signal import cosTaper
 from obspy.core.util import gps2DistAzimuth
 
 from msnoise_table_def import Filter, Job, Station, Config, DataAvailability
+
+plugin_tables = {}
+for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.table_def'):
+    plugin_tables[ep.name] = ep.load()
 
 
 def get_tech():
@@ -115,7 +120,7 @@ def read_database_inifile(inifile=None):
 # CONFIG
 
 
-def get_config(session, name=None, isbool=False):
+def get_config(session, name=None, isbool=False, plugin=None):
     """Get the value of one or all config bits from the database.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -131,9 +136,12 @@ def get_config(session, name=None, isbool=False):
     :rtype: str, bool or dict
     :returns: the value for `name` or a dict of all config values
     """
-
+    if plugin:
+        table = plugin_tables["%sConfig"%plugin]
+    else:
+        table = Config
     if name:
-        config = session.query(Config).filter(Config.name == name).first()
+        config = session.query(table).filter(table.name == name).first()
         if config is not None:
             if isbool:
                 if config.value in [True, 'True', 'true', 'Y', 'y', '1', 1]:

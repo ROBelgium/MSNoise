@@ -483,6 +483,10 @@ def index():
 def main():
     global db
     db = connect()
+    plugins = get_config(db, "plugins")
+    db.close()
+
+    db = connect()
 
     admin = Admin(app)
     admin.name = "MSNoise"
@@ -498,9 +502,18 @@ def main():
     admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',category='Results'))
     admin.add_view(ResultPlotter(endpoint='results',category='Results'))
     admin.add_view(InterferogramPlotter(endpoint='interferogram',category='Results'))
+
+    if plugins:
+        plugins = plugins.split(',')
+        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.admin_view'):
+            module_name = ep.module_name.split(".")[0]
+            if module_name in plugins:
+                admin.add_view(ep.load()(db))
+
     a = GenericView(endpoint='about',category='Help', name='About')
     a.page = "about"
     admin.add_view(a)
     admin.add_view(BugReport(name='Bug Report', endpoint='bugreport', category='Help'))
+
 
     app.run(host='0.0.0.0', debug=True)
