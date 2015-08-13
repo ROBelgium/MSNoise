@@ -786,6 +786,11 @@ def get_job_types(session, jobtype='CC'):
     return session.query(func.count(Job.flag), Job.flag).filter(Job.jobtype == jobtype).group_by(Job.flag).all()
 
 
+def get_jobs_by_lastmod(session, jobtype='CC', lastmod=datetime.datetime.now()):
+    jobs = session.query(Job).filter(Job.jobtype == jobtype).filter(Job.lastmod >= lastmod).all()
+    return jobs
+
+
 # CORRELATIONS
 
 
