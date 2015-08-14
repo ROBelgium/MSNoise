@@ -21,7 +21,8 @@ setup(
         'pymysql',
         'flask',
         'flask-admin',
-        'bokeh'
+        'bokeh',
+        'multiprocessing_logging'
     ],
     entry_points='''
         [console_scripts]

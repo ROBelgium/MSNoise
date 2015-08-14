@@ -43,28 +43,33 @@ import multiprocessing
 import argparse
 import traceback
 
+import multiprocessing_logging
+
 from api import *
 from data_structures import data_structure
 
 
-def worker(files, folder, startdate, enddate):
-    # logging = logging.getlogging('worker')
+logger = logging.getLogger()
+logger.setLevel("DEBUG")
+logger.addHandler(
+multiprocessing_logging.MultiProcessingHandler('worker-logger'))
 
+def worker(files, folder, startdate, enddate):
+    import logging
+    logging = logging.getLogger("worker-logger")
     db = connect()
+    added = 0
+    modified = 0
     for file in files:
         file = os.path.join(folder, file)
         try:
-            r0 = time.time()
             name = os.path.split(file)[1]
             data = read(file, headonly=True)
-            # print data
             if data[0].stats.starttime.date < startdate:
-                r2 = time.time()
                 logging.info(
-                    '%s: Before Start-Date! (%.2f)' % (name, r2 - r0))
+                    '%s: Before Start-Date!' % (name))
             elif data[-1].stats.endtime.date > enddate:
-                r2 = time.time()
-                logging.info('%s: After End-Date! (%.2f)' % (name, r2 - r0))
+                logging.info('%s: After End-Date!' % (name))
             else:
                 gaps = data.getGaps()
                 gaps_duration = 0
@@ -86,38 +91,29 @@ def worker(files, folder, startdate, enddate):
                 sta = trace.stats.station.upper()
                 comp = trace.stats.channel.upper()
                 path = folder.replace('\\', '/')
-                r1 = time.time()
+
                 starttime = starttime.datetime.replace(microsecond=0)
                 endtime = endtime.datetime.replace(microsecond=0)
                 result = update_data_availability(
                     db, net, sta, comp, path, name, starttime,
                     endtime, data_duration, gaps_duration,
                     data[0].stats.sampling_rate)
-                time.sleep(0.01)
 
-                #~ r2 = time.time()
-                #~ if result:
-                    #~ logging.info(
-                        #~ 'Added: "%s" (read:%.2f (%.2f) seconds | save:%.4f seconds)' %
-                        #~ (name, r1 - r0, r2 - r0, r2 - r1))
-                #~ else:
-                    #~ logging.info(
-                        #~ 'Already Exists: "%s" (read:%.2f (%.2f) seconds | save:%.4f seconds)' %
-                        #~ (name, r1 - r0, r2 - r0, r2 - r1))
+                if result:
+                    added += 1
+                else:
+                    modified += 1
+
         except Exception as e:
-            print "Problem", e
-        db.close()
-
+            logging.debug("ERROR: %s", e)
+    db.close()
+    logging.debug("%s: Added %i | Modified %i", str(folder), added, modified)
+    return
 
 def main(init=False, threads=1):
     t = time.time()
 
-    multiprocessing.log_to_stderr()
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s [%(levelname)s] %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
-
-    logging.info('*** Starting: Scan Archive ***')
+    logger.info('*** Starting: Scan Archive ***')
     db = connect()
 
     mtime = -2
@@ -195,7 +191,7 @@ def main(init=False, threads=1):
                 files.remove('')
 
             if len(files) != 0:
-                logging.info('Started: %s' % folder)
+                logging.info('%s: Started' % folder)
                 client = Process(target=worker, args=([files, folder,
                                                        startdate, enddate]))
                 client.start()
