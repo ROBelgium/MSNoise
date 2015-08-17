@@ -33,6 +33,8 @@ before_install:
   - conda install --yes -c obspy obspy
   - conda install --yes click
   - conda install --yes -c robertcoop flask-admin
+  - conda install --yes bokeh
+  - pip install multiprocessing_logging
   # Special install for scikits.samplerate
   - cd ..
   - sudo dpkg -L libsamplerate0
