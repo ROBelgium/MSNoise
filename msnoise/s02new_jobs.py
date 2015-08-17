@@ -27,7 +27,22 @@ def main(init=False):
     logging.info('*** Starting: New Jobs ***')
 
     db = connect()
+
+    plugins = get_config(db, "plugins")
+    extra_jobtypes = []
+    if plugins:
+        plugins = plugins.split(",")
+        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
+            module_name = ep.module_name.split(".")[0]
+            if module_name in plugins:
+                jobtypes = ep.load()()
+                for jobtype in jobtypes:
+                    if jobtype["after"] == "scan_archive":
+                        extra_jobtypes.append(jobtype["name"])
+
     autocorr = get_config(db, name="autocorr", isbool=True)
+
+
 
     stations_to_analyse = ["%s.%s" % (sta.net, sta.sta) for sta in get_stations(db, all=False)]
     all_jobs = []
@@ -60,6 +75,10 @@ def main(init=False):
                     if pair not in jobs:
                         all_jobs.append({"day": day, "pair": pair,
                                          "jobtype": "CC", "flag": "T",
+                                         "lastmod": datetime.datetime.utcnow()})
+                        for jobtype in extra_jobtypes:
+                            all_jobs.append({"day": day, "pair": pair,
+                                         "jobtype": jobtype, "flag": "T",
                                          "lastmod": datetime.datetime.utcnow()})
                         jobs.append(pair)
 
