@@ -145,7 +145,10 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.ar
                         taper_1s = taper_length * float(trace.stats.sampling_rate) / trace.stats.npts
                         cp = cosTaper(trace.stats.npts, taper_1s)
                         trace.data *= cp
-                stream.merge(method=0, fill_value=0.0)
+                try:
+                    stream.merge(method=0, fill_value=0.0)
+                except:
+                    continue
 
                 logging.debug("%s.%s Slicing Stream to %s:%s" % (station, comp, utcdatetime.UTCDateTime(
                     goal_day.replace('-', '')), utcdatetime.UTCDateTime(goal_day.replace('-', '')) + params.goal_duration - stream[0].stats.delta))

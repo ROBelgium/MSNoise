@@ -480,7 +480,7 @@ def index():
     return redirect("/admin/", code=302)
 
 
-def main():
+def main(port=5000):
     global db
     db = connect()
     plugins = get_config(db, "plugins")
@@ -516,4 +516,4 @@ def main():
     admin.add_view(BugReport(name='Bug Report', endpoint='bugreport', category='Help'))
 
 
-    app.run(host='0.0.0.0', debug=True)
+    app.run(host='0.0.0.0', debug=True, port=port)

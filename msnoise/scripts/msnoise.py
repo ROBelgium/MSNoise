@@ -26,9 +26,10 @@ def test():
 
 
 @click.command()
-def admin():
+@click.option('-p', '--port', default=5000, help='Port to open')
+def admin(port):
     from ..msnoise_admin import main
-    main()
+    main(port)
 
 
 @click.command()
