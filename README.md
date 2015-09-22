@@ -1,6 +1,8 @@
 MSNoise
 =======
 
+[![Join the chat at https://gitter.im/ROBelgium/MSNoise](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/ROBelgium/MSNoise?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 A Python Package for Monitoring Seismic Velocity Changes using Ambient Seismic Noise.
 
 
