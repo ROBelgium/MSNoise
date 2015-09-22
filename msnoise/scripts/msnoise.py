@@ -294,6 +294,29 @@ def dvv(mov_stack, comp, dttname, filterid, pair, all, show, outfile):
 
 
 @click.command()
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=0,  help='Plot specific mov stacks')
+@click.option('-p', '--pair', default=None,  help='Plot a specific pair',
+              multiple=True)
+@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
+@click.option('-M', '--dttname', default="A",  help='Plot M or M0?')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+def timing(mov_stack, comp, dttname, filterid, pair, all, show, outfile):
+    """Plots the timing (parses the dt/t results)\n
+    Individual pairs can be plotted extra using the -p flag one or more times.\n
+    Example: msnoise plot timing -p ID_KWUI_ID_POSI\n
+    Example: msnoise plot timing -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
+    Remember to order stations alphabetically !
+    """
+    from ..plots.timing import main
+    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
+
+
+@click.command()
 @click.argument('sta1')
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
@@ -380,6 +403,7 @@ plot.add_command(ccftime)
 plot.add_command(mwcs)
 plot.add_command(distance)
 plot.add_command(station_map)
+plot.add_command(timing)
 
 
 # Add all commands to the cli group:
