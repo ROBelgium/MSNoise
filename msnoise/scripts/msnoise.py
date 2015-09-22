@@ -145,7 +145,7 @@ def config():
 
 @click.command()
 @click.option('-s', '--sys', is_flag=True, help='System Info')
-@click.option('-m', '--modules', is_flag=True, default=True, help='Modules Info')
+@click.option('-m', '--modules', is_flag=True, help='Modules Info')
 @click.option('-e', '--env', is_flag=True, help='Environment Info')
 @click.option('-a', '--all', is_flag=True, help='All Info')
 @click.pass_context
