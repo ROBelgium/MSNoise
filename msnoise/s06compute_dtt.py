@@ -186,7 +186,7 @@ def main(interval=1):
                 for current in updated_dtt:
                     if current > datetime.date.today():
                         break
-                    #~ logging.debug("Processing %s - %02i - %02i mov" % (current, filterid, mov_stack))
+                    logging.debug("Processing %s - %02i - %02i mov" % (current, filterid, mov_stack))
                     first = True
                     for station1, station2 in get_station_pairs(db, used=True):
                         sta1 = "%s_%s" % (station1.net, station1.sta)
