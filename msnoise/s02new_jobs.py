@@ -20,9 +20,6 @@ import numpy as np
 
 
 def main(init=False):
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s [%(levelname)s] %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
 
     logging.info('*** Starting: New Jobs ***')
 

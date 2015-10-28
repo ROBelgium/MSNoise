@@ -195,7 +195,7 @@ def main(interval=1):
                         day = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" %
                                            mov_stack, components, pair, '%s.txt' % current)
                         dist = get_interstation_distance(station1, station2, station1.coordinates)
-                        if dist == 0.:
+                        if dist == 0. and dtt_lag == "dynamic":
                             logging.debug('%s: Distance is Zero?!' % pair)
                         if os.path.isfile(day):
                             df = pd.read_csv(

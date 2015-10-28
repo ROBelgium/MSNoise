@@ -1,14 +1,27 @@
 import os
 import click
 import pkg_resources
-
+import logging
 
 @click.group()
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
 (only affects modules that are designed to do parallel processing)')
+@click.option('-v', '--verbose', default=0, count=True)
 @click.pass_context
-def cli(ctx, threads):
+def cli(ctx, threads, verbose):
     ctx.obj['MSNOISE_threads'] = threads
+    if verbose == 0:
+        ctx.obj['MSNOISE_verbosity'] = "WARNING"
+    elif verbose == 1:
+        ctx.obj['MSNOISE_verbosity'] = "INFO"
+    elif verbose > 1:
+        ctx.obj['MSNOISE_verbosity'] = "DEBUG"
+
+    logging.basicConfig(level=ctx.obj['MSNOISE_verbosity'],
+                        format='%(asctime)s [%(levelname)s] %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
+
+
     pass
 
 

@@ -40,19 +40,15 @@ import logging.handlers
 from subprocess import Popen, PIPE
 from multiprocessing import Process
 import multiprocessing
+import multiprocessing_logging
+
 import argparse
 import traceback
 
-import multiprocessing_logging
+
 
 from api import *
 from data_structures import data_structure
-
-
-logger = logging.getLogger()
-logger.setLevel("DEBUG")
-logger.addHandler(
-multiprocessing_logging.MultiProcessingHandler('worker-logger'))
 
 def worker(files, folder, startdate, enddate):
     import logging
@@ -111,9 +107,13 @@ def worker(files, folder, startdate, enddate):
     return
 
 def main(init=False, threads=1):
+    logger = logging.getLogger('')
+    # logger.addHandler(
+    # multiprocessing_logging.MultiProcessingHandler('worker-logger'))
+
     t = time.time()
 
-    logger.info('*** Starting: Scan Archive ***')
+    logging.info('*** Starting: Scan Archive ***')
     db = connect()
 
     mtime = -2
