@@ -62,12 +62,18 @@ To run this script:
 
     $ msnoise compute_cc
 """
-
+import traceback
+import glob
 import time
 import calendar
 import sys
 
-from obspy.core import utcdatetime
+from obspy.core import utcdatetime, UTCDateTime
+
+from obspy.signal.invsim import cosTaper
+from obspy import read_inventory
+from obspy.xseed import Parser
+
 from scikits.samplerate import resample
 
 from api import *
@@ -107,7 +113,9 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.ar
                               (station, comp, len(files)))
                 stream = Stream()
                 for file in sorted(files):
-                    st = read(file, dytpe=np.float)
+                    st = read(file, dytpe=np.float,
+                              starttime=UTCDateTime(gd),
+                              endtime=UTCDateTime(gd)+86400)
                     for tr in st:
                         tr.data = tr.data.astype(np.float)
                     stream += st
@@ -155,8 +163,60 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.ar
                 stream[0].trim(utcdatetime.UTCDateTime(goal_day.replace('-', '')), utcdatetime.UTCDateTime(
                     goal_day.replace('-', '')) + params.goal_duration - stream[0].stats.delta, pad=True, fill_value=0.0,
                     nearest_sample=False)
+
+
+                if get_config(db, 'remove_response', isbool=True):
+                    logging.debug('Removing instrument response')
+                    response_format = get_config(db, 'response_format')
+                    response_prefilt = eval(get_config(db, 'response_prefilt'))
+                    files = glob.glob(os.path.join(get_config(db,
+                                                              'response_path'),
+                                                   "*"))
+                    if response_format == "inventory":
+                        firstinv = False
+                        inventory = None
+                        for file in files:
+                            try:
+                                inv = read_inventory(file)
+                                if firstinv:
+                                    inventory = inv
+                                    firstinv = False
+                                else:
+                                    inventory += inv
+                            except:
+                                pass
+                        stream.attach_response(inventory)
+                        stream.remove_response(output='VEL',
+                                               pre_filt=response_prefilt)
+                    elif response_format == "dataless":
+                        for file in files:
+                            p = Parser(file)
+                            try:
+                                p.getPAZ(stream[0].id,
+                                         datetime=UTCDateTime(gd))
+                                break
+                            except:
+                                traceback.print_exc()
+                                del p
+                                continue
+                        stream.simulate(seedresp={'filename': p, "units":"VEL"},
+                                        pre_filt=response_prefilt,
+                                        paz_remove=None,
+                                        paz_simulate=None,)
+                    elif response_format == "paz":
+                        msg = "Unexpected type for `response_format`: %s" % \
+                              response_format
+                        raise TypeError(msg)
+                    elif response_format == "resp":
+                        msg = "Unexpected type for `response_format`: %s" % \
+                              response_format
+                        raise TypeError(msg)
+                    else:
+                        msg = "Unexpected type for `response_format`: %s" % \
+                              response_format
+                        raise TypeError(msg)
                 trace = stream[0]
-                
+
                 logging.debug(
                     "%s.%s Highpass at %.2f Hz" % (station, comp, params.preprocess_highpass))
                 trace.filter("highpass", freq=params.preprocess_highpass, zerophase=True)

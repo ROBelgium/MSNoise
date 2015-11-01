@@ -2,6 +2,7 @@ import os
 import click
 import pkg_resources
 import logging
+import traceback
 
 @click.group()
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
@@ -49,17 +50,22 @@ def admin(port):
 def upgrade_db():
     """Upgrade the database from pre-1.3 to MSNoise 1.3. This should only
     be ran once."""
-    from sqlalchemy.exc import IntegrityError, OperationalError
+    from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
     from ..api import connect, Config, get_tech, get_engine
     from ..default import default
     db = connect()
-    try:
-        for name in ['overlap', 'dtt_lag', 'dtt_v', 'dtt_minlag', 'dtt_width',
-                     'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt']:
+    for name in ['overlap', 'dtt_lag', 'dtt_v', 'dtt_minlag', 'dtt_width',
+                 'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt',
+                 'remove_response', 'response_format', 'response_path',
+                 'response_prefilt']:
+        try:
             db.add(Config(name=name, value=default[name][-1]))
-        db.commit()
-    except IntegrityError:
-        print "The DB seems already up-to-date, exiting."
+            db.commit()
+        except:
+            db.rollback()
+            print "Passing %s: already in DB" % name
+            continue
+
     db.close()
 
     if get_tech() == 2:
