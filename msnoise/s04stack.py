@@ -106,6 +106,20 @@ def main(stype, interval=1):
     
     maxlag = float(get_config(db, "maxlag"))
     cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
+
+
+    plugins = get_config(db, "plugins")
+    extra_jobtypes = []
+    if plugins:
+        plugins = plugins.split(",")
+        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
+            module_name = ep.module_name.split(".")[0]
+            if module_name in plugins:
+                jobtypes = ep.load()()
+                for jobtype in jobtypes:
+                    if jobtype["after"] == "refstack":
+                        extra_jobtypes.append(jobtype["name"])
+    print(extra_jobtypes)
     
     if stype == "mov" or stype == "step":
         start, end, datelist = build_movstack_datelist(db)
@@ -265,6 +279,8 @@ def main(stype, interval=1):
                             ref_name = "%s:%s" % (sta1, sta2)
                             update_job(
                                 db, "REF", ref_name.replace('_', '.'), 'DTT', 'T')
+                            for jobtype in extra_jobtypes:
+                                update_job(db, "REF", ref_name.replace('_', '.'), jobtype, 'T')
                             del stack_total
 
 
