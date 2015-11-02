@@ -17,7 +17,8 @@ def cli(ctx, threads, verbose):
         ctx.obj['MSNOISE_verbosity'] = "INFO"
     elif verbose > 1:
         ctx.obj['MSNOISE_verbosity'] = "DEBUG"
-
+    # tmp hack
+    ctx.obj['MSNOISE_verbosity'] = "DEBUG"
     logging.basicConfig(level=ctx.obj['MSNOISE_verbosity'],
                         format='%(asctime)s [%(levelname)s] %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
