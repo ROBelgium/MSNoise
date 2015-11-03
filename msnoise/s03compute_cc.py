@@ -352,8 +352,8 @@ def main():
         # Computing only ZZ components ? Then we can be much faster:
         #
 
-        #if False:
-        if len(params.components_to_compute) == 1 and params.components_to_compute[0] == "ZZ":
+        if False:
+        #if len(params.components_to_compute) == 1 and params.components_to_compute[0] == "ZZ":
             Nfft = params.min30
             if params.min30 / 2 % 2 != 0:
                 Nfft = params.min30 + 2
