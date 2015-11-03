@@ -1,7 +1,7 @@
 from flask import Flask, redirect, request
 from flask.ext.admin import Admin, BaseView, expose
 import flask, time, json, socket
-
+from flask_admin.model import typefmt
 from flask.ext.admin.contrib.sqla import ModelView
 from flask import flash
 from wtforms.validators import ValidationError
@@ -19,10 +19,10 @@ from .msnoise_table_def import *
 
 class GenericView(BaseView):
     name = "MSNoise"
-    page = ""
+    page = "index"
     @expose('/')
     def index(self):
-        return self.render('admin/%s.html'%self.page)
+        return self.render('admin/%s.html'%self.page, msnoise_project="test")
 
 class FilterView(ModelView):
     view_title = "Filter Configuration"
@@ -75,9 +75,18 @@ class FilterView(ModelView):
         return  
 
 
+def date_format(view, value):
+    return "%.10f"%value
+
+MY_DEFAULT_FORMATTERS = dict(typefmt.BASE_FORMATTERS)
+MY_DEFAULT_FORMATTERS.update({
+        type(None): typefmt.null_formatter,
+        float: date_format
+    })
 class StationView(ModelView):
     view_title = "Station Configuration"
     column_filters = ('net', 'used')
+    column_type_formatters = MY_DEFAULT_FORMATTERS
     
     def __init__(self, session, **kwargs):
         super(StationView, self).__init__(Station, session, **kwargs)
@@ -490,6 +499,13 @@ def main(port=5000):
 
     admin = Admin(app)
     admin.name = "MSNoise"
+    admin.project_folder = os.getcwd()
+    tech, hostname, database, username, password = read_database_inifile()
+    if tech == 1:
+        database = "SQLite: %s"%hostname
+    else:
+        database = "MySQL: %s@%s:%s"%(username, hostname, database)
+    admin.project_database = database
     admin.add_view(StationView(db,endpoint='stations', category='Configuration'))
     admin.add_view(FilterView(db,endpoint='filters', category='Configuration'))
     admin.add_view(ConfigView(db,endpoint='config', category='Configuration'))
