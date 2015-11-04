@@ -58,7 +58,7 @@ def upgrade_db():
     for name in ['overlap', 'dtt_lag', 'dtt_v', 'dtt_minlag', 'dtt_width',
                  'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt',
                  'remove_response', 'response_format', 'response_path',
-                 'response_prefilt']:
+                 'response_prefilt','plugins']:
         try:
             db.add(Config(name=name, value=default[name][-1]))
             db.commit()
