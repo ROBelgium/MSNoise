@@ -35,7 +35,7 @@ before_install:
   - conda install --yes traitsui>=4.4 traits lxml
   - conda install --yes -c obspy obspy
   - conda install --yes -c robertcoop flask-admin
-  - conda install --yes bokeh
+  - conda install --yes bokeh==0.9.0
   - pip install multiprocessing_logging
   # Special install for scikits.samplerate
   - cd ..

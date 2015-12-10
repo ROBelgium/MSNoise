@@ -47,6 +47,10 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n" + ispresent('traits')
         output += "\n" + ispresent('scikits.samplerate')
         output += "\n" + ispresent('obspy')
+        output += "\n" + ispresent('flask')
+        output += "\n" + ispresent('flask.ext.admin', 'easy_install flask-admin')
+        output += "\n" + ispresent('wtforms')
+        output += "\n" + ispresent('bokeh')
 
         output += "\n"
         output += "\n" + "Only necessary if you plan to build the doc locally:"
@@ -63,9 +67,6 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n" + "Not required, just checking:"
         output += "\n" + ispresent('json')
         output += "\n" + ispresent('psutil')
-        output += "\n" + ispresent('flask')
-        output += "\n" + ispresent('flask.ext.admin', 'easy_install flask-admin')
-        output += "\n" + ispresent('wtforms')
         output += "\n" + ispresent('reportlab')
         output += "\n" + ispresent('configobj')
         output += "\n" + ispresent('pkg_resources')
