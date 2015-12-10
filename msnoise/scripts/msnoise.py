@@ -414,6 +414,24 @@ def station_map(show, outfile):
     from ..plots.station_map import main
     main(show, outfile)
 
+@click.command()
+@click.argument('sta1')
+@click.argument('sta2')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-d', '--day', default="2015-01-01", help='Day')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+def dtt(sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
+    """Plots a graph of dt against t\n
+    STA1 and STA2 must be provided with this format: NET.STA !"""
+    from ..plots.dtt import main
+    main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile)
+
+
 
 # Add plot commands to the plot group:
 plot.add_command(data_availability)
@@ -424,6 +442,7 @@ plot.add_command(mwcs)
 plot.add_command(distance)
 plot.add_command(station_map)
 plot.add_command(timing)
+plot.add_command(dtt)
 
 
 # Add all commands to the cli group:
