@@ -30,7 +30,7 @@ before_install:
   - conda update --yes conda
   # Installs required packages
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION
-  - conda install --yes numpy scipy matplotlib statsmodels pandas sqlalchemy
+  - conda install --yes numpy==1.9.3 scipy matplotlib statsmodels pandas sqlalchemy
   - conda install --yes sphinx jinja2 flask pymysql click
   - conda install --yes traitsui>=4.4 traits lxml
   - conda install --yes -c obspy obspy
