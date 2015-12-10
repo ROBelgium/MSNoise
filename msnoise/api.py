@@ -906,9 +906,9 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
     mytrace = Trace(data=corr)
     mytrace.stats['station'] = pair
     mytrace.stats['sampling_rate'] = cc_sampling_rate
+    if maxlag:
+        mytrace.stats.starttime = -maxlag
     mytrace.stats.sac = AttribDict()
-
-    mytrace.stats.sac.b = -maxlag
     mytrace.stats.sac.depmin = np.min(corr)
     mytrace.stats.sac.depmax = np.max(corr)
     mytrace.stats.sac.depmen = np.mean(corr)

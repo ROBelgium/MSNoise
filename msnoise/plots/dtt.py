@@ -1,7 +1,8 @@
 """
 author @claredonaldson
 
-This script plots dt (delay time) against t (time lag). It shows the results from the MWCS step, plus the calculated regression lines M0 and M.
+This script plots dt (delay time) against t (time lag). It shows the results
+from the MWCS step, plus the calculated regression lines M0 and M.
 The errors in the regression lines are also plotted as fainter lines.
 The time lags used to calculate the regression are shown in blue.
 
