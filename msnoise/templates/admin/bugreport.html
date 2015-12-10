@@ -13,8 +13,7 @@ function get_bugreport(callback) {
         dataType: 'json',
         success: callback
         });
-    };
-
+}
 function populate_bugreport(data) {
     $.each(data, function(i, value) {
         $('#report').append(value);

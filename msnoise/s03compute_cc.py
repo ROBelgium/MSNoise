@@ -526,7 +526,7 @@ def main():
                         # print "Progress: %#2d/%2d"% (islice+1,slices)
                         trame2h = trames[:, begin:end]
 
-                        rmsmat = np.std(np.abs(trame2h), axis=1)
+                        rmsmat = np.std(trame2h, axis=1)
                         for filterdb in get_filters(db, all=False):
                             filterid = filterdb.ref
                             low = float(filterdb.low)

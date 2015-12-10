@@ -67,8 +67,7 @@ function get_CCF(callback, arg) {
         data: JSON.stringify(arg),
         success: callback
         });
-    };
-
+}
 function get_pairs(callback) {
     $.ajax({
         url:'/admin/pairs.json',
@@ -76,8 +75,7 @@ function get_pairs(callback) {
         dataType: 'json',
         success: callback
         });
-    };
-
+}
 function populate_pair(data) {
     $.each(data, function(i, value) {
         $('#pair').append($('<option>').text(value).attr('value', value));
@@ -93,8 +91,7 @@ function get_filters(callback) {
         dataType: 'json',
         success: callback
         });
-    };
-
+}
 function populate_filter(data) {
     console.debug("%o",data);
     $.each(data, function(i, value) {
@@ -110,8 +107,7 @@ function get_components(callback) {
         dataType: 'json',
         success: callback
         });
-    };
-
+}
 function populate_component(data) {
     console.debug("%o",data);
     $.each(data, function(i, value) {
@@ -123,11 +119,11 @@ function populate_component(data) {
 
 
 function updateplot() {
-    var pair = $('#pair option:selected').text()
-    var filter = $('#filter option:selected').val()
-    var component = $('#component option:selected').text()
-    var format = "matrix"
-    var arg = {"pair": pair,"component": component,"filter":filter,"format":format}
+    var pair = $('#pair option:selected').text();
+    var filter = $('#filter option:selected').val();
+    var component = $('#component option:selected').text();
+    var format = "matrix";
+    var arg = {"pair": pair,"component": component,"filter":filter,"format":format};
     console.debug(arg);
     get_CCF(update, arg);
     }

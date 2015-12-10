@@ -16,10 +16,7 @@ function get_network_station(callback) {
         dataType: 'json',
         success: callback
         });
-    };
-
-
-
+}
 function populate_network(data) {
     $.each(data, function(i, value) {
         $('#network').append($('<option>').text(i).attr('value', i));
@@ -48,7 +45,7 @@ $(document).ready(function() {
         $('#station')
         .find('option')
         .remove()
-        .end()
+        .end();
         
         get_network_station(populate_stations);
 

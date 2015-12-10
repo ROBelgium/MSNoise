@@ -12,8 +12,7 @@ function data_availability_flags(callback, error) {
         dataType: 'json',
         success: callback,
     });
-};
-
+}
 function get_num_jobs(type, callback, error) {
     $.ajax({
         url:'/admin/jobs_list.json',
@@ -22,8 +21,7 @@ function get_num_jobs(type, callback, error) {
         data: {'type':type},
         success: callback,
     });
-};
-
+}
 function update_CC_jobs(res) {
     total = res['T'] + res['I'] + res['D'];
     text = total + " CC jobs in the database: " + res['T'] + " todo, ";
@@ -32,8 +30,7 @@ function update_CC_jobs(res) {
     var x = Math.floor(100*res['D']/total);
   $('#CC').css('width', x+'%').attr('aria-valuenow', x);
     $('#CC').text(x+'%');
-};
-
+}
 function update_DTT_jobs(res) {
     total = res['T'] + res['I'] + res['D'];
     text = total + " DTT jobs in the database: " + res['T'] + " todo, ";
@@ -42,9 +39,8 @@ function update_DTT_jobs(res) {
     var x = Math.floor(100.0*res['D']/parseFloat(total));
    $('#DTT').css('width', x+'%').attr('aria-valuenow', x);
     $('#DTT').text(x+'%');
-  
-};
 
+}
 function update_DA(res) {
     total = res['N'] + res['M'] + res['A'];
     text = total + " files identified in the archive: " + res['N'] + " new, ";
@@ -54,9 +50,7 @@ function update_DA(res) {
     $('#DA').css('width', x+'%').attr('aria-valuenow', x);
     $('#DA').text(x+'%');
   console.debug(x);
-};
-
-
+}
 function update_all() {
 
    get_num_jobs('CC', update_CC_jobs); 
@@ -95,7 +89,7 @@ function update_all() {
                 $("#new_jobs_console").text("error...?");
                 }
         });
-        window.location.replace("about:blank")
+        window.location.replace("about:blank");
         document.write('OK, MSNoise Admin is stopped, ' +
                 'you can close this window')
 

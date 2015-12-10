@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import scipy.fftpack
 from obspy.core import Stream, Trace, read, AttribDict
-from obspy.signal import cosTaper
+from obspy.signal.invsim import cosTaper
 
 from obspy.core.util import gps2DistAzimuth
 

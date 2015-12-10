@@ -165,7 +165,9 @@ SmoothieChart.prototype.stop = function() {
 
 // Sample timestamp formatting function 
 SmoothieChart.timeFormatter = function(dateObject) {
-  function pad2(number){return (number < 10 ? '0' : '') + number};
+  function pad2(number) {
+    return (number < 10 ? '0' : '') + number
+  }
   return pad2(dateObject.getHours())+':'+pad2(dateObject.getMinutes())+':'+pad2(dateObject.getSeconds());
 };
 

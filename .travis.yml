@@ -16,15 +16,10 @@ virtualenv:
 addons:
   apt:
     packages:
-      - gfortran
       - libsamplerate0
       - libsamplerate0-dev
 
 before_install:
-  - lsb_release -a # get info on the operating system
-  #- sudo apt-get update
-  #- sudo apt-get install -qq gfortran
-  #- sudo apt-get install libsamplerate0 libsamplerate0-dev
   # MySQL database
   - mysql -e 'create database msnoise;'
   # Python and related stuff
@@ -35,19 +30,15 @@ before_install:
   - conda update --yes conda
   # Installs required packages
   - conda install --yes pip python=$TRAVIS_PYTHON_VERSION
-  - conda install --yes numpy scipy matplotlib statsmodels pandas
-  - conda install --yes sqlalchemy sphinx jinja2
-  - conda install --yes flask pymysql
+  - conda install --yes numpy scipy matplotlib statsmodels pandas sqlalchemy
+  - conda install --yes sphinx jinja2 flask pymysql click
   - conda install --yes traitsui>=4.4 traits lxml
   - conda install --yes -c obspy obspy
-  - conda install --yes click
   - conda install --yes -c robertcoop flask-admin
   - conda install --yes bokeh
   - pip install multiprocessing_logging
   # Special install for scikits.samplerate
   - cd ..
-  #- sudo dpkg -L libsamplerate0
-  #- sudo dpkg -L libsamplerate0-dev
   - wget https://pypi.python.org/packages/source/s/scikits.samplerate/scikits.samplerate-0.3.3.tar.gz#md5=96c8d8ba3aa95a9db15994f78792efb4
   - tar -xvf scikits.samplerate-0.3.3.tar.gz
   - cd scikits.samplerate-0.3.3
