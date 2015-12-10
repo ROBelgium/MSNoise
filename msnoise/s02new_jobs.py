@@ -26,7 +26,8 @@ def main(init=False):
     db = connect()
 
     plugins = get_config(db, "plugins")
-    extra_jobtypes = []
+    extra_jobtypes_scan_archive = []
+    extra_jobtypes_new_files = []
     if plugins:
         plugins = plugins.split(",")
         for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
@@ -35,7 +36,10 @@ def main(init=False):
                 jobtypes = ep.load()()
                 for jobtype in jobtypes:
                     if jobtype["after"] == "scan_archive":
-                        extra_jobtypes.append(jobtype["name"])
+                        extra_jobtypes_scan_archive.append(jobtype["name"])
+                    elif jobtype["after"] == "new_files":
+                        extra_jobtypes_new_files.append(jobtype["name"])
+
 
     autocorr = get_config(db, name="autocorr", isbool=True)
 
@@ -49,6 +53,10 @@ def main(init=False):
         start, end = nf.starttime.date(), nf.endtime.date()
         updated_days.append(start)
         updated_days.append(end)
+        for jobtype in extra_jobtypes_new_files:
+            all_jobs.append({"day": start, "pair": "%s.%s"%(nf.net,nf.sta),
+                             "jobtype": jobtype, "flag": "T",
+                             "lastmod": datetime.datetime.utcnow()})
 
     updated_days = np.asarray(updated_days)
     updated_days = np.unique(updated_days)
@@ -73,7 +81,7 @@ def main(init=False):
                         all_jobs.append({"day": day, "pair": pair,
                                          "jobtype": "CC", "flag": "T",
                                          "lastmod": datetime.datetime.utcnow()})
-                        for jobtype in extra_jobtypes:
+                        for jobtype in extra_jobtypes_scan_archive:
                             all_jobs.append({"day": day, "pair": pair,
                                          "jobtype": jobtype, "flag": "T",
                                          "lastmod": datetime.datetime.utcnow()})
