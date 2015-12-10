@@ -73,7 +73,11 @@ def main():
     
     db = connect()
     components_to_compute = get_components_to_compute(db)
-    
+    export_format = get_config(db, 'export_format')
+    if export_format == "BOTH":
+        extension = ".MSEED"
+    else:
+        extension = "."+export_format
     mov_stack = get_config(db, "mov_stack")
     if mov_stack.count(',') == 0:
         mov_stacks = [int(mov_stack), ]
@@ -106,13 +110,15 @@ def main():
             for components in components_to_compute:
                 ref_name = pair.replace('.', '_').replace(':', '_')
                 rf = os.path.join("STACKS", "%02i" %
-                                  filterid, "REF", components, ref_name + ".MSEED")
+                                  filterid, "REF", components,
+                                  ref_name + extension)
                 ref = read(rf)[0].data
                 for day in days:
                     for mov_stack in mov_stacks:
                         df = os.path.join(
                             "STACKS", "%02i" % filterid, "%03i_DAYS" %
-                            mov_stack, components, ref_name, str(day) + ".MSEED")
+                            mov_stack, components, ref_name,
+                            str(day) + extension)
                         if os.path.isfile(df):
                             cur = read(df)[0].data
                             logging.debug(
