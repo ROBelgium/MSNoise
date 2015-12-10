@@ -16,9 +16,9 @@ virtualenv:
 addons:
   apt:
     packages:
-      gfortran
-      libsamplerate0
-      libsamplerate0-dev
+      - gfortran
+      - libsamplerate0
+      - libsamplerate0-dev
 
 before_install:
   - lsb_release -a # get info on the operating system
