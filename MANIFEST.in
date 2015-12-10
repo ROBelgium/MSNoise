@@ -1,3 +1,5 @@
 recursive-include msnoise/test *.*
 recursive-include msnoise/templates *
 recursive-include msnoise/static *
+include versioneer.py
+include msnoise/_version.py

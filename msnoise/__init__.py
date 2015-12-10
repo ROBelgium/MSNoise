@@ -10,3 +10,6 @@ __status__ = "Production"
 import os
 
 MSNoisePATH = os.path.realpath(os.path.dirname(__file__))
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
