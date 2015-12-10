@@ -33,6 +33,11 @@ def main(filterid, components, ampli=1, show=True, outfile=None):
     db = connect()
 
     pairs = get_station_pairs(db, used=1)
+    export_format = get_config(db, 'export_format')
+    if export_format == "BOTH":
+        extension = ".MSEED"
+    else:
+        extension = "."+export_format
     maxlag = float(get_config(db, 'maxlag'))
     maxlagsamples = get_maxlag_samples(db)
     t = np.linspace(-maxlag,maxlag, maxlagsamples)
@@ -51,7 +56,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None):
         print pair, dist
         ref_name = pair.replace('.', '_').replace(':', '_')
         rf = os.path.join("STACKS", "%02i" %
-                          filterid, "REF", components, ref_name + ".MSEED")
+                          filterid, "REF", components, ref_name + extension)
         if os.path.isfile(rf):
             ref = read(rf)[0]
             ref.normalize()
