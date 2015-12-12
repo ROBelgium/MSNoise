@@ -6,7 +6,7 @@ dt/t in a narrow frequency band even for a broadband signal.
 The function follows the procedure set out in Clarke et al. (2011)."""
 
 import statsmodels.api as sm
-from obspy.signal import cosTaper
+from obspy.signal.invsim import cosTaper
 import scipy.signal
 import numpy as np
 import matplotlib.pyplot as plt
