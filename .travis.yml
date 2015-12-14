@@ -42,9 +42,7 @@ before_install:
   # done
   - ls -la
 
-
 install:
-  - cd MSNoise
   - python setup.py install
   - cd
 
