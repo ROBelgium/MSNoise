@@ -59,7 +59,7 @@ install:
 
 script:
   - msnoise --help
-  - msnoise bugreport -s -m
+  - msnoise bugreport -s -m -e
   - cd
   - mkdir MSNoiseTest
   - cd MSNoiseTest
