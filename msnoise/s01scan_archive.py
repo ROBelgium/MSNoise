@@ -41,6 +41,7 @@ from subprocess import Popen, PIPE
 from multiprocessing import Process
 import multiprocessing
 import multiprocessing_logging
+import numpy as np
 
 import argparse
 import traceback
@@ -136,7 +137,7 @@ def main(init=False, threads=1):
     logging.info("Will work on %i threads" % nthreads)
 
     if os.name == "nt":
-        find = "gnufind"
+        find = "find"
     else:
         find = "find"
     startdate = get_config(db, 'startdate')
@@ -169,6 +170,7 @@ def main(init=False, threads=1):
                 tmp = os.path.join(data_folder, stafol.replace(
                 'NET', sta.net).replace('STA', sta.sta))
                 folders_to_glob.append(tmp)
+    folders_to_glob = np.unique(folders_to_glob)
 
     clients = []
     for fi in sorted(folders_to_glob):
