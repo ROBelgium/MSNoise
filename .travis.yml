@@ -39,16 +39,15 @@ before_install:
   - pip install multiprocessing_logging
   # Special install for scikits.samplerate
   - cd ..
-  - wget https://pypi.python.org/packages/source/s/scikits.samplerate/scikits.samplerate-0.3.3.tar.gz#md5=96c8d8ba3aa95a9db15994f78792efb4
-  - tar -xvf scikits.samplerate-0.3.3.tar.gz
-  - cd scikits.samplerate-0.3.3
-  - echo "[samplerate]" >> site.cfg
-  - echo "library_dirs=/usr/lib:/usr/lib/x86_64-linux-gnu" >> site.cfg
-  - echo "include_dirs=/usr/include" >> site.cfg
-  - python setup.py build
-  - python setup.py install
-  # Finished procedure, going to root folder
-  - cd ..
+  - pip install https://github.com/ThomasLecocq/samplerate/archive/master.zip
+  # - wget https://pypi.python.org/packages/source/s/scikits.samplerate/scikits.samplerate-0.3.3.tar.gz#md5=96c8d8ba3aa95a9db15994f78792efb4
+  # - tar -xvf scikits.samplerate-0.3.3.tar.gz
+  # - cd scikits.samplerate-0.3.3
+  # - echo "[samplerate]" >> site.cfg
+  # - echo "library_dirs=/usr/lib:/usr/lib/x86_64-linux-gnu" >> site.cfg
+  # - echo "include_dirs=/usr/include" >> site.cfg
+  # - python setup.py build
+  # - python setup.py install
   - ls -la
 
 

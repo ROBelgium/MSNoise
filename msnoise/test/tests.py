@@ -298,6 +298,9 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(len(datelist), 731)
 
     def test_028_S01installer(self):
+        if not "TRAVIS" in os.environ:
+            print "Seems to be running on local machine, skipping MySQL test"
+            return
         import shutil
         shutil.move('db.ini','db.bak')
         from ..s000installer import main
