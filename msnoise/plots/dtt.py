@@ -6,8 +6,9 @@ from the MWCS step, plus the calculated regression lines M0 and M.
 The errors in the regression lines are also plotted as fainter lines.
 The time lags used to calculate the regression are shown in blue.
 
-run this script like this:
-msnoise plot dtt Z7.HRIM Z7.LIND -f 3 -d 2014-09-10 -m 10
+
+.. include:: clickhelp/msnoise-plot-dtt.rst
+
 
 """
 

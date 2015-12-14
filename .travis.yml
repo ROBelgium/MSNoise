@@ -47,6 +47,8 @@ install:
   - cd
 
 script:
+  - mkdir empty
+  - cd empty
   - msnoise --help
   - msnoise bugreport -s -m -e
   - cd

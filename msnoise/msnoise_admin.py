@@ -1,4 +1,4 @@
-from flask import Flask, redirect, request
+from flask import Flask, redirect, request,  url_for
 from flask.ext.admin import Admin, BaseView, expose
 import flask, time, json, socket
 from flask_admin.model import typefmt
@@ -15,7 +15,7 @@ from bokeh.templates import RESOURCES
 
 from .api import *
 from .msnoise_table_def import *
-
+from .default import default
 
 class GenericView(BaseView):
     name = "MSNoise"
@@ -194,24 +194,26 @@ class JobView(ModelView):
 
 class ConfigView(ModelView):
     # Disable model creation
+    edit_template = 'admin/model/edit-config.html'
+
     view_title = "MSNoise General Configuration"
-    def no_root_allowed(form, field):
-        if field.data == 'root':
-            raise ValidationError('"root" is not allowed')
- 
-    # inline_models = (Config,)
-    form_args = dict(
-        value=dict(validators=[no_root_allowed])
-    )
     can_create = False
     can_delete = False
-    page_size = 50
+
     # Override displayed fields
     column_list = ('name', 'value')
 
     def __init__(self, session, **kwargs):
         # You can pass name and other parameters if you want to
         super(ConfigView, self).__init__(Config, session, **kwargs)
+
+    @expose('/edit/', methods=['GET','POST'])
+    def edit_view(self):
+        id = request.args.get('id')
+        self._template_args['helpstring'] = default[id][0]
+        self._template_args['helpstringdefault'] = default[id][1]
+        return super(ConfigView, self).edit_view()
+
 
 def getitem(obj, item, default):
     if item not in obj:

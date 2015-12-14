@@ -61,3 +61,8 @@ dv/v Plot
 ---------
 
 .. automodule:: msnoise.plots.dvv
+
+dt/t Plot
+---------
+
+.. automodule:: msnoise.plots.dtt
