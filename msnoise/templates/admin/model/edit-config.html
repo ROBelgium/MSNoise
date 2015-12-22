@@ -4,10 +4,10 @@
 
   {% block navlinks %}
       {{ super() }}
-
   {% endblock %}
+
     <h2>{{ request.args.get('id') }}</h2>
-    {{  helpstring }}<br>
+    {{  helpstring|safe }}<br>
     Defaults to <b>{{ helpstringdefault }}</b>
     <br><br>
     {{ lib.render_form(form, return_url, extra(), form_opts) }}

@@ -182,7 +182,14 @@ http://www.obspy.org (Beyreuther et al., 2010; Megies et al., 2011)
 
 .. code-block:: sh
 
-    easy_install obspy
+    pip install obspy
+
+or, better, if you are using Anaconda/Miniconda:
+
+.. code-block:: sh
+
+    conda install -c obspy obspy
+
 
 Enthought Tools Suite
 ~~~~~~~~~~~~~~~~~~~~~

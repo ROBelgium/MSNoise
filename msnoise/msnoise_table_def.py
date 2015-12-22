@@ -5,8 +5,8 @@ import datetime
 
 Base = declarative_base()
 
-f5_4 = Float(precision=5, decimal_return_scale=4)
-f10_8 = Float(precision=10, decimal_return_scale=8)
+f5_4 = Float(precision=5, )
+f10_8 = Float(precision=10,)
 
 class Filter(Base):
     """

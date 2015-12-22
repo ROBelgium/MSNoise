@@ -19,7 +19,7 @@ default['preprocess_highpass'] = ["Preprocessing High-pass value in Hz [0.01]",'
 default['remove_response'] = ["Remove instrument response Y/[N]",'N']
 default['response_format'] = ["Remove instrument format dataless/[inventory]/paz/resp",'dataless']
 default['response_path'] = ["Remove instrument file(s) location",'inventory']
-default['response_prefilt'] = ["Remove instrument correction pre-filter (0.005, 0.006, 30.0, 35.0)",'(0.005, 0.006, 30.0, 35.0)']
+default['response_prefilt'] = ["Remove instrument correction <b>pre-filter</b> (0.005, 0.006, 30.0, 35.0)",'(0.005, 0.006, 30.0, 35.0)']
 
 default['maxlag'] = ["Maximum lag (in seconds) [120.0]",'120.']
 default['corr_duration'] = ["Data windows to correlate (in seconds) [1800.]",'1800.']
