@@ -1,4 +1,5 @@
 import os
+import sys
 import click
 import pkg_resources
 import logging
@@ -7,9 +8,11 @@ import traceback
 @click.group()
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
 (only affects modules that are designed to do parallel processing)')
+@click.option('-c', '--custom', default=False, is_flag=True, help='Use custom file')
+
 @click.option('-v', '--verbose', default=0, count=True)
 @click.pass_context
-def cli(ctx, threads, verbose):
+def cli(ctx, threads, custom, verbose):
     ctx.obj['MSNOISE_threads'] = threads
     if verbose == 0:
         ctx.obj['MSNOISE_verbosity'] = "WARNING"
@@ -22,7 +25,8 @@ def cli(ctx, threads, verbose):
     logging.basicConfig(level=ctx.obj['MSNOISE_verbosity'],
                         format='%(asctime)s [%(levelname)s] %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
-
+    sys.path.append(os.getcwd())
+    ctx.obj['MSNOISE_custom'] = custom
 
     pass
 
@@ -55,10 +59,7 @@ def upgrade_db():
     from ..api import connect, Config, get_tech, get_engine
     from ..default import default
     db = connect()
-    for name in ['overlap', 'dtt_lag', 'dtt_v', 'dtt_minlag', 'dtt_width',
-                 'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt',
-                 'remove_response', 'response_format', 'response_path',
-                 'response_prefilt','plugins']:
+    for name in default.keys():
         try:
             db.add(Config(name=name, value=default[name][-1]))
             db.commit()
@@ -302,14 +303,18 @@ def data_availability(show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-def dvv(mov_stack, comp, dttname, filterid, pair, all, show, outfile):
+@click.pass_context
+def dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
     """Plots the dv/v (parses the dt/t results)\n
     Individual pairs can be plotted extra using the -p flag one or more times.\n
     Example: msnoise plot dvv -p ID_KWUI_ID_POSI\n
     Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
     Remember to order stations alphabetically !
     """
-    from ..plots.dvv import main
+    if ctx.obj['MSNOISE_custom']:
+        from dvv import main
+    else:
+        from ..plots.dvv import main
     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
 
 
@@ -364,11 +369,15 @@ def interferogram(sta1, sta2, filterid, comp, mov_stack, show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-def ccftime(sta1, sta2, filterid, comp, mov_stack,
+@click.pass_context
+def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
             ampli, seismic, show, outfile):
     """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
-    from ..plots.ccftime import main
+    if ctx.obj['MSNOISE_custom']:
+        from ccftime import main
+    else:
+        from ..plots.ccftime import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile)
 
 

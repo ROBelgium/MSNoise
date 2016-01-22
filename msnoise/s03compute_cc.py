@@ -74,6 +74,8 @@ from obspy.signal.invsim import cosTaper
 from obspy import read_inventory
 from obspy.xseed import Parser
 
+import scipy as sp
+import numpy as np
 from scikits.samplerate import resample
 
 from api import *
@@ -296,6 +298,11 @@ def main():
     params.keep_all = get_config(db, 'keep_all', isbool=True)
     params.keep_days = get_config(db, 'keep_days', isbool=True)
     params.components_to_compute = get_components_to_compute(db)
+
+    params.stack_method = get_config(db, 'stack_method')
+    params.pws_timegate = float(get_config(db, 'pws_timegate'))
+    params.pws_power = float(get_config(db, 'pws_power'))
+
 
     logging.info("Will compute %s" % " ".join(params.components_to_compute))
 
@@ -566,7 +573,7 @@ def main():
                                 thisdate = time.strftime("%Y-%m-%d", tmptime)
                                 thistime = time.strftime("%Y-%m-%d %H:%M:%S",
                                                          tmptime)
-                                if params.keep_all:
+                                if params.keep_all or params.keep_days:
                                     ccfid = "%s_%s_%s_%s_%s" % (station1, station2,
                                                              filterid, components,
                                                              thisdate)
@@ -587,30 +594,63 @@ def main():
                             export_allcorr(db, ccfid, allcorr[ccfid])
 
                     if params.keep_days:
-                        try:
-                            for filterdb in get_filters(db, all=False):
-                                filterid = filterdb.ref
-                                corr = daycorr[filterid]
-                                ncorr = ndaycorr[filterid]
-                                if ncorr > 0:
-                                    logging.debug(
-                                        "Saving daily CCF for filter %02i, comp %s (stack of %02i CCF)" % (filterid, components, ncorr))
+                        for ccfid in allcorr.keys():
+                            station1, station2, filterid, components, date = ccfid.split('_')
+                            corrs = np.asarray(allcorr[ccfid].values())
+                            if params.stack_method == "linear":
+                                corr = corrs.mean(axis=0)
+                            elif params.stack_method == "pws":
 
-                                    thisdate = time.strftime(
+                                corr = np.zeros(corrs.shape[1], dtype='f8')
+                                phasestack = np.zeros(corrs.shape[1], dtype='c8')
+                                for c in corrs:
+                                    phase = np.angle(sp.signal.hilbert(c))
+                                    phasestack.real += np.cos(phase)
+                                    phasestack.imag += np.sin(phase)
+                                coh = 1. / corrs.shape[1] * np.abs(phasestack)
+
+                                timegate_samples = params.pws_timegate *\
+                                                   params.goal_sampling_rate
+                                coh = np.convolve(sp.signal.boxcar(timegate_samples)/timegate_samples, coh, 'same')
+                                for c in corrs:
+                                    corr += c * np.power(coh, params.pws_power)
+                                corr /= corrs.shape[0]
+                            thisdate = time.strftime(
                                         "%Y-%m-%d", time.gmtime(basetime))
-                                    thistime = time.strftime(
+                            thistime = time.strftime(
                                         "%H_%M", time.gmtime(basetime))
-                                    add_corr(
-                                        db, station1.replace('.', '_'),
-                                        station2.replace('.', '_'), filterid,
-                                        thisdate, thistime,  params.min30 /
-                                        params.goal_sampling_rate,
-                                        components, corr,
-                                        params.goal_sampling_rate, day=True,
-                                        ncorr=ncorr)
-                                del corr, ncorr
-                        except Exception as e:
-                            logging.debug(str(e))
+                            add_corr(
+                                    db, station1.replace('.', '_'),
+                                    station2.replace('.', '_'), int(filterid),
+                                    thisdate, thistime,  params.min30 /
+                                    params.goal_sampling_rate,
+                                    components, corr,
+                                    params.goal_sampling_rate, day=True,
+                                    ncorr=corrs.shape[1])
+                    # try:
+                        #     for filterdb in get_filters(db, all=False):
+                        #         filterid = filterdb.ref
+                        #         corr = daycorr[filterid]
+                        #         ncorr = ndaycorr[filterid]
+                        #         if ncorr > 0:
+                        #             logging.debug(
+                        #                 "Saving daily CCF for filter %02i, comp %s (stack of %02i CCF)" % (filterid, components, ncorr))
+                        #
+                        #             thisdate = time.strftime(
+                        #                 "%Y-%m-%d", time.gmtime(basetime))
+                        #             thistime = time.strftime(
+                        #                 "%H_%M", time.gmtime(basetime))
+                        #             add_corr(
+                        #                 db, station1.replace('.', '_'),
+                        #                 station2.replace('.', '_'), filterid,
+                        #                 thisdate, thistime,  params.min30 /
+                        #                 params.goal_sampling_rate,
+                        #                 components, corr,
+                        #                 params.goal_sampling_rate, day=True,
+                        #                 ncorr=ncorr)
+                        #         del corr, ncorr
+                        # except Exception as e:
+                        #     logging.debug(str(e))
                     del trames, daycorr, ndaycorr
                 logging.debug("Updating Job")
                 update_job(db, goal_day, orig_pair, 'CC', 'D')

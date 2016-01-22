@@ -818,7 +818,8 @@ def export_allcorr(session, ccfid, data):
     return
 
 
-def add_corr(session, station1, station2, filterid, date, time, duration, components, CF, sampling_rate, day=False, ncorr=0):
+def add_corr(session, station1, station2, filterid, date, time, duration,
+             components, CF, sampling_rate, day=False, ncorr=0):
     """
     Adds a CCF to the data archive on disk.
     

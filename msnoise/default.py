@@ -26,6 +26,10 @@ default['corr_duration'] = ["Data windows to correlate (in seconds) [1800.]",'18
 default['overlap'] = ["Amount of overlap between data windows [0:1[ [0.]",'0.0']
 default['windsorizing'] = ["Windsorizing at N time RMS , 0 disables windsorizing, -1 enables 1-bit normalization [3]",'3']
 
+default['stack_method'] = ["Stack Method: Linear Mean [linear] / Phase Weighted Stack (pws) ",'linear']
+default['pws_timegate'] = ["If stack_method='pws', width of the smoothing : 1.0 ",'1.0']
+default['pws_power'] = ["If stack_method='pws', Power of the Weighting: 2.0 ",'2.0']
+
 default['crondays'] = ["Number of days to monitors with cron [-1]",'-1']
 
 
