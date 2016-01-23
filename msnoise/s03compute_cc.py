@@ -175,7 +175,7 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.ar
                                                               'response_path'),
                                                    "*"))
                     if response_format == "inventory":
-                        firstinv = False
+                        firstinv = True
                         inventory = None
                         for file in files:
                             try:
