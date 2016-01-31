@@ -1,3 +1,118 @@
+"""MSNoise Admin is a web interface that helps the user define the
+configuration for all the processing steps, it also allows configuring the
+stations and filters to be used in the processes. It gives a view on the
+database tables.
+
+Although the interface is still in development for extra features, it already
+fully replaces the former "Configurator".
+
+To start the admin:
+
+.. code-block:: sh
+
+    $ msnoise admin
+
+Which, by default, starts a web server listening on all interfaces on port
+5000. This can be overriden by passing parameters to the command, e.g. for port
+5099:
+
+.. code-block:: sh
+
+    $ msnoise admin -p 5099
+
+
+Next step is to open a web browser and open the ip address of the machine,
+by default on the current machine, it'll be http://localhost:5000/ .
+
+
+The top level menu shows four items:
+
+Home
+----
+
+The index page shows
+
+* The project location and its database
+* Stats of the Data Availability, the CC jobs and the DTT jobs
+
+Configuration
+--------------
+
+Station
+~~~~~~~
+
+Stations appear as a table and are editable.
+
+Stations are defined as:
+
+.. autoclass:: Station
+
+
+Filter
+~~~~~~
+
+Filters appear as a table and are editable. The filter parameters are validated
+before submission, so no errors should happen. Note: by default, the `used`
+parameter is set to `False`, don't forget to change it!
+
+Filters are defined as:
+
+.. autoclass:: Filter
+
+Config
+~~~~~~
+
+All configuration bits appear as a table and are editable. When editing one
+configuration item, the edition pages shows extra information about the
+parameter, where it is used and its default value. Most of the configuration
+bits are case-sensitive!
+
+Example view:
+
+.. image:: .static/msnoise_admin_config.png
+
+
+The table below repeats this
+
+.. include:: defaults.rst
+
+Database
+--------
+
+Data Availability
+~~~~~~~~~~~~~~~~~
+
+Gives a view of the `data_availability` table. Allows to bulk edit/select rows.
+Its main goal is to check that the `scan_archive` procedure has successfully
+managed to list all files from one's archive.
+
+Jobs
+~~~~
+
+Gives a view of the `jobs` table. Allows to bulk edit/select rows. Its main
+goal is to check the `new_jobs` or any other workflow step (or Plugins)
+successfully inserted/updated jobs.
+
+
+Help
+----
+
+About
+~~~~~
+
+Shows some links and information about the package. Mostly the information
+present on the github readme file.
+
+Bug Report
+~~~~~~~~~~
+
+Web view of the `msnoise bugreport -m`, allows viewing if all required python
+modules are properly installed and available for MSNoise.
+
+
+"""
+
+
 from flask import Flask, redirect, request,  url_for
 from flask.ext.admin import Admin, BaseView, expose
 import flask, time, json, socket
@@ -7,15 +122,18 @@ from flask import flash
 from wtforms.validators import ValidationError
 from flask.ext.admin.actions import action
 from flask.ext.admin.babel import ngettext, lazy_gettext
+import markdown
+from flask import Markup
 
-from bokeh.embed import components
-from bokeh.plotting import figure
-from bokeh.resources import INLINE, CDN
-from bokeh.templates import RESOURCES
+# from bokeh.embed import components
+# from bokeh.plotting import figure
+# from bokeh.resources import INLINE, CDN
+# from bokeh.templates import RESOURCES
 
 from .api import *
 from .msnoise_table_def import *
 from .default import default
+
 
 class GenericView(BaseView):
     name = "MSNoise"
@@ -24,22 +142,23 @@ class GenericView(BaseView):
     def index(self):
         return self.render('admin/%s.html'%self.page, msnoise_project="test")
 
+
 class FilterView(ModelView):
     view_title = "Filter Configuration"
     name = "filter"
     # Disable model creation
     def mwcs_low(form, field):
-        if field.data <= form.data['low']:
-            raise ValidationError("'mwcs_low' should be (at least slightly) greater than 'low'")
-            
+        if field.data < form.data['low']:
+            raise ValidationError("'mwcs_low' should be greater or equal to 'low'")
+
     def mwcs_high(form, field):
         if field.data <= form.data['mwcs_low']:
             raise ValidationError("'mwcs_high' should be greater than 'mwcs_low'")
-    
+
     def high(form, field):
-        if field.data <= form.data['mwcs_high']:
-            raise ValidationError("'high' should be (at least slightly) greater than 'mwcs_high'")
-    
+        if field.data < form.data['mwcs_high']:
+            raise ValidationError("'high' should be greater or equal than 'mwcs_high'")
+
     def mwcs_step(form, field):
         if field.data > form.data['mwcs_wlen']:
             raise ValidationError("'mwcs_step' should be smaller or equal to 'mwcs_wlen'")
@@ -76,13 +195,15 @@ class FilterView(ModelView):
 
 
 def date_format(view, value):
-    return "%.10f"%value
+    return "%.10f" % value
 
 MY_DEFAULT_FORMATTERS = dict(typefmt.BASE_FORMATTERS)
 MY_DEFAULT_FORMATTERS.update({
         type(None): typefmt.null_formatter,
         float: date_format
     })
+
+
 class StationView(ModelView):
     view_title = "Station Configuration"
     column_filters = ('net', 'used')
@@ -204,13 +325,14 @@ class ConfigView(ModelView):
     column_list = ('name', 'value')
 
     def __init__(self, session, **kwargs):
-        # You can pass name and other parameters if you want to
         super(ConfigView, self).__init__(Config, session, **kwargs)
 
-    @expose('/edit/', methods=['GET','POST'])
+    @expose('/edit/', methods=['GET', 'POST'])
     def edit_view(self):
         id = request.args.get('id')
-        self._template_args['helpstring'] = default[id][0]
+        helpstring = default[id][0]
+        helpstring = Markup(markdown.markdown(helpstring))
+        self._template_args['helpstring'] = helpstring
         self._template_args['helpstringdefault'] = default[id][1]
         return super(ConfigView, self).edit_view()
 
@@ -508,6 +630,21 @@ def main(port=5000):
     else:
         database = "MySQL: %s@%s:%s"%(username, hostname, database)
     admin.project_database = database
+
+    plugins = get_config(db, "plugins")
+    jobtypes = ["CC","DTT"]
+    if plugins:
+
+        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
+            module_name = ep.module_name.split(".")[0]
+            if module_name in plugins:
+                tmp = ep.load()()
+                for t in tmp:
+                    jobtypes.append(t["name"])
+
+    print jobtypes
+
+
     admin.add_view(StationView(db,endpoint='stations', category='Configuration'))
     admin.add_view(FilterView(db,endpoint='filters', category='Configuration'))
     admin.add_view(ConfigView(db,endpoint='config', category='Configuration'))
@@ -517,9 +654,9 @@ def main(port=5000):
     admin.add_view(JobView(db,endpoint='jobs',category='Database'))
 
 
-    admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',category='Results'))
-    admin.add_view(ResultPlotter(endpoint='results',category='Results'))
-    admin.add_view(InterferogramPlotter(endpoint='interferogram',category='Results'))
+    #admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',category='Results'))
+    # admin.add_view(ResultPlotter(endpoint='results',category='Results'))
+    # admin.add_view(InterferogramPlotter(endpoint='interferogram',category='Results'))
 
     if plugins:
         plugins = plugins.split(',')

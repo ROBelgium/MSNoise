@@ -8,9 +8,9 @@ import traceback
 @click.group()
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
 (only affects modules that are designed to do parallel processing)')
-@click.option('-c', '--custom', default=False, is_flag=True, help='Use custom file')
-
-@click.option('-v', '--verbose', default=0, count=True)
+@click.option('-c', '--custom', default=False, is_flag=True, help='Use custom \
+ file for plots. To use this, copy the plot script here and edit it.')
+@click.option('-v', '--verbose', default=2, count=True)
 @click.pass_context
 def cli(ctx, threads, custom, verbose):
     ctx.obj['MSNOISE_threads'] = threads
@@ -20,8 +20,6 @@ def cli(ctx, threads, custom, verbose):
         ctx.obj['MSNOISE_verbosity'] = "INFO"
     elif verbose > 1:
         ctx.obj['MSNOISE_verbosity'] = "DEBUG"
-    # tmp hack
-    ctx.obj['MSNOISE_verbosity'] = "DEBUG"
     logging.basicConfig(level=ctx.obj['MSNOISE_verbosity'],
                         format='%(asctime)s [%(levelname)s] %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
@@ -284,10 +282,13 @@ def plot():
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-
-def data_availability(show, outfile):
+@click.pass_context
+def data_availability(ctx, show, outfile):
     """Plots the Data Availability vs time"""
-    from ..plots.data_availability import main
+    if ctx.obj['MSNOISE_custom']:
+        from data_availability import main
+    else:
+        from ..plots.data_availability import main
     main(show, outfile)
 
 
@@ -330,14 +331,18 @@ def dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-def timing(mov_stack, comp, dttname, filterid, pair, all, show, outfile):
+@click.pass_context
+def timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
     """Plots the timing (parses the dt/t results)\n
     Individual pairs can be plotted extra using the -p flag one or more times.\n
     Example: msnoise plot timing -p ID_KWUI_ID_POSI\n
     Example: msnoise plot timing -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
     Remember to order stations alphabetically !
     """
-    from ..plots.timing import main
+    if ctx.obj['MSNOISE_custom']:
+        from timing import main
+    else:
+        from ..plots.timing import main
     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
 
 
@@ -351,10 +356,14 @@ def timing(mov_stack, comp, dttname, filterid, pair, all, show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-def interferogram(sta1, sta2, filterid, comp, mov_stack, show, outfile):
+@click.pass_context
+def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
     """Plots the interferogram between sta1 and sta2 (parses the CCFs)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
-    from ..plots.interferogram import main
+    if ctx.obj['MSNOISE_custom']:
+        from interferogram import main
+    else:
+        from ..plots.interferogram import main
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
 
 @click.command()
@@ -391,10 +400,14 @@ def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-def mwcs(sta1, sta2, filterid, comp, mov_stack, show, outfile):
+@click.pass_context
+def mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
     """Plots the mwcs results between sta1 and sta2 (parses the CCFs)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
-    from ..plots.mwcs import main
+    if ctx.obj['MSNOISE_custom']:
+        from mwcs import main
+    else:
+        from ..plots.mwcs import main
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
 
 
@@ -407,9 +420,13 @@ def mwcs(sta1, sta2, filterid, comp, mov_stack, show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-def distance(filterid, comp,  ampli, show, outfile):
+@click.pass_context
+def distance(ctx, filterid, comp,  ampli, show, outfile):
     """Plots the REFs of all pairs vs distance"""
-    from ..plots.distance import main
+    if ctx.obj['MSNOISE_custom']:
+        from distance import main
+    else:
+        from ..plots.distance import main
     main(filterid, comp, ampli, show, outfile)
 
 
@@ -418,9 +435,13 @@ def distance(filterid, comp,  ampli, show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-def station_map(show, outfile):
+@click.pass_context
+def station_map(ctx, show, outfile):
     """Plots the station map (very very basic)"""
-    from ..plots.station_map import main
+    if ctx.obj['MSNOISE_custom']:
+        from station_map import main
+    else:
+        from ..plots.station_map import main
     main(show, outfile)
 
 @click.command()
@@ -434,10 +455,14 @@ def station_map(show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-def dtt(sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
+@click.pass_context
+def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
     """Plots a graph of dt against t\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
-    from ..plots.dtt import main
+    if ctx.obj['MSNOISE_custom']:
+        from dtt import main
+    else:
+        from ..plots.dtt import main
     main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile)
 
 

@@ -8,6 +8,7 @@ Installation
 .. contents::
     :local:
 
+
 Introduction
 ------------
 
@@ -15,11 +16,10 @@ MSNoise is a set of Python codes that use a database (sqlite or MySQL) and
 the `find` command. When installed, it provides a top level command ``msnoise``
 in the console.
 
-.. note:: From version 1.3, MSNoise is a regular Python Package. Before, it was
-    a collection of Python scripts that needed to be executed sequentially. All
-    changes introduced in MSNoise 1.3 are decribed in the Release Notes of
-    :doc:`releasenotes/msnoise-1.3`. If you plan to upgrade your projects to
-    the latest version, please read the :ref:`upgradingto13` part.
+.. note:: MSNoise version 1.4 introduces new config parameters in the database.
+    For each project, to upgrade your database, remember to run
+    ``msnoise upgrade_db`` in the project folder.
+
 
 To run MSNoise, you need:
 
@@ -33,12 +33,14 @@ To run MSNoise, you need:
   * matplotlib [+]
   * statsmodels [+]
   * sqlalchemy [+]
-  * traits
-  * traitsui
-  * click
+  * flask [+]
+  * click [+]
+  * pymysql [+]
   * scikits.samplerate
   * obspy
-  * mysql-python
+  * flask-admin
+  * multiprocessing_logging
+
 
 * MySQL: if you want to use MySQL, you need to install and configure a
   :ref:`mysql` beforehand. This is not needed for sqlite.
@@ -48,7 +50,7 @@ To run MSNoise, you need:
 * The `find` command: present by default on linux and available with gnufind_
   on Windows.
 
-.. warning:: Python 3 is **not** supported!
+.. warning:: Python 3 is **not** (yet) supported!
 
 
 Quick Start - Windows
@@ -60,15 +62,14 @@ Quick Start - Windows
    
    .. code-block:: sh
     
-        conda install traitsui traits
-        easy_install obspy click
-   
-3. Download and install scikits.samplerate and mysql-python from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate and http://www.lfd.uci.edu/~gohlke/pythonlibs/#mysql-python
+        pip install flask-admin
+        conda install -c obspy obspy
+
+3. Download and install scikits.samplerate from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate
    see examples below (filenames might be different):
 
    .. code-block:: sh
 
-        pip install MySQL_python-1.2.5-cp27-none-win_amd64.whl
         pip install scikits.samplerate-0.3.3-cp27-none-win_amd64.whl
 
 4. Install a MySQL server: download and install EasyPHP_ (their "Dev" version is OK - read their installation page carefully, you need to install some Microsoft Visual C redistribuable manually too).
@@ -103,13 +104,13 @@ Quick Start - Linux
    
    .. code-block:: sh
     
-        conda install traitsui traits
-        easy_install obspy click
+        pip install flask-admin
+        conda install -c obspy obspy
  
    .. code-block:: sh
         
         sudo apt-get install libsamplerate0 libsamplerate0-dev
-        easy_install scikits.samplerate
+        pip install scikits.samplerate
     
    If this fails, follow those instructions: :ref:`samplerate`.
 
@@ -119,13 +120,6 @@ Quick Start - Linux
     
         sudo apt-get install mysql-server mysql-client phpmyadmin
 
-4. Install mysql-python:
-
-   .. code-block:: sh
-   
-        sudo apt-get build-dep python-mysqldb
-        sudo apt-get install libmysqlclient-dev
-        easy_install mysql-python
 
 5. Create a privileged user and a database:
  
@@ -174,32 +168,6 @@ the remaining packages. If you don't use Anaconda, all the packages are availabl
 Windows users are recommended to check the prebuilt binaries when advised.
 
 To know which packages you are missing, use the bug_reporter script (see :ref:`troubleshooting`) !
-
-Obspy
-~~~~~
-
-http://www.obspy.org (Beyreuther et al., 2010; Megies et al., 2011)
-
-.. code-block:: sh
-
-    pip install obspy
-
-or, better, if you are using Anaconda/Miniconda:
-
-.. code-block:: sh
-
-    conda install -c obspy obspy
-
-
-Enthought Tools Suite
-~~~~~~~~~~~~~~~~~~~~~
-
-Most of the suite should be present, one just needs to install the traitsui package and its dependencies (traits, pyface, 
-), which easy_install will do for you:
-
-.. code-block:: sh
-
-    easy_install traitsui
 
 .. _samplerate:
 
@@ -257,22 +225,6 @@ then, build and install:
     python setup.py build
     python setup.py install
 
-
-SQLAlchemy
-~~~~~~~~~~
-Windows
-+++++++
-Download and install the right version from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#sqlalchemy
-
-
-Linux:
-++++++
-
-.. code-block:: sh
-
-    easy_install sqlalchemy
-
-.. _mysql:
 
 MySQL Server
 ------------

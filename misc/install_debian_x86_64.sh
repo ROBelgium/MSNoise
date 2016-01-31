@@ -1,9 +1,6 @@
 lsb_release -a # get info on the operating system
 sudo apt-get update
-sudo apt-get install -qq gfortran
 sudo apt-get install libsamplerate0 libsamplerate0-dev
-sudo apt-get build-dep python-mysqldb
-sudo apt-get install libmysqlclient-dev
 wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
 chmod +x miniconda.sh
 ./miniconda.sh -b
@@ -12,14 +9,12 @@ source .bashrc
 conda update --yes conda
 # Installed required packages
 conda install --yes pip numpy scipy matplotlib statsmodels pandas
-conda install --yes sqlalchemy sphinx jinja2
+conda install --yes sqlalchemy sphinx jinja2 pymysql click
 conda install --yes flask
-conda install --yes traitsui enable
 # Update remaining packages not available via conda
-easy_install click
-easy_install flask-admin
-easy_install obspy
-easy_install mysql-python
+pip install flask-admin
+pip install obspy
+
 # Special install for scikits.samplerate
 cd ..
 sudo dpkg -L libsamplerate0

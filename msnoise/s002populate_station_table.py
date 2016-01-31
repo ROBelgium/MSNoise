@@ -3,7 +3,7 @@ This script is responsible for rapidly scanning the data archive and
 identifying the Networks/Stations and insert them in the *stations* table in
 the database.
 
-The ``data_folder`` (as defined in the configurator) is scanned expecting the
+The ``data_folder`` (as defined in the config) is scanned expecting the
 ``data_structure`` and possible values are defined in *data_structures.py*:
 
 .. code-block:: python

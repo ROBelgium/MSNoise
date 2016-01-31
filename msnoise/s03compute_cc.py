@@ -23,10 +23,6 @@ Decimation/Downsampling are configurable (``resampling_method``) and users are
 advised testing both. One advantage of Downsampling over Decimation is that
 it is able to downsample the data by any factor, not only integer factors.
 
-.. warning::
-    For an unknown reason, the PAZ-correction has disappeard from the
-    current sqlvolution on GitHub: CHECK!
-
 
 Processing
 ~~~~~~~~~~
@@ -38,12 +34,13 @@ rotated. This supposes the user has provided the station coordinates in the
 
 .. code-block:: python
 
-    R = tramef_N * np.cos(cplAz * np.pi / 180.) + tramef_E * np.sin(cplAz * np.pi / 180.)
-    T = tramef_N * np.sin(cplAz * np.pi / 180.) - tramef_E * np.cos(cplAz * np.pi / 180.)
+    R = N * np.cos(Az * np.pi / 180.) + E * np.sin(Az * np.pi / 180.)
+    T = N * np.sin(Az * np.pi / 180.) - E * np.cos(Az * np.pi / 180.)
 
 Then, for each ``corr_duration`` window in the signal, and for each filter
 configured in the database, the traces are clipped to ``windsorizing`` times
-the RMS and then whitened (see :ref:`whiten`) between the frequency bounds.
+the RMS (or 1-bit converted) and then whitened (see :ref:`whiten`) between the
+frequency bounds.
 When both traces are ready, the cross-correlation function is computed
 (see :ref:`mycorr`). The function returned contains data for time lags 
 corresponding to ``maxlag`` in the acausal (negative lags) and causal

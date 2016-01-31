@@ -16,15 +16,14 @@ Release notes:
 
 Introduction
 ------------
-
-X months after the last bugfix release (:doc:`msnoise-1.3.1`), and
-less than a year after the last major release (:doc:`msnoise-1.3`) we are
-proud to announce the new :doc:`msnoise-1.4`.
-It is a **major** release, with a massive amount of work since the
-last release: in `GitHub numbers <https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2015-04-1&to=2016-03-01&type=c>`_
-, it's over XXX commits and about XXX new lines of code and documentation
-added ! MSNoise 1.4 introduces two **major new features** : a new web-based
-admin interface and the support for plugins !
+X months after the last bugfix release ( :doc:`msnoise-1.3.1`), and less than a
+year after the last major release (:doc:`msnoise-1.3`) we are proud to announce
+the new :doc:`msnoise-1.4`. It is a **major** release, with a massive amount of
+work since the last release: in `GitHub numbers
+<https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2015-04-1&to=2016-03-01&type=c>`_
+, it's over XXX commits and about XXX new lines of code and documentation added
+! MSNoise 1.4 introduces two **major new features** : a new web-based admin
+interface and the support for plugins !
 
 
 TESTS
@@ -54,15 +53,15 @@ consider citing it:
 for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
 *Seismological Research Letters*, 85(3), 715‑726, doi:10.1785/0220130073.
 
-Plugin support
---------------
-
-
-MSNoise support plugin ...
-
 
 Web-based Admin Interface
 -------------------------
+
+For this release, we have replaced the Configurator by a more intuitive web-
+based configuration interface. All fields present in the Configurator are
+present, and *more* !
+
+
 
 Pros:
 
@@ -72,17 +71,46 @@ Pros:
 * removes dependency for traits/traitui
 * allows to customise "Views" to provide more information
 * allows the validation of fields before saving to database
+* will allow interactive plotting in the future
 
 Cons:
 
 * adds dependency to flask & flask-admin
 
 
+Plugin support
+--------------
 
-Customizing
------------
 
-```msnoise -c ...```
+MSNoise support plugin ...
+
+
+
+
+
+Customizing Plots
+-----------------
+
+All plots commands can be overriden using a `-c` agument *in front of the
+plot command* !!
+
+Examples:
+    * ``msnoise -c plot distance``
+    * ``msnoise -c plot ccftime YA.UV02 YA.UV06 -m 5``
+    * etc.
+
+To make this work, one has to copy the plot script from the msnoise install
+directory to the project directory (where your db.ini file is located, then
+edit it to one's desires. The first thing to edit in the code is the import of
+the :doc:`../api`:
+
+``from ..api import *``
+
+to
+
+``from msnoise.api import *``
+
+and it should work.
 
 
 New plots
@@ -101,16 +129,17 @@ Some improvements to the maths have been done for MSNoise 1.4:
 * should we add Aurélien's less-agressive whiten ?
 
 
-Performance improvements
-------------------------
-Improvements in terms of performances have also been done for MSNoise 1.4:
+Performance improvements ------------------------ Improvements in terms of
+performances have also been done for MSNoise 1.4:
 
 * ``keep_all``: if set to ``Y`` (=True) in the config, all CCF are now stored in
-  a single HDF5 file, which makes it much nicer to backup/transfer/delete. -- XXX not used actually !!!
-* ``compute_cc``: if only ZZ components are to be computed, the whitened windows
-  are pre-computed, which makes the process faster. This could lead to memory
-  issues if the job contains a lot of stations, a lot of filters are configured
-  and a large number of windows. -- Not sure it is a good idea !!!
+* a single HDF5 file, which makes it much nicer to backup/transfer/delete. --
+* XXX not used actually !!! ``compute_cc``: if only ZZ components are to be
+* computed, the whitened windows are pre-computed, which makes the process
+* faster. This could lead to memory issues if the job contains a lot of
+* stations, a lot of filters are configured and a large number of windows. --
+* Not sure it is a good idea !!!
+
 
 
 

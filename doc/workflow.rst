@@ -20,10 +20,10 @@ Installer
 .. automodule:: msnoise.s000installer
 
 
-Configurator
-------------
+MSNoise Admin (Web Interface)
+-----------------------------
 
-.. automodule:: msnoise.s001configurator
+.. automodule:: msnoise.msnoise_admin
 
 
 Populate Station Table
