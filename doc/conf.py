@@ -49,17 +49,20 @@ for key in default.keys():
     output += ".. |%s| replace:: ``%s``: %s (default=%s)\n" % (key, key, descr,
                                                             defvalue)
 
-output = output.replace('*','&#42;')
+#output = output.replace('*','&#42;')
 f = open('configs.hrst','w')
 f.write(output)
 f.close()
 
-space = "    "
+space = " " *4
 # Generate the help files
 
 from msnoise.scripts import msnoise as M
 if not os.path.isdir("clickhelp"):
     os.makedirs("clickhelp")
+
+
+
 for plot in ['ccftime', 'distance', 'data_availability', 'dvv',
              'station_map', 'mwcs', 'interferogram', 'dtt']:
 

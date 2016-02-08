@@ -33,13 +33,14 @@ To run MSNoise, you need:
   * matplotlib [+]
   * statsmodels [+]
   * sqlalchemy [+]
-  * flask [+]
+  * flask [+] (new in 1.4)
   * click [+]
-  * pymysql [+]
+  * pymysql [+] (new in 1.4)
   * scikits.samplerate
   * obspy
-  * flask-admin
-  * multiprocessing_logging
+  * flask-admin (new in 1.4)
+  * multiprocessing_logging (new in 1.4)
+  * markdown (new in 1.4)
 
 
 * MySQL: if you want to use MySQL, you need to install and configure a
@@ -193,7 +194,7 @@ This python package will probably be the most tricky to install. If you are luck
 
 .. code-block:: sh
 
-    easy_install scikits.samplerate
+    pip install scikits.samplerate
 
 On my Ubuntu 12.04, this results in an error because the SRC library path is not found. The reason is that the setup searches SRC in /usr/lib and not in /usr/lib/x86_64-linux-gnu where the library is actually present. To install, you need to download the archive from pypi and edit some configuration file:
 

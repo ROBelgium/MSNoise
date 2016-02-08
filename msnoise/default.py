@@ -4,7 +4,7 @@ default['data_folder'] = ["Data Folder",'']
 default['output_folder'] = ["CC Output Folder",'CROSS_CORRELATIONS']
 default['data_structure'] = ["Data Structure [SDS]/BUD/IDDS",'SDS']
 default['network'] = ["Network to analyse [*]",'*']
-default['channels'] = ["Channels need to match the value (ex: [*], *Z, BH*, HHZ,...)",'*']
+default['channels'] = ["Channels need to match the value (ex: [\*], \*Z, BH\*, HHZ,...)",'*']
 
 default['startdate'] = ["Start Date to process: [1970-01-01]='since beginning of the archive'","1970-01-01"]
 default['enddate'] = ["End Date to process: [2100-01-01]='No end'","2018-01-01"]

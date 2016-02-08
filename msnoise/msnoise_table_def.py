@@ -19,10 +19,10 @@ class Filter(Base):
     :type high: float
     :param high: The upper frequency bound of the Whiten function (in Hz)
     :type mwcs_low: float
-    :type mwcs_low: The lower frequency bound of the linear regression done in
+    :param mwcs_low: The lower frequency bound of the linear regression done in
         MWCS (in Hz)
     :type mwcs_high: float
-    :type mwcs_high: The upper frequency bound of the linear regression done in
+    :param mwcs_high: The upper frequency bound of the linear regression done in
         MWCS (in Hz)
     :type rms_threshold: float
     :param rms_threshold: Not used anymore

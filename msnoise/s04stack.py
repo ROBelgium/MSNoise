@@ -59,6 +59,21 @@ for jobs marked in the last 10 days:
 .. code-block:: sh
 
     $ msnoise stack -r -m -i 10
+
+
+Configuration Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+* |ref_begin|
+* |ref_end|
+* |mov_stack|
+* |stack_method|
+* |pws_timegate|
+* |pws_power|
+
+
+.. todo:: Document Phase Weighted Stacking (useful for tomo, not for dv/v if one
+    uses MWCS).
 """
 
 import os

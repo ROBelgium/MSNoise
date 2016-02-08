@@ -23,7 +23,7 @@ work since the last release: in `GitHub numbers
 <https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2015-04-1&to=2016-03-01&type=c>`_
 , it's over XXX commits and about XXX new lines of code and documentation added
 ! MSNoise 1.4 introduces two **major new features** : a new web-based admin
-interface and the support for plugins !
+interface and the support for plugins ! + PWS !!!!
 
 
 TESTS
@@ -85,7 +85,10 @@ Plugin support
 MSNoise support plugin ...
 
 
+Phase Weighted Stack
+--------------------
 
+...
 
 
 Customizing Plots

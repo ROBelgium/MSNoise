@@ -70,7 +70,7 @@ bits are case-sensitive!
 Example view:
 
 .. image:: .static/msnoise_admin_config.png
-
+    :align: center
 
 The table below repeats this
 
