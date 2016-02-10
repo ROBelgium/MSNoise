@@ -867,10 +867,10 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
                             "%s_%s" % (station1, station2), str(date))
         pair = "%s:%s" % (station1, station2)
         if mseed:
-            export_mseed(session, path, pair, components, filterid, CF/ncorr,
+            export_mseed(session, path, pair, components, filterid, CF,
                          ncorr)
         if sac:
-            export_sac(session, path, pair, components, filterid, CF/ncorr,
+            export_sac(session, path, pair, components, filterid, CF,
                        ncorr)
 
     else:

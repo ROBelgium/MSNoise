@@ -609,7 +609,7 @@ def main():
                                     phase = np.angle(sp.signal.hilbert(c))
                                     phasestack.real += np.cos(phase)
                                     phasestack.imag += np.sin(phase)
-                                coh = 1. / corrs.shape[1] * np.abs(phasestack)
+                                coh = 1. / corrs.shape[0] * np.abs(phasestack)
 
                                 timegate_samples = params.pws_timegate *\
                                                    params.goal_sampling_rate
@@ -628,7 +628,7 @@ def main():
                                     params.goal_sampling_rate,
                                     components, corr,
                                     params.goal_sampling_rate, day=True,
-                                    ncorr=corrs.shape[1])
+                                    ncorr=corrs.shape[0])
                     # try:
                         #     for filterdb in get_filters(db, all=False):
                         #         filterid = filterdb.ref

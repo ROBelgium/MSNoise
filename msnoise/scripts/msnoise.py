@@ -5,7 +5,7 @@ import pkg_resources
 import logging
 import traceback
 from pkg_resources import iter_entry_points
-from click_plugins import with_plugins
+# from click_plugins import with_plugins
 
 
 @click.group()
