@@ -49,6 +49,7 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n" + ispresent('obspy')
         output += "\n" + ispresent('flask')
         output += "\n" + ispresent('flask.ext.admin', 'easy_install flask-admin')
+        output += "\n" + ispresent('flask_admin')
         output += "\n" + ispresent('wtforms')
         output += "\n" + ispresent('bokeh')
 

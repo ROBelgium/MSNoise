@@ -19,7 +19,8 @@ setup( version=versioneer.get_version(),
         'pymysql',
         'flask',
         'flask-admin',
-        'multiprocessing_logging'
+        'multiprocessing_logging',
+        'markdown'
     ],
     entry_points='''
         [console_scripts]

@@ -14,6 +14,11 @@ The general workflow of MSNoise is presented above. The left part of the workflo
 This section only presents the "installation" and configuration of MSNoise (read "the first startup of MSNoise"), not the installation of the required software, which is described in :ref:`installation`.
 
 
+.. contents::
+    :local:
+    :depth: 1
+
+
 Installer
 ----------
 

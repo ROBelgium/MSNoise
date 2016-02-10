@@ -44,6 +44,10 @@ validation of our project ever ! See the full list on the
 
 *Thomas Lecocq & Corentin Caudron*
 
+
+new:
+* config --set option
+
 ~~~~
 
 PS: if you use MSNoise for your research and prepare publications, please

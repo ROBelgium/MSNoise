@@ -4,6 +4,9 @@ import click
 import pkg_resources
 import logging
 import traceback
+from pkg_resources import iter_entry_points
+from click_plugins import with_plugins
+
 
 @click.group()
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
@@ -29,6 +32,7 @@ def cli(ctx, threads, custom, verbose):
     pass
 
 
+# @with_plugins(iter_entry_points('msnoise.plugins'))
 @click.group()
 def plugin():
     """Runs a command in a named plugin"""
@@ -155,11 +159,28 @@ def install():
 
 
 @click.command()
-def config():
-    """This command launches the Configurator."""
-    click.echo('Let\'s Configure MSNoise !')
-    from ..s001configurator import main
-    main()
+@click.option('-s', '--set', help='Modify config value: usage --set name=value')
+def config(set):
+    """This command launches the Configurator or... TODO"""
+    if set:
+        from ..default import default
+        if not set.count("="):
+            click.echo("!! format of the set command is name=value !!")
+            return
+        name, value = set.split("=")
+        if not name in default:
+            click.echo("!! unknown parameter %s !!"%name)
+            return
+        from ..api import connect, update_config
+        db = connect()
+        update_config(db, name, value)
+        db.commit()
+        db.close()
+        click.echo("Successfully updated parameter %s = %s"%(name,value))
+    else:
+        from ..s001configurator import main
+        click.echo('Let\'s Configure MSNoise !')
+        main()
     
 
 @click.command()

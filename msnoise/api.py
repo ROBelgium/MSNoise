@@ -16,7 +16,7 @@ import scipy.fftpack
 from obspy.core import Stream, Trace, read, AttribDict
 from obspy.signal.invsim import cosTaper
 
-from obspy.core.util import gps2DistAzimuth
+from obspy.geodetics import gps2dist_azimuth
 
 from msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
@@ -49,7 +49,8 @@ def get_engine(inifile=None):
         inifile = os.path.join(os.getcwd(), 'db.ini')
     tech, hostname, database, user, passwd = read_database_inifile(inifile)
     if tech == 1:
-        engine = create_engine('sqlite:///%s' % hostname, echo=False)
+        engine = create_engine('sqlite:///%s' % hostname, echo=False,
+                               connect_args={'check_same_thread':False})
     else:
         engine = create_engine('mysql+pymysql://%s:%s@%s/%s' % (user, passwd,
                                                                 hostname,
@@ -1188,7 +1189,7 @@ def azimuth(coordinates, x0, y0, x1, y1):
     :returns: The azimuth in degrees
     """
     if coordinates == "DEG":
-        dist, azim, bazim = gps2DistAzimuth(y0, x0, y1, x1)
+        dist, azim, bazim = gps2dist_azimuth(y0, x0, y1, x1)
         return azim
     elif coordinates == 'UTM':
         azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi

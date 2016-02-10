@@ -42,7 +42,7 @@ configured in the database, the traces are clipped to ``windsorizing`` times
 the RMS (or 1-bit converted) and then whitened (see :ref:`whiten`) between the
 frequency bounds.
 When both traces are ready, the cross-correlation function is computed
-(see :ref:`mycorr`). The function returned contains data for time lags 
+(see :ref:`mycorr`). The function returned contains data for time lags
 corresponding to ``maxlag`` in the acausal (negative lags) and causal
 (positive lags) parts.
 
@@ -183,9 +183,11 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.ar
                                 else:
                                     inventory += inv
                             except:
+                                traceback.print_exc()
                                 pass
-                        stream.attach_response(inventory)
-                        stream.remove_response(output='VEL',
+                        if inventory:
+                            stream.attach_response(inventory)
+                            stream.remove_response(output='VEL',
                                                pre_filt=response_prefilt)
                     elif response_format == "dataless":
                         for file in files:
@@ -230,9 +232,12 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.ar
                     if params.resampling_method == "Resample":
                         logging.debug("%s.%s Downsample to %.1f Hz" %
                                       (station, comp, params.goal_sampling_rate))
-                        trace.data = resample(
+                        tmp = resample(
                             trace.data, params.goal_sampling_rate / trace.stats.sampling_rate, 'sinc_fastest')
-
+                        if len(tmp) != len(trace.data):
+                            missing = len(trace.data) - len(tmp)
+                            tmp = np.append(tmp,[tmp[-1] for i in range(missing)])
+                        trace.data = tmp
                     elif params.resampling_method == "Decimate":
                         logging.debug("%s.%s Decimate by a factor of %i" %
                                       (station, comp, params.decimation_factor))

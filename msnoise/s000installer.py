@@ -19,10 +19,12 @@ Questions are:
 
 To run this script:
 
-.. code-block:: sh
+.. include:: clickhelp/msnoise-install.rst
 
-    $ msnoise install
 
+.. warning:: The credentials will be saved in a flat text file in the current
+    directory. It's not very safe, but until now we haven't thought of another
+    solution.
 """
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -32,6 +34,7 @@ from msnoise_table_def import *
 from default import default
 from api import create_database_inifile
 import argparse
+
 
 def main(tech=None, hostname="localhost", username="msnoise",
          password="msnoise", database="msnoise", filename="msnoise.sqlite"):

@@ -51,7 +51,7 @@ import traceback
 from api import *
 from data_structures import data_structure
 
-def worker(files, folder, startdate, enddate):
+def worker(files, folder, startdate, enddate, goal_sampling_rate):
     import logging
     logging = logging.getLogger("worker-logger")
     db = connect()
@@ -67,6 +67,9 @@ def worker(files, folder, startdate, enddate):
                     '%s: Before Start-Date!' % (name))
             elif data[-1].stats.endtime.date > enddate:
                 logging.info('%s: After End-Date!' % (name))
+            elif data[0].stats.sampling_rate < goal_sampling_rate:
+                logging.info("%s: Sampling rate smaller than CC sampling rate"
+                             % name)
             else:
                 gaps = data.getGaps()
                 gaps_duration = 0
@@ -144,6 +147,7 @@ def main(init=False, threads=1):
     startdate = datetime.datetime.strptime(startdate, '%Y-%m-%d').date()
     enddate = get_config(db, 'enddate')
     enddate = datetime.datetime.strptime(enddate, '%Y-%m-%d').date()
+    goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
 
     data_folder = get_config(db, 'data_folder')
     data_struc = get_config(db, 'data_structure')
@@ -195,7 +199,8 @@ def main(init=False, threads=1):
             if len(files) != 0:
                 logging.info('%s: Started' % folder)
                 client = Process(target=worker, args=([files, folder,
-                                                       startdate, enddate]))
+                                                       startdate, enddate,
+                                                       goal_sampling_rate]))
                 client.start()
                 clients.append(client)
             while len(clients) >= nthreads:

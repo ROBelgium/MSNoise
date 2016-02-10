@@ -61,25 +61,52 @@ from msnoise.scripts import msnoise as M
 if not os.path.isdir("clickhelp"):
     os.makedirs("clickhelp")
 
-
-
-for plot in ['ccftime', 'distance', 'data_availability', 'dvv',
-             'station_map', 'mwcs', 'interferogram', 'dtt']:
-
-    c = click.Context(command=eval("M.%s"%plot))
-    data = c.get_help()
-
+def write_click_help(group='', command='', data=''):
     out = ".. code-block:: sh\n"
     out += "\n"
-    out += space+"msnoise plot %s --help"%plot
+    if group:
+        f = open('clickhelp/msnoise-%s-%s.rst'% (group, command), 'w')
+        out += space+"msnoise %s %s --help" % (group, command)
+    else:
+        f = open('clickhelp/msnoise-%s.rst'% (command), 'w')
+        out += space+"msnoise %s --help" % command
     out += "\n"
     out += "\n"
     for line in data.split('\n'):
         line = line.replace('\r','').replace('\n','')
         out += space+line+"\n"
-    f = open('clickhelp/msnoise-plot-%s.rst'%plot, 'w')
     f.write(out)
     f.close()
+
+out = open('clickhelp/msnoise.rst', 'w')
+out.write('Help on the msnoise commands\n')
+out.write('============================\n\n')
+out.write('This page shows all the command line interface commands\n')
+C = M.cli.commands
+for command in sorted(C):
+    group = ""
+    if hasattr(C[command], "group"):
+        group = command
+        out.write('%s\n'%group)
+        out.write('-'*len(group)+'\n')
+
+        CC = C[command].commands
+        for command in sorted(CC):
+            out.write('%s\n'%command)
+            out.write('~'*len(command)+'\n')
+
+            c = click.Context(command=eval('M.%s'%(command)))
+            data = c.get_help()
+            write_click_help(group, command, data)
+            out.write('.. include:: msnoise-%s-%s.rst\n\n'%(group,command))
+    else:
+        out.write('%s\n'%command)
+        out.write('-'*len(command)+'\n')
+        c = click.Context(command=eval('M.%s'%command))
+        data = c.get_help()
+        write_click_help(group, command, data)
+        out.write('.. include:: msnoise-%s.rst\n\n'%(command))
+out.close()
 
 
 # -- General configuration -----------------------------------------------------

@@ -194,13 +194,9 @@ class FilterView(ModelView):
         return  
 
 
-def date_format(view, value):
-    return "%.10f" % value
-
 MY_DEFAULT_FORMATTERS = dict(typefmt.BASE_FORMATTERS)
 MY_DEFAULT_FORMATTERS.update({
         type(None): typefmt.null_formatter,
-        float: date_format
     })
 
 

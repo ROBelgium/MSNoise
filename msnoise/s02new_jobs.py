@@ -9,9 +9,10 @@ To run it from the console:
 
     $ msnoise new_jobs
 
-.. warning:: Upon first run, if the number of jobs, pass the ``--init``
-    parameter to optimize the insert. Only use this flag once, otherwise
-    problems will arise from duplicate entries in the jobs table.
+.. warning:: Upon first run, if you expect the number of jobs to be large (many
+    days, many stations, pass the ``--init`` parameter to optimize the insert.
+    Only use this flag once, otherwise problems will arise from duplicate
+    entries in the jobs table.
 """
 
 from api import *

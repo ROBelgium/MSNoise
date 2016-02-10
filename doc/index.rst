@@ -47,7 +47,11 @@ Documentation Content:
    about_db_performances
    references
 
-....
+.. toctree::
+    :maxdepth: 1
+
+    clickhelp/msnoise
+
 
 Release Notes:
 

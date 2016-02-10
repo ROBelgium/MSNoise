@@ -5,8 +5,6 @@ import datetime
 
 Base = declarative_base()
 
-f5_4 = Float(precision=5, )
-f10_8 = Float(precision=10,)
 
 class Filter(Base):
     """
@@ -37,13 +35,13 @@ class Filter(Base):
     __tablename__ = "filters"
 
     ref = Column(Integer, primary_key=True)
-    low = Column(f5_4)
-    mwcs_low = Column(f5_4)
-    high = Column(f5_4)
-    mwcs_high = Column(f5_4)
-    rms_threshold = Column(f5_4)
-    mwcs_wlen = Column(f5_4)
-    mwcs_step = Column(f5_4)
+    low = Column(Float())
+    mwcs_low = Column(Float())
+    high = Column(Float())
+    mwcs_high = Column(Float())
+    rms_threshold = Column(Float())
+    mwcs_wlen = Column(Float())
+    mwcs_step = Column(Float())
     used = Column(Boolean)
 
     def __init__(self, **kwargs):
@@ -120,9 +118,9 @@ class Station(Base):
     ref = Column(Integer, primary_key=True)
     net = Column(String(10))
     sta = Column(String(10))
-    X = Column(f10_8)
-    Y = Column(f10_8)
-    altitude = Column(f10_8)
+    X = Column(Float())
+    Y = Column(Float())
+    altitude = Column(Float())
     coordinates = Column(Enum('DEG', 'UTM'))
     instrument = Column(String(20))
     used = Column(Boolean)
