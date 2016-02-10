@@ -232,12 +232,9 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.ar
                     if params.resampling_method == "Resample":
                         logging.debug("%s.%s Downsample to %.1f Hz" %
                                       (station, comp, params.goal_sampling_rate))
-                        tmp = resample(
+                        trace.data = resample(
                             trace.data, params.goal_sampling_rate / trace.stats.sampling_rate, 'sinc_fastest')
-                        if len(tmp) != len(trace.data):
-                            missing = len(trace.data) - len(tmp)
-                            tmp = np.append(tmp,[tmp[-1] for i in range(missing)])
-                        trace.data = tmp
+
                     elif params.resampling_method == "Decimate":
                         logging.debug("%s.%s Decimate by a factor of %i" %
                                       (station, comp, params.decimation_factor))
@@ -253,7 +250,10 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.ar
 
                 if len(trace.data) % 2 != 0:
                     trace.data = np.append(trace.data, 0.)
-
+                if len(trace.data) != len(tramef_Z[istation]):
+                    missing = len(tramef_Z[istation])- len(trace.data)
+                    for i in range(missing):
+                        trace.data = np.append(trace.data, 0.)
                 if comp == "Z":
                     tramef_Z[istation] = trace.data
                 elif comp == "E":
