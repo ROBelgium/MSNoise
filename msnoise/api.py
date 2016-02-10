@@ -16,7 +16,10 @@ import scipy.fftpack
 from obspy.core import Stream, Trace, read, AttribDict
 from obspy.signal.invsim import cosTaper
 
-from obspy.geodetics import gps2dist_azimuth
+try:
+    from obspy.geodetics import gps2dist_azimuth
+except:
+    from obspy.core.util.geodetics import gps2DistAzimuth as gps2dist_azimuth
 
 from msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
