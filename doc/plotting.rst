@@ -20,6 +20,33 @@ generate the filename automatically (using the `?` question mark), for example:
 .. contents::
     :local:
 
+Customizing Plots
+-----------------
+
+All plots commands can be overriden using a `-c` agument *in front of the
+plot command* !!
+
+Examples:
+
+* ``msnoise -c plot distance``
+* ``msnoise -c plot ccftime YA.UV02 YA.UV06 -m 5``
+* etc.
+
+To make this work, one has to copy the plot script from the msnoise install
+directory to the project directory (where your db.ini file is located, then
+edit it to one's desires. The first thing to edit in the code is the import of
+the :doc:`../api`:
+
+``from ..api import *``
+
+to
+
+``from msnoise.api import *``
+
+and it should work.
+
+.. versionadded:: 1.4
+
 
 Data Availability Plot
 ----------------------

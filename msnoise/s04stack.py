@@ -23,6 +23,22 @@ changes in the CCF that occurred *on* the 10th !
 
 Moving-window stack length(s) are configured using the ``mov_stack`` bit.
 
+
+Configuration Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+* |ref_begin|
+* |ref_end|
+* |mov_stack|
+* |stack_method| | *new in 1.4*
+* |pws_timegate| | *new in 1.4*
+* |pws_power| | *new in 1.4*
+
+
+.. todo:: Document Phase Weighted Stacking (useful for tomo, not for dv/v if one
+    uses MWCS).
+
+
 Usage:
 ~~~~~~
 The best way to call this code is to start it from the console (-h shows the
@@ -61,19 +77,10 @@ for jobs marked in the last 10 days:
     $ msnoise stack -r -m -i 10
 
 
-Configuration Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-* |ref_begin|
-* |ref_end|
-* |mov_stack|
-* |stack_method|
-* |pws_timegate|
-* |pws_power|
 
 
-.. todo:: Document Phase Weighted Stacking (useful for tomo, not for dv/v if one
-    uses MWCS).
+.. versionadded:: 1.4
+    The Phase Weighted Stack.
 """
 
 import os

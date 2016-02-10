@@ -9,7 +9,7 @@ The time lags used to calculate the regression are shown in blue.
 
 .. include:: clickhelp/msnoise-plot-dtt.rst
 
-
+.. versionadded:: 1.4
 """
 
 import matplotlib.pyplot as plt

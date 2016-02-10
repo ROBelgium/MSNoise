@@ -81,7 +81,7 @@ def write_click_help(group='', command='', data=''):
 out = open('clickhelp/msnoise.rst', 'w')
 out.write('Help on the msnoise commands\n')
 out.write('============================\n\n')
-out.write('This page shows all the command line interface commands\n')
+out.write('This page shows all the command line interface commands\n\n')
 C = M.cli.commands
 for command in sorted(C):
     group = ""

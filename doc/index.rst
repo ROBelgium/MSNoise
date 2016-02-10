@@ -40,6 +40,7 @@ Documentation Content:
 
    workflow
    plotting
+   plugins
    api
    core
    table_def

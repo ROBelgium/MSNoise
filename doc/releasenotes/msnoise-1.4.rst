@@ -94,6 +94,18 @@ Phase Weighted Stack
 
 ...
 
+Command Line changes
+--------------------
+
+
+* ``msnoise admin``: new command to start the web interface
+* ``msnoise config``: accepts a ``--set name=value`` option, to rapidly
+  change a configuration parameter in the database.
+* The ``msnoise`` command accepts a ``-c`` option that triggers the "custom"
+  mode, currently only for plots. See below.
+
+All commands are now documented: :doc:`../clickhelp/msnoise`.
+
 
 Customizing Plots
 -----------------
@@ -102,9 +114,10 @@ All plots commands can be overriden using a `-c` agument *in front of the
 plot command* !!
 
 Examples:
-    * ``msnoise -c plot distance``
-    * ``msnoise -c plot ccftime YA.UV02 YA.UV06 -m 5``
-    * etc.
+
+* ``msnoise -c plot distance``
+* ``msnoise -c plot ccftime YA.UV02 YA.UV06 -m 5``
+* etc.
 
 To make this work, one has to copy the plot script from the msnoise install
 directory to the project directory (where your db.ini file is located, then

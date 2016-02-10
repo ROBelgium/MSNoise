@@ -6,16 +6,42 @@ them using the following scheme. As soon as one day is selected, the
 corresponding jobs are marked "I"n Progress in the database. This allows
 running several instances of this script in parallel.
 
+Configuration Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-Waveform Preprocessing
-~~~~~~~~~~~~~~~~~~~~~~
+* |cc_sampling_rate|
+* |analysis_duration|
+* |overlap|
+* |maxlag|
+* |corr_duration|
+* |windsorizing|
+* |resampling_method|
+* |decimation_factor|
+* |preprocess_lowpass|
+* |preprocess_highpass|
+* |keep_all|
+* |keep_days|
+* |stack_method| | *new in 1.4*
+* |pws_timegate| | *new in 1.4*
+* |pws_power| | *new in 1.4*
+
+
+Waveform Pre-processing
+~~~~~~~~~~~~~~~~~~~~~~~
 Pairs are first split and a station list is created. The database is then
 queried to get file paths. For each station, all files potentially containing
 data for the day are opened. The traces are then merged and splitted, to obtain
 the most continuous chunks possible. The different chunks are then demeaned,
-tapered and merged again to a 1-day long trace. If shorter than 1-day, the
-trace is padded with zeros. If longer, it is cut to match the start/end of the
-day.
+tapered and merged again to a 1-day long trace. If a chunk is not aligned
+on the sampling grid (that is, start at a integer times the sample spacing in s)
+, the chunk is phase-shifted in the frequency domain. This requires tapering and
+fft/ifft. If the gap between two chunks is small, compared to a currently
+hard-coded value (10 samples), the gap is filled with interpolated values.
+Larger gaps will not be filled with interpolated values and remaining chunks
+will be tapered and then merged with 0 values in the gaps.
+
+If shorter than 1-day, the trace final is padded with zeros. If longer, it is
+cut to match the start/end of the day.
 
 Each 1-day long trace is then low-passed (at ``preprocess_lowpass`` Hz),
 high-passed (at ``preprocess_highpass`` Hz), then decimated/downsampled.
@@ -46,10 +72,30 @@ When both traces are ready, the cross-correlation function is computed
 corresponding to ``maxlag`` in the acausal (negative lags) and causal
 (positive lags) parts.
 
+Stacking and Saving Results
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 If configured (setting ``keep_all`` to 'Y'), each ``corr_duration`` CCF is
 saved to the hard disk. By default, the ``keep_days`` setting is set to True
 and so "N = 1 day / corr_duration" CCF are stacked and saved to the hard disk
 in the STACKS/001_DAYS folder.
+
+.. note:: Currently, the keep-all data (every CCF) are not used by next steps.
+
+If ``stack_method`` is 'linear', then a simple mean CFF of all windows is saved
+as the daily CCF. On the other hand, if ``stack_method`` is 'pws', then
+all the Phase Weighted Stack (PWS) is computed and saved as the daily CCF. The
+PWS is done in two steps: first the mean coherence between the instataneous
+phases of all windows is calculated, and eventually serves a weighting factor
+on the mean. The smoothness of this weighting array is defined using the
+``pws_timegate`` parameter in the configuration. The weighting array is the
+power of the mean coherence array. If ``pws_power`` is equal to 0, a linear
+stack is done (then it's faster to do set ``stack_method`` = 'linear'). Usual
+value is 2.
+
+.. seealso:: Schimmel, M. and Paulssen H., "Noise reduction and detection
+    of weak, coherent signals through phase-weighted stacks". Geophysical Journal
+    International 130, 2 (1997): 497-505.
 
 Once done, each job is marked "D"one in the database.
 
@@ -58,6 +104,10 @@ To run this script:
 .. code-block:: sh
 
     $ msnoise compute_cc
+
+
+.. versionadded:: 1.4
+    The Phase Weighted Stack.
 """
 import traceback
 import glob
