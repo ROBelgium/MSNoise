@@ -44,6 +44,7 @@ install:
   - "%CMD_IN_ENV% conda install --yes -q scipy matplotlib statsmodels pandas sqlalchemy"
   - "%CMD_IN_ENV% conda install --yes -q sphinx jinja2 flask pymysql click"
   - "%CMD_IN_ENV% conda install --yes -q lxml"
+#  - "%CMD_IN_ENV% conda install --yes -q bokeh"
   - "%CMD_IN_ENV% pip install obspy"
   - "%CMD_IN_ENV% pip install flask-admin"
   - "%CMD_IN_ENV% pip install multiprocessing_logging"
