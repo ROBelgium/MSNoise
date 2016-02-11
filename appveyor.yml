@@ -47,10 +47,11 @@ install:
 build: false
 
 test_script:
+  - conda info --envs
   - "%CMD_IN_ENV% python setup.py develop"
   - echo %CD%
   - ps: mkdir test
   - ps: cd test
   - echo %CD%
-  - "%CMD_IN_ENV% msnoise bugreport -m"
-  - "%CMD_IN_ENV% msnoise test"
+  - msnoise bugreport -m
+  - msnoise test
