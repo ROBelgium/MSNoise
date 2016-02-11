@@ -47,6 +47,7 @@ validation of our project ever ! See the full list on the
 
 new:
 * config --set option
+* tested on windows via Appveyor
 
 ~~~~
 
