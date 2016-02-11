@@ -36,6 +36,7 @@ install:
   - "pip install flask-admin"
   - "pip install multiprocessing_logging"
   - "pip install markdown"
+  - "pip install --trusted-host msnoise.org --use-wheel http://msnoise.org/test/scikits.samplerate-0.3.3-cp27-none-win_amd64.whl"
   # list package versions
   - "conda list"
 
