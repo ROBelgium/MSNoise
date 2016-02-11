@@ -41,17 +41,17 @@ install:
   - "conda create -q -n test-environment python=%PYTHON_VERSION% numpy=%NUMPY_VERSION% scipy conda"
   - activate test-environment
   # Install default dependencies
-  - "conda install --yes -q pip"
-  - "conda install --yes -q numpy==1.9.3 scipy matplotlib statsmodels pandas sqlalchemy"
-  - "conda install --yes -q sphinx jinja2 flask pymysql click"
-  - "conda install --yes -q traitsui>=4.4 traits lxml"
-  - "pip install obspy"
-  - "pip install flask-admin"
-  - "pip install multiprocessing_logging"
-  - "pip install markdown"
-  - "pip install --trusted-host msnoise.org --use-wheel http://msnoise.org/test/scikits.samplerate-0.3.3-cp27-none-win_amd64.whl"
+  - "%CMD_IN_ENV% conda install --yes -q pip"
+  - "%CMD_IN_ENV% conda install --yes -q numpy==1.9.3 scipy matplotlib statsmodels pandas sqlalchemy"
+  - "%CMD_IN_ENV% conda install --yes -q sphinx jinja2 flask pymysql click"
+  - "%CMD_IN_ENV% conda install --yes -q traitsui>=4.4 traits lxml"
+  - "%CMD_IN_ENV% pip install obspy"
+  - "%CMD_IN_ENV% pip install flask-admin"
+  - "%CMD_IN_ENV% pip install multiprocessing_logging"
+  - "%CMD_IN_ENV% pip install markdown"
+  - "%CMD_IN_ENV% pip install --trusted-host msnoise.org --use-wheel http://msnoise.org/test/scikits.samplerate-0.3.3-cp27-none-win_amd64.whl"
   # list package versions
-  - "conda list"
+  - "%CMD_IN_ENV% conda list"
 
 # Not a .NET project, we build SunPy in the install step instead
 build: false
