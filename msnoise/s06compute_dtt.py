@@ -128,7 +128,7 @@ variations.
 import numpy as np
 import os
 
-from api import *
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -137,6 +137,7 @@ import statsmodels.api as sm
 
 import logging
 
+from .api import *
 
 def wavg_wstd(data, errors):
     d = data

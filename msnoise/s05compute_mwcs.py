@@ -56,12 +56,12 @@ To run this step:
 
 """
 
-
+import logging
 from obspy.core import read
 
-from api import *
-from MWCS import mwcs
-import logging
+from .api import *
+from .MWCS import mwcs
+
 
 
 def main():

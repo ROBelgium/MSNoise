@@ -3,7 +3,10 @@ import logging
 import copy
 import datetime
 import itertools
-import cPickle
+try:
+    import cPickle
+except:
+    import pickle as cPickle
 import math
 import pkg_resources
 
@@ -21,7 +24,7 @@ try:
 except:
     from obspy.core.util.geodetics import gps2DistAzimuth as gps2dist_azimuth
 
-from msnoise_table_def import Filter, Job, Station, Config, DataAvailability
+from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
 plugin_tables = {}
 for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.table_def'):
@@ -97,7 +100,7 @@ def create_database_inifile(tech, hostname, database, username, password):
 
     :return: None
     """
-    f = open(os.path.join(os.getcwd(), 'db.ini'), 'w')
+    f = open(os.path.join(os.getcwd(), 'db.ini'), 'wb')
     cPickle.dump([tech, hostname, database, username, password], f)
     f.close()
 
@@ -115,7 +118,7 @@ def read_database_inifile(inifile=None):
     if not inifile:
         inifile = os.path.join(os.getcwd(), 'db.ini')
 
-    f = open(inifile, 'r')
+    f = open(inifile, 'rb')
     tech, hostname, database, username, password = cPickle.load(f)
     f.close()
     return [tech, hostname, database, username, password]
@@ -1198,8 +1201,8 @@ def azimuth(coordinates, x0, y0, x1, y1):
         azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
         return azim
     else:
-        print "Please consider having a single coordinate system for\
-            all stations"
+        print("Please consider having a single coordinate system for\
+            all stations")
         return 0
 
 
@@ -1257,7 +1260,7 @@ def getGaps(stream, min_gap=None, max_gap=None):
     copied_traces = copy.copy(stream.traces)
     stream.sort()
     gap_list = []
-    for _i in xrange(len(stream.traces) - 1):
+    for _i in range(len(stream.traces) - 1):
         # skip traces with different network, station, location or channel
         if stream.traces[_i].id != stream.traces[_i + 1].id:
             continue
@@ -1302,12 +1305,12 @@ def getGaps(stream, min_gap=None, max_gap=None):
 if __name__ == "__main__":
     s = connect()
     for filter in get_filters(s, False):
-        print filter.ref, filter.low, filter.high
+        print(filter.ref, filter.low, filter.high)
 
-    print get_networks(s)
+    print(get_networks(s))
 
     for station in get_stations(s, False, net='BE'):
-        print station.net, station.sta
+        print( station.net, station.sta)
 
-    print get_config(s)
-    print get_config(s, 'data_folder')
+    print(get_config(s))
+    print(get_config(s, 'data_folder'))

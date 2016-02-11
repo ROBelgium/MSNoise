@@ -123,11 +123,14 @@ from obspy.xseed import Parser
 
 import scipy as sp
 import numpy as np
-from scikits.samplerate import resample
+try:
+    from scikits.samplerate import resample
+except:
+    pass
 
-from api import *
-from myCorr import myCorr
-from whiten import whiten
+from .api import *
+from .myCorr import myCorr
+from .whiten import whiten
 
 
 def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.array([]), tramef_N = np.array([])):
@@ -648,7 +651,8 @@ def main():
                     if params.keep_days:
                         for ccfid in allcorr.keys():
                             station1, station2, filterid, components, date = ccfid.split('_')
-                            corrs = np.asarray(allcorr[ccfid].values())
+
+                            corrs = np.asarray(list(allcorr[ccfid].values()))
                             if params.stack_method == "linear":
                                 corr = corrs.mean(axis=0)
                             elif params.stack_method == "pws":

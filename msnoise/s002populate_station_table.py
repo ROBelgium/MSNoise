@@ -53,13 +53,13 @@ import glob
 import sys
 import os
 import numpy as np
-from api import *
+from .api import *
 
 def main():
     db = connect()
-    print
-    print ">> Populating the Station table"
-    print
+    print()
+    print(">> Populating the Station table")
+    print()
     data_folder = get_config(db, 'data_folder')
     data_structure = get_config(db, 'data_structure')
     if data_structure in ["SDS", "IDDS"]:
@@ -90,22 +90,22 @@ def main():
             stations.append("%s_%s" % (net, sta))
         del datalist
     else:
-        print "Can't parse the archive for format %s !" % data_structure
-        print "trying to import local parser (should return a station list)"
-        print 
+        print("Can't parse the archive for format %s !" % data_structure)
+        print("trying to import local parser (should return a station list)")
+        print()
         try:
             sys.path.append(os.getcwd())
             from custom import populate
             stations = populate(data_folder)
         except:
-            print "No file named custom.py in the %s folder" % os.getcwd()
+            print("No file named custom.py in the %s folder" % os.getcwd())
             return
     stations = np.unique(stations)
     
     db = connect()
     for station in stations:
         net, sta = station.split('_')
-        print 'Adding:', net, sta
+        print('Adding:', net, sta)
         X = 0.0
         Y = 0.0
         altitude = 0.0

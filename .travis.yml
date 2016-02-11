@@ -4,8 +4,15 @@
 # https://github.com/Jorge-C/ordination/blob/master/.travis.yml
 language: python
 
-python:
-  - 2.7
+matrix:
+  include:
+    # do one build run with our minimum dependencies
+    # (or, well, at least the lowest version number that is available through
+    #  anaconda..)
+    - os: linux
+      env: PYTHON_VERSION=2.7
+    - os: linux
+      env: PYTHON_VERSION=3.4
 
 sudo: false
 
@@ -23,23 +30,29 @@ before_install:
   # MySQL database
   - mysql -e 'create database msnoise;'
   # Python and related stuff
-  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+  - if [[ "${PYTHON_VERSION:0:1}" == '2' ]]; then
+      wget https://repo.continuum.io/miniconda/Miniconda-latest-${OS}-x86_64.sh -O miniconda.sh;
+    else
+      wget https://repo.continuum.io/miniconda/Miniconda3-latest-${OS}-x86_64.sh -O miniconda.sh
+    fi
+#  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
   - ./miniconda.sh -b
   - export PATH=/home/travis/miniconda2/bin:$PATH
   - conda update -q --yes conda
   # Installs required packages
   - conda install --yes -q pip python=$TRAVIS_PYTHON_VERSION
-  - conda install --yes -q numpy==1.9.3 scipy matplotlib statsmodels pandas sqlalchemy
+  - conda install --yes -q numpy scipy matplotlib statsmodels pandas sqlalchemy
   - conda install --yes -q sphinx jinja2 flask pymysql click
-  - conda install --yes -q traitsui>=4.4 traits lxml
-  - conda install --yes -q -c obspy obspy
-  - conda install --yes -q -c robertcoop flask-admin
+  - conda install --yes -q lxml
   - conda install --yes -q bokeh==0.9.0
+  - pip install obspy
+  - pip install flask-admin
   - pip install multiprocessing_logging
   - pip install markdown
+
   # Collecting scikits.samplerate from my repo, easier to install
-  - pip install https://github.com/ThomasLecocq/samplerate/archive/master.zip
+#  - pip install https://github.com/ThomasLecocq/samplerate/archive/master.zip
   # done
   - ls -la
 

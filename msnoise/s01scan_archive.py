@@ -48,8 +48,8 @@ import traceback
 
 
 
-from api import *
-from data_structures import data_structure
+from .api import *
+from .data_structures import data_structure
 
 def worker(files, folder, startdate, enddate, goal_sampling_rate):
     import logging
@@ -156,15 +156,15 @@ def main(init=False, threads=1):
     if data_struc in data_structure.keys():
         rawpath = data_structure[data_struc]
     else:
-        print "Can't parse the archive for format %s !" % data_struc
-        print "trying to import local parser (should return a station list)"
-        print
+        print("Can't parse the archive for format %s !" % data_struc)
+        print("trying to import local parser (should return a station list)")
+        print()
         if os.path.isfile(os.path.join(os.getcwd(), 'custom.py')):
             sys.path.append(os.getcwd())
             from custom import data_structure as rawpath
             rawpath=data_structure[data_struc]
         else:
-            print "No file named custom.py in the %s folder" % os.getcwd()
+            print("No file named custom.py in the %s folder" % os.getcwd())
             return
     for year in range(startdate.year, min(datetime.datetime.now().year, enddate.year) + 1):
         for channel in channels:

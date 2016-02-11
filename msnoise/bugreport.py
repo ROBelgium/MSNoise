@@ -94,7 +94,7 @@ def main(system=False, modules=False, env=False, all=False, show=True):
                 output += "\n" + " ", dir, value
     output = "".join(output)
     if show:
-        print output
+        print(output)
     else:
         return output.split("\n")
     

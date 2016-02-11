@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.fftpack
 
-from api import nextpow2
+from .api import nextpow2
 
 def myCorr(data, maxlag, plot=False):
     """This function takes ndimensional *data* array, computes the cross-correlation in the frequency domain
@@ -72,11 +72,11 @@ if __name__ == "__main__":
     import time
 
     data = np.random.random((2, 86400 * 20))
-    print data.shape
+    print(data.shape)
     t = time.time()
     corr = myCorr(data, maxlag=25, plot=False)
-    print "Time:", time.time() - t
-    print np.mean(corr)
+    print( "Time:", time.time() - t)
+    print(np.mean(corr))
 
     plt.figure()
     plt.plot(corr)

@@ -5,7 +5,7 @@ Strechting...
 from obspy.core import read
 import numpy as np
 # import pandas as pd
-from api import *
+from .api import *
 # from MWCS import mwcs
 import logging
 import matplotlib.pyplot as plt
@@ -113,10 +113,10 @@ def main():
             minlag = dtt_minlag
         else:
             minlag = get_interstation_distance(station1, station2, station1.coordinates) / dtt_v
-            print minlag
+            print(minlag)
         
         maxlag2 = minlag + dtt_width
-        print "betweeen", minlag, "and", maxlag2
+        print("betweeen", minlag, "and", maxlag2)
         
         rf = os.path.join("STACKS", "%02i" %
                           3, "REF", "ZZ", ref_name + ".MSEED")
@@ -197,7 +197,7 @@ def main():
             #~ print np.array(alldeltas).shape
             #~ print allcoefs
             df = pd.DataFrame(np.array([alldeltas,allcoefs]).T, index=alldays)
-            print df.head()
+            print(df.head())
             df.to_csv(os.path.join("STR", "%s.csv"%ref_name))
             #~ p = plt.plot(alldays, np.array(alldeltas).flatten(), c='k')
             #~ plt.scatter(alldays, np.array(alldeltas).flatten(), c=allcoefs,s=200)

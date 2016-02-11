@@ -37,9 +37,9 @@ from traitsui.api import Item, View, TreeEditor, TreeNode, TableEditor
 from traitsui.table_column import ObjectColumn
 from traitsui.extras.checkbox_column import CheckboxColumn
 
-from default import *
-from api import *
-from msnoise_table_def import *
+from .default import *
+from .api import *
+from .msnoise_table_def import *
 
 
 class StationColumn (ObjectColumn):
@@ -249,25 +249,25 @@ def main():
     if demo.configure_traits():
         db = connect()
 
-        print "Updating Config Table"
+        print("Updating Config Table")
         for config in demo.company.configs:
             update_config(db, config.name, config.value)
 
-        print "Updating Station Table"
+        print("Updating Station Table")
         for network in demo.company.networks:
             for s in network.stations:
                 update_station(
                     db, s.net, s.sta, s.X, s.Y, s.altitude, s.coordinates,
                     s.instrument, s.used)
 
-        print "Updating Filter Table"
+        print("Updating Filter Table")
         for f in demo.company.filters:
             update_filter(db, f.ref, f.low, f.mwcs_low, f.high,
                           f.mwcs_high, f.rms_threshold, f.mwcs_wlen,
                           f.mwcs_step, f.used)
 
         db.close()
-        print "Done !"
+        print("Done !")
 
 if __name__ == '__main__':
     main()

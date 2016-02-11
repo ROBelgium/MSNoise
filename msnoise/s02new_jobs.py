@@ -15,9 +15,11 @@ To run it from the console:
     entries in the jobs table.
 """
 
-from api import *
+
 import logging
 import numpy as np
+
+from .api import *
 
 
 def main(init=False):

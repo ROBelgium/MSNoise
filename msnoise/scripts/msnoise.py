@@ -67,7 +67,7 @@ def upgrade_db():
             db.commit()
         except:
             db.rollback()
-            print "Passing %s: already in DB" % name
+            print("Passing %s: already in DB" % name)
             continue
 
     db.close()
@@ -77,12 +77,12 @@ def upgrade_db():
             e = get_engine()
             e.execute('ALTER TABLE `jobs` CHANGE `type` `jobtype` VARCHAR( 10 )')
         except OperationalError:
-            print "The jobs table seems already up-to-date, exiting."
+            print( "The jobs table seems already up-to-date, exiting.")
     else:
-        print "OK, the new config parameters have been inserted, but you need" \
+        print("OK, the new config parameters have been inserted, but you need" \
               "to edit the `jobs` table manually in oder to match the new" \
-              "columns naming."
-        print "Please read http://msnoise.org/doc/releasenotes/msnoise-1.3.html"
+              "columns naming.")
+        print ("Please read http://msnoise.org/doc/releasenotes/msnoise-1.3.html")
 
 
 @click.command()

@@ -74,7 +74,7 @@ def cmap_center_point_adjust(cmap, range, center):
     a new adjusted colormap accordingly
     '''
     if not ((range[0] < center) and (center < range[1])):
-        print "beu"
+        print("beu")
         return cmap
     return cmap_center_adjust(cmap,
         abs(center - range[0]) / abs(range[1] - range[0]))
@@ -114,12 +114,12 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
             minlag = dtt_minlag
         else:
             minlag = get_interstation_distance(station1, station2, station1.coordinates) / dtt_v
-            print minlag
+            print( minlag)
         
         maxlag2 = minlag + dtt_width
         
        
-        print "New Data for %s-%s-%i-%i"%(pair,components,filterid, mov_stack)
+        print("New Data for %s-%s-%i-%i"%(pair,components,filterid, mov_stack))
         format = "matrix"
         
         alldf=[]
@@ -136,7 +136,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
                 allcoh.append( df["coh"])
                 id.append(day)
                 del df
-        print len(alldt[0])
+        print( len(alldt[0]))
                 
         alldt = pd.DataFrame(alldt,index=pd.DatetimeIndex(id))
         allcoh = pd.DataFrame(allcoh,index=pd.DatetimeIndex(id))
@@ -214,7 +214,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
                                                                   filterid,
                                                                   mov_stack))
             outfile = "mwcs " + outfile
-            print "output to:", outfile
+            print("output to:", outfile)
             plt.savefig(outfile)
         if show:
             plt.show()

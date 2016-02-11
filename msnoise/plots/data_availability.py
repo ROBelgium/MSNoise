@@ -49,11 +49,11 @@ def main(show=False, outfile=None):
         new = True
         for di in data.groups[group]:
             if new:
-                print group, di,
+                print( group, di,)
                 new = False
             dt = (di-start).days
             matrix[i, dt] = 1
-        print di
+        print(di)
 
     gs = gridspec.GridSpec(2, 1, height_ratios=[4, 1])
 
@@ -85,7 +85,7 @@ def main(show=False, outfile=None):
             now = datetime.datetime.now()
             now = now.strftime('data availability on %Y-%m-%d %H.%M.%S')
             outfile = outfile.replace('?', now)
-        print "output to:", outfile
+        print("output to:", outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

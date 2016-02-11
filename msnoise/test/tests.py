@@ -169,6 +169,12 @@ class MSNoiseTests(unittest.TestCase):
         reset_jobs(db, 'CC')
         db.close()
 
+    def test_012b_hack_noresample(self):
+        from ..api import connect, update_config
+        db = connect()
+        update_config(db,'resampling_method','Decimate')
+        db.close()
+
     def test_013_s03compute_cc(self):
         from ..s03compute_cc import main
         try:
@@ -199,7 +205,7 @@ class MSNoiseTests(unittest.TestCase):
                                        components,
                                        pair,
                                        "2010-09-01.%s" % format)
-                    print "checking", tmp
+                    print("checking", tmp)
                     if not os.path.isfile(tmp):
                         self.fail()
 
@@ -299,7 +305,7 @@ class MSNoiseTests(unittest.TestCase):
 
     def test_028_S01installer(self):
         if not "TRAVIS" in os.environ:
-            print "Seems to be running on local machine, skipping MySQL test"
+            print("Seems to be running on local machine, skipping MySQL test")
             return
         import shutil
         shutil.move('db.ini','db.bak')
@@ -319,7 +325,7 @@ def main():
     import sys
     c = len(os.listdir(os.getcwd()))
     if c > 0:
-        print "Directory is not empty, can't run tests here!"
+        print("Directory is not empty, can't run tests here!")
         sys.exit()
 
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)

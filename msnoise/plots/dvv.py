@@ -88,7 +88,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
                 alldf.append(df)
             current += datetime.timedelta(days=1)
         if len(alldf) == 0:
-            print "No Data for %s m%i f%i" % (components, mov_stack, filterid)
+            print("No Data for %s m%i f%i" % (components, mov_stack, filterid))
             continue
 
         alldf = pd.concat(alldf)
@@ -123,9 +123,9 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
             # plt.plot(tmp.index, tmp[dttname], label="Crater - Volcan")
 
             for pair in pairs:
-                print pair
+                print(pair)
                 pair1 = alldf[alldf['Pairs'] == pair].copy()
-                print pair1.head()
+                print(pair1.head())
                 plt.plot(pair1.index, pair1[dttname], label=pair)
                 plt.fill_between(pair1.index, pair1[dttname]-pair1[errname],
                                  pair1[dttname]+pair1[errname], zorder=-1,
@@ -189,7 +189,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
                                                                filterid,
                                                                dttname))
         outfile = "dvv " + outfile
-        print "output to:", outfile
+        print("output to:", outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

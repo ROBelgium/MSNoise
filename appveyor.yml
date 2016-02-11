@@ -43,12 +43,12 @@ install:
   - "%CMD_IN_ENV% conda install --yes -q pip"
   - "%CMD_IN_ENV% conda install --yes -q scipy matplotlib statsmodels pandas sqlalchemy"
   - "%CMD_IN_ENV% conda install --yes -q sphinx jinja2 flask pymysql click"
-  - "%CMD_IN_ENV% conda install --yes -q traitsui>=4.4 traits lxml"
+  - "%CMD_IN_ENV% conda install --yes -q lxml"
   - "%CMD_IN_ENV% pip install obspy"
   - "%CMD_IN_ENV% pip install flask-admin"
   - "%CMD_IN_ENV% pip install multiprocessing_logging"
   - "%CMD_IN_ENV% pip install markdown"
-  - "%CMD_IN_ENV% pip install --trusted-host msnoise.org --use-wheel http://msnoise.org/test/scikits.samplerate-0.3.3-cp27-none-win_amd64.whl"
+#  - "%CMD_IN_ENV% pip install --trusted-host msnoise.org --use-wheel http://msnoise.org/test/scikits.samplerate-0.3.3-cp27-none-win_amd64.whl"
   # list package versions
   - "%CMD_IN_ENV% conda list"
 

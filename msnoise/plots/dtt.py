@@ -42,7 +42,7 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=
             maxlag = minlag + dtt_width
 
         fname = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" %mov_stack, components, pair, '%s.txt' % day)
-        print fname
+        print( fname)
         t = []
         dt = []
         err = []
@@ -62,7 +62,7 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=
         alldf.append(df)
         alldf = pd.concat(alldf)
         line = alldf[alldf['Pairs'] == pair].copy()
-        print line
+        print(line)
         M = (line["M"])
         M0 = (line["M0"])
         A = (line["A"])

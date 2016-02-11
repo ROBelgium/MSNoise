@@ -43,7 +43,7 @@ def main(show=True, outfile=None):
             now = datetime.datetime.now()
             now = now.strftime('station map on %Y-%m-%d %H.%M.%S')
             outfile = outfile.replace('?', now)
-        print "output to:", outfile
+        print( "output to:", outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

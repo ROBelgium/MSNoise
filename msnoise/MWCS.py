@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import logging
 import scipy.fftpack
 
-from api import nextpow2
+from .api import nextpow2
 
 
 def smooth(x, window='boxcar', half_win=3):

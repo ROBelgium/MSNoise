@@ -85,14 +85,16 @@ for jobs marked in the last 10 days:
 
 import os
 import argparse
+import logging
 import numpy as np
 import pandas as pd
 
 import scipy.signal
 from numpy import nanmean
-from api import *
 
-import logging
+from .api import *
+
+
 
 
 def main(stype, interval=1):

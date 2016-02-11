@@ -53,7 +53,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None):
         sta1 = "%s.%s" % (station1.net, station1.sta)
         sta2 = "%s.%s" % (station2.net, station2.sta)
         pair = "%s:%s" % (sta1, sta2)
-        print pair, dist
+        print(pair, dist)
         ref_name = pair.replace('.', '_').replace(':', '_')
         rf = os.path.join("STACKS", "%02i" %
                           filterid, "REF", components, ref_name + extension)
@@ -80,7 +80,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None):
             newname = 'distance %s-f%i' % (components,
                                            filterid)
             outfile = outfile.replace('?', newname)
-        print "output to:", outfile
+        print("output to:", outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

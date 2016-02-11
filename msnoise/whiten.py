@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.fftpack
 
-from api import nextpow2
+from .api import nextpow2
 
 def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     """This function takes 1-dimensional *data* timeseries array,
@@ -104,5 +104,5 @@ if __name__ == '__main__':
     t = time.clock()
     for i in range(1000):
         whiten(a.copy(), N, 0.05, 1.0, 5.9, plot=False)
-    print "1000 loops:", (time.clock()-t) * 1000, "ms"
+    print("1000 loops:", (time.clock()-t) * 1000, "ms")
     whiten(a.copy(), N, 0.05, 1.0, 5.9, plot=True)

@@ -50,7 +50,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
     if sta2 > sta1: # alphabetical order filtering!
         pair = "%s:%s"%(sta1,sta2)
         
-        print "New Data for %s-%s-%i-%i"%(pair,components,filterid, mov_stack)
+        print("New Data for %s-%s-%i-%i"%(pair,components,filterid, mov_stack))
         format = "matrix"
         nstack, stack_total = get_results(db,sta1,sta2,filterid,components,datelist,mov_stack, format=format)
         ax = plt.subplot(111)
@@ -81,7 +81,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
                                                                   filterid,
                                                                   mov_stack))
             outfile = "ccftime " + outfile
-            print "output to:", outfile
+            print("output to:", outfile)
             plt.savefig(outfile)
         if show:
             plt.show()

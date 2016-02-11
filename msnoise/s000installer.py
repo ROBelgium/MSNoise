@@ -26,24 +26,25 @@ To run this script:
     directory. It's not very safe, but until now we haven't thought of another
     solution.
 """
+import argparse
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import *
 from getpass import getpass
-from msnoise_table_def import *
-from default import default
-from api import create_database_inifile
-import argparse
+from .msnoise_table_def import *
+from .default import default
+from .api import create_database_inifile
+
 
 
 def main(tech=None, hostname="localhost", username="msnoise",
          password="msnoise", database="msnoise", filename="msnoise.sqlite"):
     if tech is None:
-        print "Welcome to MSNoise"
-        print
-        print "What database technology do you want to use?"
-        print " [1] sqlite"
-        print " [2] mysql"
+        print("Welcome to MSNoise")
+        print()
+        print("What database technology do you want to use?")
+        print(" [1] sqlite")
+        print(" [2] mysql")
         tech = int(raw_input('Choice:'))
         
         if tech == 1:
@@ -95,8 +96,8 @@ def main(tech=None, hostname="localhost", username="msnoise",
     try:
         session.commit()
     except IntegrityError:
-        print "The database seems to already exist and is not empty, cannot continue"
-        return "Integrity Error - DB already exist"
+        print("The database seems to already exist and is not empty, cannot continue")
+        return("Integrity Error - DB already exist")
     session.close()
     msg = "Installation Done! - Go to Configuration Step!"
     return msg
