@@ -11,8 +11,11 @@ matrix:
     #  anaconda..)
     - os: linux
       env: PYTHON_VERSION=2.7
+      language: python
+
     - os: linux
       env: PYTHON_VERSION=3.4
+      language: python
 
 sudo: false
 
@@ -27,6 +30,11 @@ addons:
       - libsamplerate0-dev
 
 before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      export OS="MacOSX";
+    else
+      export OS="Linux";
+    fi
   # MySQL database
   - mysql -e 'create database msnoise;'
   # Python and related stuff
