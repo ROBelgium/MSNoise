@@ -16,6 +16,9 @@ environment:
 platform:
   - x64
 
+services:
+  - mysql
+
 install:
   # Install miniconda using a powershell script.
   - "powershell ./misc/appveyor/install-miniconda.ps1"
@@ -45,9 +48,9 @@ build: false
 
 test_script:
   - "%CMD_IN_ENV% python setup.py develop"
-  - "echo %CD%"
-  - "ps: mkdir test"
-  - "ps: cd test"
-  - "echo %CD%"
+  - echo %CD%
+  - ps: mkdir test
+  - ps: cd test
+  - echo %CD%
   - "%CMD_IN_ENV% msnoise bugreport -m"
   - "%CMD_IN_ENV% msnoise test"
