@@ -10,9 +10,19 @@ environment:
   matrix:
     - PYTHON_VERSION: 2.7
       MINICONDA: C:\Miniconda
+      NUMPY_VERSION: 1.8
+
+    - PYTHON_VERSION: 2.7
+      MINICONDA: C:\Miniconda
+      NUMPY_VERSION: 1.9
+
+    - PYTHON_VERSION: 2.7
+      MINICONDA: C:\Miniconda
+      NUMPY_VERSION: 1.10
 
     - PYTHON_VERSION: 3.4
       MINICONDA: C:\Miniconda3
+      NUMPY_VERSION: 1.10
 
 init:
   - "ECHO %PYTHON_VERSION% %MINICONDA%"
@@ -28,18 +38,8 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  - "conda create -q -n test-environment python=%PYTHON_VERSION% numpy scipy nose"
+  - "conda create -q -n test-environment python=%PYTHON_VERSION% numpy=%NUMPY_VERSION% scipy conda"
   - activate test-environment
-  # Install miniconda using a powershell script.
-#  - "powershell ./misc/appveyor/install-miniconda.ps1"
-#  - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
-  # Check that we have the expected version and architecture for Python
-#  - "%CMD_IN_ENV% python --version"
-  # Install the build and runtime dependencies of the project.
-  - "conda update -q --yes conda"
-  # Create a conda environment using the astropy bonus packages
-  - "conda create -q --yes -n test python=%PYTHON_VERSION%"
-  - "activate test"
   # Install default dependencies
   - "conda install --yes -q pip"
   - "conda install --yes -q numpy==1.9.3 scipy matplotlib statsmodels pandas sqlalchemy"
