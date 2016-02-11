@@ -9,18 +9,17 @@ environment:
 
   matrix:
     - PYTHON_VERSION: 2.7
-      MINICONDA: C:\Miniconda-x64
-      NUMPY_VERSION: 1.8
-
-    - PYTHON_VERSION: 2.7
+      PYTHON_ARCH: 64
       MINICONDA: C:\Miniconda-x64
       NUMPY_VERSION: 1.9
 
     - PYTHON_VERSION: 2.7
+      PYTHON_ARCH: 64
       MINICONDA: C:\Miniconda-x64
       NUMPY_VERSION: 1.10
 
     - PYTHON_VERSION: 3.4
+      PYTHON_ARCH: 64
       MINICONDA: C:\Miniconda3-x64
       NUMPY_VERSION: 1.10
 
