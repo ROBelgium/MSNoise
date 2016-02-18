@@ -48,6 +48,7 @@ validation of our project ever ! See the full list on the
 new:
 * config --set option
 * tested on windows via Appveyor
+* python 3.4 should work - BUT ONLY DECIMATE !!!
 
 ~~~~
 
