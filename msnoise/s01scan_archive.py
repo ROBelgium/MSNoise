@@ -71,7 +71,7 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate):
                 logging.info("%s: Sampling rate smaller than CC sampling rate"
                              % name)
             else:
-                gaps = data.getGaps()
+                gaps = data.get_gaps()
                 gaps_duration = 0
                 for gap in gaps:
                     gaps_duration += gap[6]

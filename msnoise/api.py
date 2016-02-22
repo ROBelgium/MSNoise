@@ -15,14 +15,12 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 import numpy as np
 import pandas as pd
+import scipy as sp
 import scipy.fftpack
 from obspy.core import Stream, Trace, read, AttribDict
-from obspy.signal.invsim import cosTaper
+from obspy.signal.invsim import cosine_taper
 
-try:
-    from obspy.geodetics import gps2dist_azimuth
-except:
-    from obspy.core.util.geodetics import gps2DistAzimuth as gps2dist_azimuth
+from obspy.geodetics import gps2dist_azimuth
 
 from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
@@ -424,7 +422,7 @@ def get_interstation_distance(station1, station2, coordinates="DEG"):
     """
 
     if coordinates == "DEG":
-        dist, azim, bazim = gps2DistAzimuth(station1.Y, station1.X,
+        dist, azim, bazim = gps2dist_azimuth(station1.Y, station1.X,
                                             station2.Y, station2.X)
         return dist / 1.e3
     else:
@@ -954,53 +952,71 @@ def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
     return
 
 
+def stack(session, data):
+    stack_method = get_config(session, 'stack_method')
+    pws_timegate = float(get_config(session, 'pws_timegate'))
+    pws_power = float(get_config(session, 'pws_power'))
+    goal_sampling_rate = float(get_config(session, "cc_sampling_rate"))
+
+    data = data[~np.isnan(data).any(axis=1)]
+    if stack_method == "linear":
+        corr = data.mean(axis=0)
+    elif stack_method == "pws":
+
+        tmp = np.zeros(data.shape[1], dtype='f8')
+        phasestack = np.zeros(data.shape[1], dtype='c8')
+        for c in data:
+            phase = np.angle(sp.signal.hilbert(c))
+            phasestack.real += np.cos(phase)
+            phasestack.imag += np.sin(phase)
+        coh = 1. / data.shape[0] * np.abs(phasestack)
+
+        timegate_samples = pws_timegate *\
+                           goal_sampling_rate
+        coh = np.convolve(sp.signal.boxcar(timegate_samples)/timegate_samples, coh, 'same')
+        for c in data:
+            tmp += c * np.power(coh, pws_power)
+        tmp /= data.shape[0]
+        corr = tmp
+    return corr
+
+
+
 def get_results(session, station1, station2, filterid, components, dates,
                 mov_stack = 1, format="stack"):
     export_format = get_config(session, 'export_format')
-    if format == "stack":
-        stack = np.zeros(get_maxlag_samples(session))
-        i = 0
-        for date in dates:
-            daystack = os.path.join("STACKS", "%02i" % filterid, "%03i_DAYS"%mov_stack, components, "%s_%s"%(station1, station2), str(date))
-            # logging.debug('reading: %s' % daystack)
-            if export_format == "BOTH":
-                daystack += ".MSEED"
-            elif export_format == "SAC":
-                daystack += ".SAC"
-            elif export_format == "MSEED":
-                daystack += ".MSEED"
-            try:
-                st = read(daystack)
-                if not np.any(np.isnan(st[0].data)) and not np.any(np.isinf(st[0].data)):
-                    stack += st[0].data
-                    i += 1
-            except:
-                pass
+    stack_method = get_config(session, 'stack_method')
+    pws_timegate = float(get_config(session, 'pws_timegate'))
+    pws_power = float(get_config(session, 'pws_power'))
+    goal_sampling_rate = float(get_config(session, "cc_sampling_rate"))
+    stack_data = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
+    i = 0
+    base = os.path.join("STACKS", "%02i" % filterid,
+                        "%03i_DAYS" % mov_stack, components,
+                        "%s_%s" % (station1, station2), "%s")
+    if export_format == "BOTH":
+        base += ".MSEED"
+    elif export_format == "SAC":
+        base += ".SAC"
+    elif export_format == "MSEED":
+        base += ".MSEED"
+    for j, date in enumerate(dates):
+        daystack = base % str(date)
+        try:
+            stack_data[j][:] = read(daystack)[0].data
+            i += 1
+        except:
+            pass
+    if format == "matrix":
+        return i, stack_data
+
+    elif format == "stack":
+        corr = stack(session, stack_data)
+
         if i > 0:
-            return i, stack / i
+            return i, corr
         else:
             return 0, None
-
-    elif format == "matrix":
-        stack = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
-        i = 0
-        base = os.path.join("STACKS", "%02i"%filterid,
-                                    "%03i_DAYS"%mov_stack, components,
-                                    "%s_%s"%(station1, station2), "%s")
-        if export_format == "BOTH":
-            base += ".MSEED"
-        elif export_format == "SAC":
-            base += ".SAC"
-        elif export_format == "MSEED":
-            base += ".MSEED"
-        for j, date in enumerate(dates):
-            daystack = base % str(date)
-            try:
-                stack[j][:] = read(daystack)[0].data
-                i += 1
-            except:
-                pass
-        return i, stack
 
 
 def get_results_all(session, station1, station2, filterid, components, dates,
@@ -1241,7 +1257,7 @@ def check_and_phase_shift(trace):
         trace.detrend(type="demean")
         trace.detrend(type="simple")
         taper_1s = taper_length * float(trace.stats.sampling_rate) / trace.stats.npts
-        cp = cosTaper(trace.stats.npts, taper_1s)
+        cp = cosine_taper(trace.stats.npts, taper_1s)
         trace.data *= cp
 
         n = int(2**nextpow2(len(trace.data)))

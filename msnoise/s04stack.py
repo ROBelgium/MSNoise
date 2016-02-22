@@ -88,6 +88,7 @@ import argparse
 import logging
 import numpy as np
 import pandas as pd
+import scipy as sp
 
 import scipy.signal
 from numpy import nanmean
@@ -95,16 +96,14 @@ from numpy import nanmean
 from .api import *
 
 
-
-
-def main(stype, interval=1):
+def main(stype, interval=1.0):
     """Computes the REF/MOV stacks.
     
     Parameters
     ----------
     stype : {'mov', 'ref'}
         Defines which of the REF or Moving-window stacks must be exported
-    interval : int, optional
+    interval : float, optional
         Number of days before now to search for modified CC jobs
 
     """
@@ -131,6 +130,10 @@ def main(stype, interval=1):
     maxlag = float(get_config(db, "maxlag"))
     cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
 
+    stack_method = get_config(db, 'stack_method')
+    pws_timegate = float(get_config(db, 'pws_timegate'))
+    pws_power = float(get_config(db, 'pws_power'))
+    goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
 
     plugins = get_config(db, "plugins")
     extra_jobtypes = []
@@ -213,7 +216,8 @@ def main(stype, interval=1):
                                                 sta1, sta2)
                                             logging.debug("%s %s [%s - %s] (%i day stack)" % (
                                                 day_name, date, datelist[low], datelist[i], mov_stack))
-                                            corr = nanmean(corr, axis=0)
+                                            corr = stack(db, corr)
+
                                             corr = scipy.signal.detrend(
                                                 corr)
                                             stack_path = os.path.join(
@@ -257,9 +261,8 @@ def main(stype, interval=1):
                                                 sta1, sta2)
                                             logging.debug("%s %s [%s - %s] (%i day stack)" % (
                                                 day_name, date, datelist[low], datelist[high-1], mov_stack))
-                                            corr = nanmean(corr, axis=0)
-                                            corr = scipy.signal.detrend(
-                                                corr)
+                                            corr = stack(db, corr)
+                                            corr = scipy.signal.detrend(corr)
                                             stack_path = os.path.join(
                                                 "STACKS", "%02i" % filterid, "%03i_DAYS" % mov_stack, components, day_name)
                                             filename = os.path.join(

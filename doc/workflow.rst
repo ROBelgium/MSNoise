@@ -9,6 +9,8 @@ Workflow
 .. image:: .static/Figure01_workflow_summary_cmyk.png
 
 
+.. todo:: rewrite header here
+
 The general workflow of MSNoise is presented above. The left part of the workflow is executed only once, while the right part can be executed on a scheduled basis (cron job).
 
 This section only presents the "installation" and configuration of MSNoise (read "the first startup of MSNoise"), not the installation of the required software, which is described in :ref:`installation`.
@@ -20,7 +22,7 @@ This section only presents the "installation" and configuration of MSNoise (read
 
 
 Installer
-----------
+---------
 
 .. automodule:: msnoise.s000installer
 
