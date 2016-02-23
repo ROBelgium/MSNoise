@@ -46,8 +46,8 @@ validation of our project ever ! See the full list on the
 
 
 new:
-* config --set option
 * tested on windows via Appveyor
+python 3.4 !!
 
 ~~~~
 
@@ -104,6 +104,12 @@ Command Line changes
   change a configuration parameter in the database.
 * The ``msnoise`` command accepts a ``-c`` option that triggers the "custom"
   mode, currently only for plots. See below.
+* ``msnoise compute_cc`` and ``msnoise compute_cc`` : support the ``-t``
+  threading flag and shoud be able to work multiple threads. Example calls:
+  ``msnoise -t 4 compute_cc`` or``msnoise -t 16 compute_mwcs``. Don't start
+  more threads than the actual number of real cores on your machine, and take
+  into account that if each instance loads a lot of data (stations), you have
+  to have enough RAM to store it.
 
 All commands are now documented: :doc:`../clickhelp/msnoise`.
 
@@ -150,15 +156,18 @@ Some improvements to the maths have been done for MSNoise 1.4:
 * should we add Aurélien's less-agressive whiten ?
 
 
-Performance improvements ------------------------ Improvements in terms of
-performances have also been done for MSNoise 1.4:
+Performance improvements
+------------------------
+
+Improvements in terms of performances have also been done for MSNoise 1.4:
 
 * ``keep_all``: if set to ``Y`` (=True) in the config, all CCF are now stored in
-* a single HDF5 file, which makes it much nicer to backup/transfer/delete. --
-* XXX not used actually !!! ``compute_cc``: if only ZZ components are to be
-* computed, the whitened windows are pre-computed, which makes the process
-* faster. This could lead to memory issues if the job contains a lot of
-* stations, a lot of filters are configured and a large number of windows. --
+  a single HDF5 file, which makes it much nicer to backup/transfer/delete. --
+  XXX not used actually !!!
+* ``compute_cc``: if only ZZ components are to be computed, the whitened
+  windows are pre-computed, which makes the process faster.
+  This could lead to memory issues if the job contains a lot of stations, a lot
+  of filters are configured and a large number of windows.
 * Not sure it is a good idea !!!
 
 
@@ -178,21 +187,13 @@ Running the following command will take care of the upgrade from 1.3 to 1.4:
     msnoise upgrade_db
 
 
-A note on parallel processing
------------------------------
-Although the ``msnoise`` command accepts the
-``-t INTEGER`` argument to launch a number of threads in parallel, it currently
-only works with ``scan_archive``: ``msnoise -t 4 scan_archive`` will run the
-scan on four folders in parallel. For the other steps, one has still to run
-multiple commands in a console. This should change in the future.
-
 
 A final note about development pace and choices
 -----------------------------------------------
 
 * MSNoise team is
 
-  * 1 developper (Thomas)
+  * **1 developper** (Thomas)
   * 1 dedicated debugger (Corentin)
   * less than 5 really *active* users, providing feedback and/or lines of codes
     (Esteban, Raphaël, Aurélien, Carmelo, ...)

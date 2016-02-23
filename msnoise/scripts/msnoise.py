@@ -3,6 +3,7 @@ import sys
 import click
 import pkg_resources
 import logging
+import time
 import traceback
 from pkg_resources import iter_entry_points
 # from click_plugins import with_plugins
@@ -233,7 +234,7 @@ def compute_cc(ctx):
         p = Process(target=main)
         p.start()
         processes.append(p)
-
+        time.sleep(1)
     for p in processes:
         p.join()
 
