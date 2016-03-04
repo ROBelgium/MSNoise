@@ -92,6 +92,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
             continue
 
         alldf = pd.concat(alldf)
+        print(mov_stack, alldf.head())
         if 'alldf' in locals():
             errname = "E" + dttname
 
@@ -137,7 +138,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
                          label='ALL: $\delta v/v$ of the mean network')
 
             tmp2 = allbut[dttname].resample('D', how='mean')
-            tmp2.plot(label='mean')
+            tmp2.plot(label='mean',)
 
             tmp3 = allbut[dttname].resample('D', how='median')
             tmp3.plot(label='median')

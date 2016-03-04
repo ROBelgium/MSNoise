@@ -117,9 +117,9 @@ import sys
 
 from obspy.core import utcdatetime, UTCDateTime
 
-from obspy.signal.invsim import cosTaper
+from obspy.signal.invsim import cosine_taper
 from obspy import read_inventory
-from obspy.xseed import Parser
+from obspy.io.xseed import Parser
 
 import scipy as sp
 import numpy as np
@@ -203,7 +203,7 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E = np.ar
                         trace.detrend(type="demean")
                         trace.detrend(type="linear")
                         taper_1s = taper_length * float(trace.stats.sampling_rate) / trace.stats.npts
-                        cp = cosTaper(trace.stats.npts, taper_1s)
+                        cp = cosine_taper(trace.stats.npts, taper_1s)
                         trace.data *= cp
                 try:
                     stream.merge(method=0, fill_value=0.0)
@@ -419,7 +419,7 @@ def main():
             Nfft = params.min30
             if params.min30 / 2 % 2 != 0:
                 Nfft = params.min30 + 2
-            cp = cosTaper(int(params.min30), 0.04)
+            cp = cosine_taper(int(params.min30), 0.04)
 
             logging.info("Pre-Whitening Traces")
             whitened_slices = np.zeros((len(stations), len(get_filters(db, all=False)), slices, int(Nfft)), dtype=np.complex)
@@ -603,7 +603,7 @@ def main():
                             skip = False
                             for i, station in enumerate(pair):
                                 if rmsmat[i] > rms_threshold:
-                                    cp = cosTaper(len(trame2h[i]),0.04)
+                                    cp = cosine_taper(len(trame2h[i]),0.04)
                                     trame2h[i] -= trame2h[i].mean()
                                     
                                     if params.windsorizing == -1:
@@ -653,24 +653,8 @@ def main():
                             station1, station2, filterid, components, date = ccfid.split('_')
 
                             corrs = np.asarray(list(allcorr[ccfid].values()))
-                            if params.stack_method == "linear":
-                                corr = corrs.mean(axis=0)
-                            elif params.stack_method == "pws":
+                            corr = stack(db, corrs)
 
-                                corr = np.zeros(corrs.shape[1], dtype='f8')
-                                phasestack = np.zeros(corrs.shape[1], dtype='c8')
-                                for c in corrs:
-                                    phase = np.angle(sp.signal.hilbert(c))
-                                    phasestack.real += np.cos(phase)
-                                    phasestack.imag += np.sin(phase)
-                                coh = 1. / corrs.shape[0] * np.abs(phasestack)
-
-                                timegate_samples = params.pws_timegate *\
-                                                   params.goal_sampling_rate
-                                coh = np.convolve(sp.signal.boxcar(timegate_samples)/timegate_samples, coh, 'same')
-                                for c in corrs:
-                                    corr += c * np.power(coh, params.pws_power)
-                                corr /= corrs.shape[0]
                             thisdate = time.strftime(
                                         "%Y-%m-%d", time.gmtime(basetime))
                             thistime = time.strftime(

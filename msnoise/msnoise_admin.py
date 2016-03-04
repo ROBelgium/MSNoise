@@ -226,7 +226,7 @@ class StationView(ModelView):
 class DataAvailabilityView(ModelView):
     view_title = "Data Availability"
     can_create = False
-    can_delete = False
+    can_delete = True
     can_edit = True
     column_filters = ('net', 'sta', 'comp','data_duration','gaps_duration','samplerate','flag')
     def __init__(self, session, **kwargs):

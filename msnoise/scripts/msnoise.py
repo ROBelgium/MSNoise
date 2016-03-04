@@ -3,6 +3,7 @@ import sys
 import click
 import pkg_resources
 import logging
+import time
 import traceback
 from pkg_resources import iter_entry_points
 # from click_plugins import with_plugins
@@ -222,10 +223,20 @@ def new_jobs(init):
 
 
 @click.command()
-def compute_cc():
+@click.pass_context
+def compute_cc(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
     from ..s03compute_cc import main
-    main()
+    from multiprocessing import Process
+    threads = ctx.obj['MSNOISE_threads']
+    processes = []
+    for i in range(threads):
+        p = Process(target=main)
+        p.start()
+        processes.append(p)
+        time.sleep(1)
+    for p in processes:
+        p.join()
 
 
 @click.command()
@@ -247,10 +258,20 @@ def stack(ref, mov, step, interval):
 
 
 @click.command()
-def compute_mwcs():
+@click.pass_context
+def compute_mwcs(ctx):
     """Computes the MWCS based on the new stacked data"""
     from ..s05compute_mwcs import main
-    main()
+    from multiprocessing import Process
+    threads = ctx.obj['MSNOISE_threads']
+    processes = []
+    for i in range(threads):
+        p = Process(target=main)
+        p.start()
+        processes.append(p)
+
+    for p in processes:
+        p.join()
 
 
 @click.command()

@@ -6,7 +6,7 @@ dt/t in a narrow frequency band even for a broadband signal.
 The function follows the procedure set out in Clarke et al. (2011)."""
 
 import statsmodels.api as sm
-from obspy.signal.invsim import cosTaper
+from obspy.signal.invsim import cosine_taper
 import scipy.signal
 import numpy as np
 import matplotlib.pyplot as plt
@@ -85,7 +85,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
     if len(indRange) < 2:
         padd = 2**(nextpow2(windL)+3)
 
-    tp = cosTaper(windL, .85)
+    tp = cosine_taper(windL, .85)
 
     timeaxis = (np.arange(len(ccCurrent)) / float(sampRate))+tmin
     minind = 0

@@ -4,6 +4,7 @@ import scipy.fftpack
 
 from .api import nextpow2
 
+
 def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     """This function takes 1-dimensional *data* timeseries array,
     goes to frequency domain using fft, whitens the amplitude of the spectrum
