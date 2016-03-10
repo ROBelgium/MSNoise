@@ -17,8 +17,8 @@ default['preprocess_lowpass'] = ["Preprocessing Low-pass value in Hz [8.0]",'8.0
 default['preprocess_highpass'] = ["Preprocessing High-pass value in Hz [0.01]",'0.01']
 
 default['remove_response'] = ["Remove instrument response Y/[N]",'N']
-default['response_format'] = ["Remove instrument format dataless/[inventory]/paz/resp",'dataless']
-default['response_path'] = ["Remove instrument file(s) location",'inventory']
+default['response_format'] = ["Remove instrument format [dataless]/inventory/paz/resp",'dataless']
+default['response_path'] = ["Remove instrument file(s) location (path relative to db.ini)",'inventory']
 default['response_prefilt'] = ["Remove instrument correction **pre-filter** (0.005, 0.006, 30.0, 35.0)",'(0.005, 0.006, 30.0, 35.0)']
 
 default['maxlag'] = ["Maximum lag (in seconds) [120.0]",'120.']

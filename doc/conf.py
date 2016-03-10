@@ -329,6 +329,7 @@ intersphinx_mapping = {
 'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
 'matplotlib': ('http://matplotlib.org/', None),
 'sqlalchemy': ('http://docs.sqlalchemy.org/en/latest/', None),
+'click': ('http://click.pocoo.org/5/', None)
 }
 
 # If true, show URL addresses after external links.

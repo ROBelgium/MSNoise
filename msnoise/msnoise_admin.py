@@ -22,7 +22,11 @@ Which, by default, starts a web server listening on all interfaces on port
 
 
 Next step is to open a web browser and open the ip address of the machine,
-by default on the current machine, it'll be http://localhost:5000/ .
+by default on the current machine, it'll be http://localhost:5000/ or
+http://127.0.0.1:5000/.
+
+.. image:: .static/msnoise_admin_home.png
+    :align: center
 
 
 The top level menu shows four items:

@@ -51,8 +51,6 @@ To run MSNoise, you need:
 * The `find` command: present by default on linux and available with gnufind_
   on Windows.
 
-.. warning:: Python 3 is **not** (yet) supported!
-
 
 Quick Start - Windows
 ----------------------
@@ -174,6 +172,10 @@ To know which packages you are missing, use the bug_reporter script (see :ref:`t
 
 scikits.samplerate
 ~~~~~~~~~~~~~~~~~~
+
+.. warning:: Scikits.samplerate isn't easy to install on Python3. If not
+    successful, one has to use the "Decimate" resampling method.
+
 https://pypi.python.org/pypi/scikits.samplerate is a wrapper to the Secret Rabbit Code (aka libsamplerate) (de Castro Lopo, 2013)
 
 Windows

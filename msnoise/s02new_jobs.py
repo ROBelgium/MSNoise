@@ -56,6 +56,9 @@ def main(init=False):
         start, end = nf.starttime.date(), nf.endtime.date()
         updated_days.append(start)
         updated_days.append(end)
+        tmp = "%s.%s" % (nf.net, nf.sta)
+        if tmp not in stations_to_analyse:
+            continue
         for jobtype in extra_jobtypes_new_files:
             all_jobs.append({"day": start, "pair": "%s.%s"%(nf.net,nf.sta),
                              "jobtype": jobtype, "flag": "T",

@@ -162,7 +162,10 @@ def install():
 @click.command()
 @click.option('-s', '--set', help='Modify config value: usage --set name=value')
 def config(set):
-    """This command launches the Configurator or... TODO"""
+    """This command should now only be used to use the command line to set
+    a parameter value in the data base. It used tolaunch the Configurator but
+    the recommended way to configure MSNoise is to use the "msnoise admin" web
+    interface."""
     if set:
         from ..default import default
         if not set.count("="):
@@ -269,7 +272,7 @@ def compute_mwcs(ctx):
         p = Process(target=main)
         p.start()
         processes.append(p)
-
+        time.sleep(1)
     for p in processes:
         p.join()
 

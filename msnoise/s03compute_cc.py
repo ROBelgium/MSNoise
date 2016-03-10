@@ -17,6 +17,10 @@ Configuration Parameters
 * |windsorizing|
 * |resampling_method|
 * |decimation_factor|
+* |remove_response|
+* |response_format|
+* |response_path|
+* |response_prefilt|
 * |preprocess_lowpass|
 * |preprocess_highpass|
 * |keep_all|
@@ -43,12 +47,25 @@ will be tapered and then merged with 0 values in the gaps.
 If shorter than 1-day, the trace final is padded with zeros. If longer, it is
 cut to match the start/end of the day.
 
-Each 1-day long trace is then low-passed (at ``preprocess_lowpass`` Hz),
-high-passed (at ``preprocess_highpass`` Hz), then decimated/downsampled.
-Decimation/Downsampling are configurable (``resampling_method``) and users are
-advised testing both. One advantage of Downsampling over Decimation is that
-it is able to downsample the data by any factor, not only integer factors.
+If configured, each 1-day long trace is corrected for its instrument response.
+Currently, only dataless seed and inventory XML are supported.
 
+.. note:: Removing the instrument response is a computationally very expensive
+   task and *not* useful for dv/v iif your instruments didn't change during the
+   analysed period. It is also not needed for tomography iif all instruments are
+   the same, or at least have an identical phase response in the frequency band
+   of interest.
+
+Each 1-day long trace is then low-passed (at ``preprocess_lowpass`` Hz),
+high-passed (at ``preprocess_highpass`` Hz), then if needed,
+decimated/downsampled. Decimation/Downsampling are configurable
+(``resampling_method``) and users are advised testing both. One advantage of
+Downsampling over Decimation is that it is able to downsample the data by any
+factor, not only integer factors.
+
+.. note:: Python 3 users will most probably struggle installing
+    scikits.samplerate, and therefore will have to use Decimate instead of
+    Resample.
 
 Processing
 ~~~~~~~~~~
@@ -106,8 +123,21 @@ To run this script:
     $ msnoise compute_cc
 
 
+This step also supports parallel processing/threading:
+
+.. code-block:: sh
+
+    $ msnoise -t 4 compute_cc
+
+will start 4 instances of the code (after 1 second delay to avoid database
+conflicts). This only works both with SQLite and MySQL but be aware problems
+could occur with SQLite.
+
+
 .. versionadded:: 1.4
-    The Phase Weighted Stack.
+    The Instrument Response removal & The Phase Weighted Stack &
+    Parallel Processing
+
 """
 import traceback
 import glob

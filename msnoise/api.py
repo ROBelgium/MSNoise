@@ -99,7 +99,7 @@ def create_database_inifile(tech, hostname, database, username, password):
     :return: None
     """
     f = open(os.path.join(os.getcwd(), 'db.ini'), 'wb')
-    cPickle.dump([tech, hostname, database, username, password], f)
+    cPickle.dump([tech, hostname, database, username, password], f, protocol=2)
     f.close()
 
 
@@ -961,9 +961,9 @@ def stack(session, data):
     data = data[~np.isnan(data).any(axis=1)]
     if stack_method == "linear":
         corr = data.mean(axis=0)
-    elif stack_method == "pws":
 
-        tmp = np.zeros(data.shape[1], dtype='f8')
+    elif stack_method == "pws":
+        corr = np.zeros(data.shape[1], dtype='f8')
         phasestack = np.zeros(data.shape[1], dtype='c8')
         for c in data:
             phase = np.angle(sp.signal.hilbert(c))
@@ -975,9 +975,9 @@ def stack(session, data):
                            goal_sampling_rate
         coh = np.convolve(sp.signal.boxcar(timegate_samples)/timegate_samples, coh, 'same')
         for c in data:
-            tmp += c * np.power(coh, pws_power)
-        tmp /= data.shape[0]
-        corr = tmp
+            corr += c * np.power(coh, pws_power)
+        corr /= data.shape[0]
+
     return corr
 
 

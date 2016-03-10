@@ -23,6 +23,20 @@ changes in the CCF that occurred *on* the 10th !
 
 Moving-window stack length(s) are configured using the ``mov_stack`` bit.
 
+If ``stack_method`` is 'linear', then a simple mean CFF of all daily is saved
+as the mov or ref CCF. On the other hand, if ``stack_method`` is 'pws', then
+all the Phase Weighted Stack (PWS) is computed and saved as the mov or ref CCF.
+The PWS is done in two steps: first the mean coherence between the instataneous
+phases of all windows is calculated, and eventually serves a weighting factor
+on the mean. The smoothness of this weighting array is defined using the
+``pws_timegate`` parameter in the configuration. The weighting array is the
+power of the mean coherence array. If ``pws_power`` is equal to 0, a linear
+stack is done (then it's faster to do set ``stack_method`` = 'linear'). Usual
+value is 2.
+
+.. seealso:: Schimmel, M. and Paulssen H., "Noise reduction and detection
+    of weak, coherent signals through phase-weighted stacks". Geophysical Journal
+    International 130, 2 (1997): 497-505.
 
 Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -33,10 +47,6 @@ Configuration Parameters
 * |stack_method| | *new in 1.4*
 * |pws_timegate| | *new in 1.4*
 * |pws_power| | *new in 1.4*
-
-
-.. todo:: Document Phase Weighted Stacking (useful for tomo, not for dv/v if one
-    uses MWCS).
 
 
 Usage:
