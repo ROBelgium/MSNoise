@@ -8,6 +8,8 @@ Extending MSNoise with Plugins
 Starting with :doc:`releasenotes/msnoise-1.4`, MSNoise supports Plugins, this
 means the default workflow "from archive to dv/v" can be branched at any step!
 
+.. contents::
+    :local:
 
 What is a Plugin and how to declare it in MSNoise
 -------------------------------------------------
@@ -237,7 +239,7 @@ Aaaand:
 Provided you have reset the DataAvailability rows with a "M" or "N" flag so that
 when you ran ``new_jobs`` it actually inserted the ``AMAZ1`` jobs !
 
-Because job-based stuff always requires a lot of trial-and-error, rememeber that
+Because job-based stuff always requires a lot of trial-and-error, remember that
 the ``msnoise reset`` command is your best friend. In this example, we would
 need to ``msnoise reset AMAZ1`` to reset "I"n Progress jobs, or
 ``msnoise reset AMAZ1 --all`` to reset all ``AMAZ1`` jobs to "T"o Do.
@@ -249,3 +251,190 @@ need to ``msnoise reset AMAZ1`` to reset "I"n Progress jobs, or
 
     * Only three hooks are currently present, of course, more will be added in
       in the future.
+
+
+Plugin's own config table
+-------------------------
+
+Plugins can create a new table in the database, e.g. in an ``install`` command.
+First, a ``amazing_table_def.py`` table definition file must be created:
+
+.. code-block:: python
+
+    # Table definitions for Amazing
+    from sqlalchemy import Column, String
+    from sqlalchemy.ext.declarative import declarative_base
+
+    Base = declarative_base()
+
+
+    class AmazingConfig(Base):
+        """
+        Config Object
+
+        :type name: str
+        :param name: The name of the config bit to set.
+
+        :type value: str
+        :param value: The value of parameter `name`
+        """
+        __tablename__ = "amazing-config"
+        name = Column(String(255), primary_key=True)
+        value = Column(String(255))
+
+        def __init__(self, name, value):
+            """"""
+            self.name = name
+            self.value = value
+
+and a ``default.py`` file containing the parameters names, explanation and
+default value:
+
+.. code-block:: python
+
+    from collections import OrderedDict
+    default = OrderedDict()
+
+    default['parameter1'] = ["Some really useful text",'1']
+    default['parameter2'] = ["Some really useful text",'1']
+    default['parameter3'] = ["Some really useful text",'1']
+    default['parameter4'] = ["Some really useful text",'1']
+
+    default['question1'] = ["Is this a useful text [Y]/N",'Y']
+
+Then, the ``install.py`` file contains the method to add this table to the
+database:
+
+.. code-block:: python
+
+    from msnoise.api import *
+
+    from .amazing_table_def import AmazingConfig
+    from .default import default
+
+    def main():
+        engine = get_engine()
+        Session = sessionmaker(bind=engine)
+        session = Session()
+
+        AmazingConfig.__table__.create(bind=engine, checkfirst=True)
+        for name in default.keys():
+            session.add(AmazingConfig(name=name,value=default[name][-1]))
+
+        session.commit()
+
+then add the command to the ``plugin_definition.py``:
+
+.. code-block:: python
+
+    @click.command()
+    def install():
+        """ Create the Config table"""
+        from .install import main
+        main()
+
+    amazing.add_command(install)
+
+
+When all this is prepared, running the ``msnoise plugin amazing install``
+command will connect to the current database, create the `amazing-config` table
+and add the parameters names and their default value.
+
+
+An entry point to the ``setup.py`` file has to be defined in order to access
+Plugin's config tables via the msnoise api :func:`msnoise.api.get_config` method:
+
+.. code-block:: python
+
+    'msnoise.plugins.table_def': [
+            'AmazingConfig = msnoise_amazing.amazing_table_def:AmazingConfig',
+        ],
+
+Then, running a simple python command:
+
+.. code-block:: python
+
+    from msnoise.api import connect, get_config
+
+    db = connect()
+    print(get_config(db, "parameter1", plugin="Amazing"))
+    print(get_config(db, "parameter2", plugin="Amazing"))
+    print(get_config(db, "parameter3", plugin="Amazing"))
+    print(get_config(db, "parameter4", plugin="Amazing"))
+    print(get_config(db, "question1", plugin="Amazing", isbool=True))
+
+should print:
+
+.. code-block:: sh
+
+    1
+    1
+    1
+    1
+    True
+
+Adding Web Admin Pages
+----------------------
+
+Plugins can also declare new pages to the Web Admin ! This is simply done by,
+againg, declaring some entry points in ``setup.py``:
+
+.. code-block:: python
+
+    'msnoise.plugins.admin_view': [
+            'AmazingConfigView = msnoise_amazing.plugin_definition:AmazingConfigView',
+            ],
+
+and the corresponding object in ``plugin_definition.py``:
+
+.. code-block:: python
+
+    from flask.ext.admin.contrib.sqla import ModelView
+    from .amazing_table_def import AmazingConfig
+
+
+    class AmazingConfigView(ModelView):
+        # Disable model creation
+        view_title = "MSNoise Amazing Configuration"
+        name = "Configuration"
+
+        can_create = False
+        can_delete = False
+        page_size = 50
+        # Override displayed fields
+        column_list = ('name', 'value')
+
+        def __init__(self, session, **kwargs):
+            # You can pass name and other parameters if you want to
+            super(AmazingConfigView, self).__init__(AmazingConfig, session,
+                                                    endpoint="amazingconfig",
+                                                    name="Config",
+                                                    category="Amazing", **kwargs)
+
+Then (as always, after re-developing/installing the package), the magic occurs:
+
+.. image:: .static/msnoise_admin_plugin.png
+    :align: center
+
+Or, changing the last 4 lines of the previous code to:
+
+.. code-block:: python
+
+    super(AmazingConfigView, self).__init__(AmazingConfig, session,
+                                            endpoint="amazingconfig",
+                                            name="Amazing Config",
+                                            category="Configuration", **kwargs)
+
+.. image:: .static/msnoise_admin_plugin2.png
+    :align: center
+
+
+Uninstalling Plugins
+--------------------
+
+Plugins can be de-activated by removing their package name from the ``plugins``
+configuration parameter. Ideally, plugins should provide an ``uninstall``
+command similar to the ``install`` to take care of deleting/dropping the tables
+in the project database.
+
+

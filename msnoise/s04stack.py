@@ -34,6 +34,10 @@ power of the mean coherence array. If ``pws_power`` is equal to 0, a linear
 stack is done (then it's faster to do set ``stack_method`` = 'linear'). Usual
 value is 2.
 
+.. warning:: PWS is largely untested, not cross-validated. It looks good, but
+    that doesn't mean a lot, does it? Use with Caution! And if you
+    cross-validate it, please let us know!!
+
 .. seealso:: Schimmel, M. and Paulssen H., "Noise reduction and detection
     of weak, coherent signals through phase-weighted stacks". Geophysical Journal
     International 130, 2 (1997): 497-505.

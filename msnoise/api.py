@@ -137,6 +137,10 @@ def get_config(session, name=None, isbool=False, plugin=None):
     :type isbool: bool
     :param isbool: if True, returns True/False for config `name`. Defaults to
         False
+    :type plugin: str
+    :param plugin: if provided, gives the name of the Plugin config to use. E.g.
+        if "Amazing" is provided, MSNoise will try to load the "AmazingConfig"
+        entry point. See :doc:`plugins` for details.
 
     :rtype: str, bool or dict
     :returns: the value for `name` or a dict of all config values

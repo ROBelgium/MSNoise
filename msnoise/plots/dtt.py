@@ -1,7 +1,5 @@
 """
-author @claredonaldson
-
-This script plots dt (delay time) against t (time lag). It shows the results
+This plots dt (delay time) against t (time lag). It shows the results
 from the MWCS step, plus the calculated regression lines M0 and M.
 The errors in the regression lines are also plotted as fainter lines.
 The time lags used to calculate the regression are shown in blue.
@@ -9,7 +7,13 @@ The time lags used to calculate the regression are shown in blue.
 
 .. include:: clickhelp/msnoise-plot-dtt.rst
 
-.. versionadded:: 1.4
+Example
+
+``msnoise plot dtt Z7.HRIM Z7.LIND 2014-08-10 -f 14 -m 20`` will plot:
+
+.. image:: .static/dtt.png
+
+.. versionadded:: 1.4 (Thanks to C.G. Donaldson)
 """
 
 import matplotlib.pyplot as plt
@@ -98,11 +102,20 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=
         plt.plot(xlineM, ylineM, 'k', label='M')
         plt.plot(xlineM, ylineEMmin, 'k', alpha=0.3)
         plt.plot(xlineM, ylineEMmax, 'k', alpha=0.3)
-        name = '%s-%s f%i m%i' % (sta1,sta2, filterid, mov_stack)
+        name = '%s-%s f%i m%i %s' % (sta1, sta2, filterid, mov_stack, day)
         name = name.replace('_', '.')
         plt.suptitle(name)
         plt.legend()
         plt.grid(True, ls="-",lw=0.2)
+        if outfile:
+            if outfile.startswith("?"):
+                basename = '%s-%s-f%i-m%i-%s' % (sta1, sta2, filterid,
+                                                 mov_stack,day)
+                outfile = outfile.replace('?', basename)
+            outfile = "dtt_" + outfile
+            print("output to: %s" % outfile)
+            plt.savefig(outfile)
+
         if show:
             plt.show()
 

@@ -56,8 +56,10 @@ def admin(port):
 
 @click.command()
 def upgrade_db():
-    """Upgrade the database from pre-1.3 to MSNoise 1.3. This should only
-    be ran once."""
+    """Upgrade the database from previous to a new version.\n
+    This procedure adds new parameters with their default value
+    in the config database.
+    """
     from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
     from ..api import connect, Config, get_tech, get_engine
     from ..default import default
@@ -80,10 +82,13 @@ def upgrade_db():
         except OperationalError:
             print( "The jobs table seems already up-to-date, exiting.")
     else:
-        print("OK, the new config parameters have been inserted, but you need" \
-              "to edit the `jobs` table manually in oder to match the new" \
-              "columns naming.")
-        print ("Please read http://msnoise.org/doc/releasenotes/msnoise-1.3.html")
+        try:
+            e = get_engine()
+            e.execute("SELECT jobtype from jobs where 1")
+        except:
+            print("You need to edit the `jobs` table manually to match the new"
+                  "column naming")
+            print ("Please read http://msnoise.org/doc/releasenotes/msnoise-1.3.html")
 
 
 @click.command()
@@ -411,6 +416,7 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
         from ..plots.interferogram import main
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
 
+
 @click.command()
 @click.argument('sta1')
 @click.argument('sta2')
@@ -489,11 +495,12 @@ def station_map(ctx, show, outfile):
         from ..plots.station_map import main
     main(show, outfile)
 
+
 @click.command()
 @click.argument('sta1')
 @click.argument('sta2')
+@click.argument('day')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-d', '--day', default="2015-01-01", help='Day')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
 @click.option('-s', '--show', help='Show interactively?',
@@ -503,7 +510,8 @@ def station_map(ctx, show, outfile):
 @click.pass_context
 def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
     """Plots a graph of dt against t\n
-    STA1 and STA2 must be provided with this format: NET.STA !"""
+    STA1 and STA2 must be provided with this format: NET.STA !\n
+    DAY must be provided in the ISO format: YYYY-MM-DD"""
     if ctx.obj['MSNOISE_custom']:
         from dtt import main
     else:

@@ -18,7 +18,7 @@ Introduction
 ------------
 Almost a year after the last major release (:doc:`msnoise-1.3`) we are proud to
 announce the new :doc:`msnoise-1.4`. It is a **major** release, with a massive
-amount of work since the last release: in `GitHub numbers
+amount of work since the last one: in `GitHub numbers
 <https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2015-04-01&to=2016-03-20&type=c>`_
 , it's over XXX commits and about XXX new lines of code and documentation added!
 
@@ -196,8 +196,8 @@ response can be corrected, based on those parameters:
 Currently, only dataless seed and inventory XML are supported.
 
 .. note:: Removing the instrument response is a computationally very expensive
-   task and *not* useful for dv/v iif your instruments didn't change during the
-   analysed period. It is also not needed for tomography iif all instruments are
+   task and *not* useful for dv/v iff your instruments didn't change during the
+   analysed period. It is also not needed for tomography iff all instruments are
    the same, or at least have an identical phase response in the frequency band
    of interest.
 
@@ -214,8 +214,8 @@ Command Line changes
   threading flag and shoud be able to work multiple threads. Example calls:
   ``msnoise -t 4 compute_cc`` or``msnoise -t 16 compute_mwcs``. Don't start
   more threads than the actual number of real cores on your machine, and take
-  into account that if each instance loads a lot of data (stations), you have
-  to have enough RAM to store it.
+  into account that if each instance loads a lot of data (stations), you shoud
+  have have enough RAM to store it.
 
 All commands are now documented: :doc:`../clickhelp/msnoise`.
 

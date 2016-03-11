@@ -51,8 +51,8 @@ If configured, each 1-day long trace is corrected for its instrument response.
 Currently, only dataless seed and inventory XML are supported.
 
 .. note:: Removing the instrument response is a computationally very expensive
-   task and *not* useful for dv/v iif your instruments didn't change during the
-   analysed period. It is also not needed for tomography iif all instruments are
+   task and *not* useful for dv/v iff your instruments didn't change during the
+   analysed period. It is also not needed for tomography iff all instruments are
    the same, or at least have an identical phase response in the frequency band
    of interest.
 
@@ -110,6 +110,10 @@ power of the mean coherence array. If ``pws_power`` is equal to 0, a linear
 stack is done (then it's faster to do set ``stack_method`` = 'linear'). Usual
 value is 2.
 
+.. warning:: PWS is largely untested, not cross-validated. It looks good, but
+    that doesn't mean a lot, does it? Use with Caution! And if you
+    cross-validate it, please let us know!!
+
 .. seealso:: Schimmel, M. and Paulssen H., "Noise reduction and detection
     of weak, coherent signals through phase-weighted stacks". Geophysical Journal
     International 130, 2 (1997): 497-505.
@@ -130,7 +134,7 @@ This step also supports parallel processing/threading:
     $ msnoise -t 4 compute_cc
 
 will start 4 instances of the code (after 1 second delay to avoid database
-conflicts). This only works both with SQLite and MySQL but be aware problems
+conflicts). This works both with SQLite and MySQL but be aware problems
 could occur with SQLite.
 
 

@@ -61,7 +61,7 @@ This step also supports parallel processing/threading:
     $ msnoise -t 4 compute_mwcs
 
 will start 4 instances of the code (after 1 second delay to avoid database
-conflicts). This only works both with SQLite and MySQL but be aware problems
+conflicts). This works both with SQLite and MySQL but be aware problems
 could occur with SQLite.
 
 .. versionadded:: 1.4
