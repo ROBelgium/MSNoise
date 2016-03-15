@@ -438,3 +438,11 @@ command similar to the ``install`` to take care of deleting/dropping the tables
 in the project database.
 
 
+Download Amazing Plugin
+-----------------------
+
+That's cheating, you know ? :-)
+
+`Download the Amazing Plugin <https://github.com/ROBelgium/msnoise-amazing>`_
+
+
