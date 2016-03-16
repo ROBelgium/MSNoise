@@ -17,6 +17,11 @@ matrix:
       env: PYTHON_VERSION=3.4
       language: python
 
+    - os: linux
+      env: PYTHON_VERSION=3.5
+      language: python
+
+
 sudo: false
 
 # Need to set this so that packages installed with apt-get are available
