@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime,\
-    text, TIMESTAMP, Enum, Numeric
+    text, TIMESTAMP, Enum, Numeric, REAL
 from sqlalchemy.ext.declarative import declarative_base
 import datetime
 
@@ -118,11 +118,8 @@ class Station(Base):
     ref = Column(Integer, primary_key=True)
     net = Column(String(10))
     sta = Column(String(10))
-    X = Column(Numeric(asdecimal=False,))
-    Y = Column(Numeric(asdecimal=False,))
-    # X = Column(Float())
-    # Y = Column(Float())
-
+    X = Column(REAL())
+    Y = Column(REAL())
     altitude = Column(Float())
     coordinates = Column(Enum('DEG', 'UTM'))
     instrument = Column(String(20))
