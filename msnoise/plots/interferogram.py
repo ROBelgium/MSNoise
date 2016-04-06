@@ -69,10 +69,16 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
 
         # ax.xaxis.set_minor_locator( MonthLocator(interval=2) )
         # ax.xaxis.set_minor_formatter(  DateFormatter('%Y-%m-%d') )
+       
+        for filterdb in get_filters(db, all=True):
+            if filterid == filterdb.ref:
+                low = float(filterdb.low)
+                high = float(filterdb.high)
+                break
         
         lag = 120
         plt.ylim(-lag,lag)
-        plt.title('%s : %s'%(sta1,sta2))
+        plt.title('%s : %s, Filter %d (%d - %d Hz)'%(sta1,sta2,filterid,low,high))
         name = '%i.%s_%s.png'%(filterid,sta1,sta2)
 
         #~ plt.savefig('interfero_publi.png',dpi=300)
