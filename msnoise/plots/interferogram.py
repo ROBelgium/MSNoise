@@ -78,7 +78,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         
         lag = 120
         plt.ylim(-lag,lag)
-        plt.title('%s : %s, Filter %d (%d - %d Hz)'%(sta1,sta2,filterid,low,high))
+        plt.title('%s : %s, %s, Filter %d (%d - %d Hz), Stack %d'%(sta1.replace('_', '.'), sta2.replace('_', '.'),components,filterid,low,high,mov_stack))
         name = '%i.%s_%s.png'%(filterid,sta1,sta2)
 
         #~ plt.savefig('interfero_publi.png',dpi=300)
