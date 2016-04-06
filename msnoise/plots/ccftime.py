@@ -62,10 +62,16 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
                 y2 = line*ampli + i + base
                 plt.fill_between(t, y1, y2, where=y2>=y1, facecolor='k', interpolate=True)
 
+        for filterdb in get_filters(db, all=True):
+            if filterid == filterdb.ref:
+                low = float(filterdb.low)
+                high = float(filterdb.high)
+                break
+       
         plt.xlabel("Lag Time (s)")
         plt.axhline(0,lw=0.5,c='k')
         plt.grid()
-        plt.title('%s : %s'%(sta1.replace('_', '.'), sta2.replace('_', '.')))
+        plt.title('%s : %s, Filter %d (%d - %d Hz)'%(sta1.replace('_', '.'), sta2.replace('_', '.'),filterid,low,high))
         plt.scatter(0,[start,])
         plt.ylim(start, end)
         plt.xlim(-maxlag, maxlag)
