@@ -102,6 +102,12 @@ def info(jobs):
     click.echo('')
     click.echo('General:')
 
+    def d(path):
+        return os.path.split(path)[0]
+
+    click.echo('MSNoise is installed in: %s'
+               % d(d(d(os.path.abspath(__file__)))))
+
     if os.path.isfile('db.ini'):
         click.echo(' - db.ini is present')
     else:
@@ -110,7 +116,6 @@ def info(jobs):
         return
     click.echo('')
     db = connect()
-
 
     if not jobs:
         click.echo('')

@@ -64,9 +64,6 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         ax.xaxis.set_major_locator( YearLocator() )
         ax.xaxis.set_major_formatter(  DateFormatter('%Y-%m') )
 
-        # ax.xaxis.set_minor_locator( MonthLocator(interval=2) )
-        # ax.xaxis.set_minor_formatter(  DateFormatter('%Y-%m-%d') )
-       
         for filterdb in get_filters(db, all=True):
             if filterid == filterdb.ref:
                 low = float(filterdb.low)

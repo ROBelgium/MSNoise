@@ -20,7 +20,8 @@ setup( version=versioneer.get_version(),
         'flask',
         'flask-admin',
         'multiprocessing_logging',
-        'markdown'
+        'markdown',
+        'folium'
     ],
     entry_points='''
         [console_scripts]
