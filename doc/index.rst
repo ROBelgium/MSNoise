@@ -47,6 +47,7 @@ Documentation Content:
    how_tos
    about_db_performances
    references
+   contributors
 
 .. toctree::
     :maxdepth: 1

@@ -108,7 +108,16 @@ for command in sorted(C):
         out.write('.. include:: msnoise-%s.rst\n\n'%(command))
 out.close()
 
+out = open('contributors.rst', 'w')
+out.write('Contributors\n')
+out.write('============\n\n')
+out.write('The following poeple have contributed to MSNoise (sorted '
+          'alphabetically):\n\n')
 
+cont = open("../CONTRIBUTORS.txt",'r')
+for line in cont.readlines():
+    out.write("* "+ line)
+out.close()
 # -- General configuration -----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.

@@ -49,17 +49,14 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         
         print("New Data for %s-%s-%i-%i"%(pair,components,filterid, mov_stack))
         format = "matrix"
-        nstack, stack_total = get_results(db,sta1,sta2,filterid,components,datelist,mov_stack, format=format)
-        # vmax = scoreatpercentile(np.abs(stack_total[np.isnan(stack_total)==False]) , 98)
-        # for i in range(stack_total.shape[0]):
-            # if not np.all( np.isnan(stack_total[i,:])):
-                # print np.max(stack_total[i,:])
-                # stack_total[i,:] /= np.max(stack_total[i,:])
-        # stack_total /= np.max(stack_total, axis=0)
+        nstack, stack_total = get_results(db,sta1,sta2,filterid,components,
+                                          datelist,mov_stack, format=format)
+
         xextent = (date2num(start), date2num(end),-maxlag,maxlag)
         ax = plt.subplot(111)
-        plt.imshow(stack_total.T, extent=xextent, aspect="auto",interpolation='none',origin='lower',cmap='seismic',
-                vmin=-1e-2,vmax=1e-2)
+        plt.imshow(stack_total.T, extent=xextent, aspect="auto",
+                   interpolation='none',origin='lower',cmap='seismic',
+                   vmin=-1e-2,vmax=1e-2)
         plt.ylabel("Lag Time (s)")
         plt.axhline(0,lw=0.5,c='k')
         plt.grid()
@@ -78,14 +75,10 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         
         lag = 120
         plt.ylim(-lag,lag)
-        plt.title('%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d'%(sta1.replace('_', '.'), sta2.replace('_', '.'),components,filterid,low,high,mov_stack))
-        name = '%i.%s_%s.png'%(filterid,sta1,sta2)
+        plt.title('%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' %
+                  (sta1.replace('_', '.'), sta2.replace('_', '.'), components,
+                   filterid, low, high, mov_stack))
 
-        #~ plt.savefig('interfero_publi.png',dpi=300)
-        # plt.figure()
-        # maxx = np.argmax(stack_total, axis=0)
-        # plt.plot(maxx)
-        
         if outfile:
             if outfile.startswith("?"):
                 pair = pair.replace(':','-')
@@ -98,8 +91,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
             plt.savefig(outfile)
         if show:
             plt.show()
-        
-                            
+
 
 if __name__ == "__main__":
     main()

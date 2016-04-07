@@ -27,7 +27,7 @@ web-based admin interface, the support for plugins and extensions, the phase
 weighted stack and the instrument response removal. It also brings the
 possibility to parallel/thread process the cross-correlation and the MWCS steps.
 MSNoise is now "tested" automatically on Linux (thanks to TravisCI) & Windows
-(thanks to Appveyor), for Python versions 2.7, 3.3 and 3.4. Yes, **MSNoise is
+(thanks to Appveyor), for Python versions 2.7, 3.4 and 3.5. Yes, **MSNoise is
 Python 3 compatible** !!!
 
 This version has benefited from outputs/ideas/pull requests/questions from
