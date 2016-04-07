@@ -12,9 +12,20 @@ Example:
 
 .. image:: .static/station_map.png
 
+
+It will also generate a HTML file showing the stations on the Leaflet Mapping
+Service:
+
+.. raw:: html
+
+    <iframe src="_static/station_map.html" width=800 height=400></iframe>
+
+
+.. versionadded:: 1.4 | Thanks to A. Mordret!
+
 """
 
-
+import traceback
 import folium
 import os
 import numpy as np
@@ -40,6 +51,7 @@ def main(show=True, outfile=None):
 
     sta_map.add_child(folium.LatLngPopup())
     if outfile:
+        tmp = outfile
         if outfile.startswith("?"):
             now = datetime.datetime.now()
             now = now.strftime('station map on %Y-%m-%d %H.%M.%S')
@@ -48,8 +60,8 @@ def main(show=True, outfile=None):
         sta_map.save('%s.html'%tmp)
 
     # plot topography/bathymetry as an image.
-    bufferlat=(np.amax(coords[:,0])-np.amin(coords[:,0]))/10
-    bufferlon=(np.amax(coords[:,1])-np.amin(coords[:,1]))/10
+    bufferlat=(np.amax(coords[:,0])-np.amin(coords[:,0]))+.1
+    bufferlon=(np.amax(coords[:,1])-np.amin(coords[:,1]))+.1
     m = Basemap(projection='mill',llcrnrlat=np.amin(coords[:,0])-bufferlat,urcrnrlat=np.amax(coords[:,0])+bufferlat,\
             llcrnrlon=np.amin(coords[:,1])-bufferlon,urcrnrlon=np.amax(coords[:,1])+bufferlon,resolution='i')
 
@@ -62,11 +74,14 @@ def main(show=True, outfile=None):
     # attach new axes image to existing Basemap instance.
     m.ax = ax
     #im = m.imshow(topodat,cm.GMT_haxby)
-    m.shadedrelief()
+    try:
+        m.shadedrelief()
+    except:
+        traceback.print_exc()
     m.scatter(x,y,50,marker='v',color='r')
     for sta in stations:
         xpt, ypt = m(sta.X,sta.Y)
-        plt.text(xpt+10000,ypt+15000,"%s_%s" % (sta.net, sta.sta),fontsize=9,
+        plt.text(xpt,ypt,"%s_%s" % (sta.net, sta.sta),fontsize=9,
                     ha='center',va='top',color='k',
                     bbox = dict(boxstyle="square",ec='None',fc=(1,1,1,0.5)))
     # draw coastlines and political boundaries.

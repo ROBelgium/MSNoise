@@ -16,10 +16,10 @@ Release notes:
 
 Introduction
 ------------
-Almost a year after the last major release (:doc:`msnoise-1.3`) we are proud to
-announce the new :doc:`msnoise-1.4`. It is a **major** release, with a massive
-amount of work since the last one: in `GitHub numbers
-<https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2015-04-01&to=2016-03-20&type=c>`_
+Just over a year after the last major release (:doc:`msnoise-1.3`) we are proud
+to announce the new :doc:`msnoise-1.4`. It is a **major** release, with a
+massive amount of work since the last one: in `GitHub numbers
+<https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2015-04-01&to=2016-04-20&type=c>`_
 , it's over XXX commits and about XXX new lines of code and documentation added!
 
 MSNoise 1.4 introduces **four major new features** : a new ultra-intuitive
@@ -46,12 +46,12 @@ several users/friends:
 Thanks to all for using MSNoise, and please, let us know why/how you use it
 (and please cite it!)!
 
-To date, we found/are aware of 11 publications using MSNoise ! That's the best
+To date, we found/are aware of 12 publications using MSNoise ! That's the best
 validation of our project ever ! See the full list on the
 `MSNoise website <http://www.msnoise.org/they-cite-msnoise/>`_.
 
 
-*Thomas Lecocq & Corentin Caudron*
+*Thomas*
 
 
 ~~~~
@@ -180,6 +180,10 @@ rows show the "REF" stack and its FTAN image. The three rows are:
 * B: PWS stack of  "windows" to "daily" - Linear stack of "daily" to "ref"
 * C: PWS stack of  "windows" to "daily" - PWS stack of "daily" to "ref"
 
+To obtain an LIN-LIN or PWS-PWS stack, simply set ``stack_method`` = 'linear' or
+'pws', respectively when running the ``compute_cc`` and ``stack`` steps.
+And for mixed cases LIN-PWS or PWS-LIN, edit the config between the two steps!
+
 .. image:: ../.static/pws.png
 
 Instrument Response Correction
@@ -262,7 +266,8 @@ Improvements in terms of performances have also been done for MSNoise 1.4:
   XXX not used actually !!!
 * ``compute_cc``: reversed the change done in 1.3, the pre-whitening of the
   traces is now disabled, it led to very high memory usage and needs a fresh
-  rewrite.
+  rewrite. This doens't mean whitening is no longer done, but just some sort
+  of caching of the pre-whitened traces.
 
 
 
@@ -278,6 +283,27 @@ Running the following command will take care of the upgrade from 1.3 to 1.4:
 
     msnoise upgrade_db
 
+
+
+There was a bug, mainly present in MySQL, with too sharp rounding of station
+coordinates. The bugfix change is done automatically for MySQL databases.
+It is a little different if you are using SQLite as it
+can't be done automatically. This is because SQLite doesn't support "ALTER"
+commands. Ultimately we want the ``station.X`` and ``station.Y`` to be be of
+type ``double``. You will have to do this operation manually:
+
+.. warning:: Do the following at your own risk. It *might* not be needed!
+    From the tests we ran, it seems the coordinates rounding error was present
+    only for MySQL databases!
+
+* Open SQLite database browser (`SQLiteManager <https://addons.mozilla.org/firefox/addon/sqlite-manager/>`_
+  extension for Firefox, for example)
+* Open the msnoise.sqlite file
+* Select the station table
+* Edit the ``X`` field and change its type to ``double``
+* Edit the ``Y`` field and change its type to ``double``
+* Ignore the warnings (it should work, although it could fail!)
+* Close the database
 
 
 A final note about development pace and choices
@@ -303,7 +329,7 @@ using has been coded by 1 person, and that it's not his full time job. So
 MSNoise is provided "as-is", carefully written and tested, but there will be
 bugs, issues, incompatibility with certain python installations, OS or module
 versions. If you **want or need** developments made and you can afford it,
-contact Thomas via email directly, you can contract with the ROB for
+contact Thomas via email directly, you can contract him for
 paid-developments. If the developments you want are within the focus of the
 developers' research, then a collaboration, i.e. resulting in a co-authored
 peer reviewed publication, can be another option.

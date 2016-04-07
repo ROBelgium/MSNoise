@@ -17,8 +17,9 @@ default['preprocess_lowpass'] = ["Preprocessing Low-pass value in Hz [8.0]",'8.0
 default['preprocess_highpass'] = ["Preprocessing High-pass value in Hz [0.01]",'0.01']
 
 default['remove_response'] = ["Remove instrument response Y/[N]",'N']
-default['response_format'] = ["Remove instrument format [dataless]/inventory/paz/resp",'dataless']
-default['response_path'] = ["Remove instrument file(s) location (path relative to db.ini)",'inventory']
+default['response_format'] = ["Remove instrument file format [dataless]/inventory/paz/resp",'dataless']
+default['response_path'] = ["Instrument correction file(s) location (path relative to db.ini), defaults to './inventory', i.e."
+                            " a subfolder in the current project folder.<br>All files in that folder will be parsed.",'inventory']
 default['response_prefilt'] = ["Remove instrument correction **pre-filter** (0.005, 0.006, 30.0, 35.0)",'(0.005, 0.006, 30.0, 35.0)']
 
 default['maxlag'] = ["Maximum lag (in seconds) [120.0]",'120.']
@@ -27,7 +28,7 @@ default['overlap'] = ["Amount of overlap between data windows [0:1[ [0.]",'0.0']
 default['windsorizing'] = ["Windsorizing at N time RMS , 0 disables windsorizing, -1 enables 1-bit normalization [3]",'3']
 
 default['stack_method'] = ["Stack Method: Linear Mean or Phase Weighted Stack: [linear]/pws ",'linear']
-default['pws_timegate'] = ["If stack_method='pws', width of the smoothing : 1.0 ",'1.0']
+default['pws_timegate'] = ["If stack_method='pws', width of the smoothing in seconds : 10.0 ",'10.0']
 default['pws_power'] = ["If stack_method='pws', Power of the Weighting: 2.0 ",'2.0']
 
 default['crondays'] = ["Number of days to monitors with cron [-1]",'-1']
