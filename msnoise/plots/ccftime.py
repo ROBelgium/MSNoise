@@ -71,7 +71,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
         plt.xlabel("Lag Time (s)")
         plt.axhline(0,lw=0.5,c='k')
         plt.grid()
-        plt.title('%s : %s, %s, Filter %d (%d - %d Hz), Stack %d'%(sta1.replace('_', '.'), sta2.replace('_', '.'),components,filterid,low,high,mov_stack))
+        plt.title('%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d'%(sta1.replace('_', '.'), sta2.replace('_', '.'),components,filterid,low,high,mov_stack))
         plt.scatter(0,[start,])
         plt.ylim(start, end)
         plt.xlim(-maxlag, maxlag)
