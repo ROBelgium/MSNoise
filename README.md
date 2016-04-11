@@ -54,10 +54,13 @@ If you use MSNoise, even a small part of it, for your research and publications,
 for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
 *Seismological Research Letters*, 85(3), 715‑726, doi:10.1785/0220130073.
 
+Thanks to all [who already did so](http://www.msnoise.org/they-cite-msnoise)! 
+
 Disclaimer
 ----------
 
 Although we have cross-checked the whole code, we cannot warranty it is exempt of bugs. The package is provided as-is, we will not be held responsible for any use you make of it, nor for the results and conclusions you may find using MSNoise.
+
 
 
 Licence
