@@ -17,8 +17,8 @@ This section only presents the "installation" and configuration of MSNoise (read
     :depth: 1
 
 
-Installer
----------
+Installer (initialize Project)
+------------------------------
 
 .. automodule:: msnoise.s000installer
 

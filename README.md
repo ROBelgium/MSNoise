@@ -1,20 +1,29 @@
 MSNoise
 =======
-
-[![Join the chat at https://gitter.im/ROBelgium/MSNoise](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/ROBelgium/MSNoise?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
 A Python Package for Monitoring Seismic Velocity Changes using Ambient Seismic Noise.
 
-
+[![Join the chat at https://gitter.im/ROBelgium/MSNoise](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/ROBelgium/MSNoise?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Build Status](https://travis-ci.org/ROBelgium/MSNoise.png)](https://travis-ci.org/ROBelgium/MSNoise)
 [![Build status](https://ci.appveyor.com/api/projects/status/82k4dw58jhadfung?svg=true)](https://ci.appveyor.com/project/ThomasLecocq/msnoise)
-
 [![Analytics](https://ga-beacon.appspot.com/UA-55331253-1/MSNoise/readme)](https://github.com/ROBelgium/MSNoise)
+
 
 MSNoise is the first complete software package for computing and monitoring relative velocity variations using ambient seismic noise. 
 MSNoise is a fully-integrated solution that automatically scans data archives and determines which jobs need to be done whenever the scheduled task is executed. 
 
-MSNoise is a joint project of the Royal Observatory of Belgium (Thomas Lecocq and Corentin Caudron) and ISTerre + IPGP (Florent Brenguier)
+MSNoise is developed by Thomas Lecocq (Royal Observatory of Belgium, ROB) and Corentin Caudron (previously at ROB and EOSingapore, now at University of Cambridge).
+The group of active users (providing questions, feedback, snippets of code) is growing and the full list of Contributors is available here: http://msnoise.org/doc/contributors.html. 
+
+History
+-------
+
+* 2010: MSNoise is created based on Matlab, c++, csh and fortran codes from Florent Brenguier (IPGP, U. Grenoble-Alpes) and Daniel Clarke (IPGP).
+* 2011/12: MSNoise is tested on Undervolc data, and used by Corentin for his PhD thesis.
+* 2013: First release of MSNoise for the IAVCEI 2013 in Kagoshima.
+* 2014: Improvements and bugfixes, release 1.2.5.
+* 2015: MSNoise 1.3: MSNoise is real python package.
+* 2016: MSNoise 1.4: new web-admin, plugin support, instrument response removal and phase weighted stacking.
+
 
 Documentation
 -------------
@@ -24,14 +33,9 @@ The full documentation can be found on: http://www.msnoise.org.
 Installation
 ------------
 
-Users are recommended to download the latest RELEASE https://github.com/ROBelgium/MSNoise/releases/latest !
+Please follow the instructions in the documentation: http://msnoise.org/doc/installation.html
 
 Remember, always consider the the current *master* as not stable!
-
-
-Packaging
----------
-Starting at release 1.3, MSNoise **is** a regular Python Package ! No need to copy/paste MSNoise sources .py everywhere!
 
 
 Getting Help
@@ -45,6 +49,7 @@ Disclaimer
 ----------
 
 Although we have cross-checked the whole code, we cannot warranty it is exempt of bugs. The package is provided as-is, we will not be held responsible for any use you make of it, nor for the results and conclusions you may find using MSNoise.
+
 
 Licence
 -------

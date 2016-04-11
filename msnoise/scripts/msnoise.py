@@ -108,7 +108,8 @@ def upgrade_db():
 def info(jobs):
     """Outputs general information about the current install and config, plus
     information about jobs and their status."""
-    from ..api import connect, get_config, get_job_types
+    from ..api import connect, get_config, get_job_types, get_filters,\
+                      get_stations
     from ..default import default
 
     click.echo('')
@@ -163,6 +164,28 @@ def info(jobs):
             else:
                 click.secho(" M %s: %s" %(key, tmp ), fg='green')
 
+        click.echo('')
+        click.echo('Filters:')
+        print('ID: [low:high]  [mwcs_low:mwcs_high]    mwcs_wlen    mwcs_step   used')
+        for f in get_filters(db, all=True):
+            data = (f.ref,
+                    f.low,
+                    f.high,
+                    f.mwcs_low,
+                    f.mwcs_high,
+                    f.mwcs_wlen,
+                    f.mwcs_step,
+                    ['N','Y'][f.used])
+            print('%02i: [%.03f:%.03f] [%.03f:%.03f] %.03i %.03i %s' % data)
+
+        click.echo('')
+        click.echo('Stations:')
+        for s in get_stations(db, all=True):
+            data = (s.net, s.sta, s.X, s.Y, s.altitude, s.coordinates,
+                    ['N', 'Y'][s.used])
+            print('%s.%s %.4f %.4f %.1f %s %s' % data)
+
+    click.echo('')
     click.echo('CC Jobs:')
     for (n,jobtype) in get_job_types(db,'CC'):
         click.echo(" %s : %i" % (jobtype, n))

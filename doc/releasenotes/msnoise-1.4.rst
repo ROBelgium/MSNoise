@@ -40,6 +40,7 @@ several users/friends:
 * Clare Donaldson
 * Aurélien Mordret
 * Raphaël De Plaen
+* Lukas E. Preiswerk
 * all others (don't be mad :-) )
 
 
@@ -110,7 +111,7 @@ msnoise, i.e. it has to be "installed" like any other python package.
 After installing a plugin, its **package name** must be declared in the
 ``plugins`` parameter in the configuration. This must be done **PER PROJECT**.
 
-Python'speaking, plugins declare entry points that MSNoise uses to define
+Pythonly speaking, plugins declare entry points that MSNoise uses to define
 commands and job types. This way, the ``msnoise plugin`` command would populate
 with the plugin commands and plugin's custom Job Types will be declared at
 different steps of the code. Currently, custom job types can be defined at three
@@ -216,10 +217,13 @@ Command Line changes
   mode, currently only for plots. See below.
 * ``msnoise compute_cc`` and ``msnoise compute_mwcs`` : support the ``-t``
   threading flag and shoud be able to work multiple threads. Example calls:
-  ``msnoise -t 4 compute_cc`` or``msnoise -t 16 compute_mwcs``. Don't start
+  ``msnoise -t 4 compute_cc`` or ``msnoise -t 16 compute_mwcs``. Don't start
   more threads than the actual number of real cores on your machine, and take
   into account that if each instance loads a lot of data (stations), you shoud
   have have enough RAM to store it.
+* ``msnoise info`` now returns the location where the MSNoise package is
+  installed (useful when developping / hacking the code). It also returns the
+  list of configured Filters and Stations in the database.
 
 All commands are now documented: :doc:`../clickhelp/msnoise`.
 
