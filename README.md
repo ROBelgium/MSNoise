@@ -14,15 +14,16 @@ MSNoise is a fully-integrated solution that automatically scans data archives an
 MSNoise is developed by Thomas Lecocq (Royal Observatory of Belgium, ROB) and Corentin Caudron (previously at ROB and EOSingapore, now at University of Cambridge).
 The group of active users (providing questions, feedback, snippets of code) is growing and the full list of Contributors is available here: http://msnoise.org/doc/contributors.html. 
 
+
 History
 -------
 
 * 2010: MSNoise is created based on Matlab, c++, csh and fortran codes from Florent Brenguier (IPGP, U. Grenoble-Alpes) and Daniel Clarke (IPGP).
 * 2011/12: MSNoise is tested on Undervolc data, and used by Corentin for his PhD thesis.
 * 2013: First release of MSNoise for the IAVCEI 2013 in Kagoshima ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.0.html)).
-* 2014: Improvements and bugfixes, release 1.2.5. Publication of the SRL article: http://srl.geoscienceworld.org/content/85/3/715.full ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.2.5.html)).
-* 2015: MSNoise 1.3: MSNoise is real python package ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.3.html)).
-* 2016: MSNoise 1.4: new web-admin, plugin support, instrument response removal and phase weighted stacking ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.4.html)).
+* 2014: Improvements and bugfixes, release 1.2.5. Publication of the [SRL article](http://srl.geoscienceworld.org/content/85/3/715.full) ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.2.5.html)).
+* 2015: MSNoise 1.3: MSNoise is real python package, with a documented API and new plots ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.3.html)).
+* 2016: MSNoise 1.4: new web admin interface, plugin support, instrument response removal and phase weighted stacking ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.4.html)).
 
 
 Documentation
