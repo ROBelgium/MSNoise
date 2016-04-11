@@ -36,7 +36,7 @@ Installation
 
 Please follow the instructions in the documentation: http://msnoise.org/doc/installation.html
 
-Remember, always consider the the current *master* as not stable!
+Remember, always consider the current GitHub *master* as not stable!
 
 
 Getting Help
@@ -45,6 +45,14 @@ The best way to get help is to subscribe to the Mailing List and ask your questi
 http://mailman-as.oma.be/mailman/listinfo/msnoise and the archive is either http://mailman-as.oma.be/pipermail/msnoise/ or 
 on http://news.gmane.org/gmane.science.geophysics.msnoise for a nice view.
 
+Citing MSNoise
+--------------
+
+If you use MSNoise, even a small part of it, for your research and publications, please consider citing it:
+
+**Lecocq, T., C. Caudron, et F. Brenguier (2014)**, MSNoise, a Python Package
+for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
+*Seismological Research Letters*, 85(3), 715‑726, doi:10.1785/0220130073.
 
 Disclaimer
 ----------

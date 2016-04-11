@@ -10,9 +10,9 @@ conda update --yes conda
 # Installed required packages
 conda install --yes pip numpy scipy matplotlib statsmodels pandas
 conda install --yes sqlalchemy sphinx jinja2 pymysql click
-conda install --yes flask
+conda install --yes flask lxml
 # Update remaining packages not available via conda
-pip install flask-admin
+pip install flask-admin folium multiprocessing_logging markdown
 pip install obspy
 
 # Special install for scikits.samplerate

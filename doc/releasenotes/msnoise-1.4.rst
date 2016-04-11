@@ -332,8 +332,8 @@ If you have complaints, post them too, but remember that the package you are
 using has been coded by 1 person, and that it's not his full time job. So
 MSNoise is provided "as-is", carefully written and tested, but there will be
 bugs, issues, incompatibility with certain python installations, OS or module
-versions. If you **want or need** developments made and you can afford it,
-contact Thomas via email directly, you can contract him for
-paid-developments. If the developments you want are within the focus of the
-developers' research, then a collaboration, i.e. resulting in a co-authored
-peer reviewed publication, can be another option.
+versions. If you **want or need** developments made, contact Thomas via email
+directly. If these developments are within the focus of the developers'
+research, then a collaboration, i.e. resulting in a co-authored peer reviewed
+publication, can be an option. Otherwise, you can contract us for
+paid-developments.
