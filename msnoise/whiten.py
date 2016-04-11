@@ -14,7 +14,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     :type data: :class:`numpy.ndarray`
     :param data: Contains the 1D time series to whiten
     :type Nfft: int
-    :para Nfft: The number of points to compute the FFT
+    :param Nfft: The number of points to compute the FFT
     :type delta: float
     :param delta: The sampling frequency of the `data`
     :type freqmin: float
