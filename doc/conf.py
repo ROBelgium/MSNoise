@@ -151,7 +151,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'MSNoise'
-copyright = u'%i, Lecocq, Caudron and Brenguier' % datetime.datetime.now().year
+copyright = u'%i, Lecocq, Caudron & the MSNoise devs' % datetime.datetime.now().year
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.

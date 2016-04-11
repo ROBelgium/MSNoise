@@ -969,6 +969,8 @@ def stack(session, data):
     elif stack_method == "pws":
         corr = np.zeros(data.shape[1], dtype='f8')
         phasestack = np.zeros(data.shape[1], dtype='c8')
+        for i in range(data.shape[0]):
+            data[i] -= data[i].mean()
         for c in data:
             phase = np.angle(sp.signal.hilbert(c))
             phasestack.real += np.cos(phase)
