@@ -70,7 +70,7 @@ def upgrade_db():
             db.commit()
         except:
             db.rollback()
-            print("Passing %s: already in DB" % name)
+            # print("Passing %s: already in DB" % name)
             continue
 
     db.close()
@@ -99,7 +99,7 @@ def upgrade_db():
             print("The jobs table seems already up-to-date, exiting.")
     else:
         print("You need to edit the `station` table manually to match the new"
-              "column naming")
+              " column naming")
         print ("Please read http://msnoise.org/doc/releasenotes/msnoise-1.4.html")
 
 
