@@ -19,10 +19,10 @@ History
 
 * 2010: MSNoise is created based on Matlab, c++, csh and fortran codes from Florent Brenguier (IPGP, U. Grenoble-Alpes) and Daniel Clarke (IPGP).
 * 2011/12: MSNoise is tested on Undervolc data, and used by Corentin for his PhD thesis.
-* 2013: First release of MSNoise for the IAVCEI 2013 in Kagoshima.
-* 2014: Improvements and bugfixes, release 1.2.5.
-* 2015: MSNoise 1.3: MSNoise is real python package.
-* 2016: MSNoise 1.4: new web-admin, plugin support, instrument response removal and phase weighted stacking.
+* 2013: First release of MSNoise for the IAVCEI 2013 in Kagoshima ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.0.html)).
+* 2014: Improvements and bugfixes, release 1.2.5. Publication of the SRL article: http://srl.geoscienceworld.org/content/85/3/715.full ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.2.5.html)).
+* 2015: MSNoise 1.3: MSNoise is real python package ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.3.html)).
+* 2016: MSNoise 1.4: new web-admin, plugin support, instrument response removal and phase weighted stacking ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.4.html)).
 
 
 Documentation
