@@ -5,7 +5,7 @@ import scipy.fftpack
 from .api import nextpow2
 
 
-def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
+def whiten(data, Nfft, delta, freqmin, freqmax, waterlevel, plot=False):
     """This function takes 1-dimensional *data* timeseries array,
     goes to frequency domain using fft, whitens the amplitude of the spectrum
     in frequency domain between *freqmin* and *freqmax*
@@ -21,6 +21,9 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     :param freqmin: The lower frequency bound
     :type freqmax: float
     :param freqmax: The upper frequency bound
+    :type waterlevel: float
+    :param waterlevel: Percentage of the mean power spectrum level below which
+        the data are not normalized
     :type plot: bool
     :param plot: Whether to show a raw plot of the action (default: False)
 
@@ -36,8 +39,8 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
 
     Napod = 100
     Nfft = int(Nfft)
-    freqVec = scipy.fftpack.fftfreq(Nfft,d=delta)[:Nfft/2]
-    
+    freqVec = scipy.fftpack.fftfreq(Nfft, d=delta)[:Nfft/2]
+
     J = np.where((freqVec >= freqmin) & (freqVec <= freqmax))[0]
     low = J[0] - Napod
     if low <= 0:
@@ -50,7 +53,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
         high = Nfft // 2
 
     FFTRawSign = scipy.fftpack.fft(data, Nfft)
-    
+
     if plot:
         plt.subplot(412)
         axis = np.arange(len(FFTRawSign))
@@ -58,15 +61,25 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
         plt.xlim(0, max(axis))
         plt.title('FFTRawSign')
 
+    taperleft=np.cos(np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2
+    taperright=np.cos(np.linspace(0., np.pi / 2., high - porte2)) ** 2
+
+    ABSFFTRawSign=np.abs(FFTRawSign)
+
+    if waterlevel != 0:
+        wl = np.ones(len(FFTRawSign)) * waterlevel * np.mean(ABSFFTRawSign[J])
+        wl = np.max([ABSFFTRawSign, wl], axis=0)
+        FFTRawSign /= wl
+    else:
+        FFTRawSign = FFTRawSign / ABSFFTRawSign
+
     # Left tapering:
     FFTRawSign[0:low] *= 0
-    FFTRawSign[low:porte1] = np.cos(np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2 * np.exp(1j * np.angle(FFTRawSign[low:porte1]))
-    # Pass band:
-    FFTRawSign[porte1:porte2] = np.exp(1j * np.angle(FFTRawSign[porte1:porte2]))
+    FFTRawSign[low:porte1] = taperleft * FFTRawSign[low:porte1]
     # Right tapering:
-    FFTRawSign[porte2:high] = np.cos(np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(1j * np.angle(FFTRawSign[porte2:high]))
+    FFTRawSign[porte2:high] = taperright * FFTRawSign[porte2:high]
     FFTRawSign[high:Nfft+1] *= 0
-    
+
     # Hermitian symmetry (because the input is real)
     FFTRawSign[-Nfft/2+1:] = FFTRawSign[1:Nfft/2].conjugate()[::-1]
 
@@ -90,11 +103,13 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
         plt.subplot(414)
         plt.plot(np.arange(len(wdata)) * delta, wdata)
         plt.xlim(0, len(wdata) * delta)
+        plt.suptitle('w=%0.4f'%waterlevel)
         plt.show()
-    
+
+
     return FFTRawSign
 
-    
+
 if __name__ == '__main__':
     import time
     N = 2048
@@ -104,6 +119,6 @@ if __name__ == '__main__':
     a -= a.mean()
     t = time.clock()
     for i in range(1000):
-        whiten(a.copy(), N, 0.05, 1.0, 5.9, plot=False)
+        whiten(a.copy(), N, 0.05, 1.0, 5.9, 0, plot=False)
     print("1000 loops:", (time.clock()-t) * 1000, "ms")
-    whiten(a.copy(), N, 0.05, 1.0, 5.9, plot=True)
+    whiten(a.copy(), N, 0.05, 1.0, 5.9, 0.99999, plot=True)

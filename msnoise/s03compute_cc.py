@@ -380,6 +380,7 @@ def main():
     params.maxlag = float(get_config(db, "maxlag"))
     params.min30 = float(get_config(db, "corr_duration")) * params.goal_sampling_rate
     params.windsorizing = float(get_config(db, "windsorizing"))
+    params.whiten_waterlevel = float(get_config(db, "whiten_waterlevel"))
     params.resampling_method = get_config(db, "resampling_method")
     params.decimation_factor = int(get_config(db, "decimation_factor"))
     params.preprocess_lowpass = float(get_config(db, "preprocess_lowpass"))
@@ -650,7 +651,8 @@ def main():
                                             trame2h[i][indexes])) * params.windsorizing * rmsmat[i]
 
                                     trames2hWb[i] = whiten(
-                                        trame2h[i]*cp, Nfft, dt, low, high, plot=False)
+                                        trame2h[i]*cp, Nfft, dt, low, high,
+                                        params.whiten_waterlevel, plot=False)
                                 else:
                                     trames2hWb[i] = np.zeros(int(Nfft))
                                     skip = True
