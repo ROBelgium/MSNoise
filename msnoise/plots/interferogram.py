@@ -30,7 +30,7 @@ import scipy.signal
 from obspy.core import read, Stream, Trace
 
 from ..api import *
-
+from matplotlib.widgets import Cursor
 
 def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None):
     db = connect()
@@ -41,7 +41,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
     # mov_stack = get_config(db,"mov_stack")
  
    
-    plt.figure(figsize=(16,16))
+    fig = plt.figure(figsize=(16,16))
     sta1 = sta1.replace('.','_')
     sta2 = sta2.replace('.','_')
     if sta2 > sta1: # alphabetical order filtering!
@@ -75,7 +75,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         plt.title('%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' %
                   (sta1.replace('_', '.'), sta2.replace('_', '.'), components,
                    filterid, low, high, mov_stack))
-
+        cursor = Cursor(ax, useblit=True, color='black', linewidth=1.2)
         if outfile:
             if outfile.startswith("?"):
                 pair = pair.replace(':','-')
