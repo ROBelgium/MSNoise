@@ -36,7 +36,7 @@ several users/friends:
 
 * Carmelo Sammarco
 * Esteban Chaves
-* Lion Krisher
+* Lion Krischer
 * Tobias Megies
 * Clare Donaldson
 * Aurélien Mordret
@@ -53,7 +53,7 @@ validation of our project ever ! See the full list on the
 `MSNoise website <http://www.msnoise.org/they-cite-msnoise/>`_.
 
 
-*Thomas*
+*Thomas & Corentin*
 
 
 ~~~~
