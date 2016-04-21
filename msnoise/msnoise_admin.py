@@ -497,7 +497,7 @@ def pairs():
 
 @app.route('/admin/bugreport.json')
 def bugreporter():
-    from bugreport import main
+    from .bugreport import main
     output = main(modules=True, show=False)
 
     o = json.dumps(output)
