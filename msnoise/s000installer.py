@@ -35,7 +35,9 @@ from .msnoise_table_def import *
 from .default import default
 from .api import create_database_inifile
 
-
+import sys
+if sys.version_info[0] >= 3:
+    raw_input = input
 
 def main(tech=None, hostname="localhost", username="msnoise",
          password="msnoise", database="msnoise", filename="msnoise.sqlite"):
