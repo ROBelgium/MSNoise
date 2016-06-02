@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import versioneer
 
-setup(version="1.4.1a",
+setup(version="1.4.1",
     name='msnoise',
     packages=find_packages(),
     include_package_data=True,
