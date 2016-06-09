@@ -79,7 +79,11 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         
         lag = 120
         plt.ylim(-lag,lag)
+<<<<<<< HEAD
         plt.title('TEST!! %s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d'%(sta1.replace('_', '.'), sta2.replace('_', '.'),components,filterid,low,high,mov_stack))
+=======
+        plt.title('%s : %s, %s, Filter %d (%d - %d Hz), Stack %d'%(sta1.replace('_', '.'), sta2.replace('_', '.'),components,filterid,low,high,mov_stack))
+>>>>>>> parent of 358e06d... Update interferogram.py
         name = '%i.%s_%s.png'%(filterid,sta1,sta2)
 
         #~ plt.savefig('interfero_publi.png',dpi=300)
