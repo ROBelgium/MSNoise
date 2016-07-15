@@ -118,17 +118,17 @@ modules are properly installed and available for MSNoise.
 
 
 from flask import Flask, redirect, request,  url_for
-from flask.ext.admin import Admin, BaseView, expose
+from flask_admin import Admin, BaseView, expose
 import flask, time, json, socket
 from flask_admin.model import typefmt
-from flask.ext.admin.contrib.sqla import ModelView
+from flask_admin.contrib.sqla import ModelView
 from flask import flash
 from wtforms.validators import ValidationError
-from flask.ext.admin.actions import action
-from flask.ext.admin.babel import ngettext, lazy_gettext
+from flask_admin.actions import action
+from flask_admin.babel import ngettext, lazy_gettext
 import markdown
 from flask import Markup
-
+from io import BytesIO
 # from bokeh.embed import components
 # from bokeh.plotting import figure
 # from bokeh.resources import INLINE, CDN
@@ -582,6 +582,15 @@ def joblists():
     return flask.Response(o, mimetype='application/json')
 
 
+@app.route('/admin/data_availability.png')
+def DA_PNG():
+    from .plots.data_availability import main
+    output = BytesIO()
+    main(show=False, outfile=output)
+    output.seek(0)
+    return flask.Response(output.read(), mimetype='image/png')
+
+
 @app.route('/admin/data_availability_flags.json')
 def DA_flags():
     db = connect()
@@ -670,5 +679,7 @@ def main(port=5000):
     admin.add_view(a)
     admin.add_view(BugReport(name='Bug Report', endpoint='bugreport', category='Help'))
 
-
-    app.run(host='0.0.0.0', debug=True, port=port)
+    print("MSNoise admin will run on all interfaces by default")
+    print("access it via the machine's IP address or")
+    print("via http://127.0.0.1:5000 when running locally.")
+    app.run(host='0.0.0.0', port=port, debug=False, reloader_interval=1)

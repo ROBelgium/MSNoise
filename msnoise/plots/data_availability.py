@@ -81,10 +81,10 @@ def main(show=False, outfile=None):
     plt.gcf().autofmt_xdate()
     plt.grid()
     if outfile:
-        if outfile.startswith("?"):
-            now = datetime.datetime.now()
-            now = now.strftime('data availability on %Y-%m-%d %H.%M.%S')
-            outfile = outfile.replace('?', now)
+        # if outfile.startswith("?"):
+        #     now = datetime.datetime.now()
+        #     now = now.strftime('data availability on %Y-%m-%d %H.%M.%S')
+        #     outfile = outfile.replace('?', now)
         print("output to:", outfile)
         plt.savefig(outfile)
     if show:
