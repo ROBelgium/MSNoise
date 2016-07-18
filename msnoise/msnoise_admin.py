@@ -651,9 +651,6 @@ def main(port=5000):
                 for t in tmp:
                     jobtypes.append(t["name"])
 
-    # print jobtypes
-
-
     admin.add_view(StationView(db,endpoint='stations', category='Configuration'))
     admin.add_view(FilterView(db,endpoint='filters', category='Configuration'))
     admin.add_view(ConfigView(db,endpoint='config', category='Configuration'))
