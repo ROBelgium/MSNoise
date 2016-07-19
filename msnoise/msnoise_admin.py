@@ -129,6 +129,8 @@ from flask_admin.babel import ngettext, lazy_gettext
 import markdown
 from flask import Markup
 from io import BytesIO
+import jinja2
+
 # from bokeh.embed import components
 # from bokeh.plotting import figure
 # from bokeh.resources import INLINE, CDN
@@ -441,7 +443,7 @@ class BugReport(BaseView):
     def index(self):
         return self.render('admin/bugreport.html')
 
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__)
 app.secret_key = 'why would I tell you my secret key?'
 
 
@@ -640,16 +642,28 @@ def main(port=5000):
         database = "MySQL: %s@%s:%s"%(username, hostname, database)
     admin.project_database = database
 
-    plugins = get_config(db, "plugins")
-    jobtypes = ["CC","DTT"]
-    if plugins:
 
+    jobtypes = ["CC", "DTT"]
+    template_folders = []
+    if plugins:
         for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
             module_name = ep.module_name.split(".")[0]
             if module_name in plugins:
                 tmp = ep.load()()
                 for t in tmp:
                     jobtypes.append(t["name"])
+        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.templates'):
+            module_name = ep.module_name.split(".")[0]
+            if module_name in plugins:
+                tmp = ep.load()()
+                for t in tmp:
+                    template_folders.append(t)
+
+    app.jinja_loader = jinja2.ChoiceLoader([
+        app.jinja_loader,
+        jinja2.FileSystemLoader(template_folders),
+        ])
+
 
     admin.add_view(StationView(db,endpoint='stations', category='Configuration'))
     admin.add_view(FilterView(db,endpoint='filters', category='Configuration'))
@@ -679,4 +693,4 @@ def main(port=5000):
     print("MSNoise admin will run on all interfaces by default")
     print("access it via the machine's IP address or")
     print("via http://127.0.0.1:5000 when running locally.")
-    app.run(host='0.0.0.0', port=port, debug=False, reloader_interval=1)
+    app.run(host='0.0.0.0', port=port, debug=True, reloader_interval=1)
