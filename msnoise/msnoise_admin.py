@@ -234,6 +234,7 @@ class DataAvailabilityView(ModelView):
     can_create = False
     can_delete = True
     can_edit = True
+    page_size = 100
     column_filters = ('net', 'sta', 'comp','data_duration','gaps_duration','samplerate','flag')
     def __init__(self, session, **kwargs):
         super(DataAvailabilityView, self).__init__(DataAvailability, session, **kwargs)
@@ -262,7 +263,7 @@ class JobView(ModelView):
     can_delete = True
     can_edit = True
     column_filters = ('pair','jobtype','flag')
-    
+    page_size = 100
     def __init__(self, session, **kwargs):
         super(JobView, self).__init__(Job, session, **kwargs)
     
@@ -322,6 +323,7 @@ class ConfigView(ModelView):
     view_title = "MSNoise General Configuration"
     can_create = False
     can_delete = False
+    page_size = 100
 
     # Override displayed fields
     column_list = ('name', 'value')

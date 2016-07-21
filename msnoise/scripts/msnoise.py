@@ -39,6 +39,11 @@ def plugin():
     """Runs a command in a named plugin"""
     pass
 
+# @with_plugins(iter_entry_points('msnoise.plugins'))
+@click.group()
+def p():
+    """Short cut for plugins"""
+    pass
 
 @click.command()
 def test():
@@ -606,8 +611,10 @@ if plugins:
         module_name = ep.module_name.split(".")[0]
         if module_name in plugins:
             plugin.add_command(ep.load())
+            p.add_command(ep.load())
 
 cli.add_command(plugin)
+cli.add_command(p)
 
 
 def run():
