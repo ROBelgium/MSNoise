@@ -18,7 +18,7 @@ The group of active users (providing questions, feedback, snippets of code) is g
 History
 -------
 
-* 2010: MSNoise is created based on Matlab, c++, csh and fortran codes from Florent Brenguier (IPGP, U. Grenoble-Alpes) and Daniel Clarke (IPGP).
+* 2010: MSNoise is based on Matlab, c++, csh and fortran codes developped at ISTerre/Univ. Grenoble and IPGP in the framework of the [ERC Whisper project](https://whisper.obs.ujf-grenoble.fr/).
 * 2011/12: MSNoise is tested on Undervolc data, and used by Corentin for his PhD thesis.
 * 2013: First release of MSNoise for the IAVCEI 2013 in Kagoshima ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.0.html)).
 * 2014: Improvements and bugfixes, release 1.2.5. Publication of the [SRL article](http://srl.geoscienceworld.org/content/85/3/715.full) ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.2.5.html)).
