@@ -118,16 +118,18 @@ modules are properly installed and available for MSNoise.
 
 
 from flask import Flask, redirect, request,  url_for
-from flask.ext.admin import Admin, BaseView, expose
+from flask_admin import Admin, BaseView, expose
 import flask, time, json, socket
 from flask_admin.model import typefmt
-from flask.ext.admin.contrib.sqla import ModelView
+from flask_admin.contrib.sqla import ModelView
 from flask import flash
 from wtforms.validators import ValidationError
-from flask.ext.admin.actions import action
-from flask.ext.admin.babel import ngettext, lazy_gettext
+from flask_admin.actions import action
+from flask_admin.babel import ngettext, lazy_gettext
 import markdown
 from flask import Markup
+from io import BytesIO
+import jinja2
 
 # from bokeh.embed import components
 # from bokeh.plotting import figure
@@ -232,6 +234,7 @@ class DataAvailabilityView(ModelView):
     can_create = False
     can_delete = True
     can_edit = True
+    page_size = 100
     column_filters = ('net', 'sta', 'comp','data_duration','gaps_duration','samplerate','flag')
     def __init__(self, session, **kwargs):
         super(DataAvailabilityView, self).__init__(DataAvailability, session, **kwargs)
@@ -260,7 +263,7 @@ class JobView(ModelView):
     can_delete = True
     can_edit = True
     column_filters = ('pair','jobtype','flag')
-    
+    page_size = 100
     def __init__(self, session, **kwargs):
         super(JobView, self).__init__(Job, session, **kwargs)
     
@@ -320,6 +323,7 @@ class ConfigView(ModelView):
     view_title = "MSNoise General Configuration"
     can_create = False
     can_delete = False
+    page_size = 100
 
     # Override displayed fields
     column_list = ('name', 'value')
@@ -441,7 +445,7 @@ class BugReport(BaseView):
     def index(self):
         return self.render('admin/bugreport.html')
 
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__)
 app.secret_key = 'why would I tell you my secret key?'
 
 
@@ -497,7 +501,7 @@ def pairs():
 
 @app.route('/admin/bugreport.json')
 def bugreporter():
-    from bugreport import main
+    from .bugreport import main
     output = main(modules=True, show=False)
 
     o = json.dumps(output)
@@ -582,6 +586,15 @@ def joblists():
     return flask.Response(o, mimetype='application/json')
 
 
+@app.route('/admin/data_availability.png')
+def DA_PNG():
+    from .plots.data_availability import main
+    output = BytesIO()
+    main(show=False, outfile=output)
+    output.seek(0)
+    return flask.Response(output.read(), mimetype='image/png')
+
+
 @app.route('/admin/data_availability_flags.json')
 def DA_flags():
     db = connect()
@@ -631,18 +644,27 @@ def main(port=5000):
         database = "MySQL: %s@%s:%s"%(username, hostname, database)
     admin.project_database = database
 
-    plugins = get_config(db, "plugins")
-    jobtypes = ["CC","DTT"]
-    if plugins:
 
+    jobtypes = ["CC", "DTT"]
+    template_folders = []
+    if plugins:
         for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
             module_name = ep.module_name.split(".")[0]
             if module_name in plugins:
                 tmp = ep.load()()
                 for t in tmp:
                     jobtypes.append(t["name"])
+        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.templates'):
+            module_name = ep.module_name.split(".")[0]
+            if module_name in plugins:
+                tmp = ep.load()()
+                for t in tmp:
+                    template_folders.append(t)
 
-    # print jobtypes
+    app.jinja_loader = jinja2.ChoiceLoader([
+        app.jinja_loader,
+        jinja2.FileSystemLoader(template_folders),
+        ])
 
 
     admin.add_view(StationView(db,endpoint='stations', category='Configuration'))
@@ -670,5 +692,7 @@ def main(port=5000):
     admin.add_view(a)
     admin.add_view(BugReport(name='Bug Report', endpoint='bugreport', category='Help'))
 
-
-    app.run(host='0.0.0.0', debug=True, port=port)
+    print("MSNoise admin will run on all interfaces by default")
+    print("access it via the machine's IP address or")
+    print("via http://127.0.0.1:5000 when running locally.")
+    app.run(host='0.0.0.0', port=port, debug=True, reloader_interval=1)

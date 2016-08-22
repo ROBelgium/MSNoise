@@ -41,6 +41,7 @@ To run MSNoise, you need:
   * flask-admin (new in 1.4)
   * multiprocessing_logging (new in 1.4)
   * markdown (new in 1.4)
+  * folium (new in 1.4)
 
 
 * MySQL: if you want to use MySQL, you need to install and configure a

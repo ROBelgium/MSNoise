@@ -52,7 +52,8 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
         
         print("New Data for %s-%s-%i-%i"%(pair,components,filterid, mov_stack))
         format = "matrix"
-        nstack, stack_total = get_results(db,sta1,sta2,filterid,components,datelist,mov_stack, format=format)
+        nstack, stack_total = get_results(db,sta1,sta2,filterid,components,
+                                          datelist,mov_stack, format=format)
         ax = plt.subplot(111)
         for i, line in enumerate(stack_total):
             line /= line.max()
@@ -60,7 +61,8 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
             if seismic:
                 y1 = np.ones(len(line)) * i
                 y2 = line*ampli + i + base
-                plt.fill_between(t, y1, y2, where=y2>=y1, facecolor='k', interpolate=True)
+                plt.fill_between(t, y1, y2, where=y2>=y1, facecolor='k',
+                                 interpolate=True)
 
         for filterdb in get_filters(db, all=True):
             if filterid == filterdb.ref:
@@ -71,13 +73,14 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
         plt.xlabel("Lag Time (s)")
         plt.axhline(0,lw=0.5,c='k')
         plt.grid()
-        plt.title('%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d'%(sta1.replace('_', '.'), sta2.replace('_', '.'),components,filterid,low,high,mov_stack))
-        plt.scatter(0,[start,])
+        plt.title('%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' %
+                  (sta1.replace('_', '.'), sta2.replace('_', '.'), components,
+                   filterid, low, high, mov_stack))
+        plt.scatter(0,[start,],alpha=0)
         plt.ylim(start, end)
         plt.xlim(-maxlag, maxlag)
         ax.fmt_ydata = mdates.DateFormatter('%Y-%m-%d')
-        Cursor(ax, useblit=True, color='red', linewidth=1.2)
-
+        cursor = Cursor(ax, useblit=True, color='red', linewidth=1.2)
 
         if outfile:
             if outfile.startswith("?"):

@@ -39,6 +39,11 @@ def plugin():
     """Runs a command in a named plugin"""
     pass
 
+# @with_plugins(iter_entry_points('msnoise.plugins'))
+@click.group()
+def p():
+    """Short cut for plugins"""
+    pass
 
 @click.command()
 def test():
@@ -70,7 +75,7 @@ def upgrade_db():
             db.commit()
         except:
             db.rollback()
-            print("Passing %s: already in DB" % name)
+            # print("Passing %s: already in DB" % name)
             continue
 
     db.close()
@@ -79,7 +84,7 @@ def upgrade_db():
         try:
             e = get_engine()
             e.execute('ALTER TABLE `jobs` CHANGE `type` `jobtype` VARCHAR( 10 )')
-        except OperationalError:
+        except:
             print( "The jobs table seems already up-to-date, exiting.")
     else:
         try:
@@ -89,6 +94,18 @@ def upgrade_db():
             print("You need to edit the `jobs` table manually to match the new"
                   "column naming")
             print ("Please read http://msnoise.org/doc/releasenotes/msnoise-1.3.html")
+    if get_tech() == 2:
+        try:
+            e = get_engine()
+            e.execute("ALTER TABLE stations CHANGE X X REAL NULL DEFAULT NULL")
+            e.execute("ALTER TABLE stations CHANGE Y Y REAL NULL DEFAULT NULL")
+            print("The station table has been updated (floating point bugfix)")
+        except:
+            print("The jobs table seems already up-to-date, exiting.")
+    else:
+        print("You need to edit the `station` table manually to match the new"
+              " column naming")
+        print ("Please read http://msnoise.org/doc/releasenotes/msnoise-1.4.html")
 
 
 @click.command()
@@ -96,11 +113,18 @@ def upgrade_db():
 def info(jobs):
     """Outputs general information about the current install and config, plus
     information about jobs and their status."""
-    from ..api import connect, get_config, get_job_types
+    from ..api import connect, get_config, get_job_types, get_filters,\
+                      get_stations
     from ..default import default
 
     click.echo('')
     click.echo('General:')
+
+    def d(path):
+        return os.path.split(path)[0]
+
+    click.echo('MSNoise is installed in: %s'
+               % d(d(d(os.path.abspath(__file__)))))
 
     if os.path.isfile('db.ini'):
         click.echo(' - db.ini is present')
@@ -110,7 +134,6 @@ def info(jobs):
         return
     click.echo('')
     db = connect()
-
 
     if not jobs:
         click.echo('')
@@ -146,6 +169,28 @@ def info(jobs):
             else:
                 click.secho(" M %s: %s" %(key, tmp ), fg='green')
 
+        click.echo('')
+        click.echo('Filters:')
+        print('ID: [low:high]  [mwcs_low:mwcs_high]    mwcs_wlen    mwcs_step   used')
+        for f in get_filters(db, all=True):
+            data = (f.ref,
+                    f.low,
+                    f.high,
+                    f.mwcs_low,
+                    f.mwcs_high,
+                    f.mwcs_wlen,
+                    f.mwcs_step,
+                    ['N','Y'][f.used])
+            print('%02i: [%.03f:%.03f] [%.03f:%.03f] %.03i %.03i %s' % data)
+
+        click.echo('')
+        click.echo('Stations:')
+        for s in get_stations(db, all=True):
+            data = (s.net, s.sta, s.X, s.Y, s.altitude, s.coordinates,
+                    ['N', 'Y'][s.used])
+            print('%s.%s %.4f %.4f %.1f %s %s' % data)
+
+    click.echo('')
     click.echo('CC Jobs:')
     for (n,jobtype) in get_job_types(db,'CC'):
         click.echo(" %s : %i" % (jobtype, n))
@@ -566,8 +611,10 @@ if plugins:
         module_name = ep.module_name.split(".")[0]
         if module_name in plugins:
             plugin.add_command(ep.load())
+            p.add_command(ep.load())
 
 cli.add_command(plugin)
+cli.add_command(p)
 
 
 def run():

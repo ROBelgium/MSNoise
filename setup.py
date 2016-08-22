@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import versioneer
 
-setup( version=versioneer.get_version(),
+setup(version="1.4.1",
     name='msnoise',
     packages=find_packages(),
     include_package_data=True,
@@ -20,7 +20,8 @@ setup( version=versioneer.get_version(),
         'flask',
         'flask-admin',
         'multiprocessing_logging',
-        'markdown'
+        'markdown',
+        'folium'
     ],
     entry_points='''
         [console_scripts]

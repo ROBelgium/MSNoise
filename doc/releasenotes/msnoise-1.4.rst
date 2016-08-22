@@ -1,9 +1,9 @@
 .. include:: ../configs.hrst
 
 MSNoise 1.4
-=============
+===========
 
-Release date: XX XXXXXX 2016
+Release date: 11 April 2016
 
 
 Release type: major
@@ -16,18 +16,19 @@ Release notes:
 
 Introduction
 ------------
-Almost a year after the last major release (:doc:`msnoise-1.3`) we are proud to
-announce the new :doc:`msnoise-1.4`. It is a **major** release, with a massive
-amount of work since the last one: in `GitHub numbers
-<https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2015-04-01&to=2016-03-20&type=c>`_
-, it's over XXX commits and about XXX new lines of code and documentation added!
+Just over a year after the last major release (:doc:`msnoise-1.3`) we are proud
+to announce the new :doc:`msnoise-1.4`. It is a **major** release, with a
+massive amount of work since the last one: in `GitHub numbers
+<https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2015-04-01&to=2016-04-20&type=c>`_
+, it's over 125 commits and about 5500 new lines of code and documentation
+added!
 
 MSNoise 1.4 introduces **four major new features** : a new ultra-intuitive
 web-based admin interface, the support for plugins and extensions, the phase
 weighted stack and the instrument response removal. It also brings the
 possibility to parallel/thread process the cross-correlation and the MWCS steps.
 MSNoise is now "tested" automatically on Linux (thanks to TravisCI) & Windows
-(thanks to Appveyor), for Python versions 2.7, 3.3 and 3.4. Yes, **MSNoise is
+(thanks to Appveyor), for Python versions 2.7, 3.4 and 3.5. Yes, **MSNoise is
 Python 3 compatible** !!!
 
 This version has benefited from outputs/ideas/pull requests/questions from
@@ -35,23 +36,24 @@ several users/friends:
 
 * Carmelo Sammarco
 * Esteban Chaves
-* Lion Krisher
+* Lion Krischer
 * Tobias Megies
 * Clare Donaldson
 * Aurélien Mordret
 * Raphaël De Plaen
+* Lukas E. Preiswerk
 * all others (don't be mad :-) )
 
 
 Thanks to all for using MSNoise, and please, let us know why/how you use it
 (and please cite it!)!
 
-To date, we found/are aware of 11 publications using MSNoise ! That's the best
+To date, we found/are aware of 12 publications using MSNoise ! That's the best
 validation of our project ever ! See the full list on the
 `MSNoise website <http://www.msnoise.org/they-cite-msnoise/>`_.
 
 
-*Thomas Lecocq & Corentin Caudron*
+*Thomas & Corentin*
 
 
 ~~~~
@@ -110,7 +112,7 @@ msnoise, i.e. it has to be "installed" like any other python package.
 After installing a plugin, its **package name** must be declared in the
 ``plugins`` parameter in the configuration. This must be done **PER PROJECT**.
 
-Python'speaking, plugins declare entry points that MSNoise uses to define
+Pythonly speaking, plugins declare entry points that MSNoise uses to define
 commands and job types. This way, the ``msnoise plugin`` command would populate
 with the plugin commands and plugin's custom Job Types will be declared at
 different steps of the code. Currently, custom job types can be defined at three
@@ -180,6 +182,10 @@ rows show the "REF" stack and its FTAN image. The three rows are:
 * B: PWS stack of  "windows" to "daily" - Linear stack of "daily" to "ref"
 * C: PWS stack of  "windows" to "daily" - PWS stack of "daily" to "ref"
 
+To obtain an LIN-LIN or PWS-PWS stack, simply set ``stack_method`` = 'linear' or
+'pws', respectively when running the ``compute_cc`` and ``stack`` steps.
+And for mixed cases LIN-PWS or PWS-LIN, edit the config between the two steps!
+
 .. image:: ../.static/pws.png
 
 Instrument Response Correction
@@ -212,10 +218,13 @@ Command Line changes
   mode, currently only for plots. See below.
 * ``msnoise compute_cc`` and ``msnoise compute_mwcs`` : support the ``-t``
   threading flag and shoud be able to work multiple threads. Example calls:
-  ``msnoise -t 4 compute_cc`` or``msnoise -t 16 compute_mwcs``. Don't start
+  ``msnoise -t 4 compute_cc`` or ``msnoise -t 16 compute_mwcs``. Don't start
   more threads than the actual number of real cores on your machine, and take
   into account that if each instance loads a lot of data (stations), you shoud
   have have enough RAM to store it.
+* ``msnoise info`` now returns the location where the MSNoise package is
+  installed (useful when developping / hacking the code). It also returns the
+  list of configured Filters and Stations in the database.
 
 All commands are now documented: :doc:`../clickhelp/msnoise`.
 
@@ -262,7 +271,8 @@ Improvements in terms of performances have also been done for MSNoise 1.4:
   XXX not used actually !!!
 * ``compute_cc``: reversed the change done in 1.3, the pre-whitening of the
   traces is now disabled, it led to very high memory usage and needs a fresh
-  rewrite.
+  rewrite. This doens't mean whitening is no longer done, but just some sort
+  of caching of the pre-whitened traces.
 
 
 
@@ -278,6 +288,27 @@ Running the following command will take care of the upgrade from 1.3 to 1.4:
 
     msnoise upgrade_db
 
+
+
+There was a bug, mainly present in MySQL, with too sharp rounding of station
+coordinates. The bugfix change is done automatically for MySQL databases.
+It is a little different if you are using SQLite as it
+can't be done automatically. This is because SQLite doesn't support "ALTER"
+commands. Ultimately we want the ``station.X`` and ``station.Y`` to be be of
+type ``double``. You will have to do this operation manually:
+
+.. warning:: Do the following at your own risk. It *might* not be needed!
+    From the tests we ran, it seems the coordinates rounding error was present
+    only for MySQL databases!
+
+* Open SQLite database browser (`SQLiteManager <https://addons.mozilla.org/firefox/addon/sqlite-manager/>`_
+  extension for Firefox, for example)
+* Open the msnoise.sqlite file
+* Select the station table
+* Edit the ``X`` field and change its type to ``double``
+* Edit the ``Y`` field and change its type to ``double``
+* Ignore the warnings (it should work, although it could fail!)
+* Close the database
 
 
 A final note about development pace and choices
@@ -302,8 +333,8 @@ If you have complaints, post them too, but remember that the package you are
 using has been coded by 1 person, and that it's not his full time job. So
 MSNoise is provided "as-is", carefully written and tested, but there will be
 bugs, issues, incompatibility with certain python installations, OS or module
-versions. If you **want or need** developments made and you can afford it,
-contact Thomas via email directly, you can contract with the ROB for
-paid-developments. If the developments you want are within the focus of the
-developers' research, then a collaboration, i.e. resulting in a co-authored
-peer reviewed publication, can be another option.
+versions. If you **want or need** developments made, contact Thomas via email
+directly. If these developments are within the focus of the developers'
+research, then a collaboration, i.e. resulting in a co-authored peer reviewed
+publication, can be an option. Otherwise, you can contract us for
+paid-developments.
