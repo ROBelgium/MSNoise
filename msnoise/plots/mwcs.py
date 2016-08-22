@@ -22,7 +22,6 @@ mov_stack = 3:
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator, YearLocator
 from scipy.stats import scoreatpercentile
-from scipy.stats.stats import nanmean
 
 
 import matplotlib.pyplot as plt
