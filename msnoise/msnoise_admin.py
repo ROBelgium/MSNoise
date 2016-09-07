@@ -635,7 +635,13 @@ def main(port=5000):
     db = connect()
 
     admin = Admin(app)
-    admin.name = "MSNoise"
+    if "msnoise_brand" in os.environ:
+        tmp = eval(os.environ["msnoise_brand"])
+        name, logo = tmp.split("|")
+        admin.logo = "<div style='float:left; height: 40px; padding-right:10px'>"+logo+"</div>"
+        admin.name = name
+    else:
+        admin.name = "MSNoise"
     admin.project_folder = os.getcwd()
     tech, hostname, database, username, password = read_database_inifile()
     if tech == 1:

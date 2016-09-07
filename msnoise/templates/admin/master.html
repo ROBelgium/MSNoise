@@ -1,2 +1,6 @@
 {% extends admin_base_template %}
+{% block title %}{% if admin_view.category %}{{ admin_view.category }} - {% endif %}{{ admin_view.name }} - {{ admin_view.admin.name }}{% endblock %}
 
+{% block brand %}
+          <a class="navbar-brand" href="#">{% if admin_view.admin.logo %}{{ admin_view.admin.logo|safe }} {% else %}{{ admin_view.admin.name }} {% endif %}</a>
+{% endblock %}
