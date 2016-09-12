@@ -638,7 +638,7 @@ def main(port=5000):
     if "msnoise_brand" in os.environ:
         tmp = eval(os.environ["msnoise_brand"])
         name, logo = tmp.split("|")
-        admin.logo = "<div style='float:left; height: 40px; padding-right:10px'>"+logo+"</div>"
+        admin.logo = logo
         admin.name = name
     else:
         admin.name = "MSNoise"
@@ -700,5 +700,5 @@ def main(port=5000):
 
     print("MSNoise admin will run on all interfaces by default")
     print("access it via the machine's IP address or")
-    print("via http://127.0.0.1:5000 when running locally.")
+    print("via http://127.0.0.1:%i when running locally."%port)
     app.run(host='0.0.0.0', port=port, debug=True, reloader_interval=1)
