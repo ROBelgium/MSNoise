@@ -654,7 +654,8 @@ def main():
                                 else:
                                     trames2hWb[i] = np.zeros(int(Nfft))
                                     skip = True
-                                    logging.debug('Slice is Zeros!')
+                                    logging.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'
+                                                  % (rmsmat[i], rms_threshold))
                             if not skip:
                                 corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False)
                                 tmptime = time.gmtime(basetime + begin /
