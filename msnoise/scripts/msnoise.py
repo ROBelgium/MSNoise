@@ -48,6 +48,8 @@ def p():
 @click.command()
 def test():
     """Runs the test suite, should be executed in an empty folder!"""
+    import matplotlib.pyplot as plt
+    plt.switch_backend("agg")
     from ..test.tests import main
     main()
 
