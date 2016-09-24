@@ -1,11 +1,12 @@
+import logging
 import os
 import sys
+import time
+
 import click
 import pkg_resources
-import logging
-import time
-import traceback
-from pkg_resources import iter_entry_points
+
+
 # from click_plugins import with_plugins
 
 
@@ -67,7 +68,6 @@ def upgrade_db():
     This procedure adds new parameters with their default value
     in the config database.
     """
-    from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
     from ..api import connect, Config, get_tech, get_engine
     from ..default import default
     db = connect()
