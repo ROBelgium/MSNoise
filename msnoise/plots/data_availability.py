@@ -14,15 +14,13 @@ Example:
 
 """
 
-import pandas as pd
+import matplotlib.dates
+import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num
-import matplotlib.dates
-import numpy as np
-import matplotlib.gridspec as gridspec
-import datetime
 
 from ..api import *
+
 
 def main(show=False, outfile=None):
     db = connect()

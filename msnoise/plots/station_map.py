@@ -26,15 +26,12 @@ Service:
 """
 
 import traceback
+
 import folium
-import os
-import numpy as np
-import sys
+import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
 
 from ..api import *
-
-from mpl_toolkits.basemap import Basemap
-import matplotlib.pyplot as plt
 
 
 def main(show=True, outfile=None):

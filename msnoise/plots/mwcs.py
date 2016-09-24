@@ -19,23 +19,12 @@ mov_stack = 3:
 
 """
 
-import matplotlib.pyplot as plt
-from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator, YearLocator
-from scipy.stats import scoreatpercentile
-
-
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-
-import os
-import numpy as np
-import sys
-import scipy.signal
-from obspy.core import read, Stream, Trace
+import matplotlib.pyplot as plt
+from matplotlib import colors, cm
+from matplotlib.dates import date2num, DateFormatter, YearLocator
 
 from ..api import *
-
-from matplotlib import pyplot, colors, cm
 
 def cmap_powerlaw_adjust(cmap, a):
     '''

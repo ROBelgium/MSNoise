@@ -17,8 +17,9 @@ Example
 """
 
 import matplotlib.pyplot as plt
-import logging
+
 from ..api import *
+
 
 def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=None):
     db = connect()

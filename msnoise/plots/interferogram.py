@@ -16,20 +16,10 @@ Example:
 """
 # plot interferogram
 import matplotlib.pyplot as plt
-from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator, YearLocator
-from scipy.stats import scoreatpercentile
-
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-
-import os
-import numpy as np
-import sys
-import scipy.signal
-from obspy.core import read, Stream, Trace
+from matplotlib.dates import date2num, DateFormatter, YearLocator
+from matplotlib.widgets import Cursor
 
 from ..api import *
-from matplotlib.widgets import Cursor
 
 def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None):
     db = connect()
