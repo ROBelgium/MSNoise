@@ -51,9 +51,9 @@ argument and return a list of stations in the format ``NET_STA``:
 
 import glob
 import sys
-import os
-import numpy as np
+
 from .api import *
+
 
 def main():
     db = connect()

@@ -1,8 +1,9 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import scipy.fftpack
 
 from .api import nextpow2
+
 
 def myCorr(data, maxlag, plot=False):
     """This function takes ndimensional *data* array, computes the cross-correlation in the frequency domain

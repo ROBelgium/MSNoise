@@ -36,7 +36,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
 
     Napod = 100
     Nfft = int(Nfft)
-    freqVec = scipy.fftpack.fftfreq(Nfft,d=delta)[:Nfft/2]
+    freqVec = scipy.fftpack.fftfreq(Nfft,d=delta)[:Nfft//2]
     
     J = np.where((freqVec >= freqmin) & (freqVec <= freqmax))[0]
     low = J[0] - Napod
@@ -47,7 +47,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     porte2 = J[-1]
     high = J[-1] + Napod
     if high > Nfft / 2:
-        high = Nfft // 2
+        high = int(Nfft // 2)
 
     FFTRawSign = scipy.fftpack.fft(data, Nfft)
     
@@ -68,7 +68,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     FFTRawSign[high:Nfft+1] *= 0
     
     # Hermitian symmetry (because the input is real)
-    FFTRawSign[-Nfft/2+1:] = FFTRawSign[1:Nfft/2].conjugate()[::-1]
+    FFTRawSign[-Nfft//2+1:] = FFTRawSign[1:Nfft//2].conjugate()[::-1]
 
     if plot:
         plt.subplot(413)

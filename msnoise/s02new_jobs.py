@@ -15,10 +15,6 @@ To run it from the console:
     entries in the jobs table.
 """
 
-
-import logging
-import numpy as np
-
 from .api import *
 
 

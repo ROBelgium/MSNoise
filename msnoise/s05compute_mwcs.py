@@ -68,12 +68,8 @@ could occur with SQLite.
     Parallel Processing
 """
 
-import logging
-from obspy.core import read
-
-from .api import *
 from .MWCS import mwcs
-
+from .api import *
 
 
 def main():

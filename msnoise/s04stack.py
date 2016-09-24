@@ -97,15 +97,9 @@ for jobs marked in the last 10 days:
     The Phase Weighted Stack.
 """
 
-import os
 import argparse
-import logging
-import numpy as np
-import pandas as pd
-import scipy as sp
 
 import scipy.signal
-from numpy import nanmean
 
 from .api import *
 

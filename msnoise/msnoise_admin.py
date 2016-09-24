@@ -116,29 +116,25 @@ modules are properly installed and available for MSNoise.
 
 """
 
+from io import BytesIO
 
-from flask import Flask, redirect, request,  url_for
-from flask_admin import Admin, BaseView, expose
-import flask, time, json, socket
-from flask_admin.model import typefmt
-from flask_admin.contrib.sqla import ModelView
+import flask
+import jinja2
+import json
+import markdown
+from flask import Flask, redirect, request
+from flask import Markup
 from flask import flash
-from wtforms.validators import ValidationError
+from flask_admin import Admin, BaseView, expose
 from flask_admin.actions import action
 from flask_admin.babel import ngettext, lazy_gettext
-import markdown
-from flask import Markup
-from io import BytesIO
-import jinja2
-
-# from bokeh.embed import components
-# from bokeh.plotting import figure
-# from bokeh.resources import INLINE, CDN
-# from bokeh.templates import RESOURCES
+from flask_admin.contrib.sqla import ModelView
+from flask_admin.model import typefmt
+from wtforms.validators import ValidationError
 
 from .api import *
-from .msnoise_table_def import *
 from .default import default
+from .msnoise_table_def import *
 
 
 class GenericView(BaseView):

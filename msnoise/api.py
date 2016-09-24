@@ -1,8 +1,9 @@
-import os
-import logging
 import copy
 import datetime
 import itertools
+import logging
+import os
+
 try:
     import cPickle
 except:
