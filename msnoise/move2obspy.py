@@ -6,7 +6,8 @@ import scipy.fftpack
 import scipy.signal
 import statsmodels.api as sm
 from obspy.signal.invsim import cosine_taper
-from scipy.signal.signaltools import _next_regular
+from scipy.fftpack.helper import next_fast_len
+#from scipy.signal.signaltools import _next_regular
 
 from .api import nextpow2
 
@@ -27,7 +28,7 @@ def myCorr(data, maxlag, plot=False, nfft=None):
         s1 = np.array(data[0].shape)
         shape = s1 - 1
         # Speed up FFT by padding to optimal size for FFTPACK
-        fshape = [_next_regular(int(d)) for d in shape]
+        fshape = [next_fast_len(int(d)) for d in shape]
         nfft = fshape[0]
 
     normalized = True

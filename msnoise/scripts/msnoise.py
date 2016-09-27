@@ -215,7 +215,7 @@ def install():
 @click.option('-s', '--set', help='Modify config value: usage --set name=value')
 def config(set):
     """This command should now only be used to use the command line to set
-    a parameter value in the data base. It used tolaunch the Configurator but
+    a parameter value in the data base. It used to launch the Configurator but
     the recommended way to configure MSNoise is to use the "msnoise admin" web
     interface."""
     if set:
