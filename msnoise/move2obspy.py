@@ -7,7 +7,6 @@ import scipy.signal
 import statsmodels.api as sm
 from obspy.signal.invsim import cosine_taper
 from scipy.fftpack.helper import next_fast_len
-# from scipy.signal.signaltools import _next_regular
 
 from .api import nextpow2
 
