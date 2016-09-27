@@ -1,3 +1,4 @@
+import sys
 import calendar
 import glob
 import time
@@ -161,7 +162,7 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E=np.arra
                 if trace.stats.sampling_rate != params.goal_sampling_rate:
                     logging.debug(
                         "%s.%s Lowpass at %.2f Hz" % (station, comp, params.preprocess_lowpass))
-                    trace.filter("lowpass", freq=params.preprocess_lowpass, zerophase=True)
+                    trace.filter("lowpass", freq=params.preprocess_lowpass, zerophase=True, corners=8)
 
                     if params.resampling_method == "Resample":
                         logging.debug("%s.%s Downsample to %.1f Hz" %
@@ -170,10 +171,25 @@ def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E=np.arra
                             trace.data, params.goal_sampling_rate / trace.stats.sampling_rate, 'sinc_fastest')
 
                     elif params.resampling_method == "Decimate":
+                        decimation_factor = trace.stats.sampling_rate / params.goal_sampling_rate
+                        if not int(decimation_factor) == decimation_factor:
+                            logging.warning("%s.%s CANNOT be decimated by an integer factor, consider using Resample or Lanczos methods"
+                                            " Trace sampling rate = %i ; Desired CC sampling rate = %i" %
+                                            (station, comp, trace.stats.sampling_rate, params.goal_sampling_rate))
+                            sys.stdout.flush()
+                            sys.exit()
                         logging.debug("%s.%s Decimate by a factor of %i" %
-                                      (station, comp, params.decimation_factor))
-                        trace.data = trace.data[::params.decimation_factor]
+                                      (station, comp, decimation_factor))
+                        trace.data = trace.data[::decimation_factor]
+
+                    elif params.resampling_method == "Lanczos":
+                        logging.debug("%s.%s Downsample to %.1f Hz" %
+                                      (station, comp, params.goal_sampling_rate))
+                        trace.data = np.array(trace.data)
+                        trace.interpolate(method="lanczos", sampling_rate=params.goal_sampling_rate, a=1.0)
+
                     trace.stats.sampling_rate = params.goal_sampling_rate
+
 
                 year, month, day, hourf, minf, secf, wday, yday, isdst = trace.stats.starttime.utctimetuple()
 

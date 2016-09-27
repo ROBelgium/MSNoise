@@ -64,8 +64,9 @@ Downsampling over Decimation is that it is able to downsample the data by any
 factor, not only integer factors.
 
 .. note:: Python 3 users will most probably struggle installing
-    scikits.samplerate, and therefore will have to use Decimate instead of
-    Resample.
+    scikits.samplerate, and therefore will have to use either Decimate or
+    Lanczos instead of Resample. This is not a problem because the Lanczos
+    resampling give very similar results as the scikits.samplerate package.
 
 Processing
 ~~~~~~~~~~
@@ -141,6 +142,10 @@ could occur with SQLite.
 .. versionadded:: 1.4
     The Instrument Response removal & The Phase Weighted Stack &
     Parallel Processing
+
+.. versionadded:: 1.5
+    The Obspy Lanczos resampling method, gives similar results as the
+    scikits.samplerate package, thus removing the requirement for it.
 
 """
 import sys
