@@ -152,8 +152,8 @@ except:
     pass
 
 from .api import *
-from .myCorr import myCorr
-from .whiten import whiten
+from .move2obspy import myCorr
+from .move2obspy import whiten
 
 from .preprocessing import preprocess
 

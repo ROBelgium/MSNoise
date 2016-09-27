@@ -5,7 +5,7 @@ import scipy.fftpack
 from .api import nextpow2
 
 
-def myCorr(data, maxlag, plot=False):
+def myCorr(data, maxlag, plot=False, nfft=None):
     """This function takes ndimensional *data* array, computes the cross-correlation in the frequency domain
     and returns the cross-correlation function between [-*maxlag*:*maxlag*].
 
@@ -22,42 +22,41 @@ def myCorr(data, maxlag, plot=False):
     allCpl = False
 
     maxlag = np.round(maxlag)
-    #~ print "np.shape(data)",np.shape(data)
+    # ~ print "np.shape(data)",np.shape(data)
     if data.shape[0] == 2:
-        #~ print "2 matrix to correlate"
+        # ~ print "2 matrix to correlate"
         if allCpl:
             # Skipped this unused part
             pass
         else:
             K = data.shape[0]
-            #couples de stations
+            # couples de stations
             couples = np.concatenate((np.arange(0, K), K + np.arange(0, K)))
 
     Nt = data.shape[1]
     Nc = 2 * Nt - 1
-    Nfft = 2 ** nextpow2(Nc)
+    #nfft = 2 **(nextpow2(Nc)+1)
 
     # corr = scipy.fftpack.fft(data,int(Nfft),axis=1)
     corr = data
 
     if plot:
-            plt.subplot(211)
-            plt.plot(np.arange(len(corr[0])) * 0.05, np.abs(corr[0]))
-            plt.subplot(212)
-            plt.plot(np.arange(len(corr[1])) * 0.05, np.abs(corr[1]))
+        plt.subplot(211)
+        plt.plot(np.arange(len(corr[0])) * 0.05, np.abs(corr[0]))
+        plt.subplot(212)
+        plt.plot(np.arange(len(corr[1])) * 0.05, np.abs(corr[1]))
 
     corr = np.conj(corr[couples[0]]) * corr[couples[1]]
-    corr = np.real(scipy.fftpack.ifft(corr)) / Nt
+    corr = np.real(scipy.fftpack.ifft(corr, nfft))/ (Nt)
     corr = np.concatenate((corr[-Nt + 1:], corr[:Nt + 1]))
 
     if plot:
         plt.figure()
         plt.plot(corr)
 
-    E = np.sqrt(np.mean(scipy.fftpack.ifft(data, axis=1) ** 2, axis=1))
-    normFact = E[0] * E[1]
-
     if normalized:
+        E = np.real(np.sqrt(np.mean(scipy.fftpack.ifft(data, n=nfft, axis=1) ** 2, axis=1)))
+        normFact = E[0] * E[1]
         corr /= np.real(normFact)
 
     if maxlag != Nt:
@@ -68,15 +67,15 @@ def myCorr(data, maxlag, plot=False):
     del data
     return corr
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     import time
 
     data = np.random.random((2, 86400 * 20))
     print(data.shape)
     t = time.time()
     corr = myCorr(data, maxlag=25, plot=False)
-    print( "Time:", time.time() - t)
+    print("Time:", time.time() - t)
     print(np.mean(corr))
 
     plt.figure()

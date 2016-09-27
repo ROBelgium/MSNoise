@@ -68,8 +68,8 @@ could occur with SQLite.
     Parallel Processing
 """
 
-from .MWCS import mwcs
 from .api import *
+from .move2obspy import mwcs
 
 
 def main():
