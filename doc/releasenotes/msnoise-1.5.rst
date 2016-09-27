@@ -71,7 +71,7 @@ Command Line changes
 --------------------
 
 
-* XXX
+* msnoise config --sync
 
 All commands are now documented: :doc:`../clickhelp/msnoise`.
 

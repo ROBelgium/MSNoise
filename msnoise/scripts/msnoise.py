@@ -223,7 +223,8 @@ def install():
 
 @click.command()
 @click.option('-s', '--set', help='Modify config value: usage --set name=value')
-def config(set):
+@click.option('-S', '--sync', is_flag=True, help='Sync station metadata from inventory/dataless')
+def config(set, sync):
     """This command should now only be used to use the command line to set
     a parameter value in the data base. It used to launch the Configurator but
     the recommended way to configure MSNoise is to use the "msnoise admin" web
@@ -243,6 +244,51 @@ def config(set):
         db.commit()
         db.close()
         click.echo("Successfully updated parameter %s = %s" % (name, value))
+    elif sync:
+        import glob
+        from ..api import connect, get_config, get_stations, update_station
+        db = connect()
+        response_format = get_config(db, 'response_format')
+        response_files = glob.glob(os.path.join(get_config(db, 'response_path'), "*"))
+        if response_format == "inventory":
+            from obspy import read_inventory
+            firstinv = True
+            metadata = None
+            for file in response_files:
+                try:
+                    inv = read_inventory(file)
+                    if firstinv:
+                        metadata = inv
+                        firstinv = False
+                    else:
+                        metadata += inv
+                except:
+                    pass
+        elif response_format == "dataless":
+            from obspy.io.xseed import Parser
+            all_metadata = {}
+            for file in response_files:
+                metadata = Parser(file)
+                tmpinv = metadata.get_inventory()
+                for chan in tmpinv["channels"]:
+                    all_metadata[chan["channel_id"]] = metadata
+        else:
+            print("Response Format Not Supported")
+            exit()
+        for station in get_stations(db):
+            id = "%s.%s.00.HHZ" % (station.net, station.sta)
+            if response_format == "inventory":
+                coords = inv.get_coordinates(id)
+            else:
+
+                coords = all_metadata[id].get_coordinates(id)
+            update_station(db, station.net, station.sta, coords["longitude"],
+                           coords["latitude"], coords["elevation"], "DEG", )
+            logging.info("Added coordinates (%.5f %.5f) for station %s.%s" %
+                        (coords["longitude"], coords["latitude"],
+                         station.net, station.sta))
+        db.close()
+
     else:
         from ..s001configurator import main
         click.echo('Let\'s Configure MSNoise !')
