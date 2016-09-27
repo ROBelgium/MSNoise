@@ -145,6 +145,7 @@ could occur with SQLite.
 """
 import sys
 import time
+from scipy.fftpack.helper import next_fast_len
 
 try:
     from scikits.samplerate import resample
@@ -340,7 +341,7 @@ def main():
 
                 for islice, (begin, end) in enumerate(zip(begins, ends)):
                     trame2h = trames[:, begin:end]
-
+                    nfft = next_fast_len(int(trame2h.shape[1]))
                     rmsmat = np.std(trame2h, axis=1)
                     for filterdb in get_filters(db, all=False):
                         filterid = filterdb.ref
@@ -348,11 +349,11 @@ def main():
                         high = float(filterdb.high)
                         rms_threshold = filterdb.rms_threshold
 
-                        Nfft = int(params.min30)
-                        if params.min30 / 2 % 2 != 0:
-                            Nfft = params.min30 + 2
+                        # Nfft = int(params.min30)
+                        # if params.min30 / 2 % 2 != 0:
+                        #     Nfft = params.min30 + 2
 
-                        trames2hWb = np.zeros((2, int(Nfft)), dtype=np.complex)
+                        trames2hWb = np.zeros((2, int(nfft)), dtype=np.complex)
                         skip = False
                         for i, station in enumerate(pair):
                             if rmsmat[i] > rms_threshold:
@@ -369,14 +370,14 @@ def main():
                                         trame2h[i][indexes])) * params.windsorizing * rmsmat[i]
 
                                 trames2hWb[i] = whiten(
-                                    trame2h[i]*cp, Nfft, dt, low, high, plot=False)
+                                    trame2h[i]*cp, nfft, dt, low, high, plot=False)
                             else:
-                                trames2hWb[i] = np.zeros(int(Nfft))
+                                trames2hWb[i] = np.zeros(int(nfft))
                                 skip = True
                                 logging.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'
                                               % (rmsmat[i], rms_threshold))
                         if not skip:
-                            corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False)
+                            corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False, nfft=nfft)
                             tmptime = time.gmtime(basetime + begin /
                                                   params.goal_sampling_rate)
                             thisdate = time.strftime("%Y-%m-%d", tmptime)

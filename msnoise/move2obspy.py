@@ -7,7 +7,7 @@ import scipy.signal
 import statsmodels.api as sm
 from obspy.signal.invsim import cosine_taper
 from scipy.fftpack.helper import next_fast_len
-#from scipy.signal.signaltools import _next_regular
+# from scipy.signal.signaltools import _next_regular
 
 from .api import nextpow2
 
@@ -48,7 +48,6 @@ def myCorr(data, maxlag, plot=False, nfft=None):
 
     Nt = data.shape[1]
     Nc = 2 * Nt - 1
-    #nfft = 2 **(nextpow2(Nc)+1)
 
     # corr = scipy.fftpack.fft(data,int(Nfft),axis=1)
     corr = data
@@ -60,7 +59,7 @@ def myCorr(data, maxlag, plot=False, nfft=None):
         plt.plot(np.arange(len(corr[1])) * 0.05, np.abs(corr[1]))
 
     corr = np.conj(corr[couples[0]]) * corr[couples[1]]
-    corr = np.real(scipy.fftpack.ifft(corr, nfft))/ (Nt)
+    corr = np.real(scipy.fftpack.ifft(corr, nfft)) / (Nt)
     corr = np.concatenate((corr[-Nt + 1:], corr[:Nt + 1]))
 
     if plot:
@@ -68,7 +67,8 @@ def myCorr(data, maxlag, plot=False, nfft=None):
         plt.plot(corr)
 
     if normalized:
-        E = np.real(np.sqrt(np.mean(scipy.fftpack.ifft(data, n=nfft, axis=1) ** 2, axis=1)))
+        E = np.real(np.sqrt(
+            np.mean(scipy.fftpack.ifft(data, n=nfft, axis=1) ** 2, axis=1)))
         normFact = E[0] * E[1]
         corr /= np.real(normFact)
 
@@ -79,8 +79,6 @@ def myCorr(data, maxlag, plot=False, nfft=None):
 
     del data
     return corr
-
-
 
 
 def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
@@ -138,12 +136,14 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
 
     # Left tapering:
     FFTRawSign[0:low] *= 0
-    FFTRawSign[low:porte1] = np.cos(np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2 * np.exp(
+    FFTRawSign[low:porte1] = np.cos(
+        np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2 * np.exp(
         1j * np.angle(FFTRawSign[low:porte1]))
     # Pass band:
     FFTRawSign[porte1:porte2] = np.exp(1j * np.angle(FFTRawSign[porte1:porte2]))
     # Right tapering:
-    FFTRawSign[porte2:high] = np.cos(np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(
+    FFTRawSign[porte2:high] = np.cos(
+        np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(
         1j * np.angle(FFTRawSign[porte2:high]))
     FFTRawSign[high:Nfft + 1] *= 0
 
@@ -166,37 +166,37 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
         plt.plot(axis, np.abs(FFTRawSign))
         plt.xlim(0, max(axis))
 
-        wdata = np.real(scipy.fftpack.ifft(FFTRawSign))
+        wdata = np.real(scipy.fftpack.ifft(FFTRawSign, Nfft))
         plt.subplot(414)
         plt.plot(np.arange(len(wdata)) * delta, wdata)
         plt.xlim(0, len(wdata) * delta)
         plt.show()
-
     return FFTRawSign
+
 
 def smooth(x, window='boxcar', half_win=3):
     """ some window smoothing """
-    window_len = 2*half_win+1
+    window_len = 2 * half_win + 1
     # extending the data at beginning and at the end
     # to apply the window at the borders
-    s = np.r_[x[window_len-1:0:-1], x, x[-1:-window_len:-1]]
+    s = np.r_[x[window_len - 1:0:-1], x, x[-1:-window_len:-1]]
     if window == "boxcar":
         w = scipy.signal.boxcar(window_len).astype('complex')
     else:
         w = scipy.signal.hanning(window_len).astype('complex')
-    y = np.convolve(w/w.sum(), s, mode='valid')
-    return y[half_win:len(y)-half_win]
+    y = np.convolve(w / w.sum(), s, mode='valid')
+    return y[half_win:len(y) - half_win]
 
 
 def getCoherence(dcs, ds1, ds2):
     n = len(dcs)
     coh = np.zeros(n).astype('complex')
     valids = np.argwhere(np.logical_and(np.abs(ds1) > 0, np.abs(ds2 > 0)))
-    coh[valids] = dcs[valids]/(ds1[valids]*ds2[valids])
-    coh[coh > (1.0+0j)] = 1.0+0j
+    coh[valids] = dcs[valids] / (ds1[valids] * ds2[valids])
+    coh[coh > (1.0 + 0j)] = 1.0 + 0j
     return coh
 
-
+from obspy.signal.filter import bandpass
 def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
          plot=False):
     """...
@@ -227,49 +227,50 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
         mean coherence for each window.
     """
 
-    windL = np.int(windL*sampRate)
-    step = np.int(step*sampRate)
+    windL = np.int(windL * sampRate)
+    step = np.int(step * sampRate)
     count = 0
     deltaT = []
     deltaErr = []
     deltaMcoh = []
     Taxis = []
-    padd = 2**(nextpow2(windL)+2)
+    padd = 2 ** (nextpow2(windL) + 2)
+    padd = next_fast_len(windL)
 
     # Tentative checking if enough point are used to compute the FFT
-    freqVec = scipy.fftpack.fftfreq(int(padd), 1./sampRate)[:int(padd)//2]
+    freqVec = scipy.fftpack.fftfreq(int(padd), 1. / sampRate)[:int(padd) // 2]
     indRange = np.argwhere(np.logical_and(freqVec >= fmin,
                                           freqVec <= fmax))
     if len(indRange) < 2:
-        padd = 2**(nextpow2(windL)+3)
+        padd = 2 ** (nextpow2(windL) + 3)
 
     tp = cosine_taper(windL, .85)
 
-    timeaxis = (np.arange(len(ccCurrent)) / float(sampRate))+tmin
+    timeaxis = (np.arange(len(ccCurrent)) / float(sampRate)) + tmin
     minind = 0
     maxind = windL
     while maxind <= len(ccCurrent):
         ind = minind
 
-        cci = ccCurrent[ind:(ind+windL)].copy()
+        cci = ccCurrent[ind:(ind + windL)].copy()
         cci = scipy.signal.detrend(cci, type='linear')
         cci -= cci.min()
         cci /= cci.max()
         cci -= np.mean(cci)
         cci *= tp
 
-        cri = ccReference[ind:(ind+windL)].copy()
+        cri = ccReference[ind:(ind + windL)].copy()
         cri = scipy.signal.detrend(cri, type='linear')
         cri -= cri.min()
         cri /= cri.max()
         cri -= np.mean(cri)
         cri *= tp
 
-        Fcur = scipy.fftpack.fft(cci, n=int(padd))[:int(padd)//2]
-        Fref = scipy.fftpack.fft(cri, n=int(padd))[:int(padd)//2]
+        Fcur = scipy.fftpack.fft(cci, n=int(padd))[:int(padd) // 2]
+        Fref = scipy.fftpack.fft(cri, n=int(padd))[:int(padd) // 2]
 
-        Fcur2 = np.real(Fcur)**2 + np.imag(Fcur)**2
-        Fref2 = np.real(Fref)**2 + np.imag(Fref)**2
+        Fcur2 = np.real(Fcur) ** 2 + np.imag(Fcur) ** 2
+        Fref2 = np.real(Fref) ** 2 + np.imag(Fref) ** 2
 
         smoother = 5
 
@@ -277,12 +278,13 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
         dref = np.sqrt(smooth(Fref2, window='hanning', half_win=smoother))
 
         # Calculate the cross-spectrum
-        X = Fref*(Fcur.conj())
+        X = Fref * (Fcur.conj())
         X = smooth(X, window='hanning', half_win=smoother)
         dcs = np.abs(X)
 
         # Find the values the frequency range of interest
-        freqVec = scipy.fftpack.fftfreq(len(X)*2, 1./sampRate)[:int(padd)//2]
+        freqVec = scipy.fftpack.fftfreq(len(X) * 2, 1. / sampRate)[
+                  :int(padd) // 2]
         indRange = np.argwhere(np.logical_and(freqVec >= fmin,
                                               freqVec <= fmax))
 
@@ -291,7 +293,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
         mcoh = np.mean(coh[indRange])
 
         # Get Weights
-        w = 1.0 / (1.0 / (coh[indRange]**2) - 1.0)
+        w = 1.0 / (1.0 / (coh[indRange] ** 2) - 1.0)
         w[coh[indRange] >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
         w = np.sqrt(w * np.sqrt(dcs[indRange]))
         # w /= (np.sum(w)/len(w)) #normalize
@@ -305,13 +307,13 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
         phi = np.angle(X)
         phi[0] = 0.
         phi = np.unwrap(phi)
-        #phio = phi.copy()
+        # phio = phi.copy()
         phi = phi[indRange]
 
         # Calculate the slope with a weighted least square linear regression
         # forced through the origin
         # weights for the WLS must be the variance !
-        res = sm.regression.linear_model.WLS(phi, v, w**2).fit()
+        res = sm.regression.linear_model.WLS(phi, v, w ** 2).fit()
 
         # print "forced", np.real(res.params[0])
         # print "!forced", np.real(res2.params[0])
@@ -320,23 +322,23 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
         deltaT.append(m)
 
         # print phi.shape, v.shape, w.shape
-        e = np.sum((phi-m*v)**2) / (np.size(v)-1)
-        s2x2 = np.sum(v**2 * w**2)
-        sx2 = np.sum(w * v**2)
-        e = np.sqrt(e*s2x2 / sx2**2)
+        e = np.sum((phi - m * v) ** 2) / (np.size(v) - 1)
+        s2x2 = np.sum(v ** 2 * w ** 2)
+        sx2 = np.sum(w * v ** 2)
+        e = np.sqrt(e * s2x2 / sx2 ** 2)
         # print w.shape
         if plot:
             plt.figure()
-            plt.suptitle('%.1fs' % (timeaxis[ind + windL//2]))
+            plt.suptitle('%.1fs' % (timeaxis[ind + windL // 2]))
             plt.subplot(311)
             plt.plot(cci)
             plt.plot(cri)
             ax = plt.subplot(312)
-            plt.plot(vo/(2*np.pi), phio)
-            plt.scatter(v/(2*np.pi), phi, c=w, edgecolor='none',
+            plt.plot(vo / (2 * np.pi), phio)
+            plt.scatter(v / (2 * np.pi), phi, c=w, edgecolor='none',
                         vmin=0.6, vmax=1)
             plt.subplot(313, sharex=ax)
-            plt.plot(v/(2*np.pi), coh[indRange])
+            plt.plot(v / (2 * np.pi), coh[indRange])
             plt.axhline(mcoh, c='r')
             plt.axhline(1.0, c='k', ls='--')
             plt.xlim(-0.1, 1.5)
@@ -345,7 +347,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
 
         deltaErr.append(e)
         deltaMcoh.append(np.real(mcoh))
-        Taxis.append(timeaxis[ind + windL//2])
+        Taxis.append(timeaxis[ind + windL // 2])
         count += 1
 
         minind += step
@@ -357,7 +359,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
         del w, v, e, s2x2
         del res
 
-    if maxind > len(ccCurrent)+step:
+    if maxind > len(ccCurrent) + step:
         logging.warning("The last window was too small, but was computed")
 
     return np.array([Taxis, deltaT, deltaErr, deltaMcoh]).T
