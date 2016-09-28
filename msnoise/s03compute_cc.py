@@ -278,67 +278,37 @@ def main():
                 else:
                     coordinates = 'MIX'
 
-                cplAz = np.deg2rad(azimuth(coordinates, X0, Y0, X1, Y1))
-                logging.debug("Azimuth=%.1f"%np.rad2deg(cplAz))
+                cplAz = azimuth(coordinates, X0, Y0, X1, Y1)
+                logging.info("Azimuth=%.1f"%cplAz)
             else:
                 # logging.debug('No Coordinates found! Skipping azimuth calculation!')
                 cplAz = 0.
-
+            params.components_to_compute = ["ZZ", "Z1", "Z2"]
             for components in params.components_to_compute:
-                t1 = stream.select(station=s1.sta, component=components[0])
-                t2 = stream.select(station=s2.sta, component=components[1])
+                t1 = stream.select(station=s1.sta)
+                t2 = stream.select(station=s2.sta)
+                if (components == "ZZ") \
+                        or ("E" in components)\
+                        or ("N" in components)\
+                        or ("1" in components)\
+                        or ("2" in components):
+                    t1 = t1.select(component=components[0])
+                    t2 = t2.select(component=components[1])
+                else:
+                    t1 = t1.rotate("NE->RT", cplAz).select(component=components[0])
+                    t2 = t2.rotate("NE->RT", cplAz).select(component=components[1])
+
+                if not len(t1):
+                    logging.info("No Data for %s.%s..%s" % (
+                        s1.net, s1.sta, components[0]))
+                    continue
+                if not len(t2):
+                    logging.info("No Data for %s.%s..%s" % (
+                        s2.net, s2.sta, components[1]))
+                    continue
+
                 current = t1+t2
-                print current
-                # if components == "ZZ":
-                #     t1 = tramef_Z[pair[0]]
-                #     t2 = tramef_Z[pair[1]]
-                # elif components[0] == "Z":
-                #     t1 = tramef_Z[pair[0]]
-                #     t2 = tramef_E[pair[1]]
-                # elif components[1] == "Z":
-                #     t1 = tramef_E[pair[0]]
-                #     t2 = tramef_Z[pair[1]]
-                # else:
-                #     t1 = tramef_E[pair[0]]
-                #     t2 = tramef_E[pair[1]]
-                # if np.all(t1 == 0) or np.all(t2 == 0):
-                #     logging.debug("%s contains empty trace(s), skipping"%components)
-                #     continue
-                # del t1, t2
-
-                # if components[0] == "Z":
-                #     t1 = tramef_Z[pair[0]]
-                # elif components[0] == "R":
-                #     if cplAz != 0:
-                #         t1 = tramef_N[pair[0]] * np.cos(cplAz) +\
-                #              tramef_E[pair[0]] * np.sin(cplAz)
-                #     else:
-                #         t1 = tramef_E[pair[0]]
-                #
-                # elif components[0] == "T":
-                #     if cplAz != 0:
-                #         t1 = tramef_N[pair[0]] * np.sin(cplAz) -\
-                #              tramef_E[pair[0]] * np.cos(cplAz)
-                #     else:
-                #         t1 = tramef_N[pair[0]]
-                #
-                # if components[1] == "Z":
-                #     t2 = tramef_Z[pair[1]]
-                # elif components[1] == "R":
-                #     if cplAz != 0:
-                #         t2 = tramef_N[pair[1]] * np.cos(cplAz) +\
-                #              tramef_E[pair[1]] * np.sin(cplAz)
-                #     else:
-                #         t2 = tramef_E[pair[1]]
-                # elif components[1] == "T":
-                #     if cplAz != 0:
-                #         t2 = tramef_N[pair[1]] * np.sin(cplAz) -\
-                #              tramef_E[pair[1]] * np.cos(cplAz)
-                #     else:
-                #         t2 = tramef_N[pair[1]]
-
-                # trames = np.vstack((t1, t2))
-                # del t1, t2
+                print(current)
 
                 daycorr = {}
                 ndaycorr = {}
@@ -347,7 +317,7 @@ def main():
                     filterid = filterdb.ref
                     daycorr[filterid] = np.zeros(get_maxlag_samples(db,))
                     ndaycorr[filterid] = 0
-                for tmp in current.slide(params.corr_duration, params.corr_duration*(1-params.overlap) ):
+                for tmp in current.slide(params.corr_duration, params.corr_duration*(1-params.overlap)):
                     trame2h = np.array([tmp[0].data.copy(), tmp[1].data.copy()])
                     nfft = next_fast_len(int(trame2h.shape[1]))
                     rmsmat = np.std(trame2h, axis=1)
@@ -356,10 +326,6 @@ def main():
                         low = float(filterdb.low)
                         high = float(filterdb.high)
                         rms_threshold = filterdb.rms_threshold
-
-                        # Nfft = int(params.min30)
-                        # if params.min30 / 2 % 2 != 0:
-                        #     Nfft = params.min30 + 2
 
                         trames2hWb = np.zeros((2, int(nfft)), dtype=np.complex)
                         skip = False
