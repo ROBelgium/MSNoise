@@ -239,14 +239,6 @@ def main():
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.goal_sampling_rate
 
-        begins = []
-        ends = []
-        i = 0
-        while i <=  (params.goal_duration - params.min30/params.goal_sampling_rate):
-            begins.append(int(i * params.goal_sampling_rate))
-            ends.append(int(i * params.goal_sampling_rate + params.min30))
-            i += int(params.min30/params.goal_sampling_rate * (1.0-params.overlap))
-
         # ITERATING OVER PAIRS #####
         for pair in pairs:
             orig_pair = pair
@@ -261,13 +253,8 @@ def main():
             s2 = get_station(db, station2.split('.')[0], station2.split('.')[1])
 
             if s1.X:
-                X0 = s1.X
-                Y0 = s1.Y
-                c0 = s1.coordinates
-
-                X1 = s2.X
-                Y1 = s2.Y
-                c1 = s2.coordinates
+                X0, Y0, c0 = (s1.X, s1.Y, s1.coordinates)
+                X1, Y1, c1 = (s2.X, s2.Y, s1.coordinates)
 
                 if c0 == c1:
                     coordinates = c0
@@ -306,17 +293,26 @@ def main():
                 current = t1+t2
                 print(current)
 
-                daycorr = {}
-                ndaycorr = {}
                 allcorr = {}
-                for filterdb in get_filters(db, all=False):
-                    filterid = filterdb.ref
-                    daycorr[filterid] = np.zeros(get_maxlag_samples(db,))
-                    ndaycorr[filterid] = 0
                 for tmp in current.slide(params.corr_duration, params.corr_duration*(1-params.overlap)):
-                    trame2h = np.array([tmp[0].data.copy(), tmp[1].data.copy()])
+                    tmp = tmp.copy()
+                    tmp.detrend("demean")
+
+                    for tr in tmp:
+                        if params.windsorizing == -1:
+                            tr.data = np.sign(tr.data)
+                        elif params.windsorizing != 0:
+                            rms = tr.data.std()
+                            indexes = np.where(np.abs(tr.data) > (params.windsorizing * rms))[0]
+                            # clipping at windsorizing*rms
+                            tr.data[indexes] = (tr.data[indexes] / np.abs(
+                                tr.data[indexes])) * params.windsorizing * rms
+                    tmp.taper(0.04)
+                    tmp1 = tmp.select(station=s1.sta, component=components[0])[0]
+                    tmp2 = tmp.select(station=s2.sta, component=components[1])[0]
+                    trame2h = np.array([tmp1.data.copy(), tmp2.data.copy()])
                     nfft = next_fast_len(int(trame2h.shape[1]))
-                    rmsmat = np.std(trame2h, axis=1)
+
                     for filterdb in get_filters(db, all=False):
                         filterid = filterdb.ref
                         low = float(filterdb.low)
@@ -326,26 +322,13 @@ def main():
                         trames2hWb = np.zeros((2, int(nfft)), dtype=np.complex)
                         skip = False
                         for i, station in enumerate(pair):
-                            if rmsmat[i] > rms_threshold:
-                                cp = cosine_taper(len(trame2h[i]),0.04)
-                                trame2h[i] -= trame2h[i].mean()
-
-                                if params.windsorizing == -1:
-                                    trame2h[i] = np.sign(trame2h[i])
-                                elif params.windsorizing != 0:
-                                    indexes = np.where(
-                                        np.abs(trame2h[i]) > (params.windsorizing * rmsmat[i]))[0]
-                                    # clipping at windsorizing*rms
-                                    trame2h[i][indexes] = (trame2h[i][indexes] / np.abs(
-                                        trame2h[i][indexes])) * params.windsorizing * rmsmat[i]
-
+                            if tmp[i].data.std() > rms_threshold:
                                 trames2hWb[i] = whiten(
-                                    trame2h[i]*cp, nfft, dt, low, high, plot=False)
+                                    tmp[i].data, nfft, dt, low, high, plot=False)
                             else:
-                                trames2hWb[i] = np.zeros(int(nfft))
                                 skip = True
                                 logging.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'
-                                              % (rmsmat[i], rms_threshold))
+                                              % (tmp[i].data.std(), rms_threshold))
                         if not skip:
                             corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False, nfft=nfft)
                             tmptime = tmp[0].stats.starttime.datetime
@@ -358,12 +341,6 @@ def main():
                                 if ccfid not in allcorr:
                                     allcorr[ccfid] = {}
                                 allcorr[ccfid][thistime] = corr
-
-                            if params.keep_days:
-                                if not np.any(np.isnan(corr)) and \
-                                        not np.any(np.isinf(corr)):
-                                    daycorr[filterid] += corr
-                                    ndaycorr[filterid] += 1
 
                             del corr, thistime, trames2hWb
 
@@ -390,7 +367,7 @@ def main():
                                 components, corr,
                                 params.goal_sampling_rate, day=True,
                                 ncorr=corrs.shape[0])
-                del daycorr, ndaycorr
+
             logging.debug("Updating Job")
             update_job(db, goal_day, orig_pair, 'CC', 'D')
 
