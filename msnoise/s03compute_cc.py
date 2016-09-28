@@ -283,7 +283,7 @@ def main():
             else:
                 # logging.debug('No Coordinates found! Skipping azimuth calculation!')
                 cplAz = 0.
-            params.components_to_compute = ["ZZ", "Z1", "Z2"]
+
             for components in params.components_to_compute:
                 t1 = stream.select(station=s1.sta)
                 t2 = stream.select(station=s2.sta)
