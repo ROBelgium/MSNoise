@@ -225,20 +225,16 @@ def main():
                      (goal_day, len(pairs), len(stations)))
         jt = time.time()
 
-        xlen = int(params.goal_duration * params.goal_sampling_rate)
-
-        if ''.join(params.components_to_compute).count('R') > 0 or ''.join(params.components_to_compute).count('T') > 0:
-            comps = ['Z', 'E', 'N']
-            tramef_Z = np.zeros((len(stations), xlen))
-            tramef_E = np.zeros((len(stations), xlen))
-            tramef_N = np.zeros((len(stations), xlen))
-            basetime, stream = preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E, tramef_N)
-            print stream
-        else:
-            comps = ['Z']
-            tramef_Z = np.zeros((len(stations), xlen))
-            basetime, stream = preprocess(db, stations, comps, goal_day, params, tramef_Z)
-            print stream
+        comps = []
+        for comp in params.components_to_compute:
+            if comp[0] in ["R", "T"] or comp[1] in ["R", "T"]:
+                comps.append("E")
+                comps.append("N")
+            else:
+                comps.append(comp[0])
+                comps.append(comp[1])
+        comps = np.unique(comps)
+        basetime, stream = preprocess(db, stations, comps, goal_day, params)
 
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.goal_sampling_rate

@@ -16,33 +16,25 @@ except:
 from .api import *
 
 
-def preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E=np.array([]), tramef_N=np.array([])):
-    datafilesZ = {}
-    datafilesE = {}
-    datafilesN = {}
+def preprocess(db, stations, comps, goal_day, params):
+    datafiles = {}
     output = Stream()
     for station in stations:
-        datafilesZ[station] = []
-        datafilesE[station] = []
-        datafilesN[station] = []
+        datafiles[station] = {}
         net, sta = station.split('.')
         gd = datetime.datetime.strptime(goal_day, '%Y-%m-%d')
         files = get_data_availability(
             db, net=net, sta=sta, starttime=gd, endtime=gd)
+        for comp in comps:
+            datafiles[station][comp] = []
         for file in files:
-            comp = file.comp
             fullpath = os.path.join(file.path, file.file)
-            if comp[-1] == 'Z':
-                datafilesZ[station].append(fullpath)
-            elif comp[-1] == 'E':
-                datafilesE[station].append(fullpath)
-            elif comp[-1] == 'N':
-                datafilesN[station].append(fullpath)
+            datafiles[station][file.comp[-1]].append(fullpath)
 
     j = 0
     for istation, station in enumerate(stations):
         for comp in comps:
-            files = eval("datafiles%s['%s']" % (comp, station))
+            files = eval("datafiles['%s']['%s']" % (station, comp))
             if len(files) != 0:
                 logging.debug("%s.%s Reading %i Files" %
                               (station, comp, len(files)))

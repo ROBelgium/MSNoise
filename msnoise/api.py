@@ -18,6 +18,8 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 import scipy.fftpack
+from scipy.fftpack.helper import next_fast_len
+
 from obspy.core import Stream, Trace, read, AttribDict
 from obspy.signal.invsim import cosine_taper
 
@@ -1267,7 +1269,7 @@ def check_and_phase_shift(trace):
         cp = cosine_taper(trace.stats.npts, taper_1s)
         trace.data *= cp
 
-        n = int(2**nextpow2(len(trace.data)))
+        n = next_fast_len(int(trace.stats.npts))
         FFTdata = scipy.fftpack.fft(trace.data, n=n)
         fftfreq = scipy.fftpack.fftfreq(n, d=trace.stats.delta)
         FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
