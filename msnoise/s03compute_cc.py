@@ -188,6 +188,7 @@ def main():
     params.goal_duration = float(get_config(db, "analysis_duration"))
     params.overlap = float(get_config(db, "overlap"))
     params.maxlag = float(get_config(db, "maxlag"))
+    params.corr_duration = float(get_config(db, "corr_duration"))
     params.min30 = float(get_config(db, "corr_duration")) * params.goal_sampling_rate
     params.windsorizing = float(get_config(db, "windsorizing"))
     params.resampling_method = get_config(db, "resampling_method")
@@ -231,13 +232,13 @@ def main():
             tramef_Z = np.zeros((len(stations), xlen))
             tramef_E = np.zeros((len(stations), xlen))
             tramef_N = np.zeros((len(stations), xlen))
-            basetime, tramef_Z, tramef_E, tramef_N = preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E, tramef_N)
-
+            basetime, stream = preprocess(db, stations, comps, goal_day, params, tramef_Z, tramef_E, tramef_N)
+            print stream
         else:
             comps = ['Z']
             tramef_Z = np.zeros((len(stations), xlen))
-            basetime, tramef_Z = preprocess(db, stations, comps, goal_day, params, tramef_Z)
-
+            basetime, stream = preprocess(db, stations, comps, goal_day, params, tramef_Z)
+            print stream
 
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.goal_sampling_rate
@@ -284,57 +285,60 @@ def main():
                 cplAz = 0.
 
             for components in params.components_to_compute:
+                t1 = stream.select(station=s1.sta, component=components[0])
+                t2 = stream.select(station=s2.sta, component=components[1])
+                current = t1+t2
+                print current
+                # if components == "ZZ":
+                #     t1 = tramef_Z[pair[0]]
+                #     t2 = tramef_Z[pair[1]]
+                # elif components[0] == "Z":
+                #     t1 = tramef_Z[pair[0]]
+                #     t2 = tramef_E[pair[1]]
+                # elif components[1] == "Z":
+                #     t1 = tramef_E[pair[0]]
+                #     t2 = tramef_Z[pair[1]]
+                # else:
+                #     t1 = tramef_E[pair[0]]
+                #     t2 = tramef_E[pair[1]]
+                # if np.all(t1 == 0) or np.all(t2 == 0):
+                #     logging.debug("%s contains empty trace(s), skipping"%components)
+                #     continue
+                # del t1, t2
 
-                if components == "ZZ":
-                    t1 = tramef_Z[pair[0]]
-                    t2 = tramef_Z[pair[1]]
-                elif components[0] == "Z":
-                    t1 = tramef_Z[pair[0]]
-                    t2 = tramef_E[pair[1]]
-                elif components[1] == "Z":
-                    t1 = tramef_E[pair[0]]
-                    t2 = tramef_Z[pair[1]]
-                else:
-                    t1 = tramef_E[pair[0]]
-                    t2 = tramef_E[pair[1]]
-                if np.all(t1 == 0) or np.all(t2 == 0):
-                    logging.debug("%s contains empty trace(s), skipping"%components)
-                    continue
-                del t1, t2
+                # if components[0] == "Z":
+                #     t1 = tramef_Z[pair[0]]
+                # elif components[0] == "R":
+                #     if cplAz != 0:
+                #         t1 = tramef_N[pair[0]] * np.cos(cplAz) +\
+                #              tramef_E[pair[0]] * np.sin(cplAz)
+                #     else:
+                #         t1 = tramef_E[pair[0]]
+                #
+                # elif components[0] == "T":
+                #     if cplAz != 0:
+                #         t1 = tramef_N[pair[0]] * np.sin(cplAz) -\
+                #              tramef_E[pair[0]] * np.cos(cplAz)
+                #     else:
+                #         t1 = tramef_N[pair[0]]
+                #
+                # if components[1] == "Z":
+                #     t2 = tramef_Z[pair[1]]
+                # elif components[1] == "R":
+                #     if cplAz != 0:
+                #         t2 = tramef_N[pair[1]] * np.cos(cplAz) +\
+                #              tramef_E[pair[1]] * np.sin(cplAz)
+                #     else:
+                #         t2 = tramef_E[pair[1]]
+                # elif components[1] == "T":
+                #     if cplAz != 0:
+                #         t2 = tramef_N[pair[1]] * np.sin(cplAz) -\
+                #              tramef_E[pair[1]] * np.cos(cplAz)
+                #     else:
+                #         t2 = tramef_N[pair[1]]
 
-                if components[0] == "Z":
-                    t1 = tramef_Z[pair[0]]
-                elif components[0] == "R":
-                    if cplAz != 0:
-                        t1 = tramef_N[pair[0]] * np.cos(cplAz) +\
-                             tramef_E[pair[0]] * np.sin(cplAz)
-                    else:
-                        t1 = tramef_E[pair[0]]
-
-                elif components[0] == "T":
-                    if cplAz != 0:
-                        t1 = tramef_N[pair[0]] * np.sin(cplAz) -\
-                             tramef_E[pair[0]] * np.cos(cplAz)
-                    else:
-                        t1 = tramef_N[pair[0]]
-
-                if components[1] == "Z":
-                    t2 = tramef_Z[pair[1]]
-                elif components[1] == "R":
-                    if cplAz != 0:
-                        t2 = tramef_N[pair[1]] * np.cos(cplAz) +\
-                             tramef_E[pair[1]] * np.sin(cplAz)
-                    else:
-                        t2 = tramef_E[pair[1]]
-                elif components[1] == "T":
-                    if cplAz != 0:
-                        t2 = tramef_N[pair[1]] * np.sin(cplAz) -\
-                             tramef_E[pair[1]] * np.cos(cplAz)
-                    else:
-                        t2 = tramef_N[pair[1]]
-
-                trames = np.vstack((t1, t2))
-                del t1, t2
+                # trames = np.vstack((t1, t2))
+                # del t1, t2
 
                 daycorr = {}
                 ndaycorr = {}
@@ -343,9 +347,8 @@ def main():
                     filterid = filterdb.ref
                     daycorr[filterid] = np.zeros(get_maxlag_samples(db,))
                     ndaycorr[filterid] = 0
-
-                for islice, (begin, end) in enumerate(zip(begins, ends)):
-                    trame2h = trames[:, begin:end]
+                for tmp in current.slide(params.corr_duration, params.corr_duration*(1-params.overlap) ):
+                    trame2h = np.array([tmp[0].data.copy(), tmp[1].data.copy()])
                     nfft = next_fast_len(int(trame2h.shape[1]))
                     rmsmat = np.std(trame2h, axis=1)
                     for filterdb in get_filters(db, all=False):
@@ -383,11 +386,9 @@ def main():
                                               % (rmsmat[i], rms_threshold))
                         if not skip:
                             corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False, nfft=nfft)
-                            tmptime = time.gmtime(basetime + begin /
-                                                  params.goal_sampling_rate)
-                            thisdate = time.strftime("%Y-%m-%d", tmptime)
-                            thistime = time.strftime("%Y-%m-%d %H:%M:%S",
-                                                     tmptime)
+                            tmptime = tmp[0].stats.starttime.datetime
+                            thisdate = tmptime.strftime("%Y-%m-%d")
+                            thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
                             if params.keep_all or params.keep_days:
                                 ccfid = "%s_%s_%s_%s_%s" % (station1, station2,
                                                          filterid, components,
@@ -427,7 +428,7 @@ def main():
                                 components, corr,
                                 params.goal_sampling_rate, day=True,
                                 ncorr=corrs.shape[0])
-                del trames, daycorr, ndaycorr
+                del daycorr, ndaycorr
             logging.debug("Updating Job")
             update_job(db, goal_day, orig_pair, 'CC', 'D')
 
