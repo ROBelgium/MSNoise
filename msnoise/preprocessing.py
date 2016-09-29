@@ -145,7 +145,8 @@ def preprocess(db, stations, comps, goal_day, params):
                         msg = "Unexpected type for `response_format`: %s" % \
                               response_format
                         raise TypeError(msg)
-                for trace in stream:
+
+                for trace in stream.split():
                     logging.debug(
                         "%s.%s Highpass at %.2f Hz" % (station, comp, params.preprocess_highpass))
                     trace.filter("highpass", freq=params.preprocess_highpass, zerophase=True)
