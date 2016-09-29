@@ -294,6 +294,8 @@ def main():
 
                 allcorr = {}
                 for tmp in current.slide(params.corr_duration, params.corr_duration*(1-params.overlap)):
+                    if len(tmp.get_gaps()) != 0:
+                        continue
                     tmp = tmp.copy()
                     tmp.detrend("demean")
 
