@@ -89,7 +89,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
     
     sta1 = sta1.replace('.','_')
     sta2 = sta2.replace('.','_')
-    if sta2 > sta1: # alphabetical order filtering!
+    if sta2 >= sta1: # alphabetical order filtering!
         pair = "%s_%s"%(sta1,sta2)
         station1 = sta1.split("_")
         station2 = sta2.split("_")

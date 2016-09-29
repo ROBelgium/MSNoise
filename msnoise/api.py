@@ -422,8 +422,6 @@ def get_interstation_distance(station1, station2, coordinates="DEG"):
     :param coordinates: The coordinates system. "DEG" is WGS84 latitude/
         longitude in degrees. "UTM" is expressed in meters.
 
-
-
     :rtype: float
     :returns: The interstation distance in km
     """
@@ -1097,10 +1095,11 @@ def get_components_to_compute(session):
     :returns: a list of components to compute
     """
 
-    components_to_compute = []
-    for comp in ['ZZ', 'RR', 'TT', 'TR', 'RT', 'ZR', 'RZ', 'TZ', 'ZT']:
-        if get_config(session, comp, isbool=True):
-            components_to_compute.append(comp)
+    components_to_compute = get_config(session, "components_to_compute")
+    if components_to_compute.count(",") == 0:
+        components_to_compute = [components_to_compute,]
+    else:
+        components_to_compute = components_to_compute.split(",")
     return components_to_compute
 
 

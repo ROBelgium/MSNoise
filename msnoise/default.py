@@ -31,9 +31,9 @@ default['stack_method'] = ["Stack Method: Linear Mean or Phase Weighted Stack: [
 default['pws_timegate'] = ["If stack_method='pws', width of the smoothing in seconds : 10.0 ",'10.0']
 default['pws_power'] = ["If stack_method='pws', Power of the Weighting: 2.0 ",'2.0']
 
-default['crondays'] = ["Number of days to monitors with cron [-1]",'-1']
+default['crondays'] = ["Number of days to monitors with cron [-1]", '-1']
 
-
+default['components_to_compute'] = ["List (comma separated) [ZZ]", 'ZZ']
 default['ZZ'] = ["Compute ZZ correlation [Y]/N",'Y']
 default['ZR'] = ["Compute ZR correlation [Y]/N",'N']
 default['ZT'] = ["Compute ZT correlation [Y]/N",'N']

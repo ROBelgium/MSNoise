@@ -150,7 +150,6 @@ could occur with SQLite.
 """
 import sys
 import time
-from scipy.fftpack.helper import next_fast_len
 
 try:
     from scikits.samplerate import resample
@@ -310,8 +309,11 @@ def main():
                     tmp.taper(0.04)
                     tmp1 = tmp.select(station=s1.sta, component=components[0])[0]
                     tmp2 = tmp.select(station=s2.sta, component=components[1])[0]
-                    trame2h = np.array([tmp1.data.copy(), tmp2.data.copy()])
-                    nfft = next_fast_len(int(trame2h.shape[1]))
+                    nfft = next_fast_len(tmp1.stats.npts)
+                    autocorr = False
+                    if (s1.net == s2.net) and (s1.sta == s2.sta) and (
+                        components[0] == components[1]):
+                        autocorr = True
 
                     for filterdb in get_filters(db, all=False):
                         filterid = filterdb.ref
@@ -323,8 +325,15 @@ def main():
                         skip = False
                         for i, station in enumerate(pair):
                             if tmp[i].data.std() > rms_threshold:
-                                trames2hWb[i] = whiten(
-                                    tmp[i].data, nfft, dt, low, high, plot=False)
+                                if autocorr:
+                                    # logging.debug("Autocorr %s"%components)
+                                    tmp[i].filter("bandpass", freqmin=low, freqmax=high, zerophase=True)
+                                    trames2hWb[i] = scipy.fftpack.fft(tmp[i].data, nfft)
+                                else:
+                                    # logging.debug("Whitening %s" % components)
+                                    trames2hWb[i] = whiten(tmp[i].data, nfft,
+                                                           dt, low, high,
+                                                           plot=False)
                             else:
                                 skip = True
                                 logging.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'

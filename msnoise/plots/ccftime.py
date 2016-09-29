@@ -36,7 +36,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
     sta2 = sta2.replace('.','_')
     t = np.arange(samples)/cc_sampling_rate - maxlag
 
-    if sta2 > sta1: # alphabetical order filtering!
+    if sta2 >= sta1: # alphabetical order filtering!
         pair = "%s:%s"%(sta1,sta2)
         
         print("New Data for %s-%s-%i-%i"%(pair,components,filterid, mov_stack))
