@@ -51,7 +51,8 @@ def preprocess(db, stations, comps, goal_day, params):
                 logging.debug("Checking sample alignment")
                 for i, trace in enumerate(stream):
                     stream[i] = check_and_phase_shift(trace)
-
+                stream.merge()
+                stream = stream.split()
                 stream.sort()
                 logging.debug("Checking Gaps")
                 if len(getGaps(stream)) > 0:
