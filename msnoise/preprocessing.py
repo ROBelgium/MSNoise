@@ -64,7 +64,7 @@ def preprocess(db, stations, comps, goal_day, params):
                         gaps = getGaps(stream)
                         for gap in gaps:
                             if int(gap[-1]) <= max_gap:
-                                stream[gap[0]] = stream[gap[0]].__add__(stream[gap[1]], method=0,
+                                stream[gap[0]] = stream[gap[0]].__add__(stream[gap[1]], method=1,
                                                                         fill_value="interpolate")
                                 stream.remove(stream[gap[1]])
                                 break
@@ -72,6 +72,7 @@ def preprocess(db, stations, comps, goal_day, params):
                                 too_long += 1
                         if too_long == len(gaps):
                             only_too_long = True
+                stream = stream.split()
                 taper_length = 20.0  # seconds
                 for trace in stream:
                     if trace.stats.npts < 4 * taper_length * trace.stats.sampling_rate:
