@@ -88,12 +88,12 @@ def preprocess(db, stations, comps, goal_day, params):
                 # except:
                 #     continue
                 #
-                logging.debug("%s.%s Slicing Stream to %s:%s" % (station, comp, utcdatetime.UTCDateTime(
-                    goal_day.replace('-', '')), utcdatetime.UTCDateTime(
-                    goal_day.replace('-', '')) + params.goal_duration - stream[0].stats.delta))
-                stream.trim(utcdatetime.UTCDateTime(goal_day.replace('-', '')), utcdatetime.UTCDateTime(
-                    goal_day.replace('-', '')) + params.goal_duration - stream[0].stats.delta, pad=True, fill_value=None,
-                               nearest_sample=False)
+                # logging.debug("%s.%s Slicing Stream to %s:%s" % (station, comp, utcdatetime.UTCDateTime(
+                #     goal_day.replace('-', '')), utcdatetime.UTCDateTime(
+                #     goal_day.replace('-', '')) + params.goal_duration - stream[0].stats.delta))
+                # stream.trim(utcdatetime.UTCDateTime(goal_day.replace('-', '')), utcdatetime.UTCDateTime(
+                #     goal_day.replace('-', '')) + params.goal_duration - stream[0].stats.delta, pad=True, fill_value=None,
+                #                nearest_sample=False)
 
                 if get_config(db, 'remove_response', isbool=True):
                     logging.debug('Removing instrument response')
