@@ -1262,6 +1262,7 @@ def check_and_phase_shift(trace):
         else:
             dt = (trace.stats.delta - dt)
 #            direction = "right"
+        print("correcting time by %.6fs"%dt)
         trace.detrend(type="demean")
         trace.detrend(type="simple")
         taper_1s = taper_length * float(trace.stats.sampling_rate) / trace.stats.npts

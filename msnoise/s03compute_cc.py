@@ -294,9 +294,15 @@ def main():
 
                 allcorr = {}
                 for tmp in current.slide(params.corr_duration, params.corr_duration*(1-params.overlap)):
-                    if len(tmp.get_gaps()) != 0:
+                    gaps = []
+                    for gap in tmp.get_gaps(min_gap=0):
+                        if gap[-2] > 0:
+                            gaps.append(gap)
+
+                    if len(gaps) > 0:
                         logging.info("Sliding Windows contains gaps, skipping...")
                         continue
+
                     tmp = tmp.copy()
                     tmp.detrend("demean")
 

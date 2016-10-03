@@ -30,7 +30,7 @@ def preprocess(db, stations, comps, goal_day, params):
         for file in files:
             fullpath = os.path.join(file.path, file.file)
             datafiles[station][file.comp[-1]].append(fullpath)
-
+            print(fullpath)
     j = 0
     for istation, station in enumerate(stations):
         for comp in comps:
@@ -47,13 +47,14 @@ def preprocess(db, stations, comps, goal_day, params):
                         tr.data = tr.data.astype(np.float)
                     stream += st
                     del st
+                stream.sort()
+                stream.merge(method=1, interpolation_samples=3, fill_value=None)
+                stream = stream.split()
 
                 logging.debug("Checking sample alignment")
                 for i, trace in enumerate(stream):
                     stream[i] = check_and_phase_shift(trace)
-                stream.merge()
-                stream = stream.split()
-                stream.sort()
+
                 logging.debug("Checking Gaps")
                 if len(getGaps(stream)) > 0:
                     max_gap = 10
@@ -71,7 +72,6 @@ def preprocess(db, stations, comps, goal_day, params):
                                 too_long += 1
                         if too_long == len(gaps):
                             only_too_long = True
-
                 taper_length = 20.0  # seconds
                 for trace in stream:
                     if trace.stats.npts < 4 * taper_length * trace.stats.sampling_rate:
@@ -147,7 +147,7 @@ def preprocess(db, stations, comps, goal_day, params):
                               response_format
                         raise TypeError(msg)
 
-                for trace in stream.split():
+                for trace in stream:
                     logging.debug(
                         "%s.%s Highpass at %.2f Hz" % (station, comp, params.preprocess_highpass))
                     trace.filter("highpass", freq=params.preprocess_highpass, zerophase=True)
@@ -193,21 +193,4 @@ def preprocess(db, stations, comps, goal_day, params):
 
                 output += stream
 
-                # if len(trace.data) % 2 != 0:
-                #     trace.data = np.append(trace.data, 0.)
-                # if len(trace.data) != len(tramef_Z[istation]):
-                #     missing = len(tramef_Z[istation]) - len(trace.data)
-                #     for i in range(missing):
-                #         trace.data = np.append(trace.data, 0.)
-                # if comp == "Z":
-                #     tramef_Z[istation] = trace.data
-                # elif comp == "E":
-                #     tramef_E[istation] = trace.data
-                # elif comp == "N":
-                #     tramef_N[istation] = trace.data
-                # del trace, stream
-
-    # if len(tramef_E) != 0:
-    #     return basetime, tramef_Z, tramef_E, tramef_N
-    # else:
     return basetime, output
