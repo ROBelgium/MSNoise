@@ -47,7 +47,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
                    interpolation='none',origin='lower',cmap='seismic',
                    vmin=-1e-2,vmax=1e-2)
         plt.ylabel("Lag Time (s)")
-        plt.axhline(0,lw=0.5,c='k')
+        plt.axhline(0, lw=0.5, c='k')
         plt.grid()
 
         ax.xaxis.set_major_locator( YearLocator() )
@@ -59,8 +59,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
                 high = float(filterdb.high)
                 break
         
-        lag = 120
-        plt.ylim(-lag,lag)
+        plt.ylim(-maxlag,maxlag)
         plt.title('%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' %
                   (sta1.replace('_', '.'), sta2.replace('_', '.'), components,
                    filterid, low, high, mov_stack))

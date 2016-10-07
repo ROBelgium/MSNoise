@@ -64,6 +64,11 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
         else:
             mov_stacks = [int(mi) for mi in mov_stack.split(',')]
 
+    if components.count(","):
+        components = components.split()
+    else:
+        components = [components,]
+
     gs = gridspec.GridSpec(len(mov_stacks), 1)
     plt.figure(figsize=(15, 10))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
@@ -73,11 +78,12 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
         first = True
         alldf = []
         while current <= end:
-            day = os.path.join('DTT', "%02i" % filterid, "%03i_DAYS" %
-                               mov_stack, components, '%s.txt' % current)
-            if os.path.isfile(day):
-                df = pd.read_csv(day, header=0, index_col=0, parse_dates=True)
-                alldf.append(df)
+            for comp in components:
+                day = os.path.join('DTT', "%02i" % filterid, "%03i_DAYS" %
+                                   mov_stack, comp, '%s.txt' % current)
+                if os.path.isfile(day):
+                    df = pd.read_csv(day, header=0, index_col=0, parse_dates=True)
+                    alldf.append(df)
             current += datetime.timedelta(days=1)
         if len(alldf) == 0:
             print("No Data for %s m%i f%i" % (components, mov_stack, filterid))
