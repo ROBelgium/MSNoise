@@ -65,7 +65,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
             mov_stacks = [int(mi) for mi in mov_stack.split(',')]
 
     if components.count(","):
-        components = components.split()
+        components = components.split(",")
     else:
         components = [components,]
 
