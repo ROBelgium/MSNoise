@@ -104,8 +104,11 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
             # groups['CRATER'] = ["UV11","UV15","FJS","FLR","SNE","UV12","FOR","RVL","UV06"]
             # groups['GPENTES'] = ["UV03","UV08","UV04","UV02","HDL"]
             # groups['VOLCAN'] = groups['CRATER'] + groups['GPENTES'] + ['HIM','VIL']
-            
-            plt.subplot(gs[i])
+
+            if first_plot == 1:
+                ax = plt.subplot(gs[i])
+            else:
+                plt.subplot(gs[i], sharex=ax)
             # x = {}
             # for group in groups.keys():
             #     pairindex = []
