@@ -619,6 +619,7 @@ def shutdown():
 # Flask views
 @app.route('/')
 def index():
+    db = connect()
     return redirect("/admin/", code=302)
 
 
@@ -628,7 +629,7 @@ def main(port=5000):
     plugins = get_config(db, "plugins")
     db.close()
 
-    db = connect()
+
 
     admin = Admin(app)
     if "msnoise_brand" in os.environ:
@@ -697,4 +698,4 @@ def main(port=5000):
     print("MSNoise admin will run on all interfaces by default")
     print("access it via the machine's IP address or")
     print("via http://127.0.0.1:%i when running locally."%port)
-    app.run(host='0.0.0.0', port=port, debug=True, reloader_interval=1)
+    app.run(host='0.0.0.0', port=port, debug=False, reloader_interval=1, threaded=True)
