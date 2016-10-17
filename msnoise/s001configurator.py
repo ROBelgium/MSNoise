@@ -31,14 +31,13 @@ Filter Parameters
 
 """
 
-
 from traits.api import HasTraits, Str, List, Instance, Float, CInt, CBool, Enum
 from traitsui.api import Item, View, TreeEditor, TreeNode, TableEditor
-from traitsui.table_column import ObjectColumn
 from traitsui.extras.checkbox_column import CheckboxColumn
+from traitsui.table_column import ObjectColumn
 
-from .default import *
 from .api import *
+from .default import *
 from .msnoise_table_def import *
 
 

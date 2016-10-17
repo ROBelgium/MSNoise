@@ -12,18 +12,8 @@ Example:
 
 """
 # plot interferogram
-import matplotlib.pyplot as plt
-from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator, YearLocator
-from scipy.stats import scoreatpercentile
 
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-
-import os
-import numpy as np
-import sys
-import scipy.signal
-from obspy.core import read, Stream, Trace
 
 from ..api import *
 

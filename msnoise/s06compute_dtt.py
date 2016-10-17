@@ -125,17 +125,7 @@ variations.
 
 """
 
-import numpy as np
-import os
-
-
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-
 import statsmodels.api as sm
-
-import logging
 
 from .api import *
 

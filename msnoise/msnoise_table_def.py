@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime,\
-    text, TIMESTAMP, Enum, Numeric, REAL
-from sqlalchemy.ext.declarative import declarative_base
 import datetime
+
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime,\
+    text, TIMESTAMP, Enum, REAL
+from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 

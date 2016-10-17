@@ -1,11 +1,12 @@
+import logging
 import os
 import sys
+import time
+
 import click
 import pkg_resources
-import logging
-import time
-import traceback
-from pkg_resources import iter_entry_points
+
+
 # from click_plugins import with_plugins
 
 
@@ -39,15 +40,19 @@ def plugin():
     """Runs a command in a named plugin"""
     pass
 
+
 # @with_plugins(iter_entry_points('msnoise.plugins'))
 @click.group()
 def p():
     """Short cut for plugins"""
     pass
 
+
 @click.command()
 def test():
     """Runs the test suite, should be executed in an empty folder!"""
+    import matplotlib.pyplot as plt
+    plt.switch_backend("agg")
     from ..test.tests import main
     main()
 
@@ -65,7 +70,6 @@ def upgrade_db():
     This procedure adds new parameters with their default value
     in the config database.
     """
-    from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
     from ..api import connect, Config, get_tech, get_engine
     from ..default import default
     db = connect()
@@ -83,9 +87,10 @@ def upgrade_db():
     if get_tech() == 2:
         try:
             e = get_engine()
-            e.execute('ALTER TABLE `jobs` CHANGE `type` `jobtype` VARCHAR( 10 )')
+            e.execute(
+                'ALTER TABLE `jobs` CHANGE `type` `jobtype` VARCHAR( 10 )')
         except:
-            print( "The jobs table seems already up-to-date, exiting.")
+            print("The jobs table seems already up-to-date, exiting.")
     else:
         try:
             e = get_engine()
@@ -93,7 +98,8 @@ def upgrade_db():
         except:
             print("You need to edit the `jobs` table manually to match the new"
                   "column naming")
-            print ("Please read http://msnoise.org/doc/releasenotes/msnoise-1.3.html")
+            print (
+            "Please read http://msnoise.org/doc/releasenotes/msnoise-1.3.html")
     if get_tech() == 2:
         try:
             e = get_engine()
@@ -105,7 +111,8 @@ def upgrade_db():
     else:
         print("You need to edit the `station` table manually to match the new"
               " column naming")
-        print ("Please read http://msnoise.org/doc/releasenotes/msnoise-1.4.html")
+        print (
+        "Please read http://msnoise.org/doc/releasenotes/msnoise-1.4.html")
 
 
 @click.command()
@@ -113,8 +120,8 @@ def upgrade_db():
 def info(jobs):
     """Outputs general information about the current install and config, plus
     information about jobs and their status."""
-    from ..api import connect, get_config, get_job_types, get_filters,\
-                      get_stations
+    from ..api import connect, get_config, get_job_types, get_filters, \
+        get_stations
     from ..default import default
 
     click.echo('')
@@ -149,29 +156,34 @@ def info(jobs):
         if os.path.isdir(output_folder):
             click.echo(" - %s exists" % output_folder)
         else:
-            if get_config(db, 'keep_all') in ['Y','y']:
+            if get_config(db, 'keep_all') in ['Y', 'y']:
                 for job in get_job_types(db):
                     if job[1] == 'D':
                         if job[0] > 0:
-                            click.secho(" - %s does not exists and that is not normal (%i CC jobs done)" % (output_folder, job[0]), fg='red')
+                            click.secho(
+                                " - %s does not exists and that is not normal (%i CC jobs done)" % (
+                                output_folder, job[0]), fg='red')
                         else:
-                            click.secho(" - %s does not exists and that is normal (%i CC jobs done)" % (output_folder, job[0]))
+                            click.secho(
+                                " - %s does not exists and that is normal (%i CC jobs done)" % (
+                                output_folder, job[0]))
             else:
-                click.secho(" - %s does not exists (and that is normal because keep_all=False)" % output_folder)
-
+                click.secho(
+                    " - %s does not exists (and that is normal because keep_all=False)" % output_folder)
 
         click.echo('')
         click.echo('Raw config bits: "D"efault or "M"odified (green)')
         for key in default.keys():
             tmp = get_config(db, key)
             if tmp == default[key][1]:
-                click.secho(" D %s: %s" %(key, tmp ))
+                click.secho(" D %s: %s" % (key, tmp))
             else:
-                click.secho(" M %s: %s" %(key, tmp ), fg='green')
+                click.secho(" M %s: %s" % (key, tmp), fg='green')
 
         click.echo('')
         click.echo('Filters:')
-        print('ID: [low:high]  [mwcs_low:mwcs_high]    mwcs_wlen    mwcs_step   used')
+        print(
+        'ID: [low:high]  [mwcs_low:mwcs_high]    mwcs_wlen    mwcs_step   used')
         for f in get_filters(db, all=True):
             data = (f.ref,
                     f.low,
@@ -180,7 +192,7 @@ def info(jobs):
                     f.mwcs_high,
                     f.mwcs_wlen,
                     f.mwcs_step,
-                    ['N','Y'][f.used])
+                    ['N', 'Y'][f.used])
             print('%02i: [%.03f:%.03f] [%.03f:%.03f] %.03i %.03i %s' % data)
 
         click.echo('')
@@ -192,12 +204,12 @@ def info(jobs):
 
     click.echo('')
     click.echo('CC Jobs:')
-    for (n,jobtype) in get_job_types(db,'CC'):
+    for (n, jobtype) in get_job_types(db, 'CC'):
         click.echo(" %s : %i" % (jobtype, n))
 
     click.echo('')
     click.echo('DTT Jobs:')
-    for (n,jobtype) in get_job_types(db,'DTT'):
+    for (n, jobtype) in get_job_types(db, 'DTT'):
         click.echo(" %s : %i" % (jobtype, n))
 
 
@@ -211,9 +223,10 @@ def install():
 
 @click.command()
 @click.option('-s', '--set', help='Modify config value: usage --set name=value')
-def config(set):
+@click.option('-S', '--sync', is_flag=True, help='Sync station metadata from inventory/dataless')
+def config(set, sync):
     """This command should now only be used to use the command line to set
-    a parameter value in the data base. It used tolaunch the Configurator but
+    a parameter value in the data base. It used to launch the Configurator but
     the recommended way to configure MSNoise is to use the "msnoise admin" web
     interface."""
     if set:
@@ -223,19 +236,64 @@ def config(set):
             return
         name, value = set.split("=")
         if not name in default:
-            click.echo("!! unknown parameter %s !!"%name)
+            click.echo("!! unknown parameter %s !!" % name)
             return
         from ..api import connect, update_config
         db = connect()
         update_config(db, name, value)
         db.commit()
         db.close()
-        click.echo("Successfully updated parameter %s = %s"%(name,value))
+        click.echo("Successfully updated parameter %s = %s" % (name, value))
+    elif sync:
+        import glob
+        from ..api import connect, get_config, get_stations, update_station
+        db = connect()
+        response_format = get_config(db, 'response_format')
+        response_files = glob.glob(os.path.join(get_config(db, 'response_path'), "*"))
+        if response_format == "inventory":
+            from obspy import read_inventory
+            firstinv = True
+            metadata = None
+            for file in response_files:
+                try:
+                    inv = read_inventory(file)
+                    if firstinv:
+                        metadata = inv
+                        firstinv = False
+                    else:
+                        metadata += inv
+                except:
+                    pass
+        elif response_format == "dataless":
+            from obspy.io.xseed import Parser
+            all_metadata = {}
+            for file in response_files:
+                metadata = Parser(file)
+                tmpinv = metadata.get_inventory()
+                for chan in tmpinv["channels"]:
+                    all_metadata[chan["channel_id"]] = metadata
+        else:
+            print("Response Format Not Supported")
+            exit()
+        for station in get_stations(db):
+            id = "%s.%s.00.HHZ" % (station.net, station.sta)
+            if response_format == "inventory":
+                coords = inv.get_coordinates(id)
+            else:
+
+                coords = all_metadata[id].get_coordinates(id)
+            update_station(db, station.net, station.sta, coords["longitude"],
+                           coords["latitude"], coords["elevation"], "DEG", )
+            logging.info("Added coordinates (%.5f %.5f) for station %s.%s" %
+                        (coords["longitude"], coords["latitude"],
+                         station.net, station.sta))
+        db.close()
+
     else:
         from ..s001configurator import main
         click.echo('Let\'s Configure MSNoise !')
         main()
-    
+
 
 @click.command()
 @click.option('-s', '--sys', is_flag=True, help='System Info')
@@ -246,7 +304,7 @@ def config(set):
 def bugreport(ctx, sys, modules, env, all):
     """This command launches the Bug Report script."""
     click.echo('Let\'s Bug Report MSNoise !')
-    #click.echo('Working on %i threads' % ctx.obj['MSNOISE_threads'])
+    # click.echo('Working on %i threads' % ctx.obj['MSNOISE_threads'])
     from ..bugreport import main
     main(sys, modules, env, all)
 
@@ -390,11 +448,11 @@ def data_availability(ctx, show, outfile):
 @click.command()
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=0,  help='Plot specific mov stacks')
-@click.option('-p', '--pair', default=None,  help='Plot a specific pair',
+@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
+@click.option('-p', '--pair', default=None, help='Plot a specific pair',
               multiple=True)
 @click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
-@click.option('-M', '--dttname', default="M",  help='Plot M or M0?')
+@click.option('-M', '--dttname', default="M", help='Plot M or M0?')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
@@ -417,11 +475,11 @@ def dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
 @click.command()
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=0,  help='Plot specific mov stacks')
-@click.option('-p', '--pair', default=None,  help='Plot a specific pair',
+@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
+@click.option('-p', '--pair', default=None, help='Plot a specific pair',
               multiple=True)
 @click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
-@click.option('-M', '--dttname', default="A",  help='Plot M or M0?')
+@click.option('-M', '--dttname', default="A", help='Plot M or M0?')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
@@ -446,7 +504,8 @@ def timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
+@click.option('-m', '--mov_stack', default=1,
+              help='Mov Stack to read from disk')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
@@ -467,7 +526,8 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
+@click.option('-m', '--mov_stack', default=1,
+              help='Mov Stack to read from disk')
 @click.option('-a', '--ampli', default=5.0, help='Amplification')
 @click.option('-S', '--seismic', is_flag=True, help='Seismic style')
 @click.option('-s', '--show', help='Show interactively?',
@@ -491,7 +551,8 @@ def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
+@click.option('-m', '--mov_stack', default=1,
+              help='Mov Stack to read from disk')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
@@ -507,7 +568,6 @@ def mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
 
 
-
 @click.command()
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
@@ -517,7 +577,7 @@ def mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
 @click.pass_context
-def distance(ctx, filterid, comp,  ampli, show, outfile):
+def distance(ctx, filterid, comp, ampli, show, outfile):
     """Plots the REFs of all pairs vs distance"""
     if ctx.obj['MSNOISE_custom']:
         from distance import main
@@ -547,7 +607,8 @@ def station_map(ctx, show, outfile):
 @click.argument('day')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk')
+@click.option('-m', '--mov_stack', default=1,
+              help='Mov Stack to read from disk')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
@@ -564,7 +625,6 @@ def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
     main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile)
 
 
-
 # Add plot commands to the plot group:
 plot.add_command(data_availability)
 plot.add_command(dvv)
@@ -575,7 +635,6 @@ plot.add_command(distance)
 plot.add_command(station_map)
 plot.add_command(timing)
 plot.add_command(dtt)
-
 
 # Add all commands to the cli group:
 cli.add_command(info)
@@ -600,6 +659,7 @@ cli.add_command(plot)
 
 try:
     from ..api import connect, get_config
+
     db = connect()
     plugins = get_config(db, "plugins")
 except:

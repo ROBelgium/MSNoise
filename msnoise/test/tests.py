@@ -321,6 +321,8 @@ class MSNoiseTests(unittest.TestCase):
 
 
 def main():
+    import matplotlib.pyplot as plt
+    plt.switch_backend("agg")
     import os
     import sys
     c = len(os.listdir(os.getcwd()))

@@ -2,13 +2,9 @@
 Strechting...
 """
 
-from obspy.core import read
-import numpy as np
 # import pandas as pd
+
 from .api import *
-# from MWCS import mwcs
-import logging
-import matplotlib.pyplot as plt
 
 
 def stretch_mat_creation(refcc, str_range=0.01, nstr=1000):

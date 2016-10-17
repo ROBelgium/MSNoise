@@ -27,15 +27,17 @@ To run this script:
     solution.
 """
 import argparse
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import *
-from getpass import getpass
-from .msnoise_table_def import *
-from .default import default
-from .api import create_database_inifile
-
 import sys
+from getpass import getpass
+
+from sqlalchemy import create_engine
+from sqlalchemy.exc import *
+from sqlalchemy.orm import sessionmaker
+
+from .api import create_database_inifile
+from .default import default
+from .msnoise_table_def import *
+
 if sys.version_info[0] >= 3:
     raw_input = input
 

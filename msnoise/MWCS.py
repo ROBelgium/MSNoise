@@ -79,7 +79,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
     padd = 2**(nextpow2(windL)+2)
 
     # Tentative checking if enough point are used to compute the FFT
-    freqVec = scipy.fftpack.fftfreq(int(padd), 1./sampRate)[:int(padd)/2]
+    freqVec = scipy.fftpack.fftfreq(int(padd), 1./sampRate)[:int(padd)//2]
     indRange = np.argwhere(np.logical_and(freqVec >= fmin,
                                           freqVec <= fmax))
     if len(indRange) < 2:
@@ -107,8 +107,8 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
         cri -= np.mean(cri)
         cri *= tp
 
-        Fcur = scipy.fftpack.fft(cci, n=int(padd))[:int(padd)/2]
-        Fref = scipy.fftpack.fft(cri, n=int(padd))[:int(padd)/2]
+        Fcur = scipy.fftpack.fft(cci, n=int(padd))[:int(padd)//2]
+        Fref = scipy.fftpack.fft(cri, n=int(padd))[:int(padd)//2]
 
         Fcur2 = np.real(Fcur)**2 + np.imag(Fcur)**2
         Fref2 = np.real(Fref)**2 + np.imag(Fref)**2
@@ -124,7 +124,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
         dcs = np.abs(X)
 
         # Find the values the frequency range of interest
-        freqVec = scipy.fftpack.fftfreq(len(X)*2, 1./sampRate)[:int(padd)/2]
+        freqVec = scipy.fftpack.fftfreq(len(X)*2, 1./sampRate)[:int(padd)//2]
         indRange = np.argwhere(np.logical_and(freqVec >= fmin,
                                               freqVec <= fmax))
 
@@ -169,7 +169,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
         # print w.shape
         if plot:
             plt.figure()
-            plt.suptitle('%.1fs' % (timeaxis[ind + windL/2]))
+            plt.suptitle('%.1fs' % (timeaxis[ind + windL//2]))
             plt.subplot(311)
             plt.plot(cci)
             plt.plot(cri)
@@ -187,7 +187,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
 
         deltaErr.append(e)
         deltaMcoh.append(np.real(mcoh))
-        Taxis.append(timeaxis[ind + windL/2])
+        Taxis.append(timeaxis[ind + windL//2])
         count += 1
 
         minind += step

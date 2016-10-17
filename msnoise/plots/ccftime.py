@@ -15,20 +15,10 @@ Example:
 .. image:: .static/ccftime.png
 """
 # plot interferogram
-import matplotlib.pyplot as plt
-from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator, YearLocator
-from scipy.stats import scoreatpercentile
 
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 from matplotlib.widgets import Cursor
-
-import os
-import numpy as np
-import sys
-import scipy.signal
-from obspy.core import read, Stream, Trace
 
 from ..api import *
 
@@ -41,7 +31,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
     cc_sampling_rate = float(get_config(db,'cc_sampling_rate'))
     start, end, datelist = build_movstack_datelist(db)
     base = mdates.date2num(start) 
-    plt.figure(figsize=(16,16))
+    #plt.figure(figsize=(16,16))
     sta1 = sta1.replace('.','_')
     sta2 = sta2.replace('.','_')
     t = np.arange(samples)/cc_sampling_rate - maxlag

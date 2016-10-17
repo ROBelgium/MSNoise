@@ -13,19 +13,10 @@ Example:
 
 """
 
-import pandas as pd
-
-import numpy as np
-import datetime
-import os
-
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-
-from statsmodels.tsa.tsatools import detrend
+import matplotlib.pyplot as plt
 
 from ..api import *
-
 
 
 def main(mov_stack=None, dttname="A", components='ZZ', filterid=1,

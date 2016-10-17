@@ -29,27 +29,17 @@ all files found in the data_availability table in the database. As usual,
 calling the script with a --help argument will show its usage.
 
 """
-from obspy.core import read
-import glob
-import os
-import sys
-import datetime
-import time
-import logging
-import logging.handlers
-from subprocess import Popen, PIPE
-from multiprocessing import Process
-import multiprocessing
-import multiprocessing_logging
-import numpy as np
-
 import argparse
-import traceback
-
-
+import glob
+import logging.handlers
+import sys
+import time
+from multiprocessing import Process
+from subprocess import Popen, PIPE
 
 from .api import *
 from .data_structures import data_structure
+
 
 def worker(files, folder, startdate, enddate, goal_sampling_rate):
     import logging
@@ -161,7 +151,6 @@ def main(init=False, threads=1):
         print()
         if os.path.isfile(os.path.join(os.getcwd(), 'custom.py')):
             sys.path.append(os.getcwd())
-            from custom import data_structure as rawpath
             rawpath=data_structure[data_struc]
         else:
             print("No file named custom.py in the %s folder" % os.getcwd())

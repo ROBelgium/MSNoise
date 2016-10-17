@@ -116,29 +116,25 @@ modules are properly installed and available for MSNoise.
 
 """
 
+from io import BytesIO
 
-from flask import Flask, redirect, request,  url_for
-from flask_admin import Admin, BaseView, expose
-import flask, time, json, socket
-from flask_admin.model import typefmt
-from flask_admin.contrib.sqla import ModelView
+import flask
+import jinja2
+import json
+import markdown
+from flask import Flask, redirect, request
+from flask import Markup
 from flask import flash
-from wtforms.validators import ValidationError
+from flask_admin import Admin, BaseView, expose
 from flask_admin.actions import action
 from flask_admin.babel import ngettext, lazy_gettext
-import markdown
-from flask import Markup
-from io import BytesIO
-import jinja2
-
-# from bokeh.embed import components
-# from bokeh.plotting import figure
-# from bokeh.resources import INLINE, CDN
-# from bokeh.templates import RESOURCES
+from flask_admin.contrib.sqla import ModelView
+from flask_admin.model import typefmt
+from wtforms.validators import ValidationError
 
 from .api import *
-from .msnoise_table_def import *
 from .default import default
+from .msnoise_table_def import *
 
 
 class GenericView(BaseView):
@@ -623,6 +619,7 @@ def shutdown():
 # Flask views
 @app.route('/')
 def index():
+    db = connect()
     return redirect("/admin/", code=302)
 
 
@@ -632,10 +629,16 @@ def main(port=5000):
     plugins = get_config(db, "plugins")
     db.close()
 
-    db = connect()
+
 
     admin = Admin(app)
-    admin.name = "MSNoise"
+    if "msnoise_brand" in os.environ:
+        tmp = eval(os.environ["msnoise_brand"])
+        name, logo = tmp.split("|")
+        admin.logo = logo
+        admin.name = name
+    else:
+        admin.name = "MSNoise"
     admin.project_folder = os.getcwd()
     tech, hostname, database, username, password = read_database_inifile()
     if tech == 1:
@@ -694,5 +697,5 @@ def main(port=5000):
 
     print("MSNoise admin will run on all interfaces by default")
     print("access it via the machine's IP address or")
-    print("via http://127.0.0.1:5000 when running locally.")
-    app.run(host='0.0.0.0', port=port, debug=True, reloader_interval=1)
+    print("via http://127.0.0.1:%i when running locally."%port)
+    app.run(host='0.0.0.0', port=port, debug=False, reloader_interval=1, threaded=True)
