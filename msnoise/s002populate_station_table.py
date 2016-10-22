@@ -13,6 +13,7 @@ The ``data_folder`` (as defined in the config) is scanned expecting the
     data_structure['IDDS'] = "YEAR/NET/STA/CHAN.TYPE/DAY/NET.STA.LOC.CHAN.TYPE.YEAR.DAY.HOUR"
     data_structure['PDF'] = "YEAR/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.DAY"
 
+More info on the recommended SDS ("SeisComP Data Structure") can be found here: https://www.seiscomp3.org/wiki/doc/applications/slarchive/SDS
 For other structures, one has to edit the data_structures.py file and define
 the reader in this script.
 
