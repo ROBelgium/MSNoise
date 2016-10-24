@@ -44,7 +44,7 @@ def preprocess(db, stations, comps, goal_day, params):
                               starttime=UTCDateTime(gd),
                               endtime=UTCDateTime(gd) + 86400)
                     for tr in st:
-                        tr.data = tr.data.astype(np.float)
+                        tr.data = tr.data.astype(np.float32)
                     stream += st
                     del st
                 stream.sort()
@@ -193,5 +193,6 @@ def preprocess(db, stations, comps, goal_day, params):
                     basetime = calendar.timegm(t)
 
                 output += stream
-
+                del stream
+            del files
     return basetime, output

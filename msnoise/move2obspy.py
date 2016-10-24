@@ -195,7 +195,7 @@ def getCoherence(dcs, ds1, ds2):
     coh[coh > (1.0 + 0j)] = 1.0 + 0j
     return coh
 
-from obspy.signal.filter import bandpass
+
 def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
          plot=False):
     """...
@@ -233,7 +233,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
     deltaErr = []
     deltaMcoh = []
     Taxis = []
-    padd = 2 ** (nextpow2(windL) + 2)
+    # padd = 2 ** (nextpow2(windL) + 2)
     padd = next_fast_len(windL)
 
     # Tentative checking if enough point are used to compute the FFT
