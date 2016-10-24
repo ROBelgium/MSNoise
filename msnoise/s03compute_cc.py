@@ -217,6 +217,7 @@ def main():
             stations.append(netsta1)
             stations.append(netsta2)
             goal_day = job.day
+        del jobs
 
         stations = np.unique(stations)
 
@@ -360,7 +361,9 @@ def main():
                                     allcorr[ccfid] = {}
                                 allcorr[ccfid][thistime] = corr
 
-                            del corr, thistime, trames2hWb
+                            del corr, thistime, trames2hWb, tmptime
+                        del low, high, rms_threshold
+                    del tmp, tmp1, tmp2
 
                 if params.keep_all:
                     for ccfid in allcorr.keys():
@@ -385,7 +388,8 @@ def main():
                                 components, corr,
                                 params.goal_sampling_rate, day=True,
                                 ncorr=corrs.shape[0])
-
+                        del corrs, corr, thisdate, thistime
+                del current, allcorr
             logging.debug("Updating Job")
             update_job(db, goal_day, orig_pair, 'CC', 'D')
 
