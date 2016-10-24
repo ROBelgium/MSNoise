@@ -68,7 +68,7 @@ def main(init=False):
         jobs = []
         modified = []
         available = []
-        for data in get_data_availability(db, starttime=day, endtime=day+datetime.timedelta(days=1-1.0e-3)):
+        for data in get_data_availability(db, starttime=day, endtime=day+datetime.timedelta(days=1)):
             sta = "%s.%s" % (data.net, data.sta)
             if sta in stations_to_analyse:
                 available.append(sta)
