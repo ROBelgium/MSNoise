@@ -361,6 +361,9 @@ def main():
                                               % (tmp[i].data.std(), rms_threshold))
                         if not skip:
                             corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False, nfft=nfft)
+                            if np.any(np.isnan(corr)):
+                                logging.debug("corr object contains NaNs, skipping")
+                                continue
                             tmptime = tmp[0].stats.starttime.datetime
                             thisdate = tmptime.strftime("%Y-%m-%d")
                             thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
