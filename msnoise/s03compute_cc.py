@@ -303,7 +303,7 @@ def main():
                     if len(gaps) > 0:
                         logging.debug("Sliding Windows %s contains gaps, skipping..." % (tmp[0].stats.starttime))
                         continue
-                    if tmp[0].stats.npts <= params.corr_duration*0.85:
+                    if tmp[0].stats.npts < 2*(params.maxlag * params.goal_sampling_rate) + 1:
                         continue
                     if len(tmp) < 2:
                         continue
@@ -363,6 +363,10 @@ def main():
                             corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False, nfft=nfft)
                             if not np.all(np.isfinite(corr)):
                                 logging.debug("corr object contains NaNs, skipping")
+                                continue
+                            if len(corr) < 2* (params.maxlag * params.goal_sampling_rate) + 1:
+                                logging.debug(
+                                    "corr object is too small, skipping")
                                 continue
                             tmptime = tmp[0].stats.starttime.datetime
                             thisdate = tmptime.strftime("%Y-%m-%d")

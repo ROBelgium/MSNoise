@@ -962,8 +962,6 @@ def stack(session, data):
     pws_timegate = float(get_config(session, 'pws_timegate'))
     pws_power = float(get_config(session, 'pws_power'))
     goal_sampling_rate = float(get_config(session, "cc_sampling_rate"))
-    with np.errstate(invalid="ignore"):
-        data[np.isnan(data)] = np.nan
     data = data[~np.isnan(data).any(axis=1)]
     if stack_method == "linear":
         corr = data.mean(axis=0)
