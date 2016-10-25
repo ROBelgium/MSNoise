@@ -301,7 +301,7 @@ def main():
                             gaps.append(gap)
 
                     if len(gaps) > 0:
-                        logging.debug("Sliding Windows %s contains gaps, skipping..." (tmp[0].stats.starttime))
+                        logging.debug("Sliding Windows %s contains gaps, skipping..." % (tmp[0].stats.starttime))
                         continue
                     if tmp[0].stats.npts <= params.corr_duration*0.85:
                         continue
