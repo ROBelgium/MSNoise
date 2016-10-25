@@ -387,7 +387,7 @@ def main():
                     for ccfid in allcorr.keys():
                         station1, station2, filterid, components, date = ccfid.split('_')
 
-                        corrs = np.asarray(list(allcorr[ccfid].values()))
+                        corrs = np.asarray(allcorr[ccfid].values())
                         corr = stack(db, corrs)
 
                         thisdate = time.strftime(
