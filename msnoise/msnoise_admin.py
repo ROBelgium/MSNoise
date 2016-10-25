@@ -116,11 +116,11 @@ modules are properly installed and available for MSNoise.
 
 """
 
+import json
 from io import BytesIO
 
 import flask
 import jinja2
-import json
 import markdown
 from flask import Flask, redirect, request
 from flask import Markup
@@ -260,6 +260,7 @@ class JobView(ModelView):
     can_edit = True
     column_filters = ('pair','jobtype','flag')
     page_size = 100
+    edit_modal = True
     def __init__(self, session, **kwargs):
         super(JobView, self).__init__(Job, session, **kwargs)
     

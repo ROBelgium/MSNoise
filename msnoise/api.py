@@ -19,9 +19,9 @@ import pandas as pd
 import scipy as sp
 import scipy.fftpack
 from scipy.fftpack.helper import next_fast_len
+import scipy.fftpack._fftpack as sff
 
 from obspy.core import Stream, Trace, read, AttribDict
-from obspy.signal.invsim import cosine_taper
 
 from obspy.geodetics import gps2dist_azimuth
 
@@ -1265,16 +1265,18 @@ def check_and_phase_shift(trace):
         print("correcting time by %.6fs"%dt)
         trace.detrend(type="demean")
         trace.detrend(type="simple")
-        taper_1s = taper_length * float(trace.stats.sampling_rate) / trace.stats.npts
-        cp = cosine_taper(trace.stats.npts, taper_1s)
-        trace.data *= cp
+        trace.taper(max_percentage=None, max_length=1.0)
 
         n = next_fast_len(int(trace.stats.npts))
         FFTdata = scipy.fftpack.fft(trace.data, n=n)
         fftfreq = scipy.fftpack.fftfreq(n, d=trace.stats.delta)
         FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
-        trace.data = np.real(scipy.fftpack.ifft(FFTdata, n=n)[:len(trace.data)])
+        FFTdata = FFTdata.astype(np.complex64)
+        scipy.fftpack.ifft(FFTdata, n=n, overwrite_x=True)
+        trace.data = np.real(FFTdata[:len(trace.data)])
         trace.stats.starttime += dt
+        del FFTdata, fftfreq
+        clean_scipy_cache()
         return trace
     else:
         return trace
@@ -1324,7 +1326,25 @@ def getGaps(stream, min_gap=None, max_gap=None):
                         stime, etime, delta, nsamples])
     # Set the original traces to not alter the stream object.
     stream.traces = copied_traces
+    del copied_traces
     return gap_list
+
+
+def clean_scipy_cache():
+    sff.destroy_zfft_cache()
+    sff.destroy_zfftnd_cache()
+    sff.destroy_drfft_cache()
+    sff.destroy_cfft_cache()
+    sff.destroy_cfftnd_cache()
+    sff.destroy_rfft_cache()
+    sff.destroy_ddct2_cache()
+    sff.destroy_ddct1_cache()
+    sff.destroy_dct2_cache()
+    sff.destroy_dct1_cache()
+    sff.destroy_ddst2_cache()
+    sff.destroy_ddst1_cache()
+    sff.destroy_dst2_cache()
+    sff.destroy_dst1_cache()
 
 
 if __name__ == "__main__":

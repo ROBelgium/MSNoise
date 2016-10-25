@@ -389,11 +389,12 @@ def main():
                                 params.goal_sampling_rate, day=True,
                                 ncorr=corrs.shape[0])
                         del corrs, corr, thisdate, thistime
-                del current, allcorr
+                del current, allcorr, t1, t2
             logging.debug("Updating Job")
             update_job(db, goal_day, orig_pair, 'CC', 'D')
 
             logging.info("Finished processing this pair. It took %.2f seconds" % (time.time() - tt))
+        clean_scipy_cache()
         logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
     logging.info('*** Finished: Compute CC ***')
 
