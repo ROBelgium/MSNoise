@@ -301,7 +301,7 @@ def main():
                             gaps.append(gap)
 
                     if len(gaps) > 0:
-                        logging.info("Sliding Windows contains gaps, skipping...")
+                        logging.debug("Sliding Windows %s contains gaps, skipping..." (tmp[0].stats.starttime))
                         continue
 
                     tmp = tmp.copy()

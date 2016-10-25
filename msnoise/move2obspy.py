@@ -147,7 +147,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     FFTRawSign[high:Nfft + 1] *= 0
 
     # Hermitian symmetry (because the input is real)
-    FFTRawSign[-Nfft // 2 + 1:] = FFTRawSign[1:Nfft // 2].conjugate()[::-1]
+    FFTRawSign[-(Nfft // 2) + 1:] = FFTRawSign[1:(Nfft // 2)].conjugate()[::-1]
 
     if plot:
         plt.subplot(413)
