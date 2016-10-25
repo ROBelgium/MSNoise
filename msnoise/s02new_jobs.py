@@ -18,7 +18,7 @@ To run it from the console:
 from .api import *
 
 
-def main(init=False):
+def main(init=False, nocc=False):
 
     logging.info('*** Starting: New Jobs ***')
 
@@ -64,37 +64,40 @@ def main(init=False):
     updated_days = np.unique(updated_days)
 
     count = 0
-    for day in updated_days:
-        jobs = []
-        modified = []
-        available = []
-        for data in get_data_availability(db, starttime=day, endtime=day+datetime.timedelta(days=1)):
-            sta = "%s.%s" % (data.net, data.sta)
-            if sta in stations_to_analyse:
-                available.append(sta)
-                if data.flag in ["N", "M"]:
-                    modified.append(sta)
+    if len(extra_jobtypes_scan_archive) != 0 or not nocc:
+        for day in updated_days:
+            jobs = []
+            modified = []
+            available = []
+            for data in get_data_availability(db, starttime=day, endtime=day+datetime.timedelta(days=1)):
+                sta = "%s.%s" % (data.net, data.sta)
+                if sta in stations_to_analyse:
+                    available.append(sta)
+                    if data.flag in ["N", "M"]:
+                        modified.append(sta)
 
-        for m in modified:
-            for a in available:
-                if m != a or autocorr:
-                    pair = ':'.join(sorted([m, a]))
-                    if pair not in jobs:
-                        all_jobs.append({"day": day, "pair": pair,
-                                         "jobtype": "CC", "flag": "T",
-                                         "lastmod": datetime.datetime.utcnow()})
-                        for jobtype in extra_jobtypes_scan_archive:
-                            all_jobs.append({"day": day, "pair": pair,
-                                         "jobtype": jobtype, "flag": "T",
-                                         "lastmod": datetime.datetime.utcnow()})
-                        jobs.append(pair)
+            for m in modified:
+                for a in available:
+                    if m != a or autocorr:
+                        pair = ':'.join(sorted([m, a]))
+                        if pair not in jobs:
+                            if not nocc:
+                                all_jobs.append({"day": day, "pair": pair,
+                                                 "jobtype": "CC", "flag": "T",
+                                                 "lastmod": datetime.datetime.utcnow()})
+                            for jobtype in extra_jobtypes_scan_archive:
+                                all_jobs.append({"day": day, "pair": pair,
+                                             "jobtype": jobtype, "flag": "T",
+                                             "lastmod": datetime.datetime.utcnow()})
+                            jobs.append(pair)
 
-        if init and len(all_jobs) > 1e5:
-            logging.debug('Already 100.000 jobs, inserting')
-            massive_insert_job(all_jobs)
-            all_jobs = []
-            count += 1e5
-
+            if init and len(all_jobs) > 1e5:
+                logging.debug('Already 100.000 jobs, inserting')
+                massive_insert_job(all_jobs)
+                all_jobs = []
+                count += 1e5
+    else:
+        logging.debug("skipping the CC jobs creation & the extrajobtype creation")
     if len(all_jobs) != 0:
         logging.debug('Inserting %i jobs' % len(all_jobs))
         if init:

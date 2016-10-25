@@ -327,10 +327,11 @@ def scan_archive(ctx, init):
 
 @click.command()
 @click.option('-i', '--init', is_flag=True, help='First run ?')
-def new_jobs(init):
+@click.option('--nocc', is_flag=True, default=False, help='Disable the creation of CC jobs')
+def new_jobs(init, nocc):
     """Determines if new CC jobs are to be defined"""
     from ..s02new_jobs import main
-    main(init)
+    main(init, nocc)
 
 
 @click.command()
