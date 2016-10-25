@@ -361,7 +361,7 @@ def main():
                                               % (tmp[i].data.std(), rms_threshold))
                         if not skip:
                             corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False, nfft=nfft)
-                            if np.any(np.isnan(corr)):
+                            if not np.all(np.isfinite(corr)):
                                 logging.debug("corr object contains NaNs, skipping")
                                 continue
                             tmptime = tmp[0].stats.starttime.datetime
@@ -387,7 +387,7 @@ def main():
                     for ccfid in allcorr.keys():
                         station1, station2, filterid, components, date = ccfid.split('_')
 
-                        corrs = np.asarray(allcorr[ccfid].values())
+                        corrs = np.asarray(list(allcorr[ccfid].values()))
                         corr = stack(db, corrs)
 
                         thisdate = time.strftime(
