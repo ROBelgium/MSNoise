@@ -2,7 +2,7 @@
 Stretching...
 """
 
-from api import *
+from .api import *
 from scipy import asarray as ar
 from scipy.optimize import curve_fit
 
