@@ -101,7 +101,7 @@ def main(tech=None, hostname="localhost", username="msnoise",
         session.commit()
     except IntegrityError:
         print("The database seems to already exist and is not empty, cannot continue")
-        return("Integrity Error - DB already exist")
+        return("Integrity Error - DB already exists")
     session.close()
     msg = "Installation Done! - Go to Configuration Step!"
     return msg
