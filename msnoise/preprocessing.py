@@ -31,7 +31,6 @@ def preprocess(db, stations, comps, goal_day, params):
         for file in files:
             fullpath = os.path.join(file.path, file.file)
             datafiles[station][file.comp[-1]].append(fullpath)
-            print(fullpath)
     j = 0
     for istation, station in enumerate(stations):
         for comp in comps:
