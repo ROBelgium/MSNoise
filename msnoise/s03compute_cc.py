@@ -291,7 +291,7 @@ def main():
                     continue
 
                 current = t1+t2
-                print(current)
+                # print(current)
 
                 allcorr = {}
                 for tmp in current.slide(params.corr_duration, params.corr_duration*(1-params.overlap)):
