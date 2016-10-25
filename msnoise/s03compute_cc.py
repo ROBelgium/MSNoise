@@ -252,7 +252,7 @@ def main():
             s1 = get_station(db, station1.split('.')[0], station1.split('.')[1])
             s2 = get_station(db, station2.split('.')[0], station2.split('.')[1])
 
-            if s1.X:
+            if s1.X and params.components_to_compute != ["ZZ",]:
                 X0, Y0, c0 = (s1.X, s1.Y, s1.coordinates)
                 X1, Y1, c1 = (s2.X, s2.Y, s1.coordinates)
 
@@ -317,8 +317,16 @@ def main():
                             tr.data[indexes] = (tr.data[indexes] / np.abs(
                                 tr.data[indexes])) * params.windsorizing * rms
                     tmp.taper(0.04)
-                    tmp1 = tmp.select(station=s1.sta, component=components[0])[0]
-                    tmp2 = tmp.select(station=s2.sta, component=components[1])[0]
+                    tmp1 = tmp.select(station=s1.sta, component=components[0])
+                    if len(tmp1) == 0:
+                        continue
+                    else:
+                        tmp1 = tmp1[0]
+                    tmp2 = tmp.select(station=s2.sta, component=components[1])
+                    if len(tmp2) == 0:
+                        continue
+                    else:
+                        tmp2 = tmp2[0]
                     nfft = next_fast_len(tmp1.stats.npts)
                     autocorr = False
                     if (s1.net == s2.net) and (s1.sta == s2.sta) and (
