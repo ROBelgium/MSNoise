@@ -180,7 +180,7 @@ def update_config(session, name, value):
         obtained by :func:`connect`
 
     :type name: str
-    :param name: The name of the config bit to set.
+    :param name: The name of the config bit to set. Set to NULL if you want
 
     :type value: str
     :param value: The value of parameter `name`
@@ -188,7 +188,10 @@ def update_config(session, name, value):
     """
 
     config = session.query(Config).filter(Config.name == name).first()
-    config.value = value
+    if "NULL" in value: 
+        config.value = None
+    else:
+        config.value = value
     session.commit()
     return
 
