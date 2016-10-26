@@ -10,8 +10,10 @@
 #
 # All configuration values have a default; values that are commented out
 # serve to show the default.
-import sys, os
+import os
+
 import matplotlib
+
 matplotlib.use('Agg')
 
 import sphinx_bootstrap_theme
@@ -21,10 +23,6 @@ import click
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-import msnoise.myCorr
-import msnoise.whiten
-import msnoise.MWCS
-import msnoise.api
 
 from msnoise.default import default
 
