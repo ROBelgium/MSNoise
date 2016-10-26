@@ -180,10 +180,11 @@ def update_config(session, name, value):
         obtained by :func:`connect`
 
     :type name: str
-    :param name: The name of the config bit to set. Set to NULL if you want
+    :param name: The name of the config bit to set.
 
     :type value: str
-    :param value: The value of parameter `name`
+    :param value: The value of parameter `name`. Can also be NULL if you don't
+        want to use this particular parameter.
 
     """
 
