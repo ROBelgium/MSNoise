@@ -312,24 +312,21 @@ def main():
 
                     for tr in tmp:
                         if params.windsorizing == -1:
-                            tr.data = np.sign(tr.data)
+                            np.sign(tr.data, tr.data)  # inplace
                         elif params.windsorizing != 0:
-                            rms = tr.data.std()
-                            indexes = np.where(np.abs(tr.data) > (params.windsorizing * rms))[0]
-                            # clipping at windsorizing*rms
-                            tr.data[indexes] = (tr.data[indexes] / np.abs(
-                                tr.data[indexes])) * params.windsorizing * rms
+                            rms = tr.data.std() * params.windsorizing
+                            np.clip(tr.data, -rms, rms, tr.data)  # inplace
                     tmp.taper(0.04)
                     tmp1 = tmp.select(station=s1.sta, component=components[0])
                     if len(tmp1) == 0:
                         continue
-                    else:
-                        tmp1 = tmp1[0]
+
                     tmp2 = tmp.select(station=s2.sta, component=components[1])
                     if len(tmp2) == 0:
                         continue
-                    else:
-                        tmp2 = tmp2[0]
+
+                    tmp1 = tmp1[0]
+                    tmp2 = tmp2[0]
                     nfft = next_fast_len(tmp1.stats.npts)
                     autocorr = False
                     if (s1.net == s2.net) and (s1.sta == s2.sta) and (
@@ -364,7 +361,7 @@ def main():
                             if not np.all(np.isfinite(corr)):
                                 logging.debug("corr object contains NaNs, skipping")
                                 continue
-                            if len(corr) < 2* (params.maxlag * params.goal_sampling_rate) + 1:
+                            if len(corr) < 2 * (params.maxlag * params.goal_sampling_rate) + 1:
                                 logging.debug(
                                     "corr object is too small, skipping")
                                 continue
