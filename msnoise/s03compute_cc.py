@@ -16,7 +16,6 @@ Configuration Parameters
 * |corr_duration|
 * |windsorizing|
 * |resampling_method|
-* |decimation_factor|
 * |remove_response|
 * |response_format|
 * |response_path|
@@ -191,7 +190,6 @@ def main():
     params.min30 = float(get_config(db, "corr_duration")) * params.goal_sampling_rate
     params.windsorizing = float(get_config(db, "windsorizing"))
     params.resampling_method = get_config(db, "resampling_method")
-    params.decimation_factor = int(get_config(db, "decimation_factor"))
     params.preprocess_lowpass = float(get_config(db, "preprocess_lowpass"))
     params.preprocess_highpass = float(get_config(db, "preprocess_highpass"))
     params.keep_all = get_config(db, 'keep_all', isbool=True)
