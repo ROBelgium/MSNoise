@@ -13,12 +13,17 @@ import pkg_resources
 @click.group()
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
 (only affects modules that are designed to do parallel processing)')
+@click.option('-d', '--delay', default=1,  help='In the case of multi-threading'
+                    ', defines the number of seconds to wait before lauching '
+                    'the next thread. Defaults to [1] second ')
 @click.option('-c', '--custom', default=False, is_flag=True, help='Use custom \
  file for plots. To use this, copy the plot script here and edit it.')
 @click.option('-v', '--verbose', default=2, count=True)
+
 @click.pass_context
-def cli(ctx, threads, custom, verbose):
+def cli(ctx, threads, delay, custom, verbose):
     ctx.obj['MSNOISE_threads'] = threads
+    ctx.obj['MSNOISE_threadsdelay'] = delay
     if verbose == 0:
         ctx.obj['MSNOISE_verbosity'] = "WARNING"
     elif verbose == 1:
@@ -341,12 +346,13 @@ def compute_cc(ctx):
     from ..s03compute_cc import main
     from multiprocessing import Process
     threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
     processes = []
     for i in range(threads):
         p = Process(target=main)
         p.start()
         processes.append(p)
-        time.sleep(1)
+        time.sleep(delay)
     for p in processes:
         p.join()
 
@@ -376,12 +382,14 @@ def compute_mwcs(ctx):
     from ..s05compute_mwcs import main
     from multiprocessing import Process
     threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+
     processes = []
     for i in range(threads):
         p = Process(target=main)
         p.start()
         processes.append(p)
-        time.sleep(1)
+        time.sleep(delay)
     for p in processes:
         p.join()
 
