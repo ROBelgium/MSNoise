@@ -12,8 +12,8 @@ Only data for new/modified dates need to be exported. If any CC-job has been
 marked "Done" within the last day, the stacks will be calculated and a new DTT
 job will be inserted in the database. For dates in the period of interest, the
 moving-window stack will only be exported if new/modified CCF is available.
-The export directory are "REF/" and "DAY%03i/" where %03i will be replaced by
-the number of days stacked together (DAYS_005 for a 5-days stack, e.g.).
+The export directory are "REF/" and "%03i_DAYS/" where %03i will be replaced by
+the number of days stacked together (005_DAYS for a 5-days stack, e.g.).
 
 Please note that within MSNoise, stacks are always *inclusive* of the time/day
 mentionned. For example, a 5-days stack on January 10, will contain
@@ -195,7 +195,9 @@ def main(stype, interval=1.0):
                 logging.debug('Processing %s-%s-%i' %
                                   (pair, components, filterid))
                 updated_days = updated_days_for_dates(db, start, end, pair.replace('_', '.'), jobtype='CC', interval=datetime.timedelta(days=interval),returndays=True)
-                if len(updated_days) != 0:
+                if len(updated_days) == 0:
+                    logging.warning("No updated days found. Check the -i parameter.")
+                else:
                     logging.debug("New Data for %s-%s-%i" %
                                   (pair, components, filterid))
                     #~ print updated_days
