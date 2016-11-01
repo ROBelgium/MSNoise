@@ -353,12 +353,12 @@ def main():
                         for i, station in enumerate(pair):
                             if tmp[i].data.std() > rms_threshold:
                                 if whitening:
-                                    # logging.debug("Whitening %s" % components)
+                                    logging.debug("Whitening %s" % components)
                                     trames2hWb[i] = whiten(tmp[i].data, nfft,
                                                            dt, low, high,
                                                            plot=False)
                                 else:
-                                    # logging.debug("Autocorr %s"%components)
+                                    logging.debug("Autocorr %s"%components)
                                     tmp[i].filter("bandpass", freqmin=low, freqmax=high, zerophase=True)
                                     trames2hWb[i] = scipy.fftpack.fft(tmp[i].data, nfft)
                             else:
