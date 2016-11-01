@@ -189,6 +189,7 @@ def main():
     params.corr_duration = float(get_config(db, "corr_duration"))
     params.min30 = float(get_config(db, "corr_duration")) * params.goal_sampling_rate
     params.windsorizing = float(get_config(db, "windsorizing"))
+    params.whitening = get_config(db, 'whitening')
     params.resampling_method = get_config(db, "resampling_method")
     params.preprocess_lowpass = float(get_config(db, "preprocess_lowpass"))
     params.preprocess_highpass = float(get_config(db, "preprocess_highpass"))
@@ -326,10 +327,20 @@ def main():
                     tmp1 = tmp1[0]
                     tmp2 = tmp2[0]
                     nfft = next_fast_len(tmp1.stats.npts)
-                    autocorr = False
-                    if (s1.net == s2.net) and (s1.sta == s2.sta) and (
-                        components[0] == components[1]):
-                        autocorr = True
+
+                    if params.whitening == "A":
+                        if (s1.net == s2.net) and (s1.sta == s2.sta) and (
+                           components[0] == components[1]):
+                            whitening = False
+                        else:
+                            whitening = True
+                    elif params.whitening == "C":
+                        if components[0] == components[1]:
+                            whitening = False
+                        else:
+                            whitening = True
+                    elif params.whitening == "N":
+                        whitening = False
 
                     for filterdb in get_filters(db, all=False):
                         filterid = filterdb.ref
@@ -341,15 +352,15 @@ def main():
                         skip = False
                         for i, station in enumerate(pair):
                             if tmp[i].data.std() > rms_threshold:
-                                if autocorr:
-                                    # logging.debug("Autocorr %s"%components)
-                                    tmp[i].filter("bandpass", freqmin=low, freqmax=high, zerophase=True)
-                                    trames2hWb[i] = scipy.fftpack.fft(tmp[i].data, nfft)
-                                else:
+                                if whitening:
                                     # logging.debug("Whitening %s" % components)
                                     trames2hWb[i] = whiten(tmp[i].data, nfft,
                                                            dt, low, high,
                                                            plot=False)
+                                else:
+                                    # logging.debug("Autocorr %s"%components)
+                                    tmp[i].filter("bandpass", freqmin=low, freqmax=high, zerophase=True)
+                                    trames2hWb[i] = scipy.fftpack.fft(tmp[i].data, nfft)
                             else:
                                 skip = True
                                 logging.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'

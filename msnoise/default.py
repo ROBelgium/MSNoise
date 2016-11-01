@@ -25,6 +25,7 @@ default['maxlag'] = ["Maximum lag (in seconds) [120.0]",'120.']
 default['corr_duration'] = ["Data windows to correlate (in seconds) [1800.]",'1800.']
 default['overlap'] = ["Amount of overlap between data windows [0:1[ [0.]",'0.0']
 default['windsorizing'] = ["Windsorizing at N time RMS , 0 disables windsorizing, -1 enables 1-bit normalization [3]",'3']
+default['whitening'] = ["Whiten Traces before cross-correlation: All (except for autocorr), None, or only if components are different [A]/N/C",'A']
 
 default['stack_method'] = ["Stack Method: Linear Mean or Phase Weighted Stack: [linear]/pws ",'linear']
 default['pws_timegate'] = ["If stack_method='pws', width of the smoothing in seconds : 10.0 ",'10.0']
