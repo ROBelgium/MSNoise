@@ -1225,10 +1225,17 @@ def azimuth(coordinates, x0, y0, x1, y1):
         dist, azim, bazim = gps2dist_azimuth(y0, x0, y1, x1)
         return azim
     elif coordinates == 'UTM':
-        azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
-        return azim
+        if (np.isclose(y0, y1) & np.isclose(x0, x1)):
+            azim = 0
+            return azim
+        else:
+            azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
+            if azim < 0:
+                return azim + 360
+            else:
+                return azim
     else:
-        print("Please consider having a single coordinate system for\
+        logging.warning("Please consider having a single coordinate system for\
             all stations")
         return 0
 
