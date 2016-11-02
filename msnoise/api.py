@@ -1339,6 +1339,40 @@ def getGaps(stream, min_gap=None, max_gap=None):
     del copied_traces
     return gap_list
 
+def make_same_length(st):
+    # This function takes a stream and makes sure that all channels have the same length
+    st.sort(keys=['starttime', 'endtime', 'channel'])
+
+    # Read out all start+endtimes and channels
+    channel_list = []
+    starttimes = []
+    endtimes = []
+    for tr in st:
+        channel_list.append(tr.stats.channel)
+        starttimes.append(tr.stats.starttime)
+        endtimes.append(tr.stats.endtime)
+
+    # Find unique channels
+    channels = len(set(channel_list))
+
+    # Loop over all chunks, check if they are the same length for all channels 
+    to_fix = False
+    for chunk in range(len(st) // channels):
+        for chan in range(1,channels):
+            if len(st[chunk * channels]) != len(st[chunk * channels + chan]):
+                to_fix = True
+                break
+        # If the chunck is not the same length for all channels, cut them to a common start + end 
+        if to_fix:
+            wrong_start = min(starttimes[chunk * channels:(chunk+1) * channels])
+            common_start = max(starttimes[chunk * channels:(chunk+1) * channels])
+            common_end = min(endtimes[chunk * channels:(chunk+1) * channels])
+            wrong_end = max(endtimes[chunk * channels:(chunk+1) * channels])
+            
+            st_temp = st[chunk * channels:(chunk+1) * channels].copy().slice(common_start, common_end)
+            st.cutout(wrong_start - tr.stats.delta, wrong_end + tr.stats.delta)
+            st += st_temp
+    return st
 
 def clean_scipy_cache():
     sff.destroy_zfft_cache()

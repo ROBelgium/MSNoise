@@ -277,6 +277,10 @@ def main():
                     t1 = t1.select(component=components[0])
                     t2 = t2.select(component=components[1])
                 else:
+                    logging.debug('Checking if traces are the same length...')
+                    t1 = make_same_length(t1)   
+                    t2 = make_same_length(t2)                
+                    logging.debug('Traces are the same length now.')
                     t1 = t1.copy().rotate("NE->RT", cplAz).select(component=components[0])
                     t2 = t2.copy().rotate("NE->RT", cplAz).select(component=components[1])
 
