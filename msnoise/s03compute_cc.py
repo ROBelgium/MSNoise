@@ -277,8 +277,8 @@ def main():
                     t1 = t1.select(component=components[0])
                     t2 = t2.select(component=components[1])
                 else:
-                    t1 = t1.rotate("NE->RT", cplAz).select(component=components[0])
-                    t2 = t2.rotate("NE->RT", cplAz).select(component=components[1])
+                    t1 = t1.copy().rotate("NE->RT", cplAz).select(component=components[0])
+                    t2 = t2.copy().rotate("NE->RT", cplAz).select(component=components[1])
 
                 if not len(t1):
                     logging.info("No Data for %s.%s..%s" % (
