@@ -63,7 +63,7 @@ def get_engine(inifile=None):
                                                                 hostname,
                                                                 database),
                                echo=False, poolclass=NullPool,
-                               connect_args={'connection_timeout': 15})
+                               connect_args={'connect_timeout': 15})
     return engine
 
 
