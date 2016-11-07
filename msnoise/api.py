@@ -62,7 +62,8 @@ def get_engine(inifile=None):
         engine = create_engine('mysql+pymysql://%s:%s@%s/%s' % (user, passwd,
                                                                 hostname,
                                                                 database),
-                               echo=False, poolclass=NullPool)
+                               echo=False, poolclass=NullPool,
+                               connect_args={'connection_timeout': 15})
     return engine
 
 
