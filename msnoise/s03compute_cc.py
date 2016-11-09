@@ -267,6 +267,7 @@ def main():
                 cplAz = 0.
 
             for components in params.components_to_compute:
+                logging.debug("Processing {!s}".format(components))
                 t1 = stream.select(station=s1.sta)
                 t2 = stream.select(station=s2.sta)
                 if (components == "ZZ") \
