@@ -278,11 +278,11 @@ def main():
                     t2 = t2.select(component=components[1])
                 else:
                     logging.debug('Checking if traces are the same length...')
-                    t1 = make_same_length(t1)   
-                    t2 = make_same_length(t2)                
+                    t1_temp = make_same_length(t1.copy())   
+                    t2_temp = make_same_length(t2.copy())                
                     logging.debug('Traces are the same length now.')
-                    t1 = t1.copy().rotate("NE->RT", cplAz).select(component=components[0])
-                    t2 = t2.copy().rotate("NE->RT", cplAz).select(component=components[1])
+                    t1 = t1_temp.rotate("NE->RT", cplAz).select(component=components[0])
+                    t2 = t2_temp.rotate("NE->RT", cplAz).select(component=components[1])
 
                 if not len(t1):
                     logging.info("No Data for %s.%s..%s" % (

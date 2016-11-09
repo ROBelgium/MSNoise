@@ -1227,14 +1227,10 @@ def azimuth(coordinates, x0, y0, x1, y1):
         return azim
     elif coordinates == 'UTM':
         if (np.isclose(y0, y1) & np.isclose(x0, x1)):
-            azim = 0
-            return azim
+            return 0
         else:
             azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
-            if azim < 0:
-                return azim + 360
-            else:
-                return azim
+            return azim % 360
     else:
         logging.warning("Please consider having a single coordinate system for\
             all stations")
@@ -1341,38 +1337,43 @@ def getGaps(stream, min_gap=None, max_gap=None):
     return gap_list
 
 def make_same_length(st):
-    # This function takes a stream and makes sure that all channels have the same length
-    st.sort(keys=['starttime', 'endtime', 'channel'])
 
-    # Read out all start+endtimes and channels
-    channel_list = []
+    """
+    This function takes a stream of equal sampling rate and makes sure that all channels 
+    have the same length and the same gaps.
+    """
+
+    # Merge traces
+    st.merge()
+
+    # Initialize arrays to be filled with start+endtimes of all traces
     starttimes = []
     endtimes = []
+
+    # Loop over all traces of the stream
     for tr in st:
-        channel_list.append(tr.stats.channel)
+        # Force conversion to masked arrays
+        if not np.ma.count_masked(tr.data):
+            tr.data = np.ma.array(tr.data, mask=False)
+        # Read out start+endtimes of traces to trim
         starttimes.append(tr.stats.starttime)
         endtimes.append(tr.stats.endtime)
 
-    # Find unique channels
-    channels = len(set(channel_list))
+    # trim stream to common starttimes
+    st.trim(max(starttimes), min(endtimes))
 
-    # Loop over all chunks, check if they are the same length for all channels 
-    to_fix = False
-    for chunk in range(len(st) // channels):
-        for chan in range(1,channels):
-            if len(st[chunk * channels]) != len(st[chunk * channels + chan]):
-                to_fix = True
-                break
-        # If the chunck is not the same length for all channels, cut them to a common start + end 
-        if to_fix:
-            wrong_start = min(starttimes[chunk * channels:(chunk+1) * channels])
-            common_start = max(starttimes[chunk * channels:(chunk+1) * channels])
-            common_end = min(endtimes[chunk * channels:(chunk+1) * channels])
-            wrong_end = max(endtimes[chunk * channels:(chunk+1) * channels])
-            
-            st_temp = st[chunk * channels:(chunk+1) * channels].copy().slice(common_start, common_end)
-            st.cutout(wrong_start - tr.stats.delta, wrong_end + tr.stats.delta)
-            st += st_temp
+    # get the mask of all traces, i.e. the parts where at least one trace has a gap
+    if len(st) == 2:
+        mask = np.logical_or(st[0].data.mask, st[1].data.mask)
+    elif len(st) == 3:
+        mask = np.logical_or(st[0].data.mask, st[1].data.mask, st[2].data.mask)
+
+    # apply the mask to all traces
+    for tr in st:
+        tr.data.mask = mask
+    
+    # remove the masks from the stream 
+    st = st.split()
     return st
 
 def clean_scipy_cache():

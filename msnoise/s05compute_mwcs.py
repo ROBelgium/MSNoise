@@ -143,12 +143,10 @@ def main():
                             np.savetxt(os.path.join(outfolder, "%s.txt" % str(day)), output)
                             del output, cur
         for day in days:
-            try:
-                update_job(db, day, pair, jobtype='DTT', flag='D')
-            except:
+            if not db.is_active:
                 logging.info("Couldn't connect to the database, trying again...")
                 db = connect()
-                update_job(db, day, pair, jobtype='DTT', flag='D')
+            update_job(db, day, pair, jobtype='DTT', flag='D')
 
     logging.info('*** Finished: Compute MWCS ***')
 
