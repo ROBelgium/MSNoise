@@ -698,4 +698,4 @@ def main(port=5000):
     print("MSNoise admin will run on all interfaces by default")
     print("access it via the machine's IP address or")
     print("via http://127.0.0.1:%i when running locally."%port)
-    app.run(host='0.0.0.0', port=port, debug=True, reloader_interval=1)
+    app.run(host='0.0.0.0', port=port, debug=False, reloader_interval=1, threaded=True)

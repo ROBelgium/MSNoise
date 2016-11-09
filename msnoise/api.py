@@ -1082,7 +1082,7 @@ def get_t_axis(session):
     return np.linspace(-maxlag, maxlag, samples)
 
 
-def get_components_to_compute(session):
+def get_components_to_compute(session, plugin=None):
     """
     Returns the components configured in the database.
 
@@ -1094,7 +1094,7 @@ def get_components_to_compute(session):
     :returns: a list of components to compute
     """
 
-    components_to_compute = get_config(session, "components_to_compute")
+    components_to_compute = get_config(session, "components_to_compute", plugin=plugin)
     if components_to_compute.count(",") == 0:
         components_to_compute = [components_to_compute,]
     else:
