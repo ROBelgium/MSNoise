@@ -16,7 +16,6 @@ Configuration Parameters
 * |corr_duration|
 * |windsorizing|
 * |resampling_method|
-* |decimation_factor|
 * |remove_response|
 * |response_format|
 * |response_path|
@@ -190,8 +189,8 @@ def main():
     params.corr_duration = float(get_config(db, "corr_duration"))
     params.min30 = float(get_config(db, "corr_duration")) * params.goal_sampling_rate
     params.windsorizing = float(get_config(db, "windsorizing"))
+    params.whitening = get_config(db, 'whitening')
     params.resampling_method = get_config(db, "resampling_method")
-    params.decimation_factor = int(get_config(db, "decimation_factor"))
     params.preprocess_lowpass = float(get_config(db, "preprocess_lowpass"))
     params.preprocess_highpass = float(get_config(db, "preprocess_highpass"))
     params.keep_all = get_config(db, 'keep_all', isbool=True)
@@ -268,6 +267,7 @@ def main():
                 cplAz = 0.
 
             for components in params.components_to_compute:
+                logging.debug("Processing {!s}".format(components))
                 t1 = stream.select(station=s1.sta)
                 t2 = stream.select(station=s2.sta)
                 if (components == "ZZ") \
@@ -278,9 +278,24 @@ def main():
                     t1 = t1.select(component=components[0])
                     t2 = t2.select(component=components[1])
                 else:
-                    t1 = t1.rotate("NE->RT", cplAz).select(component=components[0])
-                    t2 = t2.rotate("NE->RT", cplAz).select(component=components[1])
-
+                    logging.debug('Rotating streams, making sure they are aligned')
+                    t1_novert = t1.copy()
+                    t2_novert = t2.copy()
+                    # Make temporary streams withouth the vertical components
+                    for tr in t1_novert.select(component="Z"):
+                        t1_novert.remove(tr)
+                    for tr in t2_novert.select(component="Z"):
+                        t2_novert.remove(tr)
+                    # Make these streams contain the same gaps
+                    t1_novert = make_same_length(t1_novert)   
+                    t2_novert = make_same_length(t2_novert) 
+                    # Rotate
+                    t1_novert = t1_novert.rotate("NE->RT", cplAz).select(component=components[0])
+                    t2_novert = t2_novert.rotate("NE->RT", cplAz).select(component=components[1])
+                    # Include the vertical channels again
+                    t1 = t1_novert+t1.select(component="Z")
+                    t2 = t2_novert+t2.select(component="Z")
+                    
                 if not len(t1):
                     logging.info("No Data for %s.%s..%s" % (
                         s1.net, s1.sta, components[0]))
@@ -327,10 +342,20 @@ def main():
                     tmp1 = tmp1[0]
                     tmp2 = tmp2[0]
                     nfft = next_fast_len(tmp1.stats.npts)
-                    autocorr = False
-                    if (s1.net == s2.net) and (s1.sta == s2.sta) and (
-                        components[0] == components[1]):
-                        autocorr = True
+
+                    if params.whitening == "A":
+                        if (s1.net == s2.net) and (s1.sta == s2.sta) and (
+                           components[0] == components[1]):
+                            whitening = False
+                        else:
+                            whitening = True
+                    elif params.whitening == "C":
+                        if components[0] == components[1]:
+                            whitening = False
+                        else:
+                            whitening = True
+                    elif params.whitening == "N":
+                        whitening = False
 
                     for filterdb in get_filters(db, all=False):
                         filterid = filterdb.ref
@@ -342,15 +367,15 @@ def main():
                         skip = False
                         for i, station in enumerate(pair):
                             if tmp[i].data.std() > rms_threshold:
-                                if autocorr:
-                                    # logging.debug("Autocorr %s"%components)
-                                    tmp[i].filter("bandpass", freqmin=low, freqmax=high, zerophase=True)
-                                    trames2hWb[i] = scipy.fftpack.fft(tmp[i].data, nfft)
-                                else:
-                                    # logging.debug("Whitening %s" % components)
+                                if whitening:
+                                    #logging.debug("Whitening %s" % components)
                                     trames2hWb[i] = whiten(tmp[i].data, nfft,
                                                            dt, low, high,
                                                            plot=False)
+                                else:
+                                    #logging.debug("Autocorr %s"%components)
+                                    tmp[i].filter("bandpass", freqmin=low, freqmax=high, zerophase=True)
+                                    trames2hWb[i] = scipy.fftpack.fft(tmp[i].data, nfft)
                             else:
                                 skip = True
                                 logging.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'

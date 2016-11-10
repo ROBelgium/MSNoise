@@ -620,6 +620,7 @@ def shutdown():
 # Flask views
 @app.route('/')
 def index():
+    db = connect()
     return redirect("/admin/", code=302)
 
 
@@ -629,7 +630,7 @@ def main(port=5000):
     plugins = get_config(db, "plugins")
     db.close()
 
-    db = connect()
+
 
     admin = Admin(app)
     if "msnoise_brand" in os.environ:

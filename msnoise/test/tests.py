@@ -32,14 +32,7 @@ class MSNoiseTests(unittest.TestCase):
         totests.append(['data_folder', os.path.join(path, 'data')])
         totests.append(['data_structure', 'PDF'])
         totests.append(['network', 'YA'])
-        totests.append(['ZR', 'N'])
-        totests.append(['ZT', 'N'])
-        totests.append(['TZ', 'N'])
-        totests.append(['TR', 'N'])
-        totests.append(['TT', 'N'])
-        totests.append(['RZ', 'N'])
-        totests.append(['RR', 'N'])
-        totests.append(['RT', 'N'])
+        totests.append(['components_to_compute', 'ZZ'])
 
         for test in totests:
             update_config(db, test[0], test[1])
