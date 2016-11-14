@@ -70,7 +70,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
         components = [components,]
 
     gs = gridspec.GridSpec(len(mov_stacks), 1)
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
     first_plot = True
     for i, mov_stack in enumerate(mov_stacks):

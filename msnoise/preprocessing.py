@@ -4,7 +4,6 @@ import sys
 import time
 import traceback
 
-
 from obspy import read_inventory
 from obspy.core import UTCDateTime
 from obspy.io.xseed import Parser
@@ -29,6 +28,8 @@ def preprocess(db, stations, comps, goal_day, params):
         for comp in comps:
             datafiles[station][comp] = []
         for file in files:
+            if file.comp[-1] not in comps:
+                continue
             fullpath = os.path.join(file.path, file.file)
             datafiles[station][file.comp[-1]].append(fullpath)
     j = 0

@@ -30,7 +30,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
     # mov_stack = get_config(db,"mov_stack")
  
    
-    fig = plt.figure(figsize=(12,12))
+    fig = plt.figure(figsize=(12, 9))
     sta1 = sta1.replace('.','_')
     sta2 = sta2.replace('.','_')
     if sta2 >= sta1: # alphabetical order filtering!

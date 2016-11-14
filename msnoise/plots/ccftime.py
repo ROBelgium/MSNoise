@@ -31,7 +31,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
     cc_sampling_rate = float(get_config(db,'cc_sampling_rate'))
     start, end, datelist = build_movstack_datelist(db)
     base = mdates.date2num(start) 
-    plt.figure(figsize=(12,12))
+    plt.figure(figsize=(12, 9))
     sta1 = sta1.replace('.','_')
     sta2 = sta2.replace('.','_')
     t = np.arange(samples)/cc_sampling_rate - maxlag

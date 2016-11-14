@@ -62,7 +62,8 @@ def get_engine(inifile=None):
         engine = create_engine('mysql+pymysql://%s:%s@%s/%s' % (user, passwd,
                                                                 hostname,
                                                                 database),
-                               echo=False, poolclass=NullPool)
+                               echo=False, poolclass=NullPool,
+                               connect_args={'connect_timeout': 15})
     return engine
 
 
@@ -1086,7 +1087,7 @@ def get_t_axis(session):
     return np.linspace(-maxlag, maxlag, samples)
 
 
-def get_components_to_compute(session):
+def get_components_to_compute(session, plugin=None):
     """
     Returns the components configured in the database.
 
@@ -1098,7 +1099,7 @@ def get_components_to_compute(session):
     :returns: a list of components to compute
     """
 
-    components_to_compute = get_config(session, "components_to_compute")
+    components_to_compute = get_config(session, "components_to_compute", plugin=plugin)
     if components_to_compute.count(",") == 0:
         components_to_compute = [components_to_compute,]
     else:
@@ -1225,10 +1226,13 @@ def azimuth(coordinates, x0, y0, x1, y1):
         dist, azim, bazim = gps2dist_azimuth(y0, x0, y1, x1)
         return azim
     elif coordinates == 'UTM':
-        azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
-        return azim
+        if (np.isclose(y0, y1) & np.isclose(x0, x1)):
+            return 0
+        else:
+            azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
+            return azim % 360
     else:
-        print("Please consider having a single coordinate system for\
+        logging.warning("Please consider having a single coordinate system for\
             all stations")
         return 0
 
@@ -1332,6 +1336,45 @@ def getGaps(stream, min_gap=None, max_gap=None):
     del copied_traces
     return gap_list
 
+def make_same_length(st):
+
+    """
+    This function takes a stream of equal sampling rate and makes sure that all channels 
+    have the same length and the same gaps.
+    """
+
+    # Merge traces
+    st.merge()
+
+    # Initialize arrays to be filled with start+endtimes of all traces
+    starttimes = []
+    endtimes = []
+
+    # Loop over all traces of the stream
+    for tr in st:
+        # Force conversion to masked arrays
+        if not np.ma.count_masked(tr.data):
+            tr.data = np.ma.array(tr.data, mask=False)
+        # Read out start+endtimes of traces to trim
+        starttimes.append(tr.stats.starttime)
+        endtimes.append(tr.stats.endtime)
+
+    # trim stream to common starttimes
+    st.trim(max(starttimes), min(endtimes))
+
+    # get the mask of all traces, i.e. the parts where at least one trace has a gap
+    if len(st) == 2:
+        mask = np.logical_or(st[0].data.mask, st[1].data.mask)
+    elif len(st) == 3:
+        mask = np.logical_or(st[0].data.mask, st[1].data.mask, st[2].data.mask)
+
+    # apply the mask to all traces
+    for tr in st:
+        tr.data.mask = mask
+    
+    # remove the masks from the stream 
+    st = st.split()
+    return st
 
 def clean_scipy_cache():
     sff.destroy_zfft_cache()
