@@ -64,8 +64,13 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
         else:
             mov_stacks = [int(mi) for mi in mov_stack.split(',')]
 
+    if components.count(","):
+        components = components.split(",")
+    else:
+        components = [components,]
+
     gs = gridspec.GridSpec(len(mov_stacks), 1)
-    plt.figure(figsize=(15, 10))
+    plt.figure(figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
     first_plot = True
     for i, mov_stack in enumerate(mov_stacks):
@@ -73,11 +78,12 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
         first = True
         alldf = []
         while current <= end:
-            day = os.path.join('DTT', "%02i" % filterid, "%03i_DAYS" %
-                               mov_stack, components, '%s.txt' % current)
-            if os.path.isfile(day):
-                df = pd.read_csv(day, header=0, index_col=0, parse_dates=True)
-                alldf.append(df)
+            for comp in components:
+                day = os.path.join('DTT', "%02i" % filterid, "%03i_DAYS" %
+                                   mov_stack, comp, '%s.txt' % current)
+                if os.path.isfile(day):
+                    df = pd.read_csv(day, header=0, index_col=0, parse_dates=True)
+                    alldf.append(df)
             current += datetime.timedelta(days=1)
         if len(alldf) == 0:
             print("No Data for %s m%i f%i" % (components, mov_stack, filterid))
@@ -98,8 +104,11 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
             # groups['CRATER'] = ["UV11","UV15","FJS","FLR","SNE","UV12","FOR","RVL","UV06"]
             # groups['GPENTES'] = ["UV03","UV08","UV04","UV02","HDL"]
             # groups['VOLCAN'] = groups['CRATER'] + groups['GPENTES'] + ['HIM','VIL']
-            
-            plt.subplot(gs[i])
+
+            if first_plot == 1:
+                ax = plt.subplot(gs[i])
+            else:
+                plt.subplot(gs[i], sharex=ax)
             # x = {}
             # for group in groups.keys():
             #     pairindex = []
@@ -129,10 +138,10 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
                 plt.plot(ALL.index, ALL[dttname], c='r',
                          label='ALL: $\delta v/v$ of the mean network')
 
-            tmp2 = allbut[dttname].resample('D', how='mean')
+            tmp2 = allbut[dttname].resample('D').mean()
             tmp2.plot(label='mean',)
 
-            tmp3 = allbut[dttname].resample('D', how='median')
+            tmp3 = allbut[dttname].resample('D').median()
             tmp3.plot(label='median')
 
             #YA_FJS_YA_SNE

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-
 import os
 import platform
 import sys
@@ -30,6 +29,8 @@ def main(system=False, modules=False, env=False, all=False, show=True):
 
     output += "\n" + "----------------+PYTHON+-------------------"
     output += "\n" + "Python:" + sys.version
+    output += "\n"
+    output += "\n" + "This script is at " + os.path.abspath(__file__)
     output += "\n"
     if modules or all:
         output += "\n" + "---------------+MODULES+-------------------"
