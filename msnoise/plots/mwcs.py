@@ -90,8 +90,8 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         
         crange = [np.amin(alldt.values),np.amax(alldt.values)]
         
-        alldt = alldt.resample('D', how='mean')
-        allcoh = allcoh.resample('D', how='mean')
+        alldt = alldt.resample('D').mean()
+        allcoh = allcoh.resample('D').mean()
         
         xextent = (date2num(id[0]), date2num(id[-1]), -maxlag, maxlag)
         
