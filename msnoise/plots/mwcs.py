@@ -22,7 +22,7 @@ mov_stack = 3:
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 from matplotlib import colors, cm
-from matplotlib.dates import date2num, DateFormatter, YearLocator
+from matplotlib.dates import date2num, AutoDateFormatter, AutoDateLocator
 
 from ..api import *
 
@@ -101,18 +101,17 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
                        height_ratios=[1,1]
                        )
         
-        plt.figure()
-        ax = plt.subplot(gs[0])
+        fig = plt.figure()
+        ax1 = plt.subplot(gs[0])
         plt.imshow(alldt.T, extent=xextent,aspect="auto",interpolation='none',origin='lower', cmap = cm.seismic)
         cb = plt.colorbar()
         cb.set_label('dt')
         plt.ylabel("Lag Time (s)")
         plt.axhline(0,lw=0.5,c='k')
         plt.grid()
-        ax.xaxis.set_major_locator( YearLocator() )
-        ax.xaxis.set_major_formatter(  DateFormatter('%Y-%m-%d') )
         plt.title('%s : %s : dt'%(sta1,sta2))
         plot_lags(minlag, maxlag2)
+        plt.setp(ax1.get_xticklabels(), visible=False)
         
         plt.subplot(gs[1])
         plt.plot(alldt.mean( axis=0), alldt.columns, c='k')
@@ -123,7 +122,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         plt.xlabel('dt')
         plt.ylabel("Lag Time (s)")
         
-        ax = plt.subplot(gs[2], sharex=ax, sharey=ax)
+        ax2 = plt.subplot(gs[2], sharex=ax1, sharey=ax1)
         plt.imshow(allcoh.T, extent=xextent,aspect="auto",interpolation='none',origin='lower',cmap='hot',vmin=minCoh, vmax=1)
         #~ plt.imshow(allcoh.T, extent=xextent,aspect="auto",interpolation='none',origin='lower',cmap='hot')
         cb = plt.colorbar()
@@ -131,11 +130,13 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         plt.ylabel("Lag Time (s)")
         plt.axhline(0,lw=0.5,c='k')
         plt.grid()
-        ax.xaxis.set_major_locator( YearLocator() )
-        ax.xaxis.set_major_formatter(  DateFormatter('%Y-%m-%d') )
+        locator = AutoDateLocator()
+        ax2.xaxis.set_major_locator(locator)
+        ax2.xaxis.set_major_formatter(AutoDateFormatter(locator))
+        plt.setp(plt.xticks()[1], rotation=30, ha='right')
         plt.title('%s : %s : mean coherence'%(sta1,sta2))
         plot_lags(minlag, maxlag2)
-        
+                
         plt.subplot(gs[3])
         m = allcoh.mean( axis=0)
         s = allcoh.std(axis=0)
