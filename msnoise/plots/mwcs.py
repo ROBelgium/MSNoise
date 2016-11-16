@@ -103,7 +103,10 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         
         fig = plt.figure()
         ax1 = plt.subplot(gs[0])
-        plt.imshow(alldt.T, extent=xextent,aspect="auto",interpolation='none',origin='lower', cmap = cm.seismic)
+        im = plt.imshow(alldt.T, extent=xextent,aspect="auto",interpolation='none',
+                        origin='lower', cmap = cm.seismic)
+        cscale = np.nanpercentile(alldt, q=99) # the 1% largest values will appear saturated
+        im.set_clim((cscale * -1, cscale)) # make symmetric
         cb = plt.colorbar()
         cb.set_label('dt')
         plt.ylabel("Lag Time (s)")
