@@ -53,6 +53,13 @@ consider citing it:
 for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
 *Seismological Research Letters*, 85(3), 715‑726, doi:10.1785/0220130073.
 
+Requirements
+------------
+
+If you have any package older than those mentioned here, some things might not work as expected.
+
+* Pandas > 0.18.0
+
 
 Web-based Admin Interface Changes
 ---------------------------------
