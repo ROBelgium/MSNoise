@@ -59,6 +59,7 @@ Requirements
 If you have any package older than those mentioned here, some things might not work as expected.
 
 * Pandas > 0.18.0
+* Scikits-samplerate no longer needed
 
 
 Web-based Admin Interface Changes

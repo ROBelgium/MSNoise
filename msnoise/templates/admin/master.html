@@ -4,3 +4,15 @@
 {% block brand %}
          <span class="brand">{% if admin_view.admin.logo %}{{ admin_view.admin.logo|safe }} {% else %}{{ admin_view.admin.name }} {% endif %}</span>
 {% endblock %}
+
+{#{% block head_css %}#}
+{#    {% set bootswatch_theme = 'flatly' %}#}
+{#    {% set bootswatch_version = '3.3.6' %}#}
+{#    <link href="//bootswatch.com/{{ bootswatch_theme }}/bootstrap.min.css" rel="stylesheet" >#}
+{#    <link href="{{ admin_static.url(filename='admin/css/bootstrap3/admin.css', v='1.1.1') }}" rel="stylesheet">#}
+{#    <style>#}
+{#    body {#}
+{#        padding-top: 4px;#}
+{#    }#}
+{#    </style>#}
+{#{% endblock %}#}

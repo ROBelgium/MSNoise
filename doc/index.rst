@@ -30,16 +30,38 @@ for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
 
 Documentation Content:
 
+Installation
+------------
+
 .. toctree::
    :maxdepth: 1
 
    installation
 
+Workflow
+--------
+
+.. toctree::
+   :glob:
+   :maxdepth: 1
+
+   workflow/*
+
+Plotting
+--------
+
 .. toctree::
    :maxdepth: 2
 
-   workflow
    plotting
+
+
+Development & Miscellaneous
+---------------------------
+
+.. toctree::
+   :maxdepth: 2
+
    plugins
    api
    core
@@ -53,6 +75,8 @@ Documentation Content:
     :maxdepth: 1
 
     clickhelp/msnoise
+
+
 
 
 Release Notes:

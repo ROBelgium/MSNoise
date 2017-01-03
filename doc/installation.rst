@@ -23,20 +23,22 @@ in the console.
 
 To run MSNoise, you need:
 
-* A recent version of Python (2.7.x recommended). We suggest using Anaconda_
-  with extra modules ([+] modules are already distributed with Anaconda_):
+* A recent version of Python (3.x recommended). We suggest using Anaconda_
+  with extra modules (those modules are already distributed with Anaconda_):
 
-  * setuptools [+]
-  * numpy [+]
-  * scipy [+]
-  * pandas [+]
-  * matplotlib [+]
-  * statsmodels [+]
-  * sqlalchemy [+]
-  * flask [+] (new in 1.4)
-  * click [+]
-  * pymysql [+] (new in 1.4)
-  * scikits.samplerate
+  * setuptools
+  * numpy
+  * scipy
+  * pandas
+  * matplotlib
+  * statsmodels
+  * sqlalchemy
+  * click
+  * flask (new in 1.4)
+  * pymysql (new in 1.4)
+
+* Not shipped with Anaconda_:
+
   * obspy
   * flask-admin (new in 1.4)
   * multiprocessing_logging (new in 1.4)
@@ -49,110 +51,8 @@ To run MSNoise, you need:
   Read :ref:`aboutdbandperformances` for more information.
   We recommend using MySQL.
 
-* The `find` command: present by default on linux and available with gnufind_
+* The `find` command: present by default on linux and available with gow_
   on Windows.
-
-
-Quick Start - Windows
-----------------------
-
-1. Download and install Anaconda_ for your machine, make sure Anaconda's Python is the default python for your user
-
-2. Execute the following command to install the missing packages:
-   
-   .. code-block:: sh
-    
-        pip install flask-admin
-        conda install -c obspy obspy
-
-3. Download and install scikits.samplerate from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate
-   see examples below (filenames might be different):
-
-   .. code-block:: sh
-
-        pip install scikits.samplerate-0.3.3-cp27-none-win_amd64.whl
-
-4. Install a MySQL server: download and install EasyPHP_ (their "Dev" version is OK - read their installation page carefully, you need to install some Microsoft Visual C redistribuable manually too).
-
-5. Start EasyPHP and create a privileged user and a database:
-      
-   * Connect to your local host: http://localhost/phpmyadmin (or http://127.0.0.1/phpmyadmin)
-   * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
-
-6. Install gnufind_ and make sure its /bin directory is in the PATH (Control Panel -> Environment Variables -> PATH)
-
-7. Install MSNoise:
-
-   .. code-block:: sh
-
-        pip install msnoise
-
-8. Check which required packages you are still missing by executing the ``msnoise bugreport`` command. (See :ref:`testing`)
-
-9. Proceed to the :ref:`Workflow` description to start MSNoise!
-
-
-Done !
-
-
-Quick Start - Linux
--------------------
-
-1. Download and install Anaconda_ for your machine, make sure Anaconda's Python is the default python for your user
-
-2. Execute the following commands to install the missing packages:
-   
-   .. code-block:: sh
-    
-        pip install flask-admin
-        conda install -c obspy obspy
- 
-   .. code-block:: sh
-        
-        sudo apt-get install libsamplerate0 libsamplerate0-dev
-        pip install scikits.samplerate
-    
-   If this fails, follow those instructions: :ref:`samplerate`.
-
-3. Install a MySQL server and phpMyAdmin:
-   
-   .. code-block:: sh
-    
-        sudo apt-get install mysql-server mysql-client phpmyadmin
-
-
-5. Create a privileged user and a database:
- 
-   * Connect to your local host: http://localhost/phpmyadmin (or http://127.0.0.1/phpmyadmin)
-   * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
-
-6. Install MSNoise:
-
-   .. code-block:: sh
-
-        pip install msnoise
-
-7. Check which required packages you are still missing by executing the ``msnoise bugreport`` command. (See :ref:`testing`)
-
-8. Proceed to the :ref:`Workflow` description to start MSNoise!
-
-Done !
-
-UltraFast Start on Linux
-------------------------
-If one starts with a vanilla fresh Linux install (e.g. on a new virtual machine)
-, the install can be eased with an installer script we have prepared. Indeed,
-to run de tests on TravisCI, we had to prepare a pre-install script. This is
-only valid for linux x86_64 (Debian or Ubuntu):
-
-.. code-block:: sh
-
-    wget https://raw.githubusercontent.com/ROBelgium/MSNoise/master/misc/install_debian_x86_64.sh
-    chmod +x install_debian_x86_64.sh
-    ./install_debian_x86_64.sh
-    pip install msnoise
-
-Done !
 
 
 Python and Packages Installation
@@ -164,70 +64,53 @@ above-mentionned tools (those with [*]), and provides the easy_install tool
 to install the remaining ones.
 
 From now on, we suppose you installed Anaconda_, here are the instructions for installing
-the remaining packages. If you don't use Anaconda, all the packages are available through 'easy_install'.
-Windows users are recommended to check the prebuilt binaries when advised.
+the remaining packages. If you don't use Anaconda, all the packages are available through `pip` or `conda`.
 
 To know which packages you are missing, use the bug_reporter script (see :ref:`troubleshooting`) !
 
-.. _samplerate:
 
-scikits.samplerate
-~~~~~~~~~~~~~~~~~~
+Full Installation
+-----------------
 
-.. warning:: Scikits.samplerate isn't easy to install on Python3. If not
-    successful, one has to use the "Decimate" resampling method.
+1. Download and install Anaconda_ for your machine, make sure Anaconda's Python is the default python for your user
 
-https://pypi.python.org/pypi/scikits.samplerate is a wrapper to the Secret Rabbit Code (aka libsamplerate) (de Castro Lopo, 2013)
+2. Execute the following command to install the missing packages:
+   
+   .. code-block:: sh
+    
+        pip install flask-admin
+        conda install -c obspy obspy
 
-Windows
-+++++++
+3. Install a MySQL server and phpMyAdmin:
 
-Download and install the right version from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate
+   * WINDOWS: Download and install EasyPHP_ (their "Dev" version is OK - read their installation page carefully, you need to install some Microsoft Visual C redistribuable manually too). Then start EasyPHP.
+   * LINUX:
 
-Linux
-+++++
+        .. code-block:: sh
 
-You first need to install the SRC library:
+            sudo apt-get install mysql-server mysql-client phpmyadmin
 
-.. code-block:: sh
+4. Create a privileged user and a database:
+      
+   * Connect to your local host: http://localhost/phpmyadmin (or http://127.0.0.1/phpmyadmin)
+   * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
 
-    sudo apt-get install libsamplerate0 libsamplerate0-dev
+5. WINDOWS ONLY: Install gow_ and make sure its /bin directory is in the PATH (Control Panel -> Environment Variables -> PATH)
 
-This python package will probably be the most tricky to install. If you are lucky, you can just
+6. Install MSNoise:
 
-.. code-block:: sh
+   .. code-block:: sh
 
-    pip install scikits.samplerate
+        pip install msnoise
 
-On my Ubuntu 12.04, this results in an error because the SRC library path is not found. The reason is that the setup searches SRC in /usr/lib and not in /usr/lib/x86_64-linux-gnu where the library is actually present. To install, you need to download the archive from pypi and edit some configuration file:
+7. Check which required packages you are still missing by executing the ``msnoise bugreport`` command. (See :ref:`testing`)
 
-.. code-block:: sh
+8. Proceed to the :ref:`Workflow` description to start MSNoise!
 
-    wget https://pypi.python.org/packages/source/s/scikits.samplerate/scikits.samplerate-0.3.3.tar.gz#md5=96c8d8ba3aa95a9db15994f78792efb4
-    tar -xvf scikits.samplerate-0.3.3.tar.gz
-    cd scikits.samplerate-0.3.3
 
-then edit the site.cfg example file and insert the following lines:
+Done !
 
-.. code-block:: sh
 
-    [samplerate]
-    library_dirs=/usr/lib/x86_64-linux-gnu
-    include_dirs=/usr/include
-
-To know where the SRC library is on you machine:
-
-.. code-block:: sh
-
-    sudo dpkg -L libsamplerate0
-    sudo dpkg -L libsamplerate0-dev
-
-then, build and install:
-
-.. code-block:: sh
-
-    python setup.py build
-    python setup.py install
 
 
 MySQL Server
@@ -272,8 +155,8 @@ To build this documentation, some modules are required:
 
 .. code-block:: sh
 
-    easy_install sphinx
-    easy_install sphinx_bootstrap_theme
+    pip install sphinx
+    pip install sphinx_bootstrap_theme
     
 Then, this should simply work:
 
@@ -285,7 +168,7 @@ it will create a .build folder containing the documentation.
 
 You can also build the doc to Latex and then use your favorite Latex-to-PDF tool.
 
-.. _gnufind: http://sourceforge.net/projects/getgnuwin32/files/
+.. _gow: https://github.com/downloads/bmatzelle/gow/Gow-0.7.0.exe
 .. _EasyPHP: http://www.easyphp.org/
 .. _obspy: http://www.obspy.org
 .. _Anaconda: http://www.continuum.io/downloads

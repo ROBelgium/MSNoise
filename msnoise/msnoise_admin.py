@@ -25,7 +25,7 @@ Next step is to open a web browser and open the ip address of the machine,
 by default on the current machine, it'll be http://localhost:5000/ or
 http://127.0.0.1:5000/.
 
-.. image:: .static/msnoise_admin_home.png
+.. image:: ../.static/msnoise_admin_home.png
     :align: center
 
 
@@ -73,7 +73,7 @@ bits are case-sensitive!
 
 Example view:
 
-.. image:: .static/msnoise_admin_config.png
+.. image:: ../.static/msnoise_admin_config.png
     :align: center
 
 The table below repeats this
@@ -630,9 +630,8 @@ def main(port=5000):
     plugins = get_config(db, "plugins")
     db.close()
 
+    admin = Admin(app, template_mode='bootstrap2')
 
-
-    admin = Admin(app)
     if "msnoise_brand" in os.environ:
         tmp = eval(os.environ["msnoise_brand"])
         name, logo = tmp.split("|")
