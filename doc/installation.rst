@@ -2,14 +2,6 @@
 
 
 Installation
-============
-
-
-.. contents::
-    :local:
-
-
-Introduction
 ------------
 
 MSNoise is a set of Python codes that use a database (sqlite or MySQL) and

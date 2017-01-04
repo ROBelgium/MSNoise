@@ -90,10 +90,10 @@ for command in sorted(C):
         out.write('%s\n'%group)
         out.write('-'*len(group)+'\n')
         out.write("\n")
-        if command == "plugin":
+        if command in ["plugin", "p"]:
             out.write(
                 "Will be automatically populated with the commands declared "
-                "by the plugins\n\n")
+                "by the plugins (`p` is an alias for `plugin`)\n\n")
             continue
         CC = C[command].commands
         for command in sorted(CC):
