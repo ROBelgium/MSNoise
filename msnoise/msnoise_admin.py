@@ -78,7 +78,7 @@ Example view:
 
 The table below repeats this
 
-.. include:: defaults.rst
+.. include:: ../defaults.rst
 
 Database
 --------

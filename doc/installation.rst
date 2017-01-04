@@ -47,7 +47,7 @@ To run MSNoise, you need:
 
 
 * MySQL: if you want to use MySQL, you need to install and configure a
-  :ref:`mysql` beforehand. This is not needed for sqlite.
+  MySQL Server beforehand. This is not needed for sqlite.
   Read :ref:`aboutdbandperformances` for more information.
   We recommend using MySQL.
 
@@ -66,7 +66,7 @@ to install the remaining ones.
 From now on, we suppose you installed Anaconda_, here are the instructions for installing
 the remaining packages. If you don't use Anaconda, all the packages are available through `pip` or `conda`.
 
-To know which packages you are missing, use the bug_reporter script (see :ref:`troubleshooting`) !
+To know which packages you are missing, use the bug_reporter script!
 
 
 Full Installation
