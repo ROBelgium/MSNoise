@@ -28,6 +28,7 @@ dl > dt {
     border-radius: 5px;
     padding: 5px;
     color: #222222;
+    font-size: 16px;
 }
 
 .admonition {
@@ -84,3 +85,4 @@ div .section p {
 div .section h2 {
     text-decoration: underline;
 }
+

@@ -19,7 +19,7 @@ Questions are:
 
 To run this script:
 
-.. include:: clickhelp/msnoise-install.rst
+.. include:: ../clickhelp/msnoise-install.rst
 
 
 .. warning:: The credentials will be saved in a flat text file in the current

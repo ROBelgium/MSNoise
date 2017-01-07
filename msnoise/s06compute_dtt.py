@@ -44,9 +44,9 @@ stations *not* on the volcano),
 .. note:: It seems obvious that these parameters are frequency-dependent, but
     they are currently common for all filters !
 
-.. image:: .static/static.png
+.. image:: ../.static/static.png
 
-.. image:: .static/dynamic.png
+.. image:: ../.static/dynamic.png
 
 .. warning:: In order to use the dynamic time lags, one has to provide the
    station coordinates !
@@ -57,7 +57,7 @@ signal, neglecting direct waves in the 0-15 seconds range. We then select data
 which match three other thresholds: ``dtt_mincoh``, ``dtt_maxerr`` and
 ``dtt_maxdt``.
 
-.. image:: .static/Figure04_dttmatrix_01_005DAYS_ZZ-2010-10-12_cmyk.png
+.. image:: ../.static/Figure04_dttmatrix_01_005DAYS_ZZ-2010-10-12_cmyk.png
 
 Each of the 4 left subplot of this figure shows a colormapper matrix of which
 each row
@@ -93,7 +93,7 @@ is a table, with one row for each station pair.
 
 To run this script:
 
-.. code-block:: sh
+.. code-block:: bash
 
     msnoise compute_dtt
 
