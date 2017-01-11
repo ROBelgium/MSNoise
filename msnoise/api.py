@@ -832,6 +832,28 @@ def export_allcorr(session, ccfid, data):
     del df
     return
 
+def export_subdaily_corr(session, ccfid, data):
+
+    subdaily_folder = get_config(session, 'subdaily_folder')
+    subdaily_duration = float(get_config(session, 'subdaily_duration'))
+
+    station1, station2, filterid, components, date = ccfid.split('_')
+
+    path = os.path.join(subdaily_folder, "%02i" % int(filterid),
+                        station1, station2, components)
+    if not os.path.isdir(path):
+        os.makedirs(path)
+
+    df = pd.DataFrame().from_dict(data).T
+    df.columns = get_t_axis(session)
+
+    # Convert index of dataframe to datetimeindex
+    df.index = pd.to_datetime(df.index)
+    df = df.groupby(pd.TimeGrouper(freq = "{:d}s".format(int(subdaily_duration)))).mean()
+
+    df.to_hdf(os.path.join(path, date+'.h5'), 'data')
+    del df
+    return
 
 def add_corr(session, station1, station2, filterid, date, time, duration,
              components, CF, sampling_rate, day=False, ncorr=0):

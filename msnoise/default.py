@@ -38,6 +38,10 @@ default['components_to_compute'] = ["List (comma separated) [ZZ]", 'ZZ']
 default['autocorr'] = ["Compute Auto correlation [Y]/N",'N']
 default['keep_all'] = ["Keep all cross-corr (length: corr_duration) [Y]/N",'N']
 default['keep_days'] = ["Keep all daily cross-corr [Y]/N",'Y']
+default['subdaily'] = ["Compute subdaily cross-correlations [Y]/N",'N']
+default['subdaily_duration'] = ["Subdaily output will be stacked to include this duration. Should be a multiple of corr_duration (in seconds) [7200]",'7200']
+default['subdaily_folder'] = ["Output Folder for subdaily data",'SUBDAILY']
+
 
 default['ref_begin'] = ["Beginning or REF stacks. Can be absolute (2012-01-01) or relative (-100) days",'1970-01-01']
 default['ref_end'] = ["End or REF stacks. Same as ref_begin",'2018-01-01']
