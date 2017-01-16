@@ -42,7 +42,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None):
         sta1 = "%s.%s" % (station1.net, station1.sta)
         sta2 = "%s.%s" % (station2.net, station2.sta)
         pair = "%s:%s" % (sta1, sta2)
-        print(pair, dist)
+        #print(pair, dist)
         ref_name = pair.replace('.', '_').replace(':', '_')
         rf = os.path.join("STACKS", "%02i" %
                           filterid, "REF", components, ref_name + extension)
@@ -51,10 +51,16 @@ def main(filterid, components, ampli=1, show=True, outfile=None):
             ref.normalize()
             ref = ref.data * ampli
             plt.plot(t, ref+dist, c='k')
+    
+    for filterdb in get_filters(db, all=True):
+        if filterid == filterdb.ref:
+            low = float(filterdb.low)
+            high = float(filterdb.high)
+            break
         
     plt.ylabel("Interstation Distance in km")
     plt.xlabel("Lag Time")
-    plt.title("Filter = %02i" % filterid)
+    plt.title("Filter = %02i (%.2f - %.2f Hz)" % (filterid, low, high))
 
     colors = ['r', 'g', 'b']
     for i, velocity in enumerate([3.0, 2.0, 1.0]):

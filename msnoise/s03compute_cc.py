@@ -194,6 +194,7 @@ def main():
     params.preprocess_lowpass = float(get_config(db, "preprocess_lowpass"))
     params.preprocess_highpass = float(get_config(db, "preprocess_highpass"))
     params.keep_all = get_config(db, 'keep_all', isbool=True)
+    params.subdaily = get_config(db, 'subdaily', isbool=True)
     params.keep_days = get_config(db, 'keep_days', isbool=True)
     params.components_to_compute = get_components_to_compute(db)
 
@@ -404,6 +405,10 @@ def main():
                 if params.keep_all:
                     for ccfid in allcorr.keys():
                         export_allcorr(db, ccfid, allcorr[ccfid])
+
+                if params.subdaily:
+                    for ccfid in allcorr.keys():
+                        export_subdaily_corr(db, ccfid, allcorr[ccfid])
 
                 if params.keep_days:
                     for ccfid in allcorr.keys():

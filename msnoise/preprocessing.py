@@ -65,6 +65,8 @@ def preprocess(db, stations, comps, goal_day, params):
                         gaps = getGaps(stream)
                         for gap in gaps:
                             if int(gap[-1]) <= max_gap:
+                                if not stream[gap[0]].data.dtype == stream[gap[1]].data.dtype:
+                                    stream[gap[1]].data = stream[gap[1]].data.astype(stream[gap[0]].data.dtype)
                                 stream[gap[0]] = stream[gap[0]].__add__(stream[gap[1]], method=1,
                                                                         fill_value="interpolate")
                                 stream.remove(stream[gap[1]])
