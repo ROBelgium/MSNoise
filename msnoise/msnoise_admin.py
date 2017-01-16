@@ -630,8 +630,9 @@ def main(port=5000):
     plugins = get_config(db, "plugins")
     db.close()
 
-    admin = Admin(app, template_mode='bootstrap2')
 
+    admin = Admin(app, template_mode='bootstrap2')
+    
     if "msnoise_brand" in os.environ:
         tmp = eval(os.environ["msnoise_brand"])
         name, logo = tmp.split("|")
