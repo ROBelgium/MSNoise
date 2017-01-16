@@ -343,17 +343,14 @@ def main():
                     tmp2 = tmp2[0]
                     nfft = next_fast_len(tmp1.stats.npts)
 
+                    whitening = True
                     if params.whitening == "A":
                         if (s1.net == s2.net) and (s1.sta == s2.sta) and (
                            components[0] == components[1]):
                             whitening = False
-                        else:
-                            whitening = True
                     elif params.whitening == "C":
                         if components[0] == components[1]:
                             whitening = False
-                        else:
-                            whitening = True
                     elif params.whitening == "N":
                         whitening = False
 

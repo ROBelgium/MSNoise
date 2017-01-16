@@ -285,7 +285,6 @@ def config(set, sync):
             if response_format == "inventory":
                 coords = inv.get_coordinates(id)
             else:
-
                 coords = all_metadata[id].get_coordinates(id)
             update_station(db, station.net, station.sta, coords["longitude"],
                            coords["latitude"], coords["elevation"], "DEG", )
@@ -413,13 +412,14 @@ def compute_dtt(interval):
 @click.command()
 @click.argument('jobtype')
 @click.option('-a', '--all', is_flag=True, help='Reset all jobs')
-def reset(jobtype, all):
+@click.option('-r', '--rule', help='Reset job that match this SQL rule')
+def reset(jobtype, all, rule):
     """Resets the job to "T"odo. ARG is [CC] or [DTT]. By default
     only resets jobs "I"n progress. --all resets all jobs, whatever
     the flag value"""
     from ..api import connect, reset_jobs
     session = connect()
-    reset_jobs(session, jobtype, all)
+    reset_jobs(session, jobtype, all, rule)
     session.close()
 
 

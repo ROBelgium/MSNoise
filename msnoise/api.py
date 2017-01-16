@@ -755,7 +755,7 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
     return pair, days, refs
 
 
-def reset_jobs(session, jobtype, alljobs=False):
+def reset_jobs(session, jobtype, alljobs=False, rule=None):
     """
     Sets the flag of all `jobtype` Jobs to "T"odo.
 
@@ -769,6 +769,10 @@ def reset_jobs(session, jobtype, alljobs=False):
         jobs "I"n progress.
     """
     jobs = session.query(Job).filter(Job.jobtype == jobtype)
+    if rule:
+        session.execute("UPDATE jobs set flag='T' where jobtype='%s' and  %s" % (jobtype, rule))
+        session.commit()
+        return
     if not alljobs:
         jobs = jobs.filter(Job.flag == "I")
     jobs.update({Job.flag: 'T'})
@@ -996,10 +1000,6 @@ def stack(session, data):
 def get_results(session, station1, station2, filterid, components, dates,
                 mov_stack = 1, format="stack"):
     export_format = get_config(session, 'export_format')
-    stack_method = get_config(session, 'stack_method')
-    pws_timegate = float(get_config(session, 'pws_timegate'))
-    pws_power = float(get_config(session, 'pws_power'))
-    goal_sampling_rate = float(get_config(session, "cc_sampling_rate"))
     stack_data = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
     i = 0
     base = os.path.join("STACKS", "%02i" % filterid,
@@ -1336,8 +1336,8 @@ def getGaps(stream, min_gap=None, max_gap=None):
     del copied_traces
     return gap_list
 
-def make_same_length(st):
 
+def make_same_length(st):
     """
     This function takes a stream of equal sampling rate and makes sure that all channels 
     have the same length and the same gaps.
@@ -1376,7 +1376,10 @@ def make_same_length(st):
     st = st.split()
     return st
 
+
 def clean_scipy_cache():
+    """This functions wraps all destroy scipy cache at once. It is a workaround to the memory leak induced by the
+    "caching" functions in scipy fft."""
     sff.destroy_zfft_cache()
     sff.destroy_zfftnd_cache()
     sff.destroy_drfft_cache()
