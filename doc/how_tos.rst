@@ -7,7 +7,7 @@ Reprocess data
 --------------
 
 When starting to use MSNoise, one will most probably need to re-run different
-parts of the Workflow more than one time. By default, MSNoise is designed to
+parts of the Workflow more than once. By default, MSNoise is designed to
 only process "what's new", which is antagonistic to what is wanted. Hereafter,
 we present cases that will cover most of the re-run techniques:
 
