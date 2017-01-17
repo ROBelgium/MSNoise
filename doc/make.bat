@@ -124,9 +124,14 @@ if "%1" == "epub" (
 
 if "%1" == "latex" (
 	%SPHINXBUILD% -b latex %ALLSPHINXOPTS% %BUILDDIR%/latex
+	cd %BUILDDIR%/latex
+	pdflatex -synctex=1 -interaction=nonstopmode MSNoise.tex
+	pdflatex -synctex=1 -interaction=nonstopmode MSNoise.tex
 	if errorlevel 1 exit /b 1
+	xcopy MSNoise.pdf L:\msnoise.org\doc\master /s /y /e /Q
 	echo.
 	echo.Build finished; the LaTeX files are in %BUILDDIR%/latex.
+	cd ../..
 	goto end
 )
 
@@ -186,6 +191,13 @@ if "%1" == "doctest" (
 	echo.Testing of doctests in the sources finished, look at the ^
 results in %BUILDDIR%/doctest/output.txt.
 	goto end
+)
+
+if  "%1" == "pdf" (
+    %SPHINXBUILD% -b pdf %ALLSPHINXOPTS% %BUILDDIR%/pdf
+    echo.
+    echo.Build finished. The PDF files are in %BUILDDIR%/pdf
+    goto end
 )
 
 :end

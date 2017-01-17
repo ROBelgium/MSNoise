@@ -31,7 +31,7 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=
     dbmaxlag = int(float(get_config(db, "maxlag")))
     sta1 = sta1.replace('.','_')
     sta2 = sta2.replace('.','_')
-    if sta2 > sta1: # alphabetical order filtering!
+    if sta2 >= sta1: # alphabetical order filtering!
         pair = "%s_%s"%(sta1,sta2)
         station1 = sta1.split("_")
         station2 = sta2.split("_")
@@ -68,12 +68,12 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=
         alldf = pd.concat(alldf)
         line = alldf[alldf['Pairs'] == pair].copy()
         print(line)
-        M = (line["M"])
-        M0 = (line["M0"])
-        A = (line["A"])
-        EA = (line["EA"])
-        EM = (line["EM"])
-        EM0 = (line["EM0"])
+        M = float(line["M"])
+        M0 = float(line["M0"])
+        A = float(line["A"])
+        EA = float(line["EA"])
+        EM = float(line["EM"])
+        EM0 = float(line["EM0"])
 
         plt.scatter(t, dt)
         plt.errorbar(t, dt, yerr=err, linestyle="None")
@@ -81,22 +81,22 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=
         plt.ylabel("Delay time (s)")
         plt.axvspan(-maxlag, -minlag, 0,1, color='b', alpha=0.5)
         plt.axvspan(minlag, maxlag, 0,1, color='b', alpha=0.5)
-        xlineM0 = range(-dbmaxlag, dbmaxlag, 5)
+        xlineM0 = range(-dbmaxlag, dbmaxlag + 1, 5)
         ylineM0 = []
         ylineEM0min = []
         ylineEM0max = []
-        for i in range(-dbmaxlag, dbmaxlag, 5):
+        for i in range(-dbmaxlag, dbmaxlag + 1, 5):
             ylineM0.append(M0 * i)
             ylineEM0min.append((M0-EM0) * i)
             ylineEM0max.append((M0+EM0) * i)
         plt.plot(xlineM0, ylineM0, 'r', label='M0')
         plt.plot(xlineM0, ylineEM0min, 'r', alpha=0.3)
         plt.plot(xlineM0, ylineEM0max, 'r', alpha=0.3)
-        xlineM = range(-dbmaxlag, dbmaxlag, 5)
+        xlineM = range(-dbmaxlag, dbmaxlag + 1, 5)
         ylineM = []
         ylineEMmax = []
         ylineEMmin = []
-        for i in range(-dbmaxlag, dbmaxlag, 5):
+        for i in range(-dbmaxlag, dbmaxlag + 1, 5):
             ylineM.append((M * i) + A)
             ylineEMmin.append(((M-EM) * i) + A)
             ylineEMmax.append(((M+EM) * i) + A)
@@ -108,6 +108,9 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=
         plt.suptitle(name)
         plt.legend()
         plt.grid(True, ls="-",lw=0.2)
+        
+        ax = plt.gca()
+        ax.set_xlim((-dbmaxlag, dbmaxlag))
         if outfile:
             if outfile.startswith("?"):
                 basename = '%s-%s-f%i-m%i-%s' % (sta1, sta2, filterid,

@@ -9,14 +9,14 @@ Core Functions
 Whitening
 ---------
 
-.. automethod:: msnoise.whiten.whiten
+.. automethod:: msnoise.move2obspy.whiten
 
 .. _mycorr:
 
 Correlation
 -----------
 
-.. automethod:: msnoise.myCorr.myCorr
+.. automethod:: msnoise.move2obspy.myCorr
 
 
 .. _mwcs:
@@ -24,5 +24,5 @@ Correlation
 Moving-Window Cross-Spectral method
 -----------------------------------
 
-.. automethod:: msnoise.MWCS.mwcs
+.. automethod:: msnoise.move2obspy.mwcs
 

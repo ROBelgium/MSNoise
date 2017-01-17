@@ -32,14 +32,7 @@ class MSNoiseTests(unittest.TestCase):
         totests.append(['data_folder', os.path.join(path, 'data')])
         totests.append(['data_structure', 'PDF'])
         totests.append(['network', 'YA'])
-        totests.append(['ZR', 'N'])
-        totests.append(['ZT', 'N'])
-        totests.append(['TZ', 'N'])
-        totests.append(['TR', 'N'])
-        totests.append(['TT', 'N'])
-        totests.append(['RZ', 'N'])
-        totests.append(['RR', 'N'])
-        totests.append(['RT', 'N'])
+        totests.append(['components_to_compute', 'ZZ'])
 
         for test in totests:
             update_config(db, test[0], test[1])
@@ -166,7 +159,7 @@ class MSNoiseTests(unittest.TestCase):
     def test_012_reset_jobs(self):
         from ..api import connect, reset_jobs
         db = connect()
-        reset_jobs(db, 'CC')
+        reset_jobs(db, 'CC', alljobs=True)
         db.close()
 
     def test_012b_hack_noresample(self):
@@ -213,11 +206,13 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, update_config
         db = connect()
         update_config(db, "export_format", "SAC")
+        db.close()
 
     def test_017_reset_cc_jobs(self):
         from ..api import connect, reset_jobs
         db = connect()
         reset_jobs(db, 'CC', alljobs=True)
+        db.close()
 
     def test_018_recompute_cc(self):
         self.test_013_s03compute_cc()
@@ -231,6 +226,7 @@ class MSNoiseTests(unittest.TestCase):
         shutil.rmtree("STACKS")
         db = connect()
         update_config(db, "export_format", "BOTH")
+        db.close()
 
     def test_021_reprocess_BOTH(self):
         self.test_017_reset_cc_jobs()
@@ -264,6 +260,7 @@ class MSNoiseTests(unittest.TestCase):
                     tmp1 = read(tmp1)
                     tmp2 = read(tmp2)
                     assert_allclose(tmp1[0].data, tmp2[0].data)
+        db.close()
 
     def test_023_stack(self):
         from ..api import connect, update_config
@@ -294,6 +291,7 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(start, datetime.date(2009, 1, 1))
         self.failUnlessEqual(end, datetime.date(2011, 1, 1))
         self.failUnlessEqual(len(datelist), 731)
+        db.close()
 
     def test_027_build_movstack_datelist(self):
         from ..api import connect, build_movstack_datelist
@@ -302,6 +300,7 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(start, datetime.date(2009, 1, 1))
         self.failUnlessEqual(end, datetime.date(2011, 1, 1))
         self.failUnlessEqual(len(datelist), 731)
+        db.close()
 
     def test_028_S01installer(self):
         if not "TRAVIS" in os.environ:
@@ -318,6 +317,16 @@ class MSNoiseTests(unittest.TestCase):
         except:
             traceback.print_exc()
             self.fail()
+
+    def test_stretching(self):
+        from ..api import connect, update_config, reset_jobs
+        db = connect()
+        update_config(db, "export_format", "MSEED")
+        reset_jobs(db, "DTT", alljobs=True)
+        db.close()
+
+        from ..stretch import main
+        main()
 
 
 def main():

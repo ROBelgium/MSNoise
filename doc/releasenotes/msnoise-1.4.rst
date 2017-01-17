@@ -189,7 +189,7 @@ And for mixed cases LIN-PWS or PWS-LIN, edit the config between the two steps!
 .. image:: ../.static/pws.png
 
 Instrument Response Correction
------------------------------
+------------------------------
 
 During pre-processing of the waveforms (at ``compute_cc`` step), the instrument
 response can be corrected, based on those parameters:

@@ -25,7 +25,7 @@ Next step is to open a web browser and open the ip address of the machine,
 by default on the current machine, it'll be http://localhost:5000/ or
 http://127.0.0.1:5000/.
 
-.. image:: .static/msnoise_admin_home.png
+.. image:: ../.static/msnoise_admin_home.png
     :align: center
 
 
@@ -73,12 +73,12 @@ bits are case-sensitive!
 
 Example view:
 
-.. image:: .static/msnoise_admin_config.png
+.. image:: ../.static/msnoise_admin_config.png
     :align: center
 
 The table below repeats this
 
-.. include:: defaults.rst
+.. include:: ../defaults.rst
 
 Database
 --------
@@ -116,11 +116,11 @@ modules are properly installed and available for MSNoise.
 
 """
 
+import json
 from io import BytesIO
 
 import flask
 import jinja2
-import json
 import markdown
 from flask import Flask, redirect, request
 from flask import Markup
@@ -260,6 +260,7 @@ class JobView(ModelView):
     can_edit = True
     column_filters = ('pair','jobtype','flag')
     page_size = 100
+    edit_modal = True
     def __init__(self, session, **kwargs):
         super(JobView, self).__init__(Job, session, **kwargs)
     
@@ -630,8 +631,8 @@ def main(port=5000):
     db.close()
 
 
-
-    admin = Admin(app)
+    admin = Admin(app, template_mode='bootstrap2')
+    
     if "msnoise_brand" in os.environ:
         tmp = eval(os.environ["msnoise_brand"])
         name, logo = tmp.split("|")

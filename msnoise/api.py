@@ -18,8 +18,10 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 import scipy.fftpack
+from scipy.fftpack.helper import next_fast_len
+import scipy.fftpack._fftpack as sff
+
 from obspy.core import Stream, Trace, read, AttribDict
-from obspy.signal.invsim import cosine_taper
 
 from obspy.geodetics import gps2dist_azimuth
 
@@ -60,7 +62,8 @@ def get_engine(inifile=None):
         engine = create_engine('mysql+pymysql://%s:%s@%s/%s' % (user, passwd,
                                                                 hostname,
                                                                 database),
-                               echo=False, poolclass=NullPool)
+                               echo=False, poolclass=NullPool,
+                               connect_args={'connect_timeout': 15})
     return engine
 
 
@@ -181,12 +184,16 @@ def update_config(session, name, value):
     :param name: The name of the config bit to set.
 
     :type value: str
-    :param value: The value of parameter `name`
+    :param value: The value of parameter `name`. Can also be NULL if you don't
+        want to use this particular parameter.
 
     """
 
     config = session.query(Config).filter(Config.name == name).first()
-    config.value = value
+    if "NULL" in value: 
+        config.value = None
+    else:
+        config.value = value
     session.commit()
     return
 
@@ -419,8 +426,6 @@ def get_interstation_distance(station1, station2, coordinates="DEG"):
     :type coordinates: str
     :param coordinates: The coordinates system. "DEG" is WGS84 latitude/
         longitude in degrees. "UTM" is expressed in meters.
-
-
 
     :rtype: float
     :returns: The interstation distance in km
@@ -750,7 +755,7 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
     return pair, days, refs
 
 
-def reset_jobs(session, jobtype, alljobs=False):
+def reset_jobs(session, jobtype, alljobs=False, rule=None):
     """
     Sets the flag of all `jobtype` Jobs to "T"odo.
 
@@ -764,6 +769,10 @@ def reset_jobs(session, jobtype, alljobs=False):
         jobs "I"n progress.
     """
     jobs = session.query(Job).filter(Job.jobtype == jobtype)
+    if rule:
+        session.execute("UPDATE jobs set flag='T' where jobtype='%s' and  %s" % (jobtype, rule))
+        session.commit()
+        return
     if not alljobs:
         jobs = jobs.filter(Job.flag == "I")
     jobs.update({Job.flag: 'T'})
@@ -962,7 +971,6 @@ def stack(session, data):
     pws_timegate = float(get_config(session, 'pws_timegate'))
     pws_power = float(get_config(session, 'pws_power'))
     goal_sampling_rate = float(get_config(session, "cc_sampling_rate"))
-
     data = data[~np.isnan(data).any(axis=1)]
     if stack_method == "linear":
         corr = data.mean(axis=0)
@@ -992,10 +1000,6 @@ def stack(session, data):
 def get_results(session, station1, station2, filterid, components, dates,
                 mov_stack = 1, format="stack"):
     export_format = get_config(session, 'export_format')
-    stack_method = get_config(session, 'stack_method')
-    pws_timegate = float(get_config(session, 'pws_timegate'))
-    pws_power = float(get_config(session, 'pws_power'))
-    goal_sampling_rate = float(get_config(session, "cc_sampling_rate"))
     stack_data = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
     i = 0
     base = os.path.join("STACKS", "%02i" % filterid,
@@ -1083,7 +1087,7 @@ def get_t_axis(session):
     return np.linspace(-maxlag, maxlag, samples)
 
 
-def get_components_to_compute(session):
+def get_components_to_compute(session, plugin=None):
     """
     Returns the components configured in the database.
 
@@ -1095,10 +1099,11 @@ def get_components_to_compute(session):
     :returns: a list of components to compute
     """
 
-    components_to_compute = []
-    for comp in ['ZZ', 'RR', 'TT', 'TR', 'RT', 'ZR', 'RZ', 'TZ', 'ZT']:
-        if get_config(session, comp, isbool=True):
-            components_to_compute.append(comp)
+    components_to_compute = get_config(session, "components_to_compute", plugin=plugin)
+    if components_to_compute.count(",") == 0:
+        components_to_compute = [components_to_compute,]
+    else:
+        components_to_compute = components_to_compute.split(",")
     return components_to_compute
 
 
@@ -1221,10 +1226,13 @@ def azimuth(coordinates, x0, y0, x1, y1):
         dist, azim, bazim = gps2dist_azimuth(y0, x0, y1, x1)
         return azim
     elif coordinates == 'UTM':
-        azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
-        return azim
+        if (np.isclose(y0, y1) & np.isclose(x0, x1)):
+            return 0
+        else:
+            azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
+            return azim % 360
     else:
-        print("Please consider having a single coordinate system for\
+        logging.warning("Please consider having a single coordinate system for\
             all stations")
         return 0
 
@@ -1261,18 +1269,21 @@ def check_and_phase_shift(trace):
         else:
             dt = (trace.stats.delta - dt)
 #            direction = "right"
+        logging.debug("correcting time by %.6fs"%dt)
         trace.detrend(type="demean")
         trace.detrend(type="simple")
-        taper_1s = taper_length * float(trace.stats.sampling_rate) / trace.stats.npts
-        cp = cosine_taper(trace.stats.npts, taper_1s)
-        trace.data *= cp
+        trace.taper(max_percentage=None, max_length=1.0)
 
-        n = int(2**nextpow2(len(trace.data)))
+        n = next_fast_len(int(trace.stats.npts))
         FFTdata = scipy.fftpack.fft(trace.data, n=n)
         fftfreq = scipy.fftpack.fftfreq(n, d=trace.stats.delta)
         FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
-        trace.data = np.real(scipy.fftpack.ifft(FFTdata, n=n)[:len(trace.data)])
+        FFTdata = FFTdata.astype(np.complex64)
+        scipy.fftpack.ifft(FFTdata, n=n, overwrite_x=True)
+        trace.data = np.real(FFTdata[:len(trace.data)])
         trace.stats.starttime += dt
+        del FFTdata, fftfreq
+        clean_scipy_cache()
         return trace
     else:
         return trace
@@ -1322,7 +1333,67 @@ def getGaps(stream, min_gap=None, max_gap=None):
                         stime, etime, delta, nsamples])
     # Set the original traces to not alter the stream object.
     stream.traces = copied_traces
+    del copied_traces
     return gap_list
+
+
+def make_same_length(st):
+    """
+    This function takes a stream of equal sampling rate and makes sure that all channels 
+    have the same length and the same gaps.
+    """
+
+    # Merge traces
+    st.merge()
+
+    # Initialize arrays to be filled with start+endtimes of all traces
+    starttimes = []
+    endtimes = []
+
+    # Loop over all traces of the stream
+    for tr in st:
+        # Force conversion to masked arrays
+        if not np.ma.count_masked(tr.data):
+            tr.data = np.ma.array(tr.data, mask=False)
+        # Read out start+endtimes of traces to trim
+        starttimes.append(tr.stats.starttime)
+        endtimes.append(tr.stats.endtime)
+
+    # trim stream to common starttimes
+    st.trim(max(starttimes), min(endtimes))
+
+    # get the mask of all traces, i.e. the parts where at least one trace has a gap
+    if len(st) == 2:
+        mask = np.logical_or(st[0].data.mask, st[1].data.mask)
+    elif len(st) == 3:
+        mask = np.logical_or(st[0].data.mask, st[1].data.mask, st[2].data.mask)
+
+    # apply the mask to all traces
+    for tr in st:
+        tr.data.mask = mask
+    
+    # remove the masks from the stream 
+    st = st.split()
+    return st
+
+
+def clean_scipy_cache():
+    """This functions wraps all destroy scipy cache at once. It is a workaround to the memory leak induced by the
+    "caching" functions in scipy fft."""
+    sff.destroy_zfft_cache()
+    sff.destroy_zfftnd_cache()
+    sff.destroy_drfft_cache()
+    sff.destroy_cfft_cache()
+    sff.destroy_cfftnd_cache()
+    sff.destroy_rfft_cache()
+    sff.destroy_ddct2_cache()
+    sff.destroy_ddct1_cache()
+    sff.destroy_dct2_cache()
+    sff.destroy_dct1_cache()
+    sff.destroy_ddst2_cache()
+    sff.destroy_ddst1_cache()
+    sff.destroy_dst2_cache()
+    sff.destroy_dst1_cache()
 
 
 if __name__ == "__main__":
