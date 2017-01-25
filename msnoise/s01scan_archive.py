@@ -110,7 +110,7 @@ def main(init=False, threads=1):
     logging.info('*** Starting: Scan Archive ***')
     db = connect()
 
-    mtime = -2
+    mtime = get_config(db, 'crondays')
 
     if init:
         logging.info("Initializing (should be run only once)")
