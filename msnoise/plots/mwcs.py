@@ -22,50 +22,9 @@ mov_stack = 3:
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 from matplotlib import colors, cm
-from matplotlib.dates import date2num, DateFormatter, YearLocator
+from matplotlib.dates import date2num, AutoDateFormatter, AutoDateLocator
 
 from ..api import *
-
-def cmap_powerlaw_adjust(cmap, a):
-    '''
-    returns a new colormap based on the one given
-    but adjusted via power-law:
-
-    newcmap = oldcmap**a
-    '''
-    if a < 0.:
-        return cmap
-    cdict = copy.copy(cmap._segmentdata)
-    fn = lambda x : (x[0]**a, x[1], x[2])
-    for key in ('red','green','blue'):
-        cdict[key] = map(fn, cdict[key])
-        cdict[key].sort()
-        assert (cdict[key][0]<0 or cdict[key][-1]>1), \
-            "Resulting indices extend out of the [0, 1] segment."
-    return colors.LinearSegmentedColormap('colormap',cdict,1024)
-
-def cmap_center_adjust(cmap, center_ratio):
-    '''
-    returns a new colormap based on the one given
-    but adjusted so that the old center point higher
-    (>0.5) or lower (<0.5)
-    '''
-    if not (0. < center_ratio) & (center_ratio < 1.):
-        return cmap
-    a = math.log(center_ratio) / math.log(0.5)
-    return cmap_powerlaw_adjust(cmap, a)
-
-def cmap_center_point_adjust(cmap, range, center):
-    '''
-    converts center to a ratio between 0 and 1 of the
-    range given and calls cmap_center_adjust(). returns
-    a new adjusted colormap accordingly
-    '''
-    if not ((range[0] < center) and (center < range[1])):
-        print("beu")
-        return cmap
-    return cmap_center_adjust(cmap,
-        abs(center - range[0]) / abs(range[1] - range[0]))
 
 def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None):
     db = connect()
@@ -131,8 +90,8 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         
         crange = [np.amin(alldt.values),np.amax(alldt.values)]
         
-        alldt = alldt.resample('D', how='mean')
-        allcoh = allcoh.resample('D', how='mean')
+        alldt = alldt.resample('D').mean()
+        allcoh = allcoh.resample('D').mean()
         
         xextent = (date2num(id[0]), date2num(id[-1]), -maxlag, maxlag)
         
@@ -142,20 +101,22 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
                        height_ratios=[1,1]
                        )
         
-        plt.figure()
-        ax = plt.subplot(gs[0])
-        plt.imshow(alldt.T, extent=xextent,aspect="auto",interpolation='none',origin='lower',cmap=cmap_center_point_adjust(cm.seismic,crange,0))
+        fig = plt.figure()
+        ax1 = plt.subplot(gs[0])
+        im = plt.imshow(alldt.T, extent=xextent,aspect="auto",interpolation='none',
+                        origin='lower', cmap = cm.seismic)
+        cscale = np.nanpercentile(alldt, q=99) # the 1% largest values will appear saturated
+        im.set_clim((cscale * -1, cscale)) # make symmetric
         cb = plt.colorbar()
         cb.set_label('dt')
         plt.ylabel("Lag Time (s)")
         plt.axhline(0,lw=0.5,c='k')
         plt.grid()
-        ax.xaxis.set_major_locator( YearLocator() )
-        ax.xaxis.set_major_formatter(  DateFormatter('%Y-%m-%d') )
         plt.title('%s : %s : dt'%(sta1,sta2))
         plot_lags(minlag, maxlag2)
+        plt.setp(ax1.get_xticklabels(), visible=False)
         
-        plt.subplot(gs[1])
+        plt.subplot(gs[1], sharey=ax1)
         plt.plot(alldt.mean( axis=0), alldt.columns, c='k')
         plt.grid()
         plot_lags(minlag, maxlag2)
@@ -164,7 +125,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         plt.xlabel('dt')
         plt.ylabel("Lag Time (s)")
         
-        ax = plt.subplot(gs[2], sharex=ax, sharey=ax)
+        ax2 = plt.subplot(gs[2], sharex=ax1, sharey=ax1)
         plt.imshow(allcoh.T, extent=xextent,aspect="auto",interpolation='none',origin='lower',cmap='hot',vmin=minCoh, vmax=1)
         #~ plt.imshow(allcoh.T, extent=xextent,aspect="auto",interpolation='none',origin='lower',cmap='hot')
         cb = plt.colorbar()
@@ -172,12 +133,14 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         plt.ylabel("Lag Time (s)")
         plt.axhline(0,lw=0.5,c='k')
         plt.grid()
-        ax.xaxis.set_major_locator( YearLocator() )
-        ax.xaxis.set_major_formatter(  DateFormatter('%Y-%m-%d') )
+        locator = AutoDateLocator()
+        ax2.xaxis.set_major_locator(locator)
+        ax2.xaxis.set_major_formatter(AutoDateFormatter(locator))
+        plt.setp(plt.xticks()[1], rotation=30, ha='right')
         plt.title('%s : %s : mean coherence'%(sta1,sta2))
         plot_lags(minlag, maxlag2)
-        
-        plt.subplot(gs[3])
+                
+        plt.subplot(gs[3], sharey=ax1)
         m = allcoh.mean( axis=0)
         s = allcoh.std(axis=0)
         plt.plot(m, allcoh.columns, c='k')

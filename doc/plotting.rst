@@ -1,5 +1,6 @@
 Plotting
-========
+--------
+
 MSNoise comes with some default plotting tools.
 
 All plotting commands accept the ``--outfile`` argument. If provided, the

@@ -1,4 +1,4 @@
-.. include:: ../configs.hrst
+.. include:: configs.hrst
 
 Extending MSNoise with Plugins
 ==============================

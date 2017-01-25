@@ -1,11 +1,11 @@
-import sys
 import calendar
 import glob
+import sys
 import time
 import traceback
 
 from obspy import read_inventory
-from obspy.core import utcdatetime, UTCDateTime
+from obspy.core import UTCDateTime
 from obspy.io.xseed import Parser
 
 try:
@@ -28,9 +28,10 @@ def preprocess(db, stations, comps, goal_day, params):
         for comp in comps:
             datafiles[station][comp] = []
         for file in files:
+            if file.comp[-1] not in comps:
+                continue
             fullpath = os.path.join(file.path, file.file)
             datafiles[station][file.comp[-1]].append(fullpath)
-            print(fullpath)
     j = 0
     for istation, station in enumerate(stations):
         for comp in comps:
@@ -44,7 +45,7 @@ def preprocess(db, stations, comps, goal_day, params):
                               starttime=UTCDateTime(gd),
                               endtime=UTCDateTime(gd) + 86400)
                     for tr in st:
-                        tr.data = tr.data.astype(np.float)
+                        tr.data = tr.data.astype(np.float32)
                     stream += st
                     del st
                 stream.sort()
@@ -80,9 +81,7 @@ def preprocess(db, stations, comps, goal_day, params):
                     else:
                         trace.detrend(type="demean")
                         trace.detrend(type="linear")
-                        taper_1s = taper_length * float(trace.stats.sampling_rate) / trace.stats.npts
-                        cp = cosine_taper(trace.stats.npts, taper_1s)
-                        trace.data *= cp
+                        trace.taper(max_percentage = None, max_length=1.0)
                 # try:
                 #     stream.merge(method=0, fill_value=0.0)
                 # except:
@@ -191,7 +190,10 @@ def preprocess(db, stations, comps, goal_day, params):
                     t = time.strptime("%04i:%02i:%02i:%02i:%02i:%02i" %
                                       (year, month, day, hourf, minf, secf), "%Y:%m:%d:%H:%M:%S")
                     basetime = calendar.timegm(t)
-
+                for tr in stream:
+                    tr.data = tr.data.astype(np.float32)
                 output += stream
-
+                del stream
+            del files
+    clean_scipy_cache()
     return basetime, output

@@ -2,10 +2,10 @@
 Stretching...
 """
 
-from api import *
+from .api import *
 from scipy import asarray as ar
 from scipy.optimize import curve_fit
-
+from scipy.ndimage import map_coordinates
 
 def stretch_mat_creation(refcc, str_range=0.01, nstr=1001):
     """ Matrix of stretched instance of a reference trace.
@@ -44,8 +44,7 @@ def stretch_mat_creation(refcc, str_range=0.01, nstr=1001):
     coord = np.zeros((2, n))
     for (i, row) in enumerate(str_timemat):
         coord[0, :] = row + n // 2
-        strrefmat[i, :] = scipy.ndimage.map_coordinates(\
-                          refcc.reshape((len(refcc), 1)), coord)
+        strrefmat[i, :] = map_coordinates(refcc.reshape((len(refcc), 1)), coord)
     return strrefmat, strvec
 
 

@@ -16,7 +16,6 @@ Configuration Parameters
 * |corr_duration|
 * |windsorizing|
 * |resampling_method|
-* |decimation_factor|
 * |remove_response|
 * |response_format|
 * |response_path|
@@ -190,8 +189,8 @@ def main():
     params.corr_duration = float(get_config(db, "corr_duration"))
     params.min30 = float(get_config(db, "corr_duration")) * params.goal_sampling_rate
     params.windsorizing = float(get_config(db, "windsorizing"))
+    params.whitening = get_config(db, 'whitening')
     params.resampling_method = get_config(db, "resampling_method")
-    params.decimation_factor = int(get_config(db, "decimation_factor"))
     params.preprocess_lowpass = float(get_config(db, "preprocess_lowpass"))
     params.preprocess_highpass = float(get_config(db, "preprocess_highpass"))
     params.keep_all = get_config(db, 'keep_all', isbool=True)
@@ -217,6 +216,7 @@ def main():
             stations.append(netsta1)
             stations.append(netsta2)
             goal_day = job.day
+        del jobs
 
         stations = np.unique(stations)
 
@@ -251,7 +251,7 @@ def main():
             s1 = get_station(db, station1.split('.')[0], station1.split('.')[1])
             s2 = get_station(db, station2.split('.')[0], station2.split('.')[1])
 
-            if s1.X:
+            if s1.X and params.components_to_compute != ["ZZ",]:
                 X0, Y0, c0 = (s1.X, s1.Y, s1.coordinates)
                 X1, Y1, c1 = (s2.X, s2.Y, s1.coordinates)
 
@@ -267,6 +267,7 @@ def main():
                 cplAz = 0.
 
             for components in params.components_to_compute:
+                logging.debug("Processing {!s}".format(components))
                 t1 = stream.select(station=s1.sta)
                 t2 = stream.select(station=s2.sta)
                 if (components == "ZZ") \
@@ -277,9 +278,24 @@ def main():
                     t1 = t1.select(component=components[0])
                     t2 = t2.select(component=components[1])
                 else:
-                    t1 = t1.rotate("NE->RT", cplAz).select(component=components[0])
-                    t2 = t2.rotate("NE->RT", cplAz).select(component=components[1])
-
+                    logging.debug('Rotating streams, making sure they are aligned')
+                    t1_novert = t1.copy()
+                    t2_novert = t2.copy()
+                    # Make temporary streams withouth the vertical components
+                    for tr in t1_novert.select(component="Z"):
+                        t1_novert.remove(tr)
+                    for tr in t2_novert.select(component="Z"):
+                        t2_novert.remove(tr)
+                    # Make these streams contain the same gaps
+                    t1_novert = make_same_length(t1_novert)   
+                    t2_novert = make_same_length(t2_novert) 
+                    # Rotate
+                    t1_novert = t1_novert.rotate("NE->RT", cplAz).select(component=components[0])
+                    t2_novert = t2_novert.rotate("NE->RT", cplAz).select(component=components[1])
+                    # Include the vertical channels again
+                    t1 = t1_novert+t1.select(component="Z")
+                    t2 = t2_novert+t2.select(component="Z")
+                    
                 if not len(t1):
                     logging.info("No Data for %s.%s..%s" % (
                         s1.net, s1.sta, components[0]))
@@ -290,7 +306,6 @@ def main():
                     continue
 
                 current = t1+t2
-                print(current)
 
                 allcorr = {}
                 for tmp in current.slide(params.corr_duration, params.corr_duration*(1-params.overlap)):
@@ -300,29 +315,44 @@ def main():
                             gaps.append(gap)
 
                     if len(gaps) > 0:
-                        logging.info("Sliding Windows contains gaps, skipping...")
+                        logging.debug("Sliding Windows %s contains gaps, skipping..." % (tmp[0].stats.starttime))
                         continue
-
+                    if tmp[0].stats.npts < 2*(params.maxlag * params.goal_sampling_rate) + 1:
+                        continue
+                    if len(tmp) < 2:
+                        continue
                     tmp = tmp.copy()
                     tmp.detrend("demean")
 
                     for tr in tmp:
                         if params.windsorizing == -1:
-                            tr.data = np.sign(tr.data)
+                            np.sign(tr.data, tr.data)  # inplace
                         elif params.windsorizing != 0:
-                            rms = tr.data.std()
-                            indexes = np.where(np.abs(tr.data) > (params.windsorizing * rms))[0]
-                            # clipping at windsorizing*rms
-                            tr.data[indexes] = (tr.data[indexes] / np.abs(
-                                tr.data[indexes])) * params.windsorizing * rms
+                            rms = tr.data.std() * params.windsorizing
+                            np.clip(tr.data, -rms, rms, tr.data)  # inplace
                     tmp.taper(0.04)
-                    tmp1 = tmp.select(station=s1.sta, component=components[0])[0]
-                    tmp2 = tmp.select(station=s2.sta, component=components[1])[0]
+                    tmp1 = tmp.select(station=s1.sta, component=components[0])
+                    if len(tmp1) == 0:
+                        continue
+
+                    tmp2 = tmp.select(station=s2.sta, component=components[1])
+                    if len(tmp2) == 0:
+                        continue
+
+                    tmp1 = tmp1[0]
+                    tmp2 = tmp2[0]
                     nfft = next_fast_len(tmp1.stats.npts)
-                    autocorr = False
-                    if (s1.net == s2.net) and (s1.sta == s2.sta) and (
-                        components[0] == components[1]):
-                        autocorr = True
+
+                    whitening = True
+                    if params.whitening == "A":
+                        if (s1.net == s2.net) and (s1.sta == s2.sta) and (
+                           components[0] == components[1]):
+                            whitening = False
+                    elif params.whitening == "C":
+                        if components[0] == components[1]:
+                            whitening = False
+                    elif params.whitening == "N":
+                        whitening = False
 
                     for filterdb in get_filters(db, all=False):
                         filterid = filterdb.ref
@@ -334,21 +364,28 @@ def main():
                         skip = False
                         for i, station in enumerate(pair):
                             if tmp[i].data.std() > rms_threshold:
-                                if autocorr:
-                                    # logging.debug("Autocorr %s"%components)
-                                    tmp[i].filter("bandpass", freqmin=low, freqmax=high, zerophase=True)
-                                    trames2hWb[i] = scipy.fftpack.fft(tmp[i].data, nfft)
-                                else:
-                                    # logging.debug("Whitening %s" % components)
+                                if whitening:
+                                    #logging.debug("Whitening %s" % components)
                                     trames2hWb[i] = whiten(tmp[i].data, nfft,
                                                            dt, low, high,
                                                            plot=False)
+                                else:
+                                    #logging.debug("Autocorr %s"%components)
+                                    tmp[i].filter("bandpass", freqmin=low, freqmax=high, zerophase=True)
+                                    trames2hWb[i] = scipy.fftpack.fft(tmp[i].data, nfft)
                             else:
                                 skip = True
                                 logging.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'
                                               % (tmp[i].data.std(), rms_threshold))
                         if not skip:
                             corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False, nfft=nfft)
+                            if not np.all(np.isfinite(corr)):
+                                logging.debug("corr object contains NaNs, skipping")
+                                continue
+                            if len(corr) < 2 * (params.maxlag * params.goal_sampling_rate) + 1:
+                                logging.debug(
+                                    "corr object is too small, skipping")
+                                continue
                             tmptime = tmp[0].stats.starttime.datetime
                             thisdate = tmptime.strftime("%Y-%m-%d")
                             thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
@@ -360,7 +397,9 @@ def main():
                                     allcorr[ccfid] = {}
                                 allcorr[ccfid][thistime] = corr
 
-                            del corr, thistime, trames2hWb
+                            del corr, thistime, trames2hWb, tmptime
+                        del low, high, rms_threshold
+                    del tmp, tmp1, tmp2
 
                 if params.keep_all:
                     for ccfid in allcorr.keys():
@@ -385,11 +424,13 @@ def main():
                                 components, corr,
                                 params.goal_sampling_rate, day=True,
                                 ncorr=corrs.shape[0])
-
+                        del corrs, corr, thisdate, thistime
+                del current, allcorr, t1, t2
             logging.debug("Updating Job")
             update_job(db, goal_day, orig_pair, 'CC', 'D')
 
             logging.info("Finished processing this pair. It took %.2f seconds" % (time.time() - tt))
+        clean_scipy_cache()
         logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
     logging.info('*** Finished: Compute CC ***')
 
