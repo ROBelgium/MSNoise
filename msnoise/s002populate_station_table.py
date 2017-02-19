@@ -13,6 +13,9 @@ The ``data_folder`` (as defined in the config) is scanned expecting the
     data_structure['IDDS'] = "YEAR/NET/STA/CHAN.TYPE/DAY/NET.STA.LOC.CHAN.TYPE.YEAR.DAY.HOUR"
     data_structure['PDF'] = "YEAR/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.DAY"
 
+If one's data structure is one of those, then the ``data_structure`` configuration
+bit needs to be set to the acronym (SDS, BUD, IDDS or PDF).
+
 More info on the recommended SDS ("SeisComP Data Structure") can be found here:
 https://www.seiscomp3.org/wiki/doc/applications/slarchive/SDS
 For other structures, one has to edit the data_structures.py file and define
@@ -29,20 +32,23 @@ To run this script:
 Custom data structure & station table population
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If one's data structure is not one of the pre-defined, MSNoise expects to find
+If one's data structure is not one of the pre-defined, it can be defined
+directly in the ``data_structure`` configuration bit using forward slashes,
+e.g.:
+
+``data_structure`` = "NET/STA/YEAR/NET.STA.YEAR.DAY.MSEED"
+
+MSNoise expects to find
 a file named ``custom.py`` in the current folder. This python file will contain
-the data_structure (here ``data_structure`` = "TOM" in the configuration and a
-function called ``populate`` wich will accept one
-argument and return a list of stations in the format ``NET_STA``:
+ a function called ``populate`` wich will accept one argument and return a list
+ of stations in the format ``NET_STA``:
 
 .. code-block:: python
-
-    data_structure['TOM'] = "YEAR/NET/STA/CHAN/YEAR.DAY"
 
     def populate(data_folder):
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*")))
         stations = []
-        for di in datalist
+        for di in datalist:
             tmp = os.path.split(di)
             sta = tmp[1]
             net = os.path.split(tmp[0])[1]
