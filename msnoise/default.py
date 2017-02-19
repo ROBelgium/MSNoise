@@ -2,7 +2,8 @@ from collections import OrderedDict
 default = OrderedDict()
 default['data_folder'] = ["Data Folder",'']
 default['output_folder'] = ["CC Output Folder",'CROSS_CORRELATIONS']
-default['data_structure'] = ["Data Structure [SDS]/BUD/IDDS",'SDS']
+default['data_structure'] = ["Either a predefined acronym [SDS]/BUD/IDDS,<br> "
+                             "or /-separated path (e.g. NET/STA/YEAR/NET.STA.YEAR.DAY.MSEED).", 'SDS']
 default['network'] = ["Network to analyse [*]",'*']
 default['channels'] = ["Channels need to match the value (ex: [\*], \*Z, BH\*, HHZ,...)",'*']
 

@@ -145,14 +145,15 @@ def main(init=False, threads=1):
     folders_to_glob = []
     if data_struc in data_structure.keys():
         rawpath = data_structure[data_struc]
+    elif data_struc.count('/') != 0:
+        rawpath = data_struc
     else:
         print("Can't parse the archive for format %s !" % data_struc)
         print("trying to import local parser (should return a station list)")
         print()
         if os.path.isfile(os.path.join(os.getcwd(), 'custom.py')):
             sys.path.append(os.getcwd())
-            # from custom import data_structure
-            rawpath=data_structure[data_struc]
+            from custom import data_structure as raw_path
         else:
             print("No file named custom.py in the %s folder" % os.getcwd())
             return

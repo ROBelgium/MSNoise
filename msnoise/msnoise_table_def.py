@@ -126,17 +126,17 @@ class Station(Base):
     instrument = Column(String(20))
     used = Column(Boolean)
 
-    def __init__(self, net, sta, X, Y, altitude, coordinates, instrument,
-                 used):
+    def __init__(self, *args):
         """"""
-        self.net = net
-        self.sta = sta
-        self.X = X
-        self.Y = Y
-        self.altitude = altitude
-        self.coordinates = coordinates
-        self.instrument = instrument
-        self.used = used
+        if len(args):
+            self.net = args[0]
+            self.sta = args[1]
+            self.X = args[2]
+            self.Y = args[3]
+            self.altitude = args[4]
+            self.coordinates = args[5]
+            self.instrument = args[6]
+            self.used = args[7]
 
 ########################################################################
 

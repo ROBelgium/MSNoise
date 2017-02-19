@@ -51,6 +51,7 @@ argument and return a list of stations in the format ``NET_STA``:
 
 """
 
+import traceback
 import glob
 import sys
 
@@ -100,6 +101,7 @@ def main():
             from custom import populate
             stations = populate(data_folder)
         except:
+            traceback.print_exc()
             print("No file named custom.py in the %s folder" % os.getcwd())
             return
     stations = np.unique(stations)
