@@ -153,7 +153,7 @@ def main(init=False, threads=1):
         print()
         if os.path.isfile(os.path.join(os.getcwd(), 'custom.py')):
             sys.path.append(os.getcwd())
-            from custom import data_structure as raw_path
+            from custom import data_structure as rawpath
         else:
             print("No file named custom.py in the %s folder" % os.getcwd())
             return

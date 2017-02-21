@@ -12,7 +12,7 @@ default['enddate'] = ["End Date to process: [2100-01-01]='No end'","2018-01-01"]
 
 default['analysis_duration'] = ["Duration of the Analysis (total in seconds : 3600, [86400])",'86400']
 default['cc_sampling_rate'] = ["Sampling Rate for the CrossCorrelation [20.0]",'20.0']
-default['resampling_method'] = ["Resampling method [Resample]/Decimate/Lanczos",'Resample']
+default['resampling_method'] = ["Resampling method Resample/Decimate/[Lanczos]",'Lanczos']
 default['preprocess_lowpass'] = ["Preprocessing Low-pass value in Hz [8.0]",'8.0']
 default['preprocess_highpass'] = ["Preprocessing High-pass value in Hz [0.01]",'0.01']
 

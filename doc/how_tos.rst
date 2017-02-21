@@ -60,7 +60,7 @@ When changing the dt/t parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-``msnoise compute_dtt --i 999`` will ensure all MWCS jobs marked done in the
+``msnoise compute_dtt -i 999`` will ensure all MWCS jobs marked done in the
 last 999 days are checked for modification.
 
 

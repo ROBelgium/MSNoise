@@ -122,7 +122,7 @@ from io import BytesIO
 import flask
 import jinja2
 import markdown
-from flask import Flask, redirect, request
+from flask import Flask, redirect, request, render_template
 from flask import Markup
 from flask import flash
 from flask_admin import Admin, BaseView, expose
@@ -312,6 +312,9 @@ class JobView(ModelView):
         self.session.commit()
         return
 
+from wtforms.fields import SelectField, StringField
+from wtforms.utils import unset_value
+from flask_wtf import Form
 
 class ConfigView(ModelView):
     # Disable model creation
@@ -327,6 +330,14 @@ class ConfigView(ModelView):
 
     def __init__(self, session, **kwargs):
         super(ConfigView, self).__init__(Config, session, **kwargs)
+
+    # def edit_form(self, obj=None):
+    #     form = super(ModelView, self).edit_form(obj)
+    #     nf = SelectField("Value", choices=[("E:\\", "YREAHHHH"), ("2", "KO")])
+    #     nf = nf.bind(form, "value")
+    #     nf.data = "E:\\"
+    #     form._fields["value"] = nf
+    #     return form
 
     @expose('/edit/', methods=['GET', 'POST'])
     def edit_view(self):
@@ -557,7 +568,7 @@ def allresults():
 
 @app.route('/admin/new_jobs_TRIG.json')
 def new_jobsTRIG():
-    from s02new_jobs import main
+    from .s02new_jobs import main
     count = main()
     global db
     db.flush()

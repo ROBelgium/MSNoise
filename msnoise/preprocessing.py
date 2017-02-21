@@ -45,7 +45,7 @@ def preprocess(db, stations, comps, goal_day, params):
                               starttime=UTCDateTime(gd),
                               endtime=UTCDateTime(gd) + 86400)
                     for tr in st:
-                        tr.data = tr.data.astype(np.float32)
+                        tr.data = tr.data.astype(np.float)
                     stream += st
                     del st
                 stream.sort()
@@ -82,17 +82,6 @@ def preprocess(db, stations, comps, goal_day, params):
                         trace.detrend(type="demean")
                         trace.detrend(type="linear")
                         trace.taper(max_percentage = None, max_length=1.0)
-                # try:
-                #     stream.merge(method=0, fill_value=0.0)
-                # except:
-                #     continue
-                #
-                # logging.debug("%s.%s Slicing Stream to %s:%s" % (station, comp, utcdatetime.UTCDateTime(
-                #     goal_day.replace('-', '')), utcdatetime.UTCDateTime(
-                #     goal_day.replace('-', '')) + params.goal_duration - stream[0].stats.delta))
-                # stream.trim(utcdatetime.UTCDateTime(goal_day.replace('-', '')), utcdatetime.UTCDateTime(
-                #     goal_day.replace('-', '')) + params.goal_duration - stream[0].stats.delta, pad=True, fill_value=None,
-                #                nearest_sample=False)
 
                 if get_config(db, 'remove_response', isbool=True):
                     logging.debug('Removing instrument response')
@@ -182,18 +171,10 @@ def preprocess(db, stations, comps, goal_day, params):
                             trace.interpolate(method="lanczos", sampling_rate=params.goal_sampling_rate, a=1.0)
 
                         trace.stats.sampling_rate = params.goal_sampling_rate
-
-
-                year, month, day, hourf, minf, secf, wday, yday, isdst = trace.stats.starttime.utctimetuple()
-
-                if j == 0:
-                    t = time.strptime("%04i:%02i:%02i:%02i:%02i:%02i" %
-                                      (year, month, day, hourf, minf, secf), "%Y:%m:%d:%H:%M:%S")
-                    basetime = calendar.timegm(t)
                 for tr in stream:
                     tr.data = tr.data.astype(np.float32)
                 output += stream
                 del stream
             del files
     clean_scipy_cache()
-    return basetime, output
+    return 0, output

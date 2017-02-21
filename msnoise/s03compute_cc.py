@@ -412,10 +412,8 @@ def main():
                         corrs = np.asarray(list(allcorr[ccfid].values()))
                         corr = stack(db, corrs)
 
-                        thisdate = time.strftime(
-                                    "%Y-%m-%d", time.gmtime(basetime))
-                        thistime = time.strftime(
-                                    "%H_%M", time.gmtime(basetime))
+                        thisdate = goal_day
+                        thistime = "0_0"
                         add_corr(
                                 db, station1.replace('.', '_'),
                                 station2.replace('.', '_'), int(filterid),
@@ -432,6 +430,7 @@ def main():
             logging.info("Finished processing this pair. It took %.2f seconds" % (time.time() - tt))
         clean_scipy_cache()
         logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
+        del stream
     logging.info('*** Finished: Compute CC ***')
 
 if __name__ == "__main__":
