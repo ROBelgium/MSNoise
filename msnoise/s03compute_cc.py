@@ -279,23 +279,27 @@ def main():
                     t2 = t2.select(component=components[1])
                 else:
                     logging.debug('Rotating streams, making sure they are aligned')
-                    t1_novert = t1.copy()
-                    t2_novert = t2.copy()
-                    # Make temporary streams withouth the vertical components
-                    for tr in t1_novert.select(component="Z"):
-                        t1_novert.remove(tr)
-                    for tr in t2_novert.select(component="Z"):
-                        t2_novert.remove(tr)
-                    # Make these streams contain the same gaps
-                    t1_novert = make_same_length(t1_novert)   
-                    t2_novert = make_same_length(t2_novert) 
-                    # Rotate
-                    t1_novert = t1_novert.rotate("NE->RT", cplAz).select(component=components[0])
-                    t2_novert = t2_novert.rotate("NE->RT", cplAz).select(component=components[1])
-                    # Include the vertical channels again
-                    t1 = t1_novert+t1.select(component="Z")
-                    t2 = t2_novert+t2.select(component="Z")
-                    
+
+                    if components[0] == "Z":
+                        t1 = t1.select(component=components[0])
+                    else:
+                        t1_novert = t1.copy()
+                        for tr in t1_novert.select(component="Z"):
+                            t1_novert.remove(tr)
+                        # Make these streams contain the same gaps
+                        t1_novert = make_same_length(t1_novert)
+                        t1 = t1_novert.rotate("NE->RT", cplAz).select(component=components[0])
+
+                    if components[1] == "Z":
+                        t2 = t2.select(component=components[1])
+                    else:
+                        t2_novert = t2.copy()
+                        for tr in t2_novert.select(component="Z"):
+                            t2_novert.remove(tr)
+                        # Make these streams contain the same gaps
+                        t2_novert = make_same_length(t2_novert)
+                        t2 = t2_novert.rotate("NE->RT", cplAz).select(component=components[1])
+
                 if not len(t1):
                     logging.info("No Data for %s.%s..%s" % (
                         s1.net, s1.sta, components[0]))
