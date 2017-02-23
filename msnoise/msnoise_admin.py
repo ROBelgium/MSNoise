@@ -293,7 +293,7 @@ class JobView(ModelView):
         model_pk = getattr(self.model, self._primary_key)
         query = self.get_query().filter(model_pk.in_(ids))
         for s in query.all():
-            type_to_delete = s.type
+            type_to_delete = s.jobtype
         self.get_query().filter(Job.jobtype == type_to_delete).delete()
         self.session.commit()
         return
@@ -305,7 +305,7 @@ class JobView(ModelView):
         model_pk = getattr(self.model, self._primary_key)
         query = self.get_query().filter(model_pk.in_(ids))
         for s in query.all():
-            type_to_delete = s.type
+            type_to_delete = s.jobtype
         
         for s in self.get_query().filter(Job.jobtype == type_to_delete).all():
             s.flag = 'T'
