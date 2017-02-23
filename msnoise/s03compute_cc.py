@@ -335,11 +335,11 @@ def main():
                             rms = tr.data.std() * params.windsorizing
                             np.clip(tr.data, -rms, rms, tr.data)  # inplace
                     tmp.taper(0.04)
-                    tmp1 = tmp.select(station=s1.sta, component=components[0])
+                    tmp1 = tmp.select(network=s1.net, station=s1.sta, component=components[0])
                     if len(tmp1) == 0:
                         continue
 
-                    tmp2 = tmp.select(station=s2.sta, component=components[1])
+                    tmp2 = tmp.select(network=s2.net, station=s2.sta, component=components[1])
                     if len(tmp2) == 0:
                         continue
 
