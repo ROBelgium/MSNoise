@@ -268,8 +268,10 @@ def main():
 
             for components in params.components_to_compute:
                 logging.debug("Processing {!s}".format(components))
-                t1 = stream.select(station=s1.sta)
-                t2 = stream.select(station=s2.sta)
+                t1 = stream.select(network=s1.net, station=s1.sta)
+                t2 = stream.select(network=s2.net, station=s2.sta)
+                print("t1", t1)
+                print("t2", t2)
                 if (components == "ZZ") \
                         or ("E" in components)\
                         or ("N" in components)\
