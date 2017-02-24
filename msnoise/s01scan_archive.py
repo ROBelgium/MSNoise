@@ -48,54 +48,55 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate):
     added = 0
     modified = 0
     for file in files:
-        file = os.path.join(folder, file)
-        try:
-            name = os.path.split(file)[1]
-            data = read(file, headonly=True)
-            if data[0].stats.starttime.date < startdate:
-                logging.info(
-                    '%s: Before Start-Date!' % (name))
-            elif data[-1].stats.endtime.date > enddate:
-                logging.info('%s: After End-Date!' % (name))
-            elif data[0].stats.sampling_rate < goal_sampling_rate:
-                logging.info("%s: Sampling rate smaller than CC sampling rate"
-                             % name)
-            else:
-                gaps = data.get_gaps()
-                gaps_duration = 0
-                for gap in gaps:
-                    gaps_duration += gap[6]
-                data_duration = 0
-                start = datetime.datetime.strptime('2100-01-01', '%Y-%m-%d')
-                stop = datetime.datetime.strptime('1900-01-01', '%Y-%m-%d')
-                for trace in data:
-                    data_duration += trace.stats.delta * trace.stats.npts
-                    if trace.stats.starttime.datetime < start:
-                        starttime = trace.stats.starttime
-                        start = trace.stats.starttime.datetime
-                    if trace.stats.endtime.datetime > stop:
-                        endtime = trace.stats.endtime
-                        stop = trace.stats.endtime.datetime
-
-                net = trace.stats.network.upper()
-                sta = trace.stats.station.upper()
-                comp = trace.stats.channel.upper()
-                path = folder.replace('\\', '/')
-
-                starttime = starttime.datetime.replace(microsecond=0)
-                endtime = endtime.datetime.replace(microsecond=0)
-                result = update_data_availability(
-                    db, net, sta, comp, path, name, starttime,
-                    endtime, data_duration, gaps_duration,
-                    data[0].stats.sampling_rate)
-
-                if result:
-                    added += 1
+        if any(str(sta.sta) in file for sta in get_stations(db, all=False)):
+            file = os.path.join(folder, file)
+            try:
+                name = os.path.split(file)[1]
+                data = read(file, headonly=True)
+                if data[0].stats.starttime.date < startdate:
+                    logging.info(
+                        '%s: Before Start-Date!' % (name))
+                elif data[-1].stats.endtime.date > enddate:
+                    logging.info('%s: After End-Date!' % (name))
+                elif data[0].stats.sampling_rate < goal_sampling_rate:
+                    logging.info("%s: Sampling rate smaller than CC sampling rate"
+                                 % name)
                 else:
-                    modified += 1
+                    gaps = data.get_gaps()
+                    gaps_duration = 0
+                    for gap in gaps:
+                        gaps_duration += gap[6]
+                    data_duration = 0
+                    start = datetime.datetime.strptime('2100-01-01', '%Y-%m-%d')
+                    stop = datetime.datetime.strptime('1900-01-01', '%Y-%m-%d')
+                    for trace in data:
+                        data_duration += trace.stats.delta * trace.stats.npts
+                        if trace.stats.starttime.datetime < start:
+                            starttime = trace.stats.starttime
+                            start = trace.stats.starttime.datetime
+                        if trace.stats.endtime.datetime > stop:
+                            endtime = trace.stats.endtime
+                            stop = trace.stats.endtime.datetime
 
-        except Exception as e:
-            logging.debug("ERROR: %s", e)
+                    net = trace.stats.network.upper()
+                    sta = trace.stats.station.upper()
+                    comp = trace.stats.channel.upper()
+                    path = folder.replace('\\', '/')
+
+                    starttime = starttime.datetime.replace(microsecond=0)
+                    endtime = endtime.datetime.replace(microsecond=0)
+                    result = update_data_availability(
+                        db, net, sta, comp, path, name, starttime,
+                        endtime, data_duration, gaps_duration,
+                        data[0].stats.sampling_rate)
+
+                    if result:
+                        added += 1
+                    else:
+                        modified += 1
+
+            except Exception as e:
+                logging.debug("ERROR: %s", e)
     db.close()
     logging.debug("%s: Added %i | Modified %i", str(folder), added, modified)
     return
@@ -157,14 +158,19 @@ def main(init=False, threads=1):
         else:
             print("No file named custom.py in the %s folder" % os.getcwd())
             return
-    for year in range(startdate.year, min(datetime.datetime.now().year, enddate.year) + 1):
+    now=startdate
+    while now <= enddate :
+        year=now.year
+        day=int(now.strftime('%j'))
         for channel in channels:
-            stafol = os.path.split(rawpath)[0].replace('YEAR', "%04i" % year).replace('DAY', '*').replace(
-                'HOUR', '*').replace('CHAN', channel).replace('TYPE', '*').replace('LOC', '*')
+            stafol = os.path.split(rawpath)[0].replace('YEAR', "%04i" % year).replace(
+            'DAY', "%03i" % day ).replace('HOUR', '*').replace('CHAN', channel).replace(
+            'TYPE', '*').replace('LOC', '*')
             for sta in get_stations(db, all=False):
                 tmp = os.path.join(data_folder, stafol.replace(
                 'NET', sta.net).replace('STA', sta.sta))
                 folders_to_glob.append(tmp)
+        now+=datetime.timedelta(days=1)
     folders_to_glob = np.unique(folders_to_glob)
 
     clients = []
