@@ -286,9 +286,12 @@ def main():
                         t1_novert = t1.copy()
                         for tr in t1_novert.select(component="Z"):
                             t1_novert.remove(tr)
-                        # Make these streams contain the same gaps
-                        t1_novert = make_same_length(t1_novert)
-                        t1 = t1_novert.rotate("NE->RT", cplAz).select(component=components[0])
+                        if len(t1_novert):
+                            # Make these streams contain the same gaps
+                            t1_novert = make_same_length(t1_novert)
+                            t1 = t1_novert.rotate("NE->RT", cplAz).select(component=components[0])
+                        else:
+                            t1 = t1_novert
 
                     if components[1] == "Z":
                         t2 = t2.select(component=components[1])
@@ -296,9 +299,12 @@ def main():
                         t2_novert = t2.copy()
                         for tr in t2_novert.select(component="Z"):
                             t2_novert.remove(tr)
-                        # Make these streams contain the same gaps
-                        t2_novert = make_same_length(t2_novert)
-                        t2 = t2_novert.rotate("NE->RT", cplAz).select(component=components[1])
+                        if len(t2_novert):
+                            # Make these streams contain the same gaps
+                            t2_novert = make_same_length(t2_novert)
+                            t2 = t2_novert.rotate("NE->RT", cplAz).select(component=components[1])
+                        else:
+                            t2 = t2_novert
 
                 if not len(t1):
                     logging.info("No Data for %s.%s..%s" % (

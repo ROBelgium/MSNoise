@@ -314,19 +314,57 @@ def bugreport(ctx, sys, modules, env, all):
 
 
 @click.command()
-def populate():
+@click.option('--fromDA',  help='Populates the station table '
+                                                'using network and station codes'
+                                                ' found in the data_availability'
+                                                ' table, overrides the default'
+                                                ' workflow step.',
+              is_flag=True)
+def populate(fromda):
     """Rapidly scan the archive filenames and find Network/Stations"""
-    from ..s002populate_station_table import main
-    main()
+    if fromda:
+        logging.info("Overriding workflow...")
+        from ..msnoise_table_def import DataAvailability
+        from ..api import update_station
+        db = connect()
+        stations = db.query(DataAvailability.net, DataAvailability.sta). \
+            group_by(DataAvailability.net, DataAvailability.sta)
+
+        for net,sta in stations:
+            print('Adding:', net, sta)
+            X = 0.0
+            Y = 0.0
+            altitude = 0.0
+            coordinates = 'UTM'
+            instrument = 'N/A'
+            update_station(db, net, sta, X, Y, altitude,
+                           coordinates=coordinates, instrument=instrument)
+    else:
+        from ..s002populate_station_table import main
+        main()
 
 
 @click.command()
 @click.option('-i', '--init', is_flag=True, help='First run ?')
+@click.option('--path',  help='Scan all files in specific folder, overrides the default workflow step.')
 @click.pass_context
-def scan_archive(ctx, init):
+def scan_archive(ctx, init, path):
     """Scan the archive and insert into the Data Availability table."""
-    from ..s01scan_archive import main
-    main(init, threads=ctx.obj['MSNOISE_threads'])
+    if path:
+        logging.info("Overriding workflow...")
+        from obspy import UTCDateTime
+        from ..s01scan_archive import worker
+        db = connect()
+        startdate = UTCDateTime(get_config(db, "startdate"))
+        enddate = UTCDateTime(get_config(db, "enddate"))
+        cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
+        db.close()
+
+        worker(sorted(os.listdir(path)), path, startdate, enddate,
+               cc_sampling_rate)
+    else:
+        from ..s01scan_archive import main
+        main(init, threads=ctx.obj['MSNOISE_threads'])
 
 
 @click.command()
