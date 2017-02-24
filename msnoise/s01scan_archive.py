@@ -48,7 +48,7 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate):
     added = 0
     modified = 0
     for file in files:
-        if any("_"+str(sta.sta)+"_" in file for sta in get_stations(db, all=False)):
+        if any(str(sta.sta) in file for sta in get_stations(db, all=False)):
             file = os.path.join(folder, file)
             try:
                 name = os.path.split(file)[1]
