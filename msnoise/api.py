@@ -569,9 +569,10 @@ def mark_data_availability(session, net, sta, flag):
     :param flag: Status of the DataAvailability object: New, Modified or
         Archive. Values accepted are {'N', 'M', 'A'}
     """
-
-    data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta)
-    data.update({DataAvailability.flag: flag})
+    logging.debug("updating: %s %s %s" %(net, sta, flag))
+    da = DataAvailability.__table__
+    stmt = da.update().where(da.c.sta==sta).where(da.c.net==net).values(flag=flag)
+    session.execute(stmt)
     session.commit()
 
 
@@ -617,19 +618,19 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     :rtype: :class:`~msnoise.msnoise_table_def.Job` or None
     :returns: If returnjob is True, returns the modified/inserted Job.
     """
-    
-    job = session.query(Job).filter(Job.day == day).filter(Job.pair == pair).filter(Job.jobtype == jobtype).first()
-    if job is None:
-        job = Job(day, pair, jobtype, 'T')
-        if commit:
-            session.add(job)
-    else:
-        job.flag = flag
-        job.lastmod = datetime.datetime.utcnow()
-    if commit:
+    jt = Job.__table__
+    try:
+        stmt = jt.update().where(jt.c.day == day).where(jt.c.pair == pair).where(jt.c.jobtype == jobtype).values(flag=flag)
+        session.execute(stmt)
         session.commit()
-    if returnjob:
-        return job
+    except:
+        traceback.print_exc()
+        job = Job(day, pair, jobtype, 'T')
+        session.add(job)
+        session.commit()
+    session.commit()
+    #TODO BUGS !!!!!!!!!!
+
 
 
 def massive_insert_job(jobs):

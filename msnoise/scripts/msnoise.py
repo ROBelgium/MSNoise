@@ -75,7 +75,7 @@ def upgrade_db():
     This procedure adds new parameters with their default value
     in the config database.
     """
-    from ..api import connect, Config, get_tech, get_engine
+    from ..api import connect, Config
     from ..default import default
     db = connect()
     for name in default.keys():
@@ -86,38 +86,7 @@ def upgrade_db():
             db.rollback()
             # print("Passing %s: already in DB" % name)
             continue
-
     db.close()
-
-    if get_tech() == 2:
-        try:
-            e = get_engine()
-            e.execute(
-                'ALTER TABLE `jobs` CHANGE `type` `jobtype` VARCHAR( 10 )')
-        except:
-            print("The jobs table seems already up-to-date, exiting.")
-    else:
-        try:
-            e = get_engine()
-            e.execute("SELECT jobtype from jobs where 1")
-        except:
-            print("You need to edit the `jobs` table manually to match the new"
-                  "column naming")
-            print (
-            "Please read http://msnoise.org/doc/releasenotes/msnoise-1.3.html")
-    if get_tech() == 2:
-        try:
-            e = get_engine()
-            e.execute("ALTER TABLE stations CHANGE X X REAL NULL DEFAULT NULL")
-            e.execute("ALTER TABLE stations CHANGE Y Y REAL NULL DEFAULT NULL")
-            print("The station table has been updated (floating point bugfix)")
-        except:
-            print("The jobs table seems already up-to-date, exiting.")
-    else:
-        print("You need to edit the `station` table manually to match the new"
-              " column naming")
-        print (
-        "Please read http://msnoise.org/doc/releasenotes/msnoise-1.4.html")
 
 
 @click.command()

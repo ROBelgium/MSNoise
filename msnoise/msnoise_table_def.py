@@ -1,7 +1,7 @@
 import datetime
 
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime,\
-    text, TIMESTAMP, Enum, REAL
+    text, TIMESTAMP, Enum, REAL, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -80,6 +80,7 @@ class Job(Base):
     jobtype = Column(String(10))
     flag = Column(String(1))
     lastmod = Column(TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP'))
+    UniqueConstraint('day', 'pair', 'jobtype', name='uix_1')
 
     def __init__(self, day, pair, jobtype, flag,
                  lastmod=datetime.datetime.utcnow()):
@@ -205,6 +206,7 @@ class DataAvailability(Base):
     gaps_duration = Column(Float)
     samplerate = Column(Float)
     flag = Column(String(1))
+    # UniqueConstraint('net', 'sta', 'comp', 'filename', name='uix_1')
 
     def __init__(self, net, sta, comp, path, file, starttime, endtime,
                  data_duration, gaps_duration, samplerate, flag):

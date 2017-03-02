@@ -128,11 +128,10 @@ def main(init=False, threads=1):
         nthreads = 1
 
     logging.info("Will work on %i threads" % nthreads)
+    find = get_config(db, 'find_command')
+    if find == "":
+        find = "find"
 
-    if os.name == "nt":
-        find = "find"
-    else:
-        find = "find"
     startdate = get_config(db, 'startdate')
     startdate = datetime.datetime.strptime(startdate, '%Y-%m-%d').date()
     enddate = get_config(db, 'enddate')
