@@ -40,8 +40,8 @@ e.g.:
 
 MSNoise expects to find
 a file named ``custom.py`` in the current folder. This python file will contain
- a function called ``populate`` wich will accept one argument and return a list
- of stations in the format ``NET_STA``:
+a function called ``populate`` wich will accept one argument and return a list
+of stations in the format ``NET_STA``:
 
 .. code-block:: python
 
@@ -57,9 +57,9 @@ a file named ``custom.py`` in the current folder. This python file will contain
 
 """
 
-import traceback
 import glob
 import sys
+import traceback
 
 from .api import *
 
