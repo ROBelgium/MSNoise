@@ -389,11 +389,13 @@ def linear_regression(xdata, ydata, weights=None, p0 = None, intercept=False):
     :return:
     """
     if weights is not None:
-        weights = 1./weights
+        sigma = 1./weights
+    else:
+        sigma = None
     if intercept:
         p, cov = scipy.optimize.curve_fit(lambda x, a, b: a * x + b,
                                           xdata, ydata,
-                                          [0, 0], sigma=1. / weights,
+                                          [0, 0], sigma=sigma,
                                           absolute_sigma=False,
                                           xtol=1e-20)
         slope, intercept = p
@@ -404,7 +406,7 @@ def linear_regression(xdata, ydata, weights=None, p0 = None, intercept=False):
     else:
         p, cov = scipy.optimize.curve_fit(lambda x, a: a * x,
                                           xdata, ydata,
-                                          0, sigma=1. / weights,
+                                          0, sigma=sigma,
                                           absolute_sigma=False,
                                           xtol=1e-20)
         slope = p[0]
