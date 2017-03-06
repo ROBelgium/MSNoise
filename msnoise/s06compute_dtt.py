@@ -333,9 +333,9 @@ def main(interval=1):
                             index = np.intersect1d(index, dtindex)
     
                             used[i][index] = 1.0
-    
+
                             w = 1.0 / errArray[i][index]
-    
+                            w[~np.isfinite(w)] = 1.0
                             VecXfilt = tArray[index]
                             VecYfilt = dtArray[i][index]
                             if len(VecYfilt) >= 2:
@@ -343,7 +343,6 @@ def main(interval=1):
                                                        w, intercept=True)
                                 m0, em0 = wls(VecXfilt, VecYfilt,
                                                 w, intercept=False)
-
                                 M.append(m)
                                 EM.append(em)
                                 A.append(a)
