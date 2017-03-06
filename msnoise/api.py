@@ -618,18 +618,33 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     :rtype: :class:`~msnoise.msnoise_table_def.Job` or None
     :returns: If returnjob is True, returns the modified/inserted Job.
     """
-    jt = Job.__table__
-    try:
-        stmt = jt.update().where(jt.c.day == day).where(jt.c.pair == pair).where(jt.c.jobtype == jobtype).values(flag=flag)
-        session.execute(stmt)
-        session.commit()
-    except:
-        traceback.print_exc()
+    job = session.query(Job).filter(Job.day == day).filter(
+        Job.pair == pair).filter(Job.jobtype == jobtype).first()
+    if job is None:
         job = Job(day, pair, jobtype, 'T')
-        session.add(job)
+        if commit:
+            session.add(job)
+    else:
+        job.flag = flag
+        job.lastmod = datetime.datetime.utcnow()
+    if commit:
         session.commit()
-    session.commit()
-    #TODO BUGS !!!!!!!!!!
+    if returnjob:
+        return job
+
+    # jt = Job.__table__
+    # try:
+    #     job = Job(day, pair, jobtype, 'T')
+    #     session.add(job)
+    #     session.commit()
+    # except:
+    #     session.rollback()
+    #     traceback.print_exc()
+    #     stmt = jt.update().where(jt.c.day == day).where(
+    #         jt.c.pair == pair).where(jt.c.jobtype == jobtype).values(flag=flag)
+    #     session.execute(stmt)
+    #     session.commit()
+    # #TODO BUGS !!!!!!!!!!
 
 
 

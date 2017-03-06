@@ -125,9 +125,8 @@ variations.
 
 """
 
-import statsmodels.api as sm
-
 from .api import *
+from .move2obspy import wls
 
 def wavg_wstd(data, errors):
     d = data
@@ -335,37 +334,29 @@ def main(interval=1):
     
                             used[i][index] = 1.0
     
-                            w = 1.0 / (errArray[i][index] ** 2)
+                            w = 1.0 / errArray[i][index]
     
                             VecXfilt = tArray[index]
                             VecYfilt = dtArray[i][index]
                             if len(VecYfilt) >= 2:
-                                B = sm.tools.tools.add_constant(
-                                    VecXfilt, prepend=False)
-                                res = sm.regression.linear_model.WLS(
-                                    VecYfilt, B, w).fit()
-                                res0 = sm.regression.linear_model.WLS(
-                                    VecYfilt, VecXfilt, w).fit()
-                                if res.df_resid > 0:
-                                    m, a = res.params
-                                    em, ea = res.bse
-    
-                                    m0 = res0.params[0]
-                                    em0 = res0.bse[0]
-    
-                                    M.append(m)
-                                    EM.append(em)
-                                    A.append(a)
-                                    EA.append(ea)
-    
-                                    M0.append(m0)
-                                    EM0.append(em0)
-    
-                                    Dates.append(current)
-                                    Pairs.append(pair)
-    
-                                    del m, a, em, ea, m0, em0
-                                del res, res0, B
+                                m, a, em, ea = wls(VecXfilt, VecYfilt,
+                                                       w, intercept=True)
+                                m0, em0 = wls(VecXfilt, VecYfilt,
+                                                w, intercept=False)
+
+                                M.append(m)
+                                EM.append(em)
+                                A.append(a)
+                                EA.append(ea)
+
+                                M0.append(m0)
+                                EM0.append(em0)
+
+                                Dates.append(current)
+                                Pairs.append(pair)
+
+                                del m, a, em, ea, m0, em0
+
                             del VecXfilt, VecYfilt, w
                             del index, cohindex, errindex, dtindex
     
