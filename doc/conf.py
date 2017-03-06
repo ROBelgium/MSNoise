@@ -23,7 +23,6 @@ import click
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-
 from msnoise.default import default
 
 grid = [ [key, default[key][0], default[key][1]] for key in default.keys() ]

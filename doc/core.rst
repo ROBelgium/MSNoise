@@ -26,3 +26,8 @@ Moving-Window Cross-Spectral method
 
 .. automethod:: msnoise.move2obspy.mwcs
 
+
+WLS
+---
+
+.. automethod:: msnoise.move2obspy.linear_regression

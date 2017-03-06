@@ -126,7 +126,7 @@ variations.
 """
 
 from .api import *
-from .move2obspy import wls
+from .move2obspy import linear_regression
 
 def wavg_wstd(data, errors):
     d = data
@@ -339,9 +339,9 @@ def main(interval=1):
                             VecXfilt = tArray[index]
                             VecYfilt = dtArray[i][index]
                             if len(VecYfilt) >= 2:
-                                m, a, em, ea = wls(VecXfilt, VecYfilt,
+                                m, a, em, ea = linear_regression(VecXfilt, VecYfilt,
                                                        w, intercept=True)
-                                m0, em0 = wls(VecXfilt, VecYfilt,
+                                m0, em0 = linear_regression(VecXfilt, VecYfilt,
                                                 w, intercept=False)
                                 M.append(m)
                                 EM.append(em)

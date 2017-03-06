@@ -365,11 +365,34 @@ def mwcs_old(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
     return np.array([Taxis, deltaT, deltaErr, deltaMcoh]).T
 
 
-def wls(x, y, w, intercept=False):
+def linear_regression(xdata, ydata, weights=None, p0 = None, intercept=False):
+    """ Use non-linear least squares to fit a function, f, to data. This method
+    is a generalized version of :meth:`~scipy.optimize.curve_fit`; allowing for:
+
+    * OLS without intercept : linear_regression(xdata, ydata)
+    * OLS with intercept : linear_regression(xdata, ydata, intercept=True)
+    * WLS without intercept : linear_regression(xdata, ydata, weights)
+    * WLS with intercept : linear_regression(xdata, ydata, weights, intercept=True)
+
+    If the expected values of slope (and intercept) are different from 0.0,
+    provide the p0 value(s).
+
+    :param xdata: The independent variable where the data is measured.
+    :param ydata: The dependent data - nominally f(xdata, ...)
+    :param weights: If not None, the uncertainties in the ydata array. These are
+     used as weights in the least-squares problem. If None, the uncertainties
+     are assumed to be 1.
+    :param p0: Initial guess for the parameters. If None, then the initial
+     values will all be 0 (Different from SciPy where all are 1)
+    :param intercept: If False: solves y=a*x ; if True: solves y=a*x+b.
+    :return:
+    """
+    if weights:
+        weights = 1./weights
     if intercept:
         p, cov = scipy.optimize.curve_fit(lambda x, a, b: a * x + b,
-                                          x, y,
-                                          [0, 0], sigma=1. / w,
+                                          xdata, ydata,
+                                          [0, 0], sigma=1. / weights,
                                           absolute_sigma=False,
                                           xtol=1e-20)
         slope, intercept = p
@@ -379,14 +402,13 @@ def wls(x, y, w, intercept=False):
 
     else:
         p, cov = scipy.optimize.curve_fit(lambda x, a: a * x,
-                                          x, y,
-                                          0, sigma=1. / w,
+                                          xdata, ydata,
+                                          0, sigma=1. / weights,
                                           absolute_sigma=False,
                                           xtol=1e-20)
         slope = p[0]
         std_slope = np.sqrt(cov[0, 0])
         return slope, std_slope
-
 
 
 def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
@@ -485,7 +507,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
         # Calculate the slope with a weighted least square linear regression
         # forced through the origin
         # weights for the WLS must be the variance !
-        m, em = wls(v.flatten(), phi.flatten(), w.flatten())
+        m, em = linear_regression(v.flatten(), phi.flatten(), w.flatten())
 
         deltaT.append(m)
 
