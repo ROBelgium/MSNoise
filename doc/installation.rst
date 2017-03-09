@@ -71,72 +71,93 @@ Full Installation
    .. code-block:: sh
     
         pip install flask-admin
-        conda install -c obspy obspy
+        conda install -c conda-forge obspy
 
-3. Install a MySQL server and phpMyAdmin:
+3. Install a MySQL server and MySQL Workbench:
 
-   * WINDOWS: Download and install EasyPHP_ (their "Dev" version is OK - read their installation page carefully, you need to install some Microsoft Visual C redistribuable manually too). Then start EasyPHP.
-   * LINUX:
+   Download and install MySQL Community Server (MySQLs_ ) and MySQL Workbench (MySQLw_ ) ; On Windows on can also use the MySQL installer (MySQLi_ ).
+
+   On Linux, the MySQL server can also be installed using the following command:
 
         .. code-block:: sh
 
-            sudo apt-get install mysql-server mysql-client phpmyadmin
+            sudo apt-get install mysql-server
 
 4. Create a privileged user and a database:
-      
-   * Connect to your local host: http://localhost/phpmyadmin (or http://127.0.0.1/phpmyadmin)
+
+   * Start MySQL Workbench and connect to the local database
    * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
 
-5. WINDOWS ONLY: Install gow_ and make sure its /bin directory is in the PATH (Control Panel -> Environment Variables -> PATH)
+5. WINDOWS ONLY: Install gow_ and make sure its /bin directory is in the beginning of the System PATH (Control Panel -> Environment Variables -> Machine -> PATH).
+   After that, the find command should be available in cmd.exe. If this fails, you will have to provide the full path to find.exe in the configuration (``find_command``).
 
-6. Install MSNoise:
+6. Install the latest release version of MSNoise:
 
    .. code-block:: sh
 
         pip install msnoise
 
+   Power user could install the development version too, but it is not recommended.
+
 7. Check which required packages you are still missing by executing the ``msnoise bugreport`` command. (See :ref:`testing`)
+
+8. To be sure all is running OK, one could start the ``msnoise test`` command in an empty directory.
+   This will start the standard MSNoise test suite, which should end with a "Ran xx tests in yy seconds : OK".
 
 8. Proceed to the :ref:`Workflow` description to start MSNoise!
 
 
 Done !
 
+MySQL Server and Workbench
+--------------------------
 
+Using the MySQL Server and Workbench is fairly easy and lots of tutorials are available online as text or videos.
 
+Once both are installed, start Workbench and you should see the local MySQL server automatically identified:
 
-MySQL Server
-------------
-.. warning:: MySQL is not compulsory, one *can* work only using sqlite database. See :ref:`aboutdbandperformances`. for more info.
+.. image:: .static/workbench_1.png
 
-MSNoise requires a database in order to store waveform metadata, configuration bits and jobs.
-If you choose to use MySQL, a running MySQL server must be available, either on the network or on localhost and have a privileged user and a database.
+And by clicking on "Local Instance ..." another tab should open, connected to the local database.
 
-Windows
-~~~~~~~
-The simplest option to install a MySQL server on your machine is to install EasyPHP_, a small AMP (Apache, MySQL, PHP) server.
+Create a msnoise user
+~~~~~~~~~~~~~~~~~~~~~
 
-Linux
-~~~~~
+Select "Users and Privileges" in the left sidebar, then "Add Account". Define the username and the password (msnoise:msnoise could do, although "weak"):
 
-If you don't have a MySQL server on the network, you need to install one locally on your computer.
-MySQL is usually prepackaged for every distribution, on Ubuntu/Debian you should:
+.. image:: .static/workbench_2.png
 
-.. code-block:: sh
+Then, under "Administrative Roles", grant this user the *DBA* mode (user can perform all tasks on the database server) and click "Apply".
 
-    sudo apt-get install mysql-server mysql-client
+.. image:: .static/workbench_3.png
 
-We recommend to install phpmyadmin too, as it is a handy tool to edit the database directly
+Create an empty database
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: sh
+Each "project" needs a database. That is, if one has two different volcanoes and wants to run MSNoise the two datasets, one needs to create two empty databases.
 
-    sudo apt-get install phpmyadmin
+Click on the "Create new schema" button in the taskbar:
 
-This will also install apache2 and php, needed to run phpmyadmin. Once installed, it should be available through http://localhost/phpmyadmin.
+.. image:: .static/workbench_4.png
 
+and give the database a name (for example msnoise; or msnoise_project1, or project1, or else, you choose) ; and click "Apply":
+
+.. image:: .static/workbench_5.png
+
+and click "Apply" again and it should state all is OK:
+
+.. image:: .static/workbench_6.png
+
+.. image:: .static/workbench_7.png
+
+When done, the database we created is present in the left sidebar:
+
+.. image:: .static/workbench_8.png
+
+And you're ready to start your first project: :ref:`Workflow`.
 
 Database Structure - Tables
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------
 MSNoise will create the tables automatically upon running the installer script (see :ref:`Workflow`).
 
 
@@ -164,3 +185,6 @@ You can also build the doc to Latex and then use your favorite Latex-to-PDF tool
 .. _EasyPHP: http://www.easyphp.org/
 .. _obspy: http://www.obspy.org
 .. _Anaconda: http://www.continuum.io/downloads
+.. _MySQLi: https://dev.mysql.com/downloads/installer
+.. _MySQLs: https://dev.mysql.com/downloads/mysql
+.. _MySQLw: https://dev.mysql.com/downloads/workbench

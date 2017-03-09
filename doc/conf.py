@@ -16,6 +16,7 @@ import matplotlib
 
 matplotlib.use('Agg')
 
+import msnoise.move2obspy
 import sphinx_bootstrap_theme
 import datetime
 import click
