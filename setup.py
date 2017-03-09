@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import versioneer
 
-setup(version="1.4.1",
+setup(version="1.5a",
     name='msnoise',
     packages=find_packages(),
     include_package_data=True,
@@ -15,13 +15,13 @@ setup(version="1.4.1",
         'sqlalchemy',
         'obspy',
         'click',
-        # 'scikits.samplerate',
         'pymysql',
         'flask',
         'flask-admin',
         'multiprocessing_logging',
         'markdown',
-        'folium'
+        'folium',
+        'wtforms'
     ],
     entry_points='''
         [console_scripts]

@@ -38,7 +38,7 @@ value is 2.
     that doesn't mean a lot, does it? Use with Caution! And if you
     cross-validate it, please let us know!!
 
-.. seealso:: Schimmel, M. and Paulssen H., "Noise reduction and detection
+    Schimmel, M. and Paulssen H., "Noise reduction and detection
     of weak, coherent signals through phase-weighted stacks". Geophysical Journal
     International 130, 2 (1997): 497-505.
 

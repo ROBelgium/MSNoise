@@ -99,7 +99,7 @@ in the STACKS/001_DAYS folder.
 
 .. note:: Currently, the keep-all data (every CCF) are not used by next steps.
 
-If ``stack_method`` is 'linear', then a simple mean CFF of all windows is saved
+If ``stack_method`` is 'linear', then a simple mean CCF of all windows is saved
 as the daily CCF. On the other hand, if ``stack_method`` is 'pws', then
 all the Phase Weighted Stack (PWS) is computed and saved as the daily CCF. The
 PWS is done in two steps: first the mean coherence between the instataneous
@@ -114,7 +114,7 @@ value is 2.
     that doesn't mean a lot, does it? Use with Caution! And if you
     cross-validate it, please let us know!!
 
-.. seealso:: Schimmel, M. and Paulssen H., "Noise reduction and detection
+    Schimmel, M. and Paulssen H., "Noise reduction and detection
     of weak, coherent signals through phase-weighted stacks". Geophysical Journal
     International 130, 2 (1997): 497-505.
 

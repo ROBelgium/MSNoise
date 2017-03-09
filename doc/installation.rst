@@ -26,16 +26,17 @@ To run MSNoise, you need:
   * statsmodels
   * sqlalchemy
   * click
-  * flask (new in 1.4)
-  * pymysql (new in 1.4)
+  * flask
+  * pymysql
+  * wtforms
 
 * Not shipped with Anaconda_:
 
   * obspy
-  * flask-admin (new in 1.4)
-  * multiprocessing_logging (new in 1.4)
-  * markdown (new in 1.4)
-  * folium (new in 1.4)
+  * flask-admin
+  * multiprocessing_logging
+  * markdown
+  * folium
 
 
 * MySQL: if you want to use MySQL, you need to install and configure a
@@ -52,7 +53,7 @@ Python and Packages Installation
 
 If you don't know which Python distribution to use and even if your system comes
 with a python distribution, we suggest installing Anaconda_, as it comes with most of the
-above-mentionned tools (those with [*]), and provides the easy_install tool
+above-mentionned tools (those with [*]), and provides the `pip` or `conda` tools
 to install the remaining ones.
 
 From now on, we suppose you installed Anaconda_, here are the instructions for installing
@@ -75,7 +76,7 @@ Full Installation
 
 3. Install a MySQL server and MySQL Workbench:
 
-   Download and install MySQL Community Server (MySQLs_ ) and MySQL Workbench (MySQLw_ ) ; On Windows on can also use the MySQL installer (MySQLi_ ).
+   Download and install MySQL Community Server (MySQLs_ ) and MySQL Workbench (MySQLw_ ) ; On Windows one can also use the MySQL installer (MySQLi_ ).
 
    On Linux, the MySQL server can also be installed using the following command:
 
