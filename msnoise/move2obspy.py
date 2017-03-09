@@ -414,7 +414,7 @@ def linear_regression(xdata, ydata, weights=None, p0 = None, intercept=False):
         return slope, std_slope
 
 
-def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step):
+def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step, smoothing_half_win=5):
     """The `current` time series is compared to the `reference`.
 Both time series are sliced in several overlapping windows.
 Each slice is mean-adjusted and cosine-tapered (85% taper) before being Fourier-
@@ -480,6 +480,10 @@ segment.
 :param window_length: The moving window length (in seconds)
 :type step: float
 :param step: The step to jump for the moving window (in seconds)
+:type smoothing_half_win: int
+:param smoothing_half_win: If different from 0, defines the half length of the
+    smoothing hanning window.
+
 
 :rtype: :class:`numpy.ndarray`
 :returns: [Taxis,deltaT,deltaErr,deltaMcoh]. Taxis contains the central
@@ -516,43 +520,44 @@ segment.
         Fcur2 = np.real(Fcur) ** 2 + np.imag(Fcur) ** 2
         Fref2 = np.real(Fref) ** 2 + np.imag(Fref) ** 2
 
-        smoother = 5
-
-        dcur = np.sqrt(smooth(Fcur2, window='hanning', half_win=smoother))
-        dref = np.sqrt(smooth(Fref2, window='hanning', half_win=smoother))
-
         # Calculate the cross-spectrum
         X = Fref * (Fcur.conj())
-        X = smooth(X, window='hanning', half_win=smoother)
+        if smoothing_half_win != 0:
+            dcur = np.sqrt(smooth(Fcur2, window='hanning', half_win=smoothing_half_win))
+            dref = np.sqrt(smooth(Fref2, window='hanning', half_win=smoothing_half_win))
+            X = smooth(X, window='hanning', half_win=smoothing_half_win)
+        else:
+            dcur = np.sqrt(Fcur2)
+            dref = np.sqrt(Fref2)
+
         dcs = np.abs(X)
 
         # Find the values the frequency range of interest
-        freqVec = scipy.fftpack.fftfreq(len(X) * 2, 1. / df)[
-                  :padd // 2]
-        indRange = np.argwhere(np.logical_and(freqVec >= freqmin,
-                                              freqVec <= freqmax))
+        freq_vec = scipy.fftpack.fftfreq(len(X) * 2, 1. / df)[:padd // 2]
+        index_range = np.argwhere(np.logical_and(freq_vec >= freqmin,
+                                                 freq_vec <= freqmax))
 
         # Get Coherence and its mean value
         coh = getCoherence(dcs, dref, dcur)
-        mcoh = np.mean(coh[indRange])
+        mcoh = np.mean(coh[index_range])
 
         # Get Weights
-        w = 1.0 / (1.0 / (coh[indRange] ** 2) - 1.0)
-        w[coh[indRange] >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
-        w = np.sqrt(w * np.sqrt(dcs[indRange]))
+        w = 1.0 / (1.0 / (coh[index_range] ** 2) - 1.0)
+        w[coh[index_range] >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
+        w = np.sqrt(w * np.sqrt(dcs[index_range]))
         # w /= (np.sum(w)/len(w)) #normalize
         w = np.real(w)
 
         # Frequency array:
-        v = np.real(freqVec[indRange]) * 2 * np.pi
-        vo = np.real(freqVec) * 2 * np.pi
+        v = np.real(freq_vec[index_range]) * 2 * np.pi
+        vo = np.real(freq_vec) * 2 * np.pi
 
         # Phase:
         phi = np.angle(X)
         phi[0] = 0.
         phi = np.unwrap(phi)
         # phio = phi.copy()
-        phi = phi[indRange]
+        phi = phi[index_range]
 
         # Calculate the slope with a weighted least square linear regression
         # forced through the origin
@@ -574,8 +579,8 @@ segment.
 
         del Fcur, Fref
         del X
-        del freqVec
-        del indRange
+        del freq_vec
+        del index_range
         del w, v, e, s2x2, sx2, m, em
 
     if maxind > len(current) + step*df:
