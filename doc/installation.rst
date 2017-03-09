@@ -157,6 +157,12 @@ When done, the database we created is present in the left sidebar:
 
 And you're ready to start your first project: :ref:`Workflow`.
 
+
+When moving your project to a larger server, HPC or else, just add the
+connection to this server in Workbench and you're good to go with the very
+same interface/tool !
+
+
 Database Structure - Tables
 ----------------------------
 MSNoise will create the tables automatically upon running the installer script (see :ref:`Workflow`).

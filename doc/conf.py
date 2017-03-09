@@ -135,11 +135,10 @@ out.close()
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.intersphinx',
               'sphinx.ext.autodoc',
-              'sphinx.ext.todo',
               'sphinx.ext.coverage',
-              'numpydoc',
-              'rst2pdf.pdfbuilder']
-
+              'sphinx.ext.mathjax',
+              'numpydoc',]
+math_number_all = False
 todo_include_todos = True
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['.templates']

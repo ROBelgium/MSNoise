@@ -426,6 +426,9 @@ def reset(jobtype, all, rule):
     the flag value"""
     from ..api import connect, reset_jobs
     session = connect()
+    if jobtype != jobtype.upper():
+        logging.info("The jobtype %s is not uppercase (usually jobtypes"
+                     " are uppercase...)"%jobtype)
     reset_jobs(session, jobtype, all, rule)
     session.close()
 

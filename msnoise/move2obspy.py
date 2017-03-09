@@ -414,54 +414,101 @@ def linear_regression(xdata, ydata, weights=None, p0 = None, intercept=False):
         return slope, std_slope
 
 
-def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
-    """...
+def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step):
+    """The `current` time series is compared to the `reference`.
+Both time series are sliced in several overlapping windows.
+Each slice is mean-adjusted and cosine-tapered (85% taper) before being Fourier-
+transformed to the frequency domain.
+:math:`F_{cur}(\\nu)` and :math:`F_{ref}(\\nu)` are the first halves of the
+Hermitian symmetric Fourier-transformed segments. The cross-spectrum
+:math:`X(\\nu)` is defined as
+:math:`X(\\nu) = F_{ref}(\\nu) F_{cur}^*(\\nu)`
 
-    :type ccCurrent: :class:`numpy.ndarray`
-    :param ccCurrent: The "Current" timeseries
-    :type ccReference: :class:`numpy.ndarray`
-    :param ccReference: The "Reference" timeseries
-    :type fmin: float
-    :param fmin: The lower frequency bound to compute the dephasing
-    :type fmax: float
-    :param fmax: The higher frequency bound to compute the dephasing
-    :type sampRate: float
-    :param sampRate: The sample rate of the input timeseries
-    :type tmin: float
-    :param tmin: The leftmost time lag (used to compute the "time lags array")
-    :type windL: float
-    :param windL: The moving window length (in seconds)
-    :type step: float
-    :param step: The step to jump for the moving window (in seconds)
+in which :math:`{}^*` denotes the complex conjugation.
+:math:`X(\\nu)` is then smoothed by convolution with a Hanning window.
+The similarity of the two time-series is assessed using the cross-coherency
+between energy densities in the frequency domain:
 
-    :rtype: :class:`numpy.ndarray`
-    :returns: [Taxis,deltaT,deltaErr,deltaMcoh]. Taxis contains the central
-        times of the windows. The three other columns contain dt, error and
-        mean coherence for each window.
+:math:`C(\\nu) = \\frac{|\overline{X(\\nu))}|}{\sqrt{|\overline{F_{ref}(\\nu)}|^2.|\overline{F_{cur}(\\nu)}|^2}}`
+
+
+in which the over-line here represents the smoothing of the energy spectra for
+:math:`F_{ref}` and :math:`F_{cur}` and of the spectrum of :math:`X`. The mean
+coherence for the segment is defined as the mean of :math:`C(\\nu)` in the
+frequency range of interest. The time-delay between the two cross correlations
+is found in the unwrapped phase, :math:`\phi(\nu)`, of the cross spectrum and is
+linearly proportional to frequency:
+
+:math:`\phi_j = m. \nu_j, m = 2 \pi \delta t`
+
+The time shift for each window between two signals is the slope :math:`m` of a
+weighted linear regression of the samples within the frequency band of interest.
+The weights are those introduced by [Clarke2011]_,
+which incorporate both the cross-spectral amplitude and cross-coherence, unlike
+[Poupinet1984]_. The errors are estimated using the weights (thus the
+coherence) and the squared misfit to the modelled slope:
+
+:math:`e_m = \sqrt{\sum_j{\\frac{w_j \\nu_j}{\sum_i{w_i \\nu_i^2}}^2}\sigma_{\phi}^2}`
+
+where :math:`w` are weights, :math:`\\nu` are cross-coherences and
+:math:`\sigma_{\phi}^2` is the squared misfit of the data to the modelled slope
+and is calculated as :math:`\sigma_{\phi}^2 = \\frac{\sum_j(\phi_j - m \\nu_j)^2}{N-1}`
+
+The output of this process is a table containing, for each moving window: the
+central time lag, the measured delay, its error and the mean coherence of the
+segment.
+
+.. warning::
+
+    The time series will not be filtered before computing the cross-spectrum!
+    They should be band-pass filtered around the `freqmin`-`freqmax` band of
+    interest beforehand.
+
+:type current: :class:`numpy.ndarray`
+:param current: The "Current" timeseries
+:type reference: :class:`numpy.ndarray`
+:param reference: The "Reference" timeseries
+:type freqmin: float
+:param freqmin: The lower frequency bound to compute the dephasing (in Hz)
+:type freqmax: float
+:param freqmax: The higher frequency bound to compute the dephasing (in Hz)
+:type df: float
+:param df: The sampling rate of the input timeseries (in Hz)
+:type tmin: float
+:param tmin: The leftmost time lag (used to compute the "time lags array")
+:type window_length: float
+:param window_length: The moving window length (in seconds)
+:type step: float
+:param step: The step to jump for the moving window (in seconds)
+
+:rtype: :class:`numpy.ndarray`
+:returns: [Taxis,deltaT,deltaErr,deltaMcoh]. Taxis contains the central
+    times of the windows. The three other columns contain dt, error and
+    mean coherence for each window.
     """
     deltaT = []
     deltaErr = []
     deltaMcoh = []
     Taxis = []
 
-    windL2 = np.int(windL * sampRate)
+    windL2 = np.int(window_length * df)
     padd = next_fast_len(windL2)
 
     count = 0
     tp = cosine_taper(windL2, 0.85)
     minind = 0
     maxind = windL2
-    while maxind <= len(ccCurrent):
-        cci = ccCurrent[minind:(minind + windL2)]
+    while maxind <= len(current):
+        cci = current[minind:(minind + windL2)]
         cci = scipy.signal.detrend(cci, type='linear')
         cci *= tp
 
-        cri = ccReference[minind:(minind + windL2)]
+        cri = reference[minind:(minind + windL2)]
         cri = scipy.signal.detrend(cri, type='linear')
         cri *= tp
 
-        minind += int(step*sampRate)
-        maxind += int(step*sampRate)
+        minind += int(step*df)
+        maxind += int(step*df)
 
         Fcur = scipy.fftpack.fft(cci, n=padd)[:padd // 2]
         Fref = scipy.fftpack.fft(cri, n=padd)[:padd // 2]
@@ -480,10 +527,10 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
         dcs = np.abs(X)
 
         # Find the values the frequency range of interest
-        freqVec = scipy.fftpack.fftfreq(len(X) * 2, 1. / sampRate)[
+        freqVec = scipy.fftpack.fftfreq(len(X) * 2, 1. / df)[
                   :padd // 2]
-        indRange = np.argwhere(np.logical_and(freqVec >= fmin,
-                                              freqVec <= fmax))
+        indRange = np.argwhere(np.logical_and(freqVec >= freqmin,
+                                              freqVec <= freqmax))
 
         # Get Coherence and its mean value
         coh = getCoherence(dcs, dref, dcur)
@@ -522,7 +569,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
 
         deltaErr.append(e)
         deltaMcoh.append(np.real(mcoh))
-        Taxis.append(tmin+windL/2.+count*step)
+        Taxis.append(tmin+window_length/2.+count*step)
         count += 1
 
         del Fcur, Fref
@@ -531,7 +578,7 @@ def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step):
         del indRange
         del w, v, e, s2x2, sx2, m, em
 
-    if maxind > len(ccCurrent) + step*sampRate:
+    if maxind > len(current) + step*df:
         logging.warning("The last window was too small, but was computed")
 
     return np.array([Taxis, deltaT, deltaErr, deltaMcoh]).T
