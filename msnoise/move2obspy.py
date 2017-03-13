@@ -386,7 +386,10 @@ def linear_regression(xdata, ydata, weights=None, p0 = None, intercept=False):
     :param p0: Initial guess for the parameters. If None, then the initial
      values will all be 0 (Different from SciPy where all are 1)
     :param intercept: If False: solves y=a*x ; if True: solves y=a*x+b.
-    :return:
+
+    :rtype: tuple
+    :returns: (slope, intercept, std_slope, std_intercept) if `intercept` is
+     `True` or (slope, std_slope) if `False`
     """
     if weights is not None:
         sigma = 1./weights
@@ -429,7 +432,7 @@ in which :math:`{}^*` denotes the complex conjugation.
 The similarity of the two time-series is assessed using the cross-coherency
 between energy densities in the frequency domain:
 
-:math:`C(\\nu) = \\frac{|\overline{X(\\nu))}|}{\sqrt{|\overline{F_{ref}(\\nu)}|^2.|\overline{F_{cur}(\\nu)}|^2}}`
+:math:`C(\\nu) = \\frac{|\overline{X(\\nu))}|}{\sqrt{|\overline{F_{ref}(\\nu)|^2} |\overline{F_{cur}(\\nu)|^2}}}`
 
 
 in which the over-line here represents the smoothing of the energy spectra for
@@ -448,7 +451,7 @@ which incorporate both the cross-spectral amplitude and cross-coherence, unlike
 [Poupinet1984]_. The errors are estimated using the weights (thus the
 coherence) and the squared misfit to the modelled slope:
 
-:math:`e_m = \sqrt{\sum_j{\\frac{w_j \\nu_j}{\sum_i{w_i \\nu_i^2}}^2}\sigma_{\phi}^2}`
+:math:`e_m = \sqrt{\sum_j{(\\frac{w_j \\nu_j}{\sum_i{w_i \\nu_i^2}})^2}\sigma_{\phi}^2}`
 
 where :math:`w` are weights, :math:`\\nu` are cross-coherences and
 :math:`\sigma_{\phi}^2` is the squared misfit of the data to the modelled slope
@@ -497,6 +500,7 @@ segment.
 
     windL2 = np.int(window_length * df)
     padd = next_fast_len(windL2)
+
 
     count = 0
     tp = cosine_taper(windL2, 0.85)
