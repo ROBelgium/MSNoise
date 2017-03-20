@@ -1296,7 +1296,7 @@ def check_and_phase_shift(trace):
         FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
         FFTdata = FFTdata.astype(np.complex64)
         scipy.fftpack.ifft(FFTdata, n=n, overwrite_x=True)
-        trace.data = np.real(FFTdata[:len(trace.data)])
+        trace.data = np.real(FFTdata[:len(trace.data)]).astype(np.float)
         trace.stats.starttime += dt
         del FFTdata, fftfreq
         clean_scipy_cache()
