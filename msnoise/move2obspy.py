@@ -9,6 +9,8 @@ import statsmodels.api as sm
 from obspy.signal.invsim import cosine_taper
 from scipy.fftpack.helper import next_fast_len
 
+from obspy.signal.regression import linear_regression
+
 from .api import nextpow2
 
 
@@ -196,7 +198,7 @@ def getCoherence(dcs, ds1, ds2):
     coh[coh > (1.0 + 0j)] = 1.0 + 0j
     return coh
 
-
+# from obspy.signal.util import next_pow_2 as next_fast_len
 def mwcs_old(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
          plot=False):
     """...
@@ -235,14 +237,15 @@ def mwcs_old(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
     deltaMcoh = []
     Taxis = []
     # padd = 2 ** (nextpow2(windL) + 2)
+
     padd = next_fast_len(windL)
 
     # Tentative checking if enough point are used to compute the FFT
     freqVec = scipy.fftpack.fftfreq(int(padd), 1. / sampRate)[:int(padd) // 2]
     indRange = np.argwhere(np.logical_and(freqVec >= fmin,
                                           freqVec <= fmax))
-    if len(indRange) < 2:
-        padd = 2 ** (nextpow2(windL) + 3)
+    # if len(indRange) < 2:
+    #     padd = 2 ** (nextpow2(windL) + 3)
 
     tp = cosine_taper(windL, .85)
 
@@ -326,24 +329,6 @@ def mwcs_old(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
         s2x2 = np.sum(v ** 2 * w ** 2)
         sx2 = np.sum(w * v ** 2)
         e = np.sqrt(e * s2x2 / sx2 ** 2)
-        # print w.shape
-        if plot:
-            plt.figure()
-            plt.suptitle('%.1fs' % (timeaxis[ind + windL // 2]))
-            plt.subplot(311)
-            plt.plot(cci)
-            plt.plot(cri)
-            ax = plt.subplot(312)
-            plt.plot(vo / (2 * np.pi), phio)
-            plt.scatter(v / (2 * np.pi), phi, c=w, edgecolor='none',
-                        vmin=0.6, vmax=1)
-            plt.subplot(313, sharex=ax)
-            plt.plot(v / (2 * np.pi), coh[indRange])
-            plt.axhline(mcoh, c='r')
-            plt.axhline(1.0, c='k', ls='--')
-            plt.xlim(-0.1, 1.5)
-            plt.ylim(0, 1.5)
-            plt.show()
 
         deltaErr.append(e)
         deltaMcoh.append(np.real(mcoh))
@@ -363,58 +348,6 @@ def mwcs_old(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
         logging.warning("The last window was too small, but was computed")
 
     return np.array([Taxis, deltaT, deltaErr, deltaMcoh]).T
-
-
-def linear_regression(xdata, ydata, weights=None, p0 = None, intercept=False):
-    """ Use non-linear least squares to fit a function, f, to data. This method
-    is a generalized version of :meth:`scipy.optimize.minpack.curve_fit`;
-    allowing for:
-
-    * OLS without intercept : ``linear_regression(xdata, ydata)``
-    * OLS with intercept : ``linear_regression(xdata, ydata, intercept=True)``
-    * WLS without intercept : ``linear_regression(xdata, ydata, weights)``
-    * WLS with intercept : ``linear_regression(xdata, ydata, weights, intercept=True)``
-
-    If the expected values of slope (and intercept) are different from 0.0,
-    provide the p0 value(s).
-
-    :param xdata: The independent variable where the data is measured.
-    :param ydata: The dependent data - nominally f(xdata, ...)
-    :param weights: If not None, the uncertainties in the ydata array. These are
-     used as weights in the least-squares problem. If None, the uncertainties
-     are assumed to be 1. In SciPy vocabulary, our weights are 1/sigma.
-    :param p0: Initial guess for the parameters. If None, then the initial
-     values will all be 0 (Different from SciPy where all are 1)
-    :param intercept: If False: solves y=a*x ; if True: solves y=a*x+b.
-
-    :rtype: tuple
-    :returns: (slope, intercept, std_slope, std_intercept) if `intercept` is
-     `True` or (slope, std_slope) if `False`
-    """
-    if weights is not None:
-        sigma = 1./weights
-    else:
-        sigma = None
-    if intercept:
-        p, cov = scipy.optimize.curve_fit(lambda x, a, b: a * x + b,
-                                          xdata, ydata,
-                                          [0, 0], sigma=sigma,
-                                          absolute_sigma=False,
-                                          xtol=1e-20)
-        slope, intercept = p
-        std_slope = np.sqrt(cov[0, 0])
-        std_intercept = np.sqrt(cov[1, 1])
-        return slope, intercept, std_slope, std_intercept
-
-    else:
-        p, cov = scipy.optimize.curve_fit(lambda x, a: a * x,
-                                          xdata, ydata,
-                                          0, sigma=sigma,
-                                          absolute_sigma=False,
-                                          xtol=1e-20)
-        slope = p[0]
-        std_slope = np.sqrt(cov[0, 0])
-        return slope, std_slope
 
 
 def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step, smoothing_half_win=5):
@@ -484,55 +417,61 @@ segment.
 :type step: float
 :param step: The step to jump for the moving window (in seconds)
 :type smoothing_half_win: int
-:param smoothing_half_win: If different from 0, defines the half length of the
-    smoothing hanning window.
+:param smoothing_half_win: If different from 0, defines the half length of
+    the smoothing hanning window.
 
 
 :rtype: :class:`numpy.ndarray`
-:returns: [Taxis,deltaT,deltaErr,deltaMcoh]. Taxis contains the central
-    times of the windows. The three other columns contain dt, error and
+:returns: [time_axis,delta_t,delta_err,delta_mcoh]. time_axis contains the
+    central times of the windows. The three other columns contain dt, error and
     mean coherence for each window.
     """
-    deltaT = []
-    deltaErr = []
-    deltaMcoh = []
-    Taxis = []
+    delta_t = []
+    delta_err = []
+    delta_mcoh = []
+    time_axis = []
 
-    windL2 = np.int(window_length * df)
-    padd = next_fast_len(windL2)
+    window_length_samples = np.int(window_length * df)
+    try:
+        from scipy.fftpack.helper import next_fast_len
+    except ImportError:
+        from obspy.signal.util import next_pow_2 as next_fast_len
 
-
+    padd = next_fast_len(window_length_samples)
     count = 0
-    tp = cosine_taper(windL2, 0.85)
+    tp = cosine_taper(window_length_samples, 0.85)
     minind = 0
-    maxind = windL2
+    maxind = window_length_samples
     while maxind <= len(current):
-        cci = current[minind:(minind + windL2)]
+        cci = current[minind:(minind + window_length_samples)]
         cci = scipy.signal.detrend(cci, type='linear')
         cci *= tp
 
-        cri = reference[minind:(minind + windL2)]
+        cri = reference[minind:(minind + window_length_samples)]
         cri = scipy.signal.detrend(cri, type='linear')
         cri *= tp
 
         minind += int(step*df)
         maxind += int(step*df)
 
-        Fcur = scipy.fftpack.fft(cci, n=padd)[:padd // 2]
-        Fref = scipy.fftpack.fft(cri, n=padd)[:padd // 2]
+        fcur = scipy.fftpack.fft(cci, n=padd)[:padd // 2]
+        fref = scipy.fftpack.fft(cri, n=padd)[:padd // 2]
 
-        Fcur2 = np.real(Fcur) ** 2 + np.imag(Fcur) ** 2
-        Fref2 = np.real(Fref) ** 2 + np.imag(Fref) ** 2
+        fcur2 = np.real(fcur) ** 2 + np.imag(fcur) ** 2
+        fref2 = np.real(fref) ** 2 + np.imag(fref) ** 2
 
         # Calculate the cross-spectrum
-        X = Fref * (Fcur.conj())
+        X = fref * (fcur.conj())
         if smoothing_half_win != 0:
-            dcur = np.sqrt(smooth(Fcur2, window='hanning', half_win=smoothing_half_win))
-            dref = np.sqrt(smooth(Fref2, window='hanning', half_win=smoothing_half_win))
-            X = smooth(X, window='hanning', half_win=smoothing_half_win)
+            dcur = np.sqrt(smooth(fcur2, window='hanning',
+                                  half_win=smoothing_half_win))
+            dref = np.sqrt(smooth(fref2, window='hanning',
+                                  half_win=smoothing_half_win))
+            X = smooth(X, window='hanning',
+                       half_win=smoothing_half_win)
         else:
-            dcur = np.sqrt(Fcur2)
-            dref = np.sqrt(Fref2)
+            dcur = np.sqrt(fcur2)
+            dref = np.sqrt(fref2)
 
         dcs = np.abs(X)
 
@@ -549,18 +488,15 @@ segment.
         w = 1.0 / (1.0 / (coh[index_range] ** 2) - 1.0)
         w[coh[index_range] >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
         w = np.sqrt(w * np.sqrt(dcs[index_range]))
-        # w /= (np.sum(w)/len(w)) #normalize
         w = np.real(w)
 
         # Frequency array:
         v = np.real(freq_vec[index_range]) * 2 * np.pi
-        vo = np.real(freq_vec) * 2 * np.pi
 
         # Phase:
         phi = np.angle(X)
         phi[0] = 0.
         phi = np.unwrap(phi)
-        # phio = phi.copy()
         phi = phi[index_range]
 
         # Calculate the slope with a weighted least square linear regression
@@ -568,7 +504,7 @@ segment.
         # weights for the WLS must be the variance !
         m, em = linear_regression(v.flatten(), phi.flatten(), w.flatten())
 
-        deltaT.append(m)
+        delta_t.append(m)
 
         # print phi.shape, v.shape, w.shape
         e = np.sum((phi - m * v) ** 2) / (np.size(v) - 1)
@@ -576,12 +512,12 @@ segment.
         sx2 = np.sum(w * v ** 2)
         e = np.sqrt(e * s2x2 / sx2 ** 2)
 
-        deltaErr.append(e)
-        deltaMcoh.append(np.real(mcoh))
-        Taxis.append(tmin+window_length/2.+count*step)
+        delta_err.append(e)
+        delta_mcoh.append(np.real(mcoh))
+        time_axis.append(tmin+window_length/2.+count*step)
         count += 1
 
-        del Fcur, Fref
+        del fcur, fref
         del X
         del freq_vec
         del index_range
@@ -590,5 +526,5 @@ segment.
     if maxind > len(current) + step*df:
         logging.warning("The last window was too small, but was computed")
 
-    return np.array([Taxis, deltaT, deltaErr, deltaMcoh]).T
+    return np.array([time_axis, delta_t, delta_err, delta_mcoh]).T
 
