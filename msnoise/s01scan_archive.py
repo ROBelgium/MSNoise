@@ -51,48 +51,53 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate):
         file = os.path.join(folder, file)
         try:
             name = os.path.split(file)[1]
-            data = read(file, headonly=True)
-            if data[0].stats.starttime.date < startdate:
-                logging.info(
-                    '%s: Before Start-Date!' % (name))
-            elif data[-1].stats.endtime.date > enddate:
-                logging.info('%s: After End-Date!' % (name))
-            elif data[0].stats.sampling_rate < goal_sampling_rate:
-                logging.info("%s: Sampling rate smaller than CC sampling rate"
-                             % name)
-            else:
-                gaps = data.get_gaps()
-                gaps_duration = 0
-                for gap in gaps:
-                    gaps_duration += gap[6]
-                data_duration = 0
-                start = datetime.datetime.strptime('2100-01-01', '%Y-%m-%d')
-                stop = datetime.datetime.strptime('1900-01-01', '%Y-%m-%d')
-                for trace in data:
-                    data_duration += trace.stats.delta * trace.stats.npts
-                    if trace.stats.starttime.datetime < start:
-                        starttime = trace.stats.starttime
-                        start = trace.stats.starttime.datetime
-                    if trace.stats.endtime.datetime > stop:
-                        endtime = trace.stats.endtime
-                        stop = trace.stats.endtime.datetime
-
-                net = trace.stats.network.upper()
-                sta = trace.stats.station.upper()
-                comp = trace.stats.channel.upper()
-                path = folder.replace('\\', '/')
-
-                starttime = starttime.datetime.replace(microsecond=0)
-                endtime = endtime.datetime.replace(microsecond=0)
-                result = update_data_availability(
-                    db, net, sta, comp, path, name, starttime,
-                    endtime, data_duration, gaps_duration,
-                    data[0].stats.sampling_rate)
-
-                if result:
-                    added += 1
+            st = read(file, headonly=True)
+            unique_ids = np.unique([tr.id for tr in st])
+            for id in unique_ids:
+                net, sta, loc, chan = id.split(".")
+                data = st.select(network=net, station=sta,
+                                 location=loc, channel=chan)
+                if data[-1].stats.endtime.date < startdate:
+                    logging.info(
+                        '%s: Before Start-Date!' % (id))
+                elif data[0].stats.starttime.date > enddate:
+                    logging.info('%s: After End-Date!' % (id))
+                elif data[0].stats.sampling_rate < goal_sampling_rate:
+                    logging.info("%s: Sampling rate smaller than CC sampling"
+                                 " rate" % id)
                 else:
-                    modified += 1
+                    gaps = data.get_gaps()
+                    gaps_duration = 0
+                    for gap in gaps:
+                        gaps_duration += gap[6]
+                    data_duration = 0
+                    start = datetime.datetime.strptime('2100-01-01', '%Y-%m-%d')
+                    stop = datetime.datetime.strptime('1900-01-01', '%Y-%m-%d')
+                    for trace in data:
+                        data_duration += trace.stats.delta * trace.stats.npts
+                        if trace.stats.starttime.datetime < start:
+                            starttime = trace.stats.starttime
+                            start = trace.stats.starttime.datetime
+                        if trace.stats.endtime.datetime > stop:
+                            endtime = trace.stats.endtime
+                            stop = trace.stats.endtime.datetime
+
+                    net = trace.stats.network.upper()
+                    sta = trace.stats.station.upper()
+                    comp = trace.stats.channel.upper()
+                    path = folder.replace('\\', '/')
+
+                    starttime = starttime.datetime.replace(microsecond=0)
+                    endtime = endtime.datetime.replace(microsecond=0)
+                    result = update_data_availability(
+                        db, net, sta, comp, path, name, starttime,
+                        endtime, data_duration, gaps_duration,
+                        data[0].stats.sampling_rate)
+
+                    if result:
+                        added += 1
+                    else:
+                        modified += 1
 
         except Exception as e:
             logging.debug("ERROR: %s", e)
@@ -179,7 +184,7 @@ def main(init=False, threads=1):
                 stdout, stderr = proc.communicate()
 
                 if len(stdout) != 0:
-                    files = sorted(stdout.replace('\r', '').split('\n'))
+                    files = sorted(stdout.replace(b'\r', b'').split(b'\n'))
                 else:
                     files = []
 

@@ -20,6 +20,7 @@ import scipy as sp
 import scipy.fftpack
 from scipy.fftpack.helper import next_fast_len
 import scipy.fftpack._fftpack as sff
+import scipy.optimize
 
 from obspy.core import Stream, Trace, read, AttribDict
 
@@ -57,7 +58,7 @@ def get_engine(inifile=None):
     tech, hostname, database, user, passwd = read_database_inifile(inifile)
     if tech == 1:
         engine = create_engine('sqlite:///%s' % hostname, echo=False,
-                               connect_args={'check_same_thread':False})
+                               connect_args={'check_same_thread': False})
     else:
         engine = create_engine('mysql+pymysql://%s:%s@%s/%s' % (user, passwd,
                                                                 hostname,
@@ -296,7 +297,8 @@ def get_networks(session, all=False):
     if all:
         networks = session.query(Station).group_by(Station.net).all()
     else:
-        networks = session.query(Station).filter(Station.used == True).group_by(Station.net)
+        networks = session.query(Station).filter(Station.used == True).\
+            group_by(Station.net)
     return [net.net for net in networks]
 
 
@@ -318,13 +320,16 @@ def get_stations(session, all=False, net=None):
     q = session.query(Station)
     if all:
         if net is not None:
-            stations = q.filter(Station.net == net).order_by(Station.net).order_by(Station.sta)
+            stations = q.filter(Station.net == net).order_by(Station.net).\
+                order_by(Station.sta)
         else:
             stations = q.order_by(Station.net).order_by(Station.sta).all()
     else:
-        stations = q.filter(Station.used == True).order_by(Station.net).order_by(Station.sta)
+        stations = q.filter(Station.used == True).order_by(Station.net).\
+            order_by(Station.sta)
         if net is not None:
-            stations = stations.filter(Station.net == net).order_by(Station.net).order_by(Station.sta)
+            stations = stations.filter(Station.net == net).\
+                order_by(Station.net).order_by(Station.sta)
     return stations
 
 
@@ -343,7 +348,8 @@ def get_station(session, net, sta):
     :returns: a :class:`~msnoise.msnoise_table_def.Station` Object
 
     """
-    station = session.query(Station).filter(Station.net == net).filter(Station.sta == sta).first()
+    station = session.query(Station).filter(Station.net == net).\
+        filter(Station.sta == sta).first()
     return station
 
 
@@ -374,9 +380,11 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
     :type used: bool
     :param used: Whether this station must be used in the computations.
     """
-    station = session.query(Station).filter(Station.net == net).filter(Station.sta == sta).first()
+    station = session.query(Station).filter(Station.net == net).\
+        filter(Station.sta == sta).first()
     if station is None:
-        station = Station(net, sta, X, Y, altitude, coordinates, instrument, used)
+        station = Station(net, sta, X, Y, altitude, coordinates, instrument,
+                          used)
         session.add(station)
     else:
         station.X = X
@@ -475,7 +483,11 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
     :param samplerate: Sample rate of the data in the file (in Hz)
     """
 
-    data = session.query(DataAvailability).filter(DataAvailability.file == file).first()
+    data = session.query(DataAvailability).\
+        filter(DataAvailability.file == file).\
+        filter(DataAvailability.net == net).\
+        filter(DataAvailability.sta == sta).\
+        filter(DataAvailability.comp == comp).first()
     if data is None:
         flag = "N"
         data = DataAvailability(net, sta, comp, path, file, starttime, endtime,
@@ -517,7 +529,9 @@ def get_new_files(session):
     :returns: list of :class:`~msnoise.msnoise_table_def.DataAvailability`
     """
 
-    files = session.query(DataAvailability).filter(DataAvailability.flag != 'A').order_by(DataAvailability.starttime).all()
+    files = session.query(DataAvailability).\
+        filter(DataAvailability.flag != 'A').\
+        order_by(DataAvailability.starttime).all()
     return files
 
 
@@ -544,11 +558,20 @@ def get_data_availability(session, net=None, sta=None, comp=None,
     """
 
     if not starttime:
-        data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(DataAvailability.comp == comp).all()
+        data = session.query(DataAvailability).\
+            filter(DataAvailability.net == net).\
+            filter(DataAvailability.sta == sta).\
+            filter(DataAvailability.comp == comp).all()
     elif not net:
-        data = session.query(DataAvailability).filter(DataAvailability.starttime <= endtime).filter(DataAvailability.endtime >= starttime).all()
+        data = session.query(DataAvailability).\
+            filter(DataAvailability.starttime <= endtime).\
+            filter(DataAvailability.endtime >= starttime).all()
     else:
-        data = session.query(DataAvailability).filter(DataAvailability.net == net).filter(DataAvailability.sta == sta).filter(func.DATE(DataAvailability.starttime) <= starttime.date()).filter(func.DATE(DataAvailability.endtime) >= endtime.date()).all()
+        data = session.query(DataAvailability).\
+            filter(DataAvailability.net == net).\
+            filter(DataAvailability.sta == sta).\
+            filter(func.DATE(DataAvailability.starttime) <= starttime.date()).\
+            filter(func.DATE(DataAvailability.endtime) >= endtime.date()).all()
     return data
 
 
@@ -571,7 +594,8 @@ def mark_data_availability(session, net, sta, flag):
     """
     logging.debug("updating: %s %s %s" %(net, sta, flag))
     da = DataAvailability.__table__
-    stmt = da.update().where(da.c.sta==sta).where(da.c.net==net).values(flag=flag)
+    stmt = da.update().where(da.c.sta==sta).where(da.c.net==net).\
+        values(flag=flag)
     session.execute(stmt)
     session.commit()
 
@@ -589,7 +613,9 @@ def count_data_availability_flags(session):
     :returns: list of [count, flag] pairs
     """
 
-    return session.query(func.count(DataAvailability.flag),DataAvailability.flag).group_by(DataAvailability.flag).all()
+    return session.query(func.count(DataAvailability.flag),
+                         DataAvailability.flag).\
+        group_by(DataAvailability.flag).all()
 
 
 # Jobs
@@ -632,21 +658,6 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     if returnjob:
         return job
 
-    # jt = Job.__table__
-    # try:
-    #     job = Job(day, pair, jobtype, 'T')
-    #     session.add(job)
-    #     session.commit()
-    # except:
-    #     session.rollback()
-    #     traceback.print_exc()
-    #     stmt = jt.update().where(jt.c.day == day).where(
-    #         jt.c.pair == pair).where(jt.c.jobtype == jobtype).values(flag=flag)
-    #     session.execute(stmt)
-    #     session.commit()
-    # #TODO BUGS !!!!!!!!!!
-
-
 
 def massive_insert_job(jobs):
     """
@@ -680,7 +691,8 @@ def is_next_job(session, flag='T', jobtype='CC'):
     :returns: True if at least one :class:`~msnoise.msnoise_table_def.Job`
         matches, False otherwise.
     """
-    job = session.query(Job).filter(Job.jobtype == jobtype).filter(Job.flag == flag).first()
+    job = session.query(Job).filter(Job.jobtype == jobtype).\
+        filter(Job.flag == flag).first()
     if job is None:
         return False
     else:
@@ -690,8 +702,9 @@ def is_next_job(session, flag='T', jobtype='CC'):
 def get_next_job(session, flag='T', jobtype='CC'):
     """
     Get the next :class:`~msnoise.msnoise_table_def.Job` in the database,
-    with flag=`flag` and jobtype=`jobtype`. Jobs of the same `type` are grouped per
-    day. This function also sets the flag of all selected Jobs to "I"n progress.
+    with flag=`flag` and jobtype=`jobtype`. Jobs of the same `type` are grouped
+    per day. This function also sets the flag of all selected Jobs to "I"n
+    progress.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
@@ -704,8 +717,10 @@ def get_next_job(session, flag='T', jobtype='CC'):
     :rtype: list
     :returns: list of :class:`~msnoise.msnoise_table_def.Job`
     """
-    day = session.query(Job).filter(Job.jobtype == jobtype).filter(Job.flag == flag).order_by(Job.day).first().day
-    jobs = session.query(Job).filter(Job.jobtype == jobtype).filter(Job.flag == flag).filter(Job.day == day)
+    day = session.query(Job).filter(Job.jobtype == jobtype).\
+        filter(Job.flag == flag).order_by(Job.day).first().day
+    jobs = session.query(Job).filter(Job.jobtype == jobtype).\
+        filter(Job.flag == flag).filter(Job.day == day)
     tmp = jobs.all()
     jobs.update({Job.flag: 'I'})
     session.commit()
@@ -715,8 +730,8 @@ def get_next_job(session, flag='T', jobtype='CC'):
 def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
     """
     Are there any DTT :class:`~msnoise.msnoise_table_def.Job` in the database,
-    with flag=`flag` and jobtype=`jobtype`. If `ref` is provided, checks if a DTT
-    "REF" job is present.
+    with flag=`flag` and jobtype=`jobtype`. If `ref` is provided, checks if a
+    DTT "REF" job is present.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
@@ -731,7 +746,8 @@ def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
     :rtype: bool
     :returns: True if at least one Job matches, False otherwise.
     """
-    q = session.query(Job.ref).filter(Job.flag == flag).filter(Job.jobtype == jobtype)
+    q = session.query(Job.ref).filter(Job.flag == flag).\
+        filter(Job.jobtype == jobtype)
     if ref:
         job = q.filter(Job.pair == ref).filter(Job.day == 'REF').count()
     else:
@@ -745,8 +761,9 @@ def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
 def get_dtt_next_job(session, flag='T', jobtype='DTT'):
     """
     Get the next DTT :class:`~msnoise.msnoise_table_def.Job` in the database,
-    with flag=`flag` and jobtype=`jobtype`. Jobs are then grouped per station pair.
-    This function also sets the flag of all selected Jobs to "I"n progress.
+    with flag=`flag` and jobtype=`jobtype`. Jobs are then grouped per station
+    pair. This function also sets the flag of all selected Jobs to "I"n
+    progress.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
@@ -762,8 +779,11 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
         Days of the next DTT jobs -
         Job IDs (for later being able to update their flag).
     """
-    pair = session.query(Job).filter(Job.flag == flag).filter(Job.jobtype == jobtype).filter(Job.day != 'REF').first().pair
-    jobs = session.query(Job.ref, Job.day).filter(Job.flag == flag).filter(Job.jobtype == jobtype).filter(Job.day != 'REF').filter(Job.pair == pair)
+    pair = session.query(Job).filter(Job.flag == flag).\
+        filter(Job.jobtype == jobtype).filter(Job.day != 'REF').first().pair
+    jobs = session.query(Job.ref, Job.day).filter(Job.flag == flag).\
+        filter(Job.jobtype == jobtype).filter(Job.day != 'REF').\
+        filter(Job.pair == pair)
     tmp = list(jobs)
     jobs.update({Job.flag: 'I'}, synchronize_session=False)
     session.commit()
@@ -786,7 +806,8 @@ def reset_jobs(session, jobtype, alljobs=False, rule=None):
     """
     jobs = session.query(Job).filter(Job.jobtype == jobtype)
     if rule:
-        session.execute("UPDATE jobs set flag='T' where jobtype='%s' and  %s" % (jobtype, rule))
+        session.execute("UPDATE jobs set flag='T' where jobtype='%s' and  %s"
+                        % (jobtype, rule))
         session.commit()
         return
     if not alljobs:
@@ -806,7 +827,8 @@ def reset_dtt_jobs(session, pair):
     :param pair: The pair to update
     """
 
-    jobs = session.query(Job).filter(Job.pair == pair).filter(Job.jobtype == "DTT")
+    jobs = session.query(Job).filter(Job.pair == pair).\
+        filter(Job.jobtype == "DTT")
     jobs.update({Job.flag: 'T'})
     session.commit()
 
@@ -826,11 +848,13 @@ def get_job_types(session, jobtype='CC'):
     :returns: list of [count, flag] pairs
     """
 
-    return session.query(func.count(Job.flag), Job.flag).filter(Job.jobtype == jobtype).group_by(Job.flag).all()
+    return session.query(func.count(Job.flag), Job.flag).\
+        filter(Job.jobtype == jobtype).group_by(Job.flag).all()
 
 
 def get_jobs_by_lastmod(session, jobtype='CC', lastmod=datetime.datetime.now()):
-    jobs = session.query(Job).filter(Job.jobtype == jobtype).filter(Job.lastmod >= lastmod).all()
+    jobs = session.query(Job).filter(Job.jobtype == jobtype).\
+        filter(Job.lastmod >= lastmod).all()
     return jobs
 
 
@@ -1004,7 +1028,8 @@ def stack(session, data):
 
         timegate_samples = pws_timegate *\
                            goal_sampling_rate
-        coh = np.convolve(sp.signal.boxcar(timegate_samples)/timegate_samples, coh, 'same')
+        coh = np.convolve(sp.signal.boxcar(timegate_samples) /
+                          timegate_samples, coh, 'same')
         for c in data:
             corr += c * np.power(coh, pws_power)
         corr /= data.shape[0]
@@ -1115,7 +1140,8 @@ def get_components_to_compute(session, plugin=None):
     :returns: a list of components to compute
     """
 
-    components_to_compute = get_config(session, "components_to_compute", plugin=plugin)
+    components_to_compute = get_config(session, "components_to_compute",
+                                       plugin=plugin)
     if components_to_compute.count(",") == 0:
         components_to_compute = [components_to_compute,]
     else:
@@ -1206,12 +1232,19 @@ def updated_days_for_dates(session, date1, date2, pair, jobtype='CC',
     """
     lastmod = datetime.datetime.now() - interval
     if pair == '%':
-        days = session.query(Job).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.jobtype == jobtype).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
+        days = session.query(Job).filter(Job.day >= date1).\
+            filter(Job.day <= date2).filter(Job.jobtype == jobtype).\
+            filter(Job.lastmod >= lastmod).group_by(Job.day).\
+            order_by(Job.day).all()
     else:
-        days = session.query(Job).filter(Job.pair == pair).filter(Job.day >= date1).filter(Job.day <= date2).filter(Job.jobtype == jobtype).filter(Job.lastmod >= lastmod).group_by(Job.day).order_by(Job.day).all()
+        days = session.query(Job).filter(Job.pair == pair).\
+            filter(Job.day >= date1).filter(Job.day <= date2).\
+            filter(Job.jobtype == jobtype).filter(Job.lastmod >= lastmod).\
+            group_by(Job.day).order_by(Job.day).all()
     logging.debug('Found %03i updated days' % len(days))
     if returndays and len(days) != 0:
-        return [datetime.datetime.strptime(day.day,'%Y-%m-%d').date() for day in days] ## RETURN DATE LIST !!!
+        return [datetime.datetime.strptime(day.day,'%Y-%m-%d').date() for day
+                in days] ## RETURN DATE LIST !!!
     elif returndays and len(days) == 0:
         return []
     else:
@@ -1248,8 +1281,8 @@ def azimuth(coordinates, x0, y0, x1, y1):
             azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
             return azim % 360
     else:
-        logging.warning("Please consider having a single coordinate system for\
-            all stations")
+        logging.warning("Please consider having a single coordinate system for"
+                        " all stations")
         return 0
 
 
@@ -1277,8 +1310,8 @@ def check_and_phase_shift(trace):
     dt = np.mod(trace.stats.starttime.datetime.microsecond*1.0e-6,
                 trace.stats.delta)
     if (trace.stats.delta - dt) <= np.finfo(float).eps:
-        dt = 0
-    if dt != 0:
+        dt = 0.
+    if dt != 0.:
         if dt <= (trace.stats.delta / 2.):
             dt = -dt
 #            direction = "left"
@@ -1355,8 +1388,8 @@ def getGaps(stream, min_gap=None, max_gap=None):
 
 def make_same_length(st):
     """
-    This function takes a stream of equal sampling rate and makes sure that all channels 
-    have the same length and the same gaps.
+    This function takes a stream of equal sampling rate and makes sure that all
+    channels have the same length and the same gaps.
     """
 
     # Merge traces
@@ -1378,7 +1411,8 @@ def make_same_length(st):
     # trim stream to common starttimes
     st.trim(max(starttimes), min(endtimes))
 
-    # get the mask of all traces, i.e. the parts where at least one trace has a gap
+    # get the mask of all traces, i.e. the parts where at least one trace has
+    # a gap
     if len(st) == 2:
         mask = np.logical_or(st[0].data.mask, st[1].data.mask)
     elif len(st) == 3:
@@ -1394,8 +1428,8 @@ def make_same_length(st):
 
 
 def clean_scipy_cache():
-    """This functions wraps all destroy scipy cache at once. It is a workaround to the memory leak induced by the
-    "caching" functions in scipy fft."""
+    """This functions wraps all destroy scipy cache at once. It is a workaround
+    to the memory leak induced by the "caching" functions in scipy fft."""
     sff.destroy_zfft_cache()
     sff.destroy_zfftnd_cache()
     sff.destroy_drfft_cache()
@@ -1410,6 +1444,72 @@ def clean_scipy_cache():
     sff.destroy_ddst1_cache()
     sff.destroy_dst2_cache()
     sff.destroy_dst1_cache()
+
+
+### TMP
+
+def linear_regression(xdata, ydata, weights=None, p0=None,
+                      intercept_origin=True):
+    """
+    Use linear least squares to fit a function, f, to data.
+    This method is a generalized version of
+    :func:`scipy.optimize.minpack.curve_fit`; allowing for Ordinary Least
+    Square and Weighted Least Square regressions:
+
+    * OLS through origin: ``linear_regression(xdata, ydata)``
+    * OLS with any intercept: ``linear_regression(xdata, ydata,
+      intercept_origin=False)``
+    * WLS through origin: ``linear_regression(xdata, ydata, weights)``
+    * WLS with any intercept: ``linear_regression(xdata, ydata, weights,
+      intercept_origin=False)``
+
+    If the expected values of slope (and intercept) are different from 0.0,
+    provide the p0 value(s).
+
+    :param xdata: The independent variable where the data is measured.
+    :param ydata: The dependent data - nominally f(xdata, ...)
+    :param weights: If not None, the uncertainties in the ydata array. These
+        are used as weights in the least-squares problem. If ``None``, the
+        uncertainties are assumed to be 1. In SciPy vocabulary, our weights are
+        1/sigma.
+    :param p0: Initial guess for the parameters. If ``None``, then the initial
+        values will all be 0 (Different from SciPy where all are 1)
+    :param intercept_origin: If ``True``: solves ``y=a*x`` (default);
+        if ``False``: solves ``y=a*x+b``.
+
+    :rtype: tuple
+    :returns: (slope, std_slope) if ``intercept_origin`` is ``True``;
+        (slope, intercept, std_slope, std_intercept) if ``False``.
+    """
+    if weights is not None:
+        sigma = 1. / weights
+    else:
+        sigma = None
+
+    if p0 is None:
+        if intercept_origin:
+            p0 = 0.0
+        else:
+            p0 = [0.0, 0.0]
+
+    if intercept_origin:
+        p, cov = scipy.optimize.curve_fit(lambda x, a: a * x,
+                                          xdata, ydata, p0, sigma=sigma,
+                                          xtol=1e-20)
+        slope = p[0]
+        std_slope = np.sqrt(cov[0, 0])
+        return slope, std_slope
+
+    else:
+        p, cov = scipy.optimize.curve_fit(lambda x, a, b: a * x + b,
+                                          xdata, ydata, p0, sigma=sigma,
+                                          xtol=1e-20)
+        slope, intercept = p
+        std_slope = np.sqrt(cov[0, 0])
+        std_intercept = np.sqrt(cov[1, 1])
+        return slope, intercept, std_slope, std_intercept
+
+
 
 
 if __name__ == "__main__":

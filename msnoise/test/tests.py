@@ -303,11 +303,11 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
 
     def test_028_S01installer(self):
-        if not "TRAVIS" in os.environ:
+        if "TRAVIS" not in os.environ:
             print("Seems to be running on local machine, skipping MySQL test")
             return
         import shutil
-        shutil.move('db.ini','db.bak')
+        shutil.move('db.ini', 'db.bak')
         from ..s000installer import main
         try:
             ret = main(tech=2, username="root", password="",

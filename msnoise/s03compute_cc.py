@@ -115,8 +115,8 @@ value is 2.
     cross-validate it, please let us know!!
 
     Schimmel, M. and Paulssen H., "Noise reduction and detection
-    of weak, coherent signals through phase-weighted stacks". Geophysical Journal
-    International 130, 2 (1997): 497-505.
+    of weak, coherent signals through phase-weighted stacks". Geophysical
+    Journal International 130, 2 (1997): 497-505.
 
 Once done, each job is marked "D"one in the database.
 
@@ -187,7 +187,8 @@ def main():
     params.overlap = float(get_config(db, "overlap"))
     params.maxlag = float(get_config(db, "maxlag"))
     params.corr_duration = float(get_config(db, "corr_duration"))
-    params.min30 = float(get_config(db, "corr_duration")) * params.goal_sampling_rate
+    params.min30 = float(get_config(db, "corr_duration")) *\
+                   params.goal_sampling_rate
     params.windsorizing = float(get_config(db, "windsorizing"))
     params.whitening = get_config(db, 'whitening')
     params.resampling_method = get_config(db, "resampling_method")
@@ -251,7 +252,7 @@ def main():
             s1 = get_station(db, station1.split('.')[0], station1.split('.')[1])
             s2 = get_station(db, station2.split('.')[0], station2.split('.')[1])
 
-            if s1.X and params.components_to_compute != ["ZZ",]:
+            if s1.X and params.components_to_compute != ["ZZ", ]:
                 X0, Y0, c0 = (s1.X, s1.Y, s1.coordinates)
                 X1, Y1, c1 = (s2.X, s2.Y, s1.coordinates)
 
@@ -263,7 +264,6 @@ def main():
                 cplAz = azimuth(coordinates, X0, Y0, X1, Y1)
                 logging.info("Azimuth=%.1f"%cplAz)
             else:
-                # logging.debug('No Coordinates found! Skipping azimuth calculation!')
                 cplAz = 0.
 
             for components in params.components_to_compute:
@@ -278,7 +278,8 @@ def main():
                     t1 = t1.select(component=components[0])
                     t2 = t2.select(component=components[1])
                 else:
-                    logging.debug('Rotating streams, making sure they are aligned')
+                    logging.debug('Rotating streams, making sure they are'
+                                  ' aligned')
 
                     if components[0] == "Z":
                         t1 = t1.select(component=components[0])
@@ -289,7 +290,8 @@ def main():
                         if len(t1_novert):
                             # Make these streams contain the same gaps
                             t1_novert = make_same_length(t1_novert)
-                            t1 = t1_novert.rotate("NE->RT", cplAz).select(component=components[0])
+                            t1 = t1_novert.rotate("NE->RT", cplAz).\
+                                select(component=components[0])
                         else:
                             t1 = t1_novert
 
@@ -302,7 +304,8 @@ def main():
                         if len(t2_novert):
                             # Make these streams contain the same gaps
                             t2_novert = make_same_length(t2_novert)
-                            t2 = t2_novert.rotate("NE->RT", cplAz).select(component=components[1])
+                            t2 = t2_novert.rotate("NE->RT", cplAz).\
+                                select(component=components[1])
                         else:
                             t2 = t2_novert
 
@@ -318,16 +321,20 @@ def main():
                 current = t1+t2
 
                 allcorr = {}
-                for tmp in current.slide(params.corr_duration, params.corr_duration*(1-params.overlap)):
+                for tmp in current.slide(params.corr_duration,
+                                         params.corr_duration *
+                                         (1-params.overlap)):
                     gaps = []
                     for gap in tmp.get_gaps(min_gap=0):
                         if gap[-2] > 0:
                             gaps.append(gap)
 
                     if len(gaps) > 0:
-                        logging.debug("Sliding Windows %s contains gaps, skipping..." % (tmp[0].stats.starttime))
+                        logging.debug("Sliding Windows %s contains gaps,"
+                                      " skipping..." % tmp[0].stats.starttime)
                         continue
-                    if tmp[0].stats.npts < 2*(params.maxlag * params.goal_sampling_rate) + 1:
+                    if tmp[0].stats.npts < 2*(params.maxlag *
+                                              params.goal_sampling_rate) + 1:
                         continue
                     if len(tmp) < 2:
                         continue
@@ -341,11 +348,13 @@ def main():
                             rms = tr.data.std() * params.windsorizing
                             np.clip(tr.data, -rms, rms, tr.data)  # inplace
                     tmp.taper(0.04)
-                    tmp1 = tmp.select(network=s1.net, station=s1.sta, component=components[0])
+                    tmp1 = tmp.select(network=s1.net, station=s1.sta,
+                                      component=components[0])
                     if len(tmp1) == 0:
                         continue
 
-                    tmp2 = tmp.select(network=s2.net, station=s2.sta, component=components[1])
+                    tmp2 = tmp.select(network=s2.net, station=s2.sta,
+                                      component=components[1])
                     if len(tmp2) == 0:
                         continue
 
@@ -381,7 +390,8 @@ def main():
                                                            plot=False)
                                 else:
                                     #logging.debug("Autocorr %s"%components)
-                                    tmp[i].filter("bandpass", freqmin=low, freqmax=high, zerophase=True)
+                                    tmp[i].filter("bandpass", freqmin=low,
+                                                  freqmax=high, zerophase=True)
                                     trames2hWb[i] = scipy.fftpack.fft(tmp[i].data, nfft)
                             else:
                                 skip = True

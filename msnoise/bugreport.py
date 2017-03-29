@@ -12,7 +12,7 @@ def ispresent(module, how=None):
         else:
             return "[X] %s: present (no version)"%module
     except:
-        return "[ ] %s: not found (install via %s)"% (module, how)
+        return "[ ] %s: not found"% (module)
 
 
 def main(system=False, modules=False, env=False, all=False, show=True):
@@ -37,28 +37,31 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n"
         output += "\n" + "Required:"
         output += "\n" + ispresent('setuptools')
-        output += "\n" + ispresent('click', 'easy_install click')
         output += "\n" + ispresent('numpy')
         output += "\n" + ispresent('scipy')
         output += "\n" + ispresent('pandas')
         output += "\n" + ispresent('matplotlib')
-        output += "\n" + ispresent('statsmodels')
         output += "\n" + ispresent('sqlalchemy')
         output += "\n" + ispresent('obspy')
+        output += "\n" + ispresent('click')
+        output += "\n" + ispresent('pymysql')
         output += "\n" + ispresent('flask')
         output += "\n" + ispresent('flask_admin')
+        output += "\n" + ispresent('multiprocessing_logging')
+        output += "\n" + ispresent('markdown')
         output += "\n" + ispresent('wtforms')
-        output += "\n" + ispresent('bokeh')
+        output += "\n" + ispresent('folium')
+        output += "\n" + ispresent('jinja2')
 
         output += "\n"
         output += "\n" + "Only necessary if you plan to build the doc locally:"
         output += "\n" + ispresent('sphinx')
-        output += "\n" + ispresent('jinja2')
+
 
         output += "\n"
         output += "\n" + "Graphical Backends: (at least one is required)"
         output += "\n" + ispresent('wx')
-        output += "\n" + ispresent('PyQt4')
+        output += "\n" + ispresent('pyqt')
         output += "\n" + ispresent('PySide')
         
         output += "\n"

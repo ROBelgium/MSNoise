@@ -56,7 +56,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
     start, end, datelist = build_movstack_datelist(db)
 
     if mov_stack != 0:
-        mov_stacks = [mov_stack,]
+        mov_stacks = [mov_stack, ]
     else:
         mov_stack = get_config(db, "mov_stack")
         if mov_stack.count(',') == 0:
@@ -67,7 +67,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
     if components.count(","):
         components = components.split(",")
     else:
-        components = [components,]
+        components = [components, ]
 
     gs = gridspec.GridSpec(len(mov_stacks), 1)
     plt.figure(figsize=(12, 9))
@@ -82,7 +82,8 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
                 day = os.path.join('DTT', "%02i" % filterid, "%03i_DAYS" %
                                    mov_stack, comp, '%s.txt' % current)
                 if os.path.isfile(day):
-                    df = pd.read_csv(day, header=0, index_col=0, parse_dates=True)
+                    df = pd.read_csv(day, header=0, index_col=0,
+                                     parse_dates=True)
                     alldf.append(df)
             current += datetime.timedelta(days=1)
         if len(alldf) == 0:
@@ -99,11 +100,6 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
 
             ALL = alldf[alldf['Pairs'] == 'ALL'].copy()
             allbut = alldf[alldf['Pairs'] != 'ALL'].copy()
-
-            # groups = {}
-            # groups['CRATER'] = ["UV11","UV15","FJS","FLR","SNE","UV12","FOR","RVL","UV06"]
-            # groups['GPENTES'] = ["UV03","UV08","UV04","UV02","HDL"]
-            # groups['VOLCAN'] = groups['CRATER'] + groups['GPENTES'] + ['HIM','VIL']
 
             if first_plot == 1:
                 ax = plt.subplot(gs[i])
@@ -143,26 +139,6 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
 
             tmp3 = allbut[dttname].resample('D').median()
             tmp3.plot(label='median')
-
-            #YA_FJS_YA_SNE
-            #tmp2 = allbut.resample('D', 'median')
-
-            # py1_wmean, py1_wstd = get_wavgwstd(allbut, dttname, errname)
-            # py1_wmean = py1_wmean.resample('D', how='mean')
-            # py1_wstd = py1_wstd.resample('D', how='mean').fillna(0.0)
-
-            # data = detrend(py1_wmean)
-
-
-            #plt.plot(pair1.index, pair1[dttname], c='b',label='pair')
-            #~ plt.plot(pair2.index, pair2[dttname], c='magenta',label='pair')
-            #~ r = pd.rolling_mean(pair1[dttname], 30)
-            #~ plt.plot(r.index, r, c='k')
-            #plt.fill_between(ALL.index,ALL[dttname]-ALL[errname],ALL[dttname]+ALL[errname],lw=1,color='red',zorder=-1,alpha=0.3)
-            # plt.plot(py1_wmean.index, data, c='g', lw=1, zorder=11,
-            #          label='Weighted mean of $\delta v/v$ of individual pairs')
-            # plt.fill_between(py1_wmean.index, data+py1_wstd,data-py1_wstd,color='g',lw=1,zorder=-1,alpha=0.3)
-            # plt.ylabel('$\delta v/v$ in %')
 
             if first_plot == 1:
                 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=4,

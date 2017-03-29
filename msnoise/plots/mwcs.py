@@ -26,9 +26,11 @@ from matplotlib.dates import date2num, AutoDateFormatter, AutoDateLocator
 
 from ..api import *
 
-def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None):
+
+def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
+         outfile=None):
     db = connect()
-    maxlag = float(get_config(db,'maxlag'))
+    maxlag = float(get_config(db, 'maxlag'))
     start, end, datelist = build_movstack_datelist(db)
     
     dtt_lag = get_config(db, "dtt_lag")
@@ -40,84 +42,76 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
     maxErr = float(get_config(db, "dtt_maxerr"))
     maxDt = float(get_config(db, "dtt_maxdt"))
 
-    def plot_lags(minlag,maxlag):
+    def plot_lags(minlag, maxlag):
         plt.axhline(minlag, c='g')
         plt.axhline(-minlag, c='g')
         plt.axhline(maxlag, c='g')
         plt.axhline(-maxlag, c='g')
     
-    sta1 = sta1.replace('.','_')
-    sta2 = sta2.replace('.','_')
-    if sta2 >= sta1: # alphabetical order filtering!
-        pair = "%s_%s"%(sta1,sta2)
+    sta1 = sta1.replace('.', '_')
+    sta2 = sta2.replace('.', '_')
+    if sta2 >= sta1:
+        pair = "%s_%s" % (sta1, sta2)
         station1 = sta1.split("_")
         station2 = sta2.split("_")
         
         station1 = get_station(db, station1[0], station1[1])
         station2 = get_station(db, station2[0], station2[1])
         
-        
         if dtt_lag == "static":
             minlag = dtt_minlag
         else:
-            minlag = get_interstation_distance(station1, station2, station1.coordinates) / dtt_v
-            print( minlag)
+            minlag = get_interstation_distance(station1, station2,
+                                               station1.coordinates) / dtt_v
+            print(minlag)
         
         maxlag2 = minlag + dtt_width
         
-       
-        print("New Data for %s-%s-%i-%i"%(pair,components,filterid, mov_stack))
-        format = "matrix"
-        
-        alldf=[]
+        print("New Data for %s-%s-%i-%i" % (pair, components, filterid,
+                                            mov_stack))
+
         id = []
         alldt = []
         allcoh = []
         for day in datelist:
             fname = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" %
-                                           mov_stack, components, pair, '%s.txt' % day)
-            #~ print fname
+                                 mov_stack, components, pair, '%s.txt' % day)
             if os.path.isfile(fname):
-                df = pd.read_csv(fname, delimiter=' ', header=None, index_col=0, names=['t', 'dt', 'err', 'coh']) 
-                alldt.append( df["dt"])
-                allcoh.append( df["coh"])
+                df = pd.read_csv(fname, delimiter=' ', header=None, index_col=0,
+                                 names=['t', 'dt', 'err', 'coh'])
+                alldt.append(df["dt"])
+                allcoh.append(df["coh"])
                 id.append(day)
                 del df
-        print( len(alldt[0]))
+        print(len(alldt[0]))
                 
-        alldt = pd.DataFrame(alldt,index=pd.DatetimeIndex(id))
-        allcoh = pd.DataFrame(allcoh,index=pd.DatetimeIndex(id))
-        
-        crange = [np.amin(alldt.values),np.amax(alldt.values)]
-        
+        alldt = pd.DataFrame(alldt, index=pd.DatetimeIndex(id))
+        allcoh = pd.DataFrame(allcoh, index=pd.DatetimeIndex(id))
+
         alldt = alldt.resample('D').mean()
         allcoh = allcoh.resample('D').mean()
         
         xextent = (date2num(id[0]), date2num(id[-1]), -maxlag, maxlag)
+
+        gs = gridspec.GridSpec(2, 2, width_ratios=[3, 1], height_ratios=[1, 1])
         
-        
-        gs = gridspec.GridSpec(2, 2,
-                       width_ratios=[3,1],
-                       height_ratios=[1,1]
-                       )
-        
-        fig = plt.figure()
+        plt.figure()
         ax1 = plt.subplot(gs[0])
-        im = plt.imshow(alldt.T, extent=xextent,aspect="auto",interpolation='none',
-                        origin='lower', cmap = cm.seismic)
-        cscale = np.nanpercentile(alldt, q=99) # the 1% largest values will appear saturated
-        im.set_clim((cscale * -1, cscale)) # make symmetric
+        im = plt.imshow(alldt.T, extent=xextent, aspect="auto",
+                        interpolation='none', origin='lower', cmap=cm.seismic)
+        cscale = np.nanpercentile(alldt, q=99)
+        im.set_clim((cscale * -1, cscale))
         cb = plt.colorbar()
         cb.set_label('dt')
         plt.ylabel("Lag Time (s)")
-        plt.axhline(0,lw=0.5,c='k')
+        plt.axhline(0, lw=0.5, c='k')
         plt.grid()
-        plt.title('%s : %s : dt'%(sta1,sta2))
+        plt.title('%s : %s : dt' % (sta1, sta2))
         plot_lags(minlag, maxlag2)
         plt.setp(ax1.get_xticklabels(), visible=False)
         
         plt.subplot(gs[1], sharey=ax1)
-        plt.plot(alldt.mean( axis=0), alldt.columns, c='k')
+        plt.plot(alldt.mean(axis=0), alldt.columns, c='k')
         plt.grid()
         plot_lags(minlag, maxlag2)
         plt.axvline(-maxDt, c='r', ls='--')
@@ -126,25 +120,27 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         plt.ylabel("Lag Time (s)")
         
         ax2 = plt.subplot(gs[2], sharex=ax1, sharey=ax1)
-        plt.imshow(allcoh.T, extent=xextent,aspect="auto",interpolation='none',origin='lower',cmap='hot',vmin=minCoh, vmax=1)
-        #~ plt.imshow(allcoh.T, extent=xextent,aspect="auto",interpolation='none',origin='lower',cmap='hot')
+        plt.imshow(allcoh.T, extent=xextent, aspect="auto",
+                   interpolation='none', origin='lower', cmap='hot',
+                   vmin=minCoh, vmax=1)
+
         cb = plt.colorbar()
         cb.set_label('mean coherence')
         plt.ylabel("Lag Time (s)")
-        plt.axhline(0,lw=0.5,c='k')
+        plt.axhline(0, lw=0.5, c='k')
         plt.grid()
         locator = AutoDateLocator()
         ax2.xaxis.set_major_locator(locator)
         ax2.xaxis.set_major_formatter(AutoDateFormatter(locator))
         plt.setp(plt.xticks()[1], rotation=30, ha='right')
-        plt.title('%s : %s : mean coherence'%(sta1,sta2))
+        plt.title('%s : %s : mean coherence' % (sta1, sta2))
         plot_lags(minlag, maxlag2)
                 
         plt.subplot(gs[3], sharey=ax1)
-        m = allcoh.mean( axis=0)
+        m = allcoh.mean(axis=0)
         s = allcoh.std(axis=0)
         plt.plot(m, allcoh.columns, c='k')
-        plt.fill_betweenx( allcoh.columns, m-s, m+s, color='silver',)
+        plt.fill_betweenx(allcoh.columns, m-s, m+s, color='silver',)
 
         plt.grid()
         plot_lags(minlag, maxlag2)
@@ -152,14 +148,14 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
         plt.xlabel('Coherence')
         plt.ylabel("Lag Time (s)")
         
-        name = '%s-%s f%i m%i' % (sta1,sta2, filterid, mov_stack)
+        name = '%s-%s f%i m%i' % (sta1, sta2, filterid, mov_stack)
         name = name.replace('_', '.')
         
         plt.suptitle(name)
 
         if outfile:
             if outfile.startswith("?"):
-                pair = pair.replace(':','-')
+                pair = pair.replace(':', '-')
                 outfile = outfile.replace('?', '%s-%s-f%i-m%i' % (pair,
                                                                   components,
                                                                   filterid,
@@ -169,9 +165,3 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True, outfile=None)
             plt.savefig(outfile)
         if show:
             plt.show()
-        
-        
-                            
-
-if __name__ == "__main__":
-    main()

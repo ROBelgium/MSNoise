@@ -31,7 +31,7 @@ def main(mov_stack=None, dttname="A", components='ZZ', filterid=1,
     start, end, datelist = build_movstack_datelist(db)
 
     if mov_stack != 0:
-        mov_stacks = [mov_stack,]
+        mov_stacks = [mov_stack, ]
     else:
         mov_stack = get_config(db, "mov_stack")
         if mov_stack.count(',') == 0:

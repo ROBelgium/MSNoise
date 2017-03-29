@@ -34,6 +34,7 @@ def preprocess(db, stations, comps, goal_day, params):
             datafiles[station][file.comp[-1]].append(fullpath)
     j = 0
     for istation, station in enumerate(stations):
+        net, sta = station.split(".")
         for comp in comps:
             files = eval("datafiles['%s']['%s']" % (station, comp))
             if len(files) != 0:
@@ -44,6 +45,7 @@ def preprocess(db, stations, comps, goal_day, params):
                     st = read(file, dytpe=np.float,
                               starttime=UTCDateTime(gd),
                               endtime=UTCDateTime(gd) + 86400)
+                    st = st.select(network=net, station=sta)
                     for tr in st:
                         tr.data = tr.data.astype(np.float)
                     stream += st

@@ -29,14 +29,15 @@ def main(filterid, components, ampli=1, show=True, outfile=None):
         extension = "."+export_format
     maxlag = float(get_config(db, 'maxlag'))
     maxlagsamples = get_maxlag_samples(db)
-    t = np.linspace(-maxlag,maxlag, maxlagsamples)
+    t = np.linspace(-maxlag, maxlag, maxlagsamples)
 
     plt.figure()
-    dists=[]
+    dists = []
     for pair in pairs:
         station1, station2 = pair
 
-        dist = get_interstation_distance(station1, station2, station1.coordinates)
+        dist = get_interstation_distance(station1, station2,
+                                         station1.coordinates)
         dists.append(dist)
 
         sta1 = "%s.%s" % (station1.net, station1.sta)
@@ -58,9 +59,9 @@ def main(filterid, components, ampli=1, show=True, outfile=None):
 
     colors = ['r', 'g', 'b']
     for i, velocity in enumerate([3.0, 2.0, 1.0]):
-        plt.plot([0,-max(dists)/velocity], [0, max(dists)], c=colors[i],
-                 label='%.1f $km s^{-1}$' % velocity)
-        plt.plot([0,max(dists)/velocity], [0, max(dists)], c=colors[i])
+        plt.plot([0, -1*np.max(dists)/velocity], [0, np.max(dists)],
+                 c=colors[i], label='%.1f $km s^{-1}$' % velocity)
+        plt.plot([0, np.max(dists)/velocity], [0, np.max(dists)], c=colors[i])
 
     plt.xlim(-maxlag, maxlag)
     plt.legend(loc=4)
@@ -73,8 +74,3 @@ def main(filterid, components, ampli=1, show=True, outfile=None):
         plt.savefig(outfile)
     if show:
         plt.show()
-        
-                            
-
-if __name__ == "__main__":
-    main()

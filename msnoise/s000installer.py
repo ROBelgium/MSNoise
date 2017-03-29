@@ -41,6 +41,7 @@ from .msnoise_table_def import *
 if sys.version_info[0] >= 3:
     raw_input = input
 
+
 def main(tech=None, hostname="localhost", username="msnoise",
          password="msnoise", database="msnoise", filename="msnoise.sqlite"):
     if tech is None:
@@ -70,7 +71,7 @@ def main(tech=None, hostname="localhost", username="msnoise",
             password = a if len(a) != 0 else "msnoise"
             
     if tech == 1:
-        engine = create_engine('sqlite:///%s'%filename, echo=False)
+        engine = create_engine('sqlite:///%s' % filename, echo=False)
         database = None
         username = None
         password = None
@@ -83,32 +84,30 @@ def main(tech=None, hostname="localhost", username="msnoise",
                                echo=False)
     
     create_database_inifile(tech, hostname, database, username, password)
-    
-    
-    
+
     # create tables
     Base.metadata.create_all(engine)
     
     Session = sessionmaker(bind=engine)
     session = Session()
     
-    configs = []
     for name in default.keys():
-        session.add(Config(name=name,value=default[name][-1]))
+        session.add(Config(name=name, value=default[name][-1]))
     
-    # session.add_all(configs)
     try:
         session.commit()
     except IntegrityError:
-        print("The database seems to already exist and is not empty, cannot continue")
-        return("Integrity Error - DB already exists")
+        print("The database seems to already exist and is not empty, cannot"
+              " continue")
+        return "Integrity Error - DB already exists"
     session.close()
     msg = "Installation Done! - Go to Configuration Step!"
     return msg
     
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Creates the database connection file (db.ini)',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description='Creates the database connection file (db.ini)',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-t', '--tech', type=int, default=None,
                         help='DB technology to use [1] sqlite or [2] mysql.')
     parser.add_argument('-f', '--filename', type=str, default='msnoise.sqlite',
@@ -122,5 +121,5 @@ if __name__ == "__main__":
     parser.add_argument('-b', '--database', type=str, default='msnoise',
                         help='Database name for the MySQL DB')
     args = parser.parse_args()
-    main(args.tech, args.hostname, args.username, args.password, args.database, args.filename)
-    
+    main(args.tech, args.hostname, args.username, args.password, args.database,
+         args.filename)

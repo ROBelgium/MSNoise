@@ -47,7 +47,7 @@ def main(show=False, outfile=None):
         new = True
         for di in data.groups[group]:
             if new:
-                print( group, di,)
+                print(group, di)
                 new = False
             dt = (di-start).days
             matrix[i, dt] = 1
@@ -72,10 +72,9 @@ def main(show=False, outfile=None):
     plt.gcf().autofmt_xdate()
     plt.grid()
 
-
     ax = plt.subplot(gs[1])
     plt.plot(datelist, np.sum(matrix, axis=0))
-    ax.set_ylim((-0.1,np.amax(np.sum(matrix, axis=0))+0.1))
+    ax.set_ylim((-0.1, np.amax(np.sum(matrix, axis=0))+0.1))
     plt.ylabel('N stations')
     plt.gcf().autofmt_xdate()
     plt.grid()
@@ -88,6 +87,3 @@ def main(show=False, outfile=None):
         plt.savefig(outfile)
     if show:
         plt.show()
-
-if __name__ == "__main__":
-    main()

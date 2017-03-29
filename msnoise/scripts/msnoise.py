@@ -19,7 +19,6 @@ import pkg_resources
 @click.option('-c', '--custom', default=False, is_flag=True, help='Use custom \
  file for plots. To use this, copy the plot script here and edit it.')
 @click.option('-v', '--verbose', default=2, count=True)
-
 @click.pass_context
 def cli(ctx, threads, delay, custom, verbose):
     ctx.obj['MSNOISE_threads'] = threads
@@ -135,15 +134,17 @@ def info(jobs):
                     if job[1] == 'D':
                         if job[0] > 0:
                             click.secho(
-                                " - %s does not exists and that is not normal (%i CC jobs done)" % (
-                                output_folder, job[0]), fg='red')
+                                " - %s does not exists and that is not normal"
+                                " (%i CC jobs done)" % (output_folder, job[0]),
+                                fg='red')
                         else:
                             click.secho(
-                                " - %s does not exists and that is normal (%i CC jobs done)" % (
-                                output_folder, job[0]))
+                                " - %s does not exists and that is normal"
+                                " (%i CC jobs done)" % (output_folder, job[0]))
             else:
                 click.secho(
-                    " - %s does not exists (and that is normal because keep_all=False)" % output_folder)
+                    " - %s does not exists (and that is normal because"
+                    " keep_all=False)" % output_folder)
 
         click.echo('')
         click.echo('Raw config bits: "D"efault or "M"odified (green)')
@@ -156,8 +157,8 @@ def info(jobs):
 
         click.echo('')
         click.echo('Filters:')
-        print(
-        'ID: [low:high]  [mwcs_low:mwcs_high]    mwcs_wlen    mwcs_step   used')
+        print('ID: [low:high]  [mwcs_low:mwcs_high]    mwcs_wlen    mwcs_step'
+              '   used')
         for f in get_filters(db, all=True):
             data = (f.ref,
                     f.low,
@@ -197,7 +198,8 @@ def install():
 
 @click.command()
 @click.option('-s', '--set', help='Modify config value: usage --set name=value')
-@click.option('-S', '--sync', is_flag=True, help='Sync station metadata from inventory/dataless')
+@click.option('-S', '--sync', is_flag=True, help='Sync station metadata from'
+                                                 ' inventory/dataless')
 def config(set, sync):
     """This command should now only be used to use the command line to set
     a parameter value in the data base. It used to launch the Configurator but
@@ -209,7 +211,7 @@ def config(set, sync):
             click.echo("!! format of the set command is name=value !!")
             return
         name, value = set.split("=")
-        if not name in default:
+        if name not in default:
             click.echo("!! unknown parameter %s !!" % name)
             return
         from ..api import connect, update_config
@@ -223,7 +225,8 @@ def config(set, sync):
         from ..api import connect, get_config, get_stations, update_station
         db = connect()
         response_format = get_config(db, 'response_format')
-        response_files = glob.glob(os.path.join(get_config(db, 'response_path'), "*"))
+        response_files = glob.glob(os.path.join(get_config(db, 'response_path'),
+                                                "*"))
         if response_format == "inventory":
             from obspy import read_inventory
             firstinv = True
@@ -284,10 +287,10 @@ def bugreport(ctx, sys, modules, env, all):
 
 @click.command()
 @click.option('--fromDA',  help='Populates the station table '
-                                                'using network and station codes'
-                                                ' found in the data_availability'
-                                                ' table, overrides the default'
-                                                ' workflow step.',
+                                'using network and station codes'
+                                ' found in the data_availability'
+                                ' table, overrides the default'
+                                ' workflow step.',
               is_flag=True)
 def populate(fromda):
     """Rapidly scan the archive filenames and find Network/Stations"""
@@ -299,7 +302,7 @@ def populate(fromda):
         stations = db.query(DataAvailability.net, DataAvailability.sta). \
             group_by(DataAvailability.net, DataAvailability.sta)
 
-        for net,sta in stations:
+        for net, sta in stations:
             print('Adding:', net, sta)
             X = 0.0
             Y = 0.0
@@ -315,7 +318,8 @@ def populate(fromda):
 
 @click.command()
 @click.option('-i', '--init', is_flag=True, help='First run ?')
-@click.option('--path',  help='Scan all files in specific folder, overrides the default workflow step.')
+@click.option('--path',  help='Scan all files in specific folder, overrides the'
+                              ' default workflow step.')
 @click.pass_context
 def scan_archive(ctx, init, path):
     """Scan the archive and insert into the Data Availability table."""
@@ -338,7 +342,8 @@ def scan_archive(ctx, init, path):
 
 @click.command()
 @click.option('-i', '--init', is_flag=True, help='First run ?')
-@click.option('--nocc', is_flag=True, default=False, help='Disable the creation of CC jobs')
+@click.option('--nocc', is_flag=True, default=False, help='Disable the creation'
+                                                          ' of CC jobs')
 def new_jobs(init, nocc):
     """Determines if new CC jobs are to be defined"""
     from ..s02new_jobs import main
@@ -367,8 +372,8 @@ def compute_cc(ctx):
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-@click.option('-i', '--interval', default=1, help='Number of days before now to\
- search for modified Jobs')
+@click.option('-i', '--interval', default=1, help='Number of days before now to'
+                                                  ' search for modified Jobs')
 def stack(ref, mov, step, interval):
     """Stacks the [REF] and/or [MOV] windows"""
     click.secho('Lets STACK !', fg='green')
@@ -553,16 +558,19 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
+@click.option('-e', '--envelope', is_flag=True, help='Plot envelope instead of'
+                                                     'time series')
 @click.pass_context
 def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
-            ampli, seismic, show, outfile):
+            ampli, seismic, show, outfile, envelope):
     """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
     if ctx.obj['MSNOISE_custom']:
         from ccftime import main
     else:
         from ..plots.ccftime import main
-    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile)
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
+         envelope)
 
 
 @click.command()

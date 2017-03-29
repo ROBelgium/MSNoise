@@ -131,6 +131,9 @@ from flask_admin.babel import ngettext, lazy_gettext
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.model import typefmt
 from wtforms.validators import ValidationError
+from wtforms.fields import SelectField, StringField
+from wtforms.utils import unset_value
+from flask_wtf import Form
 
 from .api import *
 from .default import default
@@ -140,6 +143,7 @@ from .msnoise_table_def import *
 class GenericView(BaseView):
     name = "MSNoise"
     page = "index"
+
     @expose('/')
     def index(self):
         return self.render('admin/%s.html'%self.page, msnoise_project="test")
@@ -148,22 +152,26 @@ class GenericView(BaseView):
 class FilterView(ModelView):
     view_title = "Filter Configuration"
     name = "filter"
-    # Disable model creation
+
     def mwcs_low(form, field):
         if field.data < form.data['low']:
-            raise ValidationError("'mwcs_low' should be greater or equal to 'low'")
+            raise ValidationError("'mwcs_low' should be greater or equal to"
+                                  " 'low'")
 
     def mwcs_high(form, field):
         if field.data <= form.data['mwcs_low']:
-            raise ValidationError("'mwcs_high' should be greater than 'mwcs_low'")
+            raise ValidationError("'mwcs_high' should be greater than"
+                                  " 'mwcs_low'")
 
     def high(form, field):
         if field.data < form.data['mwcs_high']:
-            raise ValidationError("'high' should be greater or equal than 'mwcs_high'")
+            raise ValidationError("'high' should be greater or equal than"
+                                  " 'mwcs_high'")
 
     def mwcs_step(form, field):
         if field.data > form.data['mwcs_wlen']:
-            raise ValidationError("'mwcs_step' should be smaller or equal to 'mwcs_wlen'")
+            raise ValidationError("'mwcs_step' should be smaller or equal to"
+                                  " 'mwcs_wlen'")
     
     form_args = dict(
         mwcs_low=dict(validators=[mwcs_low]),
@@ -172,10 +180,10 @@ class FilterView(ModelView):
         mwcs_step=dict(validators=[mwcs_step]),
     )
     
-    column_list = ('ref','low', 'mwcs_low', 'mwcs_high', 'high',
+    column_list = ('ref', 'low', 'mwcs_low', 'mwcs_high', 'high',
                    'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used')
     form_columns = ('low', 'mwcs_low', 'mwcs_high', 'high',
-                   'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used')
+                    'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used')
     
     def __init__(self, session, **kwargs):
         # You can pass name and other parameters if you want to
@@ -231,9 +239,12 @@ class DataAvailabilityView(ModelView):
     can_delete = True
     can_edit = True
     page_size = 100
-    column_filters = ('net', 'sta', 'comp','data_duration','gaps_duration','samplerate','flag')
+    column_filters = ('net', 'sta', 'comp', 'data_duration', 'gaps_duration',
+                      'samplerate', 'flag')
+
     def __init__(self, session, **kwargs):
-        super(DataAvailabilityView, self).__init__(DataAvailability, session, **kwargs)
+        super(DataAvailabilityView, self).__init__(DataAvailability, session,
+                                                   **kwargs)
     
     @action('modified',
             lazy_gettext('Mark as (M)odified'),
@@ -247,10 +258,9 @@ class DataAvailabilityView(ModelView):
             count += 1
         self.session.commit()
         flash(ngettext('Model was successfully flagged (M)odified.',
-               '%(count)s models were successfully flagged (M)odified.',
-               count,
-               count=count))
-        return     
+                       '%(count)s models were successfully flagged (M)odified.',
+              count, count=count))
+        return
     
 
 class JobView(ModelView):
@@ -258,15 +268,16 @@ class JobView(ModelView):
     can_create = False
     can_delete = True
     can_edit = True
-    column_filters = ('pair','jobtype','flag')
+    column_filters = ('pair', 'jobtype', 'flag')
     page_size = 100
     edit_modal = True
+
     def __init__(self, session, **kwargs):
         super(JobView, self).__init__(Job, session, **kwargs)
     
     @action('todo',
-        lazy_gettext('Mark as (T)odo'),
-        lazy_gettext('Are you sure you want to update selected models?'))
+            lazy_gettext('Mark as (T)odo'),
+            lazy_gettext('Are you sure you want to update selected models?'))
     def todo(self, ids):
         model_pk = getattr(self.model, self._primary_key)
         query = self.get_query().filter(model_pk.in_(ids))
@@ -276,8 +287,8 @@ class JobView(ModelView):
         return
     
     @action('done',
-        lazy_gettext('Mark as (D)one'),
-        lazy_gettext('Are you sure you want to update selected models?'))
+            lazy_gettext('Mark as (D)one'),
+            lazy_gettext('Are you sure you want to update selected models?'))
     def done(self, ids):
         model_pk = getattr(self.model, self._primary_key)
         query = self.get_query().filter(model_pk.in_(ids))
@@ -287,8 +298,8 @@ class JobView(ModelView):
         return
     
     @action('deletetype',
-        lazy_gettext('Delete all Jobs of the same "Type"'),
-        lazy_gettext('Are you sure you want to delete all those models?'))
+            lazy_gettext('Delete all Jobs of the same "Type"'),
+            lazy_gettext('Are you sure you want to delete all those models?'))
     def deletetype(self, ids):
         model_pk = getattr(self.model, self._primary_key)
         query = self.get_query().filter(model_pk.in_(ids))
@@ -299,8 +310,8 @@ class JobView(ModelView):
         return
     
     @action('massTodo',
-        lazy_gettext('Mark all Jobs of the same Type as (T)odo'),
-        lazy_gettext('Are you sure you want to update all those models?'))
+            lazy_gettext('Mark all Jobs of the same Type as (T)odo'),
+            lazy_gettext('Are you sure you want to update all those models?'))
     def massTodo(self, ids):
         model_pk = getattr(self.model, self._primary_key)
         query = self.get_query().filter(model_pk.in_(ids))
@@ -312,9 +323,7 @@ class JobView(ModelView):
         self.session.commit()
         return
 
-from wtforms.fields import SelectField, StringField
-from wtforms.utils import unset_value
-from flask_wtf import Form
+
 
 class ConfigView(ModelView):
     # Disable model creation
@@ -361,20 +370,22 @@ def select_filter():
     filters = []
     query = get_filters(db, all=False)
     for f in query:
-        filters.append({'optid':f.ref, 'text':"%.2f - %.2f"%(f.low, f.high)})
+        filters.append({'optid': f.ref,
+                        'text': "%.2f - %.2f" % (f.low, f.high)})
     db.close()
     return filters
 
 
 def select_pair():
     db = connect()
-    stations = ["%s.%s" % (s.net, s.sta) for s in get_stations(db,all=False)]
+    stations = ["%s.%s" % (s.net, s.sta) for s in get_stations(db, all=False)]
     pairs = itertools.combinations(stations, 2)
     output = []
     i = 0
     for pair in pairs:
-        output.append({'optid':i, 'text':"%s - %s"%(pair[0],pair[1])})
-        i+=1
+        output.append({'optid': i,
+                       'text': "%s - %s" % (pair[0], pair[1])})
+        i += 1
     db.close()
     return output
 
@@ -397,9 +408,10 @@ class ResultPlotter(BaseView):
         format = getitem(args, 'format', 'stack')
 
         db = connect()
-        station1, station2 = pairs[pair]['text'].replace('.','_').split(' - ')
+        station1, station2 = pairs[pair]['text'].replace('.', '_').split(' - ')
         start, end, dates = build_ref_datelist(db)
-        i, result = get_results(db,station1, station2, filter, component, dates, format=format)
+        i, result = get_results(db,station1, station2, filter, component, dates,
+                                format=format)
 
         if format == 'stack':
             if i != 0:
@@ -408,23 +420,23 @@ class ResultPlotter(BaseView):
                 y = result
         db.close()
 
-        fig = figure(title=pairs[pair]['text'], plot_width=1000)
-        fig.line(x, y, line_width=2)
-
-        plot_resources = RESOURCES.render(
-            js_raw=CDN.js_raw,
-            css_raw=CDN.css_raw,
-            js_files=CDN.js_files,
-            css_files=CDN.css_files,
-        )
-
-        script, div = components(fig, INLINE)
-        return self.render(
-            'admin/results.html',
-            plot_script=script, plot_div=div, plot_resources=plot_resources,
-            filter_list=filters,
-            pair_list=pairs
-        )
+        # fig = figure(title=pairs[pair]['text'], plot_width=1000)
+        # fig.line(x, y, line_width=2)
+        #
+        # plot_resources = RESOURCES.render(
+        #     js_raw=CDN.js_raw,
+        #     css_raw=CDN.css_raw,
+        #     js_files=CDN.js_files,
+        #     css_files=CDN.css_files,
+        # )
+        #
+        # script, div = components(fig, INLINE)
+        # return self.render(
+        #     'admin/results.html',
+        #     plot_script=script, plot_div=div, plot_resources=plot_resources,
+        #     filter_list=filters,
+        #     pair_list=pairs
+        # )
 
 
 class InterferogramPlotter(BaseView):
@@ -469,6 +481,7 @@ def networksJSON():
     db.close()
     return flask.Response(o, mimetype='application/json')
 
+
 @app.route('/admin/filters.json')
 def filtersJSON():
     db = connect()
@@ -480,6 +493,7 @@ def filtersJSON():
     o = json.dumps(data)
     db.close()
     return flask.Response(o, mimetype='application/json')
+
 
 @app.route('/admin/components.json')
 def componentsJSON():
@@ -497,11 +511,11 @@ def componentsJSON():
 @app.route('/admin/pairs.json')
 def pairs():
     db = connect()
-    stations = ["%s.%s" % (s.net, s.sta) for s in get_stations(db,all=False)]
+    stations = ["%s.%s" % (s.net, s.sta) for s in get_stations(db, all=False)]
     pairs = itertools.combinations(stations, 2)
     output = []
     for pair in pairs:
-        output.append("%s - %s"%(pair[0],pair[1]))
+        output.append("%s - %s" % (pair[0], pair[1]))
     o = json.dumps(output)
     db.close()
     return flask.Response(o, mimetype='application/json')
@@ -511,7 +525,6 @@ def pairs():
 def bugreporter():
     from .bugreport import main
     output = main(modules=True, show=False)
-
     o = json.dumps(output)
     db.close()
     return flask.Response(o, mimetype='application/json')
@@ -521,10 +534,11 @@ def bugreporter():
 def dataAvail():
     data = flask.request.get_json()
     db = connect()
-    data = get_data_availability(db, net=data['net'], sta=data['sta'],comp='HHZ')
-    o = {'dates':[o.starttime.strftime('%Y-%m-%d') for o in data]}
+    data = get_data_availability(db, net=data['net'], sta=data['sta'],
+                                 comp='HHZ')
+    o = {'dates': [o.starttime.strftime('%Y-%m-%d') for o in data]}
     db.close()
-    o['result']='ok'
+    o['result'] = 'ok'
     o = json.dumps(o)
     return flask.Response(o, mimetype='application/json')
 
@@ -538,13 +552,15 @@ def allresults():
     components = data['component']
     format = data['format']
     start, end, dates = build_ref_datelist(db)
-    i, result = get_results(db,station1, station2, filterid, components, dates, format=format)
+    i, result = get_results(db,station1, station2, filterid, components, dates,
+                            format=format)
     
     data = {}
     if format == 'stack':
         if i != 0:
             maxlag = float(get_config(db, 'maxlag'))
-            data['x'] = np.linspace(-maxlag, maxlag, get_maxlag_samples(db)).tolist()
+            data['x'] = np.linspace(-maxlag, maxlag, get_maxlag_samples(db)).\
+                tolist()
             data['y'] = result.tolist()
             data["info"] = "Data OK"
         else:
@@ -555,7 +571,7 @@ def allresults():
             for y in range(len(dates)):
                 r = result[y]
                 r = np.nan_to_num(r)
-                x.append( r.tolist() )
+                x.append(r.tolist())
             data["image"] = x
             data["nx"] = len(r)
             data["ny"] = len(x)
@@ -573,9 +589,8 @@ def new_jobsTRIG():
     global db
     db.flush()
     db.commit()
-
     o = {}
-    o['count']=count
+    o['count'] = count
     o = json.dumps(o)
     return flask.Response(o, mimetype='application/json')
     
@@ -586,10 +601,9 @@ def joblists():
     db = connect()
     data = get_job_types(db,jobtype)
     db.close()
-    o = {'T':0,'I':0,'D':0}
+    o = {'T': 0, 'I': 0, 'D': 0}
     for count, flag in data:
         o[flag] = count
-
     o = json.dumps(o)
     return flask.Response(o, mimetype='application/json')
 
@@ -608,7 +622,7 @@ def DA_flags():
     db = connect()
     data = count_data_availability_flags(db)
     db.close()
-    o = {'N':0,'M':0,'A':0}
+    o = {'N': 0, 'M': 0, 'A': 0}
     for count, flag in data:
         o[flag] = count
     o = json.dumps(o)
@@ -641,7 +655,6 @@ def main(port=5000):
     plugins = get_config(db, "plugins")
     db.close()
 
-
     admin = Admin(app, template_mode='bootstrap2')
     
     if "msnoise_brand" in os.environ:
@@ -654,11 +667,10 @@ def main(port=5000):
     admin.project_folder = os.getcwd()
     tech, hostname, database, username, password = read_database_inifile()
     if tech == 1:
-        database = "SQLite: %s"%hostname
+        database = "SQLite: %s" % hostname
     else:
-        database = "MySQL: %s@%s:%s"%(username, hostname, database)
+        database = "MySQL: %s@%s:%s" % (username, hostname, database)
     admin.project_database = database
-
 
     jobtypes = ["CC", "DTT"]
     template_folders = []
@@ -686,14 +698,17 @@ def main(port=5000):
     admin.add_view(FilterView(db,endpoint='filters', category='Configuration'))
     admin.add_view(ConfigView(db,endpoint='config', category='Configuration'))
 
-    admin.add_view(DataAvailabilityView(db,endpoint='data_availability',category='Database'))
+    admin.add_view(DataAvailabilityView(db,endpoint='data_availability',
+                                        category='Database'))
 
     admin.add_view(JobView(db,endpoint='jobs',category='Database'))
 
 
-    #admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',category='Results'))
+    # admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',
+                                        # category='Results'))
     # admin.add_view(ResultPlotter(endpoint='results',category='Results'))
-    # admin.add_view(InterferogramPlotter(endpoint='interferogram',category='Results'))
+    # admin.add_view(InterferogramPlotter(endpoint='interferogram',
+                                        # category='Results'))
 
     if plugins:
         plugins = plugins.split(',')
@@ -705,9 +720,11 @@ def main(port=5000):
     a = GenericView(endpoint='about',category='Help', name='About')
     a.page = "about"
     admin.add_view(a)
-    admin.add_view(BugReport(name='Bug Report', endpoint='bugreport', category='Help'))
+    admin.add_view(BugReport(name='Bug Report', endpoint='bugreport',
+                             category='Help'))
 
     print("MSNoise admin will run on all interfaces by default")
     print("access it via the machine's IP address or")
     print("via http://127.0.0.1:%i when running locally."%port)
-    app.run(host='0.0.0.0', port=port, debug=False, reloader_interval=1, threaded=True)
+    app.run(host='0.0.0.0', port=port, debug=False, reloader_interval=1,
+            threaded=True)

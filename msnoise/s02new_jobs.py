@@ -16,7 +16,7 @@ To run it from the console:
 """
 
 from .api import *
-
+import pandas as pd
 
 def main(init=False, nocc=False):
 
@@ -50,8 +50,9 @@ def main(init=False, nocc=False):
     nfs = get_new_files(db)
     for nf in nfs:
         start, end = nf.starttime.date(), nf.endtime.date()
-        updated_days.append(start)
-        updated_days.append(end)
+        for date in pd.date_range(start, end, freq="D"):
+            updated_days.append(date.date())
+
         tmp = "%s.%s" % (nf.net, nf.sta)
         if tmp not in stations_to_analyse:
             continue

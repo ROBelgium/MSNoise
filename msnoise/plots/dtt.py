@@ -21,18 +21,18 @@ import matplotlib.pyplot as plt
 from ..api import *
 
 
-def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=None):
+def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True,
+         outfile=None):
     db = connect()
     dtt_lag = get_config(db, "dtt_lag")
     dtt_v = float(get_config(db, "dtt_v"))
     dtt_minlag = float(get_config(db, "dtt_minlag"))
     dtt_width = float(get_config(db, "dtt_width"))
-    dtt_sides = get_config(db, "dtt_sides")
     dbmaxlag = int(float(get_config(db, "maxlag")))
-    sta1 = sta1.replace('.','_')
-    sta2 = sta2.replace('.','_')
-    if sta2 >= sta1: # alphabetical order filtering!
-        pair = "%s_%s"%(sta1,sta2)
+    sta1 = sta1.replace('.', '_')
+    sta2 = sta2.replace('.', '_')
+    if sta2 >= sta1:
+        pair = "%s_%s" % (sta1, sta2)
         station1 = sta1.split("_")
         station2 = sta2.split("_")
 
@@ -43,24 +43,27 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=
             minlag = dtt_minlag
             maxlag = minlag + dtt_width
         else:
-            minlag = get_interstation_distance(station1, station2, station1.coordinates) / dtt_v
+            minlag = get_interstation_distance(station1, station2,
+                                               station1.coordinates) / dtt_v
             maxlag = minlag + dtt_width
 
-        fname = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" %mov_stack, components, pair, '%s.txt' % day)
-        print( fname)
+        fname = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" % mov_stack,
+                             components, pair, '%s.txt' % day)
+        print(fname)
         t = []
         dt = []
         err = []
         if os.path.isfile(fname):
-            #df = pd.read_csv(fname, delimiter=' ', header=None, index_col=0, names=['t', 'dt', 'err', 'coh'])
-            df = pd.read_csv(fname, delimiter=' ', header=None, names=['t', 'dt', 'err', 'coh'])
+            df = pd.read_csv(fname, delimiter=' ', header=None,
+                             names=['t', 'dt', 'err', 'coh'])
             t = df["t"].tolist()
             dt = df["dt"].tolist()
             err = df["err"].tolist()
             del df
 
         alldf = []
-        fname = os.path.join('DTT', "%02i" % filterid, "%03i_DAYS" %mov_stack, components, '%s.txt' % day)
+        fname = os.path.join('DTT', "%02i" % filterid, "%03i_DAYS" % mov_stack,
+                             components, '%s.txt' % day)
         if not os.path.isfile(fname):
             return
         df = pd.read_csv(fname, delimiter=',')
@@ -79,8 +82,8 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=
         plt.errorbar(t, dt, yerr=err, linestyle="None")
         plt.xlabel("Time (s)")
         plt.ylabel("Delay time (s)")
-        plt.axvspan(-maxlag, -minlag, 0,1, color='b', alpha=0.5)
-        plt.axvspan(minlag, maxlag, 0,1, color='b', alpha=0.5)
+        plt.axvspan(-maxlag, -minlag, 0, 1, color='b', alpha=0.5)
+        plt.axvspan(minlag, maxlag, 0, 1, color='b', alpha=0.5)
         xlineM0 = range(-dbmaxlag, dbmaxlag + 1, 5)
         ylineM0 = []
         ylineEM0min = []
@@ -107,14 +110,14 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=
         name = name.replace('_', '.')
         plt.suptitle(name)
         plt.legend()
-        plt.grid(True, ls="-",lw=0.2)
+        plt.grid(True, ls="-", lw=0.2)
         
         ax = plt.gca()
         ax.set_xlim((-dbmaxlag, dbmaxlag))
         if outfile:
             if outfile.startswith("?"):
                 basename = '%s-%s-f%i-m%i-%s' % (sta1, sta2, filterid,
-                                                 mov_stack,day)
+                                                 mov_stack, day)
                 outfile = outfile.replace('?', basename)
             outfile = "dtt_" + outfile
             print("output to: %s" % outfile)
@@ -122,7 +125,3 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True, outfile=
 
         if show:
             plt.show()
-
-
-if __name__ == "__main__":
-    main()
