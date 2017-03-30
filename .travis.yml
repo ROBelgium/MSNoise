@@ -82,4 +82,8 @@ script:
   - mkdir MSNoiseTest
   - cd MSNoiseTest
   - msnoise test
+  - df -h
+  - ls -lah data/2010/UV05/HHZ.D
+  - ls -lah data/2010/UV06/HHZ.D
+  - ls -lah data/2010/UV10/HHZ.D
 
