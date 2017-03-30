@@ -37,7 +37,7 @@ import time
 from multiprocessing import Process
 from obspy import UTCDateTime
 # import multiprocessing_logging
-import numpy as np
+
 
 
 from .api import *
@@ -46,7 +46,6 @@ from .data_structures import data_structure
 
 
 def worker(files, folder, startdate, enddate, goal_sampling_rate, init):
-    # import logging
     db = connect()
     added = 0
     modified = 0
@@ -117,6 +116,7 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate, init):
 
 
 def main(init=False, threads=1):
+    import numpy as np
     t = time.time()
     logging.info('*** Starting: Scan Archive ***')
     db = connect()
@@ -126,7 +126,6 @@ def main(init=False, threads=1):
     if init:
         logging.info("Initializing (should be run only once)")
         mtime = "-20000"
-        init = True
     else:
         mtime = "%s" % mtime
 
@@ -176,17 +175,17 @@ def main(init=False, threads=1):
                 'NET', sta.net).replace('STA', sta.sta))
                 folders_to_glob.append(tmp)
     folders_to_glob = np.unique(folders_to_glob)
+    logging.info("Folders to glob: %s"%",".join(folders_to_glob))
     clients = []
     for fi in sorted(folders_to_glob):
         folders = glob.glob(fi)
         for folder in sorted(folders):
-
             if init:
                 files = os.listdir(folder)
             else:
                 items = glob.glob(os.path.join(folder, "*"))
                 mintime = UTCDateTime() + (86400 * float(mtime))
-                logging.debug("Will search for files more recent than %s" %
+                logging.info("Will search for files more recent than %s" %
                               mintime)
                 files = []
                 for item in items:
@@ -195,11 +194,11 @@ def main(init=False, threads=1):
                     if os.stat(item).st_mtime >= mintime:
                         files.append(item)
 
-            logging.debug("Files (%i) detected in %s folder: %s" %
-                          (len(files), folder, ",".join(files)))
+            logging.info("Files (%i) detected in %s folder: %s" %
+                         (len(files), folder, ",".join(files)))
             if len(files) != 0:
                 files = np.asarray(files, dtype=np.str)
-                logging.debug("%s"%",".join(files))
+                logging.info("%s" % ",".join(files))
                 logging.info('%s: Started' % folder)
                 client = Process(target=worker, args=([files, folder,
                                                        startdate, enddate,

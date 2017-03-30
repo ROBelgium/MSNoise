@@ -346,8 +346,6 @@ class MSNoiseTests(unittest.TestCase):
                 tr.stats.starttime += datetime.timedelta(days=1)
             out = f.replace("244", "245")
             st.write(out, format="MSEED")
-        print(os.listdir(os.path.join(self.data_folder, "2010", "UV05",
-                                      "HHZ.D")))
 
         from ..s01scan_archive import main
         try:
