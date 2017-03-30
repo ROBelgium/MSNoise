@@ -36,21 +36,22 @@ import sys
 import time
 from multiprocessing import Process
 from obspy import UTCDateTime
+# import multiprocessing_logging
 import numpy as np
-from subprocess import Popen, PIPE
-import traceback
+
 
 from .api import *
 from .data_structures import data_structure
 
 
+
 def worker(files, folder, startdate, enddate, goal_sampling_rate, init):
-    import logging
-    logging = logging.getLogger("worker-logger")
+    # import logging
     db = connect()
     added = 0
     modified = 0
     unchanged = 0
+    print(files)
     for file in files:
         if init:
             file = os.path.join(folder, file)
@@ -112,15 +113,11 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate, init):
     db.close()
     logging.debug("%s: Added %i | Modified %i | Unchanged %i", str(folder),
                   added, modified, unchanged)
-    return
+    return 0
+
 
 def main(init=False, threads=1):
-    logger = logging.getLogger('')
-    # logger.addHandler(
-    # multiprocessing_logging.MultiProcessingHandler('worker-logger'))
-
     t = time.time()
-
     logging.info('*** Starting: Scan Archive ***')
     db = connect()
 
@@ -137,14 +134,11 @@ def main(init=False, threads=1):
     if threads:
         nthreads = threads
     if get_tech() == 1 and nthreads > 1:
-        logging.info("You can not work on %i threads because SQLite only\
- supports 1 connection at a time" % nthreads)
+        logging.info("You can not work on %i threads because SQLite only"
+                     " supports 1 connection at a time" % nthreads)
         nthreads = 1
 
     logging.info("Will work on %i threads" % nthreads)
-    # find = get_config(db, 'find_command')
-    # if find == "":
-    #     find = "find"
 
     startdate = get_config(db, 'startdate')
     startdate = datetime.datetime.strptime(startdate, '%Y-%m-%d').date()
@@ -220,7 +214,7 @@ def main(init=False, threads=1):
                         client.join(0.01)
                         clients.remove(client)
                 
-    while len(clients) != 0:
+    while len(clients) > 0:
         for client in clients:
             client.join(0.01)
             if not client.is_alive():
