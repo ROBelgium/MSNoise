@@ -204,7 +204,7 @@ def main(init=False, threads=1):
                 files.remove('')
             if '.' in files:
                 files.remove('')
-
+            print("Files detected in %s folder:"%folder, files)
             if len(files) != 0:
                 files = np.asarray(files, dtype=np.str)
                 logging.info('%s: Started' % folder)
