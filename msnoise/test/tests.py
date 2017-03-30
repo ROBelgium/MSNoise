@@ -385,7 +385,7 @@ def main():
         sys.exit()
 
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
-    runner = unittest.TextTestRunner(verbosity=2)
+    runner = unittest.TextTestRunner(verbosity=4)
     result = runner.run(suite)
     if not result.wasSuccessful():
         sys.exit(1)
