@@ -143,11 +143,14 @@ def main(init=False, threads=1):
     startdate = datetime.datetime.strptime(startdate, '%Y-%m-%d').date()
     enddate = get_config(db, 'enddate')
     enddate = datetime.datetime.strptime(enddate, '%Y-%m-%d').date()
+    logging.info("Will search for files between %s and %s"%(startdate, enddate))
     goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
 
     data_folder = get_config(db, 'data_folder')
     data_struc = get_config(db, 'data_structure')
+
     channels = [c for c in get_config(db, 'channels').split(',')]
+    logging.debug("%s"%channels)
     folders_to_glob = []
     if data_struc in data_structure.keys():
         rawpath = data_structure[data_struc]
@@ -165,6 +168,7 @@ def main(init=False, threads=1):
             logging.info("No file named custom.py in the %s"
                          " folder" % os.getcwd())
             return
+    data_folder = os.path.realpath(data_folder)
     for year in range(startdate.year, min(datetime.datetime.now().year, enddate.year) + 1):
         for channel in channels:
             stafol = os.path.split(rawpath)[0].replace('YEAR', "%04i" % year).replace('DAY', '*').replace(

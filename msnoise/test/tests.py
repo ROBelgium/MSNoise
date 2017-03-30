@@ -3,7 +3,8 @@ import traceback
 import os
 import datetime
 import shutil
-
+import glob
+from obspy import read
 
 class MSNoiseTests(unittest.TestCase):
 
@@ -337,8 +338,7 @@ class MSNoiseTests(unittest.TestCase):
         main()
 
     def test_030_create_fake_new_files(self):
-        import glob
-        from obspy import read
+
         for f in sorted(glob.glob(os.path.join(self.data_folder, "2010", "*",
                                                "HHZ.D", "*"))):
             st = read(f)
