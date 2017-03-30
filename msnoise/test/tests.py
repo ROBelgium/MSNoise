@@ -2,10 +2,19 @@ import unittest
 import traceback
 import os
 import datetime
+import shutil
 
 
-# Here's our "unit tests".
 class MSNoiseTests(unittest.TestCase):
+
+    def setUp(self):
+        path = os.path.abspath(os.path.dirname(__file__))
+        data_folder = os.path.join(path, 'data')
+        if not os.path.isdir("data"):
+            shutil.copytree(data_folder, "data/")
+        self.data_folder = "data"
+
+
     def test_001_S01installer(self):
         from ..s000installer import main
         try:
@@ -28,8 +37,7 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, get_config, update_config
         db = connect()
         totests = []
-        path = os.path.abspath(os.path.dirname(__file__))
-        totests.append(['data_folder', os.path.join(path, 'data')])
+        totests.append(['data_folder', self.data_folder])
         totests.append(['data_structure', 'PDF'])
         totests.append(['network', 'YA'])
         totests.append(['components_to_compute', 'ZZ'])
@@ -318,7 +326,7 @@ class MSNoiseTests(unittest.TestCase):
             traceback.print_exc()
             self.fail()
 
-    def test_stretching(self):
+    def test_029_stretching(self):
         from ..api import connect, update_config, reset_jobs
         db = connect()
         update_config(db, "export_format", "MSEED")
@@ -327,6 +335,20 @@ class MSNoiseTests(unittest.TestCase):
 
         from ..stretch import main
         main()
+
+    def test_030_create_fake_new_files(self):
+        import glob
+        from obspy import read
+        for f in sorted(glob.glob(os.path.join(self.data_folder, "2010", "*",
+                                               "HHZ.D", "*"))):
+            st = read(f)
+            for tr in st:
+                tr.stats.starttime += datetime.timedelta(days=1)
+            out = f.replace("244", "245")
+            st.write(out, format="MSEED")
+        os.system("msnoise scan_archive")
+        os.system("msnoise new_jobs")
+        os.system("msnoise info -j")
 
 
 def main():
