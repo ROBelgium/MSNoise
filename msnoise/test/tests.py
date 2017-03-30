@@ -346,11 +346,21 @@ class MSNoiseTests(unittest.TestCase):
                 tr.stats.starttime += datetime.timedelta(days=1)
             out = f.replace("244", "245")
             st.write(out, format="MSEED")
-        os.system("msnoise -vvvv scan_archive")
-        os.system("msnoise -vvvv new_jobs")
-        os.system("msnoise -vvvv info -j")
+        from ..s01scan_archive import main
+        try:
+            main(init=False, threads=1)
+        except:
+            traceback.print_exc()
+            self.fail()
 
-    def test_031_check_done_jobs(self):
+        from ..s02new_jobs import main
+
+        try:
+            main()
+        except:
+            traceback.print_exc()
+            self.fail()
+
         from ..api import connect, get_job_types
         db = connect()
         jobs = get_job_types(db, 'CC')
