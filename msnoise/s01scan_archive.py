@@ -192,6 +192,8 @@ def main(init=False, threads=1):
             else:
                 items = glob.glob(os.path.join(folder, "*"))
                 mintime = UTCDateTime() + (86400 * float(mtime))
+                logging.debug("Will search for files more recent than %s" %
+                              mintime)
                 files = []
                 for item in items:
                     if not os.path.isfile(item):
@@ -199,9 +201,11 @@ def main(init=False, threads=1):
                     if os.stat(item).st_mtime >= mintime:
                         files.append(item)
 
-            print("Files detected in %s folder:" % folder, files)
+            logging.debug("Files (%i) detected in %s folder: %s" %
+                          (len(files), folder, ",".join(files)))
             if len(files) != 0:
                 files = np.asarray(files, dtype=np.str)
+                logging.debug("%s"%",".join(files))
                 logging.info('%s: Started' % folder)
                 client = Process(target=worker, args=([files, folder,
                                                        startdate, enddate,
