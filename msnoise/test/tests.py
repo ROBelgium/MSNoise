@@ -348,19 +348,10 @@ class MSNoiseTests(unittest.TestCase):
             st.write(out, format="MSEED")
 
         from ..s01scan_archive import main
-        try:
-            main(init=False, threads=1)
-        except:
-            traceback.print_exc()
-            self.fail()
+        main(init=False, threads=1)
 
         from ..s02new_jobs import main
-
-        try:
-            main()
-        except:
-            traceback.print_exc()
-            self.fail()
+        main()
 
         from ..api import connect, get_job_types
         db = connect()

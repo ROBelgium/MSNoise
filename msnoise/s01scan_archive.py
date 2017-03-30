@@ -152,7 +152,7 @@ def main(init=False, threads=1):
     channels = [c for c in get_config(db, 'channels').split(',')]
     logging.debug("%s"%channels)
     folders_to_glob = []
-    if data_struc in data_structure.keys():
+    if data_struc in data_structure:
         rawpath = data_structure[data_struc]
     elif data_struc.count('/') != 0:
         rawpath = data_struc
@@ -169,6 +169,7 @@ def main(init=False, threads=1):
                          " folder" % os.getcwd())
             return
     data_folder = os.path.realpath(data_folder)
+    logging.debug("Data Folder: %s" % data_folder)
     for year in range(startdate.year, min(datetime.datetime.now().year, enddate.year) + 1):
         for channel in channels:
             stafol = os.path.split(rawpath)[0].replace('YEAR', "%04i" % year).replace('DAY', '*').replace(
@@ -179,7 +180,7 @@ def main(init=False, threads=1):
                 'NET', sta.net).replace('STA', sta.sta))
                 folders_to_glob.append(tmp)
     folders_to_glob = np.unique(folders_to_glob)
-    logging.info("Folders to glob: %s"%",".join(folders_to_glob))
+    logging.info("Folders to glob: %s" % ",".join(folders_to_glob))
     clients = []
     for fi in sorted(folders_to_glob):
         folders = glob.glob(fi)
