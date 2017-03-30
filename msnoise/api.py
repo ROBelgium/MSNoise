@@ -493,7 +493,7 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
         data = DataAvailability(net, sta, comp, path, file, starttime, endtime,
                                 data_duration, gaps_duration, samplerate, flag)
         session.add(data)
-        toreturn = True
+        toreturn = 1
     else:
         modified = False
         for item in ['net', 'sta', 'comp', 'path', 'starttime', 'endtime',
@@ -512,7 +512,9 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
             data.gaps_duration = gaps_duration
             data.samplerate = samplerate
             data.flag = "M"
-        toreturn = False
+            toreturn = -1
+        else:
+            toreturn = 0
     session.commit()
     return toreturn
 

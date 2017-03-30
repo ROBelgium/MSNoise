@@ -36,19 +36,22 @@ import sys
 import time
 from multiprocessing import Process
 from subprocess import Popen, PIPE
+import traceback
 
 from .api import *
 from .data_structures import data_structure
 
 
-def worker(files, folder, startdate, enddate, goal_sampling_rate):
+def worker(files, folder, startdate, enddate, goal_sampling_rate, init):
     import logging
     logging = logging.getLogger("worker-logger")
     db = connect()
     added = 0
     modified = 0
+    unchanged = 0
     for file in files:
-        file = os.path.join(folder, file)
+        if init:
+            file = os.path.join(folder, file)
         try:
             name = os.path.split(file)[1]
             st = read(file, headonly=True)
@@ -94,15 +97,19 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate):
                         endtime, data_duration, gaps_duration,
                         data[0].stats.sampling_rate)
 
-                    if result:
+                    if result == 1:
                         added += 1
-                    else:
+                    elif result == -1:
                         modified += 1
+                    else:
+                        unchanged += 1
 
         except Exception as e:
             logging.debug("ERROR: %s", e)
+
     db.close()
-    logging.debug("%s: Added %i | Modified %i", str(folder), added, modified)
+    logging.debug("%s: Added %i | Modified %i | Unchanged %i", str(folder),
+                  added, modified, unchanged)
     return
 
 def main(init=False, threads=1):
@@ -152,50 +159,59 @@ def main(init=False, threads=1):
     elif data_struc.count('/') != 0:
         rawpath = data_struc
     else:
-        print("Can't parse the archive for format %s !" % data_struc)
-        print("trying to import local parser (should return a station list)")
-        print()
+        logging.info("Can't parse the archive for format %s !" % data_struc)
+        logging.info("trying to import local parser (should return a station"
+                     " list)")
+
         if os.path.isfile(os.path.join(os.getcwd(), 'custom.py')):
             sys.path.append(os.getcwd())
             from custom import data_structure as rawpath
         else:
-            print("No file named custom.py in the %s folder" % os.getcwd())
+            logging.info("No file named custom.py in the %s"
+                         " folder" % os.getcwd())
             return
     for year in range(startdate.year, min(datetime.datetime.now().year, enddate.year) + 1):
         for channel in channels:
             stafol = os.path.split(rawpath)[0].replace('YEAR', "%04i" % year).replace('DAY', '*').replace(
-                'HOUR', '*').replace('CHAN', channel).replace('TYPE', '*').replace('LOC', '*')
+                'HOUR', '*').replace('CHAN', channel).replace('TYPE', 'D').replace('LOC', '*')
+
             for sta in get_stations(db, all=False):
                 tmp = os.path.join(data_folder, stafol.replace(
                 'NET', sta.net).replace('STA', sta.sta))
                 folders_to_glob.append(tmp)
     folders_to_glob = np.unique(folders_to_glob)
-
     clients = []
     for fi in sorted(folders_to_glob):
         folders = glob.glob(fi)
         for folder in sorted(folders):
+
             if init:
                 files = os.listdir(folder)
             else:
+                shell = False
+                if os.name == "nt":
+                    shell = True
                 proc = Popen(
                     [find, folder, "-type", "f", "-mtime", mtime, "-print"],
-                    stdout=PIPE, stderr=PIPE)
+                    stdout=PIPE, stderr=PIPE, shell=shell)
                 stdout, stderr = proc.communicate()
-
                 if len(stdout) != 0:
-                    files = sorted(stdout.replace(b'\r', b'').split(b'\n'))
+                    files = sorted(stdout.splitlines())
                 else:
                     files = []
 
             if '' in files:
                 files.remove('')
+            if '.' in files:
+                files.remove('')
 
             if len(files) != 0:
+                files = np.asarray(files, dtype=np.str)
                 logging.info('%s: Started' % folder)
                 client = Process(target=worker, args=([files, folder,
                                                        startdate, enddate,
-                                                       goal_sampling_rate]))
+                                                       goal_sampling_rate,
+                                                       init]))
                 client.start()
                 clients.append(client)
             while len(clients) >= nthreads:
