@@ -15,7 +15,6 @@ class MSNoiseTests(unittest.TestCase):
             shutil.copytree(data_folder, "data/")
         self.data_folder = "data"
 
-
     def test_001_S01installer(self):
         from ..s000installer import main
         try:
@@ -311,23 +310,7 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(len(datelist), 731)
         db.close()
 
-    def test_028_S01installer(self):
-        if "TRAVIS" not in os.environ:
-            print("Seems to be running on local machine, skipping MySQL test")
-            return
-        import shutil
-        shutil.move('db.ini', 'db.bak')
-        from ..s000installer import main
-        try:
-            ret = main(tech=2, username="root", password="",
-                       hostname="localhost", database="msnoise")
-            msg = "Installation Done! - Go to Configuration Step!"
-            self.failUnlessEqual(ret, msg)
-        except:
-            traceback.print_exc()
-            self.fail()
-
-    def test_029_stretching(self):
+    def test_028_stretching(self):
         from ..api import connect, update_config, reset_jobs
         db = connect()
         update_config(db, "export_format", "MSEED")
@@ -337,8 +320,7 @@ class MSNoiseTests(unittest.TestCase):
         from ..stretch import main
         main()
 
-    def test_030_create_fake_new_files(self):
-
+    def test_029_create_fake_new_files(self):
         for f in sorted(glob.glob(os.path.join(self.data_folder, "2010", "*",
                                                "HHZ.D", "*"))):
             st = read(f)
@@ -362,6 +344,21 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(jobs[1][0], 3)
         self.failUnlessEqual(jobs[1][1], 'T')
 
+    def test_099_S01installer(self):
+        if "TRAVIS" not in os.environ:
+            print("Seems to be running on local machine, skipping MySQL test")
+            return
+        import shutil
+        shutil.move('db.ini', 'db.bak')
+        from ..s000installer import main
+        try:
+            ret = main(tech=2, username="root", password="",
+                       hostname="localhost", database="msnoise")
+            msg = "Installation Done! - Go to Configuration Step!"
+            self.failUnlessEqual(ret, msg)
+        except:
+            traceback.print_exc()
+            self.fail()
 
 def main():
     import matplotlib.pyplot as plt
