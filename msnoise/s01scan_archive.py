@@ -35,6 +35,7 @@ import logging.handlers
 import sys
 import time
 from multiprocessing import Process
+from obspy import UTCDateTime
 from subprocess import Popen, PIPE
 import traceback
 
@@ -140,9 +141,9 @@ def main(init=False, threads=1):
         nthreads = 1
 
     logging.info("Will work on %i threads" % nthreads)
-    find = get_config(db, 'find_command')
-    if find == "":
-        find = "find"
+    # find = get_config(db, 'find_command')
+    # if find == "":
+    #     find = "find"
 
     startdate = get_config(db, 'startdate')
     startdate = datetime.datetime.strptime(startdate, '%Y-%m-%d').date()
@@ -188,17 +189,14 @@ def main(init=False, threads=1):
             if init:
                 files = os.listdir(folder)
             else:
-                shell = False
-                if os.name == "nt":
-                    shell = True
-                proc = Popen(
-                    [find, folder, "-type", "f", "-mtime", mtime, "-print"],
-                    stdout=PIPE, stderr=PIPE, shell=shell)
-                stdout, stderr = proc.communicate()
-                if len(stdout) != 0:
-                    files = sorted(stdout.splitlines())
-                else:
-                    files = []
+                items = glob.glob(os.path.join(folder, "*"))
+                mintime = UTCDateTime() + (86400 * float(mtime))
+                files = []
+                for item in items:
+                    if not os.path.isfile(item):
+                        continue
+                    if os.stat(item).st_mtime >= mintime:
+                        files.append(item)
 
             if '' in files:
                 files.remove('')
