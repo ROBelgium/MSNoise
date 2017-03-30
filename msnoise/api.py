@@ -1026,12 +1026,12 @@ def stack(session, data):
             phasestack.imag += np.sin(phase)
         coh = 1. / data.shape[0] * np.abs(phasestack)
 
-        timegate_samples = pws_timegate *\
-                           goal_sampling_rate
+        timegate_samples = int(pws_timegate * goal_sampling_rate)
         coh = np.convolve(sp.signal.boxcar(timegate_samples) /
                           timegate_samples, coh, 'same')
+        coh = np.power(coh, pws_power)
         for c in data:
-            corr += c * np.power(coh, pws_power)
+            corr += c * coh
         corr /= data.shape[0]
 
     return corr
