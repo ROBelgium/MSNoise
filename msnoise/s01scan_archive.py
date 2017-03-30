@@ -36,6 +36,7 @@ import sys
 import time
 from multiprocessing import Process
 from obspy import UTCDateTime
+import numpy as np
 from subprocess import Popen, PIPE
 import traceback
 
@@ -198,11 +199,7 @@ def main(init=False, threads=1):
                     if os.stat(item).st_mtime >= mintime:
                         files.append(item)
 
-            if '' in files:
-                files.remove('')
-            if '.' in files:
-                files.remove('')
-            print("Files detected in %s folder:"%folder, files)
+            print("Files detected in %s folder:" % folder, files)
             if len(files) != 0:
                 files = np.asarray(files, dtype=np.str)
                 logging.info('%s: Started' % folder)
