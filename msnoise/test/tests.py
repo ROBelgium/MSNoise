@@ -354,6 +354,7 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, get_job_types
         db = connect()
         jobs = get_job_types(db, 'CC')
+        print(jobs)
         self.failUnlessEqual(jobs[0][0], 3)
         self.failUnlessEqual(jobs[0][1], 'D')
         self.failUnlessEqual(jobs[1][0], 3)
