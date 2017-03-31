@@ -11,15 +11,12 @@ matrix:
     #  anaconda..)
     - os: linux
       env: PYTHON_VERSION=2.7
-      language: python
 
     - os: linux
       env: PYTHON_VERSION=3.5
-      language: python
 
     - os: osx
       env: PYTHON_VERSION=3.5
-      language: python
 
 
 sudo: false
