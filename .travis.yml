@@ -2,7 +2,7 @@
 # https://gist.github.com/dan-blanchard/7045057
 # and
 # https://github.com/Jorge-C/ordination/blob/master/.travis.yml
-language: python
+language: c
 
 matrix:
   include:
@@ -20,16 +20,6 @@ matrix:
 
 
 sudo: false
-
-# Need to set this so that packages installed with apt-get are available
-virtualenv:
-  system_site_packages: true
-
-addons:
-  apt:
-    packages:
-      - libsamplerate0
-      - libsamplerate0-dev
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
