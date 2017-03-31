@@ -50,7 +50,6 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate, init):
     added = 0
     modified = 0
     unchanged = 0
-    print(files)
     for file in files:
         if init:
             file = os.path.join(folder, file)
@@ -63,12 +62,12 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate, init):
                 data = st.select(network=net, station=sta,
                                  location=loc, channel=chan)
                 if data[-1].stats.endtime.date < startdate:
-                    logging.info(
+                    logging.debug(
                         '%s: Before Start-Date!' % (id))
                 elif data[0].stats.starttime.date > enddate:
-                    logging.info('%s: After End-Date!' % (id))
+                    logging.debug('%s: After End-Date!' % (id))
                 elif data[0].stats.sampling_rate < goal_sampling_rate:
-                    logging.info("%s: Sampling rate smaller than CC sampling"
+                    logging.debug("%s: Sampling rate smaller than CC sampling"
                                  " rate" % id)
                 else:
                     gaps = data.get_gaps()
@@ -110,7 +109,7 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate, init):
             logging.debug("ERROR: %s", e)
 
     db.close()
-    logging.debug("%s: Added %i | Modified %i | Unchanged %i", str(folder),
+    logging.info("%s: Added %i | Modified %i | Unchanged %i", str(folder),
                   added, modified, unchanged)
     return 0
 
@@ -137,7 +136,7 @@ def main(init=False, threads=1):
                      " supports 1 connection at a time" % nthreads)
         nthreads = 1
 
-    logging.info("Will work on %i threads" % nthreads)
+    logging.info("Will work on %i thread(s)" % nthreads)
 
     startdate = get_config(db, 'startdate')
     startdate = datetime.datetime.strptime(startdate, '%Y-%m-%d').date()
@@ -150,7 +149,7 @@ def main(init=False, threads=1):
     data_struc = get_config(db, 'data_structure')
 
     channels = [c for c in get_config(db, 'channels').split(',')]
-    logging.debug("%s"%channels)
+    logging.debug("Will search for channels: %s" % channels)
     folders_to_glob = []
     if data_struc in data_structure:
         rawpath = data_structure[data_struc]
@@ -180,7 +179,7 @@ def main(init=False, threads=1):
                 'NET', sta.net).replace('STA', sta.sta))
                 folders_to_glob.append(tmp)
     folders_to_glob = np.unique(folders_to_glob)
-    logging.info("Folders to glob: %s" % ",".join(folders_to_glob))
+    logging.debug("Folders to glob: %s" % ",".join(folders_to_glob))
     clients = []
     for fi in sorted(folders_to_glob):
         folders = glob.glob(fi)
@@ -190,7 +189,7 @@ def main(init=False, threads=1):
             else:
                 items = glob.glob(os.path.join(folder, "*"))
                 mintime = UTCDateTime() + (86400 * float(mtime))
-                logging.info("Will search for files more recent than %s" %
+                logging.debug("Will search for files more recent than %s" %
                               mintime)
                 files = []
                 for item in items:
@@ -199,11 +198,10 @@ def main(init=False, threads=1):
                     if os.stat(item).st_mtime >= mintime:
                         files.append(item)
 
-            logging.info("Files (%i) detected in %s folder: %s" %
-                         (len(files), folder, ",".join(files)))
+            logging.debug("Files detected in %s folder: %i" %
+                         (folder,len(files)))
             if len(files) != 0:
                 files = np.asarray(files, dtype=np.str)
-                logging.info("%s" % ",".join(files))
                 logging.info('%s: Started' % folder)
                 client = Process(target=worker, args=([files, folder,
                                                        startdate, enddate,
