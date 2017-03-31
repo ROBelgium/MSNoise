@@ -47,7 +47,6 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n" + ispresent('pymysql')
         output += "\n" + ispresent('flask')
         output += "\n" + ispresent('flask_admin')
-        output += "\n" + ispresent('multiprocessing_logging')
         output += "\n" + ispresent('markdown')
         output += "\n" + ispresent('wtforms')
         output += "\n" + ispresent('folium')

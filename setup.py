@@ -16,7 +16,6 @@ setup(version="1.5a",
           'pymysql',
           'flask',
           'flask-admin',
-          'multiprocessing_logging',
           'markdown',
           'folium',
           'wtforms',
@@ -35,4 +34,4 @@ setup(version="1.5a",
       keywords="noise monitoring seismic velocity change dvv dtt doublet"
                " stretching cross-correlation acoustics seismology",
       zip_safe=False,
-)
+      )

@@ -8,7 +8,7 @@ MSNoise is a set of Python codes that use a database (sqlite or MySQL) and
 the `find` command. When installed, it provides a top level command ``msnoise``
 in the console.
 
-.. note:: MSNoise version 1.4 introduces new config parameters in the database.
+.. note:: MSNoise version 1.5 introduces new config parameters in the database.
     For each project, to upgrade your database, remember to run
     ``msnoise upgrade_db`` in the project folder.
 
@@ -16,7 +16,11 @@ in the console.
 To run MSNoise, you need:
 
 * A recent version of Python (3.x recommended). We suggest using Anaconda_
-  with extra modules (those modules are already distributed with Anaconda_):
+  with a few extra modules. MSNoise is tested "continuously" by automatic
+  build systems (TravisCI and Appeveyor) for Python 2.7 and Python 3.5, on
+  Windows, Linux and MacOSX 64 bits systems.
+
+  Those modules are already distributed with Anaconda_:
 
   * setuptools
   * numpy
@@ -34,7 +38,6 @@ To run MSNoise, you need:
 
   * obspy
   * flask-admin
-  * multiprocessing_logging
   * markdown
   * folium
 
@@ -43,9 +46,6 @@ To run MSNoise, you need:
   MySQL Server beforehand. This is not needed for sqlite.
   Read :ref:`aboutdbandperformances` for more information.
   We recommend using MySQL.
-
-* The `find` command: present by default on linux and available with gow_
-  on Windows.
 
 
 Python and Packages Installation
@@ -80,19 +80,16 @@ Full Installation
 
    On Linux, the MySQL server can also be installed using the following command:
 
-        .. code-block:: sh
+    .. code-block:: sh
 
-            sudo apt-get install mysql-server
+        sudo apt-get install mysql-server
 
 4. Create a privileged user and a database:
 
    * Start MySQL Workbench and connect to the local database
    * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
 
-5. WINDOWS ONLY: Install gow_ and make sure its /bin directory is in the beginning of the System PATH (Control Panel -> Environment Variables -> Machine -> PATH).
-   After that, the find command should be available in cmd.exe. If this fails, you will have to provide the full path to find.exe in the configuration (``find_command``).
-
-6. Install the latest release version of MSNoise:
+5. Install the latest release version of MSNoise:
 
    .. code-block:: sh
 
@@ -100,13 +97,12 @@ Full Installation
 
    Power user could install the development version too, but it is not recommended.
 
-7. Check which required packages you are still missing by executing the ``msnoise bugreport`` command. (See :ref:`testing`)
+6. Check which required packages you are still missing by executing the ``msnoise bugreport`` command. (See :ref:`testing`)
 
-8. To be sure all is running OK, one could start the ``msnoise test`` command in an empty directory.
+7. To be sure all is running OK, one could start the ``msnoise test`` command in an empty directory.
    This will start the standard MSNoise test suite, which should end with a "Ran xx tests in yy seconds : OK".
 
 8. Proceed to the :ref:`Workflow` description to start MSNoise!
-
 
 Done !
 

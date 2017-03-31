@@ -36,8 +36,6 @@ import sys
 import time
 from multiprocessing import Process
 from obspy import UTCDateTime
-# import multiprocessing_logging
-
 
 
 from .api import *

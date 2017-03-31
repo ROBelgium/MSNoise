@@ -23,6 +23,7 @@ massive amount of work since the last one: in `GitHub numbers
 , it's over 100 commits and about 2500 lines of code and documentation changed
 or added!
 
+
 MSNoise 1.5 introduces **XXXX major new features** :
 
 * new preprocessing function, returns streams, NO MERGE TO ZEROS anymore
@@ -39,7 +40,7 @@ MSNoise 1.5 introduces **XXXX major new features** :
 * this documentation is now available in PDF too (easier for offline usage)
 * custom archive structure can now directly be input in the config (need at least one slash)
 * everything in compute_cc and preprocessing is obspy stream
-*
+* dropped the need for "find" to be present
 
 
 Parameters
@@ -52,6 +53,15 @@ Parameters
 
 In MSNoise 1.5 we drop the dependency to `statsmodels` in favour of our own
 linear regression routine that we included in `obspy` as of version 1.1.
+
+
+Since 1.4, MSNoise is "tested" automatically on Linux (thanks to TravisCI)
+& Windows (thanks to Appveyor), for Python versions 2.7 and 3.5. With MSNoise
+1.5 we also added the MacOSX tests on TravisCI. With these tests, we can
+guarantee MSNoise works on different platforms and Anaconda (or miniconda)
+python versions.
+
+Yes, **MSNoise is Python 3 compatible** !!!
 
 
 This version has benefited from outputs/ideas/pull requests/questions from
