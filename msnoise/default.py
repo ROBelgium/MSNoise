@@ -32,7 +32,6 @@ default['stack_method'] = ["Stack Method: Linear Mean or Phase Weighted Stack: [
 default['pws_timegate'] = ["If stack_method='pws', width of the smoothing in seconds : 10.0 ",'10.0']
 default['pws_power'] = ["If stack_method='pws', Power of the Weighting: 2.0 ",'2.0']
 
-# default['find_command'] = ["Full path to the find command on the local OS (including /find or /find.exe at the end). If empty, the default machine *find* will be called", ""]
 default['crondays'] = ["Number of days to monitor with cron [-1], must be a negative number", '-1']
 
 default['components_to_compute'] = ["List (comma separated) [ZZ]", 'ZZ']
