@@ -31,7 +31,7 @@ MSNoise 1.5 introduces a series of **new features** :
   ``statsmodels``, required to move `mwcs` to ObsPy later.
 
 * The preprocessing routine has been isolated, rewritten and optimized. It is
-  now a standalone script, callable by plugings. It returns a Stream object with
+  now a standalone script, callable by plugins. It returns a Stream object with
   all the data needed for the analysis.
 
 * This change in preprocessing was done mostly to allow cross-component, auto-
@@ -39,7 +39,8 @@ MSNoise 1.5 introduces a series of **new features** :
   the same code. CC, SC and AC are now supported in MSNoise with proper
   whitening (possible to disable spectral whitening for specific cases).
 
-* This documentation is now available in PDF too (easier for offline usage)
+* This documentation is now available in PDF_ too (easier for offline usage) and
+  it also includes a new tutorial for setting up the MySQL server and Workbench.
 
 * Last but not least: MSNoise is "tested" automatically on Linux (thanks to
   TravisCI) & Windows (thanks to Appveyor), for Python versions 2.7 and 3.5.
@@ -63,7 +64,7 @@ several users/friends (listed alphabetically):
 Thanks to all for using MSNoise, and please, let us know why/how you use it
 (and please cite it!)!
 
-To date, we found/are aware of XXX publications using MSNoise ! That's the best
+To date, we found/are aware of 25 publications using MSNoise ! That's the best
 validation of our project ever ! See the full list on the
 `MSNoise website <http://www.msnoise.org/they-cite-msnoise/>`_.
 
@@ -283,6 +284,12 @@ Improvements in terms of performances have also been done for MSNoise 1.5:
 * The preprocessing only reads files that should contain the right component.
 * The stretching code has been improved (thanks to Clare Donaldson)
 
+Documentation
+-------------
+
+* New tutorial for installing and configuring MySQL and MySQL workbench.
+* The Workflow is separated in steps (See :ref:`workflow`))
+* The Documentation is now available in PDF format (PDF_).
 
 Upgrading an existing project to MSNoise 1.5
 --------------------------------------------
@@ -331,3 +338,5 @@ directly. If these developments are within the focus of the developers'
 research, then a collaboration, i.e. resulting in a co-authored peer reviewed
 publication, can be an option. Otherwise, you can contract us for
 paid-developments.
+
+.. _PDF: http://msnoise.org/doc/MSNoise.pdf
