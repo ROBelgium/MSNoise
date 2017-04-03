@@ -16,7 +16,7 @@ Release notes:
 
 Introduction
 ------------
-Just over XXX after the last major release (:doc:`msnoise-1.4`) we are proud
+About 1 year after the last major release (:doc:`msnoise-1.4`) we are proud
 to announce the new :doc:`msnoise-1.5`. It is a **major** release, with a
 massive amount of work since the last one: in `GitHub numbers
 <https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2016-06-02&to=2017-04-30&type=c>`_
@@ -24,53 +24,39 @@ massive amount of work since the last one: in `GitHub numbers
 or added!
 
 
-MSNoise 1.5 introduces **XXXX major new features** :
+MSNoise 1.5 introduces a series of **new features** :
 
-* new preprocessing function, returns streams, NO MERGE TO ZEROS anymore
-* started to move core math functions to obspy (and move2obspy)
-* default Lanczos resampling method now
-* all-component possible
-* autocorr-not-whitened + more explanation from lukas about whitening types
-* dvv plot allows averaging over components
-* stretching improvements
-* reduced the memory imprint caused by scipy's caching of FFT arrays
-* cross-correlation between slices are only possible when the two traces are longer than 2 times the maxlag defined
-* add a default delay of 1 (customizable) to start parallel threads (using -t)
-* new `make_same_length` API method to return common data for two traces
-* this documentation is now available in PDF too (easier for offline usage)
-* custom archive structure can now directly be input in the config (need at least one slash)
-* everything in compute_cc and preprocessing is obspy stream
-* dropped the need for "find" to be present
+* We have started to move core math functions to ObsPy, currently the only one
+  ready is `linear_regression`, a function I wrote to remove the dependency to
+  ``statsmodels``, required to move `mwcs` to ObsPy later.
 
+* The preprocessing routine has been isolated, rewritten and optimized. It is
+  now a standalone script, callable by plugings. It returns a Stream object with
+  all the data needed for the analysis.
 
-Parameters
+* This change in preprocessing was done mostly to allow cross-component, auto-
+  correlation and cross-correlation, with or without rotation, to be done with
+  the same code. CC, SC and AC are now supported in MSNoise with proper
+  whitening (possible to disable spectral whitening for specific cases).
 
-* REMOVED: decimation_factor : it's now computed automatically
-* REMOVED: ZZ, RR, TT, etc in favour of `components_to_compute`
-* ADDED: components_to_compute: it's accepting a comma-separated list of components
-* ADDED: whitening method +LUKAS
+* This documentation is now available in PDF too (easier for offline usage)
 
-
-In MSNoise 1.5 we drop the dependency to `statsmodels` in favour of our own
-linear regression routine that we included in `obspy` as of version 1.1.
-
-
-Since 1.4, MSNoise is "tested" automatically on Linux (thanks to TravisCI)
-& Windows (thanks to Appveyor), for Python versions 2.7 and 3.5. With MSNoise
-1.5 we also added the MacOSX tests on TravisCI. With these tests, we can
-guarantee MSNoise works on different platforms and Anaconda (or miniconda)
-python versions.
-
-Yes, **MSNoise is Python 3 compatible** !!!
+* Last but not least: MSNoise is "tested" automatically on Linux (thanks to
+  TravisCI) & Windows (thanks to Appveyor), for Python versions 2.7 and 3.5.
+  With MSNoise 1.5 we also added the MacOSX tests on TravisCI. With these tests,
+  we can guarantee MSNoise works on different platforms and Anaconda
+  (or miniconda) python versions.
 
 
 This version has benefited from outputs/ideas/pull requests/questions from
-several users/friends:
+several users/friends (listed alphabetically):
 
-* Lukas Preiswerk
+* Raphael De Plaen
 * Clare Donaldson
 * Robert Green
-* ...
+* Aurelien Mordret
+* Lukas Preiswerk
+* The participants to the NERC MSNoise Liverpool Workshop in January 2017
 * all others (don't be mad :-) )
 
 
@@ -82,7 +68,7 @@ validation of our project ever ! See the full list on the
 `MSNoise website <http://www.msnoise.org/they-cite-msnoise/>`_.
 
 
-*Thomas & Corentin*
+*Thomas, Corentin and others*
 
 
 ~~~~
@@ -98,10 +84,11 @@ for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
 Requirements
 ------------
 
-If you have any package older than those mentioned here, some things might not work as expected.
+If you have any package older than those mentioned here, some things might not
+work as expected.
 
-* Pandas > 0.18.0
-* obspy > 1.1
+* Pandas >= 0.18.0
+* obspy >= 1.1
 * Scikits-samplerate no longer needed
 * statsmodels is no longer needed
 
@@ -109,15 +96,146 @@ If you have any package older than those mentioned here, some things might not w
 Web-based Admin Interface Changes
 ---------------------------------
 
-* Bugfix: Stations can be added manually
+* Bugfix: Stations can now be added manually
 * Bugfix: Bulk operations on Job based on their jobtype is now possible
-* Feature: Calling admin/data_availability.png should serve the image directy
 * Bugfix: Set debug-mode to False to increase performance and remove the risk
   of Werkzeug failing.
-* Feature: It's now possible to "Brand" MSNoise by setting an environment
-  variable `msnoise_brand` to `CustomName|http://custom.url/logo.png`
+
+* Feature: Calling admin/data_availability.png should serve the image directy
+* Feature: It's now possible to "Brand" MSNoise:
+  The name and the logo of the page can be overriden by setting an environment
+  variable with a name and the HTML tag of the logo image:
+
+  .. code:: sh
+
+      set msnoise_brand="ROB|<img src='http://www.seismologie.be/img/oma/ROB-logo.svg' width=200 height=200>"
+
+  and then starting msnoise admin:
+
+  .. image:: ../.static/branding.png
+      :align: center
+
+Configuration Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+* REMOVED: ``decimation_factor``: it's now computed automatically from the
+  stream's sampling rate. If the decimation factor is non-integer, the routine
+  exits and the user is advised to use the Lanczos resampler.
+* REMOVED: `ZZ`, `RR`, `TT`, etc in favor of ``components_to_compute``.
+* ADDED: ``components_to_compute``: it's accepting a comma-separated list of
+  components.
+* ADDED: ``whitening`` method for disabling spectral whitening in specific
+  cases.
+
+Populate Station Table and Scan Archive
+---------------------------------------
 
 
+* Because of platform-dependent issues, we dropped the need for the "find"
+  command to be present on each machine. The "cron" scan_archive procedure is
+  now a simple python routine. It might take a little longer, but much safer.
+  This also means the ``crondays`` parameter can be set to a floating point
+  value, "-1.0" meaning "files modified in the last 1 day".
+
+* The custom archive structure can now directly be input in the config.
+  This is still quite preliminary and need at least one slash in the parameter
+  value to be identified as such by the code.
+
+Expert/Lazy mode
+~~~~~~~~~~~~~~~~
+
+* Added an Expert/Lazy mode to input network/stations directly from the data
+  scanned using the new ``scan_archive --path`` procedure
+  (:ref:`"see here"<populate-expert>`).
+
+* Added an Expert/Lazy mode to scan files directly by passing the path of their
+  containing folder to ``scan_archive`` :ref:`"see here"<scan-archive-expert>`.
+
+* The ``scan_archive`` is now capable of handling multiplexed files and inputs
+  one line in DataAvailability per unique "trace id" in files.
+
+Practically, the three changes above allow users to:
+
+#. Download a single or few mseed file with N stations, for example from webdc
+   or using FDSN webservices in ObsPy or else.
+#. Run ``msnoise install``
+#. Run ``msnoise scan_archive --path /path/to/the/big/file/``
+#. Run ``msnoise populate --fromDA``
+#. Run ``msnoise admin``, define (pre-)processing and filter parameters
+#. Run ``msnoise compute_cc``
+
+
+Preprocessing and Cross-Correlation
+-----------------------------------
+
+Preprocessing
+~~~~~~~~~~~~~
+
+* A complete rewrite of the preprocessing function to avoid padding and merging
+  to zero. The preprocessing function is now separated from the ``compute_cc``
+  code and can be called by external plugins. It returns a Stream object that
+  can easily be filtered or slided.
+* The instrument response removal has been accelerated by doing it after
+  decimation, on fewer data (Thanks to Robert Green).
+  The response removal is done without the `evalresp` stuff from ObsPy, it's
+  faster but potentially a little less safe.
+* The default decimation tool is now Lanczos (builtin in ObsPy) and
+  scikits.samplerate is no longer needed.
+
+Cross-Correlation
+~~~~~~~~~~~~~~~~~
+
+* It is now possible to do the Cross-Correlation (classic "CC"), the Auto-
+  Correlation ("AC") or the Cross-Components within the same station ("SC").
+  To achieve this, we removed the `ZZ`, `ZT`, etc parameters from the
+  configuration and replaced it with ``components_to_compute`` which takes a list:
+  e.g. `ZZ,ZE,ZN,EZ,EE,EN,NZ,NE,NN` for the full non-rotated tensor between
+  stations. If `autocorr` is set to "Y", then the cross-components (SC) of each
+  station will also be computed.
+
+* The cross-correlation is done on sliding windows on the available data. If one
+  trace contains a gap, the window is skipped. This corrects previous errors
+  linked with gaps synchronised in time that lead to perfect sinc autocorr
+  functions. The windows should have a duration of at least 2 times the `maxlag`
+  configuration value.
+
+* The whitening procedure can be skipped by setting the ``whitening``
+  configuration to `None`. The two other ``whitening`` modes are "[A]ll except
+  for auto-correlation" or "Only if [C]omponents are different". This allows
+  skipping the whitening when, for example, computing ZZ components for very
+  close by stations (much closer than the wavelength sampled), leading to
+  spatial autocorrelation issues.
+
+
+Command Line changes
+--------------------
+
+
+* ``msnoise config --sync`` will try to parse the dataless files for existing
+  stations in the Station table an, if found, will input the coordinates.
+* ``msnoise scan_archive --path`` will only scan the ``path`` independently of
+  its structure. It will only read files, not "walk" in subfolders.
+* ``msnoise populate --fromDA`` will populate the station table from the
+  existing data_availability table.
+* ``msnoise p`` is a lazy alias to ``msnoise plugin``
+* add a default delay of 1 second (customizable) to start parallel
+  threads (using -t)
+
+
+Note, all commands are documented: :doc:`../clickhelp/msnoise`.
+
+
+API Changes
+-----------
+
+* New ``make_same_length`` API method to return common data for two traces, this
+  is necessary to compute the rotation of the horizontal traces to Radial/
+  Transverse.
+
+* New ``clean_scipy_cache`` API method to reduce the memory imprint caused by
+  scipy's automatic caching of FFT arrays.
+
+See :doc:`../api`.
 
 Plugin support
 --------------
@@ -130,50 +248,40 @@ Plugin support
 See :doc:`../plugins`.
 
 
-Command Line changes
---------------------
-
-
-* msnoise config --sync
-* msnoise scan_archive --path
-* msnoise populate --fromDA
-* msnoise p == msnoise plugin
-* add a default delay of 1 (customizable) to start parallel threads (using -t)
-
-
-Note, all commands are documented: :doc:`../clickhelp/msnoise`.
-
-
 Other Bugfixes
 --------------
 
-* Removed the call to `scipy.stats.nanmean` and replaced by `numpy.nanmean`
+* Removed the call to ``scipy.stats.nanmean`` and replaced by ``numpy.nanmean``
 * Better error message in compute_cc when the content of the slice is only zeros
-  or smaller than `rms_threshold`
+  or smaller than ``rms_threshold``
 * Checked all "integer" - "float" warnings from numpy/scipy
-* crondays were hardcoded to -2, now taking the `crondays` value from the DB
-* Py3 error when `msnoise scan_archive` in cron mode
-
-
+* crondays were hardcoded to -2, now taking the ``crondays`` value from the DB
+* Py3 error when ``msnoise scan_archive`` in cron mode
 
 
 Plot Updates
 ------------
 
-* The ccftime now accepts -e (--envelope) and will plot the envelope of the ccfs
-* Most plots have better titles (filter details, etc)
+* ``msnoise plot ccftime`` now accepts -e (--envelope) and will plot the
+  envelope of the ccfs.
+* Most plots have better titles (filter details, etc).
+* The dv/v plot now allows averaging over components by passing them as comma-
+  separated values.
 
 
-Performance improvements
-------------------------
+Performance and Code improvements
+---------------------------------
 
 Improvements in terms of performances have also been done for MSNoise 1.5:
 
-* Added fftpack optimized nfft (scipy's next_fast_len) !! smoothing warning !!
-* Replaced binarization (sign) and windsorizing (clip) by standard numpy functions
-  operating directly inplace on the arrays, avoiding unecessary copies
-* preprocessing only reads files that should contain the right component
-
+* Added fftpack optimized nfft (scipy's next_fast_len). This could lead to some
+  small differences in the final result of the MWCS procedure, because of the
+  number of points used for smoothing the (cross-)spectra.
+* Replaced binarization (sign) and windsorizing (clip) by standard numpy
+  functions operating directly inplace on the arrays, avoiding unecessary
+  copies.
+* The preprocessing only reads files that should contain the right component.
+* The stretching code has been improved (thanks to Clare Donaldson)
 
 
 Upgrading an existing project to MSNoise 1.5
@@ -189,7 +297,11 @@ Running the following command will take care of the upgrade from 1.4 to 1.5:
     msnoise upgrade_db
 
 
+.. warning::
 
+    Upgradind the database **will not** remove deprecated configuration bits, so
+    users should remember to define, for example, the ``components_to_compute``
+    parameter if anything else than ``ZZ`` was set before.
 
 
 A final note about development pace and choices
@@ -200,7 +312,7 @@ A final note about development pace and choices
   * **1 developper** (Thomas)
   * 1 dedicated debugger (Corentin)
   * less than 5 really *active* users, providing feedback and/or lines of codes
-    (Esteban, Raphaël, Aurélien, Carmelo, ...)
+    (Esteban, Raphaël, Aurélien, Carmelo, Clare, Rob ...)
 
 * All software engineering ideas are coming from too infrequent beerstormings
   between Thomas & others
