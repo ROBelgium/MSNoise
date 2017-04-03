@@ -83,60 +83,7 @@ def preprocess(db, stations, comps, goal_day, params):
                     else:
                         trace.detrend(type="demean")
                         trace.detrend(type="linear")
-                        trace.taper(max_percentage = None, max_length=1.0)
-
-                if get_config(db, 'remove_response', isbool=True):
-                    logging.debug('Removing instrument response')
-                    response_format = get_config(db, 'response_format')
-                    response_prefilt = eval(get_config(db, 'response_prefilt'))
-                    files = glob.glob(os.path.join(get_config(db,
-                                                              'response_path'),
-                                                   "*"))
-                    if response_format == "inventory":
-                        firstinv = True
-                        inventory = None
-                        for file in files:
-                            try:
-                                inv = read_inventory(file)
-                                if firstinv:
-                                    inventory = inv
-                                    firstinv = False
-                                else:
-                                    inventory += inv
-                            except:
-                                traceback.print_exc()
-                                pass
-                        if inventory:
-                            stream.attach_response(inventory)
-                            stream.remove_response(output='VEL',
-                                                   pre_filt=response_prefilt)
-                    elif response_format == "dataless":
-                        for file in files:
-                            p = Parser(file)
-                            try:
-                                p.getPAZ(stream[0].id,
-                                         datetime=UTCDateTime(gd))
-                                break
-                            except:
-                                traceback.print_exc()
-                                del p
-                                continue
-                        stream.simulate(seedresp={'filename': p, "units": "VEL"},
-                                        pre_filt=response_prefilt,
-                                        paz_remove=None,
-                                        paz_simulate=None, )
-                    elif response_format == "paz":
-                        msg = "Unexpected type for `response_format`: %s" % \
-                              response_format
-                        raise TypeError(msg)
-                    elif response_format == "resp":
-                        msg = "Unexpected type for `response_format`: %s" % \
-                              response_format
-                        raise TypeError(msg)
-                    else:
-                        msg = "Unexpected type for `response_format`: %s" % \
-                              response_format
-                        raise TypeError(msg)
+                        trace.taper(max_percentage=None, max_length=1.0)
 
                 for trace in stream:
                     logging.debug(
@@ -173,6 +120,60 @@ def preprocess(db, stations, comps, goal_day, params):
                             trace.interpolate(method="lanczos", sampling_rate=params.goal_sampling_rate, a=1.0)
 
                         trace.stats.sampling_rate = params.goal_sampling_rate
+
+                if get_config(db, 'remove_response', isbool=True):
+                    logging.debug('Removing instrument response')
+                    response_format = get_config(db, 'response_format')
+                    response_prefilt = eval(get_config(db, 'response_prefilt'))
+                    files = glob.glob(os.path.join(get_config(db,
+                                                              'response_path'),
+                                                   "*"))
+                    if response_format == "inventory":
+                        firstinv = True
+                        inventory = None
+                        for file in files:
+                            try:
+                                inv = read_inventory(file)
+                                if firstinv:
+                                    inventory = inv
+                                    firstinv = False
+                                else:
+                                    inventory += inv
+                            except:
+                                traceback.print_exc()
+                                pass
+                        if inventory:
+                            stream.attach_response(inventory)
+                            stream.remove_response(output='VEL',
+                                                   pre_filt=response_prefilt)
+                    elif response_format == "dataless":
+                        for file in files:
+                            p = Parser(file)
+                            try:
+                                datalesspz = p.get_paz(stream[0].id,
+                                                       datetime=UTCDateTime(gd))
+                                break
+                            except:
+                                traceback.print_exc()
+                                del p
+                                continue
+                        stream.simulate(paz_remove=datalesspz,
+                                        remove_sensitivity=True,
+                                        pre_filt=response_prefilt,
+                                        paz_simulate=None,)
+                    elif response_format == "paz":
+                        msg = "Unexpected type for `response_format`: %s" % \
+                              response_format
+                        raise TypeError(msg)
+                    elif response_format == "resp":
+                        msg = "Unexpected type for `response_format`: %s" % \
+                              response_format
+                        raise TypeError(msg)
+                    else:
+                        msg = "Unexpected type for `response_format`: %s" % \
+                              response_format
+                        raise TypeError(msg)
+
                 for tr in stream:
                     tr.data = tr.data.astype(np.float32)
                 output += stream

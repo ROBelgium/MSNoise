@@ -173,7 +173,7 @@ class MSNoiseTests(unittest.TestCase):
     def test_012b_hack_noresample(self):
         from ..api import connect, update_config
         db = connect()
-        update_config(db,'resampling_method','Decimate')
+        update_config(db, 'resampling_method', 'Decimate')
         db.close()
 
     def test_013_s03compute_cc(self):
@@ -343,6 +343,18 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(jobs[0][1], 'D')
         self.failUnlessEqual(jobs[1][0], 3)
         self.failUnlessEqual(jobs[1][1], 'T')
+
+    def test_030_instrument_response(self):
+        from ..api import connect, update_config
+        path = os.path.abspath(os.path.dirname(__file__))
+        resp_folder = os.path.join(path, 'extra')
+        db = connect()
+        update_config(db, 'response_path', resp_folder)
+        update_config(db, 'response_format', "dataless")
+        update_config(db, 'remove_response', "Y")
+        db.close()
+        self.test_013_s03compute_cc()
+
 
     def test_099_S01installer(self):
         if "TRAVIS" not in os.environ:
