@@ -334,7 +334,7 @@ def scan_archive(ctx, init, path):
         db.close()
 
         worker(sorted(os.listdir(path)), path, startdate, enddate,
-               cc_sampling_rate)
+               cc_sampling_rate, init=True)
     else:
         from ..s01scan_archive import main
         main(init, threads=ctx.obj['MSNOISE_threads'])
