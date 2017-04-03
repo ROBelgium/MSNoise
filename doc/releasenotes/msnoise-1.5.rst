@@ -20,7 +20,7 @@ About 1 year after the last major release (:doc:`msnoise-1.4`) we are proud
 to announce the new :doc:`msnoise-1.5`. It is a **major** release, with a
 massive amount of work since the last one: in `GitHub numbers
 <https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2016-06-02&to=2017-04-30&type=c>`_
-, it's over 100 commits and about 2500 lines of code and documentation changed
+, it's over 140 commits and about 2500 lines of code and documentation changed
 or added!
 
 
