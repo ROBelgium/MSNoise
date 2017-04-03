@@ -148,14 +148,13 @@ def preprocess(db, stations, comps, goal_day, params):
                                                    pre_filt=response_prefilt)
                     elif response_format == "dataless":
                         for file in files:
-                            p = Parser(file)
                             try:
+                                p = Parser(file)
                                 datalesspz = p.get_paz(stream[0].id,
                                                        datetime=UTCDateTime(gd))
                                 break
                             except:
                                 traceback.print_exc()
-                                del p
                                 continue
                         stream.simulate(paz_remove=datalesspz,
                                         remove_sensitivity=True,
