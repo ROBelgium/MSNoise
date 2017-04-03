@@ -24,10 +24,10 @@ Configuration Parameters
 * |preprocess_highpass|
 * |keep_all|
 * |keep_days|
-* |stack_method| | *new in 1.4*
-* |pws_timegate| | *new in 1.4*
-* |pws_power| | *new in 1.4*
-
+* |stack_method|
+* |pws_timegate|
+* |pws_power|
+* |whitening|  | *new in 1.5*
 
 Waveform Pre-processing
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -43,29 +43,28 @@ hard-coded value (10 samples), the gap is filled with interpolated values.
 Larger gaps will not be filled with interpolated values and remaining chunks
 will be tapered and then merged with 0 values in the gaps.
 
-If shorter than 1-day, the trace final is padded with zeros. If longer, it is
-cut to match the start/end of the day.
-
-If configured, each 1-day long trace is corrected for its instrument response.
-Currently, only dataless seed and inventory XML are supported.
-
-.. note:: Removing the instrument response is a computationally very expensive
-   task and *not* useful for dv/v iff your instruments didn't change during the
-   analysed period. It is also not needed for tomography iff all instruments are
-   the same, or at least have an identical phase response in the frequency band
-   of interest.
+As from MSNoise 1.5, traces are no longer padded by or merged with 0s.
 
 Each 1-day long trace is then low-passed (at ``preprocess_lowpass`` Hz),
 high-passed (at ``preprocess_highpass`` Hz), then if needed,
 decimated/downsampled. Decimation/Downsampling are configurable
-(``resampling_method``) and users are advised testing both. One advantage of
+(``resampling_method``) and users are advised testing Decimate. One advantage of
 Downsampling over Decimation is that it is able to downsample the data by any
-factor, not only integer factors.
+factor, not only integer factors. Downsampling can be achieved with the new
+ObsPy Lanczos resampler, giving similar results as scikits.samplerate.
 
 .. note:: Python 3 users will most probably struggle installing
     scikits.samplerate, and therefore will have to use either Decimate or
     Lanczos instead of Resample. This is not a problem because the Lanczos
     resampling give very similar results as the scikits.samplerate package.
+
+
+If configured, each 1-day long trace is corrected for its instrument response.
+Currently, only dataless seed and inventory XML are supported.
+
+As from MSNoise 1.5, the preprocessing routine is separated from the compute_cc
+and can be used by plugins with their own parameters. The routine returns a
+Stream object containing all the traces for all the stations/components.
 
 Processing
 ~~~~~~~~~~
@@ -73,17 +72,18 @@ Processing
 Once all traces are preprocessed, station pairs are processed sequentially.
 If a component different from *ZZ* is to be computed, the traces are first
 rotated. This supposes the user has provided the station coordinates in the
-*station* table. The rotation is computed for Radial and Transverse components:
-
-.. code-block:: python
-
-    R = N * np.cos(Az * np.pi / 180.) + E * np.sin(Az * np.pi / 180.)
-    T = N * np.sin(Az * np.pi / 180.) - E * np.cos(Az * np.pi / 180.)
+*station* table. The rotation is computed for Radial and Transverse components.
 
 Then, for each ``corr_duration`` window in the signal, and for each filter
 configured in the database, the traces are clipped to ``windsorizing`` times
-the RMS (or 1-bit converted) and then whitened (see :ref:`whiten`) between the
-frequency bounds.
+the RMS (or 1-bit converted) and then whitened in the frequency domain
+(see :ref:`whiten`) between the frequency bounds. The whitening procedure can be
+skipped by setting the ``whitening`` configuration to `None`. The two other
+``whitening`` modes are "[A]ll except for auto-correlation" or "Only if
+[C]omponents are different". This allows skipping the whitening when, for
+example, computing ZZ components for very close by stations (much closer than
+the wavelength sampled), leading to spatial autocorrelation issues.
+
 When both traces are ready, the cross-correlation function is computed
 (see :ref:`mycorr`). The function returned contains data for time lags
 corresponding to ``maxlag`` in the acausal (negative lags) and causal
@@ -145,6 +145,11 @@ could occur with SQLite.
 .. versionadded:: 1.5
     The Obspy Lanczos resampling method, gives similar results as the
     scikits.samplerate package, thus removing the requirement for it.
+    This method is defined by default.
+
+.. versionadded:: 1.5
+    The preprocessing routine is separated from the compute_cc and can be called
+    by external plugins.
 
 """
 import sys

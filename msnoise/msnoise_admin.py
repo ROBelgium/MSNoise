@@ -3,9 +3,6 @@ configuration for all the processing steps, it also allows configuring the
 stations and filters to be used in the processes. It gives a view on the
 database tables.
 
-Although the interface is still in development for extra features, it already
-fully replaces the former "Configurator".
-
 To start the admin:
 
 .. code-block:: sh
@@ -38,6 +35,19 @@ The index page shows
 
 * The project location and its database
 * Stats of the Data Availability, the CC jobs and the DTT jobs
+
+The name and the logo of the page can be overriden by setting an environment
+variable with a name and the HTML tag of the logo image:
+
+.. code:: sh
+    
+    set msnoise_brand="ROB|<img src='http://www.seismologie.be/img/oma/ROB-logo.svg' width=200 height=200>"
+    
+and then starting msnoise admin:
+
+.. image:: ../.static/branding.png
+    :align: center
+
 
 Configuration
 --------------

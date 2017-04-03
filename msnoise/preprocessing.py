@@ -32,7 +32,7 @@ def preprocess(db, stations, comps, goal_day, params):
                 continue
             fullpath = os.path.join(file.path, file.file)
             datafiles[station][file.comp[-1]].append(fullpath)
-    j = 0
+
     for istation, station in enumerate(stations):
         net, sta = station.split(".")
         for comp in comps:

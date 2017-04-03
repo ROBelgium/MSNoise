@@ -3,64 +3,44 @@
 
 Installation
 ------------
-
-MSNoise is a set of Python codes that use a database (sqlite or MySQL) and
-the `find` command. When installed, it provides a top level command ``msnoise``
-in the console.
-
-.. note:: MSNoise version 1.5 introduces new config parameters in the database.
-    For each project, to upgrade your database, remember to run
-    ``msnoise upgrade_db`` in the project folder.
-
+MSNoise is a python package that uses a database (sqlite or MySQL) for storing
+station and files metadata together with jobs. When installed, it provides a top
+level command ``msnoise`` in the console.
 
 To run MSNoise, you need:
 
 * A recent version of Python (3.x recommended). We suggest using Anaconda_
   with a few extra modules. MSNoise is tested "continuously" by automatic
-  build systems (TravisCI and Appeveyor) for Python 2.7 and Python 3.5, on
-  Windows, Linux and MacOSX 64 bits systems.
+  build systems (TravisCI and Appeveyor) for **Python 2.7** and **Python 3.5**,
+  on **Windows, Linux and MacOSX** 64 bits systems!
 
-  Those modules are already distributed with Anaconda_:
+  * Those modules are already distributed with Anaconda_:
 
-  * setuptools
-  * numpy
-  * scipy
-  * pandas
-  * matplotlib
-  * statsmodels
-  * sqlalchemy
-  * click
-  * flask
-  * pymysql
-  * wtforms
+    * setuptools
+    * numpy
+    * scipy
+    * pandas
+    * matplotlib
+    * statsmodels
+    * sqlalchemy
+    * click
+    * flask
+    * pymysql
+    * wtforms
 
-* Not shipped with Anaconda_:
+  * Not shipped with Anaconda_:
 
-  * obspy
-  * flask-admin
-  * markdown
-  * folium
+    * obspy
+    * flask-admin
+    * markdown
+    * folium
+    * flask-wtf
 
 
 * MySQL: if you want to use MySQL, you need to install and configure a
   MySQL Server beforehand. This is not needed for sqlite.
   Read :ref:`aboutdbandperformances` for more information.
   We recommend using MySQL.
-
-
-Python and Packages Installation
---------------------------------
-
-If you don't know which Python distribution to use and even if your system comes
-with a python distribution, we suggest installing Anaconda_, as it comes with
-most of the above-mentionned tools (those with [*]), and provides the `pip` or
-`conda` tools to install the remaining ones.
-
-From now on, we suppose you installed Anaconda_, here are the instructions for
-installing the remaining packages. If you don't use Anaconda, all the packages
-are available through `pip` or `conda`.
-
-To know which packages you are missing, use the bug_reporter script!
 
 
 Full Installation
@@ -73,7 +53,7 @@ Full Installation
    
    .. code-block:: sh
 
-        pip install flask-admin
+        pip install flask-admin flask-wtf markdown folium
         conda install -c conda-forge obspy
 
 3. Install a MySQL server and MySQL Workbench:
@@ -139,6 +119,9 @@ Then, under "Administrative Roles", grant this user the *DBA* mode (user can
 perform all tasks on the database server) and click "Apply".
 
 .. image:: .static/workbench_3.png
+
+
+.. _emptydb:
 
 Create an empty database
 ~~~~~~~~~~~~~~~~~~~~~~~~

@@ -43,7 +43,7 @@ class Filter(Base):
     rms_threshold = Column(Float())
     mwcs_wlen = Column(Float())
     mwcs_step = Column(Float())
-    used = Column(Boolean)
+    used = Column(Boolean(True))
 
     def __init__(self, **kwargs):
         """"""

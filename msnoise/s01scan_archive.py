@@ -28,6 +28,21 @@ This will scan the data_archive folder the configured stations and will insert
 all files found in the data_availability table in the database. As usual,
 calling the script with a --help argument will show its usage.
 
+.. _scan-archive-expert:
+
+Expert (lazy) mode:
+~~~~~~~~~~~~~~~~~~~
+
+Sometimes, you only want to scan a few files and run MSNoise on them. To do this
+simply run:
+
+.. code-block:: sh
+
+    $ msnoise scan_archive --path /path/to/where/files/are
+    
+and MSNoise will read anything ObsPy can (provided the files have a proper
+header (network code, station code and channel code). Then, once done, simply
+run the :ref:`"populate from DataAvailability"<populate-expert>` procedure.
 """
 import argparse
 import glob

@@ -17,6 +17,10 @@ Questions are:
     - username: as registered in the privileged users of the mysql server
     - password: his password
 
+The SQLite choice will create a xxx.sqlite file in the current (project) folder,
+while, for MySQL, one has to create an empty database first on the mysql server,
+see :ref:`how to do this <emptydb>` .
+
 To run this script:
 
 .. include:: ../clickhelp/msnoise-install.rst
