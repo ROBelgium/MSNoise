@@ -1,5 +1,5 @@
 """
-This console scripts is responsible asking questions about the database
+This console script is responsible asking questions about the database
 connection, to create the db.ini file in order to store the answers and
 to create the tables in the database.
 

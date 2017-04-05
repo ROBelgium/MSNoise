@@ -67,7 +67,7 @@ Filter
 
 Filters appear as a table and are editable. The filter parameters are validated
 before submission, so no errors should happen. Note: by default, the `used`
-parameter is set to `False`, don't forget to change it!
+parameter is set to `False`, **don't forget to change it!**
 
 Filters are defined as:
 
@@ -77,7 +77,7 @@ Config
 ~~~~~~
 
 All configuration bits appear as a table and are editable. When editing one
-configuration item, the edition pages shows extra information about the
+configuration item, the Edit tab shows extra information about the
 parameter, where it is used and its default value. Most of the configuration
 bits are case-sensitive!
 

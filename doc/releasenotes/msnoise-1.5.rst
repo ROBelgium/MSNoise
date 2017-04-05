@@ -74,8 +74,8 @@ validation of our project ever ! See the full list on the
 
 ~~~~
 
-PS: if you use MSNoise for your research and prepare publications, please
-consider citing it:
+PS: if you use MSNoise for your research and prepare publications, **please
+consider citing it**:
 
 **Lecocq, T., C. Caudron, et F. Brenguier (2014)**, MSNoise, a Python Package
 for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
@@ -90,8 +90,11 @@ work as expected.
 
 * Pandas >= 0.18.0
 * obspy >= 1.1
-* Scikits-samplerate no longer needed
-* statsmodels is no longer needed
+
+No longer needed:
+
+* scikits-samplerate
+* statsmodels
 
 
 Web-based Admin Interface Changes
@@ -102,7 +105,7 @@ Web-based Admin Interface Changes
 * Bugfix: Set debug-mode to False to increase performance and remove the risk
   of Werkzeug failing.
 
-* Feature: Calling admin/data_availability.png should serve the image directy
+* Feature: Calling admin/data_availability.png should serve the image directly
 * Feature: It's now possible to "Brand" MSNoise:
   The name and the logo of the page can be overriden by setting an environment
   variable with a name and the HTML tag of the logo image:
@@ -139,18 +142,18 @@ Populate Station Table and Scan Archive
   value, "-1.0" meaning "files modified in the last 1 day".
 
 * The custom archive structure can now directly be input in the config.
-  This is still quite preliminary and need at least one slash in the parameter
+  This is still quite preliminary and needs at least one slash in the parameter
   value to be identified as such by the code.
 
 Expert/Lazy mode
 ~~~~~~~~~~~~~~~~
 
-* Added an Expert/Lazy mode to input network/stations directly from the data
-  scanned using the new ``scan_archive --path`` procedure
-  (:ref:`"see here"<populate-expert>`).
-
 * Added an Expert/Lazy mode to scan files directly by passing the path of their
-  containing folder to ``scan_archive`` :ref:`"see here"<scan-archive-expert>`.
+  containing folder to ``scan_archive --path`` :ref:`(see here)<scan-archive-expert>`.
+
+* Added an Expert/Lazy mode to input network/stations directly from the data
+  scanned using the new ``populate --fromDA`` procedure
+  (:ref:`(see here)<populate-expert>`).
 
 * The ``scan_archive`` is now capable of handling multiplexed files and inputs
   one line in DataAvailability per unique "trace id" in files.
@@ -173,11 +176,11 @@ Preprocessing
 ~~~~~~~~~~~~~
 
 * A complete rewrite of the preprocessing function to avoid padding and merging
-  to zero. The preprocessing function is now separated from the ``compute_cc``
-  code and can be called by external plugins. It returns a Stream object that
-  can easily be filtered or slided.
+  with zeros. The preprocessing function is now separated from the
+  ``compute_cc`` code and can be called by external plugins. It returns a Stream
+  object that can easily be filtered or slided.
 * The instrument response removal has been accelerated by doing it after
-  decimation, on fewer data (Thanks to Robert Green).
+  decimation, on fewer data points (Thanks to Robert Green).
   The response removal is done without the `evalresp` stuff from ObsPy, it's
   faster but potentially a little less safe.
 * The default decimation tool is now Lanczos (builtin in ObsPy) and
@@ -192,7 +195,7 @@ Cross-Correlation
   configuration and replaced it with ``components_to_compute`` which takes a list:
   e.g. `ZZ,ZE,ZN,EZ,EE,EN,NZ,NE,NN` for the full non-rotated tensor between
   stations. If `autocorr` is set to "Y", then the cross-components (SC) of each
-  station will also be computed.
+  station will also be computed (of course, `ZE` and `EZ` are identical).
 
 * The cross-correlation is done on sliding windows on the available data. If one
   trace contains a gap, the window is skipped. This corrects previous errors
@@ -213,7 +216,7 @@ Command Line changes
 
 
 * ``msnoise config --sync`` will try to parse the dataless files for existing
-  stations in the Station table an, if found, will input the coordinates.
+  stations in the Station table and, if found, will input the coordinates.
 * ``msnoise scan_archive --path`` will only scan the ``path`` independently of
   its structure. It will only read files, not "walk" in subfolders.
 * ``msnoise populate --fromDA`` will populate the station table from the
@@ -318,7 +321,7 @@ A final note about development pace and choices
 
   * **1 developper** (Thomas)
   * 1 dedicated debugger (Corentin)
-  * less than 5 really *active* users, providing feedback and/or lines of codes
+  * less than 10 really *active* users, providing feedback and/or lines of codes
     (Esteban, Raphaël, Aurélien, Carmelo, Clare, Rob ...)
 
 * All software engineering ideas are coming from too infrequent beerstormings
@@ -326,7 +329,7 @@ A final note about development pace and choices
 * The web-interface and the plugin support were developed during Thomas'
   holidays
 
-If you need help, please ask your question on the mailing list. Don't be afraid
+If you need help, please ask your questions on the mailing list. Don't be afraid
 to ask. If you have ideas, please share them. If you develop codes to supplement
 MSNoise, please share them, even if very small, even if you don't master gitHub.
 If you have complaints, post them too, but remember that the package you are

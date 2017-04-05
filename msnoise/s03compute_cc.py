@@ -40,10 +40,10 @@ on the sampling grid (that is, start at a integer times the sample spacing in s)
 , the chunk is phase-shifted in the frequency domain. This requires tapering and
 fft/ifft. If the gap between two chunks is small, compared to a currently
 hard-coded value (10 samples), the gap is filled with interpolated values.
-Larger gaps will not be filled with interpolated values and remaining chunks
-will be tapered and then merged with 0 values in the gaps.
+Larger gaps will not be filled with interpolated values.
 
-As from MSNoise 1.5, traces are no longer padded by or merged with 0s.
+.. arning::
+    As from MSNoise 1.5, traces are no longer padded by or merged with 0s.
 
 Each 1-day long trace is then low-passed (at ``preprocess_lowpass`` Hz),
 high-passed (at ``preprocess_highpass`` Hz), then if needed,
@@ -51,12 +51,12 @@ decimated/downsampled. Decimation/Downsampling are configurable
 (``resampling_method``) and users are advised testing Decimate. One advantage of
 Downsampling over Decimation is that it is able to downsample the data by any
 factor, not only integer factors. Downsampling can be achieved with the new
-ObsPy Lanczos resampler, giving similar results as scikits.samplerate.
+ObsPy Lanczos resampler, giving results similar to those by scikits.samplerate.
 
 .. note:: Python 3 users will most probably struggle installing
     scikits.samplerate, and therefore will have to use either Decimate or
     Lanczos instead of Resample. This is not a problem because the Lanczos
-    resampling give very similar results as the scikits.samplerate package.
+    resampling gives results similar to those by scikits.samplerate.
 
 
 If configured, each 1-day long trace is corrected for its instrument response.
