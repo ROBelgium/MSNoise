@@ -13,13 +13,13 @@ The ``data_folder`` (as defined in the config) is scanned expecting the
     data_structure['IDDS'] = "YEAR/NET/STA/CHAN.TYPE/DAY/NET.STA.LOC.CHAN.TYPE.YEAR.DAY.HOUR"
     data_structure['PDF'] = "YEAR/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.DAY"
 
-If one's data structure is one of those, then the ``data_structure``
-configuration bit needs to be set to the acronym (SDS, BUD, IDDS or PDF).
+If one's data structure is one of those, then the ``data_structure`` configuration
+bit needs to be set to the acronym (SDS, BUD, IDDS or PDF).
 
 More info on the recommended SDS ("SeisComP Data Structure") can be found here:
 https://www.seiscomp3.org/wiki/doc/applications/slarchive/SDS
-For other simple structures, one has to edit the `data_structure` configuration
-(see below).
+For other structures, one has to edit the data_structures.py file and define
+the reader in this script.
 
 By default, station coordinates are initialized at 0.
 
@@ -45,8 +45,7 @@ a file named ``custom.py`` in the current folder. This python file will contain
  in the database: Net,Sta,X,Y,Altitude,Coordinates(UTM/DEG),Instrument
 
 .. code-block:: python
-    
-    import os, glob
+
     def populate(data_folder):
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*")))
         stationdict = {}
@@ -57,35 +56,20 @@ a file named ``custom.py`` in the current folder. This python file will contain
             stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
         return stationdict
 
-.. _populate-expert:
-
-Expert (lazy) mode:
-~~~~~~~~~~~~~~~~~~~
-
-If the `DataAvailability` has already been filled in by another process, for
-example using the :ref:`"scan from path"<scan-archive-expert>` procedure, the
-network/station names can be "populated" from the `DataAvailability` table
-automatically. To do this, simply run:
-
-.. code-block:: sh
-
-    msnoise populate --fromDA
-
-and MSNoise will insert the unique NET.STA in the `Stations` table.
 """
 
+import traceback
 import glob
 import sys
-import traceback
 
 from .api import *
 
 
 def main():
     db = connect()
-    print()
+    print("")
     print(">> Populating the Station table")
-    print()
+    print("")
     data_folder = get_config(db, 'data_folder')
     data_structure = get_config(db, 'data_structure')
 
