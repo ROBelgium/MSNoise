@@ -39,28 +39,28 @@ def main(init=False, nocc=False):
                     elif jobtype["after"] == "new_files":
                         extra_jobtypes_new_files.append(jobtype["name"])
 
-
     autocorr = get_config(db, name="autocorr", isbool=True)
-
-
 
     stations_to_analyse = ["%s.%s" % (sta.net, sta.sta) for sta in get_stations(db, all=False)]
     all_jobs = []
     updated_days = []
     nfs = get_new_files(db)
+    now = datetime.datetime.utcnow()
     for nf in nfs:
-        start, end = nf.starttime.date(), nf.endtime.date()
-        for date in pd.date_range(start, end, freq="D"):
-            updated_days.append(date.date())
-
         tmp = "%s.%s" % (nf.net, nf.sta)
         if tmp not in stations_to_analyse:
             continue
-        for jobtype in extra_jobtypes_new_files:
-            all_jobs.append({"day": start, "pair": "%s.%s"%(nf.net,nf.sta),
-                             "jobtype": jobtype, "flag": "T",
-                             "lastmod": datetime.datetime.utcnow()})
 
+        start, end = nf.starttime.date(), nf.endtime.date()
+        for date in pd.date_range(start, end, freq="D"):
+            updated_days.append(date.date())
+            for jobtype in extra_jobtypes_new_files:
+                all_jobs.append({"day": date.date(),
+                                 "pair": "%s.%s" % (nf.net, nf.sta),
+                                 "jobtype": jobtype,
+                                 "flag": "T", "lastmod": now})
+
+    all_jobs = list(np.unique(all_jobs))
     updated_days = np.asarray(updated_days)
     updated_days = np.unique(updated_days)
 
@@ -76,7 +76,8 @@ def main(init=False, nocc=False):
                     available.append(sta)
                     if data.flag in ["N", "M"]:
                         modified.append(sta)
-
+            modified = np.unique(modified)
+            available = np.unique(available)
             for m in modified:
                 for a in available:
                     if m != a or autocorr:
@@ -85,11 +86,11 @@ def main(init=False, nocc=False):
                             if not nocc:
                                 all_jobs.append({"day": day, "pair": pair,
                                                  "jobtype": "CC", "flag": "T",
-                                                 "lastmod": datetime.datetime.utcnow()})
+                                                 "lastmod": now})
                             for jobtype in extra_jobtypes_scan_archive:
                                 all_jobs.append({"day": day, "pair": pair,
                                              "jobtype": jobtype, "flag": "T",
-                                             "lastmod": datetime.datetime.utcnow()})
+                                             "lastmod": now})
                             jobs.append(pair)
 
             if init and len(all_jobs) > 1e5:
