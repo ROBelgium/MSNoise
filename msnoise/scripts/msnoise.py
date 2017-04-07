@@ -1,3 +1,4 @@
+import traceback
 import logging
 import os
 import sys
@@ -85,6 +86,12 @@ def upgrade_db():
             db.rollback()
             # print("Passing %s: already in DB" % name)
             continue
+    try:
+        db.execute("CREATE INDEX job_index ON jobs (day, pair, jobtype)")
+        db.commit()
+    except:
+        logging.info("It looks like the v1.5 'job_index' is already in the DB")
+        db.rollback()
     db.close()
 
 
@@ -431,7 +438,9 @@ def reset(jobtype, all, rule):
     the flag value"""
     from ..api import connect, reset_jobs
     session = connect()
-    if jobtype != jobtype.upper():
+    if jobtype == "DA":
+        session.execute("update data_availability set flag='M' where 1")
+    elif jobtype != jobtype.upper():
         logging.info("The jobtype %s is not uppercase (usually jobtypes"
                      " are uppercase...)"%jobtype)
     reset_jobs(session, jobtype, all, rule)
