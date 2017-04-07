@@ -622,7 +622,7 @@ def count_data_availability_flags(session):
 
 # Jobs
 
-
+import time
 def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     """
     Updates or Inserts a new :class:`~msnoise.msnoise_table_def.Job` in the
@@ -646,12 +646,13 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     :rtype: :class:`~msnoise.msnoise_table_def.Job` or None
     :returns: If returnjob is True, returns the modified/inserted Job.
     """
-    job = session.query(Job).filter(Job.day == day).filter(
-        Job.pair == pair).filter(Job.jobtype == jobtype).first()
+    job = session.query(Job)\
+        .filter(Job.day == day)\
+        .filter(Job.pair == pair)\
+        .filter(Job.jobtype == jobtype).first()
     if job is None:
         job = Job(day, pair, jobtype, 'T')
-        if commit:
-            session.add(job)
+        session.add(job)
     else:
         job.flag = flag
         job.lastmod = datetime.datetime.utcnow()

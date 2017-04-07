@@ -1,7 +1,7 @@
 import datetime
 
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime,\
-    text, TIMESTAMP, Enum, REAL, UniqueConstraint
+    text, TIMESTAMP, Enum, REAL, UniqueConstraint, Index
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -80,7 +80,8 @@ class Job(Base):
     jobtype = Column(String(10))
     flag = Column(String(1))
     lastmod = Column(TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP'))
-    UniqueConstraint('day', 'pair', 'jobtype', name='uix_1')
+
+    table_args__ = (Index('job_index', "day", "pair", "jobtype", unique=True),)
 
     def __init__(self, day, pair, jobtype, flag,
                  lastmod=datetime.datetime.utcnow()):
