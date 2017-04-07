@@ -18,6 +18,7 @@ To run it from the console:
 from .api import *
 import pandas as pd
 
+
 def main(init=False, nocc=False):
 
     logging.info('*** Starting: New Jobs ***')
@@ -107,7 +108,9 @@ def main(init=False, nocc=False):
         else:
             for job in all_jobs:
                 update_job(db, job['day'], job['pair'],
-                           job['jobtype'], job['flag'])
+                           job['jobtype'], job['flag'],
+                           commit=False)
+    db.commit()
     count += len(all_jobs)
 
     for sta in get_stations(db, all=True):
