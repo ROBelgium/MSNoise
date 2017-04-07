@@ -194,6 +194,7 @@ def main(init=False, threads=1):
     folders_to_glob = np.unique(folders_to_glob)
     logging.debug("Folders to glob: %s" % ",".join(folders_to_glob))
     clients = []
+    mintime = UTCDateTime() + (86400 * float(mtime))
     for fi in sorted(folders_to_glob):
         folders = glob.glob(fi)
         for folder in sorted(folders):
@@ -201,7 +202,6 @@ def main(init=False, threads=1):
                 files = os.listdir(folder)
             else:
                 items = glob.glob(os.path.join(folder, "*"))
-                mintime = UTCDateTime() + (86400 * float(mtime))
                 logging.debug("Will search for files more recent than %s" %
                               mintime)
                 files = []

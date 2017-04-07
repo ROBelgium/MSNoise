@@ -25,6 +25,7 @@ def main(init=False, nocc=False):
 
     db = connect()
 
+    logging.debug("Checking plugins' entry points")
     plugins = get_config(db, "plugins")
     extra_jobtypes_scan_archive = []
     extra_jobtypes_new_files = []
@@ -41,7 +42,7 @@ def main(init=False, nocc=False):
                         extra_jobtypes_new_files.append(jobtype["name"])
 
     autocorr = get_config(db, name="autocorr", isbool=True)
-
+    logging.debug('Scanning New/Modified files')
     stations_to_analyse = ["%s.%s" % (sta.net, sta.sta) for sta in get_stations(db, all=False)]
     all_jobs = []
     updated_days = []
@@ -64,7 +65,7 @@ def main(init=False, nocc=False):
     all_jobs = list(np.unique(all_jobs))
     updated_days = np.asarray(updated_days)
     updated_days = np.unique(updated_days)
-
+    logging.debug('Determining available data for each "updated date"')
     count = 0
     if len(extra_jobtypes_scan_archive) != 0 or not nocc:
         for day in updated_days:
@@ -95,14 +96,14 @@ def main(init=False, nocc=False):
                             jobs.append(pair)
 
             if init and len(all_jobs) > 1e5:
-                logging.debug('Already 100.000 jobs, inserting')
+                logging.debug('Already 100.000 jobs, inserting/updating')
                 massive_insert_job(all_jobs)
                 all_jobs = []
                 count += 1e5
     else:
         logging.debug("skipping the CC jobs creation & the extrajobtype creation")
     if len(all_jobs) != 0:
-        logging.debug('Inserting %i jobs' % len(all_jobs))
+        logging.debug('Inserting/Updating %i jobs' % len(all_jobs))
         if init:
             massive_insert_job(all_jobs)
         else:

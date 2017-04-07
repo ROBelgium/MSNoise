@@ -647,6 +647,7 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     :returns: If returnjob is True, returns the modified/inserted Job.
     """
     job = session.query(Job)\
+        .with_hint(Job, 'USE INDEX (job_index)')\
         .filter(Job.day == day)\
         .filter(Job.pair == pair)\
         .filter(Job.jobtype == jobtype).first()

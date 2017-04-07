@@ -170,6 +170,26 @@ Practically, the three changes above allow users to:
 #. Run ``msnoise compute_cc``
 
 
+New Jobs
+--------
+
+* The ``msnoise new_jobs`` routine has been rewritten to correct a few bugs
+  linked to start/end dates (missed days if a file of day 2 begins on day 1 and
+  ends on day 3, jobs were only created for day 1 and 3. This is corrected.
+
+* A change in the database structure (added an index on the
+  "day"+"pair"+"jobtype") allows running ``msnoise new_jobs`` much faster than
+  before. It took 5m40s for a test with 105381 jobs, while it would have taken
+  hours before. For the first run, it is still faster (20s for the example
+  above) to use ``msnoise new_jobs --init`` as this doesn't check for existing
+  jobs.
+
+.. warning::
+
+    The change in the database (adding an index) requires that you
+    ``msnoise upgrade_db`` every project!
+
+
 Preprocessing and Cross-Correlation
 -----------------------------------
 
