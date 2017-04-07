@@ -1451,7 +1451,7 @@ def clean_scipy_cache():
 ### TMP
 
 def linear_regression(xdata, ydata, weights=None, p0=None,
-                      intercept_origin=True):
+                      intercept_origin=True, **kwargs):
     """
     Use linear least squares to fit a function, f, to data.
     This method is a generalized version of
@@ -1497,7 +1497,7 @@ def linear_regression(xdata, ydata, weights=None, p0=None,
     if intercept_origin:
         p, cov = scipy.optimize.curve_fit(lambda x, a: a * x,
                                           xdata, ydata, p0, sigma=sigma,
-                                          xtol=1e-20)
+                                          **kwargs)
         slope = p[0]
         std_slope = np.sqrt(cov[0, 0])
         return slope, std_slope
@@ -1505,13 +1505,11 @@ def linear_regression(xdata, ydata, weights=None, p0=None,
     else:
         p, cov = scipy.optimize.curve_fit(lambda x, a, b: a * x + b,
                                           xdata, ydata, p0, sigma=sigma,
-                                          xtol=1e-20)
+                                          **kwargs)
         slope, intercept = p
         std_slope = np.sqrt(cov[0, 0])
         std_intercept = np.sqrt(cov[1, 1])
         return slope, intercept, std_slope, std_intercept
-
-
 
 
 if __name__ == "__main__":
