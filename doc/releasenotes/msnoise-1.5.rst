@@ -165,6 +165,7 @@ Practically, the three changes above allow users to:
 #. Run ``msnoise install``
 #. Run ``msnoise scan_archive --path /path/to/the/big/file/``
 #. Run ``msnoise populate --fromDA``
+#. Run ``msnoise new_jobs --init``
 #. Run ``msnoise admin``, define (pre-)processing and filter parameters
 #. Run ``msnoise compute_cc``
 
