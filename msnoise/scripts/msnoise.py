@@ -621,14 +621,18 @@ def mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
+@click.option('-r', '--refilter', default=None, help='Refilter CCFs before '
+                                                     'plotting (e.g. 4:8 for '
+                                                     'filtering CCFs between '
+                                                     '4.0 and 8.0 Hz')
 @click.pass_context
-def distance(ctx, filterid, comp, ampli, show, outfile):
+def distance(ctx, filterid, comp, ampli, show, outfile, refilter):
     """Plots the REFs of all pairs vs distance"""
     if ctx.obj['MSNOISE_custom']:
         from distance import main
     else:
         from ..plots.distance import main
-    main(filterid, comp, ampli, show, outfile)
+    main(filterid, comp, ampli, show, outfile, refilter)
 
 
 @click.command()

@@ -289,10 +289,10 @@ Plot Updates
 
 * ``msnoise plot ccftime`` now accepts -e (--envelope) and will plot the
   envelope of the ccfs.
-* ``msnoise plot ccftime`` and ``msnoise plot interferogram`` now accept -r
-  (--refilter) to refilter the CCFs before plotting. The argument must be a
-  column-separated string (e.g. ``-r 4:8`` for filtering between 4.0 and 8.0 Hz
-  ).
+* ``msnoise plot ccftime``, ``msnoise plot interferogram`` and
+  ``msnoise plot distance`` now accept -r (--refilter) to refilter the CCFs
+  before plotting. The argument must be a column-separated string (e.g.
+``-r 4:8`` for filtering between 4.0 and 8.0 Hz).
 * Most plots have better titles (filter details, etc).
 * The dv/v plot now allows averaging over components by passing them as comma-
   separated values.
