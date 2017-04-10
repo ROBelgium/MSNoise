@@ -544,7 +544,9 @@ def timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
 @click.option('-r', '--refilter', default=None, help='Refilter CCFs before '
-                                                     'plotting')
+                                                     'plotting (e.g. 4:8 for '
+                                                     'filtering CCFs between '
+                                                     '4.0 and 8.0 Hz')
 @click.pass_context
 def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
                   refilter):
@@ -573,7 +575,9 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
 @click.option('-e', '--envelope', is_flag=True, help='Plot envelope instead of '
                                                      'time series')
 @click.option('-r', '--refilter', default=None, help='Refilter CCFs before '
-                                                     'plotting')
+                                                     'plotting (e.g. 4:8 for '
+                                                     'filtering CCFs between '
+                                                     '4.0 and 8.0 Hz')
 @click.pass_context
 def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
             ampli, seismic, show, outfile, envelope, refilter):
