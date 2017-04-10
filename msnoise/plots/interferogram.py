@@ -2,7 +2,8 @@
 This plot shows the cross-correlation functions (CCF) vs time in a very similar
 manner as on the *ccftime* plot above, but shows an image instead of wiggles.
 The parameters allow to plot the daily or the mov-stacked CCF. Filters and
-components are selectable too.
+components are selectable too. Passing ``--refilter`` allows to bandpass filter
+CCFs before plotting (new in 1.5).
 
 .. include:: clickhelp/msnoise-plot-interferogram.rst
 
@@ -19,14 +20,21 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import date2num, DateFormatter, YearLocator
 from matplotlib.widgets import Cursor
 
+from obspy.signal.filter import bandpass
+
 from ..api import *
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
-         outfile=None):
+         outfile=None, refilter=None):
     db = connect()
     maxlag = float(get_config(db, 'maxlag'))
+    cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
     start, end, datelist = build_movstack_datelist(db)
+    if refilter:
+        freqmin, freqmax = refilter.split(':')
+        freqmin = float(freqmin)
+        freqmax = float(freqmax)
     plt.figure(figsize=(12, 9))
     sta1 = sta1.replace('.', '_')
     sta2 = sta2.replace('.', '_')
@@ -41,7 +49,12 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
 
         xextent = (date2num(start), date2num(end), -maxlag, maxlag)
         ax = plt.subplot(111)
-        plt.imshow(stack_total.T, extent=xextent, aspect="auto",
+        data = stack_total
+        if refilter:
+            for i, d in enumerate(data):
+                data[i] = bandpass(data[i], freqmin, freqmax, cc_sampling_rate,
+                                   corners=4, zerophase=True)
+        plt.imshow(data.T, extent=xextent, aspect="auto",
                    interpolation='none', origin='lower', cmap='seismic',
                    vmin=-1e-2, vmax=1e-2)
         plt.ylabel("Lag Time (s)")
@@ -58,9 +71,12 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
                 break
         
         plt.ylim(-maxlag, maxlag)
-        plt.title('%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' %
-                  (sta1.replace('_', '.'), sta2.replace('_', '.'), components,
-                   filterid, low, high, mov_stack))
+        title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' % \
+                (sta1.replace('_', '.'), sta2.replace('_', '.'), components,
+                 filterid, low, high, mov_stack)
+        if refilter:
+            title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
+        plt.title(title)
         cursor = Cursor(ax, useblit=True, color='black', linewidth=1.2)
         if outfile:
             if outfile.startswith("?"):

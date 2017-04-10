@@ -4,9 +4,8 @@ import sys
 import time
 import traceback
 
-from obspy import read_inventory
-from obspy.core import UTCDateTime
-from obspy.io.xseed import Parser
+
+from obspy.core import UTCDateTime, Stream, read
 
 try:
     from scikits.samplerate import resample
@@ -16,7 +15,8 @@ except:
 from .api import *
 
 
-def preprocess(db, stations, comps, goal_day, params):
+def preprocess(db, stations, comps, goal_day, params, responses=None):
+
     datafiles = {}
     output = Stream()
     for station in stations:
@@ -123,56 +123,21 @@ def preprocess(db, stations, comps, goal_day, params):
 
                 if get_config(db, 'remove_response', isbool=True):
                     logging.debug('Removing instrument response')
-                    response_format = get_config(db, 'response_format')
                     response_prefilt = eval(get_config(db, 'response_prefilt'))
-                    files = glob.glob(os.path.join(get_config(db,
-                                                              'response_path'),
-                                                   "*"))
-                    if response_format == "inventory":
-                        firstinv = True
-                        inventory = None
-                        for file in files:
-                            try:
-                                inv = read_inventory(file)
-                                if firstinv:
-                                    inventory = inv
-                                    firstinv = False
-                                else:
-                                    inventory += inv
-                            except:
-                                traceback.print_exc()
-                                pass
-                        if inventory:
-                            stream.attach_response(inventory)
-                            stream.remove_response(output='VEL',
-                                                   pre_filt=response_prefilt)
-                    elif response_format == "dataless":
-                        for file in files:
-                            try:
-                                p = Parser(file)
-                                datalesspz = p.get_paz(stream[0].id,
-                                                       datetime=UTCDateTime(gd))
-                                break
-                            except:
-                                traceback.print_exc()
-                                continue
-                        stream.simulate(paz_remove=datalesspz,
-                                        remove_sensitivity=True,
-                                        pre_filt=response_prefilt,
-                                        paz_simulate=None,)
-                    elif response_format == "paz":
-                        msg = "Unexpected type for `response_format`: %s" % \
-                              response_format
-                        raise TypeError(msg)
-                    elif response_format == "resp":
-                        msg = "Unexpected type for `response_format`: %s" % \
-                              response_format
-                        raise TypeError(msg)
-                    else:
-                        msg = "Unexpected type for `response_format`: %s" % \
-                              response_format
-                        raise TypeError(msg)
 
+                    response = responses[responses["channel_id"] == stream[0].id]
+                    if len(response) > 1:
+                        response = response[response["start_date"]<UTCDateTime(gd)]
+                        response = response[response["end_date"]>UTCDateTime(gd)]
+                    elif len(response) == 0:
+                        logging.info("No instrument response information "
+                                     "for %s, exiting" % stream[0].id)
+                        sys.exit()
+                    datalesspz = response["paz"].values[0]
+                    stream.simulate(paz_remove=datalesspz,
+                                    remove_sensitivity=True,
+                                    pre_filt=response_prefilt,
+                                    paz_simulate=None, )
                 for tr in stream:
                     tr.data = tr.data.astype(np.float32)
                 output += stream
