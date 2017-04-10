@@ -40,20 +40,22 @@ e.g.:
 
 MSNoise expects to find a file named ``custom.py`` in the current folder.
 This python file will contain a function called ``populate`` wich will accept
-one argument and return a list of stations in the format ``NET_STA``:
+one argument and return a station dictionary with keys of the format ``NET_STA``
+, and fields for the stations table in the database: Net,Sta,X,Y,Altitude,
+Coordinates(UTM/DEG),Instrument.
 
 .. code-block:: python
     
     import os, glob
     def populate(data_folder):
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*")))
-        stations = []
+        stationdict = {}
         for di in datalist:
             tmp = os.path.split(di)
             sta = tmp[1]
             net = os.path.split(tmp[0])[1]
-            stations.append("%s_%s" % (net, sta))
-        return stations
+            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
+        return stationdict
 
 .. _populate-expert:
 
@@ -86,58 +88,58 @@ def main():
     print()
     data_folder = get_config(db, 'data_folder')
     data_structure = get_config(db, 'data_structure')
+
     if data_structure in ["SDS", "IDDS"]:
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*", "*")))
-        stations = []
+        stationdict={}
         for di in datalist:
             tmp = os.path.split(di)
             sta = tmp[1]
             net = os.path.split(tmp[0])[1]
-            stations.append("%s_%s" % (net, sta))
+            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
         del datalist
     elif data_structure in ["BUD", ]:
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*",)))
-        stations = []
+        stationdict={}
         for di in datalist:
             tmp = os.path.split(di)
             sta = tmp[1]
             net = os.path.split(tmp[0])[1]
-            stations.append("%s_%s" % (net, sta))
+            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
         del datalist
     elif data_structure in ["PDF", ]:
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*",)))
-        stations = []
+        stationdict={}
         for di in datalist:
             tmp = os.path.split(di)
             sta = tmp[1]
             net = get_config(db, 'network')
-            stations.append("%s_%s" % (net, sta))
+            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
         del datalist
     else:
         print("Can't parse the archive for format %s !" % data_structure)
-        print("trying to import local parser (should return a station list)")
-        print()
+        print("trying to import local parser (should return a station dictionary)")
+        print("")
         try:
             sys.path.append(os.getcwd())
             from custom import populate
-            stations = populate(data_folder)
+            stationdict = populate(data_folder)
         except:
             traceback.print_exc()
             print("No file named custom.py in the %s folder" % os.getcwd())
             return
-    stations = np.unique(stations)
-    
+
     db = connect()
-    for station in stations:
-        net, sta = station.split('_')
+    for s in stationdict.keys() :
+        net,sta,lon,lat,alt,coordinates,instype=stationdict[s]
         print('Adding:', net, sta)
-        X = 0.0
-        Y = 0.0
-        altitude = 0.0
-        coordinates = 'UTM'
-        instrument = 'N/A'
+        X = float(lon)
+        Y = float(lat)
+        altitude = float(alt)
+        instrument = str(instype)
         update_station(db, net, sta, X, Y, altitude,
                        coordinates=coordinates, instrument=instrument)
+
     return True
 
 if __name__ == "__main__":
