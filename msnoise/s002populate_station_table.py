@@ -40,9 +40,10 @@ e.g.:
 
 MSNoise expects to find
 a file named ``custom.py`` in the current folder. This python file will contain
- a function called ``populate`` wich will accept one argument and return a station
- dictionary with keys of the format ``NET_STA``, and fields for the stations table
- in the database: Net,Sta,X,Y,Altitude,Coordinates(UTM/DEG),Instrument
+a function called ``populate`` wich will accept one argument and return a
+station dictionary with keys of the format ``NET_STA``, and fields for the
+stations table in the database: Net,Sta,X,Y,Altitude,Coordinates(UTM/DEG),
+Instrument.
 
 .. code-block:: python
     
