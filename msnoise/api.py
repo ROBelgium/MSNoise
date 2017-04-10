@@ -3,6 +3,7 @@ import datetime
 import itertools
 import logging
 import os
+import glob
 
 try:
     import cPickle
@@ -22,8 +23,9 @@ from scipy.fftpack.helper import next_fast_len
 import scipy.fftpack._fftpack as sff
 import scipy.optimize
 
-from obspy.core import Stream, Trace, read, AttribDict
-
+from obspy.core import Stream, Trace, read, AttribDict, UTCDateTime
+from obspy import read_inventory
+from obspy.io.xseed import Parser
 from obspy.geodetics import gps2dist_azimuth
 
 from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
@@ -1512,6 +1514,72 @@ def linear_regression(xdata, ydata, weights=None, p0=None,
         std_slope = np.sqrt(cov[0, 0])
         std_intercept = np.sqrt(cov[1, 1])
         return slope, intercept, std_slope, std_intercept
+
+
+def preload_instrument_responses(session):
+    """
+    This function preloads all instrument responses from ``response_format``
+    and stores the seed ids, start and end dates, and paz for every channel
+    in a DataFrame.
+    
+    .. warning::
+        This function only works for ``response_format`` being "inventory"
+        or "dataless".
+    
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect` 
+    
+    :rtype: pandas.DataFrame
+    :returns: A table containing all channels with the time of operation and
+        poles and zeros.
+    
+    """
+    logging.debug('Removing instrument response')
+    response_format = get_config(db, 'response_format')
+    files = glob.glob(os.path.join(get_config(db, 'response_path'), "*"))
+    channels = []
+    if response_format == "inventory":
+        for file in files:
+            print("Processing %s" % file)
+            try:
+                inv = read_inventory(file, format='STATIONXML')
+                for net in inv.networks:
+                    for sta in net.stations:
+                        for cha in sta.channels:
+                            seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
+                                                       cha.location_code,
+                                                       cha.code)
+                            resp = inv.get_response(seed_id, cha.start_date+10)
+                            polezerostage = resp.get_paz()
+                            totalsensitivity = resp.instrument_sensitivity
+                            pzdict = {}
+                            pzdict['poles'] = polezerostage.poles
+                            pzdict['zeros'] = polezerostage.zeros
+                            pzdict['gain'] = polezerostage.normalization_factor
+                            pzdict['sensitivity'] = totalsensitivity.value
+                            channels.append([seed_id, cha.start_date,
+                                             cha.end_date or UTCDateTime(),
+                                             pzdict])
+            except:
+                pass
+
+    elif response_format == "dataless":
+        for file in files:
+            try:
+                p = Parser(file)
+                for channel in p.get_inventory()["channels"]:
+                    resp = p.get_paz(channel["channel_id"],
+                                     channel["start_date"]+10)
+                    channels.append([channel["channel_id"],
+                                     channel["start_date"],
+                                     channel["end_date"] or UTCDateTime(),
+                                     resp])
+            except:
+                pass
+    channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
+                                               "end_date", "paz"],)
+    return(channels)
 
 
 if __name__ == "__main__":
