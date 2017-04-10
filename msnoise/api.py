@@ -1536,8 +1536,8 @@ def preload_instrument_responses(session):
     
     """
     logging.debug('Removing instrument response')
-    response_format = get_config(db, 'response_format')
-    files = glob.glob(os.path.join(get_config(db, 'response_path'), "*"))
+    response_format = get_config(session, 'response_format')
+    files = glob.glob(os.path.join(get_config(session, 'response_path'), "*"))
     channels = []
     if response_format == "inventory":
         for file in files:

@@ -5,8 +5,7 @@ import time
 import traceback
 
 
-from obspy.core import UTCDateTime
-from obspy.io.xseed import Parser
+from obspy.core import UTCDateTime, Stream, read
 
 try:
     from scikits.samplerate import resample
@@ -16,8 +15,8 @@ except:
 from .api import *
 
 
-def preprocess(db, stations, comps, goal_day, params):
-    responses = preload_instrument_responses(db)
+def preprocess(db, stations, comps, goal_day, params, responses=None):
+
     datafiles = {}
     output = Stream()
     for station in stations:
@@ -139,8 +138,6 @@ def preprocess(db, stations, comps, goal_day, params):
                                     remove_sensitivity=True,
                                     pre_filt=response_prefilt,
                                     paz_simulate=None, )
-
-
                 for tr in stream:
                     tr.data = tr.data.astype(np.float32)
                 output += stream

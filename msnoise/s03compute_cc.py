@@ -209,6 +209,12 @@ def main():
 
     logging.info("Will compute %s" % " ".join(params.components_to_compute))
 
+    if get_config(db, 'remove_response', isbool=True):
+        logging.debug('Pre-loading all instrument response')
+        responses = preload_instrument_responses(db)
+    else:
+        responses = None
+
     while is_next_job(db, jobtype='CC'):
         jobs = get_next_job(db, jobtype='CC')
         stations = []
@@ -239,7 +245,8 @@ def main():
                 comps.append(comp[0])
                 comps.append(comp[1])
         comps = np.unique(comps)
-        basetime, stream = preprocess(db, stations, comps, goal_day, params)
+        basetime, stream = preprocess(db, stations, comps, goal_day, params,
+                                      responses)
 
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.goal_sampling_rate
