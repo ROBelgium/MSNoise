@@ -201,6 +201,7 @@ def main(stype, interval=1.0):
                     #~ print updated_days
                     nstack, stack_total = get_results(
                         db, sta1, sta2, filterid, components, datelist, format=format)
+                    logging.debug("Data loaded")
                     if nstack > 0:
                         if stype == "mov":
                             for i, date in enumerate(datelist):

@@ -85,6 +85,10 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         trace.detrend(type="linear")
                         trace.taper(max_percentage=None, max_length=1.0)
 
+                if not len(stream):
+                    logging.debug(" has only too small traces, skipping...")
+                    continue
+
                 for trace in stream:
                     logging.debug(
                         "%s.%s Highpass at %.2f Hz" % (station, comp, params.preprocess_highpass))
@@ -122,7 +126,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         trace.stats.sampling_rate = params.goal_sampling_rate
 
                 if get_config(db, 'remove_response', isbool=True):
-                    logging.debug('Removing instrument response')
+                    logging.debug('%s Removing instrument response'%stream[0].id)
                     response_prefilt = eval(get_config(db, 'response_prefilt'))
 
                     response = responses[responses["channel_id"] == stream[0].id]

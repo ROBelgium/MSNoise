@@ -1058,13 +1058,15 @@ def get_results(session, station1, station2, filterid, components, dates,
         base += ".SAC"
     elif export_format == "MSEED":
         base += ".MSEED"
+    logging.debug("Reading files...")
     for j, date in enumerate(dates):
         daystack = base % str(date)
         try:
-            stack_data[j][:] = read(daystack)[0].data
+            stack_data[j, :] = read(daystack, format=export_format)[0].data[:]
             i += 1
         except:
             pass
+    logging.debug("Stacking...")
     if format == "matrix":
         return i, stack_data
 

@@ -61,7 +61,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
                            corners=4, zerophase=True)
             ref.normalize()
             ref = ref.data * ampli
-            plt.plot(t, ref+dist, c='k')
+            plt.plot(t, ref+dist, c='k', lw=1)
         
     plt.ylabel("Interstation Distance in km")
     plt.xlabel("Lag Time")
