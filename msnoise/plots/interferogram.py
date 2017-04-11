@@ -53,7 +53,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
         if refilter:
             for i, d in enumerate(data):
                 data[i] = bandpass(data[i], freqmin, freqmax, cc_sampling_rate,
-                                   corners=4, zerophase=True)
+                                   zerophase=True)
         plt.imshow(data.T, extent=xextent, aspect="auto",
                    interpolation='none', origin='lower', cmap='seismic',
                    vmin=-1e-2, vmax=1e-2)

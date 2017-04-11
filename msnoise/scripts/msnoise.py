@@ -229,47 +229,25 @@ def config(set, sync):
         click.echo("Successfully updated parameter %s = %s" % (name, value))
     elif sync:
         import glob
-        from ..api import connect, get_config, get_stations, update_station
+        from ..api import connect, get_config, get_stations, update_station,\
+            preload_instrument_responses
+
         db = connect()
-        response_format = get_config(db, 'response_format')
-        response_files = glob.glob(os.path.join(get_config(db, 'response_path'),
-                                                "*"))
-        if response_format == "inventory":
-            from obspy import read_inventory
-            firstinv = True
-            metadata = None
-            for file in response_files:
-                try:
-                    inv = read_inventory(file)
-                    if firstinv:
-                        metadata = inv
-                        firstinv = False
-                    else:
-                        metadata += inv
-                except:
-                    pass
-        elif response_format == "dataless":
-            from obspy.io.xseed import Parser
-            all_metadata = {}
-            for file in response_files:
-                metadata = Parser(file)
-                tmpinv = metadata.get_inventory()
-                for chan in tmpinv["channels"]:
-                    all_metadata[chan["channel_id"]] = metadata
-        else:
-            print("Response Format Not Supported")
-            exit()
+        responses = preload_instrument_responses(db)
+        netsta = []
+        for id, row in responses.iterrows():
+            net, sta, loc, chan = row["channel_id"].split(".")
+            netsta.append("%s.%s"%(net,sta))
+        responses["netsta"] = netsta
+
         for station in get_stations(db):
-            id = "%s.%s.00.HHZ" % (station.net, station.sta)
-            if response_format == "inventory":
-                coords = inv.get_coordinates(id)
-            else:
-                coords = all_metadata[id].get_coordinates(id)
-            update_station(db, station.net, station.sta, coords["longitude"],
-                           coords["latitude"], coords["elevation"], "DEG", )
+            id = "%s.%s" % (station.net, station.sta)
+            coords = responses[responses["netsta"] == id]
+            lon = float(coords["longitude"].values[0])
+            lat = float(coords["latitude"].values[0])
+            update_station(db, station.net, station.sta, lat, lon, 0, "DEG", )
             logging.info("Added coordinates (%.5f %.5f) for station %s.%s" %
-                        (coords["longitude"], coords["latitude"],
-                         station.net, station.sta))
+                        (lon, lat, station.net, station.sta))
         db.close()
 
     else:
@@ -543,10 +521,9 @@ def timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-@click.option('-r', '--refilter', default=None, help='Refilter CCFs before '
-                                                     'plotting (e.g. 4:8 for '
-                                                     'filtering CCFs between '
-                                                     '4.0 and 8.0 Hz')
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
 @click.pass_context
 def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
                   refilter):
@@ -574,10 +551,9 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
               default=None, type=str)
 @click.option('-e', '--envelope', is_flag=True, help='Plot envelope instead of '
                                                      'time series')
-@click.option('-r', '--refilter', default=None, help='Refilter CCFs before '
-                                                     'plotting (e.g. 4:8 for '
-                                                     'filtering CCFs between '
-                                                     '4.0 and 8.0 Hz')
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
 @click.pass_context
 def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
             ampli, seismic, show, outfile, envelope, refilter):
@@ -621,18 +597,21 @@ def mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-@click.option('-r', '--refilter', default=None, help='Refilter CCFs before '
-                                                     'plotting (e.g. 4:8 for '
-                                                     'filtering CCFs between '
-                                                     '4.0 and 8.0 Hz')
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.option('--virtual-source', default=None,
+              help='Use only pairs including this station. Format must be '
+                   'NET.STA')
 @click.pass_context
-def distance(ctx, filterid, comp, ampli, show, outfile, refilter):
+def distance(ctx, filterid, comp, ampli, show, outfile, refilter,
+             virtual_source):
     """Plots the REFs of all pairs vs distance"""
     if ctx.obj['MSNOISE_custom']:
         from distance import main
     else:
         from ..plots.distance import main
-    main(filterid, comp, ampli, show, outfile, refilter)
+    main(filterid, comp, ampli, show, outfile, refilter, virtual_source)
 
 
 @click.command()

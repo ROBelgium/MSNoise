@@ -1562,7 +1562,8 @@ def preload_instrument_responses(session):
                             pzdict['sensitivity'] = totalsensitivity.value
                             channels.append([seed_id, cha.start_date,
                                              cha.end_date or UTCDateTime(),
-                                             pzdict])
+                                             pzdict, cha.latitude,
+                                             cha.longitude])
             except:
                 pass
 
@@ -1576,11 +1577,14 @@ def preload_instrument_responses(session):
                     channels.append([channel["channel_id"],
                                      channel["start_date"],
                                      channel["end_date"] or UTCDateTime(),
-                                     resp])
+                                     resp,
+                                     channel["latitude"],
+                                     channel["longitude"]])
             except:
                 pass
     channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
-                                               "end_date", "paz"],)
+                                               "end_date", "paz", "latitude",
+                                               "longitude"],)
     return(channels)
 
 

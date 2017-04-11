@@ -42,7 +42,7 @@ fft/ifft. If the gap between two chunks is small, compared to a currently
 hard-coded value (10 samples), the gap is filled with interpolated values.
 Larger gaps will not be filled with interpolated values.
 
-.. arning::
+.. warning::
     As from MSNoise 1.5, traces are no longer padded by or merged with 0s.
 
 Each 1-day long trace is then low-passed (at ``preprocess_lowpass`` Hz),

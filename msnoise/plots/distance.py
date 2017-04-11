@@ -1,6 +1,9 @@
 """
 Plots the REF stacks vs interstation distance. This could help deciding which
-parameters to use in the dt/t calculation step.
+parameters to use in the dt/t calculation step. Passing ``--refilter`` allows
+to bandpass filter CCFs before plotting (new in 1.5). It is also possible to
+only draw CCFs for pairs including one station by passing ``--virtual-pair``
+followed by the desired ``NET.STA`` (new in 1.5).
 
 .. include:: clickhelp/msnoise-plot-distance.rst
 
@@ -19,7 +22,7 @@ from ..api import *
 
 
 def main(filterid, components, ampli=1, show=True, outfile=None,
-         refilter=None):
+         refilter=None, virtual_source=None):
     db = connect()
 
     pairs = get_station_pairs(db, used=1)
@@ -49,6 +52,11 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
 
         sta1 = "%s.%s" % (station1.net, station1.sta)
         sta2 = "%s.%s" % (station2.net, station2.sta)
+
+        if virtual_source is not None:
+            if virtual_source not in [sta1, sta2]:
+                continue
+
         pair = "%s:%s" % (sta1, sta2)
         print(pair, dist)
         ref_name = pair.replace('.', '_').replace(':', '_')
@@ -57,11 +65,13 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
         if os.path.isfile(rf):
             ref = read(rf)[0]
             if refilter:
+                ref.detrend("simple")
+                ref.taper(0.02)
                 ref.filter("bandpass", freqmin=freqmin, freqmax=freqmax,
-                           corners=4, zerophase=True)
+                           zerophase=True)
             ref.normalize()
             ref = ref.data * ampli
-            plt.plot(t, ref+dist, c='k', lw=1)
+            plt.plot(t, ref+dist, c='k', lw=0.4)
         
     plt.ylabel("Interstation Distance in km")
     plt.xlabel("Lag Time")

@@ -57,7 +57,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
                 continue
             if refilter:
                 line = bandpass(line, freqmin, freqmax, cc_sampling_rate,
-                                corners=4, zerophase=True)
+                                zerophase=True)
             if envelope:
                 line = obspy_envelope(line)
             line /= line.max()

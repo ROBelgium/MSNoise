@@ -292,12 +292,14 @@ Plot Updates
 * ``msnoise plot ccftime``, ``msnoise plot interferogram`` and
   ``msnoise plot distance`` now accept -r (--refilter) to refilter the CCFs
   before plotting. The argument must be a column-separated string (e.g.
-``-r 4:8`` for filtering between 4.0 and 8.0 Hz).
+  ``-r 4:8`` for filtering between 4.0 and 8.0 Hz).
+* ``msnoise plot distance`` accepts a new ``--virtual-source`` NET.STA parameter
+  to only plot the pairs including this station.
 * Most plots have better titles (filter details, etc).
 * The dv/v plot now allows averaging over components by passing them as comma-
   separated values.
 
-
+See :doc:`../plotting`.
 
 Performance and Code improvements
 ---------------------------------
