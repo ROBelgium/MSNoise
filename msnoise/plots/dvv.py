@@ -139,7 +139,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
 
             tmp3 = allbut[dttname].resample('D').median()
             tmp3.plot(label='median')
-
+            plt.ylabel('dv/v (%)')
             if first_plot == 1:
                 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=4,
                            ncol=2, borderaxespad=0.)

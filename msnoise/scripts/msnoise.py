@@ -92,6 +92,14 @@ def upgrade_db():
     except:
         logging.info("It looks like the v1.5 'job_index' is already in the DB")
         db.rollback()
+
+    try:
+        db.execute("CREATE INDEX da_index ON data_availability (path, file, net, sta, comp)")
+        db.commit()
+    except:
+        logging.info("It looks like the v1.5 'da_index' is already in the DB")
+        db.rollback()
+
     db.close()
 
 

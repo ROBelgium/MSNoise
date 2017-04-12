@@ -208,6 +208,12 @@ class DataAvailability(Base):
     samplerate = Column(Float)
     flag = Column(String(1))
     # UniqueConstraint('net', 'sta', 'comp', 'filename', name='uix_1')
+    table_args__ = (Index('da_index',
+                          "path",
+                          "file",
+                          "net",
+                          "sta",
+                          "comp", unique=True),)
 
     def __init__(self, net, sta, comp, path, file, starttime, endtime,
                  data_duration, gaps_duration, samplerate, flag):

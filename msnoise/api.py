@@ -486,6 +486,8 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
     """
 
     data = session.query(DataAvailability).\
+        with_hint(DataAvailability, 'USE INDEX (da_index)'). \
+        filter(DataAvailability.path == path). \
         filter(DataAvailability.file == file).\
         filter(DataAvailability.net == net).\
         filter(DataAvailability.sta == sta).\
@@ -596,7 +598,7 @@ def mark_data_availability(session, net, sta, flag):
     :param flag: Status of the DataAvailability object: New, Modified or
         Archive. Values accepted are {'N', 'M', 'A'}
     """
-    logging.debug("updating: %s %s %s" %(net, sta, flag))
+    logging.debug("Updating: %s %s to flag=%s" %(net, sta, flag))
     da = DataAvailability.__table__
     stmt = da.update().where(da.c.sta==sta).where(da.c.net==net).\
         values(flag=flag)

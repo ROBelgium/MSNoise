@@ -145,11 +145,21 @@ Populate Station Table and Scan Archive
   This is still quite preliminary and needs at least one slash in the parameter
   value to be identified as such by the code.
 
+* A change in the database structure (added an index on the
+  "path"+"file"+"net"+"sta"+"comp") allows running ``msnoise scan_archive``
+  a little more efficiently than before.
+
+.. warning::
+
+    The change in the database (adding an index) requires that you
+    ``msnoise upgrade_db`` every project!
+
 Expert/Lazy mode
 ~~~~~~~~~~~~~~~~
 
 * Added an Expert/Lazy mode to scan files directly by passing the path of their
-  containing folder to ``scan_archive --path`` :ref:`(see here)<scan-archive-expert>`.
+  containing folder to ``scan_archive --path``
+  :ref:`(see here)<scan-archive-expert>`.
 
 * Added an Expert/Lazy mode to input network/stations directly from the data
   scanned using the new ``populate --fromDA`` procedure
