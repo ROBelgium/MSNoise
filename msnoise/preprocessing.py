@@ -44,7 +44,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                 for file in sorted(files):
                     st = read(file, dytpe=np.float,
                               starttime=UTCDateTime(gd),
-                              endtime=UTCDateTime(gd) + 86400)
+                              endtime=UTCDateTime(gd)+86400)
                     st = st.select(network=net, station=sta)
                     for tr in st:
                         tr.data = tr.data.astype(np.float)

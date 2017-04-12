@@ -37,31 +37,19 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     allCpl = False
 
     maxlag = np.round(maxlag)
-    # ~ print "np.shape(data)",np.shape(data)
-    if data.shape[0] == 2:
-        # ~ print "2 matrix to correlate"
-        if allCpl:
-            # Skipped this unused part
-            pass
-        else:
-            K = data.shape[0]
-            # couples de stations
-            couples = np.concatenate((np.arange(0, K), K + np.arange(0, K)))
 
     Nt = data.shape[1]
-    Nc = 2 * Nt - 1
 
-    # corr = scipy.fftpack.fft(data,int(Nfft),axis=1)
-    corr = data
+    # data = scipy.fftpack.fft(data,int(Nfft),axis=1)
 
     if plot:
         plt.subplot(211)
-        plt.plot(np.arange(len(corr[0])) * 0.05, np.abs(corr[0]))
+        plt.plot(np.arange(len(data[0])) * 0.05, np.abs(data[0]))
         plt.subplot(212)
-        plt.plot(np.arange(len(corr[1])) * 0.05, np.abs(corr[1]))
+        plt.plot(np.arange(len(data[1])) * 0.05, np.abs(data[1]))
 
-    corr = np.conj(corr[couples[0]]) * corr[couples[1]]
-    corr = np.real(scipy.fftpack.ifft(corr, nfft)) / (Nt)
+    corr = np.conj(data[0]) * data[1]
+    corr = np.real(scipy.fftpack.ifft(corr, nfft)) / Nt
     corr = np.concatenate((corr[-Nt + 1:], corr[:Nt + 1]))
 
     if plot:
@@ -69,10 +57,10 @@ def myCorr(data, maxlag, plot=False, nfft=None):
         plt.plot(corr)
 
     if normalized:
-        E = np.real(np.sqrt(
-            np.mean(scipy.fftpack.ifft(data, n=nfft, axis=1) ** 2, axis=1)))
-        normFact = E[0] * E[1]
-        corr /= np.real(normFact)
+        E = np.prod(np.real(np.sqrt(
+            np.mean(scipy.fftpack.ifft(data, n=nfft, axis=1) ** 2, axis=1))))
+
+        corr /= np.real(E)
 
     if maxlag != Nt:
         tcorr = np.arange(-Nt + 1, Nt)
