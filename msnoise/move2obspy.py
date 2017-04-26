@@ -6,6 +6,8 @@ import scipy.fftpack
 import scipy.optimize
 import scipy.signal
 from obspy.signal.invsim import cosine_taper
+from obspy.signal.konnoohmachismoothing \
+    import konno_ohmachi_smoothing_window as ko_window
 from scipy.fftpack.helper import next_fast_len
 
 try:
@@ -71,28 +73,32 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     return corr
 
 
-def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
-    """This function takes 1-dimensional *data* timeseries array,
-    goes to frequency domain using fft, whitens the amplitude of the spectrum
-    in frequency domain between *freqmin* and *freqmax*
-    and returns the whitened fft.
+def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, wtype='brutal'):
+    """This function whitens the amplitude spectrum of the input trace. It is
+    modified from MSNoise to include different types of whitening."""
 
-    :type data: :class:`numpy.ndarray`
-    :param data: Contains the 1D time series to whiten
-    :type Nfft: int
-    :param Nfft: The number of points to compute the FFT
-    :type delta: float
-    :param delta: The sampling frequency of the `data`
-    :type freqmin: float
-    :param freqmin: The lower frequency bound
-    :type freqmax: float
-    :param freqmax: The upper frequency bound
-    :type plot: bool
-    :param plot: Whether to show a raw plot of the action (default: False)
+    def smoothen(spectrum, bandwidth, low, high):
+        """Smoothens the given spectrum between low and high using a
+        Konno Ohmachi window. Returns an array with the smoothened part only"""
 
-    :rtype: :class:`numpy.ndarray`
-    :returns: The FFT of the input trace, whitened between the frequency bounds
-"""
+        # half-width of the sliding window
+        wl = 90
+        # create the filter
+        ko_filter = ko_window(freqVec[:2*wl+1], freqVec[wl],
+                              bandwidth, normalize=False)
+
+        # add zeros to the low end of the spectrum if filter doesn't fit
+        if low < wl:
+            offset = wl - low
+            spectrum = np.append(np.zeros(offset), spectrum)
+            low += offset
+            high += offset
+
+        return np.array([np.dot(spectrum[x - wl:x + wl + 1], ko_filter) \
+                        for x in range(low, high)])
+
+    if wtype not in ['brutal', 'smoothing', 'smooth_whitening', 'none']:
+        raise ValueError('Unknown whitening type %s' % wtype)
 
     if plot:
         plt.subplot(411)
@@ -109,8 +115,8 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     if low <= 0:
         low = 1
 
-    porte1 = J[0]
-    porte2 = J[-1]
+    p1 = J[0]
+    p2 = J[-1]
     high = J[-1] + Napod
     if high > Nfft / 2:
         high = int(Nfft // 2)
@@ -124,33 +130,71 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
         plt.xlim(0, max(axis))
         plt.title('FFTRawSign')
 
-    # Left tapering:
+    if wtype == 'brutal':
+        # Left tapering: amplitude spectrum is the cosine taper itself
+        FFTRawSign[low:p1] = np.cos(
+            np.linspace(np.pi / 2., np.pi, p1 - low)) ** 2 * np.exp(
+            1j * np.angle(FFTRawSign[low:p1]))
+
+        # Pass band: amplitude spectrum is 1
+        FFTRawSign[p1:p2] = np.exp(1j * np.angle(FFTRawSign[p1:p2]))
+
+        # Right tapering: amplitude spectrum is the cosine taper itself
+        FFTRawSign[p2:high] = np.cos(
+            np.linspace(0., np.pi / 2., high - p2)) ** 2 * np.exp(
+            1j * np.angle(FFTRawSign[p2:high]))
+
+    else:
+        if wtype == 'smoothing':
+            # Pass band: a smoothened spectrum for the pass band
+            FFTRawSign[low:high] = (smoothen(np.abs(FFTRawSign), 10, low, high) *
+                np.exp(1j * np.angle(FFTRawSign[low:high])))
+
+        elif wtype == 'smooth_whitening':
+            # compute a smooth amplitude spectrum
+            smooth = smoothen(np.abs(FFTRawSign), 10, low, high)
+            waterlevel = 0.001 * np.max(smooth)
+            # add waterlevel
+            smooth[smooth < waterlevel] = waterlevel
+
+            # Pass band: the amplitudes are whitened using a smooth spectrum
+            FFTRawSign[low:high] = ((np.abs(FFTRawSign[low:high]) / smooth) *
+                                np.exp(1j * np.angle(FFTRawSign[low:high])))
+
+        # Left tapering: amplitude spectrum is multiplied by cosine taper
+        FFTRawSign[low:p1] = (np.abs(FFTRawSign[low:p1]) *
+            np.cos(np.linspace(np.pi / 2., np.pi, p1 - low)) ** 2 *
+            np.exp(1j * np.angle(FFTRawSign[low:p1])))
+
+        # Right tapering: amplitude spectrum is multiplied by cosine taper
+        FFTRawSign[p2:high] = (np.abs(FFTRawSign[p2:high]) *
+            np.cos(np.linspace(0., np.pi / 2., high - p2)) ** 2 *
+            np.exp(1j * np.angle(FFTRawSign[p2:high])))
+
+    # set lower part of spectrum to zero
     FFTRawSign[0:low] *= 0
-    FFTRawSign[low:porte1] = np.cos(
-        np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2 * np.exp(
-        1j * np.angle(FFTRawSign[low:porte1]))
-    # Pass band:
-    FFTRawSign[porte1:porte2] = np.exp(1j * np.angle(FFTRawSign[porte1:porte2]))
-    # Right tapering:
-    FFTRawSign[porte2:high] = np.cos(
-        np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(
-        1j * np.angle(FFTRawSign[porte2:high]))
+
+    # set upper part of spectrum to zero
     FFTRawSign[high:Nfft + 1] *= 0
 
     # Hermitian symmetry (because the input is real)
     FFTRawSign[-(Nfft // 2) + 1:] = FFTRawSign[1:(Nfft // 2)].conjugate()[::-1]
 
+    # Normalize the amplitude spectrum
+    FFTRawSign = (np.abs(FFTRawSign) / np.amax(FFTRawSign) *
+                  np.exp(1j * np.angle(FFTRawSign)))
+
     if plot:
         plt.subplot(413)
         axis = np.arange(len(FFTRawSign))
         plt.axvline(low, c='g')
-        plt.axvline(porte1, c='g')
-        plt.axvline(porte2, c='r')
+        plt.axvline(p1, c='g')
+        plt.axvline(p2, c='r')
         plt.axvline(high, c='r')
 
         plt.axvline(Nfft - high, c='r')
-        plt.axvline(Nfft - porte2, c='r')
-        plt.axvline(Nfft - porte1, c='g')
+        plt.axvline(Nfft - p2, c='r')
+        plt.axvline(Nfft - p1, c='g')
         plt.axvline(Nfft - low, c='g')
 
         plt.plot(axis, np.abs(FFTRawSign))
