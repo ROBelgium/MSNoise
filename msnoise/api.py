@@ -1545,7 +1545,7 @@ def preload_instrument_responses(session):
     channels = []
     if response_format == "inventory":
         for file in files:
-            print("Processing %s" % file)
+            logging.debug("Processing %s" % file)
             try:
                 inv = read_inventory(file, format='STATIONXML')
                 for net in inv.networks:
@@ -1554,20 +1554,39 @@ def preload_instrument_responses(session):
                             seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
                                                        cha.location_code,
                                                        cha.code)
-                            resp = inv.get_response(seed_id, cha.start_date+10)
-                            polezerostage = resp.get_paz()
-                            totalsensitivity = resp.instrument_sensitivity
                             pzdict = {}
-                            pzdict['poles'] = polezerostage.poles
-                            pzdict['zeros'] = polezerostage.zeros
-                            pzdict['gain'] = polezerostage.normalization_factor
-                            pzdict['sensitivity'] = totalsensitivity.value
+                            try:
+                                resp = inv.get_response(seed_id, cha.start_date+10)
+                                polezerostage = resp.get_paz()
+                            except Exception as e:
+                                logging.warning(
+                                    'Failed to get PAZ for SEED ID "%s", this '
+                                    'SEED ID will have an empty dictionary '
+                                    'for Poles and Zeros '
+                                    'information (Error message: %s).' % (
+                                        seed_id, str(e)))
+                            else:
+                                totalsensitivity = resp.instrument_sensitivity
+                                pzdict['poles'] = polezerostage.poles
+                                pzdict['zeros'] = polezerostage.zeros
+                                pzdict['gain'] = polezerostage.normalization_factor
+                                pzdict['sensitivity'] = totalsensitivity.value
+                            lat = cha.latitude
+                            lon = cha.longitude
+                            elevation = cha.elevation
+                            if lat is None or lon is None or elevation is None:
+                                lat = sta.latitude
+                                lon = sta.longitude
+                                elevation = sta.elevation
+                            if lat is None or lon is None or elevation is None:
+                                logging.error(
+                                    'Failed to look up coordinates for SEED '
+                                    'ID: %s' % seed_id)
                             channels.append([seed_id, cha.start_date,
                                              cha.end_date or UTCDateTime(),
-                                             pzdict, cha.latitude,
-                                             cha.longitude])
-            except:
-                pass
+                                             pzdict, lat, lon, elevation])
+            except Exception as e:
+                logging.error('Failed to process file %s: %s' % (file, str(e)))
 
     elif response_format == "dataless":
         for file in files:
@@ -1581,12 +1600,13 @@ def preload_instrument_responses(session):
                                      channel["end_date"] or UTCDateTime(),
                                      resp,
                                      channel["latitude"],
-                                     channel["longitude"]])
+                                     channel["longitude"],
+                                     channel["elevation_in_m"]])
             except:
                 pass
     channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
                                                "end_date", "paz", "latitude",
-                                               "longitude"],)
+                                               "longitude", "elevation"],)
     return(channels)
 
 
