@@ -1554,14 +1554,23 @@ def preload_instrument_responses(session):
                             seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
                                                        cha.location_code,
                                                        cha.code)
-                            resp = inv.get_response(seed_id, cha.start_date+10)
-                            polezerostage = resp.get_paz()
-                            totalsensitivity = resp.instrument_sensitivity
                             pzdict = {}
-                            pzdict['poles'] = polezerostage.poles
-                            pzdict['zeros'] = polezerostage.zeros
-                            pzdict['gain'] = polezerostage.normalization_factor
-                            pzdict['sensitivity'] = totalsensitivity.value
+                            try:
+                                resp = inv.get_response(seed_id, cha.start_date+10)
+                                polezerostage = resp.get_paz()
+                            except Exception as e:
+                                logging.warning(
+                                    'Failed to get PAZ for SEED ID "%s", this '
+                                    'SEED ID will have an empty dictionary '
+                                    'for Poles and Zeros '
+                                    'information (Error message: %s).' % (
+                                        seed_id, str(e)))
+                            else:
+                                totalsensitivity = resp.instrument_sensitivity
+                                pzdict['poles'] = polezerostage.poles
+                                pzdict['zeros'] = polezerostage.zeros
+                                pzdict['gain'] = polezerostage.normalization_factor
+                                pzdict['sensitivity'] = totalsensitivity.value
                             channels.append([seed_id, cha.start_date,
                                              cha.end_date or UTCDateTime(),
                                              pzdict, cha.latitude,
