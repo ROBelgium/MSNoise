@@ -1571,10 +1571,18 @@ def preload_instrument_responses(session):
                                 pzdict['zeros'] = polezerostage.zeros
                                 pzdict['gain'] = polezerostage.normalization_factor
                                 pzdict['sensitivity'] = totalsensitivity.value
+                            lat = cha.latitude
+                            lon = cha.longitude
+                            if lat is None or lon is None:
+                                lat = sta.latitude
+                                lon = sta.longitude
+                            if lat is None or lon is None:
+                                logging.error(
+                                    'Failed to look up coordinates for SEED '
+                                    'ID: %s' % seed_id)
                             channels.append([seed_id, cha.start_date,
                                              cha.end_date or UTCDateTime(),
-                                             pzdict, cha.latitude,
-                                             cha.longitude])
+                                             pzdict, lat, lon])
             except:
                 pass
 
