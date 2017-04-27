@@ -1545,7 +1545,7 @@ def preload_instrument_responses(session):
     channels = []
     if response_format == "inventory":
         for file in files:
-            print("Processing %s" % file)
+            logging.debug("Processing %s" % file)
             try:
                 inv = read_inventory(file, format='STATIONXML')
                 for net in inv.networks:
@@ -1585,8 +1585,8 @@ def preload_instrument_responses(session):
                             channels.append([seed_id, cha.start_date,
                                              cha.end_date or UTCDateTime(),
                                              pzdict, lat, lon, elevation])
-            except:
-                pass
+            except Exception as e:
+                logging.error('Failed to process file %s: %s' % (file, str(e)))
 
     elif response_format == "dataless":
         for file in files:
