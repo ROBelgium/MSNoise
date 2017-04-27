@@ -73,9 +73,31 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     return corr
 
 
-def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, wtype='brutal'):
-    """This function whitens the amplitude spectrum of the input trace. It is
-    modified from MSNoise to include different types of whitening."""
+def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, method='brutal'):
+    """This function takes 1-dimensional *data* timeseries array,
+    goes to frequency domain using fft, whitens the amplitude of the spectrum
+    in frequency domain between *freqmin* and *freqmax*
+    and returns the whitened fft.
+
+    :type data: :class:`numpy.ndarray`
+    :param data: Contains the 1D time series to whiten
+    :type Nfft: int
+    :param Nfft: The number of points to compute the FFT
+    :type delta: float
+    :param delta: The sampling frequency of the `data`
+    :type freqmin: float
+    :param freqmin: The lower frequency bound
+    :type freqmax: float
+    :param freqmax: The upper frequency bound
+    :type plot: bool
+    :param plot: Whether to show a raw plot of the action (default: False)
+    :type method: str
+    :param method: Whitening method to use, currently supported "brutal",
+        "smoothing", "smooth_whitening", "none".
+
+    :rtype: :class:`numpy.ndarray`
+    :returns: The FFT of the input trace, whitened between the frequency bounds
+    """
 
     def smoothen(spectrum, bandwidth, low, high):
         """Smoothens the given spectrum between low and high using a
@@ -96,9 +118,6 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, wtype='brutal'):
 
         return np.array([np.dot(spectrum[x - wl:x + wl + 1], ko_filter) \
                         for x in range(low, high)])
-
-    if wtype not in ['brutal', 'smoothing', 'smooth_whitening', 'none']:
-        raise ValueError('Unknown whitening type %s' % wtype)
 
     if plot:
         plt.subplot(411)
@@ -130,7 +149,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, wtype='brutal'):
         plt.xlim(0, max(axis))
         plt.title('FFTRawSign')
 
-    if wtype == 'brutal':
+    if method == 'brutal':
         # Left tapering: amplitude spectrum is the cosine taper itself
         FFTRawSign[low:p1] = np.cos(
             np.linspace(np.pi / 2., np.pi, p1 - low)) ** 2 * np.exp(
@@ -144,13 +163,13 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, wtype='brutal'):
             np.linspace(0., np.pi / 2., high - p2)) ** 2 * np.exp(
             1j * np.angle(FFTRawSign[p2:high]))
 
-    else:
-        if wtype == 'smoothing':
+    elif method in ('smoothing', 'smooth_whitening', 'none'):
+        if method == 'smoothing':
             # Pass band: a smoothened spectrum for the pass band
             FFTRawSign[low:high] = (smoothen(np.abs(FFTRawSign), 10, low, high) *
                 np.exp(1j * np.angle(FFTRawSign[low:high])))
 
-        elif wtype == 'smooth_whitening':
+        elif method == 'smooth_whitening':
             # compute a smooth amplitude spectrum
             smooth = smoothen(np.abs(FFTRawSign), 10, low, high)
             waterlevel = 0.001 * np.max(smooth)
@@ -170,6 +189,9 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, wtype='brutal'):
         FFTRawSign[p2:high] = (np.abs(FFTRawSign[p2:high]) *
             np.cos(np.linspace(0., np.pi / 2., high - p2)) ** 2 *
             np.exp(1j * np.angle(FFTRawSign[p2:high])))
+
+    else:
+        raise ValueError('Unknown whitening type %s' % method)
 
     # set lower part of spectrum to zero
     FFTRawSign[0:low] *= 0
