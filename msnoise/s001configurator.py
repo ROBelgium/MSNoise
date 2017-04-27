@@ -56,6 +56,8 @@ class TFilter(HasTraits):
     mwcs_wlen = Float
     mwcs_step = Float
     used = CBool
+    whitening_method = Str
+    # XXX do we have to add whitening_method to View??
     traits_view = View('low', 'high', 'rms_threshold', 'used',
                        buttons=['OK', 'Cancel'])
 
@@ -105,6 +107,7 @@ filter_editor = TableEditor(
              StationColumn(name='rms_threshold'),
              StationColumn(name='mwcs_wlen'),
              StationColumn(name='mwcs_step'),
+             StationColumn(name='whitening_method'),
              ])
 
 config_editor = TableEditor(
@@ -225,7 +228,8 @@ def main():
             TFilter(
                 ref=f.ref, low=f.low, high=f.high, mwcs_low=f.mwcs_low,
                 mwcs_high=f.mwcs_high, rms_threshold=f.rms_threshold,
-                mwcs_wlen=f.mwcs_wlen, mwcs_step=f.mwcs_step, used=f.used))
+                mwcs_wlen=f.mwcs_wlen, mwcs_step=f.mwcs_step, used=f.used,
+                whitening_method=f.whitening_method))
 
     configs = []
     for name in default.keys():
@@ -263,7 +267,7 @@ def main():
         for f in demo.company.filters:
             update_filter(db, f.ref, f.low, f.mwcs_low, f.high,
                           f.mwcs_high, f.rms_threshold, f.mwcs_wlen,
-                          f.mwcs_step, f.used)
+                          f.mwcs_step, f.used, f.whitening_method)
 
         db.close()
         print("Done !")

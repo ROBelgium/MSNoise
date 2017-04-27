@@ -173,7 +173,7 @@ def info(jobs):
         click.echo('')
         click.echo('Filters:')
         print('ID: [low:high]  [mwcs_low:mwcs_high]    mwcs_wlen    mwcs_step'
-              '   used')
+              '   used   whitening_method')
         for f in get_filters(db, all=True):
             data = (f.ref,
                     f.low,
@@ -182,8 +182,9 @@ def info(jobs):
                     f.mwcs_high,
                     f.mwcs_wlen,
                     f.mwcs_step,
-                    ['N', 'Y'][f.used])
-            print('%02i: [%.03f:%.03f] [%.03f:%.03f] %.03i %.03i %s' % data)
+                    ['N', 'Y'][f.used],
+                    f.whitening_method)
+            print('%02i: [%.03f:%.03f] [%.03f:%.03f] %.03i %.03i %s     %s' % data)
 
         click.echo('')
         click.echo('Stations:')

@@ -84,6 +84,10 @@ skipped by setting the ``whitening`` configuration to `None`. The two other
 example, computing ZZ components for very close by stations (much closer than
 the wavelength sampled), leading to spatial autocorrelation issues.
 
+The whitening method to use can be set in each filter's configuration as key
+``whitening_method``. Currently supported options are "brutal" (MSNoise
+default), "smoothing", "smooth_whitening" and "none".
+
 When both traces are ready, the cross-correlation function is computed
 (see :ref:`mycorr`). The function returned contains data for time lags
 corresponding to ``maxlag`` in the acausal (negative lags) and causal
@@ -390,6 +394,7 @@ def main():
                         low = float(filterdb.low)
                         high = float(filterdb.high)
                         rms_threshold = filterdb.rms_threshold
+                        whitening_method = filterdb.whitening_method
 
                         trames2hWb = np.zeros((2, int(nfft)), dtype=np.complex)
                         skip = False
@@ -399,7 +404,8 @@ def main():
                                     #logging.debug("Whitening %s" % components)
                                     trames2hWb[i] = whiten(tmp[i].data, nfft,
                                                            dt, low, high,
-                                                           plot=False)
+                                                           plot=False,
+                                                           method=whitening_method)
                                 else:
                                     #logging.debug("Autocorr %s"%components)
                                     tmp[i].filter("bandpass", freqmin=low,
