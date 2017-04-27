@@ -1573,16 +1573,18 @@ def preload_instrument_responses(session):
                                 pzdict['sensitivity'] = totalsensitivity.value
                             lat = cha.latitude
                             lon = cha.longitude
-                            if lat is None or lon is None:
+                            elevation = cha.elevation
+                            if lat is None or lon is None or elevation is None:
                                 lat = sta.latitude
                                 lon = sta.longitude
-                            if lat is None or lon is None:
+                                elevation = sta.elevation
+                            if lat is None or lon is None or elevation is None:
                                 logging.error(
                                     'Failed to look up coordinates for SEED '
                                     'ID: %s' % seed_id)
                             channels.append([seed_id, cha.start_date,
                                              cha.end_date or UTCDateTime(),
-                                             pzdict, lat, lon])
+                                             pzdict, lat, lon, elevation])
             except:
                 pass
 
@@ -1598,12 +1600,13 @@ def preload_instrument_responses(session):
                                      channel["end_date"] or UTCDateTime(),
                                      resp,
                                      channel["latitude"],
-                                     channel["longitude"]])
+                                     channel["longitude"],
+                                     channel["elevation_in_m"]])
             except:
                 pass
     channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
                                                "end_date", "paz", "latitude",
-                                               "longitude"],)
+                                               "longitude", "elevation"],)
     return(channels)
 
 
