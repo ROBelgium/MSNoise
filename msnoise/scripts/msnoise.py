@@ -360,6 +360,23 @@ def compute_cc(ctx):
     for p in processes:
         p.join()
 
+@click.command()
+@click.pass_context
+def compute_cc2(ctx):
+    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    from ..s03compute_no_rotation import main
+    from multiprocessing import Process
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    processes = []
+    for i in range(threads):
+        p = Process(target=main)
+        p.start()
+        processes.append(p)
+        time.sleep(delay)
+    for p in processes:
+        p.join()
+
 
 @click.command()
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
@@ -683,6 +700,7 @@ cli.add_command(bugreport)
 cli.add_command(scan_archive)
 cli.add_command(new_jobs)
 cli.add_command(compute_cc)
+cli.add_command(compute_cc2)
 cli.add_command(stack)
 cli.add_command(compute_mwcs)
 cli.add_command(compute_stretching)

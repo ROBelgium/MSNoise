@@ -59,7 +59,6 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     if normalized:
         E = np.prod(np.real(np.sqrt(
             np.mean(scipy.fftpack.ifft(data, n=nfft, axis=1) ** 2, axis=1))))
-
         corr /= np.real(E)
 
     if maxlag != Nt:
@@ -70,6 +69,42 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     del data
     return corr
 
+
+def myCorr2(data, maxlag, energy, index, plot=False, nfft=None):
+    """This function takes ndimensional *data* array, computes the cross-correlation in the frequency domain
+    and returns the cross-correlation function between [-*maxlag*:*maxlag*].
+
+    :type data: :class:`numpy.ndarray`
+    :param data: This array contains the fft of each timeseries to be cross-correlated.
+    :type maxlag: int
+    :param maxlag: This number defines the number of samples (N=2*maxlag + 1) of the CCF that will be returned.
+
+    :rtype: :class:`numpy.ndarray`
+    :returns: The cross-correlation function between [-maxlag:maxlag]
+    """
+
+    normalized = False
+    maxlag = np.round(maxlag)
+    Nt = data.shape[1]
+
+    if maxlag != Nt:
+        tcorr = np.arange(-Nt + 1, Nt)
+        dN = np.where(np.abs(tcorr) <= maxlag)[0]
+    corrs = {}
+    for id, sta1, sta2 in index:
+        corr = np.conj(data[sta1]) * data[sta2]
+        corr = np.real(scipy.fftpack.ifft(corr, nfft)) / Nt
+        corr = np.concatenate((corr[-Nt + 1:], corr[:Nt + 1]))
+
+        if normalized:
+            corr /= (energy[sta1] * energy[sta2])
+
+        if maxlag != Nt:
+            corr = corr[dN]
+        corrs[id] = corr
+
+
+    return corrs
 
 def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     """This function takes 1-dimensional *data* timeseries array,
@@ -161,7 +196,56 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
         plt.plot(np.arange(len(wdata)) * delta, wdata)
         plt.xlim(0, len(wdata) * delta)
         plt.show()
+
     return FFTRawSign
+
+
+def whiten2(fft, Nfft, low, high, porte1, porte2, psds):
+    """This function takes 1-dimensional *data* timeseries array,
+    goes to frequency domain using fft, whitens the amplitude of the spectrum
+    in frequency domain between *freqmin* and *freqmax*
+    and returns the whitened fft.
+
+    :type data: :class:`numpy.ndarray`
+    :param data: Contains the 1D time series to whiten
+    :type Nfft: int
+    :param Nfft: The number of points to compute the FFT
+    :type delta: float
+    :param delta: The sampling frequency of the `data`
+    :type freqmin: float
+    :param freqmin: The lower frequency bound
+    :type freqmax: float
+    :param freqmax: The upper frequency bound
+    :type plot: bool
+    :param plot: Whether to show a raw plot of the action (default: False)
+
+    :rtype: :class:`numpy.ndarray`
+    :returns: The FFT of the input trace, whitened between the frequency bounds
+"""
+    taper = np.ones(Nfft//2+1)
+    taper[0:low] *= 0
+    taper[low:porte1] *= np.cos(np.linspace(np.pi / 2., 0, porte1 - low))**2
+    taper[porte2:high] *= np.cos(np.linspace(0., np.pi / 2., high - porte2))**2
+    taper[high:] *= 0
+    for i in range(fft.shape[0]):
+        fft[i][:Nfft//2+1] /= psds[i]
+        fft[i][:Nfft//2+1] *= taper
+        # Left tapering:
+        # fft[i,0:low] *= 0
+        # fft[i,low:porte1] = np.cos(
+        #     np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2 * np.exp(
+        #     1j * np.angle(fft[i,low:porte1]))
+        # # Pass band:
+        # fft[i,porte1:porte2] = np.exp(1j * np.angle(fft[i,porte1:porte2]))
+        # # Right tapering:
+        # fft[i,porte2:high] = np.cos(
+        #     np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(
+        #     1j * np.angle(fft[i,porte2:high]))
+        # fft[i,high:Nfft + 1] *= 0
+
+        # Hermitian symmetry (because the input is real)
+        fft[i,-(Nfft // 2) + 1:] = np.conjugate(fft[i,1:(Nfft // 2)])[::-1]
+
 
 
 def smooth(x, window='boxcar', half_win=3):

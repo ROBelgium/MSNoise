@@ -250,8 +250,9 @@ def main():
 
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.goal_sampling_rate
-
+        start_processing = time.time()
         # ITERATING OVER PAIRS #####
+        logging.info("Will do %i pairs" % len(pairs))
         for pair in pairs:
             orig_pair = pair
 
@@ -462,7 +463,7 @@ def main():
 
             logging.info("Finished processing this pair. It took %.2f seconds" % (time.time() - tt))
         clean_scipy_cache()
-        logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
+        logging.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & process %.2f s)" % ((time.time() - jt), start_processing-jt, time.time()-start_processing))
         del stream
     logging.info('*** Finished: Compute CC ***')
 
