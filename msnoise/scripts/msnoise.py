@@ -253,7 +253,7 @@ def config(set, sync):
             coords = responses[responses["netsta"] == id]
             lon = float(coords["longitude"].values[0])
             lat = float(coords["latitude"].values[0])
-            update_station(db, station.net, station.sta, lat, lon, 0, "DEG", )
+            update_station(db, station.net, station.sta, lon, lat, 0, "DEG", )
             logging.info("Added coordinates (%.5f %.5f) for station %s.%s" %
                         (lon, lat, station.net, station.sta))
         db.close()
