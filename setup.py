@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-setup(version="1.5a",
+setup(version="1.5",
       name='msnoise',
       packages=find_packages(),
       include_package_data=True,
@@ -9,6 +9,7 @@ setup(version="1.5a",
           'numpy>=1.0',
           'scipy',
           'pandas',
+          'pytables',
           'matplotlib',
           'sqlalchemy',
           'obspy',
