@@ -1545,7 +1545,7 @@ def preload_instrument_responses(session):
     channels = []
     if response_format == "inventory":
         for file in files:
-            print("Processing %s" % file)
+            logging.debug("Processing %s" % file)
             try:
                 inv = read_inventory(file, format='STATIONXML')
                 for net in inv.networks:
