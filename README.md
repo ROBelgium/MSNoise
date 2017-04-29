@@ -66,4 +66,4 @@ Although we have cross-checked the whole code, we cannot warranty it is exempt o
 Licence
 -------
 
-Although MSNoise is provided freely on the internet and every individual may use it, we do not allow anyone to provide commercial service (read -paid in any way-), like training or teaching without contacting the original authors first. The authors and the contact email address are in the __init__.py file of the package.
+MSNoise is released under EUPL v1.1

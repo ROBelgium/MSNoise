@@ -4,7 +4,7 @@ MSNoise - Documentation
 Originally, MSNoise was a "Python Package for Monitoring Seismic Velocity
 Changes using Ambient Seismic Noise". With the release of MSNoise 1.4, and
 because of the Plugin Support, we could call MSNoise: "Measuring with Seismic
-Noise".
+Noise". The current release version of MSNoise is **MSNoise 1.5**.
 
 The standard MSNoise workflow is designed to go from seismic data archives to
 dv/v curves. The monitoring is achieved by computing the cross-correlation of
@@ -27,27 +27,51 @@ citing MSNoise:
 for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
 *Seismological Research Letters*, 85(3), 715‑726, doi:10.1785/0220130073.
 
+This documentation is also available in PDF format on the MSNoise Website
+(PDF_).
 
-Documentation Content:
-
-.. toctree::
-   :maxdepth: 1
-
-   installation
+Installation
+============
 
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 1
 
-   workflow
-   plotting
-   plugins
-   api
-   core
-   table_def
-   how_tos
-   about_db_performances
-   references
-   contributors
+    installation
+
+Workflow
+========
+
+.. toctree::
+    :glob:
+    :maxdepth: 1
+
+    workflow/*
+
+Plotting
+========
+
+.. toctree::
+    :maxdepth: 2
+
+    plotting
+
+
+Development & Miscellaneous
+===========================
+
+.. toctree::
+    :maxdepth: 2
+
+    api
+    core
+    table_def
+    plugins
+
+    how_tos
+    about_db_performances
+    references
+    contributors
+
 
 .. toctree::
     :maxdepth: 1
@@ -55,27 +79,25 @@ Documentation Content:
     clickhelp/msnoise
 
 
-Release Notes:
 
+
+
+Release Notes
+=============
 .. toctree::
-   :maxdepth: 1
+    :maxdepth: 1
 
-   releasenotes/msnoise-1.5
-   releasenotes/msnoise-1.4
-   releasenotes/msnoise-1.3.1
-   releasenotes/msnoise-1.3
-   releasenotes/msnoise-1.2.5
-   releasenotes/msnoise-1.2.4
-   releasenotes/msnoise-1.2.3
-   releasenotes/msnoise-1.2.2
-   releasenotes/msnoise-1.2.1
-   releasenotes/msnoise-1.2
-   releasenotes/msnoise-1.0
+    releasenotes/msnoise-1.5
+    releasenotes/msnoise-1.4
+    releasenotes/msnoise-1.3.1
+    releasenotes/msnoise-1.3
+    releasenotes/msnoise-1.2.5
+    releasenotes/msnoise-1.2.4
+    releasenotes/msnoise-1.2.3
+    releasenotes/msnoise-1.2.2
+    releasenotes/msnoise-1.2.1
+    releasenotes/msnoise-1.2
+    releasenotes/msnoise-1.0
 
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+.. _PDF: http://msnoise.org/doc/MSNoise.pdf

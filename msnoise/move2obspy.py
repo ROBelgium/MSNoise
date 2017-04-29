@@ -3,12 +3,15 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.fftpack
+import scipy.optimize
 import scipy.signal
-import statsmodels.api as sm
 from obspy.signal.invsim import cosine_taper
 from scipy.fftpack.helper import next_fast_len
 
-from .api import nextpow2
+try:
+    from obspy.signal.regression import linear_regression
+except ImportError:
+    from .api import linear_regression
 
 
 def myCorr(data, maxlag, plot=False, nfft=None):
@@ -34,31 +37,19 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     allCpl = False
 
     maxlag = np.round(maxlag)
-    # ~ print "np.shape(data)",np.shape(data)
-    if data.shape[0] == 2:
-        # ~ print "2 matrix to correlate"
-        if allCpl:
-            # Skipped this unused part
-            pass
-        else:
-            K = data.shape[0]
-            # couples de stations
-            couples = np.concatenate((np.arange(0, K), K + np.arange(0, K)))
 
     Nt = data.shape[1]
-    Nc = 2 * Nt - 1
 
-    # corr = scipy.fftpack.fft(data,int(Nfft),axis=1)
-    corr = data
+    # data = scipy.fftpack.fft(data,int(Nfft),axis=1)
 
     if plot:
         plt.subplot(211)
-        plt.plot(np.arange(len(corr[0])) * 0.05, np.abs(corr[0]))
+        plt.plot(np.arange(len(data[0])) * 0.05, np.abs(data[0]))
         plt.subplot(212)
-        plt.plot(np.arange(len(corr[1])) * 0.05, np.abs(corr[1]))
+        plt.plot(np.arange(len(data[1])) * 0.05, np.abs(data[1]))
 
-    corr = np.conj(corr[couples[0]]) * corr[couples[1]]
-    corr = np.real(scipy.fftpack.ifft(corr, nfft)) / (Nt)
+    corr = np.conj(data[0]) * data[1]
+    corr = np.real(scipy.fftpack.ifft(corr, nfft)) / Nt
     corr = np.concatenate((corr[-Nt + 1:], corr[:Nt + 1]))
 
     if plot:
@@ -66,10 +57,10 @@ def myCorr(data, maxlag, plot=False, nfft=None):
         plt.plot(corr)
 
     if normalized:
-        E = np.real(np.sqrt(
-            np.mean(scipy.fftpack.ifft(data, n=nfft, axis=1) ** 2, axis=1)))
-        normFact = E[0] * E[1]
-        corr /= np.real(normFact)
+        E = np.prod(np.real(np.sqrt(
+            np.mean(scipy.fftpack.ifft(data, n=nfft, axis=1) ** 2, axis=1))))
+
+        corr /= np.real(E)
 
     if maxlag != Nt:
         tcorr = np.arange(-Nt + 1, Nt)
@@ -147,7 +138,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     FFTRawSign[high:Nfft + 1] *= 0
 
     # Hermitian symmetry (because the input is real)
-    FFTRawSign[-Nfft // 2 + 1:] = FFTRawSign[1:Nfft // 2].conjugate()[::-1]
+    FFTRawSign[-(Nfft // 2) + 1:] = FFTRawSign[1:(Nfft // 2)].conjugate()[::-1]
 
     if plot:
         plt.subplot(413)
@@ -195,170 +186,183 @@ def getCoherence(dcs, ds1, ds2):
     coh[coh > (1.0 + 0j)] = 1.0 + 0j
     return coh
 
-from obspy.signal.filter import bandpass
-def mwcs(ccCurrent, ccReference, fmin, fmax, sampRate, tmin, windL, step,
-         plot=False):
-    """...
 
-    :type ccCurrent: :class:`numpy.ndarray`
-    :param ccCurrent: The "Current" timeseries
-    :type ccReference: :class:`numpy.ndarray`
-    :param ccReference: The "Reference" timeseries
-    :type fmin: float
-    :param fmin: The lower frequency bound to compute the dephasing
-    :type fmax: float
-    :param fmax: The higher frequency bound to compute the dephasing
-    :type sampRate: float
-    :param sampRate: The sample rate of the input timeseries
-    :type tmin: float
-    :param tmin: The leftmost time lag (used to compute the "time lags array")
-    :type windL: float
-    :param windL: The moving window length
-    :type step: float
-    :param step: The step to jump for the moving window
-    :type plot: bool
-    :param plot: If True, plots the MWCS result for each window. Defaults to
-        False
+def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step,
+         smoothing_half_win=5):
+    """The `current` time series is compared to the `reference`.
+Both time series are sliced in several overlapping windows.
+Each slice is mean-adjusted and cosine-tapered (85% taper) before being Fourier-
+transformed to the frequency domain.
+:math:`F_{cur}(\\nu)` and :math:`F_{ref}(\\nu)` are the first halves of the
+Hermitian symmetric Fourier-transformed segments. The cross-spectrum
+:math:`X(\\nu)` is defined as
+:math:`X(\\nu) = F_{ref}(\\nu) F_{cur}^*(\\nu)`
 
-    :rtype: :class:`numpy.ndarray`
-    :returns: [Taxis,deltaT,deltaErr,deltaMcoh]. Taxis contains the central
-        times of the windows. The three other columns contain dt, error and
-        mean coherence for each window.
+in which :math:`{}^*` denotes the complex conjugation.
+:math:`X(\\nu)` is then smoothed by convolution with a Hanning window.
+The similarity of the two time-series is assessed using the cross-coherency
+between energy densities in the frequency domain:
+
+:math:`C(\\nu) = \\frac{|\overline{X(\\nu))}|}{\sqrt{|\overline{F_{ref}(\\nu)|^2} |\overline{F_{cur}(\\nu)|^2}}}`
+
+
+in which the over-line here represents the smoothing of the energy spectra for
+:math:`F_{ref}` and :math:`F_{cur}` and of the spectrum of :math:`X`. The mean
+coherence for the segment is defined as the mean of :math:`C(\\nu)` in the
+frequency range of interest. The time-delay between the two cross correlations
+is found in the unwrapped phase, :math:`\phi(\nu)`, of the cross spectrum and is
+linearly proportional to frequency:
+
+:math:`\phi_j = m. \nu_j, m = 2 \pi \delta t`
+
+The time shift for each window between two signals is the slope :math:`m` of a
+weighted linear regression of the samples within the frequency band of interest.
+The weights are those introduced by [Clarke2011]_,
+which incorporate both the cross-spectral amplitude and cross-coherence, unlike
+[Poupinet1984]_. The errors are estimated using the weights (thus the
+coherence) and the squared misfit to the modelled slope:
+
+:math:`e_m = \sqrt{\sum_j{(\\frac{w_j \\nu_j}{\sum_i{w_i \\nu_i^2}})^2}\sigma_{\phi}^2}`
+
+where :math:`w` are weights, :math:`\\nu` are cross-coherences and
+:math:`\sigma_{\phi}^2` is the squared misfit of the data to the modelled slope
+and is calculated as :math:`\sigma_{\phi}^2 = \\frac{\sum_j(\phi_j - m \\nu_j)^2}{N-1}`
+
+The output of this process is a table containing, for each moving window: the
+central time lag, the measured delay, its error and the mean coherence of the
+segment.
+
+.. warning::
+
+    The time series will not be filtered before computing the cross-spectrum!
+    They should be band-pass filtered around the `freqmin`-`freqmax` band of
+    interest beforehand.
+
+:type current: :class:`numpy.ndarray`
+:param current: The "Current" timeseries
+:type reference: :class:`numpy.ndarray`
+:param reference: The "Reference" timeseries
+:type freqmin: float
+:param freqmin: The lower frequency bound to compute the dephasing (in Hz)
+:type freqmax: float
+:param freqmax: The higher frequency bound to compute the dephasing (in Hz)
+:type df: float
+:param df: The sampling rate of the input timeseries (in Hz)
+:type tmin: float
+:param tmin: The leftmost time lag (used to compute the "time lags array")
+:type window_length: float
+:param window_length: The moving window length (in seconds)
+:type step: float
+:param step: The step to jump for the moving window (in seconds)
+:type smoothing_half_win: int
+:param smoothing_half_win: If different from 0, defines the half length of
+    the smoothing hanning window.
+
+
+:rtype: :class:`numpy.ndarray`
+:returns: [time_axis,delta_t,delta_err,delta_mcoh]. time_axis contains the
+    central times of the windows. The three other columns contain dt, error and
+    mean coherence for each window.
     """
+    delta_t = []
+    delta_err = []
+    delta_mcoh = []
+    time_axis = []
 
-    windL = np.int(windL * sampRate)
-    step = np.int(step * sampRate)
+    window_length_samples = np.int(window_length * df)
+    try:
+        from scipy.fftpack.helper import next_fast_len
+    except ImportError:
+        from obspy.signal.util import next_pow_2 as next_fast_len
+
+    padd = next_fast_len(window_length_samples)
     count = 0
-    deltaT = []
-    deltaErr = []
-    deltaMcoh = []
-    Taxis = []
-    padd = 2 ** (nextpow2(windL) + 2)
-    padd = next_fast_len(windL)
-
-    # Tentative checking if enough point are used to compute the FFT
-    freqVec = scipy.fftpack.fftfreq(int(padd), 1. / sampRate)[:int(padd) // 2]
-    indRange = np.argwhere(np.logical_and(freqVec >= fmin,
-                                          freqVec <= fmax))
-    if len(indRange) < 2:
-        padd = 2 ** (nextpow2(windL) + 3)
-
-    tp = cosine_taper(windL, .85)
-
-    timeaxis = (np.arange(len(ccCurrent)) / float(sampRate)) + tmin
+    tp = cosine_taper(window_length_samples, 0.85)
     minind = 0
-    maxind = windL
-    while maxind <= len(ccCurrent):
-        ind = minind
-
-        cci = ccCurrent[ind:(ind + windL)].copy()
+    maxind = window_length_samples
+    while maxind <= len(current):
+        cci = current[minind:(minind + window_length_samples)]
         cci = scipy.signal.detrend(cci, type='linear')
-        cci -= cci.min()
-        cci /= cci.max()
-        cci -= np.mean(cci)
         cci *= tp
 
-        cri = ccReference[ind:(ind + windL)].copy()
+        cri = reference[minind:(minind + window_length_samples)]
         cri = scipy.signal.detrend(cri, type='linear')
-        cri -= cri.min()
-        cri /= cri.max()
-        cri -= np.mean(cri)
         cri *= tp
 
-        Fcur = scipy.fftpack.fft(cci, n=int(padd))[:int(padd) // 2]
-        Fref = scipy.fftpack.fft(cri, n=int(padd))[:int(padd) // 2]
+        minind += int(step*df)
+        maxind += int(step*df)
 
-        Fcur2 = np.real(Fcur) ** 2 + np.imag(Fcur) ** 2
-        Fref2 = np.real(Fref) ** 2 + np.imag(Fref) ** 2
+        fcur = scipy.fftpack.fft(cci, n=padd)[:padd // 2]
+        fref = scipy.fftpack.fft(cri, n=padd)[:padd // 2]
 
-        smoother = 5
-
-        dcur = np.sqrt(smooth(Fcur2, window='hanning', half_win=smoother))
-        dref = np.sqrt(smooth(Fref2, window='hanning', half_win=smoother))
+        fcur2 = np.real(fcur) ** 2 + np.imag(fcur) ** 2
+        fref2 = np.real(fref) ** 2 + np.imag(fref) ** 2
 
         # Calculate the cross-spectrum
-        X = Fref * (Fcur.conj())
-        X = smooth(X, window='hanning', half_win=smoother)
+        X = fref * (fcur.conj())
+        if smoothing_half_win != 0:
+            dcur = np.sqrt(smooth(fcur2, window='hanning',
+                                  half_win=smoothing_half_win))
+            dref = np.sqrt(smooth(fref2, window='hanning',
+                                  half_win=smoothing_half_win))
+            X = smooth(X, window='hanning',
+                       half_win=smoothing_half_win)
+        else:
+            dcur = np.sqrt(fcur2)
+            dref = np.sqrt(fref2)
+
         dcs = np.abs(X)
 
         # Find the values the frequency range of interest
-        freqVec = scipy.fftpack.fftfreq(len(X) * 2, 1. / sampRate)[
-                  :int(padd) // 2]
-        indRange = np.argwhere(np.logical_and(freqVec >= fmin,
-                                              freqVec <= fmax))
+        freq_vec = scipy.fftpack.fftfreq(len(X) * 2, 1. / df)[:padd // 2]
+        index_range = np.argwhere(np.logical_and(freq_vec >= freqmin,
+                                                 freq_vec <= freqmax))
 
         # Get Coherence and its mean value
         coh = getCoherence(dcs, dref, dcur)
-        mcoh = np.mean(coh[indRange])
+        mcoh = np.mean(coh[index_range])
 
         # Get Weights
-        w = 1.0 / (1.0 / (coh[indRange] ** 2) - 1.0)
-        w[coh[indRange] >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
-        w = np.sqrt(w * np.sqrt(dcs[indRange]))
-        # w /= (np.sum(w)/len(w)) #normalize
+        w = 1.0 / (1.0 / (coh[index_range] ** 2) - 1.0)
+        w[coh[index_range] >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
+        w = np.sqrt(w * np.sqrt(dcs[index_range]))
         w = np.real(w)
 
         # Frequency array:
-        v = np.real(freqVec[indRange]) * 2 * np.pi
-        vo = np.real(freqVec) * 2 * np.pi
+        v = np.real(freq_vec[index_range]) * 2 * np.pi
 
         # Phase:
         phi = np.angle(X)
         phi[0] = 0.
         phi = np.unwrap(phi)
-        # phio = phi.copy()
-        phi = phi[indRange]
+        phi = phi[index_range]
 
         # Calculate the slope with a weighted least square linear regression
         # forced through the origin
         # weights for the WLS must be the variance !
-        res = sm.regression.linear_model.WLS(phi, v, w ** 2).fit()
+        m, em = linear_regression(v.flatten(), phi.flatten(), w.flatten())
 
-        # print "forced", np.real(res.params[0])
-        # print "!forced", np.real(res2.params[0])
-
-        m = np.real(res.params[0])
-        deltaT.append(m)
+        delta_t.append(m)
 
         # print phi.shape, v.shape, w.shape
         e = np.sum((phi - m * v) ** 2) / (np.size(v) - 1)
         s2x2 = np.sum(v ** 2 * w ** 2)
         sx2 = np.sum(w * v ** 2)
         e = np.sqrt(e * s2x2 / sx2 ** 2)
-        # print w.shape
-        if plot:
-            plt.figure()
-            plt.suptitle('%.1fs' % (timeaxis[ind + windL // 2]))
-            plt.subplot(311)
-            plt.plot(cci)
-            plt.plot(cri)
-            ax = plt.subplot(312)
-            plt.plot(vo / (2 * np.pi), phio)
-            plt.scatter(v / (2 * np.pi), phi, c=w, edgecolor='none',
-                        vmin=0.6, vmax=1)
-            plt.subplot(313, sharex=ax)
-            plt.plot(v / (2 * np.pi), coh[indRange])
-            plt.axhline(mcoh, c='r')
-            plt.axhline(1.0, c='k', ls='--')
-            plt.xlim(-0.1, 1.5)
-            plt.ylim(0, 1.5)
-            plt.show()
 
-        deltaErr.append(e)
-        deltaMcoh.append(np.real(mcoh))
-        Taxis.append(timeaxis[ind + windL // 2])
+        delta_err.append(e)
+        delta_mcoh.append(np.real(mcoh))
+        time_axis.append(tmin+window_length/2.+count*step)
         count += 1
 
-        minind += step
-        maxind += step
-        del Fcur, Fref
+        del fcur, fref
         del X
-        del freqVec
-        del indRange
-        del w, v, e, s2x2
-        del res
+        del freq_vec
+        del index_range
+        del w, v, e, s2x2, sx2, m, em
 
-    if maxind > len(ccCurrent) + step:
+    if maxind > len(current) + step*df:
         logging.warning("The last window was too small, but was computed")
 
-    return np.array([Taxis, deltaT, deltaErr, deltaMcoh]).T
+    return np.array([time_axis, delta_t, delta_err, delta_mcoh]).T
+

@@ -1,3 +1,4 @@
+import traceback
 import logging
 import os
 import sys
@@ -13,12 +14,16 @@ import pkg_resources
 @click.group()
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
 (only affects modules that are designed to do parallel processing)')
+@click.option('-d', '--delay', default=1,  help='In the case of multi-threading'
+                    ', defines the number of seconds to wait before lauching '
+                    'the next thread. Defaults to [1] second ')
 @click.option('-c', '--custom', default=False, is_flag=True, help='Use custom \
  file for plots. To use this, copy the plot script here and edit it.')
 @click.option('-v', '--verbose', default=2, count=True)
 @click.pass_context
-def cli(ctx, threads, custom, verbose):
+def cli(ctx, threads, delay, custom, verbose):
     ctx.obj['MSNOISE_threads'] = threads
+    ctx.obj['MSNOISE_threadsdelay'] = delay
     if verbose == 0:
         ctx.obj['MSNOISE_verbosity'] = "WARNING"
     elif verbose == 1:
@@ -70,7 +75,7 @@ def upgrade_db():
     This procedure adds new parameters with their default value
     in the config database.
     """
-    from ..api import connect, Config, get_tech, get_engine
+    from ..api import connect, Config
     from ..default import default
     db = connect()
     for name in default.keys():
@@ -81,38 +86,21 @@ def upgrade_db():
             db.rollback()
             # print("Passing %s: already in DB" % name)
             continue
+    try:
+        db.execute("CREATE INDEX job_index ON jobs (day, pair, jobtype)")
+        db.commit()
+    except:
+        logging.info("It looks like the v1.5 'job_index' is already in the DB")
+        db.rollback()
+
+    try:
+        db.execute("CREATE INDEX da_index ON data_availability (path, file, net, sta, comp)")
+        db.commit()
+    except:
+        logging.info("It looks like the v1.5 'da_index' is already in the DB")
+        db.rollback()
 
     db.close()
-
-    if get_tech() == 2:
-        try:
-            e = get_engine()
-            e.execute(
-                'ALTER TABLE `jobs` CHANGE `type` `jobtype` VARCHAR( 10 )')
-        except:
-            print("The jobs table seems already up-to-date, exiting.")
-    else:
-        try:
-            e = get_engine()
-            e.execute("SELECT jobtype from jobs where 1")
-        except:
-            print("You need to edit the `jobs` table manually to match the new"
-                  "column naming")
-            print (
-            "Please read http://msnoise.org/doc/releasenotes/msnoise-1.3.html")
-    if get_tech() == 2:
-        try:
-            e = get_engine()
-            e.execute("ALTER TABLE stations CHANGE X X REAL NULL DEFAULT NULL")
-            e.execute("ALTER TABLE stations CHANGE Y Y REAL NULL DEFAULT NULL")
-            print("The station table has been updated (floating point bugfix)")
-        except:
-            print("The jobs table seems already up-to-date, exiting.")
-    else:
-        print("You need to edit the `station` table manually to match the new"
-              " column naming")
-        print (
-        "Please read http://msnoise.org/doc/releasenotes/msnoise-1.4.html")
 
 
 @click.command()
@@ -161,15 +149,17 @@ def info(jobs):
                     if job[1] == 'D':
                         if job[0] > 0:
                             click.secho(
-                                " - %s does not exists and that is not normal (%i CC jobs done)" % (
-                                output_folder, job[0]), fg='red')
+                                " - %s does not exists and that is not normal"
+                                " (%i CC jobs done)" % (output_folder, job[0]),
+                                fg='red')
                         else:
                             click.secho(
-                                " - %s does not exists and that is normal (%i CC jobs done)" % (
-                                output_folder, job[0]))
+                                " - %s does not exists and that is normal"
+                                " (%i CC jobs done)" % (output_folder, job[0]))
             else:
                 click.secho(
-                    " - %s does not exists (and that is normal because keep_all=False)" % output_folder)
+                    " - %s does not exists (and that is normal because"
+                    " keep_all=False)" % output_folder)
 
         click.echo('')
         click.echo('Raw config bits: "D"efault or "M"odified (green)')
@@ -182,8 +172,8 @@ def info(jobs):
 
         click.echo('')
         click.echo('Filters:')
-        print(
-        'ID: [low:high]  [mwcs_low:mwcs_high]    mwcs_wlen    mwcs_step   used')
+        print('ID: [low:high]  [mwcs_low:mwcs_high]    mwcs_wlen    mwcs_step'
+              '   used')
         for f in get_filters(db, all=True):
             data = (f.ref,
                     f.low,
@@ -223,7 +213,8 @@ def install():
 
 @click.command()
 @click.option('-s', '--set', help='Modify config value: usage --set name=value')
-@click.option('-S', '--sync', is_flag=True, help='Sync station metadata from inventory/dataless')
+@click.option('-S', '--sync', is_flag=True, help='Sync station metadata from'
+                                                 ' inventory/dataless')
 def config(set, sync):
     """This command should now only be used to use the command line to set
     a parameter value in the data base. It used to launch the Configurator but
@@ -235,7 +226,7 @@ def config(set, sync):
             click.echo("!! format of the set command is name=value !!")
             return
         name, value = set.split("=")
-        if not name in default:
+        if name not in default:
             click.echo("!! unknown parameter %s !!" % name)
             return
         from ..api import connect, update_config
@@ -246,47 +237,25 @@ def config(set, sync):
         click.echo("Successfully updated parameter %s = %s" % (name, value))
     elif sync:
         import glob
-        from ..api import connect, get_config, get_stations, update_station
-        db = connect()
-        response_format = get_config(db, 'response_format')
-        response_files = glob.glob(os.path.join(get_config(db, 'response_path'), "*"))
-        if response_format == "inventory":
-            from obspy import read_inventory
-            firstinv = True
-            metadata = None
-            for file in response_files:
-                try:
-                    inv = read_inventory(file)
-                    if firstinv:
-                        metadata = inv
-                        firstinv = False
-                    else:
-                        metadata += inv
-                except:
-                    pass
-        elif response_format == "dataless":
-            from obspy.io.xseed import Parser
-            all_metadata = {}
-            for file in response_files:
-                metadata = Parser(file)
-                tmpinv = metadata.get_inventory()
-                for chan in tmpinv["channels"]:
-                    all_metadata[chan["channel_id"]] = metadata
-        else:
-            print("Response Format Not Supported")
-            exit()
-        for station in get_stations(db):
-            id = "%s.%s.00.HHZ" % (station.net, station.sta)
-            if response_format == "inventory":
-                coords = inv.get_coordinates(id)
-            else:
+        from ..api import connect, get_config, get_stations, update_station,\
+            preload_instrument_responses
 
-                coords = all_metadata[id].get_coordinates(id)
-            update_station(db, station.net, station.sta, coords["longitude"],
-                           coords["latitude"], coords["elevation"], "DEG", )
+        db = connect()
+        responses = preload_instrument_responses(db)
+        netsta = []
+        for id, row in responses.iterrows():
+            net, sta, loc, chan = row["channel_id"].split(".")
+            netsta.append("%s.%s"%(net,sta))
+        responses["netsta"] = netsta
+
+        for station in get_stations(db):
+            id = "%s.%s" % (station.net, station.sta)
+            coords = responses[responses["netsta"] == id]
+            lon = float(coords["longitude"].values[0])
+            lat = float(coords["latitude"].values[0])
+            update_station(db, station.net, station.sta, lon, lat, 0, "DEG", )
             logging.info("Added coordinates (%.5f %.5f) for station %s.%s" %
-                        (coords["longitude"], coords["latitude"],
-                         station.net, station.sta))
+                        (lon, lat, station.net, station.sta))
         db.close()
 
     else:
@@ -310,27 +279,68 @@ def bugreport(ctx, sys, modules, env, all):
 
 
 @click.command()
-def populate():
+@click.option('--fromDA',  help='Populates the station table '
+                                'using network and station codes'
+                                ' found in the data_availability'
+                                ' table, overrides the default'
+                                ' workflow step.',
+              is_flag=True)
+def populate(fromda):
     """Rapidly scan the archive filenames and find Network/Stations"""
-    from ..s002populate_station_table import main
-    main()
+    if fromda:
+        logging.info("Overriding workflow...")
+        from ..msnoise_table_def import DataAvailability
+        from ..api import update_station
+        db = connect()
+        stations = db.query(DataAvailability.net, DataAvailability.sta). \
+            group_by(DataAvailability.net, DataAvailability.sta)
+
+        for net, sta in stations:
+            print('Adding:', net, sta)
+            X = 0.0
+            Y = 0.0
+            altitude = 0.0
+            coordinates = 'UTM'
+            instrument = 'N/A'
+            update_station(db, net, sta, X, Y, altitude,
+                           coordinates=coordinates, instrument=instrument)
+    else:
+        from ..s002populate_station_table import main
+        main()
 
 
 @click.command()
 @click.option('-i', '--init', is_flag=True, help='First run ?')
+@click.option('--path',  help='Scan all files in specific folder, overrides the'
+                              ' default workflow step.')
 @click.pass_context
-def scan_archive(ctx, init):
+def scan_archive(ctx, init, path):
     """Scan the archive and insert into the Data Availability table."""
-    from ..s01scan_archive import main
-    main(init, threads=ctx.obj['MSNOISE_threads'])
+    if path:
+        logging.info("Overriding workflow...")
+        from obspy import UTCDateTime
+        from ..s01scan_archive import worker
+        db = connect()
+        startdate = UTCDateTime(get_config(db, "startdate"))
+        enddate = UTCDateTime(get_config(db, "enddate"))
+        cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
+        db.close()
+
+        worker(sorted(os.listdir(path)), path, startdate, enddate,
+               cc_sampling_rate, init=True)
+    else:
+        from ..s01scan_archive import main
+        main(init, threads=ctx.obj['MSNOISE_threads'])
 
 
 @click.command()
 @click.option('-i', '--init', is_flag=True, help='First run ?')
-def new_jobs(init):
+@click.option('--nocc', is_flag=True, default=False, help='Disable the creation'
+                                                          ' of CC jobs')
+def new_jobs(init, nocc):
     """Determines if new CC jobs are to be defined"""
     from ..s02new_jobs import main
-    main(init)
+    main(init, nocc)
 
 
 @click.command()
@@ -340,12 +350,13 @@ def compute_cc(ctx):
     from ..s03compute_cc import main
     from multiprocessing import Process
     threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
     processes = []
     for i in range(threads):
         p = Process(target=main)
         p.start()
         processes.append(p)
-        time.sleep(1)
+        time.sleep(delay)
     for p in processes:
         p.join()
 
@@ -354,8 +365,8 @@ def compute_cc(ctx):
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-@click.option('-i', '--interval', default=1, help='Number of days before now to\
- search for modified Jobs')
+@click.option('-i', '--interval', default=1, help='Number of days before now to'
+                                                  ' search for modified Jobs')
 def stack(ref, mov, step, interval):
     """Stacks the [REF] and/or [MOV] windows"""
     click.secho('Lets STACK !', fg='green')
@@ -375,12 +386,14 @@ def compute_mwcs(ctx):
     from ..s05compute_mwcs import main
     from multiprocessing import Process
     threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+
     processes = []
     for i in range(threads):
         p = Process(target=main)
         p.start()
         processes.append(p)
-        time.sleep(1)
+        time.sleep(delay)
     for p in processes:
         p.join()
 
@@ -404,13 +417,19 @@ def compute_dtt(interval):
 @click.command()
 @click.argument('jobtype')
 @click.option('-a', '--all', is_flag=True, help='Reset all jobs')
-def reset(jobtype, all):
+@click.option('-r', '--rule', help='Reset job that match this SQL rule')
+def reset(jobtype, all, rule):
     """Resets the job to "T"odo. ARG is [CC] or [DTT]. By default
     only resets jobs "I"n progress. --all resets all jobs, whatever
     the flag value"""
     from ..api import connect, reset_jobs
     session = connect()
-    reset_jobs(session, jobtype, all)
+    if jobtype == "DA":
+        session.execute("update data_availability set flag='M' where 1")
+    elif jobtype != jobtype.upper():
+        logging.info("The jobtype %s is not uppercase (usually jobtypes"
+                     " are uppercase...)"%jobtype)
+    reset_jobs(session, jobtype, all, rule)
     session.close()
 
 
@@ -510,15 +529,19 @@ def timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
 @click.pass_context
-def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
+def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
+                  refilter):
     """Plots the interferogram between sta1 and sta2 (parses the CCFs)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
     if ctx.obj['MSNOISE_custom']:
         from interferogram import main
     else:
         from ..plots.interferogram import main
-    main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
+    main(sta1, sta2, filterid, comp, mov_stack, show, outfile, refilter)
 
 
 @click.command()
@@ -534,16 +557,22 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
+@click.option('-e', '--envelope', is_flag=True, help='Plot envelope instead of '
+                                                     'time series')
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
 @click.pass_context
 def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
-            ampli, seismic, show, outfile):
+            ampli, seismic, show, outfile, envelope, refilter):
     """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
     if ctx.obj['MSNOISE_custom']:
         from ccftime import main
     else:
         from ..plots.ccftime import main
-    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile)
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
+         envelope, refilter)
 
 
 @click.command()
@@ -576,14 +605,21 @@ def mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.option('--virtual-source', default=None,
+              help='Use only pairs including this station. Format must be '
+                   'NET.STA')
 @click.pass_context
-def distance(ctx, filterid, comp, ampli, show, outfile):
+def distance(ctx, filterid, comp, ampli, show, outfile, refilter,
+             virtual_source):
     """Plots the REFs of all pairs vs distance"""
     if ctx.obj['MSNOISE_custom']:
         from distance import main
     else:
         from ..plots.distance import main
-    main(filterid, comp, ampli, show, outfile)
+    main(filterid, comp, ampli, show, outfile, refilter, virtual_source)
 
 
 @click.command()

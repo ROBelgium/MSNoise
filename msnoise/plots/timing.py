@@ -31,7 +31,7 @@ def main(mov_stack=None, dttname="A", components='ZZ', filterid=1,
     start, end, datelist = build_movstack_datelist(db)
 
     if mov_stack != 0:
-        mov_stacks = [mov_stack,]
+        mov_stacks = [mov_stack, ]
     else:
         mov_stack = get_config(db, "mov_stack")
         if mov_stack.count(',') == 0:
@@ -40,7 +40,7 @@ def main(mov_stack=None, dttname="A", components='ZZ', filterid=1,
             mov_stacks = [int(mi) for mi in mov_stack.split(',')]
 
     gs = gridspec.GridSpec(len(mov_stacks), 1)
-    plt.figure(figsize=(15, 10))
+    plt.figure(figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
     first_plot = True
     for i, mov_stack in enumerate(mov_stacks):

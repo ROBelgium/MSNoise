@@ -2,267 +2,164 @@
 
 
 Installation
-============
-
-
-.. contents::
-    :local:
-
-
-Introduction
 ------------
-
-MSNoise is a set of Python codes that use a database (sqlite or MySQL) and
-the `find` command. When installed, it provides a top level command ``msnoise``
-in the console.
-
-.. note:: MSNoise version 1.4 introduces new config parameters in the database.
-    For each project, to upgrade your database, remember to run
-    ``msnoise upgrade_db`` in the project folder.
-
+MSNoise is a python package that uses a database (sqlite or MySQL) for storing
+station and files metadata together with jobs. When installed, it provides a top
+level command ``msnoise`` in the console.
 
 To run MSNoise, you need:
 
-* A recent version of Python (2.7.x recommended). We suggest using Anaconda_
-  with extra modules ([+] modules are already distributed with Anaconda_):
+* A recent version of Python (3.x recommended). We suggest using Anaconda_
+  with a few extra modules. MSNoise is tested "continuously" by automatic
+  build systems (TravisCI and Appeveyor) for **Python 2.7** and **Python 3.5**,
+  on **Windows, Linux and MacOSX** 64 bits systems!
 
-  * setuptools [+]
-  * numpy [+]
-  * scipy [+]
-  * pandas [+]
-  * matplotlib [+]
-  * statsmodels [+]
-  * sqlalchemy [+]
-  * flask [+] (new in 1.4)
-  * click [+]
-  * pymysql [+] (new in 1.4)
-  * scikits.samplerate
-  * obspy
-  * flask-admin (new in 1.4)
-  * multiprocessing_logging (new in 1.4)
-  * markdown (new in 1.4)
-  * folium (new in 1.4)
+  * Those modules are already distributed with Anaconda_:
+
+    * setuptools
+    * numpy
+    * scipy
+    * pandas
+    * matplotlib
+    * statsmodels
+    * sqlalchemy
+    * click
+    * flask
+    * pymysql
+    * wtforms
+
+  * Not shipped with Anaconda_:
+
+    * obspy
+    * flask-admin
+    * markdown
+    * folium
+    * flask-wtf
 
 
 * MySQL: if you want to use MySQL, you need to install and configure a
-  :ref:`mysql` beforehand. This is not needed for sqlite.
+  MySQL Server beforehand. This is not needed for sqlite.
   Read :ref:`aboutdbandperformances` for more information.
   We recommend using MySQL.
 
-* The `find` command: present by default on linux and available with gnufind_
-  on Windows.
 
+Full Installation
+-----------------
 
-Quick Start - Windows
-----------------------
-
-1. Download and install Anaconda_ for your machine, make sure Anaconda's Python is the default python for your user
+1. Download and install Anaconda_ for your machine, make sure Anaconda's Python
+   is the default python for your user
 
 2. Execute the following command to install the missing packages:
    
    .. code-block:: sh
-    
-        pip install flask-admin
-        conda install -c obspy obspy
 
-3. Download and install scikits.samplerate from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate
-   see examples below (filenames might be different):
+        pip install flask-admin flask-wtf markdown folium
+        conda install -c conda-forge obspy
 
-   .. code-block:: sh
+3. Install a MySQL server and MySQL Workbench:
 
-        pip install scikits.samplerate-0.3.3-cp27-none-win_amd64.whl
+   Download and install MySQL Community Server (MySQLs_ ) and MySQL Workbench
+   (MySQLw_ ) ; On Windows one can also use the MySQL installer (MySQLi_ ).
 
-4. Install a MySQL server: download and install EasyPHP_ (their "Dev" version is OK - read their installation page carefully, you need to install some Microsoft Visual C redistribuable manually too).
-
-5. Start EasyPHP and create a privileged user and a database:
-      
-   * Connect to your local host: http://localhost/phpmyadmin (or http://127.0.0.1/phpmyadmin)
-   * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
-
-6. Install gnufind_ and make sure its /bin directory is in the PATH (Control Panel -> Environment Variables -> PATH)
-
-7. Install MSNoise:
+   On Linux, the MySQL server can also be installed using the following command:
 
    .. code-block:: sh
 
-        pip install msnoise
+       sudo apt-get install mysql-server
 
-8. Check which required packages you are still missing by executing the ``msnoise bugreport`` command. (See :ref:`testing`)
+4. Create a privileged user and a database:
 
-9. Proceed to the :ref:`Workflow` description to start MSNoise!
+   * Start MySQL Workbench and connect to the local database
+   * Click on "Privileges" and create a new user, with all privileges (Select
+     all). Ideally, create user "msnoise" with password "msnoise".
 
-
-Done !
-
-
-Quick Start - Linux
--------------------
-
-1. Download and install Anaconda_ for your machine, make sure Anaconda's Python is the default python for your user
-
-2. Execute the following commands to install the missing packages:
-   
-   .. code-block:: sh
-    
-        pip install flask-admin
-        conda install -c obspy obspy
- 
-   .. code-block:: sh
-        
-        sudo apt-get install libsamplerate0 libsamplerate0-dev
-        pip install scikits.samplerate
-    
-   If this fails, follow those instructions: :ref:`samplerate`.
-
-3. Install a MySQL server and phpMyAdmin:
-   
-   .. code-block:: sh
-    
-        sudo apt-get install mysql-server mysql-client phpmyadmin
-
-
-5. Create a privileged user and a database:
- 
-   * Connect to your local host: http://localhost/phpmyadmin (or http://127.0.0.1/phpmyadmin)
-   * Click on "Privileges" and create a new user, with all privileges (Select all). Ideally, create user "msnoise" with password "msnoise".
-
-6. Install MSNoise:
+5. Install the latest release version of MSNoise:
 
    .. code-block:: sh
 
         pip install msnoise
 
-7. Check which required packages you are still missing by executing the ``msnoise bugreport`` command. (See :ref:`testing`)
+   Power user could install the development version too, but it is not
+   recommended.
+
+6. Check which required packages you are still missing by executing the
+   ``msnoise bugreport`` command. (See :ref:`testing`)
+
+7. To be sure all is running OK, one could start the ``msnoise test`` command
+   in an empty directory. This will start the standard MSNoise test suite, which
+   should end with a "Ran xx tests in yy seconds : OK".
 
 8. Proceed to the :ref:`Workflow` description to start MSNoise!
 
 Done !
 
-UltraFast Start on Linux
-------------------------
-If one starts with a vanilla fresh Linux install (e.g. on a new virtual machine)
-, the install can be eased with an installer script we have prepared. Indeed,
-to run de tests on TravisCI, we had to prepare a pre-install script. This is
-only valid for linux x86_64 (Debian or Ubuntu):
+MySQL Server and Workbench
+--------------------------
 
-.. code-block:: sh
+Using the MySQL Server and Workbench is fairly easy and lots of tutorials are
+available online as text or videos.
 
-    wget https://raw.githubusercontent.com/ROBelgium/MSNoise/master/misc/install_debian_x86_64.sh
-    chmod +x install_debian_x86_64.sh
-    ./install_debian_x86_64.sh
-    pip install msnoise
+Once both are installed, start Workbench and you should see the local MySQL
+server automatically identified:
 
-Done !
+.. image:: .static/workbench_1.png
 
+And by clicking on "Local Instance ..." another tab should open, connected to
+the local database.
 
-Python and Packages Installation
---------------------------------
+Create a msnoise user
+~~~~~~~~~~~~~~~~~~~~~
 
-If you don't know which Python distribution to use and even if your system comes
-with a python distribution, we suggest installing Anaconda_, as it comes with most of the
-above-mentionned tools (those with [*]), and provides the easy_install tool
-to install the remaining ones.
+Select "Users and Privileges" in the left sidebar, then "Add Account". Define
+the username and the password (msnoise:msnoise could do, although "weak"):
 
-From now on, we suppose you installed Anaconda_, here are the instructions for installing
-the remaining packages. If you don't use Anaconda, all the packages are available through 'easy_install'.
-Windows users are recommended to check the prebuilt binaries when advised.
+.. image:: .static/workbench_2.png
 
-To know which packages you are missing, use the bug_reporter script (see :ref:`troubleshooting`) !
+Then, under "Administrative Roles", grant this user the *DBA* mode (user can
+perform all tasks on the database server) and click "Apply".
 
-.. _samplerate:
-
-scikits.samplerate
-~~~~~~~~~~~~~~~~~~
-
-.. warning:: Scikits.samplerate isn't easy to install on Python3. If not
-    successful, one has to use the "Decimate" resampling method.
-
-https://pypi.python.org/pypi/scikits.samplerate is a wrapper to the Secret Rabbit Code (aka libsamplerate) (de Castro Lopo, 2013)
-
-Windows
-+++++++
-
-Download and install the right version from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#scikits.samplerate
-
-Linux
-+++++
-
-You first need to install the SRC library:
-
-.. code-block:: sh
-
-    sudo apt-get install libsamplerate0 libsamplerate0-dev
-
-This python package will probably be the most tricky to install. If you are lucky, you can just
-
-.. code-block:: sh
-
-    pip install scikits.samplerate
-
-On my Ubuntu 12.04, this results in an error because the SRC library path is not found. The reason is that the setup searches SRC in /usr/lib and not in /usr/lib/x86_64-linux-gnu where the library is actually present. To install, you need to download the archive from pypi and edit some configuration file:
-
-.. code-block:: sh
-
-    wget https://pypi.python.org/packages/source/s/scikits.samplerate/scikits.samplerate-0.3.3.tar.gz#md5=96c8d8ba3aa95a9db15994f78792efb4
-    tar -xvf scikits.samplerate-0.3.3.tar.gz
-    cd scikits.samplerate-0.3.3
-
-then edit the site.cfg example file and insert the following lines:
-
-.. code-block:: sh
-
-    [samplerate]
-    library_dirs=/usr/lib/x86_64-linux-gnu
-    include_dirs=/usr/include
-
-To know where the SRC library is on you machine:
-
-.. code-block:: sh
-
-    sudo dpkg -L libsamplerate0
-    sudo dpkg -L libsamplerate0-dev
-
-then, build and install:
-
-.. code-block:: sh
-
-    python setup.py build
-    python setup.py install
+.. image:: .static/workbench_3.png
 
 
-MySQL Server
-------------
-.. warning:: MySQL is not compulsory, one *can* work only using sqlite database. See :ref:`aboutdbandperformances`. for more info.
+.. _emptydb:
 
-MSNoise requires a database in order to store waveform metadata, configuration bits and jobs.
-If you choose to use MySQL, a running MySQL server must be available, either on the network or on localhost and have a privileged user and a database.
+Create an empty database
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-Windows
-~~~~~~~
-The simplest option to install a MySQL server on your machine is to install EasyPHP_, a small AMP (Apache, MySQL, PHP) server.
+Each "project" needs a database. That is, if one has two different volcanoes and
+wants to run MSNoise the two datasets, one needs to create two empty databases.
 
-Linux
-~~~~~
+Click on the "Create new schema" button in the taskbar:
 
-If you don't have a MySQL server on the network, you need to install one locally on your computer.
-MySQL is usually prepackaged for every distribution, on Ubuntu/Debian you should:
+.. image:: .static/workbench_4.png
 
-.. code-block:: sh
+and give the database a name (for example msnoise; or msnoise_project1, or
+project1, or else, you choose) ; and click "Apply":
 
-    sudo apt-get install mysql-server mysql-client
+.. image:: .static/workbench_5.png
 
-We recommend to install phpmyadmin too, as it is a handy tool to edit the database directly
+and click "Apply" again and it should state all is OK:
 
-.. code-block:: sh
+.. image:: .static/workbench_6.png
 
-    sudo apt-get install phpmyadmin
+.. image:: .static/workbench_7.png
 
-This will also install apache2 and php, needed to run phpmyadmin. Once installed, it should be available through http://localhost/phpmyadmin.
+When done, the database we created is present in the left sidebar:
+
+.. image:: .static/workbench_8.png
+
+And you're ready to start your first project: :ref:`Workflow`.
+
+
+When moving your project to a larger server, HPC or else, just add the
+connection to this server in Workbench and you're good to go with the very
+same interface/tool !
 
 
 Database Structure - Tables
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-MSNoise will create the tables automatically upon running the installer script (see :ref:`Workflow`).
+----------------------------
+MSNoise will create the tables automatically upon running the installer script
+(see :ref:`Workflow`).
 
 
 Building this documentation
@@ -272,8 +169,8 @@ To build this documentation, some modules are required:
 
 .. code-block:: sh
 
-    easy_install sphinx
-    easy_install sphinx_bootstrap_theme
+    pip install sphinx
+    pip install sphinx_bootstrap_theme
     
 Then, this should simply work:
 
@@ -283,9 +180,38 @@ Then, this should simply work:
     
 it will create a .build folder containing the documentation.
 
-You can also build the doc to Latex and then use your favorite Latex-to-PDF tool.
+You can also build the doc to Latex and then use your favorite Latex-to-PDF
+tool.
 
-.. _gnufind: http://sourceforge.net/projects/getgnuwin32/files/
-.. _EasyPHP: http://www.easyphp.org/
+
+Using the development version
+-----------------------------
+
+This is not recommended, but users willing to test the latest development
+(hopefully stable) version of MSNoise can:
+
+.. code-block:: sh
+
+    pip uninstall msnoise
+    pip install http://msnoise.org/master.zip
+
+Please note this version most probably uses the very latest version of every
+package: Release versions of `numpy`, `scipy`, etc obtained from conda-forge
+and "master" version of `obspy`. The development version (master) of obspy can
+be installed from github:
+
+.. code-block:: sh
+
+    pip uninstall obspy
+    pip install https://github.com/obspy/obspy/archive/master.zip
+
+If you are using the master version, please use the issue tracker of github to
+communicate about bugs and not the mailing list, preferably used for Releases.
+
+
 .. _obspy: http://www.obspy.org
 .. _Anaconda: http://www.continuum.io/downloads
+.. _MySQLi: https://dev.mysql.com/downloads/installer
+.. _MySQLs: https://dev.mysql.com/downloads/mysql
+.. _MySQLw: https://dev.mysql.com/downloads/workbench
+

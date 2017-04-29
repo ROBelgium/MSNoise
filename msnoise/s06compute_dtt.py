@@ -44,9 +44,9 @@ stations *not* on the volcano),
 .. note:: It seems obvious that these parameters are frequency-dependent, but
     they are currently common for all filters !
 
-.. image:: .static/static.png
+.. image:: ../.static/static.png
 
-.. image:: .static/dynamic.png
+.. image:: ../.static/dynamic.png
 
 .. warning:: In order to use the dynamic time lags, one has to provide the
    station coordinates !
@@ -57,7 +57,7 @@ signal, neglecting direct waves in the 0-15 seconds range. We then select data
 which match three other thresholds: ``dtt_mincoh``, ``dtt_maxerr`` and
 ``dtt_maxdt``.
 
-.. image:: .static/Figure04_dttmatrix_01_005DAYS_ZZ-2010-10-12_cmyk.png
+.. image:: ../.static/Figure04_dttmatrix_01_005DAYS_ZZ-2010-10-12_cmyk.png
 
 Each of the 4 left subplot of this figure shows a colormapper matrix of which
 each row
@@ -93,7 +93,7 @@ is a table, with one row for each station pair.
 
 To run this script:
 
-.. code-block:: sh
+.. code-block:: bash
 
     msnoise compute_dtt
 
@@ -125,9 +125,13 @@ variations.
 
 """
 
-import statsmodels.api as sm
-
 from .api import *
+
+try:
+    from obspy.signal.regression import linear_regression
+except ImportError:
+    from .api import linear_regression
+
 
 def wavg_wstd(data, errors):
     d = data
@@ -166,7 +170,8 @@ def main(interval=1):
     
     components_to_compute = get_components_to_compute(db)
     updated_dtt = updated_days_for_dates(
-        db, start, end, '%', jobtype='DTT', returndays=True, interval=datetime.timedelta(days=interval))
+        db, start, end, '%', jobtype='DTT', returndays=True,
+        interval=datetime.timedelta(days=interval))
     
     for f in get_filters(db, all=False):
         filterid = int(f.ref)
@@ -177,20 +182,24 @@ def main(interval=1):
                 for current in updated_dtt:
                     if current > datetime.date.today():
                         break
-                    logging.debug("Processing %s - %02i - %02i mov" % (current, filterid, mov_stack))
+                    logging.debug("Processing %s - %02i - %02i mov" %
+                                  (current, filterid, mov_stack))
                     first = True
                     for station1, station2 in get_station_pairs(db, used=True):
                         sta1 = "%s_%s" % (station1.net, station1.sta)
                         sta2 = "%s_%s" % (station2.net, station2.sta)
                         pair = "%s_%s" % (sta1, sta2)
-                        day = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" %
-                                           mov_stack, components, pair, '%s.txt' % current)
-                        dist = get_interstation_distance(station1, station2, station1.coordinates)
+                        day = os.path.join('MWCS', "%02i" % filterid,
+                                           "%03i_DAYS" % mov_stack, components,
+                                           pair, '%s.txt' % current)
+                        dist = get_interstation_distance(station1, station2,
+                                                         station1.coordinates)
                         if dist == 0. and dtt_lag == "dynamic":
                             logging.debug('%s: Distance is Zero?!' % pair)
                         if os.path.isfile(day):
                             df = pd.read_csv(
-                                day, delimiter=' ', header=None, index_col=0, names=['t', 'dt', 'err', 'coh'])
+                                day, delimiter=' ', header=None, index_col=0,
+                                names=['t', 'dt', 'err', 'coh'])
                             tArray = df.index.values
                             if dtt_lag == "static":
                                 lmlag = -dtt_minlag
@@ -259,7 +268,8 @@ def main(interval=1):
                                     index = np.intersect1d(index, dtindex)
     
                                     wavg, wstd = wavg_wstd(
-                                        dtArray[:, i][index], errArray[:, i][index])
+                                        dtArray[:, i][index],
+                                        errArray[:, i][index])
                                     new_dtArray[i] = wavg
                                     new_errArray[i] = wstd
                                     new_cohArray[i] = 1.0
@@ -268,14 +278,11 @@ def main(interval=1):
                             errArray = np.vstack((errArray, new_errArray))
                             cohArray = np.vstack((cohArray, new_cohArray))
                             pairArray.append("ALL")
-                            del new_cohArray, new_dtArray, new_errArray, cohindex, errindex, dtindex, wavg, wstd
+                            del new_cohArray, new_dtArray, new_errArray,\
+                                cohindex, errindex, dtindex, wavg, wstd
                             
                             # then stack selected pais to GROUPS:
                             groups = {}
-                            # groups['CRATER'] = ["CSS","FJS","BON","SNE","FLR","RVL","FOR",]
-                            # groups['GPENTES'] = ["CRA","GPN","GPS","HDL","GBS"]
-                            # groups['VOLCAN'] = groups['CRATER'] + groups['GPENTES'] + ['HIM','VIL']
-                            # groups['NORD'] = ['PRO','MVL','RSL','MAT','PCR','OBS','CIL','CAM']
                             npairs = len(pairArray)-1
                             for group in groups.keys():
                                 new_dtArray = np.zeros(len(tArray))
@@ -284,10 +291,11 @@ def main(interval=1):
                                 pairindex = []
                                 for j, pair in enumerate(pairArray[:npairs]):
                                     net1, sta1, net2, sta2 = pair.split('_')
-                                    if sta1 in groups[group] and sta2 in groups[group]:
+                                    if sta1 in groups[group] and \
+                                                    sta2 in groups[group]:
                                         pairindex.append(j)
                                 pairindex = np.array(pairindex)
-                                #~ print "found", len(pairindex), " pairs for group", group
+
                                 for i in range(len(tArray)):
                                     #~ if i in tindex:
                                     if 1:
@@ -298,13 +306,15 @@ def main(interval=1):
                                         dtindex = np.where(
                                             np.abs(dtArray[:, i]) <= maxDt)[0]
         
-                                        index = np.intersect1d(cohindex, errindex)
+                                        index = np.intersect1d(cohindex,
+                                                               errindex)
                                         index = np.intersect1d(index, dtindex)
                                         index = np.intersect1d(index, pairindex)
                                         
         
                                         wavg, wstd = wavg_wstd(
-                                            dtArray[:, i][index], errArray[:, i][index])
+                                            dtArray[:, i][index],
+                                            errArray[:, i][index])
                                         new_dtArray[i] = wavg
                                         new_errArray[i] = wstd
                                         new_cohArray[i] = 1.0
@@ -313,7 +323,8 @@ def main(interval=1):
                                 errArray = np.vstack((errArray, new_errArray))
                                 cohArray = np.vstack((cohArray, new_cohArray))
                                 pairArray.append(group)
-                                del new_cohArray, new_dtArray, new_errArray, cohindex, errindex, dtindex, wavg, wstd
+                                del new_cohArray, new_dtArray, new_errArray,\
+                                    cohindex, errindex, dtindex, wavg, wstd
                                 # END OF GROUP HANDLING
     
                         # then process all pairs + the ALL
@@ -334,57 +345,54 @@ def main(interval=1):
                             index = np.intersect1d(index, dtindex)
     
                             used[i][index] = 1.0
-    
-                            w = 1.0 / (errArray[i][index] ** 2)
-    
+
+                            w = 1.0 / errArray[i][index]
+                            w[~np.isfinite(w)] = 1.0
                             VecXfilt = tArray[index]
                             VecYfilt = dtArray[i][index]
                             if len(VecYfilt) >= 2:
-                                B = sm.tools.tools.add_constant(
-                                    VecXfilt, prepend=False)
-                                res = sm.regression.linear_model.WLS(
-                                    VecYfilt, B, w).fit()
-                                res0 = sm.regression.linear_model.WLS(
-                                    VecYfilt, VecXfilt, w).fit()
-                                if res.df_resid > 0:
-                                    m, a = res.params
-                                    em, ea = res.bse
-    
-                                    m0 = res0.params[0]
-                                    em0 = res0.bse[0]
-    
-                                    M.append(m)
-                                    EM.append(em)
-                                    A.append(a)
-                                    EA.append(ea)
-    
-                                    M0.append(m0)
-                                    EM0.append(em0)
-    
-                                    Dates.append(current)
-                                    Pairs.append(pair)
-    
-                                    del m, a, em, ea, m0, em0
-                                del res, res0, B
+                                m, a, em, ea = linear_regression(
+                                    VecXfilt, VecYfilt, w,
+                                    intercept_origin=False)
+                                m0, em0 = linear_regression(
+                                    VecXfilt, VecYfilt, w,
+                                    intercept_origin=True)
+                                M.append(m)
+                                EM.append(em)
+                                A.append(a)
+                                EA.append(ea)
+
+                                M0.append(m0)
+                                EM0.append(em0)
+
+                                Dates.append(current)
+                                Pairs.append(pair)
+
+                                del m, a, em, ea, m0, em0
+
                             del VecXfilt, VecYfilt, w
                             del index, cohindex, errindex, dtindex
     
                         logging.debug(
-                            "%s: exporting: %i pairs" % (current, len(pairArray)))
+                            "%s: exporting: %i pairs" % (current,
+                                                         len(pairArray)))
                         df = pd.DataFrame(
-                            {'Pairs': Pairs, 'M': M, 'EM': EM, 'A': A, 'EA': EA, 'M0': M0, 'EM0': EM0}, index=pd.DatetimeIndex(Dates))
+                            {'Pairs': Pairs, 'M': M, 'EM': EM, 'A': A, 'EA': EA,
+                             'M0': M0, 'EM0': EM0},
+                            index=pd.DatetimeIndex(Dates))
                         # Needs to be changed !
                         output = os.path.join(
-                            'DTT', "%02i" % filterid, "%03i_DAYS" % mov_stack, components)
+                            'DTT', "%02i" % filterid, "%03i_DAYS" % mov_stack,
+                            components)
                         if not os.path.isdir(output):
                             os.makedirs(output)
                         df.to_csv(
-                            os.path.join(output, '%s.txt' % current), index_label='Date')
+                            os.path.join(output, '%s.txt' % current),
+                            index_label='Date')
                         del df, M, EM, A, EA, M0, EM0, Pairs, Dates, used
                         del tArray, dtArray, errArray, cohArray, pairArray
                         del output
-    
-    
+
     logging.info('*** Finished: Compute DT/T ***')
 
 

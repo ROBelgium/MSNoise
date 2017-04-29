@@ -2,10 +2,19 @@ import unittest
 import traceback
 import os
 import datetime
+import shutil
+import glob
+from obspy import read
 
-
-# Here's our "unit tests".
 class MSNoiseTests(unittest.TestCase):
+
+    def setUp(self):
+        path = os.path.abspath(os.path.dirname(__file__))
+        data_folder = os.path.join(path, 'data')
+        if not os.path.isdir("data"):
+            shutil.copytree(data_folder, "data/")
+        self.data_folder = "data"
+
     def test_001_S01installer(self):
         from ..s000installer import main
         try:
@@ -28,18 +37,10 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, get_config, update_config
         db = connect()
         totests = []
-        path = os.path.abspath(os.path.dirname(__file__))
-        totests.append(['data_folder', os.path.join(path, 'data')])
+        totests.append(['data_folder', self.data_folder])
         totests.append(['data_structure', 'PDF'])
         totests.append(['network', 'YA'])
-        totests.append(['ZR', 'N'])
-        totests.append(['ZT', 'N'])
-        totests.append(['TZ', 'N'])
-        totests.append(['TR', 'N'])
-        totests.append(['TT', 'N'])
-        totests.append(['RZ', 'N'])
-        totests.append(['RR', 'N'])
-        totests.append(['RT', 'N'])
+        totests.append(['components_to_compute', 'ZZ'])
 
         for test in totests:
             update_config(db, test[0], test[1])
@@ -166,13 +167,13 @@ class MSNoiseTests(unittest.TestCase):
     def test_012_reset_jobs(self):
         from ..api import connect, reset_jobs
         db = connect()
-        reset_jobs(db, 'CC')
+        reset_jobs(db, 'CC', alljobs=True)
         db.close()
 
     def test_012b_hack_noresample(self):
         from ..api import connect, update_config
         db = connect()
-        update_config(db,'resampling_method','Decimate')
+        update_config(db, 'resampling_method', 'Decimate')
         db.close()
 
     def test_013_s03compute_cc(self):
@@ -213,11 +214,13 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, update_config
         db = connect()
         update_config(db, "export_format", "SAC")
+        db.close()
 
     def test_017_reset_cc_jobs(self):
         from ..api import connect, reset_jobs
         db = connect()
         reset_jobs(db, 'CC', alljobs=True)
+        db.close()
 
     def test_018_recompute_cc(self):
         self.test_013_s03compute_cc()
@@ -231,6 +234,7 @@ class MSNoiseTests(unittest.TestCase):
         shutil.rmtree("STACKS")
         db = connect()
         update_config(db, "export_format", "BOTH")
+        db.close()
 
     def test_021_reprocess_BOTH(self):
         self.test_017_reset_cc_jobs()
@@ -264,6 +268,7 @@ class MSNoiseTests(unittest.TestCase):
                     tmp1 = read(tmp1)
                     tmp2 = read(tmp2)
                     assert_allclose(tmp1[0].data, tmp2[0].data)
+        db.close()
 
     def test_023_stack(self):
         from ..api import connect, update_config
@@ -294,6 +299,7 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(start, datetime.date(2009, 1, 1))
         self.failUnlessEqual(end, datetime.date(2011, 1, 1))
         self.failUnlessEqual(len(datelist), 731)
+        db.close()
 
     def test_027_build_movstack_datelist(self):
         from ..api import connect, build_movstack_datelist
@@ -302,13 +308,60 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(start, datetime.date(2009, 1, 1))
         self.failUnlessEqual(end, datetime.date(2011, 1, 1))
         self.failUnlessEqual(len(datelist), 731)
+        db.close()
 
-    def test_028_S01installer(self):
-        if not "TRAVIS" in os.environ:
+    def test_028_stretching(self):
+        from ..api import connect, update_config, reset_jobs
+        db = connect()
+        update_config(db, "export_format", "MSEED")
+        reset_jobs(db, "DTT", alljobs=True)
+        db.close()
+
+        from ..stretch import main
+        main()
+
+    def test_029_create_fake_new_files(self):
+        for f in sorted(glob.glob(os.path.join(self.data_folder, "2010", "*",
+                                               "HHZ.D", "*"))):
+            st = read(f)
+            for tr in st:
+                tr.stats.starttime += datetime.timedelta(days=1)
+            out = f.replace("244", "245")
+            st.write(out, format="MSEED")
+
+        from ..s01scan_archive import main
+        main(init=False, threads=1)
+
+        from ..s02new_jobs import main
+        main()
+
+        from ..api import connect, get_job_types
+        db = connect()
+        jobs = get_job_types(db, 'CC')
+        print(jobs)
+        self.failUnlessEqual(jobs[0][0], 3)
+        self.failUnlessEqual(jobs[0][1], 'D')
+        self.failUnlessEqual(jobs[1][0], 3)
+        self.failUnlessEqual(jobs[1][1], 'T')
+
+    def test_030_instrument_response(self):
+        from ..api import connect, update_config
+        path = os.path.abspath(os.path.dirname(__file__))
+        resp_folder = os.path.join(path, 'extra')
+        db = connect()
+        update_config(db, 'response_path', resp_folder)
+        update_config(db, 'response_format', "dataless")
+        update_config(db, 'remove_response', "Y")
+        db.close()
+        self.test_013_s03compute_cc()
+
+
+    def test_099_S01installer(self):
+        if "TRAVIS" not in os.environ:
             print("Seems to be running on local machine, skipping MySQL test")
             return
         import shutil
-        shutil.move('db.ini','db.bak')
+        shutil.move('db.ini', 'db.bak')
         from ..s000installer import main
         try:
             ret = main(tech=2, username="root", password="",
@@ -318,7 +371,6 @@ class MSNoiseTests(unittest.TestCase):
         except:
             traceback.print_exc()
             self.fail()
-
 
 def main():
     import matplotlib.pyplot as plt
@@ -331,7 +383,7 @@ def main():
         sys.exit()
 
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
-    runner = unittest.TextTestRunner(verbosity=2)
+    runner = unittest.TextTestRunner(verbosity=4)
     result = runner.run(suite)
     if not result.wasSuccessful():
         sys.exit(1)

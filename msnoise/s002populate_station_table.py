@@ -13,8 +13,13 @@ The ``data_folder`` (as defined in the config) is scanned expecting the
     data_structure['IDDS'] = "YEAR/NET/STA/CHAN.TYPE/DAY/NET.STA.LOC.CHAN.TYPE.YEAR.DAY.HOUR"
     data_structure['PDF'] = "YEAR/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.DAY"
 
-For other structures, one has to edit the data_structures.py file and define
-the reader in this script.
+If one's data structure is one of those, then the ``data_structure``
+configuration bit needs to be set to the acronym (SDS, BUD, IDDS or PDF).
+
+More info on the recommended SDS ("SeisComP Data Structure") can be found here:
+https://www.seiscomp3.org/wiki/doc/applications/slarchive/SDS
+For other simple structures, one has to edit the `data_structure` configuration
+(see below).
 
 By default, station coordinates are initialized at 0.
 
@@ -27,30 +32,51 @@ To run this script:
 Custom data structure & station table population
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If one's data structure is not one of the pre-defined, MSNoise expects to find
-a file named ``custom.py`` in the current folder. This python file will contain
-the data_structure (here ``data_structure`` = "TOM" in the configuration and a
-function called ``populate`` wich will accept one
-argument and return a list of stations in the format ``NET_STA``:
+If one's data structure is not one of the pre-defined, it can be defined
+directly in the ``data_structure`` configuration bit using forward slashes,
+e.g.:
+
+``data_structure`` = "NET/STA/YEAR/NET.STA.YEAR.DAY.MSEED"
+
+MSNoise expects to find a file named ``custom.py`` in the current folder.
+This python file will contain a function called ``populate`` wich will accept
+one argument and return a station dictionary with keys of the format ``NET_STA``
+, and fields for the stations table in the database: Net,Sta,X,Y,Altitude,
+Coordinates(UTM/DEG),Instrument.
 
 .. code-block:: python
-
-    data_structure['TOM'] = "YEAR/NET/STA/CHAN/YEAR.DAY"
-
+    
+    import os, glob
     def populate(data_folder):
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*")))
-        stations = []
-        for di in datalist
+        stationdict = {}
+        for di in datalist:
             tmp = os.path.split(di)
             sta = tmp[1]
             net = os.path.split(tmp[0])[1]
-            stations.append("%s_%s" % (net, sta))
-        return stations
+            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
+        return stationdict
 
+.. _populate-expert:
+
+Expert (lazy) mode:
+~~~~~~~~~~~~~~~~~~~
+
+If the `DataAvailability` has already been filled in by another process, for
+example using the :ref:`"scan from path"<scan-archive-expert>` procedure, the
+network/station names can be "populated" from the `DataAvailability` table
+automatically. To do this, simply run:
+
+.. code-block:: sh
+
+    msnoise populate --fromDA
+
+and MSNoise will insert the unique NET.STA in the `Stations` table.
 """
 
 import glob
 import sys
+import traceback
 
 from .api import *
 
@@ -62,57 +88,58 @@ def main():
     print()
     data_folder = get_config(db, 'data_folder')
     data_structure = get_config(db, 'data_structure')
+
     if data_structure in ["SDS", "IDDS"]:
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*", "*")))
-        stations = []
+        stationdict={}
         for di in datalist:
             tmp = os.path.split(di)
             sta = tmp[1]
             net = os.path.split(tmp[0])[1]
-            stations.append("%s_%s" % (net, sta))
+            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
         del datalist
     elif data_structure in ["BUD", ]:
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*",)))
-        stations = []
+        stationdict={}
         for di in datalist:
             tmp = os.path.split(di)
             sta = tmp[1]
             net = os.path.split(tmp[0])[1]
-            stations.append("%s_%s" % (net, sta))
+            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
         del datalist
     elif data_structure in ["PDF", ]:
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*",)))
-        stations = []
+        stationdict={}
         for di in datalist:
             tmp = os.path.split(di)
             sta = tmp[1]
             net = get_config(db, 'network')
-            stations.append("%s_%s" % (net, sta))
+            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
         del datalist
     else:
         print("Can't parse the archive for format %s !" % data_structure)
-        print("trying to import local parser (should return a station list)")
-        print()
+        print("trying to import local parser (should return a station dictionary)")
+        print("")
         try:
             sys.path.append(os.getcwd())
             from custom import populate
-            stations = populate(data_folder)
+            stationdict = populate(data_folder)
         except:
+            traceback.print_exc()
             print("No file named custom.py in the %s folder" % os.getcwd())
             return
-    stations = np.unique(stations)
-    
+
     db = connect()
-    for station in stations:
-        net, sta = station.split('_')
+    for s in stationdict.keys() :
+        net,sta,lon,lat,alt,coordinates,instype=stationdict[s]
         print('Adding:', net, sta)
-        X = 0.0
-        Y = 0.0
-        altitude = 0.0
-        coordinates = 'UTM'
-        instrument = 'N/A'
+        X = float(lon)
+        Y = float(lat)
+        altitude = float(alt)
+        instrument = str(instype)
         update_station(db, net, sta, X, Y, altitude,
                        coordinates=coordinates, instrument=instrument)
+
     return True
 
 if __name__ == "__main__":

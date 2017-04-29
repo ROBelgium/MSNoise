@@ -2,7 +2,7 @@
 # https://gist.github.com/dan-blanchard/7045057
 # and
 # https://github.com/Jorge-C/ordination/blob/master/.travis.yml
-language: python
+language: c
 
 matrix:
   include:
@@ -11,28 +11,18 @@ matrix:
     #  anaconda..)
     - os: linux
       env: PYTHON_VERSION=2.7
-      language: python
-
-    - os: linux
-      env: PYTHON_VERSION=3.4
-      language: python
 
     - os: linux
       env: PYTHON_VERSION=3.5
-      language: python
+
+    - os: osx
+      env: PYTHON_VERSION=2.7
+
+    - os: osx
+      env: PYTHON_VERSION=3.5
 
 
 sudo: false
-
-# Need to set this so that packages installed with apt-get are available
-virtualenv:
-  system_site_packages: true
-
-addons:
-  apt:
-    packages:
-      - libsamplerate0
-      - libsamplerate0-dev
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
@@ -40,33 +30,27 @@ before_install:
     else
       export OS="Linux";
     fi
+  - if [[ $TRAVIS_OS_NAME == "osx" ]]; then brew update > /dev/null && brew install mariadb && mysql.server start; fi
   # MySQL database
-  - mysql -e 'create database msnoise;'
+  - mysql -u root -e 'create database msnoise;'
   # Python and related stuff
   - if [[ "${PYTHON_VERSION:0:1}" == '2' ]]; then
-      wget https://repo.continuum.io/miniconda/Miniconda-latest-${OS}-x86_64.sh -O miniconda.sh;
+      wget https://repo.continuum.io/miniconda/Miniconda2-latest-${OS}-x86_64.sh -O miniconda.sh;
     else
       wget https://repo.continuum.io/miniconda/Miniconda3-latest-${OS}-x86_64.sh -O miniconda.sh;
     fi
-#  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
   - hash -r
   - conda update -q --yes conda
   # Installs required packages
-  - conda install --yes -q pip python=$TRAVIS_PYTHON_VERSION
-  - conda install --yes -q numpy scipy matplotlib statsmodels pandas sqlalchemy
+  - conda install --yes -q pip python=$PYTHON_VERSION
+  - conda install --yes -q numpy scipy matplotlib pandas sqlalchemy
   - conda install --yes -q sphinx jinja2 flask pymysql click
   - conda install --yes -q lxml pyqt
-#  - conda install --yes -q bokeh
-  - pip install obspy
+  - conda install --yes -q -c conda-forge obspy
   - pip install flask-admin
-  - pip install multiprocessing_logging
   - pip install markdown
-
-  # Collecting scikits.samplerate from my repo, easier to install
-#  - pip install https://github.com/ThomasLecocq/samplerate/archive/master.zip
-  # done
   - ls -la
 
 install:
@@ -82,4 +66,3 @@ script:
   - mkdir MSNoiseTest
   - cd MSNoiseTest
   - msnoise test
-

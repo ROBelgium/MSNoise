@@ -38,7 +38,7 @@ value is 2.
     that doesn't mean a lot, does it? Use with Caution! And if you
     cross-validate it, please let us know!!
 
-.. seealso:: Schimmel, M. and Paulssen H., "Noise reduction and detection
+    Schimmel, M. and Paulssen H., "Noise reduction and detection
     of weak, coherent signals through phase-weighted stacks". Geophysical Journal
     International 130, 2 (1997): 497-505.
 
@@ -201,6 +201,7 @@ def main(stype, interval=1.0):
                     #~ print updated_days
                     nstack, stack_total = get_results(
                         db, sta1, sta2, filterid, components, datelist, format=format)
+                    logging.debug("Data loaded")
                     if nstack > 0:
                         if stype == "mov":
                             for i, date in enumerate(datelist):

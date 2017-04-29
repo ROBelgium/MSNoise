@@ -10,10 +10,13 @@
 #
 # All configuration values have a default; values that are commented out
 # serve to show the default.
-import sys, os
+import os
+
 import matplotlib
+
 matplotlib.use('Agg')
 
+import msnoise.move2obspy
 import sphinx_bootstrap_theme
 import datetime
 import click
@@ -21,11 +24,6 @@ import click
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-import msnoise.myCorr
-import msnoise.whiten
-import msnoise.MWCS
-import msnoise.api
-
 from msnoise.default import default
 
 grid = [ [key, default[key][0], default[key][1]] for key in default.keys() ]
@@ -77,6 +75,7 @@ def write_click_help(group='', command='', data=''):
         out += space+line+"\n"
     f.write(out)
     f.close()
+    return out
 
 out = open('clickhelp/msnoise.rst', 'w')
 out.write('Help on the msnoise commands\n')
@@ -87,9 +86,15 @@ for command in sorted(C):
     group = ""
     if hasattr(C[command], "group"):
         group = command
+        out.write("\n")
         out.write('%s\n'%group)
         out.write('-'*len(group)+'\n')
-
+        out.write("\n")
+        if command in ["plugin", "p"]:
+            out.write(
+                "Will be automatically populated with the commands declared "
+                "by the plugins (`p` is an alias for `plugin`)\n\n")
+            continue
         CC = C[command].commands
         for command in sorted(CC):
             out.write('%s\n'%command)
@@ -97,15 +102,18 @@ for command in sorted(C):
 
             c = click.Context(command=eval('M.%s'%(command)))
             data = c.get_help()
-            write_click_help(group, command, data)
-            out.write('.. include:: msnoise-%s-%s.rst\n\n'%(group,command))
+            out.write(write_click_help(group, command, data))
+            # out.write('.. include:: msnoise-%s-%s.rst\n\n'%(group,command))
+            out.write("\n\n")
+
     else:
         out.write('%s\n'%command)
         out.write('-'*len(command)+'\n')
         c = click.Context(command=eval('M.%s'%command))
         data = c.get_help()
-        write_click_help(group, command, data)
-        out.write('.. include:: msnoise-%s.rst\n\n'%(command))
+        out.write(write_click_help(group, command, data))
+        # out.write('.. include:: msnoise-%s.rst\n\n'%(command))
+        out.write("\n\n")
 out.close()
 
 out = open('contributors.rst', 'w')
@@ -127,15 +135,10 @@ out.close()
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.intersphinx',
               'sphinx.ext.autodoc',
-              'sphinx.ext.todo',
               'sphinx.ext.coverage',
-              'sphinx.ext.pngmath',
               'sphinx.ext.mathjax',
-              'numpydoc',
-              'matplotlib.sphinxext.mathmpl',
-              'matplotlib.sphinxext.only_directives',
-              'matplotlib.sphinxext.plot_directive',]
-
+              'numpydoc',]
+math_number_all = False
 todo_include_todos = True
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['.templates']
@@ -172,7 +175,7 @@ release = 'master'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['.build']
+exclude_patterns = ['.build', 'clickhelp/msnoise-*.rst']
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
@@ -207,7 +210,7 @@ html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
 # further.  For a list of options available for each theme, see the
 # documentation.
 # html_theme_options = {}
-html_theme_options = {'bootswatch_theme': "simplex",
+html_theme_options = {'bootswatch_theme': "lumen",
                     "navbar_site_name":"Menu",
                     "navbar_sidebarrel":True,
                     "source_link_position":"footer",
@@ -285,33 +288,38 @@ htmlhelp_basename = 'MSNoisedoc'
 # -- Options for LaTeX output --------------------------------------------------
 
 latex_elements = {
-# The paper size ('letterpaper' or 'a4paper').
-#'papersize': 'letterpaper',
-
-# The font size ('10pt', '11pt' or '12pt').
-#'pointsize': '10pt',
-
-# Additional stuff for the LaTeX preamble.
-#'preamble': '',
+    'preamble': '''
+\setcounter{tocdepth}{2}
+''',
+    # disable font inclusion
+    'fontpkg': '',
+    'fontenc': '',
+    # Fix Unicode handling by disabling the defaults for a few items
+    # set by sphinx
+    'inputenc': '',
+    'utf8extra': '',
+    'papersize': 'a4paper',
+    'pointsize': '11pt',
 }
+
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
   ('index', 'MSNoise.tex', u'MSNoise Documentation',
-   u'Lecocq, Caudron, Brenguier', 'manual'),
+   u'Thomas Lecocq, Corentin Caudron and MSNoise Devs', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
-#latex_logo = None
+latex_logo = r".static/msnoise_logo_large.png"
 
 # For "manual" documents, if this is true, then toplevel headings are parts,
 # not chapters.
-#latex_use_parts = False
+# latex_use_parts = True
 
 # If true, show page references after internal links.
-#latex_show_pagerefs = False
+latex_show_pagerefs = True
 
 # If true, show URL addresses after external links.
 #latex_show_urls = False
@@ -320,7 +328,22 @@ latex_documents = [
 #latex_appendices = []
 
 # If false, no module index is generated.
-#latex_domain_indices = True
+latex_domain_indices = False
+
+# latex_show_urls = 'footnote'
+
+pdf_documents = [
+    ('index', u'msnoise', u'Msnoise Documentation', u'Lecocq, Caudron'),
+]
+# A comma-separated list of custom stylesheets. Example:
+pdf_stylesheets = ['sphinx', 'a4']
+# A list of folders to search for stylesheets. Example:
+pdf_style_path = ['_styles']
+pdf_toc_depth = 4
+pdf_fit_mode = "shrink"
+pdf_break_level = 1
+pdf_verbosity = 0
+pdf_use_modindex = False
 
 
 # -- Options for manual page output --------------------------------------------

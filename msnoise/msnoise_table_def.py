@@ -1,7 +1,7 @@
 import datetime
 
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime,\
-    text, TIMESTAMP, Enum, REAL
+    text, TIMESTAMP, Enum, REAL, UniqueConstraint, Index
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -43,7 +43,7 @@ class Filter(Base):
     rms_threshold = Column(Float())
     mwcs_wlen = Column(Float())
     mwcs_step = Column(Float())
-    used = Column(Boolean)
+    used = Column(Boolean(True))
 
     def __init__(self, **kwargs):
         """"""
@@ -80,6 +80,8 @@ class Job(Base):
     jobtype = Column(String(10))
     flag = Column(String(1))
     lastmod = Column(TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP'))
+
+    table_args__ = (Index('job_index', "day", "pair", "jobtype", unique=True),)
 
     def __init__(self, day, pair, jobtype, flag,
                  lastmod=datetime.datetime.utcnow()):
@@ -126,17 +128,17 @@ class Station(Base):
     instrument = Column(String(20))
     used = Column(Boolean)
 
-    def __init__(self, net, sta, X, Y, altitude, coordinates, instrument,
-                 used):
+    def __init__(self, *args):
         """"""
-        self.net = net
-        self.sta = sta
-        self.X = X
-        self.Y = Y
-        self.altitude = altitude
-        self.coordinates = coordinates
-        self.instrument = instrument
-        self.used = used
+        if len(args):
+            self.net = args[0]
+            self.sta = args[1]
+            self.X = args[2]
+            self.Y = args[3]
+            self.altitude = args[4]
+            self.coordinates = args[5]
+            self.instrument = args[6]
+            self.used = args[7]
 
 ########################################################################
 
@@ -205,6 +207,13 @@ class DataAvailability(Base):
     gaps_duration = Column(Float)
     samplerate = Column(Float)
     flag = Column(String(1))
+    # UniqueConstraint('net', 'sta', 'comp', 'filename', name='uix_1')
+    table_args__ = (Index('da_index',
+                          "path",
+                          "file",
+                          "net",
+                          "sta",
+                          "comp", unique=True),)
 
     def __init__(self, net, sta, comp, path, file, starttime, endtime,
                  data_duration, gaps_duration, samplerate, flag):

@@ -47,7 +47,7 @@ def main(show=False, outfile=None):
         new = True
         for di in data.groups[group]:
             if new:
-                print( group, di,)
+                print(group, di)
                 new = False
             dt = (di-start).days
             matrix[i, dt] = 1
@@ -55,7 +55,7 @@ def main(show=False, outfile=None):
 
     gs = gridspec.GridSpec(2, 1, height_ratios=[4, 1])
 
-    plt.figure(figsize=(11.8, 8.4))
+    plt.figure(figsize=(12, 9))
     ax = plt.subplot(gs[0])
     plt.imshow(matrix, interpolation="none", aspect='auto', cmap='bwr',
                vmin=-1, vmax=1, extent=(date2num(start), date2num(end),
@@ -72,9 +72,9 @@ def main(show=False, outfile=None):
     plt.gcf().autofmt_xdate()
     plt.grid()
 
-
     ax = plt.subplot(gs[1])
     plt.plot(datelist, np.sum(matrix, axis=0))
+    ax.set_ylim((-0.1, np.amax(np.sum(matrix, axis=0))+0.1))
     plt.ylabel('N stations')
     plt.gcf().autofmt_xdate()
     plt.grid()
@@ -87,6 +87,3 @@ def main(show=False, outfile=None):
         plt.savefig(outfile)
     if show:
         plt.show()
-
-if __name__ == "__main__":
-    main()

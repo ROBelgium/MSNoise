@@ -2,7 +2,8 @@ from collections import OrderedDict
 default = OrderedDict()
 default['data_folder'] = ["Data Folder",'']
 default['output_folder'] = ["CC Output Folder",'CROSS_CORRELATIONS']
-default['data_structure'] = ["Data Structure [SDS]/BUD/IDDS",'SDS']
+default['data_structure'] = ["Either a predefined acronym [SDS]/BUD/IDDS,<br> "
+                             "or /-separated path (e.g. NET/STA/YEAR/NET.STA.YEAR.DAY.MSEED).", 'SDS']
 default['network'] = ["Network to analyse [*]",'*']
 default['channels'] = ["Channels need to match the value (ex: [\*], \*Z, BH\*, HHZ,...)",'*']
 
@@ -11,8 +12,7 @@ default['enddate'] = ["End Date to process: [2100-01-01]='No end'","2018-01-01"]
 
 default['analysis_duration'] = ["Duration of the Analysis (total in seconds : 3600, [86400])",'86400']
 default['cc_sampling_rate'] = ["Sampling Rate for the CrossCorrelation [20.0]",'20.0']
-default['resampling_method'] = ["Resampling method [Resample]/Decimate/Lanczos",'Resample']
-default['decimation_factor'] = ["If Resampling method=Decimate, decimation factor [5]",'5']
+default['resampling_method'] = ["Resampling method Resample/Decimate/[Lanczos]",'Lanczos']
 default['preprocess_lowpass'] = ["Preprocessing Low-pass value in Hz [8.0]",'8.0']
 default['preprocess_highpass'] = ["Preprocessing High-pass value in Hz [0.01]",'0.01']
 
@@ -26,26 +26,18 @@ default['maxlag'] = ["Maximum lag (in seconds) [120.0]",'120.']
 default['corr_duration'] = ["Data windows to correlate (in seconds) [1800.]",'1800.']
 default['overlap'] = ["Amount of overlap between data windows [0:1[ [0.]",'0.0']
 default['windsorizing'] = ["Windsorizing at N time RMS , 0 disables windsorizing, -1 enables 1-bit normalization [3]",'3']
+default['whitening'] = ["Whiten Traces before cross-correlation: All (except for autocorr), None, or only if components are different [A]/N/C",'A']
 
 default['stack_method'] = ["Stack Method: Linear Mean or Phase Weighted Stack: [linear]/pws ",'linear']
 default['pws_timegate'] = ["If stack_method='pws', width of the smoothing in seconds : 10.0 ",'10.0']
 default['pws_power'] = ["If stack_method='pws', Power of the Weighting: 2.0 ",'2.0']
 
-default['crondays'] = ["Number of days to monitors with cron [-1]",'-1']
+default['crondays'] = ["Number of days to monitor with cron [-1], must be a negative number", '-1']
 
-
-default['ZZ'] = ["Compute ZZ correlation [Y]/N",'Y']
-default['ZR'] = ["Compute ZR correlation [Y]/N",'N']
-default['ZT'] = ["Compute ZT correlation [Y]/N",'N']
-default['RZ'] = ["Compute RZ correlation [Y]/N",'N']
-default['RR'] = ["Compute RR correlation [Y]/N",'N']
-default['RT'] = ["Compute RT correlation [Y]/N",'N']
-default['TZ'] = ["Compute TZ correlation [Y]/N",'N']
-default['TR'] = ["Compute TR correlation [Y]/N",'N']
-default['TT'] = ["Compute TT correlation [Y]/N",'N']
+default['components_to_compute'] = ["List (comma separated) [ZZ]", 'ZZ']
 
 default['autocorr'] = ["Compute Auto correlation [Y]/N",'N']
-default['keep_all'] = ["Keep all 30 seconds cross-corr [Y]/N",'N']
+default['keep_all'] = ["Keep all cross-corr (length: corr_duration) [Y]/N",'N']
 default['keep_days'] = ["Keep all daily cross-corr [Y]/N",'Y']
 
 default['ref_begin'] = ["Beginning or REF stacks. Can be absolute (2012-01-01) or relative (-100) days",'1970-01-01']
