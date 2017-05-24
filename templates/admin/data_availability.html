@@ -1,0 +1,89 @@
+{% extends 'admin/master.html' %}
+{% block body %}
+{{ super() }}
+<script type='text/javascript' src='//code.jquery.com/jquery-2.0.2.js'></script>
+<link rel="stylesheet" type="text/css" href="http://cdn.pydata.org/bokeh-0.4.4.css">
+<script type='text/javascript' src="/static/admin/bokeh-0.4.4.js"></script>
+<script type="text/coffeescript">
+</script>
+<script type="text/javascript" src="/static/admin/coffeescript.js"></script>
+
+<script>
+function get_network_station(callback) {
+    $.ajax({
+        url:'/admin/networks.json',
+        type:'GET',
+        dataType: 'json',
+        success: callback
+        });
+    };
+
+
+
+function populate_network(data) {
+    $.each(data, function(i, value) {
+        $('#network').append($('<option>').text(i).attr('value', i));
+    });
+    $('#network').change();
+}
+
+
+function populate_stations(data) {
+    var net = $('#network option:selected').text();
+    $.each(data, function(i, value) {
+    if(i == net) {
+        net = data[i];
+        for(j=0;j<net.length;j++) {
+            $('#station').append($('<option>').text(net[j]).attr('value',net[j]));
+            }
+        }
+    });
+    $('#station').change();
+}
+
+$(document).ready(function() {
+    get_network_station(populate_network);
+    
+    $('#network').change(function() {
+        $('#station')
+        .find('option')
+        .remove()
+        .end()
+        
+        get_network_station(populate_stations);
+
+    });
+    
+    $('#station').change(function() {
+        var net = $('#network option:selected').text();
+        var sta = $('#station option:selected').text();
+        $.ajax({
+            url: "/admin/data_availability.json",
+            data: JSON.stringify({'net':net,'sta':sta}), //returns all cells' data
+            dataType: 'json',
+            contentType: 'application/json',
+            type: 'POST',
+            success: function (res) {
+              console.debug('%o', res);
+              if (res.result === 'ok') {
+                $('#dates').text(res.dates);
+            }},
+            error: function () {
+              console.debug('Something bad happened...');
+            }
+          });
+    
+    });
+
+});
+</script>
+
+<h1 class="page-header">{{ admin_view.view_title }}</h1>
+  <p>
+  Network: <select id="network" name="network" ></select><br>
+  Station: <select id="station" name="station" ></select>
+  </p>
+  <div id='dates'>
+  </div>
+
+{% endblock body %}
