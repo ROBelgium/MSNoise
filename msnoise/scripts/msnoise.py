@@ -365,7 +365,7 @@ def compute_cc(ctx):
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-@click.option('-i', '--interval', default=1, help='Number of days before now to'
+@click.option('-i', '--interval', default=1.0, help='Number of days before now to'
                                                   ' search for modified Jobs')
 def stack(ref, mov, step, interval):
     """Stacks the [REF] and/or [MOV] windows"""
@@ -406,7 +406,7 @@ def compute_stretching():
 
 
 @click.command()
-@click.option('-i', '--interval', default=1, help='Number of days before now to\
+@click.option('-i', '--interval', default=1.0, help='Number of days before now to\
  search for modified Jobs')
 def compute_dtt(interval):
     """Computes the dt/t jobs based on the new MWCS data"""
