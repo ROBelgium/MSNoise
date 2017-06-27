@@ -66,8 +66,5 @@ script:
   - cd
   - mkdir MSNoiseTest
   - cd MSNoiseTest
-  - msnoise test
-  - cd ..
-  - mkdir CovTest
-  - cd CovTest
   - coverage run -m msnoise.test.tests
+  - codecov
