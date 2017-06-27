@@ -63,8 +63,8 @@ script:
   - cd empty
   - msnoise --help
   - msnoise bugreport -s -m -e
-  - cd
+  - cd ..
   - mkdir MSNoiseTest
   - cd MSNoiseTest
-  - coverage run -m msnoise.test.tests
+  - coverage run --inlcude='*/msnoise/*' -m msnoise.test.tests
   - codecov
