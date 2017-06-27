@@ -66,5 +66,5 @@ script:
   - cd ..
   - mkdir MSNoiseTest
   - cd MSNoiseTest
-  - coverage run --inlcude='*/msnoise/*' -m msnoise.test.tests
+  - coverage run --include='*/msnoise/*' -m msnoise.test.tests
   - codecov
