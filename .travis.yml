@@ -51,6 +51,7 @@ before_install:
   - conda install --yes -q -c conda-forge obspy
   - pip install flask-admin
   - pip install markdown
+  - pip install codecov
   - ls -la
 
 install:
@@ -66,3 +67,4 @@ script:
   - mkdir MSNoiseTest
   - cd MSNoiseTest
   - msnoise test
+  - coverage run -m msnoise.test.tests
