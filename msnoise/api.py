@@ -1056,6 +1056,7 @@ def get_results(session, station1, station2, filterid, components, dates,
                         "%s_%s" % (station1, station2), "%s")
     if export_format == "BOTH":
         base += ".MSEED"
+        export_format = "MSEED"
     elif export_format == "SAC":
         base += ".SAC"
     elif export_format == "MSEED":
@@ -1068,11 +1069,12 @@ def get_results(session, station1, station2, filterid, components, dates,
             i += 1
         except:
             pass
-    logging.debug("Stacking...")
+
     if format == "matrix":
         return i, stack_data
 
     elif format == "stack":
+        logging.debug("Stacking...")
         corr = stack(session, stack_data)
 
         if i > 0:
