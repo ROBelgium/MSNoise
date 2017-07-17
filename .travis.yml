@@ -49,9 +49,7 @@ before_install:
   - conda install --yes -q sphinx jinja2 flask pymysql click
   - conda install --yes -q lxml pyqt
   - conda install --yes -q -c conda-forge obspy
-  - pip install flask-admin
-  - pip install markdown
-  - pip install codecov
+  - conda install --yes -q -c conda-forge flask-admin markdown codecov
   - ls -la
 
 install:
