@@ -107,23 +107,3 @@ def main(tech=None, hostname="localhost", username="msnoise",
     session.close()
     msg = "Installation Done! - Go to Configuration Step!"
     return msg
-    
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description='Creates the database connection file (db.ini)',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-t', '--tech', type=int, default=None,
-                        help='DB technology to use [1] sqlite or [2] mysql.')
-    parser.add_argument('-f', '--filename', type=str, default='msnoise.sqlite',
-                        help='File name of the SQLite DB')
-    parser.add_argument('-d', '--hostname', type=str, default='localhost',
-                        help='Hostname for the MySQL DB')
-    parser.add_argument('-u', '--username', type=str, default='msnoise',
-                        help='Username for the MySQL DB')
-    parser.add_argument('-p', '--password', type=str, default='msnoise',
-                        help='Password for the MySQL DB')
-    parser.add_argument('-b', '--database', type=str, default='msnoise',
-                        help='Database name for the MySQL DB')
-    args = parser.parse_args()
-    main(args.tech, args.hostname, args.username, args.password, args.database,
-         args.filename)
