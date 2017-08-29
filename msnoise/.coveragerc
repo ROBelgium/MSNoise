@@ -1,5 +1,6 @@
 [run]
 omit = */data/*,*/docs/*
+concurrency = multiprocessing
 
 [report]
 # Regexes for lines to exclude from consideration
