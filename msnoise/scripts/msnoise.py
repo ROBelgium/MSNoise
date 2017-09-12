@@ -313,8 +313,10 @@ def populate(fromda):
 @click.option('-i', '--init', is_flag=True, help='First run ?')
 @click.option('--path',  help='Scan all files in specific folder, overrides the'
                               ' default workflow step.')
+@click.option('-r', '--recursively', is_flag=True,
+              help='When scanning a path, walk subfolders automatically ?')
 @click.pass_context
-def scan_archive(ctx, init, path):
+def scan_archive(ctx, init, path, recursively):
     """Scan the archive and insert into the Data Availability table."""
     if path:
         logging.info("Overriding workflow...")
@@ -325,7 +327,15 @@ def scan_archive(ctx, init, path):
         enddate = UTCDateTime(get_config(db, "enddate"))
         cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
         db.close()
-
+        if recursively:
+            for root, dirs, _ in os.walk(path):
+                for d in dirs:
+                    tmppath = os.path.join(root, d)
+                    _ = os.listdir(tmppath)
+                    if not len(_):
+                        continue
+                    worker(sorted(_), tmppath, startdate, enddate,
+                           cc_sampling_rate, init=True)
         worker(sorted(os.listdir(path)), path, startdate, enddate,
                cc_sampling_rate, init=True)
     else:
