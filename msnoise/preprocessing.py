@@ -45,7 +45,13 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     st = read(file, dytpe=np.float,
                               starttime=UTCDateTime(gd),
                               endtime=UTCDateTime(gd)+86400)
-                    st = st.select(network=net, station=sta)
+                    tmp = st.select(network=net, station=sta, component=comp)
+                    if not len(tmp):
+                        for tr in st:
+                            tr.stats.network = net
+                        st = st.select(network=net, station=sta, component=comp)
+                    else:
+                        st = tmp
                     for tr in st:
                         tr.data = tr.data.astype(np.float)
                     stream += st

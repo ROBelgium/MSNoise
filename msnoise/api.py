@@ -576,8 +576,8 @@ def get_data_availability(session, net=None, sta=None, comp=None,
         data = session.query(DataAvailability).\
             filter(DataAvailability.net == net).\
             filter(DataAvailability.sta == sta).\
-            filter(func.DATE(DataAvailability.starttime) <= starttime.date()).\
-            filter(func.DATE(DataAvailability.endtime) >= endtime.date()).all()
+            filter(func.DATE(DataAvailability.starttime) <= endtime.date()).\
+            filter(func.DATE(DataAvailability.endtime) >= starttime.date()).all()
     return data
 
 
