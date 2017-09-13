@@ -32,6 +32,7 @@ To run this script:
 """
 import argparse
 import sys
+import logging
 from getpass import getpass
 
 from sqlalchemy import create_engine
@@ -104,6 +105,21 @@ def main(tech=None, hostname="localhost", username="msnoise",
         print("The database seems to already exist and is not empty, cannot"
               " continue")
         return "Integrity Error - DB already exists"
+
+    try:
+        session.execute("CREATE INDEX job_index ON jobs (day, pair, jobtype)")
+        session.commit()
+    except:
+        logging.info("It looks like the v1.5 'job_index' is already in the DB")
+        session.rollback()
+
+    try:
+        session.execute("CREATE INDEX da_index ON data_availability (path, file, net, sta, comp)")
+        session.commit()
+    except:
+        logging.info("It looks like the v1.5 'da_index' is already in the DB")
+        session.rollback()
+
     session.close()
     msg = "Installation Done! - Go to Configuration Step!"
     return msg
