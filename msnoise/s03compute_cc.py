@@ -217,6 +217,11 @@ def main():
 
     while is_next_job(db, jobtype='CC'):
         jobs = get_next_job(db, jobtype='CC')
+        if len(jobs) == 0:
+            # edge case, should only occur when is_next returns true, but
+            # get_next receives no jobs (heavily parallelised calls).
+            continue
+
         stations = []
         pairs = []
         refs = []

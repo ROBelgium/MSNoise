@@ -725,10 +725,11 @@ def get_next_job(session, flag='T', jobtype='CC'):
     :rtype: list
     :returns: list of :class:`~msnoise.msnoise_table_def.Job`
     """
-    day = session.query(Job).filter(Job.jobtype == jobtype).\
-        filter(Job.flag == flag).order_by(Job.day).first().day
+    # day =
     jobs = session.query(Job).filter(Job.jobtype == jobtype).\
-        filter(Job.flag == flag).filter(Job.day == day)
+        filter(Job.flag == flag).filter(Job.day == session.query(Job).filter(Job.jobtype == jobtype).\
+        filter(Job.flag == flag).order_by(Job.day).first().day).with_for_update()
+    print(jobs.statement.compile(compile_kwargs={"literal_binds": True}))
     tmp = jobs.all()
     jobs.update({Job.flag: 'I'})
     session.commit()
