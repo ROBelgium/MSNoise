@@ -249,7 +249,12 @@ def main():
         comps = np.unique(comps)
         basetime, stream = preprocess(db, stations, comps, goal_day, params,
                                       responses)
-
+        if not len(stream):
+            logging.info("Not enough data for this day !")
+            logging.info("Marking job Done and continuing with next !")
+            for job in jobs:
+                update_job(db, job.day, job.pair, 'CC', 'D')
+            continue
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.goal_sampling_rate
         logging.info("Starting slides")
