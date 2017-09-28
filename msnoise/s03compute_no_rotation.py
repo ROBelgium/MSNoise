@@ -168,6 +168,8 @@ from .move2obspy import whiten, whiten2
 
 from .preprocessing import preprocess
 
+import matplotlib.pyplot as plt
+from scipy.stats import scoreatpercentile
 
 class Params():
     pass
@@ -222,7 +224,7 @@ def main():
 
         if len(jobs) == 0:
             # edge case, should only occur when is_next returns true, but
-            # get_next receives no jobs (heavily parallelised calls).
+            # get_next receives no jobs (heavily parallelised code
             continue
 
         stations = []
@@ -307,7 +309,10 @@ def main():
                 if params.windsorizing == -1:
                     np.sign(tr.data, tr.data)  # inplace
                 elif params.windsorizing != 0:
-                    rms = tr.data.std() * params.windsorizing
+                    imin = scoreatpercentile(tr.data, 1)
+                    imax = scoreatpercentile(tr.data, 99)
+                    not_outliers = np.where((tr.data >= imin) & (tr.data <= imax))[0]
+                    rms = tr.data[not_outliers].std() * params.windsorizing
                     np.clip(tr.data, -rms, rms, tr.data)  # inplace
             tmp.taper(0.04)
             Napod = 100
@@ -362,8 +367,8 @@ def main():
                 filterid = filterdb.ref
                 low = float(filterdb.low)
                 high = float(filterdb.high)
-                rms_threshold = filterdb.rms_threshold
-                fffff = scipy.fftpack.fftfreq(nfft, d=dt)
+                # rms_threshold = filterdb.rms_threshold
+                # fffff = scipy.fftpack.fftfreq(nfft, d=dt)
                 freqVec = scipy.fftpack.fftfreq(nfft, d=dt)[:nfft // 2]
                 J = np.where((freqVec >= low) & (freqVec <= high))[0]
                 low = J[0] - Napod
@@ -374,6 +379,8 @@ def main():
                 high = J[-1] + Napod
                 if high > nfft / 2:
                     high = int(nfft // 2)
+                # plt.imshow(data, aspect='auto', interpolation='none')
+                # plt.show()
                 ffts = scipy.fftpack.fftn(data, shape=[nfft, ], axes=[1, ])
                 whiten2(ffts, nfft, low, high, porte1, porte2, psds)  # inplace
 

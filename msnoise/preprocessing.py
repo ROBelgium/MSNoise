@@ -82,6 +82,9 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         if too_long == len(gaps):
                             only_too_long = True
                 stream = stream.split()
+                for tr in stream:
+                    if tr.stats.sampling_rate < (params.goal_sampling_rate-1):
+                        stream.remove(tr)
                 taper_length = 20.0  # seconds
                 for trace in stream:
                     if trace.stats.npts < 4 * taper_length * trace.stats.sampling_rate:

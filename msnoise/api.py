@@ -1021,6 +1021,16 @@ def stack(session, data):
     pws_power = float(get_config(session, 'pws_power'))
     goal_sampling_rate = float(get_config(session, "cc_sampling_rate"))
     data = data[~np.isnan(data).any(axis=1)]
+    sanitize = True
+    if sanitize:
+        threshold = 0.99
+        npts = data.shape[1]
+        corr = data.mean(axis=0)
+        corrcoefs = np.array([np.corrcoef(di, corr)[1][0] for di in data])
+        toolarge = np.where(corrcoefs >= threshold)[0]
+        if len(toolarge):
+            data = data[np.where(corrcoefs <= threshold)[0]]
+    
     if stack_method == "linear":
         logging.debug("Doing a linear stack")
         corr = data.mean(axis=0)
