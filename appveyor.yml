@@ -12,7 +12,7 @@ environment:
       PYTHON_ARCH: 64
       MINICONDA: C:\Miniconda-x64
 
-    - PYTHON_VERSION: 3.5
+    - PYTHON_VERSION: 3.6
       PYTHON_ARCH: 64
       MINICONDA: C:\Miniconda3-x64
 
