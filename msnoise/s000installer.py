@@ -30,7 +30,6 @@ To run this script:
     directory. It's not very safe, but until now we haven't thought of another
     solution.
 """
-import argparse
 import sys
 from getpass import getpass
 
