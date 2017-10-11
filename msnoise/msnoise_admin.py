@@ -132,7 +132,7 @@ from io import BytesIO
 import flask
 import jinja2
 import markdown
-from flask import Flask, redirect, request, render_template
+from flask import Flask, redirect, request
 from flask import Markup
 from flask import flash
 from flask_admin import Admin, BaseView, expose
@@ -141,9 +141,6 @@ from flask_admin.babel import ngettext, lazy_gettext
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.model import typefmt
 from wtforms.validators import ValidationError
-from wtforms.fields import SelectField, StringField
-from wtforms.utils import unset_value
-from flask_wtf import Form
 
 from .api import *
 from .default import default
@@ -156,7 +153,7 @@ class GenericView(BaseView):
 
     @expose('/')
     def index(self):
-        return self.render('admin/%s.html'%self.page, msnoise_project="test")
+        return self.render('admin/%s.html' % self.page, msnoise_project="test")
 
 
 class FilterView(ModelView):
@@ -182,23 +179,23 @@ class FilterView(ModelView):
         if field.data > form.data['mwcs_wlen']:
             raise ValidationError("'mwcs_step' should be smaller or equal to"
                                   " 'mwcs_wlen'")
-    
+
     form_args = dict(
         mwcs_low=dict(validators=[mwcs_low]),
         mwcs_high=dict(validators=[mwcs_high]),
         high=dict(validators=[high]),
         mwcs_step=dict(validators=[mwcs_step]),
     )
-    
+
     column_list = ('ref', 'low', 'mwcs_low', 'mwcs_high', 'high',
                    'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used')
     form_columns = ('low', 'mwcs_low', 'mwcs_high', 'high',
                     'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used')
-    
+
     def __init__(self, session, **kwargs):
         # You can pass name and other parameters if you want to
         super(FilterView, self).__init__(Filter, session, **kwargs)
-        
+
     @action('used',
             lazy_gettext('Toggle Used'),
             lazy_gettext('Are you sure you want to update selected models?'))
@@ -211,23 +208,23 @@ class FilterView(ModelView):
             else:
                 s.used = True
         self.session.commit()
-        return  
+        return
 
 
 MY_DEFAULT_FORMATTERS = dict(typefmt.BASE_FORMATTERS)
 MY_DEFAULT_FORMATTERS.update({
-        type(None): typefmt.null_formatter,
-    })
+    type(None): typefmt.null_formatter,
+})
 
 
 class StationView(ModelView):
     view_title = "Station Configuration"
     column_filters = ('net', 'used')
     column_type_formatters = MY_DEFAULT_FORMATTERS
-    
+
     def __init__(self, session, **kwargs):
         super(StationView, self).__init__(Station, session, **kwargs)
-    
+
     @action('used',
             lazy_gettext('Toggle Used'),
             lazy_gettext('Are you sure you want to update selected models?'))
@@ -240,7 +237,7 @@ class StationView(ModelView):
             else:
                 s.used = True
         self.session.commit()
-        return  
+        return
 
 
 class DataAvailabilityView(ModelView):
@@ -255,7 +252,7 @@ class DataAvailabilityView(ModelView):
     def __init__(self, session, **kwargs):
         super(DataAvailabilityView, self).__init__(DataAvailability, session,
                                                    **kwargs)
-    
+
     @action('modified',
             lazy_gettext('Mark as (M)odified'),
             lazy_gettext('Are you sure you want to update selected models?'))
@@ -269,9 +266,9 @@ class DataAvailabilityView(ModelView):
         self.session.commit()
         flash(ngettext('Model was successfully flagged (M)odified.',
                        '%(count)s models were successfully flagged (M)odified.',
-              count, count=count))
+                       count, count=count))
         return
-    
+
 
 class JobView(ModelView):
     view_title = "Jobs"
@@ -284,7 +281,7 @@ class JobView(ModelView):
 
     def __init__(self, session, **kwargs):
         super(JobView, self).__init__(Job, session, **kwargs)
-    
+
     @action('todo',
             lazy_gettext('Mark as (T)odo'),
             lazy_gettext('Are you sure you want to update selected models?'))
@@ -295,7 +292,7 @@ class JobView(ModelView):
             s.flag = 'T'
         self.session.commit()
         return
-    
+
     @action('done',
             lazy_gettext('Mark as (D)one'),
             lazy_gettext('Are you sure you want to update selected models?'))
@@ -306,7 +303,7 @@ class JobView(ModelView):
             s.flag = 'D'
         self.session.commit()
         return
-    
+
     @action('deletetype',
             lazy_gettext('Delete all Jobs of the same "Type"'),
             lazy_gettext('Are you sure you want to delete all those models?'))
@@ -318,7 +315,7 @@ class JobView(ModelView):
         self.get_query().filter(Job.jobtype == type_to_delete).delete()
         self.session.commit()
         return
-    
+
     @action('massTodo',
             lazy_gettext('Mark all Jobs of the same Type as (T)odo'),
             lazy_gettext('Are you sure you want to update all those models?'))
@@ -327,12 +324,11 @@ class JobView(ModelView):
         query = self.get_query().filter(model_pk.in_(ids))
         for s in query.all():
             type_to_delete = s.jobtype
-        
+
         for s in self.get_query().filter(Job.jobtype == type_to_delete).all():
             s.flag = 'T'
         self.session.commit()
         return
-
 
 
 class ConfigView(ModelView):
@@ -420,7 +416,7 @@ class ResultPlotter(BaseView):
         db = connect()
         station1, station2 = pairs[pair]['text'].replace('.', '_').split(' - ')
         start, end, dates = build_ref_datelist(db)
-        i, result = get_results(db,station1, station2, filter, component, dates,
+        i, result = get_results(db, station1, station2, filter, component, dates,
                                 format=format)
 
         if format == 'stack':
@@ -475,6 +471,7 @@ class BugReport(BaseView):
     def index(self):
         return self.render('admin/bugreport.html')
 
+
 app = Flask(__name__)
 app.secret_key = 'why would I tell you my secret key?'
 
@@ -498,7 +495,7 @@ def filtersJSON():
     data = {}
     filters = get_filters(db, all=False)
     for f in filters:
-        data[f.ref] = "%.2f - %.2f"%(f.low, f.high)
+        data[f.ref] = "%.2f - %.2f" % (f.low, f.high)
     db.close()
     o = json.dumps(data)
     db.close()
@@ -510,7 +507,7 @@ def componentsJSON():
     db = connect()
     components = get_components_to_compute(db)
     data = {}
-    for i,c in enumerate(components):
+    for i, c in enumerate(components):
         data[i] = c
     db.close()
     o = json.dumps(data)
@@ -540,7 +537,7 @@ def bugreporter():
     return flask.Response(o, mimetype='application/json')
 
 
-@app.route('/admin/data_availability.json',methods=['GET','POST'])
+@app.route('/admin/data_availability.json', methods=['GET', 'POST'])
 def dataAvail():
     data = flask.request.get_json()
     db = connect()
@@ -553,23 +550,23 @@ def dataAvail():
     return flask.Response(o, mimetype='application/json')
 
 
-@app.route('/admin/all_results.json',methods=['POST'])
+@app.route('/admin/all_results.json', methods=['POST'])
 def allresults():
     data = flask.request.get_json(force=True)
     db = connect()
-    station1, station2 = data['pair'].replace('.','_').split(' - ')
+    station1, station2 = data['pair'].replace('.', '_').split(' - ')
     filterid = int(data['filter'])
     components = data['component']
     format = data['format']
     start, end, dates = build_ref_datelist(db)
-    i, result = get_results(db,station1, station2, filterid, components, dates,
+    i, result = get_results(db, station1, station2, filterid, components, dates,
                             format=format)
-    
+
     data = {}
     if format == 'stack':
         if i != 0:
             maxlag = float(get_config(db, 'maxlag'))
-            data['x'] = np.linspace(-maxlag, maxlag, get_maxlag_samples(db)).\
+            data['x'] = np.linspace(-maxlag, maxlag, get_maxlag_samples(db)). \
                 tolist()
             data['y'] = result.tolist()
             data["info"] = "Data OK"
@@ -603,13 +600,13 @@ def new_jobsTRIG():
     o['count'] = count
     o = json.dumps(o)
     return flask.Response(o, mimetype='application/json')
-    
+
 
 @app.route('/admin/jobs_list.json')
 def joblists():
     jobtype = flask.request.args['type']
     db = connect()
-    data = get_job_types(db,jobtype)
+    data = get_job_types(db, jobtype)
     db.close()
     o = {'T': 0, 'I': 0, 'D': 0}
     for count, flag in data:
@@ -666,7 +663,7 @@ def main(port=5000):
     db.close()
 
     admin = Admin(app, template_mode='bootstrap2')
-    
+
     if "msnoise_brand" in os.environ:
         tmp = eval(os.environ["msnoise_brand"])
         name, logo = tmp.split("|")
@@ -701,24 +698,22 @@ def main(port=5000):
     app.jinja_loader = jinja2.ChoiceLoader([
         app.jinja_loader,
         jinja2.FileSystemLoader(template_folders),
-        ])
+    ])
 
+    admin.add_view(StationView(db, endpoint='stations', category='Configuration'))
+    admin.add_view(FilterView(db, endpoint='filters', category='Configuration'))
+    admin.add_view(ConfigView(db, endpoint='config', category='Configuration'))
 
-    admin.add_view(StationView(db,endpoint='stations', category='Configuration'))
-    admin.add_view(FilterView(db,endpoint='filters', category='Configuration'))
-    admin.add_view(ConfigView(db,endpoint='config', category='Configuration'))
-
-    admin.add_view(DataAvailabilityView(db,endpoint='data_availability',
+    admin.add_view(DataAvailabilityView(db, endpoint='data_availability',
                                         category='Database'))
 
-    admin.add_view(JobView(db,endpoint='jobs',category='Database'))
-
+    admin.add_view(JobView(db, endpoint='jobs', category='Database'))
 
     # admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',
-                                        # category='Results'))
+    # category='Results'))
     # admin.add_view(ResultPlotter(endpoint='results',category='Results'))
     # admin.add_view(InterferogramPlotter(endpoint='interferogram',
-                                        # category='Results'))
+    # category='Results'))
 
     if plugins:
         plugins = plugins.split(',')
@@ -727,7 +722,7 @@ def main(port=5000):
             if module_name in plugins:
                 admin.add_view(ep.load()(db))
 
-    a = GenericView(endpoint='about',category='Help', name='About')
+    a = GenericView(endpoint='about', category='Help', name='About')
     a.page = "about"
     admin.add_view(a)
     admin.add_view(BugReport(name='Bug Report', endpoint='bugreport',
@@ -735,6 +730,6 @@ def main(port=5000):
 
     print("MSNoise admin will run on all interfaces by default")
     print("access it via the machine's IP address or")
-    print("via http://127.0.0.1:%i when running locally."%port)
+    print("via http://127.0.0.1:%i when running locally." % port)
     app.run(host='0.0.0.0', port=port, debug=False, reloader_interval=1,
             threaded=True)
