@@ -884,7 +884,7 @@ def export_allcorr(session, ccfid, data):
 
 
 def add_corr(session, station1, station2, filterid, date, time, duration,
-             components, CF, sampling_rate, day=False, ncorr=0):
+             components, cf, sampling_rate, day=False, ncorr=0):
     """
     Adds a CCF to the data archive on disk.
     
@@ -905,6 +905,8 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
     :param duration: The total duration of the exported CCF
     :type components: str
     :param components: The name of the components used (ZZ, ZR, ...)
+    # :type cf: TODO FIll it
+    # :param cf: TODO FILL IT
     :type sampling_rate: float
     :param sampling_rate: The sampling rate of the exported CCF
     :type day: bool
@@ -931,10 +933,10 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
                             "%s_%s" % (station1, station2), str(date))
         pair = "%s:%s" % (station1, station2)
         if mseed:
-            export_mseed(session, path, pair, components, filterid, CF,
+            export_mseed(session, path, pair, components, filterid, cf,
                          ncorr)
         if sac:
-            export_sac(session, path, pair, components, filterid, CF,
+            export_sac(session, path, pair, components, filterid, cf,
                        ncorr)
 
     else:
@@ -945,7 +947,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
             os.makedirs(path)
 
         t = Trace()
-        t.data = CF
+        t.data = cf
         t.stats.sampling_rate = sampling_rate
         t.stats.starttime = -float(get_config(session, 'maxlag'))
         t.stats.components = components
@@ -1341,21 +1343,21 @@ def check_and_phase_shift(trace):
         trace.taper(max_percentage=None, max_length=1.0)
 
         n = next_fast_len(int(trace.stats.npts))
-        FFTdata = scipy.fftpack.fft(trace.data, n=n)
+        fftdata = scipy.fftpack.fft(trace.data, n=n)
         fftfreq = scipy.fftpack.fftfreq(n, d=trace.stats.delta)
-        FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
-        FFTdata = FFTdata.astype(np.complex64)
-        scipy.fftpack.ifft(FFTdata, n=n, overwrite_x=True)
-        trace.data = np.real(FFTdata[:len(trace.data)]).astype(np.float)
+        fftdata = fftdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
+        fftdata = fftdata.astype(np.complex64)
+        scipy.fftpack.ifft(fftdata, n=n, overwrite_x=True)
+        trace.data = np.real(fftdata[:len(trace.data)]).astype(np.float)
         trace.stats.starttime += dt
-        del FFTdata, fftfreq
+        del fftdata, fftfreq
         clean_scipy_cache()
         return trace
     else:
         return trace
 
 
-def getGaps(stream, min_gap=None, max_gap=None):
+def get_gaps(stream, min_gap=None, max_gap=None):
     # Create shallow copy of the traces to be able to sort them later on.
     copied_traces = copy.copy(stream.traces)
     stream.sort()
