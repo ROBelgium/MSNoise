@@ -355,7 +355,7 @@ def get_station(session, net, sta):
     return station
 
 
-def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
+def update_station(session, net, sta, x, y, altitude, coordinates='UTM',
                    instrument='N/A', used=1):
     """Updates or Insert a new Station in the database.
 
@@ -368,10 +368,10 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
     :param net: The network code of the Station
     :type sta: str
     :param sta: The station code
-    :type X: float
-    :param X: The X coordinate of the station
-    :type Y: float
-    :param Y: The Y coordinate of the station
+    :type x: float
+    :param x: The x coordinate of the station
+    :type y: float
+    :param y: The y coordinate of the station
     :type altitude: float
     :param altitude: The altitude of the station
     :type coordinates: str
@@ -385,12 +385,12 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
     station = session.query(Station).filter(Station.net == net).\
         filter(Station.sta == sta).first()
     if station is None:
-        station = Station(net, sta, X, Y, altitude, coordinates, instrument,
+        station = Station(net, sta, x, y, altitude, coordinates, instrument,
                           used)
         session.add(station)
     else:
-        station.X = X
-        station.Y = Y
+        station.X = x
+        station.Y = y
         station.altitude = altitude
         station.coordinates = coordinates
         station.instrument = instrument
@@ -625,8 +625,6 @@ def count_data_availability_flags(session):
 
 
 # Jobs
-
-import time
 def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     """
     Updates or Inserts a new :class:`~msnoise.msnoise_table_def.Job` in the
@@ -1196,6 +1194,13 @@ def build_movstack_datelist(session, startdate=None, enddate=None):
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
+    :type startdate: str
+    :param startdate: a startdate for which method should create a date array.
+        Defaults to None, in this case method gets the value from database.
+    :type enddate: str
+    :param enddate: a enddate for which method should create a date array.
+        Defaults to None, in this case method gets the value from database.
+
 
     :rtype: tuple
     :returns: (start, end, datelist)
