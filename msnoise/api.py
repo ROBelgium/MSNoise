@@ -299,7 +299,7 @@ def get_networks(session, all=False):
     if all:
         networks = session.query(Station).group_by(Station.net).all()
     else:
-        networks = session.query(Station).filter(Station.used == True). \
+        networks = session.query(Station).filter(Station.used is True). \
             group_by(Station.net)
     return [net.net for net in networks]
 
@@ -327,7 +327,7 @@ def get_stations(session, all=False, net=None):
         else:
             stations = q.order_by(Station.net).order_by(Station.sta).all()
     else:
-        stations = q.filter(Station.used == True).order_by(Station.net). \
+        stations = q.filter(Station.used is True).order_by(Station.net). \
             order_by(Station.sta).all()
         if net is not None:
             stations = stations.filter(Station.net == net). \
