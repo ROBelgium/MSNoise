@@ -101,6 +101,8 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None):
 
         if maxlag != Nt:
             corr = corr[dN]
+        if len(corr) < (2*maxlag)+1:
+            continue
         corrs[id] = corr
 
 

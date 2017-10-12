@@ -42,9 +42,13 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                               (station, comp, len(files)))
                 stream = Stream()
                 for file in sorted(files):
-                    st = read(file, dytpe=np.float,
+                    try:
+                        st = read(file, dytpe=np.float,
                               starttime=UTCDateTime(gd),
                               endtime=UTCDateTime(gd)+86400)
+                    except:
+                        logging.debug("ERROR reading file %s"%file)
+                        continue
                     tmp = st.select(network=net, station=sta, component=comp)
                     if not len(tmp):
                         for tr in st:
@@ -54,10 +58,21 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         st = tmp
                     for tr in st:
                         tr.data = tr.data.astype(np.float)
+                        tr.stats.network = tr.stats.network.upper()
+                        tr.stats.station = tr.stats.station.upper()
+                        tr.stats.channel = tr.stats.channel.upper()
+
                     stream += st
                     del st
                 stream.sort()
-                stream.merge(method=1, interpolation_samples=3, fill_value=None)
+                try:
+                    # HACK not super clean... should find a way to prevent the
+                    # same trace id with different sps to occur
+                    stream.merge(method=1, interpolation_samples=3, fill_value=None)
+                except:
+                    logging.debug("Error while merging...")
+                    traceback.print_exc()
+                    continue
                 stream = stream.split()
 
                 logging.debug("Checking sample alignment")
@@ -73,14 +88,19 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         gaps = getGaps(stream)
                         for gap in gaps:
                             if int(gap[-1]) <= max_gap:
-                                stream[gap[0]] = stream[gap[0]].__add__(stream[gap[1]], method=1,
+                                try:
+                                    stream[gap[0]] = stream[gap[0]].__add__(stream[gap[1]], method=1,
                                                                         fill_value="interpolate")
-                                stream.remove(stream[gap[1]])
+                                    stream.remove(stream[gap[1]])
+                                except:
+                                    stream.remove(stream[gap[1]])
+
                                 break
                             else:
                                 too_long += 1
                         if too_long == len(gaps):
                             only_too_long = True
+
                 stream = stream.split()
                 for tr in stream:
                     if tr.stats.sampling_rate < (params.goal_sampling_rate-1):
@@ -141,12 +161,18 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     response = responses[responses["channel_id"] == stream[0].id]
                     if len(response) > 1:
                         response = response[response["start_date"]<UTCDateTime(gd)]
+                    if len(response) > 1:
                         response = response[response["end_date"]>UTCDateTime(gd)]
                     elif len(response) == 0:
                         logging.info("No instrument response information "
-                                     "for %s, exiting" % stream[0].id)
-                        sys.exit()
-                    datalesspz = response["paz"].values[0]
+                                     "for %s, skipping" % stream[0].id)
+                        continue
+                    try:
+                        datalesspz = response["paz"].values[0]
+                    except:
+                        logging.error("Bad instrument response information "
+                                      "for %s, skipping" % stream[0].id)
+                        continue
                     stream.simulate(paz_remove=datalesspz,
                                     remove_sensitivity=True,
                                     pre_filt=response_prefilt,

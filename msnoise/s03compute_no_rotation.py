@@ -218,8 +218,9 @@ def main():
         responses = preload_instrument_responses(db)
     else:
         responses = None
-
+    logging.info("Checking if there are jobs to do")
     while is_next_job(db, jobtype='CC'):
+        logging.info("Getting the next job")
         jobs = get_next_job(db, jobtype='CC')
 
         if len(jobs) == 0:
@@ -293,6 +294,11 @@ def main():
                 continue
 
             base = np.amax([tr.stats.npts for tr in tmp])
+            if base <= (params.maxlag*params.goal_sampling_rate*2+1):
+                logging.debug("All traces shorter are too short to export"
+                              " +-maxlag")
+                continue
+
             for tr in tmp:
                 if tr.stats.npts != base:
                     tmp.remove(tr)
@@ -332,7 +338,8 @@ def main():
 
                 Pxx, freqs = mlab.psd(tmp[i].data,
                                       Fs=tmp[i].stats.sampling_rate,
-                                      NFFT=nfft)
+                                      NFFT=nfft,
+                                      detrend='mean')
                 psds.append(np.sqrt(Pxx))
             psds = np.asarray(psds)
 
@@ -352,12 +359,13 @@ def main():
             thisdate = tmptime.strftime("%Y-%m-%d")
             thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
             pair_index = []
-            for sta1, sta2 in itertools.combinations(names, 2):
+            # TODO: with or without replacement is a matter of AC or SC!
+            for sta1, sta2 in itertools.combinations_with_replacement(names, 2):
                 n1, s1, l1, c1 = sta1
                 n2, s2, l2, c2 = sta2
                 comp = "%s%s" % (c1[-1], c2[-1])
-                if n1 == n2 and s1 == s2:
-                    continue
+                # if (n1 == n2 and s1 == s2) :
+                #     continue
                 if comp in params.components_to_compute:
                     pair_index.append(
                         ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
@@ -401,21 +409,32 @@ def main():
                     allcorr[ccfid][thistime] = corr[key]
                 del corr
 
-        for ccfid in allcorr.keys():
-            station1, station2, components, filterid, date = ccfid.split('_')
+        if params.keep_all:
+            for ccfid in allcorr.keys():
+                export_allcorr2(db, ccfid, allcorr[ccfid])
 
-            corrs = np.asarray(list(allcorr[ccfid].values()))
-            corr = stack(db, corrs)
-            thisdate = goal_day
-            thistime = "0_0"
-            add_corr(
-                db, station1.replace('.', '_'),
-                station2.replace('.', '_'), int(filterid),
-                thisdate, thistime, params.min30 /
-                                    params.goal_sampling_rate,
-                components, corr,
-                params.goal_sampling_rate, day=True,
-                ncorr=corrs.shape[0])
+        if params.keep_days:
+            for ccfid in allcorr.keys():
+                station1, station2, components, filterid, date = ccfid.split('_')
+
+                corrs = np.asarray(list(allcorr[ccfid].values()))
+                if not len(corrs):
+                    logging.debug("No data to stack.")
+                    continue
+                corr = stack(db, corrs)
+                if not len(corr):
+                    logging.debug("No data to save.")
+                    continue
+                thisdate = goal_day
+                thistime = "0_0"
+                add_corr(
+                    db, station1.replace('.', '_'),
+                    station2.replace('.', '_'), int(filterid),
+                    thisdate, thistime, params.min30 /
+                                        params.goal_sampling_rate,
+                    components, corr,
+                    params.goal_sampling_rate, day=True,
+                    ncorr=corrs.shape[0])
 
         for job in jobs:
             update_job(db, job.day, job.pair, 'CC', 'D')

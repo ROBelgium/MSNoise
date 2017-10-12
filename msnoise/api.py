@@ -699,7 +699,8 @@ def is_next_job(session, flag='T', jobtype='CC'):
     :returns: True if at least one :class:`~msnoise.msnoise_table_def.Job`
         matches, False otherwise.
     """
-    job = session.query(Job).filter(Job.jobtype == jobtype).\
+    job = session.query(Job).with_hint(Job, 'USE INDEX (job_index2)').\
+        filter(Job.jobtype == jobtype).\
         filter(Job.flag == flag).first()
     if job is None:
         return False
@@ -727,9 +728,9 @@ def get_next_job(session, flag='T', jobtype='CC'):
     """
     # day =
     jobs = session.query(Job).filter(Job.jobtype == jobtype).\
-        filter(Job.flag == flag).filter(Job.day == session.query(Job).filter(Job.jobtype == jobtype).\
-        filter(Job.flag == flag).order_by(Job.day).first().day).with_for_update()
-    print(jobs.statement.compile(compile_kwargs={"literal_binds": True}))
+        filter(Job.flag == flag).filter(Job.day == session.query(Job).with_hint(Job, 'USE INDEX (job_index2)').filter(Job.jobtype == jobtype).\
+        filter(Job.flag == flag).first().day).with_for_update()
+    # print(jobs.statement.compile(compile_kwargs={"literal_binds": True}))
     tmp = jobs.all()
     jobs.update({Job.flag: 'I'})
     session.commit()
@@ -886,6 +887,22 @@ def export_allcorr(session, ccfid, data):
     return
 
 
+def export_allcorr2(session, ccfid, data):
+    output_folder = get_config(session, 'output_folder')
+    station1, station2, components, filterid, date = ccfid.split('_')
+
+    path = os.path.join(output_folder, "%02i" % int(filterid),
+                        station1, station2, components)
+    if not os.path.isdir(path):
+        os.makedirs(path)
+
+    df = pd.DataFrame().from_dict(data).T
+    df.columns = get_t_axis(session)
+    df.to_hdf(os.path.join(path, date+'.h5'), 'data')
+    del df
+    return
+
+
 def add_corr(session, station1, station2, filterid, date, time, duration,
              components, CF, sampling_rate, day=False, ncorr=0):
     """
@@ -1020,9 +1037,12 @@ def stack(session, data):
     pws_timegate = float(get_config(session, 'pws_timegate'))
     pws_power = float(get_config(session, 'pws_power'))
     goal_sampling_rate = float(get_config(session, "cc_sampling_rate"))
+    if len(data) == 0:
+        logging.debug("No data to stack.")
+        return []
     data = data[~np.isnan(data).any(axis=1)]
     sanitize = True
-    if sanitize:
+    if len(data) != 1 and sanitize:
         threshold = 0.99
         npts = data.shape[1]
         corr = data.mean(axis=0)
@@ -1030,7 +1050,9 @@ def stack(session, data):
         toolarge = np.where(corrcoefs >= threshold)[0]
         if len(toolarge):
             data = data[np.where(corrcoefs <= threshold)[0]]
-    
+
+    if len(data) == 0:
+        return []
     if stack_method == "linear":
         logging.debug("Doing a linear stack")
         corr = data.mean(axis=0)
@@ -1554,7 +1576,7 @@ def preload_instrument_responses(session):
         poles and zeros.
     
     """
-    logging.debug('Removing instrument response')
+    logging.debug('Preloading instrument response')
     response_format = get_config(session, 'response_format')
     files = glob.glob(os.path.join(get_config(session, 'response_path'), "*"))
     channels = []
@@ -1602,6 +1624,7 @@ def preload_instrument_responses(session):
     channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
                                                "end_date", "paz", "latitude",
                                                "longitude"],)
+    logging.debug('Finished Loading instrument responses')
     return(channels)
 
 

@@ -226,6 +226,8 @@ def main(stype, interval=1.0):
                                             logging.debug("%s %s [%s - %s] (%i day stack)" % (
                                                 day_name, date, datelist[low], datelist[i], mov_stack))
                                             corr = stack(db, corr)
+                                            if not len(corr):
+                                                continue
 
                                             corr = scipy.signal.detrend(
                                                 corr)

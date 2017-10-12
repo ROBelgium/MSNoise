@@ -81,7 +81,8 @@ class Job(Base):
     flag = Column(String(1))
     lastmod = Column(TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP'))
 
-    table_args__ = (Index('job_index', "day", "pair", "jobtype", unique=True),)
+    table_args__ = (Index('job_index', "day", "pair", "jobtype", unique=True),
+                    Index('job_index2', "jobtype", "flag", unique=False))
 
     def __init__(self, day, pair, jobtype, flag,
                  lastmod=datetime.datetime.utcnow()):

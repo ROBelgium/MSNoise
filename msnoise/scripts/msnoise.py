@@ -94,6 +94,14 @@ def upgrade_db():
         db.rollback()
 
     try:
+        db.execute("CREATE INDEX job_index2 ON jobs (jobtype, flag)")
+        db.commit()
+    except:
+        logging.info("It looks like the v1.5 'job_index2' is already in the DB")
+        db.rollback()
+
+
+    try:
         db.execute("CREATE INDEX da_index ON data_availability (path, file, net, sta, comp)")
         db.commit()
     except:
@@ -379,13 +387,16 @@ def compute_cc2(ctx):
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     processes = []
-    for i in range(threads):
-        p = Process(target=main)
-        p.start()
-        processes.append(p)
-        time.sleep(delay)
-    for p in processes:
-        p.join()
+    if threads == 1:
+        main()
+    else:
+        for i in range(threads):
+            p = Process(target=main)
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
 
 
 @click.command()
@@ -726,6 +737,7 @@ try:
 
     db = connect()
     plugins = get_config(db, "plugins")
+    db.close()
 except:
     plugins = None
 
