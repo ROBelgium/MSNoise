@@ -325,7 +325,7 @@ def get_stations(session, all=False, net=None):
             stations = q.filter(Station.net == net).order_by(Station.net).\
                 order_by(Station.sta)
         else:
-            stations = q.order_by(Station.net).order_by(Station.sta).all()
+            stations = q.order_by(Station.net).order_by(Station.sta)
     else:
         stations = q.filter(Station.used == True).order_by(Station.net).\
             order_by(Station.sta)
