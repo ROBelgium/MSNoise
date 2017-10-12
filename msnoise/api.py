@@ -323,15 +323,15 @@ def get_stations(session, all=False, net=None):
     if all:
         if net is not None:
             stations = q.filter(Station.net == net).order_by(Station.net).\
-                order_by(Station.sta)
+                order_by(Station.sta).all()
         else:
             stations = q.order_by(Station.net).order_by(Station.sta)
     else:
         stations = q.filter(Station.used == True).order_by(Station.net).\
-            order_by(Station.sta)
+            order_by(Station.sta).all()
         if net is not None:
             stations = stations.filter(Station.net == net).\
-                order_by(Station.net).order_by(Station.sta)
+                order_by(Station.net).order_by(Station.sta).all()
     return stations
 
 
