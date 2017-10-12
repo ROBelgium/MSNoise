@@ -1187,7 +1187,7 @@ def build_ref_datelist(session):
     return start, end, datelist.tolist()
 
 
-def build_movstack_datelist(session):
+def build_movstack_datelist(session, startdate=None, enddate=None):
     """
     Creates a date array for the analyse period.
     The returned tuple contains a start and an end date, and a list of
@@ -1200,8 +1200,8 @@ def build_movstack_datelist(session):
     :rtype: tuple
     :returns: (start, end, datelist)
     """
-    begin = get_config(session, "startdate")
-    end = get_config(session, "enddate")
+    begin = startdate if startdate is not None else get_config(session, "startdate")
+    end = enddate if enddate is not None else get_config(session, "enddate")
     if begin[0] == '-':
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
         end = datetime.date.today() + datetime.timedelta(days=int(end))
