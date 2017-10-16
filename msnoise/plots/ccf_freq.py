@@ -27,17 +27,17 @@ from ..api import *
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
-         show=False, outfile=None, envelope=False, refilter=None,  startdate=None, enddate=None):
+         show=False, outfile=None, envelope=False, refilter=None,
+         startdate=None, enddate=None):
+
     db = connect()
-    maxlag = float(get_config(db, 'maxlag'))
-    samples = get_maxlag_samples(db)
     cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
     start, end, datelist = build_movstack_datelist(db, startdate, enddate)
     base = mdates.date2num(start)
-    plt.figure(figsize=(12, 9))
     sta1 = sta1.replace('.', '_')
     sta2 = sta2.replace('.', '_')
-    t = np.arange(samples)/cc_sampling_rate - maxlag
+
+    fig = plt.figure(figsize=(12, 9))
 
     if refilter:
         freqmin, freqmax = refilter.split(':')
@@ -51,17 +51,23 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
                                             mov_stack))
         nstack, stack_total = get_results(db, sta1, sta2, filterid, components,
                                           datelist, mov_stack, format="matrix")
-        ax = plt.subplot(111)
+        ax = fig.add_subplot(111)
         for i, line in enumerate(stack_total):
             if np.all(np.isnan(line)):
                 continue
+            else:
+                freq, line = prepare_fft(line, cc_sampling_rate)
+
             if refilter:
                 line = bandpass(line, freqmin, freqmax, cc_sampling_rate,
                                 zerophase=True)
+
             if envelope:
                 line = obspy_envelope(line)
-            line /= line.max()
-            plt.plot(t, line * ampli + i + base, c='k')
+
+            # line /= line.max()
+            ax.plot(freq, line * ampli + i + base, c='k')
+
             if seismic:
                 y1 = np.ones(len(line)) * i
                 y2 = line*ampli + i + base
@@ -73,21 +79,23 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
                 low = float(filterdb.low)
                 high = float(filterdb.high)
                 break
-       
-        plt.xlabel("Lag Time (s)")
-        plt.axhline(0, lw=0.5, c='k')
-        plt.grid()
+
+        ax.set_xlabel("Frequency [Hz]")
+        ax.set_xscale('log')
+        ax.grid()
+
         title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' %\
                 (sta1.replace('_', '.'), sta2.replace('_', '.'), components,
                  filterid, low, high, mov_stack)
         if refilter:
             title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
-        plt.title(title)
-        plt.scatter(0, [start, ], alpha=0)
-        plt.ylim(start-datetime.timedelta(days=ampli),
-                 end+datetime.timedelta(days=ampli))
-        plt.xlim(-maxlag, maxlag)
+        ax.set_title(title)
+
+        ax.set_ylim(start-datetime.timedelta(days=ampli),
+                    end+datetime.timedelta(days=ampli))
         ax.fmt_ydata = mdates.DateFormatter('%Y-%m-%d')
+
+
         cursor = Cursor(ax, useblit=True, color='red', linewidth=1.2)
 
         if outfile:
@@ -99,6 +107,29 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
                                                                   mov_stack))
             outfile = "ccftime " + outfile
             print("output to:", outfile)
-            plt.savefig(outfile)
+            fig.savefig(outfile)
         if show:
             plt.show()
+
+def prepare_fft(line, sampling_rate):
+    """
+    Method that returns a positive part of FFT of provided signal along with
+    a corresponding frequency vector.
+
+    :type line: todo
+    :param line: Signal to calculate fft.
+    :type sampling_rate: float
+    :param sampling_rate: Sampling rate of provided signal
+
+    :rtype: tuple #TODO
+    :return: TODO
+    """
+    val = np.fft.fft(line)
+    val = np.abs(val)
+
+    freq = np.fft.fftfreq(len(line),(1/sampling_rate))
+    freq = [x for x in freq if x >=0]
+
+    val = val[:len(freq)]
+
+    return freq, val
