@@ -1,4 +1,3 @@
-import traceback
 import logging
 import os
 import sys
@@ -6,9 +5,6 @@ import time
 
 import click
 import pkg_resources
-
-
-# from click_plugins import with_plugins
 
 
 @click.group()
@@ -246,7 +242,7 @@ def config(set, sync):
         netsta = []
         for id, row in responses.iterrows():
             net, sta, loc, chan = row["channel_id"].split(".")
-            netsta.append("%s.%s"%(net,sta))
+            netsta.append("%s.%s" % (net,sta))
         responses["netsta"] = netsta
 
         for station in get_stations(db):
@@ -554,32 +550,28 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
 @click.option('-m', '--mov_stack', default=1,
               help='Mov Stack to read from disk')
 @click.option('-a', '--ampli', default=5.0, help='Amplification')
-@click.option('-S', '--seismic', is_flag=True, help='Seismic style')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
-@click.option('-e', '--envelope', is_flag=True, help='Plot envelope instead of '
-                                                     'time series')
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
-@click.option('--startdate', help='Change startdate',
+@click.option('--startdate', help='Change startdate. Use format yyyy-mm-dd',
               default=None, type=str)
-@click.option('--enddate', help='Change enddate',
+@click.option('--enddate', help='Change enddate. Use format yyyy-mm-dd',
               default=None, type=str)
 @click.pass_context
-def ccf_freq(ctx, sta1, sta2, filterid, comp, mov_stack,
-             ampli, seismic, show, outfile, envelope, refilter,
-             startdate, enddate):
+def ccf_freq(ctx, sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
+             refilter, startdate, enddate):
     """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
     if ctx.obj['MSNOISE_custom']:
         from ccf_freq import main
     else:
         from ..plots.ccf_freq import main
-    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
-         envelope, refilter, startdate, enddate)
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
+         refilter, startdate, enddate)
 
 
 @click.command()
@@ -600,22 +592,21 @@ def ccf_freq(ctx, sta1, sta2, filterid, comp, mov_stack,
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
-@click.option('--startdate', help='Change startdate',
+@click.option('--startdate', help='Change startdate. Use format yyyy-mm-dd',
               default=None, type=str)
-@click.option('--enddate', help='Change enddate',
+@click.option('--enddate', help='Change enddate. Use format yyyy-mm-dd',
               default=None, type=str)
 @click.pass_context
-def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
-            ampli, seismic, show, outfile, envelope, refilter,
-            startdate, enddate):
+def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show,
+            outfile, envelope, refilter, startdate, enddate):
     """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
     if ctx.obj['MSNOISE_custom']:
         from ccftime import main
     else:
         from ..plots.ccftime import main
-    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
-         envelope, refilter, startdate, enddate)
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show,
+         outfile, envelope, refilter, startdate, enddate)
 
 
 @click.command()
