@@ -1198,11 +1198,11 @@ def build_movstack_datelist(session, startdate=None, enddate=None):
     :param enddate: a enddate for which method should create a date array.
         Defaults to None, in this case method gets the value from database.
 
-
-    :rtype: tuple
-    :returns: (start, end, datelist)
+    :rtype: (datetime.date, datetime.date, list of datetime.date)
+    :returns: Returns startdate, enddate and a list of all days between those.
     """
-    begin = startdate if startdate is not None else get_config(session, "startdate")
+    begin = startdate if startdate is not None else get_config(session,
+                                                               "startdate")
     end = enddate if enddate is not None else get_config(session, "enddate")
     if begin[0] == '-':
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
