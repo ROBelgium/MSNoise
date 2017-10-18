@@ -65,12 +65,12 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     stream[i] = check_and_phase_shift(trace)
 
                 logging.debug("Checking Gaps")
-                if len(get_gaps(stream)) > 0:
+                if len(getGaps(stream)) > 0:
                     max_gap = 10
                     only_too_long = False
-                    while get_gaps(stream) and not only_too_long:
+                    while getGaps(stream) and not only_too_long:
                         too_long = 0
-                        gaps = get_gaps(stream)
+                        gaps = getGaps(stream)
                         for gap in gaps:
                             if int(gap[-1]) <= max_gap:
                                 stream[gap[0]] = stream[gap[0]].__add__(stream[gap[1]], method=1,

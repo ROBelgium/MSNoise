@@ -97,7 +97,7 @@ class MSNoiseTests(unittest.TestCase):
     def test_006_get_stations(self):
         from ..api import connect, get_stations
         db = connect()
-        stations = get_stations(db)
+        stations = get_stations(db).all()
         self.failUnlessEqual(len(stations), 3)
         db.close()
 
