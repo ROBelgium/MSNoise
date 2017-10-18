@@ -153,7 +153,7 @@ def get_config(session, name=None, isbool=False, plugin=None):
     :returns: the value for `name` or a dict of all config values
     """
     if plugin:
-        table = plugin_tables["%sConfig" % plugin]
+        table = plugin_tables["%sConfig"%plugin]
     else:
         table = Config
     if name:
@@ -200,8 +200,9 @@ def update_config(session, name, value):
     session.commit()
     return
 
-
 # FILTERS PART
+
+
 def get_filters(session, all=False):
     """Get Filters from the database.
 
@@ -220,7 +221,7 @@ def get_filters(session, all=False):
     if all:
         filters = session.query(Filter).all()
     else:
-        filters = session.query(Filter).filter(Filter.used is True).all()
+        filters = session.query(Filter).filter(Filter.used == True).all()
     return filters
 
 
@@ -279,7 +280,6 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
     session.commit()
     return
 
-
 # NETWORK AND STATION
 
 
@@ -299,7 +299,7 @@ def get_networks(session, all=False):
     if all:
         networks = session.query(Station).group_by(Station.net).all()
     else:
-        networks = session.query(Station).filter(Station.used is True). \
+        networks = session.query(Station).filter(Station.used == True).\
             group_by(Station.net)
     return [net.net for net in networks]
 
@@ -322,16 +322,16 @@ def get_stations(session, all=False, net=None):
     q = session.query(Station)
     if all:
         if net is not None:
-            stations = q.filter(Station.net == net).order_by(Station.net). \
-                order_by(Station.sta).all()
+            stations = q.filter(Station.net == net).order_by(Station.net).\
+                order_by(Station.sta)
         else:
             stations = q.order_by(Station.net).order_by(Station.sta).all()
     else:
-        stations = q.filter(Station.used is True).order_by(Station.net). \
-            order_by(Station.sta).all()
+        stations = q.filter(Station.used == True).order_by(Station.net).\
+            order_by(Station.sta)
         if net is not None:
-            stations = stations.filter(Station.net == net). \
-                order_by(Station.net).order_by(Station.sta).all()
+            stations = stations.filter(Station.net == net).\
+                order_by(Station.net).order_by(Station.sta)
     return stations
 
 
@@ -350,12 +350,12 @@ def get_station(session, net, sta):
     :returns: a :class:`~msnoise.msnoise_table_def.Station` Object
 
     """
-    station = session.query(Station).filter(Station.net == net). \
+    station = session.query(Station).filter(Station.net == net).\
         filter(Station.sta == sta).first()
     return station
 
 
-def update_station(session, net, sta, x, y, altitude, coordinates='UTM',
+def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
                    instrument='N/A', used=1):
     """Updates or Insert a new Station in the database.
 
@@ -368,10 +368,10 @@ def update_station(session, net, sta, x, y, altitude, coordinates='UTM',
     :param net: The network code of the Station
     :type sta: str
     :param sta: The station code
-    :type x: float
-    :param x: The x coordinate of the station
-    :type y: float
-    :param y: The y coordinate of the station
+    :type X: float
+    :param X: The X coordinate of the station
+    :type Y: float
+    :param Y: The Y coordinate of the station
     :type altitude: float
     :param altitude: The altitude of the station
     :type coordinates: str
@@ -382,15 +382,15 @@ def update_station(session, net, sta, x, y, altitude, coordinates='UTM',
     :type used: bool
     :param used: Whether this station must be used in the computations.
     """
-    station = session.query(Station).filter(Station.net == net). \
+    station = session.query(Station).filter(Station.net == net).\
         filter(Station.sta == sta).first()
     if station is None:
-        station = Station(net, sta, x, y, altitude, coordinates, instrument,
+        station = Station(net, sta, X, Y, altitude, coordinates, instrument,
                           used)
         session.add(station)
     else:
-        station.X = x
-        station.Y = y
+        station.X = X
+        station.Y = Y
         station.altitude = altitude
         station.coordinates = coordinates
         station.instrument = instrument
@@ -443,7 +443,7 @@ def get_interstation_distance(station1, station2, coordinates="DEG"):
 
     if coordinates == "DEG":
         dist, azim, bazim = gps2dist_azimuth(station1.Y, station1.X,
-                                             station2.Y, station2.X)
+                                            station2.Y, station2.X)
         return dist / 1.e3
     else:
         dist = np.hypot(float(station1.X - station2.X),
@@ -485,12 +485,12 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
     :param samplerate: Sample rate of the data in the file (in Hz)
     """
 
-    data = session.query(DataAvailability). \
+    data = session.query(DataAvailability).\
         with_hint(DataAvailability, 'USE INDEX (da_index)'). \
         filter(DataAvailability.path == path). \
-        filter(DataAvailability.file == file). \
-        filter(DataAvailability.net == net). \
-        filter(DataAvailability.sta == sta). \
+        filter(DataAvailability.file == file).\
+        filter(DataAvailability.net == net).\
+        filter(DataAvailability.sta == sta).\
         filter(DataAvailability.comp == comp).first()
     if data is None:
         flag = "N"
@@ -535,8 +535,8 @@ def get_new_files(session):
     :returns: list of :class:`~msnoise.msnoise_table_def.DataAvailability`
     """
 
-    files = session.query(DataAvailability). \
-        filter(DataAvailability.flag != 'A'). \
+    files = session.query(DataAvailability).\
+        filter(DataAvailability.flag != 'A').\
         order_by(DataAvailability.starttime).all()
     return files
 
@@ -564,19 +564,19 @@ def get_data_availability(session, net=None, sta=None, comp=None,
     """
 
     if not starttime:
-        data = session.query(DataAvailability). \
-            filter(DataAvailability.net == net). \
-            filter(DataAvailability.sta == sta). \
+        data = session.query(DataAvailability).\
+            filter(DataAvailability.net == net).\
+            filter(DataAvailability.sta == sta).\
             filter(DataAvailability.comp == comp).all()
     elif not net:
-        data = session.query(DataAvailability). \
-            filter(DataAvailability.starttime <= endtime). \
+        data = session.query(DataAvailability).\
+            filter(DataAvailability.starttime <= endtime).\
             filter(DataAvailability.endtime >= starttime).all()
     else:
-        data = session.query(DataAvailability). \
-            filter(DataAvailability.net == net). \
-            filter(DataAvailability.sta == sta). \
-            filter(func.DATE(DataAvailability.starttime) <= endtime.date()). \
+        data = session.query(DataAvailability).\
+            filter(DataAvailability.net == net).\
+            filter(DataAvailability.sta == sta).\
+            filter(func.DATE(DataAvailability.starttime) <= endtime.date()).\
             filter(func.DATE(DataAvailability.endtime) >= starttime.date()).all()
     return data
 
@@ -598,9 +598,9 @@ def mark_data_availability(session, net, sta, flag):
     :param flag: Status of the DataAvailability object: New, Modified or
         Archive. Values accepted are {'N', 'M', 'A'}
     """
-    logging.debug("Updating: %s %s to flag=%s" % (net, sta, flag))
+    logging.debug("Updating: %s %s to flag=%s" %(net, sta, flag))
     da = DataAvailability.__table__
-    stmt = da.update().where(da.c.sta == sta).where(da.c.net == net). \
+    stmt = da.update().where(da.c.sta==sta).where(da.c.net==net).\
         values(flag=flag)
     session.execute(stmt)
     session.commit()
@@ -620,11 +620,13 @@ def count_data_availability_flags(session):
     """
 
     return session.query(func.count(DataAvailability.flag),
-                         DataAvailability.flag). \
+                         DataAvailability.flag).\
         group_by(DataAvailability.flag).all()
 
 
 # Jobs
+
+import time
 def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     """
     Updates or Inserts a new :class:`~msnoise.msnoise_table_def.Job` in the
@@ -648,10 +650,10 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     :rtype: :class:`~msnoise.msnoise_table_def.Job` or None
     :returns: If returnjob is True, returns the modified/inserted Job.
     """
-    job = session.query(Job) \
-        .with_hint(Job, 'USE INDEX (job_index)') \
-        .filter(Job.day == day) \
-        .filter(Job.pair == pair) \
+    job = session.query(Job)\
+        .with_hint(Job, 'USE INDEX (job_index)')\
+        .filter(Job.day == day)\
+        .filter(Job.pair == pair)\
         .filter(Job.jobtype == jobtype).first()
     if job is None:
         job = Job(day, pair, jobtype, 'T')
@@ -697,7 +699,7 @@ def is_next_job(session, flag='T', jobtype='CC'):
     :returns: True if at least one :class:`~msnoise.msnoise_table_def.Job`
         matches, False otherwise.
     """
-    job = session.query(Job).filter(Job.jobtype == jobtype). \
+    job = session.query(Job).filter(Job.jobtype == jobtype).\
         filter(Job.flag == flag).first()
     if job is None:
         return False
@@ -723,9 +725,9 @@ def get_next_job(session, flag='T', jobtype='CC'):
     :rtype: list
     :returns: list of :class:`~msnoise.msnoise_table_def.Job`
     """
-    day = session.query(Job).filter(Job.jobtype == jobtype). \
+    day = session.query(Job).filter(Job.jobtype == jobtype).\
         filter(Job.flag == flag).order_by(Job.day).first().day
-    jobs = session.query(Job).filter(Job.jobtype == jobtype). \
+    jobs = session.query(Job).filter(Job.jobtype == jobtype).\
         filter(Job.flag == flag).filter(Job.day == day)
     tmp = jobs.all()
     jobs.update({Job.flag: 'I'})
@@ -752,7 +754,7 @@ def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
     :rtype: bool
     :returns: True if at least one Job matches, False otherwise.
     """
-    q = session.query(Job.ref).filter(Job.flag == flag). \
+    q = session.query(Job.ref).filter(Job.flag == flag).\
         filter(Job.jobtype == jobtype)
     if ref:
         job = q.filter(Job.pair == ref).filter(Job.day == 'REF').count()
@@ -785,15 +787,15 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
         Days of the next DTT jobs -
         Job IDs (for later being able to update their flag).
     """
-    pair = session.query(Job).filter(Job.flag == flag). \
+    pair = session.query(Job).filter(Job.flag == flag).\
         filter(Job.jobtype == jobtype).filter(Job.day != 'REF').first().pair
-    jobs = session.query(Job.ref, Job.day).filter(Job.flag == flag). \
-        filter(Job.jobtype == jobtype).filter(Job.day != 'REF'). \
+    jobs = session.query(Job.ref, Job.day).filter(Job.flag == flag).\
+        filter(Job.jobtype == jobtype).filter(Job.day != 'REF').\
         filter(Job.pair == pair)
     tmp = list(jobs)
     jobs.update({Job.flag: 'I'}, synchronize_session=False)
     session.commit()
-    refs, days = zip(*[[job.ref, job.day] for job in tmp])
+    refs, days = zip(*[[job.ref,job.day] for job in tmp])
     return pair, days, refs
 
 
@@ -833,7 +835,7 @@ def reset_dtt_jobs(session, pair):
     :param pair: The pair to update
     """
 
-    jobs = session.query(Job).filter(Job.pair == pair). \
+    jobs = session.query(Job).filter(Job.pair == pair).\
         filter(Job.jobtype == "DTT")
     jobs.update({Job.flag: 'T'})
     session.commit()
@@ -854,12 +856,12 @@ def get_job_types(session, jobtype='CC'):
     :returns: list of [count, flag] pairs
     """
 
-    return session.query(func.count(Job.flag), Job.flag). \
+    return session.query(func.count(Job.flag), Job.flag).\
         filter(Job.jobtype == jobtype).group_by(Job.flag).all()
 
 
 def get_jobs_by_lastmod(session, jobtype='CC', lastmod=datetime.datetime.now()):
-    jobs = session.query(Job).filter(Job.jobtype == jobtype). \
+    jobs = session.query(Job).filter(Job.jobtype == jobtype).\
         filter(Job.lastmod >= lastmod).all()
     return jobs
 
@@ -878,13 +880,13 @@ def export_allcorr(session, ccfid, data):
 
     df = pd.DataFrame().from_dict(data).T
     df.columns = get_t_axis(session)
-    df.to_hdf(os.path.join(path, date + '.h5'), 'data')
+    df.to_hdf(os.path.join(path, date+'.h5'), 'data')
     del df
     return
 
 
 def add_corr(session, station1, station2, filterid, date, time, duration,
-             components, cf, sampling_rate, day=False, ncorr=0):
+             components, CF, sampling_rate, day=False, ncorr=0):
     """
     Adds a CCF to the data archive on disk.
     
@@ -931,10 +933,10 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
                             "%s_%s" % (station1, station2), str(date))
         pair = "%s:%s" % (station1, station2)
         if mseed:
-            export_mseed(session, path, pair, components, filterid, cf,
+            export_mseed(session, path, pair, components, filterid, CF,
                          ncorr)
         if sac:
-            export_sac(session, path, pair, components, filterid, cf,
+            export_sac(session, path, pair, components, filterid, CF,
                        ncorr)
 
     else:
@@ -945,12 +947,12 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
             os.makedirs(path)
 
         t = Trace()
-        t.data = cf
+        t.data = CF
         t.stats.sampling_rate = sampling_rate
         t.stats.starttime = -float(get_config(session, 'maxlag'))
         t.stats.components = components
         # if ncorr != 0:
-        # t.stats.location = "%02i"%ncorr
+            # t.stats.location = "%02i"%ncorr
         st = Stream(traces=[t, ])
         st.write(os.path.join(path, file), format='mseed')
         del t, st
@@ -1043,8 +1045,9 @@ def stack(session, data):
     return corr
 
 
+
 def get_results(session, station1, station2, filterid, components, dates,
-                mov_stack=1, format="stack"):
+                mov_stack = 1, format="stack"):
     export_format = get_config(session, 'export_format')
     stack_data = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
     i = 0
@@ -1081,7 +1084,8 @@ def get_results(session, station1, station2, filterid, components, dates,
 
 
 def get_results_all(session, station1, station2, filterid, components, dates,
-                    mov_stack=1, format="stack"):
+                mov_stack = 1, format="stack"):
+
     output_folder = get_config(session, 'output_folder')
     path = os.path.join(output_folder, "%02i" % int(filterid),
                         station1, station2, components)
@@ -1096,8 +1100,9 @@ def get_results_all(session, station1, station2, filterid, components, dates,
     del results
     return result
 
-
 # Some helper functions
+
+
 def get_maxlag_samples(session):
     """
     Returns the length of the CC functions. Gets the maxlag and sampling rate
@@ -1114,7 +1119,7 @@ def get_maxlag_samples(session):
 
     maxlag = float(get_config(session, 'maxlag'))
     cc_sampling_rate = float(get_config(session, 'cc_sampling_rate'))
-    return int(2 * maxlag * cc_sampling_rate) + 1
+    return int(2*maxlag*cc_sampling_rate)+1
 
 
 def get_t_axis(session):
@@ -1150,7 +1155,7 @@ def get_components_to_compute(session, plugin=None):
     components_to_compute = get_config(session, "components_to_compute",
                                        plugin=plugin)
     if components_to_compute.count(",") == 0:
-        components_to_compute = [components_to_compute, ]
+        components_to_compute = [components_to_compute,]
     else:
         components_to_compute = components_to_compute.split(",")
     return components_to_compute
@@ -1198,11 +1203,11 @@ def build_movstack_datelist(session, startdate=None, enddate=None):
     :param enddate: a enddate for which method should create a date array.
         Defaults to None, in this case method gets the value from database.
 
-
-    :rtype: tuple
-    :returns: (start, end, datelist)
+    :rtype: (datetime.date, datetime.date, list of datetime.date)
+    :returns: Returns startdate, enddate and a list of all days between those.
     """
-    begin = startdate if startdate is not None else get_config(session, "startdate")
+    begin = startdate if startdate is not None else get_config(session,
+                                                               "startdate")
     end = enddate if enddate is not None else get_config(session, "enddate")
     if begin[0] == '-':
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
@@ -1246,24 +1251,23 @@ def updated_days_for_dates(session, date1, date2, pair, jobtype='CC',
     """
     lastmod = datetime.datetime.now() - interval
     if pair == '%':
-        days = session.query(Job).filter(Job.day >= date1). \
-            filter(Job.day <= date2).filter(Job.jobtype == jobtype). \
-            filter(Job.lastmod >= lastmod).group_by(Job.day). \
+        days = session.query(Job).filter(Job.day >= date1).\
+            filter(Job.day <= date2).filter(Job.jobtype == jobtype).\
+            filter(Job.lastmod >= lastmod).group_by(Job.day).\
             order_by(Job.day).all()
     else:
-        days = session.query(Job).filter(Job.pair == pair). \
-            filter(Job.day >= date1).filter(Job.day <= date2). \
-            filter(Job.jobtype == jobtype).filter(Job.lastmod >= lastmod). \
+        days = session.query(Job).filter(Job.pair == pair).\
+            filter(Job.day >= date1).filter(Job.day <= date2).\
+            filter(Job.jobtype == jobtype).filter(Job.lastmod >= lastmod).\
             group_by(Job.day).order_by(Job.day).all()
     logging.debug('Found %03i updated days' % len(days))
     if returndays and len(days) != 0:
-        return [datetime.datetime.strptime(day.day, '%Y-%m-%d').date() for day
-                in days]  ## RETURN DATE LIST !!!
+        return [datetime.datetime.strptime(day.day,'%Y-%m-%d').date() for day
+                in days] ## RETURN DATE LIST !!!
     elif returndays and len(days) == 0:
         return []
     else:
         return True
-
 
 # MISC
 
@@ -1318,42 +1322,42 @@ def nextpow2(x):
 def check_and_phase_shift(trace):
     # print trace
     taper_length = 20.0
-    if trace.stats.npts < 4 * taper_length * trace.stats.sampling_rate:
+    if trace.stats.npts < 4 * taper_length*trace.stats.sampling_rate:
         trace.data = np.zeros(trace.stats.npts)
         return trace
 
-    dt = np.mod(trace.stats.starttime.datetime.microsecond * 1.0e-6,
+    dt = np.mod(trace.stats.starttime.datetime.microsecond*1.0e-6,
                 trace.stats.delta)
     if (trace.stats.delta - dt) <= np.finfo(float).eps:
         dt = 0.
     if dt != 0.:
         if dt <= (trace.stats.delta / 2.):
             dt = -dt
-        #            direction = "left"
+#            direction = "left"
         else:
             dt = (trace.stats.delta - dt)
-        #            direction = "right"
-        logging.debug("correcting time by %.6fs" % dt)
+#            direction = "right"
+        logging.debug("correcting time by %.6fs"%dt)
         trace.detrend(type="demean")
         trace.detrend(type="simple")
         trace.taper(max_percentage=None, max_length=1.0)
 
         n = next_fast_len(int(trace.stats.npts))
-        fftdata = scipy.fftpack.fft(trace.data, n=n)
+        FFTdata = scipy.fftpack.fft(trace.data, n=n)
         fftfreq = scipy.fftpack.fftfreq(n, d=trace.stats.delta)
-        fftdata = fftdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
-        fftdata = fftdata.astype(np.complex64)
-        scipy.fftpack.ifft(fftdata, n=n, overwrite_x=True)
-        trace.data = np.real(fftdata[:len(trace.data)]).astype(np.float)
+        FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
+        FFTdata = FFTdata.astype(np.complex64)
+        scipy.fftpack.ifft(FFTdata, n=n, overwrite_x=True)
+        trace.data = np.real(FFTdata[:len(trace.data)]).astype(np.float)
         trace.stats.starttime += dt
-        del fftdata, fftfreq
+        del FFTdata, fftfreq
         clean_scipy_cache()
         return trace
     else:
         return trace
 
 
-def get_gaps(stream, min_gap=None, max_gap=None):
+def getGaps(stream, min_gap=None, max_gap=None):
     # Create shallow copy of the traces to be able to sort them later on.
     copied_traces = copy.copy(stream.traces)
     stream.sort()
@@ -1374,7 +1378,7 @@ def get_gaps(stream, min_gap=None, max_gap=None):
         # Check that any overlap is not larger than the trace coverage
         if delta < 0:
             temp = stream.traces[_i + 1].stats['endtime'].timestamp - \
-                   etime.timestamp
+                etime.timestamp
             if (delta * -1) > temp:
                 delta = -1 * temp
         # Check gap/overlap criteria
@@ -1391,10 +1395,10 @@ def get_gaps(stream, min_gap=None, max_gap=None):
             nsamples -= 1
         else:
             nsamples += 1
-        gap_list.append([_i, _i + 1,
-                         stats['network'], stats['station'],
-                         stats['location'], stats['channel'],
-                         stime, etime, delta, nsamples])
+        gap_list.append([_i, _i+1,
+                        stats['network'], stats['station'],
+                        stats['location'], stats['channel'],
+                        stime, etime, delta, nsamples])
     # Set the original traces to not alter the stream object.
     stream.traces = copied_traces
     del copied_traces
@@ -1559,7 +1563,7 @@ def preload_instrument_responses(session):
                             seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
                                                        cha.location_code,
                                                        cha.code)
-                            resp = inv.get_response(seed_id, cha.start_date + 10)
+                            resp = inv.get_response(seed_id, cha.start_date+10)
                             polezerostage = resp.get_paz()
                             totalsensitivity = resp.instrument_sensitivity
                             pzdict = {}
@@ -1580,7 +1584,7 @@ def preload_instrument_responses(session):
                 p = Parser(file)
                 for channel in p.get_inventory()["channels"]:
                     resp = p.get_paz(channel["channel_id"],
-                                     channel["start_date"] + 10)
+                                     channel["start_date"]+10)
                     channels.append([channel["channel_id"],
                                      channel["start_date"],
                                      channel["end_date"] or UTCDateTime(),
@@ -1591,8 +1595,8 @@ def preload_instrument_responses(session):
                 pass
     channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
                                                "end_date", "paz", "latitude",
-                                               "longitude"], )
-    return (channels)
+                                               "longitude"],)
+    return(channels)
 
 
 if __name__ == "__main__":
@@ -1603,7 +1607,7 @@ if __name__ == "__main__":
     print(get_networks(s))
 
     for station in get_stations(s, False, net='BE'):
-        print(station.net, station.sta)
+        print( station.net, station.sta)
 
     print(get_config(s))
     print(get_config(s, 'data_folder'))
