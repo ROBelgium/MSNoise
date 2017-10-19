@@ -3,6 +3,7 @@ import datetime
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime,\
     text, TIMESTAMP, Enum, REAL, UniqueConstraint, Index
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import validates
 
 Base = declarative_base()
 
@@ -161,6 +162,16 @@ class Config(Base):
         """"""
         self.name = name
         self.value = value
+
+    @validates('value')
+    def strip_value(self, key, value):
+        """
+        Strips the input value out of all trailing and leading whitespaces.
+        It also removes all spaces in the string.
+        """
+        value = value.strip() if value is not None else None
+        value = value.replace(" ", "") if value is not None else None
+        return value
 
 ########################################################################
 
