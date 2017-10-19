@@ -163,12 +163,20 @@ class Config(Base):
         self.name = name
         self.value = value
 
-    @validates('value')
+    @validates("value")
     def strip_value(self, key, value):
         """
         Strips the input value out of all trailing and leading whitespaces.
         It also removes all spaces in the string.
         """
+        fields_to_skip = [
+            "data_folder",
+            "output_folder",
+            "response_path"
+        ]
+        if self.name in fields_to_skip:
+            return value
+
         value = value.strip() if value is not None else None
         value = value.replace(" ", "") if value is not None else None
         return value
