@@ -1,4 +1,4 @@
-from unittest import TestCase, TestSuite, TextTestRunner
+from unittest import makeSuite, TestCase, TestSuite, TextTestRunner
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import date
@@ -73,12 +73,8 @@ class TestGetConfig(TestCase):
 
 def suite():
     testsuite = TestSuite()
-    testsuite.addTest(
-        TestBuildMovstackDatelist('test_custom_dates_proper_strings'))
-    testsuite.addTest(
-        TestBuildMovstackDatelist('test_custom_dates_improper_strings'))
-    testsuite.addTest(TestBuildMovstackDatelist('test_dates_from_db'))
-    testsuite.addTest(TestGetConfig('test_get_config'))
+    testsuite.addTest(makeSuite(TestBuildMovstackDatelist))
+    testsuite.addTest(makeSuite(TestGetConfig))
 
     return testsuite
 
