@@ -174,10 +174,11 @@ class Config(Base):
             "output_folder",
             "response_path"
         ]
+
+        value = value.strip() if value is not None else None
         if self.name in fields_to_skip:
             return value
 
-        value = value.strip() if value is not None else None
         value = value.replace(" ", "") if value is not None else None
         return value
 
