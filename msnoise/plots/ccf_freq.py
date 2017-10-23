@@ -86,7 +86,10 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
             print("output to:", outfile)
             fig.savefig(outfile)
         if show:
-            plt.show()
+            fig.show()
+        else:
+            plt.close(fig)
+
 
 def prepare_abs_postitive_fft(line, sampling_rate):
     """
