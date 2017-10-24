@@ -5,12 +5,16 @@ TODO FILL THIS
 """
 # plot ccf_freq
 
+import datetime
+
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.widgets import Cursor
-
 from obspy.signal.filter import bandpass
-from ..api import *
+
+from msnoise.api import build_movstack_datelist, connect, get_config, \
+    get_filters, get_results
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
@@ -96,19 +100,20 @@ def prepare_abs_postitive_fft(line, sampling_rate):
     Method that returns a positive part of FFT of provided signal along with
     a corresponding frequency vector.
 
-    :type line: todo
+    :type line: numpy.ndarray
     :param line: Signal to calculate fft.
     :type sampling_rate: float
     :param sampling_rate: Sampling rate of provided signal
 
-    :rtype: tuple #TODO
-    :return: TODO
+    :rtype: tuple(numpy.ndarray, numpy.ndarray)
+    :return: Tuple of two arrays. One contains frequency vector for positive
+    part of FFT, second contains positive and absolute FFT of input array.
     """
     val = np.fft.fft(line)
     val = np.abs(val)
 
-    freq = np.fft.fftfreq(len(line),(1/sampling_rate))
-    freq = [x for x in freq if x >=0]
+    freq = np.fft.fftfreq(len(line), (1/sampling_rate))
+    freq = [x for x in freq if x >= 0]
 
     val = val[:len(freq)]
 
