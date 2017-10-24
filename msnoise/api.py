@@ -1056,9 +1056,9 @@ def get_results(session, station1, station2, filterid, components, dates,
                         "%s_%s" % (station1, station2), "%s")
 
     if not os.path.exists(base):
-        raise NotADirectoryError('Path does not exist. Check if provided '
-                                 'station names are following NETW.STATION '
-                                 'pattern.')
+        raise NotADirectoryError('Path ' + base + ' does not exist. Check if '
+                                 'provided station names are following '
+                                 'NETW.STATION pattern.')
 
     if export_format == "BOTH":
         base += ".MSEED"
