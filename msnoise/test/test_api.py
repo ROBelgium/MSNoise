@@ -70,6 +70,10 @@ class TestGetConfig(TestCase):
     def test_get_config(self):
         self.fail()
 
+class TestGetResults(TestCase):
+    def test_get_results_fail_non_esisting_path(self):
+        self.fail()
+
 
 def suite():
     testsuite = TestSuite()
