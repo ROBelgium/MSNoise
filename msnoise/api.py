@@ -1054,6 +1054,12 @@ def get_results(session, station1, station2, filterid, components, dates,
     base = os.path.join("STACKS", "%02i" % filterid,
                         "%03i_DAYS" % mov_stack, components,
                         "%s_%s" % (station1, station2), "%s")
+
+    if not os.path.exists(base):
+        raise NotADirectoryError('Path ' + base + ' does not exist. Check if '
+                                 'provided station names are following '
+                                 'NETW.STATION pattern.')
+
     if export_format == "BOTH":
         base += ".MSEED"
         export_format = "MSEED"
