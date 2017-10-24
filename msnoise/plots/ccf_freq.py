@@ -1,7 +1,18 @@
 """
+This plot shows the cross-correlation functions (CCF) vs frequency. The
+parameters allow to plot the daily or the mov-stacked CCF. Filters and
+components are selectable too. The ``--ampli`` argument allows to increase the
+vertical scale of the CCFs. Passing ``--refilter`` allows to bandpass filter
+CCFs before plotting.
 
-TODO FILL THIS
+.. include:: clickhelp/msnoise-plot-ccf_freq.rst
 
+
+Example:
+
+``msnoise plot ccftime ID.KWUI ID.POSI`` will plot all defaults:
+
+.. image:: .static/ccf_freq.png
 """
 # plot ccf_freq
 
