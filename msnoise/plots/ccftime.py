@@ -19,13 +19,17 @@ Example:
 """
 # plot interferogram
 
+import datetime
+
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.widgets import Cursor
-
-from obspy.signal.filter import envelope as obspy_envelope
 from obspy.signal.filter import bandpass
-from msnoise.api import *
+from obspy.signal.filter import envelope as obspy_envelope
+
+from msnoise.api import connect, get_config, get_maxlag_samples, \
+    build_movstack_datelist, get_filters, get_results
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
