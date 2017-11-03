@@ -402,9 +402,10 @@ def main():
                                                            plot=False)
                                 else:
                                     #logging.debug("Autocorr %s"%components)
-                                    tmp[i].filter("bandpass", freqmin=low,
-                                                  freqmax=high, zerophase=True)
-                                    trames2hWb[i] = scipy.fftpack.fft(tmp[i].data, nfft)
+                                    X = tmp[i].copy()
+                                    X.filter("bandpass", freqmin=low,
+                                             freqmax=high, zerophase=True)
+                                    trames2hWb[i] = scipy.fftpack.fft(X.data, nfft)
                             else:
                                 skip = True
                                 logging.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'
