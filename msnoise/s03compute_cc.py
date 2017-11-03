@@ -365,6 +365,7 @@ def main():
                         elif params.windsorizing != 0:
                             rms = tr.data.std() * params.windsorizing
                             np.clip(tr.data, -rms, rms, tr.data)  # inplace
+
                     # TODO should not hardcode 4 percent!
                     tmp.taper(0.04)
                     tmp1 = tmp.select(network=s1.net, station=s1.sta,
