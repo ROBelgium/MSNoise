@@ -1041,7 +1041,7 @@ def stack(session, data):
         logging.debug("No data to stack.")
         return []
     data = data[~np.isnan(data).any(axis=1)]
-    sanitize = True
+    sanitize = False
     if len(data) != 1 and sanitize:
         threshold = 0.99
         npts = data.shape[1]

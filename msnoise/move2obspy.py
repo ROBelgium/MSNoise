@@ -5,6 +5,7 @@ import numpy as np
 import scipy.fftpack
 import scipy.optimize
 import scipy.signal
+from scipy.stats import scoreatpercentile
 from obspy.signal.invsim import cosine_taper
 from scipy.fftpack.helper import next_fast_len
 
@@ -202,7 +203,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     return FFTRawSign
 
 
-def whiten2(fft, Nfft, low, high, porte1, porte2, psds):
+def whiten2(fft, Nfft, low, high, porte1, porte2, psds, whiten_type):
     """This function takes 1-dimensional *data* timeseries array,
     goes to frequency domain using fft, whitens the amplitude of the spectrum
     in frequency domain between *freqmin* and *freqmax*
@@ -224,26 +225,35 @@ def whiten2(fft, Nfft, low, high, porte1, porte2, psds):
     :rtype: :class:`numpy.ndarray`
     :returns: The FFT of the input trace, whitened between the frequency bounds
 """
+
     taper = np.ones(Nfft//2+1)
     taper[0:low] *= 0
     taper[low:porte1] *= np.cos(np.linspace(np.pi / 2., 0, porte1 - low))**2
     taper[porte2:high] *= np.cos(np.linspace(0., np.pi / 2., high - porte2))**2
     taper[high:] *= 0
+    taper *= taper
     for i in range(fft.shape[0]):
-        fft[i][:Nfft//2+1] /= psds[i]
-        fft[i][:Nfft//2+1] *= taper
-        # Left tapering:
-        # fft[i,0:low] *= 0
-        # fft[i,low:porte1] = np.cos(
-        #     np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2 * np.exp(
-        #     1j * np.angle(fft[i,low:porte1]))
-        # # Pass band:
-        # fft[i,porte1:porte2] = np.exp(1j * np.angle(fft[i,porte1:porte2]))
-        # # Right tapering:
-        # fft[i,porte2:high] = np.cos(
-        #     np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(
-        #     1j * np.angle(fft[i,porte2:high]))
-        # fft[i,high:Nfft + 1] *= 0
+        if whiten_type == "PSD":
+            fft[i][:Nfft//2+1] /= psds[i]
+            fft[i][:Nfft//2+1] *= taper
+            tmp = fft[i, porte1:porte2]
+            imin = scoreatpercentile(tmp, 5)
+            imax = scoreatpercentile(tmp, 95)
+            not_outliers = np.where((tmp >= imin) & (tmp <= imax))[0]
+            rms = tmp[not_outliers].std() * 1.0
+            np.clip(fft[i, porte1:porte2], -rms, rms, fft[i, porte1:porte2])  # inplace
+            fft[i, 0:low] *= 0
+            fft[i, high:] *= 0
+        else:
+            # print("Doing the classic Brutal Whiten")
+            # Left tapering:
+            fft[i,0:low] *= 0
+            fft[i,low:porte1] = np.cos(np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2 * np.exp(1j * np.angle(fft[i,low:porte1]))
+            # Pass band:
+            fft[i,porte1:porte2] = np.exp(1j * np.angle(fft[i,porte1:porte2]))
+            # Right tapering:
+            fft[i,porte2:high] = np.cos(np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(1j * np.angle(fft[i,porte2:high]))
+            fft[i,high:] *= 0
 
         # Hermitian symmetry (because the input is real)
         fft[i,-(Nfft // 2) + 1:] = np.conjugate(fft[i,1:(Nfft // 2)])[::-1]

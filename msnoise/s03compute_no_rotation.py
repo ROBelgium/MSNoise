@@ -320,7 +320,10 @@ def main():
                     not_outliers = np.where((tr.data >= imin) & (tr.data <= imax))[0]
                     rms = tr.data[not_outliers].std() * params.windsorizing
                     np.clip(tr.data, -rms, rms, tr.data)  # inplace
+            # TODO should not hardcode 4 percent!
             tmp.taper(0.04)
+
+            # TODO should not hardcode 100 taper points in spectrum
             Napod = 100
 
             data = np.asarray([tr.data for tr in tmp])
@@ -387,11 +390,9 @@ def main():
                 high = J[-1] + Napod
                 if high > nfft / 2:
                     high = int(nfft // 2)
-                # plt.imshow(data, aspect='auto', interpolation='none')
-                # plt.show()
-                ffts = scipy.fftpack.fftn(data, shape=[nfft, ], axes=[1, ])
-                whiten2(ffts, nfft, low, high, porte1, porte2, psds)  # inplace
 
+                ffts = scipy.fftpack.fftn(data, shape=[nfft, ], axes=[1, ])
+                whiten2(ffts, nfft, low, high, porte1, porte2, psds, params.whitening)  # inplace
                 energy = np.ones(ffts.shape[0])
 
                 # logging.info("Pre-whitened %i traces"%(i+1))
