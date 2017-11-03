@@ -115,11 +115,11 @@ def main(tech=None, hostname="localhost", username="msnoise",
         session.rollback()
 
     try:
-        db.execute("CREATE INDEX job_index2 ON jobs (jobtype, flag)")
-        db.commit()
+        session.execute("CREATE INDEX job_index2 ON jobs (jobtype, flag)")
+        session.commit()
     except:
         logging.info("It looks like the v1.5 'job_index2' is already in the DB")
-        db.rollback()
+        session.rollback()
 
     try:
         session.execute("CREATE INDEX da_index ON data_availability (path, file, net, sta, comp)")
