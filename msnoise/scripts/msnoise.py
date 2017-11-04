@@ -369,14 +369,17 @@ def compute_cc(ctx):
     from multiprocessing import Process
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
-    processes = []
-    for i in range(threads):
-        p = Process(target=main)
-        p.start()
-        processes.append(p)
-        time.sleep(delay)
-    for p in processes:
-        p.join()
+    if threads == 1:
+        main()
+    else:
+        processes = []
+        for i in range(threads):
+            p = Process(target=main)
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
 
 @click.command()
 @click.pass_context
@@ -386,10 +389,10 @@ def compute_cc2(ctx):
     from multiprocessing import Process
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
-    processes = []
     if threads == 1:
         main()
     else:
+        processes = []
         for i in range(threads):
             p = Process(target=main)
             p.start()
@@ -425,15 +428,17 @@ def compute_mwcs(ctx):
     from multiprocessing import Process
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
-
-    processes = []
-    for i in range(threads):
-        p = Process(target=main)
-        p.start()
-        processes.append(p)
-        time.sleep(delay)
-    for p in processes:
-        p.join()
+    if threads == 1:
+        main()
+    else:
+        processes = []
+        for i in range(threads):
+            p = Process(target=main)
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
 
 
 @click.command()
