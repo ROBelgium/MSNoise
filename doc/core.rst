@@ -31,3 +31,9 @@ WLS
 ---
 
 .. automethod:: msnoise.move2obspy.linear_regression
+
+
+Preprocessing
+--------------
+
+.. automethod:: msnoise.preprocessing.preprocess

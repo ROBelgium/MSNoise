@@ -152,6 +152,7 @@ could occur with SQLite.
     by external plugins.
 
 """
+#TODO docstring
 import sys
 import time
 
@@ -227,8 +228,7 @@ def main():
                 comps.append(comp[0])
                 comps.append(comp[1])
         comps = np.unique(comps)
-        basetime, stream = preprocess(db, stations, comps, goal_day, params,
-                                      responses)
+        stream = preprocess(db, stations, comps, goal_day, params, responses)
         if not len(stream):
             logging.info("Not enough data for this day !")
             logging.info("Marking job Done and continuing with next !")

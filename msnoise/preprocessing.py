@@ -1,9 +1,5 @@
-import calendar
-import glob
 import sys
-import time
 import traceback
-
 
 from obspy.core import UTCDateTime, Stream, read
 
@@ -16,7 +12,43 @@ from .api import *
 
 
 def preprocess(db, stations, comps, goal_day, params, responses=None):
+    """
+    Fetches data for each ``stations`` and each ``comps`` using the
+    data_availability table in the database.
 
+    To correct for instrument responses, make sure to set ``remove_response``
+    to "Y" in the config and to provide the ``responses`` DataFrame.
+
+    :Example:
+    >>> from msnoise.api import connect, get_params, preload_instrument_responses
+    >>> from msnoise.preprocessing import preprocess
+    >>> db = connect()
+    >>> params = get_params(db)
+    >>> responses = preload_instrument_responses(db)
+    >>> st = preprocess(db, ["YA.UV06","YA.UV10"], ["Z",], "2010-09-01", params, responses)
+    >>> st
+     2 Trace(s) in Stream:
+    YA.UV06.00.HHZ | 2010-09-01T00:00:00.000000Z - 2010-09-01T23:59:59.950000Z | 20.0 Hz, 1728000 samples
+    YA.UV10.00.HHZ | 2010-09-01T00:00:00.000000Z - 2010-09-01T23:59:59.950000Z | 20.0 Hz, 1728000 samples
+
+    :type db: :class:`sqlalchemy.orm.session.Session`
+    :param db: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`msnoise.api.connect`.
+    :type stations: list of str
+    :param stations: a list of station names, in the format NET.STA.
+    :type comps: list of str
+    :param comps: a list of component names, in Z,N,E,1,2.
+    :type goal_day: str
+    :param goal_day: the day of data to load, ISO 8601 format: e.g. 2016-12-31.
+    :type params: class
+    :param params: an object containing the config parameters, as obtained by
+        :func:`msnoise.api.get_params`.
+    :type responses: :class:`pandas.DataFrame`
+    :param responses: a DataFrame containing the instrument responses, as
+        obtained by :func:`msnoise.api.preload_instrument_responses`.
+    :rtype: :class:`obspy.core.stream.Stream`
+    :return: A Stream object containing all traces.
+    """
     datafiles = {}
     output = Stream()
     for station in stations:
@@ -182,4 +214,4 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                 del stream
             del files
     clean_scipy_cache()
-    return 0, output
+    return output

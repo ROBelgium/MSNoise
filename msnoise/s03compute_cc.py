@@ -155,11 +155,6 @@ could occur with SQLite.
 import sys
 import time
 
-try:
-    from scikits.samplerate import resample
-except:
-    pass
-
 from .api import *
 from .move2obspy import myCorr
 from .move2obspy import whiten
@@ -227,8 +222,7 @@ def main():
                 comps.append(comp[0])
                 comps.append(comp[1])
         comps = np.unique(comps)
-        basetime, stream = preprocess(db, stations, comps, goal_day, params,
-                                      responses)
+        stream = preprocess(db, stations, comps, goal_day, params, responses)
 
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.goal_sampling_rate
