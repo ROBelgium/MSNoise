@@ -186,30 +186,11 @@ def main():
         sys.exit()
 
     # Get Configuration
-    params = Params()
-    params.goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-    params.goal_duration = float(get_config(db, "analysis_duration"))
-    params.overlap = float(get_config(db, "overlap"))
-    params.maxlag = float(get_config(db, "maxlag"))
-    params.corr_duration = float(get_config(db, "corr_duration"))
-    params.min30 = float(get_config(db, "corr_duration")) *\
-                   params.goal_sampling_rate
-    params.windsorizing = float(get_config(db, "windsorizing"))
-    params.whitening = get_config(db, 'whitening')
-    params.resampling_method = get_config(db, "resampling_method")
-    params.preprocess_lowpass = float(get_config(db, "preprocess_lowpass"))
-    params.preprocess_highpass = float(get_config(db, "preprocess_highpass"))
-    params.keep_all = get_config(db, 'keep_all', isbool=True)
-    params.keep_days = get_config(db, 'keep_days', isbool=True)
-    params.components_to_compute = get_components_to_compute(db)
-
-    params.stack_method = get_config(db, 'stack_method')
-    params.pws_timegate = float(get_config(db, 'pws_timegate'))
-    params.pws_power = float(get_config(db, 'pws_power'))
+    params = get_params(db)
 
     logging.info("Will compute %s" % " ".join(params.components_to_compute))
 
-    if get_config(db, 'remove_response', isbool=True):
+    if params.remove_response:
         logging.debug('Pre-loading all instrument response')
         responses = preload_instrument_responses(db)
     else:

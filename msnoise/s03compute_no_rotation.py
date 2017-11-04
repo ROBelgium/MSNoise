@@ -190,32 +190,14 @@ def main():
         sys.exit()
 
     # Get Configuration
-    params = Params()
-    params.goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-    params.goal_duration = float(get_config(db, "analysis_duration"))
-    params.overlap = float(get_config(db, "overlap"))
-    params.maxlag = float(get_config(db, "maxlag"))
-    params.corr_duration = float(get_config(db, "corr_duration"))
-    params.min30 = float(get_config(db, "corr_duration")) *\
-                   params.goal_sampling_rate
-    params.windsorizing = float(get_config(db, "windsorizing"))
-    params.whitening = get_config(db, 'whitening')
-    params.resampling_method = get_config(db, "resampling_method")
-    params.preprocess_lowpass = float(get_config(db, "preprocess_lowpass"))
-    params.preprocess_highpass = float(get_config(db, "preprocess_highpass"))
-    params.keep_all = get_config(db, 'keep_all', isbool=True)
-    params.keep_days = get_config(db, 'keep_days', isbool=True)
-    params.components_to_compute = get_components_to_compute(db)
-
-    params.stack_method = get_config(db, 'stack_method')
-    params.pws_timegate = float(get_config(db, 'pws_timegate'))
-    params.pws_power = float(get_config(db, 'pws_power'))
+    params = get_params(db)
 
     logging.info("Will compute %s" % " ".join(params.components_to_compute))
 
-    if get_config(db, 'remove_response', isbool=True):
+    if params.remove_response:
         logging.debug('Pre-loading all instrument response')
         responses = preload_instrument_responses(db)
+        print(responses[responses["channel_id"]=="GR.GRA1..BHZ"])
     else:
         responses = None
     logging.info("Checking if there are jobs to do")
@@ -362,13 +344,16 @@ def main():
             thisdate = tmptime.strftime("%Y-%m-%d")
             thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
             pair_index = []
-            # TODO: with or without replacement is a matter of AC or SC!
-            for sta1, sta2 in itertools.combinations_with_replacement(names, 2):
+
+            # Different iterator func if autocorr:
+            if params.autocorr:
+                iterfunc = itertools.combinations_with_replacement
+            else:
+                iterfunc = itertools.combinations
+            for sta1, sta2 in iterfunc(names, 2):
                 n1, s1, l1, c1 = sta1
                 n2, s2, l2, c2 = sta2
                 comp = "%s%s" % (c1[-1], c2[-1])
-                # if (n1 == n2 and s1 == s2) :
-                #     continue
                 if comp in params.components_to_compute:
                     pair_index.append(
                         ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
@@ -378,8 +363,7 @@ def main():
                 filterid = filterdb.ref
                 low = float(filterdb.low)
                 high = float(filterdb.high)
-                # rms_threshold = filterdb.rms_threshold
-                # fffff = scipy.fftpack.fftfreq(nfft, d=dt)
+
                 freqVec = scipy.fftpack.fftfreq(nfft, d=dt)[:nfft // 2]
                 J = np.where((freqVec >= low) & (freqVec <= high))[0]
                 low = J[0] - Napod
@@ -392,6 +376,7 @@ def main():
                     high = int(nfft // 2)
 
                 ffts = scipy.fftpack.fftn(data, shape=[nfft, ], axes=[1, ])
+                # TODO: AC will require a more clever handling, no whiten or else.
                 whiten2(ffts, nfft, low, high, porte1, porte2, psds, params.whitening)  # inplace
                 energy = np.ones(ffts.shape[0])
 

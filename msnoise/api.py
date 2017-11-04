@@ -200,6 +200,37 @@ def update_config(session, name, value):
     session.commit()
     return
 
+
+def get_params(session):
+    # TODO: this could be populated automatically from defauts iff defaults would mention types
+    class Params:
+        pass
+    s = session
+    params = Params()
+    params.goal_sampling_rate = float(get_config(s, "cc_sampling_rate"))
+    params.goal_duration = float(get_config(s, "analysis_duration"))
+    params.overlap = float(get_config(s, "overlap"))
+    params.maxlag = float(get_config(s, "maxlag"))
+    params.corr_duration = float(get_config(s, "corr_duration"))
+    params.min30 = float(get_config(s, "corr_duration")) * \
+                   params.goal_sampling_rate
+    params.windsorizing = float(get_config(s, "windsorizing"))
+    params.whitening = get_config(s, 'whitening')
+    params.resampling_method = get_config(s, "resampling_method")
+    params.remove_response = get_config(s, 'remove_response', isbool=True)
+    params.response_prefilt = eval(get_config(s, 'response_prefilt'))
+    params.preprocess_lowpass = float(get_config(s, "preprocess_lowpass"))
+    params.preprocess_highpass = float(get_config(s, "preprocess_highpass"))
+    params.keep_all = get_config(s, 'keep_all', isbool=True)
+    params.keep_days = get_config(s, 'keep_days', isbool=True)
+    params.autocorr = get_config(s, "autocorr", isbool=True)
+    params.components_to_compute = get_components_to_compute(s)
+
+    params.stack_method = get_config(s, 'stack_method')
+    params.pws_timegate = float(get_config(s, 'pws_timegate'))
+    params.pws_power = float(get_config(s, 'pws_power'))
+    return params
+
 # FILTERS PART
 
 

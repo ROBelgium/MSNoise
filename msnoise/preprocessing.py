@@ -154,15 +154,14 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
 
                         trace.stats.sampling_rate = params.goal_sampling_rate
 
-                if get_config(db, 'remove_response', isbool=True):
+                if params.remove_response:
                     logging.debug('%s Removing instrument response'%stream[0].id)
-                    response_prefilt = eval(get_config(db, 'response_prefilt'))
 
                     response = responses[responses["channel_id"] == stream[0].id]
                     if len(response) > 1:
-                        response = response[response["start_date"]<UTCDateTime(gd)]
+                        response = response[response["start_date"] <= UTCDateTime(gd)]
                     if len(response) > 1:
-                        response = response[response["end_date"]>UTCDateTime(gd)]
+                        response = response[response["end_date"] >= UTCDateTime(gd)]
                     elif len(response) == 0:
                         logging.info("No instrument response information "
                                      "for %s, skipping" % stream[0].id)
@@ -175,7 +174,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         continue
                     stream.simulate(paz_remove=datalesspz,
                                     remove_sensitivity=True,
-                                    pre_filt=response_prefilt,
+                                    pre_filt=params.response_prefilt,
                                     paz_simulate=None, )
                 for tr in stream:
                     tr.data = tr.data.astype(np.float32)
