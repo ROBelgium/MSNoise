@@ -192,7 +192,7 @@ def main(init=False, threads=1):
                 'NET', sta.net).replace('STA', sta.sta))
                 folders_to_glob.append(tmp)
     folders_to_glob = np.unique(folders_to_glob)
-    logging.debug("Folders to glob: %s" % ",".join(folders_to_glob))
+    # logging.debug("Folders to glob: %s" % ",".join(folders_to_glob))
     clients = []
     mintime = UTCDateTime() + (86400 * float(mtime))
     for fi in sorted(folders_to_glob):

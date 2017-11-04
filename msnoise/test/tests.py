@@ -363,6 +363,25 @@ class MSNoiseTests(unittest.TestCase):
         from ..s03compute_no_rotation import main
         main()
 
+    # PLOTS
+
+    def test_100_plot_cctfime(self):
+        from ..api import connect, get_station_pairs, get_filters
+        from ..plots.ccftime import main
+        db = connect()
+        for sta1, sta2 in get_station_pairs(db):
+            sta1 = "%s.%s" % (sta1.net, sta1.sta)
+            sta2 = "%s.%s" % (sta2.net, sta2.sta)
+            for filter in get_filters(db):
+                main(sta1, sta2, filter.ref, "ZZ",  1, show=False,
+                     outfile="?.png")
+                fn = 'ccftime %s-%s-f%i-m%i.png' % \
+                     ("%s-%s" % (sta1.replace(".", "_"),
+                                 sta2.replace(".", "_")),
+                      "ZZ", filter.ref, 1)
+                self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
+
+
     def test_099_S01installer(self):
         if "TRAVIS" not in os.environ:
             print("Seems to be running on local machine, skipping MySQL test")
