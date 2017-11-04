@@ -167,10 +167,6 @@ from .move2obspy import whiten
 from .preprocessing import preprocess
 
 
-class Params():
-    pass
-
-
 def main():
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s [%(levelname)s] %(message)s',
@@ -252,18 +248,18 @@ def main():
             s2 = get_station(db, station2.split('.')[0], station2.split('.')[1])
 
             if s1.X and params.components_to_compute != ["ZZ", ]:
-                X0, Y0, c0 = (s1.X, s1.Y, s1.coordinates)
-                X1, Y1, c1 = (s2.X, s2.Y, s1.coordinates)
+                x0, y0, c0 = (s1.X, s1.Y, s1.coordinates)
+                x1, y1, c1 = (s2.X, s2.Y, s1.coordinates)
 
                 if c0 == c1:
                     coordinates = c0
                 else:
                     coordinates = 'MIX'
 
-                cplAz = azimuth(coordinates, X0, Y0, X1, Y1)
-                logging.info("Azimuth=%.1f"%cplAz)
+                cpl_az = azimuth(coordinates, x0, y0, x1, y1)
+                logging.info("Azimuth=%.1f"%cpl_az)
             else:
-                cplAz = 0.
+                cpl_az = 0.
 
             for components in params.components_to_compute:
                 logging.debug("Processing {!s}".format(components))
@@ -289,7 +285,7 @@ def main():
                         if len(t1_novert):
                             # Make these streams contain the same gaps
                             t1_novert = make_same_length(t1_novert)
-                            t1 = t1_novert.rotate("NE->RT", cplAz).\
+                            t1 = t1_novert.rotate("NE->RT", cpl_az).\
                                 select(component=components[0])
                         else:
                             t1 = t1_novert
@@ -303,7 +299,7 @@ def main():
                         if len(t2_novert):
                             # Make these streams contain the same gaps
                             t2_novert = make_same_length(t2_novert)
-                            t2 = t2_novert.rotate("NE->RT", cplAz).\
+                            t2 = t2_novert.rotate("NE->RT", cpl_az).\
                                 select(component=components[1])
                         else:
                             t2 = t2_novert

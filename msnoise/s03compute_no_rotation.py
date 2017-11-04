@@ -157,22 +157,13 @@ import time
 
 import matplotlib.mlab as mlab
 
-try:
-    from scikits.samplerate import resample
-except:
-    pass
-
 from .api import *
-from .move2obspy import myCorr, myCorr2
-from .move2obspy import whiten, whiten2
+from .move2obspy import myCorr2
+from .move2obspy import whiten2
 
 from .preprocessing import preprocess
 
-import matplotlib.pyplot as plt
 from scipy.stats import scoreatpercentile
-
-class Params():
-    pass
 
 
 def main():
@@ -197,7 +188,6 @@ def main():
     if params.remove_response:
         logging.debug('Pre-loading all instrument response')
         responses = preload_instrument_responses(db)
-        print(responses[responses["channel_id"]=="GR.GRA1..BHZ"])
     else:
         responses = None
     logging.info("Checking if there are jobs to do")
@@ -207,7 +197,7 @@ def main():
 
         if len(jobs) == 0:
             # edge case, should only occur when is_next returns true, but
-            # get_next receives no jobs (heavily parallelised code
+            # get_next receives no jobs (heavily parallelised code)
             continue
 
         stations = []
@@ -221,7 +211,6 @@ def main():
             stations.append(netsta1)
             stations.append(netsta2)
             goal_day = job.day
-
 
         stations = np.unique(stations)
 
@@ -297,16 +286,16 @@ def main():
                 if params.windsorizing == -1:
                     np.sign(tr.data, tr.data)  # inplace
                 elif params.windsorizing != 0:
-                    imin = scoreatpercentile(tr.data, 1)
-                    imax = scoreatpercentile(tr.data, 99)
-                    not_outliers = np.where((tr.data >= imin) & (tr.data <= imax))[0]
+                    imin, imax = scoreatpercentile(tr.data, [1, 99])
+                    not_outliers = np.where((tr.data >= imin) &
+                                            (tr.data <= imax))[0]
                     rms = tr.data[not_outliers].std() * params.windsorizing
                     np.clip(tr.data, -rms, rms, tr.data)  # inplace
             # TODO should not hardcode 4 percent!
             tmp.taper(0.04)
 
             # TODO should not hardcode 100 taper points in spectrum
-            Napod = 100
+            napod = 100
 
             data = np.asarray([tr.data for tr in tmp])
             names = [tr.id.split(".") for tr in tmp]
@@ -321,22 +310,22 @@ def main():
                     channel_index[netsta] = {}
                 channel_index[netsta][c1[-1]] = i
 
-                Pxx, freqs = mlab.psd(tmp[i].data,
+                pxx, freqs = mlab.psd(tmp[i].data,
                                       Fs=tmp[i].stats.sampling_rate,
                                       NFFT=nfft,
                                       detrend='mean')
-                psds.append(np.sqrt(Pxx))
+                psds.append(np.sqrt(pxx))
             psds = np.asarray(psds)
 
             for chan in channel_index:
                 comps = channel_index[chan].keys()
                 if "E" in comps and "N" in comps:
-                    iE = channel_index[chan]["E"]
-                    iN = channel_index[chan]["N"]
+                    i_e = channel_index[chan]["E"]
+                    i_n = channel_index[chan]["N"]
                     # iZ = channel_index[chan]["Z"]
-                    mm = psds[[iE,iN]].mean(axis=0)
-                    psds[iE] = mm
-                    psds[iN] = mm
+                    mm = psds[[i_e,i_n]].mean(axis=0)
+                    psds[i_e] = mm
+                    psds[i_n] = mm
                     # psds[iZ] = mm
 
             # define pairwise CCs
@@ -364,20 +353,21 @@ def main():
                 low = float(filterdb.low)
                 high = float(filterdb.high)
 
-                freqVec = scipy.fftpack.fftfreq(nfft, d=dt)[:nfft // 2]
-                J = np.where((freqVec >= low) & (freqVec <= high))[0]
-                low = J[0] - Napod
+                freq_vec = scipy.fftpack.fftfreq(nfft, d=dt)[:nfft // 2]
+                freq_sel = np.where((freq_vec >= low) & (freq_vec <= high))[0]
+                low = freq_sel[0] - napod
                 if low <= 0:
                     low = 1
-                porte1 = J[0]
-                porte2 = J[-1]
-                high = J[-1] + Napod
+                p1 = freq_sel[0]
+                p2 = freq_sel[-1]
+                high = freq_sel[-1] + napod
                 if high > nfft / 2:
                     high = int(nfft // 2)
 
                 ffts = scipy.fftpack.fftn(data, shape=[nfft, ], axes=[1, ])
-                # TODO: AC will require a more clever handling, no whiten or else.
-                whiten2(ffts, nfft, low, high, porte1, porte2, psds, params.whitening)  # inplace
+                # TODO: AC will require a more clever handling, no whiten...
+                whiten2(ffts, nfft, low, high, p1, p2, psds,
+                        params.whitening)  # inplace
                 energy = np.ones(ffts.shape[0])
 
                 # logging.info("Pre-whitened %i traces"%(i+1))
@@ -401,7 +391,8 @@ def main():
 
         if params.keep_days:
             for ccfid in allcorr.keys():
-                station1, station2, components, filterid, date = ccfid.split('_')
+                station1, station2, components, filterid, date = \
+                    ccfid.split('_')
 
                 corrs = np.asarray(list(allcorr[ccfid].values()))
                 if not len(corrs):
@@ -425,12 +416,13 @@ def main():
         for job in jobs:
             update_job(db, job.day, job.pair, 'CC', 'D')
 
-        logging.info(
-            "Job Finished. It took %.2f seconds (preprocess: %.2f s & process %.2f s)" % (
-            (time.time() - jt), start_processing - jt,
-            time.time() - start_processing))
+        logging.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & "
+                     "process %.2f s)" % ((time.time() - jt),
+                                          start_processing - jt,
+                                          time.time() - start_processing))
         del stream
     logging.info('*** Finished: Compute CC ***')
+
 
 if __name__ == "__main__":
     main()    

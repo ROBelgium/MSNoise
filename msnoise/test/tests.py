@@ -355,6 +355,13 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
         self.test_013_s03compute_cc()
 
+    def test_031_compute_cc2tmp(self):
+        from ..api import connect, reset_jobs
+        db = connect()
+        reset_jobs(db, "CC", alljobs=True)
+        db.close()
+        from ..s03compute_no_rotation import main
+        main()
 
     def test_099_S01installer(self):
         if "TRAVIS" not in os.environ:

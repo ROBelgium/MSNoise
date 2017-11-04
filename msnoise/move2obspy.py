@@ -27,6 +27,7 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     :rtype: :class:`numpy.ndarray`
     :returns: The cross-correlation function between [-maxlag:maxlag]
     """
+    # TODO: docsting
     if nfft is None:
         s1 = np.array(data[0].shape)
         shape = s1 - 1
@@ -72,8 +73,9 @@ def myCorr(data, maxlag, plot=False, nfft=None):
 
 
 def myCorr2(data, maxlag, energy, index, plot=False, nfft=None):
-    """This function takes ndimensional *data* array, computes the cross-correlation in the frequency domain
-    and returns the cross-correlation function between [-*maxlag*:*maxlag*].
+    """This function takes ndimensional *data* array, computes the
+    cross-correlation in the frequency domain and returns the cross-correlation
+    function between [-*maxlag*:*maxlag*].
 
     :type data: :class:`numpy.ndarray`
     :param data: This array contains the fft of each timeseries to be cross-correlated.
@@ -83,7 +85,7 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None):
     :rtype: :class:`numpy.ndarray`
     :returns: The cross-correlation function between [-maxlag:maxlag]
     """
-
+    # TODO: docsting
     normalized = False
     maxlag = np.round(maxlag)
     Nt = data.shape[1]
@@ -130,8 +132,8 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
 
     :rtype: :class:`numpy.ndarray`
     :returns: The FFT of the input trace, whitened between the frequency bounds
-"""
-
+    """
+    # TODO: docsting
     if plot:
         plt.subplot(411)
         plt.plot(np.arange(len(data)) * delta, data)
@@ -224,8 +226,8 @@ def whiten2(fft, Nfft, low, high, porte1, porte2, psds, whiten_type):
 
     :rtype: :class:`numpy.ndarray`
     :returns: The FFT of the input trace, whitened between the frequency bounds
-"""
-
+    """
+    # TODO: docsting
     taper = np.ones(Nfft//2+1)
     taper[0:low] *= 0
     taper[low:porte1] *= np.cos(np.linspace(np.pi / 2., 0, porte1 - low))**2
@@ -262,6 +264,7 @@ def whiten2(fft, Nfft, low, high, porte1, porte2, psds, whiten_type):
 
 def smooth(x, window='boxcar', half_win=3):
     """ some window smoothing """
+    # TODO: docsting
     window_len = 2 * half_win + 1
     # extending the data at beginning and at the end
     # to apply the window at the borders
@@ -275,6 +278,7 @@ def smooth(x, window='boxcar', half_win=3):
 
 
 def getCoherence(dcs, ds1, ds2):
+    # TODO: docsting
     n = len(dcs)
     coh = np.zeros(n).astype('complex')
     valids = np.argwhere(np.logical_and(np.abs(ds1) > 0, np.abs(ds2 > 0)))

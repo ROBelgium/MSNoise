@@ -202,7 +202,16 @@ def update_config(session, name, value):
 
 
 def get_params(session):
-    # TODO: this could be populated automatically from defauts iff defaults would mention types
+    """Get config parameters from the database.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :returns: a Param class containing the parameters
+    """
+    # TODO: this could be populated automatically from defauts iff defaults
+    # would mention types
     class Params:
         pass
     s = session
