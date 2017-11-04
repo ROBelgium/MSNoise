@@ -14,7 +14,7 @@ environment:
 
     - PYTHON_VERSION: 3.6
       PYTHON_ARCH: 64
-      MINICONDA: C:\Miniconda3-x64
+      MINICONDA: C:\Miniconda36-x64
 
 init:
   - "ECHO %PYTHON_VERSION% %MINICONDA%"
