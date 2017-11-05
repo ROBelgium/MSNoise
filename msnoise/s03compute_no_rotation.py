@@ -183,7 +183,7 @@ def main():
 
     # Get Configuration
     params = get_params(db)
-
+    filters = get_filters(db, all=False)
     logging.info("Will compute %s" % " ".join(params.components_to_compute))
 
     if params.remove_response:
@@ -348,7 +348,7 @@ def main():
                         ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
                          names.index(sta1), names.index(sta2)])
 
-            for filterdb in get_filters(db, all=False):
+            for filterdb in filters:
                 filterid = filterdb.ref
                 low = float(filterdb.low)
                 high = float(filterdb.high)
@@ -398,7 +398,8 @@ def main():
                 if not len(corrs):
                     logging.debug("No data to stack.")
                     continue
-                corr = stack(db, corrs)
+                corr = stack(corrs, params.stack_method, params.pws_timegate,
+                             params.pws_power, params.goal_sampling_rate)
                 if not len(corr):
                     logging.debug("No data to save.")
                     continue
@@ -411,7 +412,8 @@ def main():
                                         params.goal_sampling_rate,
                     components, corr,
                     params.goal_sampling_rate, day=True,
-                    ncorr=corrs.shape[0])
+                    ncorr=corrs.shape[0],
+                    params=params)
 
         for job in jobs:
             update_job(db, job.day, job.pair, 'CC', 'D')

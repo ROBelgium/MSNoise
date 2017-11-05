@@ -225,7 +225,10 @@ def main(stype, interval=1.0):
                                                 sta1, sta2)
                                             logging.debug("%s %s [%s - %s] (%i day stack)" % (
                                                 day_name, date, datelist[low], datelist[i], mov_stack))
-                                            corr = stack(db, corr)
+                                            corr = stack(corr, stack_method,
+                                                         pws_timegate,
+                                                         pws_power,
+                                                         goal_sampling_rate)
                                             if not len(corr):
                                                 continue
 
@@ -272,7 +275,10 @@ def main(stype, interval=1.0):
                                                 sta1, sta2)
                                             logging.debug("%s %s [%s - %s] (%i day stack)" % (
                                                 day_name, date, datelist[low], datelist[high-1], mov_stack))
-                                            corr = stack(db, corr)
+                                            corr = stack(corr, stack_method,
+                                                         pws_timegate,
+                                                         pws_power,
+                                                         goal_sampling_rate)
                                             corr = scipy.signal.detrend(corr)
                                             stack_path = os.path.join(
                                                 "STACKS", "%02i" % filterid, "%03i_DAYS" % mov_stack, components, day_name)

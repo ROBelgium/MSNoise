@@ -216,6 +216,9 @@ def get_params(session):
         pass
     s = session
     params = Params()
+    params.output_folder = get_config(s, 'output_folder')
+    params.export_format = get_config(s, 'export_format')
+
     params.goal_sampling_rate = float(get_config(s, "cc_sampling_rate"))
     params.goal_duration = float(get_config(s, "analysis_duration"))
     params.overlap = float(get_config(s, "overlap"))
@@ -234,6 +237,8 @@ def get_params(session):
     params.keep_days = get_config(s, 'keep_days', isbool=True)
     params.autocorr = get_config(s, "autocorr", isbool=True)
     params.components_to_compute = get_components_to_compute(s)
+    params.export_format = get_config(s, 'export_format')
+    params.sac_format = get_config(s, "sac_format")
 
     params.stack_method = get_config(s, 'stack_method')
     params.pws_timegate = float(get_config(s, 'pws_timegate'))
@@ -944,7 +949,7 @@ def export_allcorr2(session, ccfid, data):
 
 
 def add_corr(session, station1, station2, filterid, date, time, duration,
-             components, CF, sampling_rate, day=False, ncorr=0):
+             components, CF, sampling_rate, day=False, ncorr=0, params=None):
     """
     Adds a CCF to the data archive on disk.
     
@@ -975,8 +980,8 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
     :param ncorr: Number of CCF that have been stacked for this CCF.
     """
 
-    output_folder = get_config(session, 'output_folder')
-    export_format = get_config(session, 'export_format')
+    output_folder = params.output_folder
+    export_format = params.export_format
     sac, mseed = False, False
     if export_format == "BOTH":
         mseed = True
@@ -992,10 +997,10 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
         pair = "%s:%s" % (station1, station2)
         if mseed:
             export_mseed(session, path, pair, components, filterid, CF,
-                         ncorr)
+                         ncorr, params=params)
         if sac:
             export_sac(session, path, pair, components, filterid, CF,
-                       ncorr)
+                       ncorr, params=params)
 
     else:
         file = '%s.cc' % time
@@ -1017,7 +1022,11 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
 
 
 def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
-               sac_format=None, maxlag=None, cc_sampling_rate=None):
+               sac_format=None, maxlag=None, cc_sampling_rate=None,
+               params=None):
+    maxlag = params.maxlag
+    cc_sampling_rate = params.goal_sampling_rate
+    sac_format = params.sac_format
     if sac_format is None:
         sac_format = get_config(db, "sac_format")
     if maxlag is None:
@@ -1048,13 +1057,14 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
 
 
 def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
-                 maxlag=None, cc_sampling_rate=None):
+                 maxlag=None, cc_sampling_rate=None, params=None):
     try:
         os.makedirs(os.path.split(filename)[0])
     except:
         pass
     filename += ".MSEED"
-    
+    maxlag = params.maxlag
+    cc_sampling_rate = params.goal_sampling_rate
     if maxlag is None:
         maxlag = float(get_config(db, "maxlag"))
     if cc_sampling_rate is None:
@@ -1072,16 +1082,17 @@ def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
     return
 
 
-def stack(session, data):
-    stack_method = get_config(session, 'stack_method')
-    pws_timegate = float(get_config(session, 'pws_timegate'))
-    pws_power = float(get_config(session, 'pws_power'))
-    goal_sampling_rate = float(get_config(session, "cc_sampling_rate"))
+def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
+          goal_sampling_rate=20.0):
+    # stack_method = get_config(session, 'stack_method')
+    # pws_timegate = float(get_config(session, 'pws_timegate'))
+    # pws_power = float(get_config(session, 'pws_power'))
+    # goal_sampling_rate = float(get_config(session, "cc_sampling_rate"))
     if len(data) == 0:
         logging.debug("No data to stack.")
         return []
     data = data[~np.isnan(data).any(axis=1)]
-    sanitize = True
+    sanitize = False
     if len(data) != 1 and sanitize:
         threshold = 0.99
         npts = data.shape[1]
@@ -1150,7 +1161,9 @@ def get_results(session, station1, station2, filterid, components, dates,
 
     elif format == "stack":
         logging.debug("Stacking...")
-        corr = stack(session, stack_data)
+        params = get_params(session)
+        corr = stack(stack_data, params.stack_method, params.pws_timegate,
+                     params.pws_power, params.goal_sampling_rate)
 
         if i > 0:
             return i, corr

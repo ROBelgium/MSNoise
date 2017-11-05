@@ -178,6 +178,7 @@ def main():
 
     # Get Configuration
     params = get_params(db)
+    filters = get_filters(db, all=False)
 
     logging.info("Will compute %s" % " ".join(params.components_to_compute))
 
@@ -364,7 +365,7 @@ def main():
                     elif params.whitening == "N":
                         whitening = False
 
-                    for filterdb in get_filters(db, all=False):
+                    for filterdb in filters:
                         filterid = filterdb.ref
                         low = float(filterdb.low)
                         high = float(filterdb.high)
@@ -422,7 +423,9 @@ def main():
                         station1, station2, filterid, components, date = ccfid.split('_')
 
                         corrs = np.asarray(list(allcorr[ccfid].values()))
-                        corr = stack(db, corrs)
+                        corr = stack(corrs, params.stack_method,
+                                     params.pws_timegate, params.pws_power,
+                                     params.goal_sampling_rate)
 
                         thisdate = goal_day
                         thistime = "0_0"
@@ -433,7 +436,7 @@ def main():
                                 params.goal_sampling_rate,
                                 components, corr,
                                 params.goal_sampling_rate, day=True,
-                                ncorr=corrs.shape[0])
+                                ncorr=corrs.shape[0], params=params)
                         del corrs, corr, thisdate, thistime
                 del current, allcorr, t1, t2
             logging.debug("Updating Job")
