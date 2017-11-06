@@ -177,6 +177,7 @@ def info(jobs):
                 click.secho(" D %s: %s" % (key, tmp))
             else:
                 click.secho(" M %s: %s" % (key, tmp), fg='green')
+        # TODO add plugins params
 
         click.echo('')
         click.echo('Filters:')

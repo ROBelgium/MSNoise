@@ -176,7 +176,7 @@ def get_config(session, name=None, isbool=False, plugin=None):
     return config
 
 
-def update_config(session, name, value):
+def update_config(session, name, value, plugin=None):
     """Update one config bit in the database.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -190,9 +190,17 @@ def update_config(session, name, value):
     :param value: The value of parameter `name`. Can also be NULL if you don't
         want to use this particular parameter.
 
-    """
+    :type plugin: str
+    :param plugin: if provided, gives the name of the Plugin config to use. E.g.
+        if "Amazing" is provided, MSNoise will try to load the "AmazingConfig"
+        entry point. See :doc:`plugins` for details.
 
-    config = session.query(Config).filter(Config.name == name).first()
+    """
+    if plugin:
+        table = plugin_tables["%sConfig"%plugin]
+    else:
+        table = Config
+    config = session.query(table).filter(table.name == name).first()
     if "NULL" in value: 
         config.value = None
     else:
