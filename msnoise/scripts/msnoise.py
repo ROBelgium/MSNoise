@@ -562,14 +562,14 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
 @click.option('--enddate', help='Change enddate. Use format yyyy-mm-dd',
               default=None, type=str)
 @click.pass_context
-def ccf_freq(ctx, sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
-             refilter, startdate, enddate):
+def ccffreq(ctx, sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
+            refilter, startdate, enddate):
     """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
     if ctx.obj['MSNOISE_custom']:
-        from ccf_freq import main
+        from ccffreq import main
     else:
-        from ..plots.ccf_freq import main
+        from ..plots.ccffreq import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
          refilter, startdate, enddate)
 
@@ -700,7 +700,7 @@ plot.add_command(data_availability)
 plot.add_command(dvv)
 plot.add_command(interferogram)
 plot.add_command(ccftime)
-plot.add_command(ccf_freq)
+plot.add_command(ccffreq)
 plot.add_command(mwcs)
 plot.add_command(distance)
 plot.add_command(station_map)

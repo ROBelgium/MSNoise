@@ -7,16 +7,16 @@ CCFs before plotting. Passing ``--startdate`` and ``--enddate`` parameters
 allows to specify which period of data should be plotted. By default the plot
 uses dates determined in database.
 
-.. include:: clickhelp/msnoise-plot-ccf_freq.rst
+.. include:: clickhelp/msnoise-plot-ccffreq.rst
 
 
 Example:
 
 ``msnoise plot ccftime ID.KWUI ID.POSI`` will plot all defaults:
 
-.. image:: .static/ccf_freq.png
+.. image:: .static/ccffreq.png
 """
-# plot ccf_freq
+# plot ccffreq
 
 import datetime
 
