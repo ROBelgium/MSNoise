@@ -54,12 +54,23 @@ def p():
 
 
 @click.command()
-def test():
+@click.option('-a', '--all', is_flag=True, help='Run all tests')
+@click.option('-f', '--functional', is_flag=True, help='Run functional tests '
+                                                       'only')
+@click.option('-u', '--unit', is_flag=True, help='Run unit tests only')
+def test(all, functional, unit):
     """Runs the test suite, should be executed in an empty folder!"""
     import matplotlib.pyplot as plt
     plt.switch_backend("agg")
-    from ..test.tests import main
-    main()
+    from ..test.tests import functional_tests, unit_tests
+    if all:
+        functional_tests()
+        unit_tests()
+        return
+    if functional:
+        functional_tests()
+    if unit:
+        unit_tests()
 
 
 @click.command()

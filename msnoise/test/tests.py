@@ -372,7 +372,8 @@ class MSNoiseTests(unittest.TestCase):
             traceback.print_exc()
             self.fail()
 
-def main():
+
+def functional_tests():
     import matplotlib.pyplot as plt
     plt.switch_backend("agg")
     import os
@@ -388,5 +389,12 @@ def main():
     if not result.wasSuccessful():
         sys.exit(1)
 
+def unit_tests():
+    pass
+
 if __name__ == '__main__':
-    main()
+    print("Running unit tests")
+    unit_tests()
+    print("Running functional tests")
+    functional_tests()
+
