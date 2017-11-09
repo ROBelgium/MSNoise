@@ -4,7 +4,9 @@ allow to plot the daily or the mov-stacked CCF. Filters and components are
 selectable too. The ``--ampli`` argument allows to increase the vertical scale
 of the CCFs. The ``--seismic`` shows the up-going wiggles with a black-filled
 background (very heavy !). Passing ``--refilter`` allows to bandpass filter
-CCFs before plotting (new in 1.5).
+CCFs before plotting (new in 1.5). Passing ``--startdate`` and ``--enddate``
+parameters allows to specify which period of data should be plotted. By default
+the plot uses dates determined in database.
 
 .. include:: clickhelp/msnoise-plot-ccftime.rst
 
@@ -17,22 +19,26 @@ Example:
 """
 # plot interferogram
 
+import datetime
+
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.widgets import Cursor
-
-from obspy.signal.filter import envelope as obspy_envelope
 from obspy.signal.filter import bandpass
-from ..api import *
+from obspy.signal.filter import envelope as obspy_envelope
+
+from msnoise.api import connect, get_config, get_maxlag_samples, \
+    build_movstack_datelist, get_filters, get_results
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
-         show=False, outfile=None, envelope=False, refilter=None):
+         show=False, outfile=None, envelope=False, refilter=None,  startdate=None, enddate=None):
     db = connect()
     maxlag = float(get_config(db, 'maxlag'))
     samples = get_maxlag_samples(db)
     cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
-    start, end, datelist = build_movstack_datelist(db)
+    start, end, datelist = build_movstack_datelist(db, startdate, enddate)
     base = mdates.date2num(start) 
     plt.figure(figsize=(12, 9))
     sta1 = sta1.replace('.', '_')

@@ -193,7 +193,7 @@ def update_config(session, name, value):
     """
 
     config = session.query(Config).filter(Config.name == name).first()
-    if "NULL" in value: 
+    if "NULL" in value:
         config.value = None
     else:
         config.value = value
@@ -996,7 +996,7 @@ def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
     except:
         pass
     filename += ".MSEED"
-    
+
     if maxlag is None:
         maxlag = float(get_config(db, "maxlag"))
     if cc_sampling_rate is None:
@@ -1187,7 +1187,7 @@ def build_ref_datelist(session):
     return start, end, datelist.tolist()
 
 
-def build_movstack_datelist(session):
+def build_movstack_datelist(session, startdate=None, enddate=None):
     """
     Creates a date array for the analyse period.
     The returned tuple contains a start and an end date, and a list of
@@ -1196,12 +1196,19 @@ def build_movstack_datelist(session):
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
+    :type startdate: str
+    :param startdate: a startdate for which method should create a date array.
+        Defaults to None, in this case method gets the value from database.
+    :type enddate: str
+    :param enddate: a enddate for which method should create a date array.
+        Defaults to None, in this case method gets the value from database.
 
-    :rtype: tuple
-    :returns: (start, end, datelist)
+    :rtype: (datetime.date, datetime.date, list of datetime.date)
+    :returns: Returns startdate, enddate and a list of all days between those.
     """
-    begin = get_config(session, "startdate")
-    end = get_config(session, "enddate")
+    begin = startdate if startdate is not None else get_config(session,
+                                                               "startdate")
+    end = enddate if enddate is not None else get_config(session, "enddate")
     if begin[0] == '-':
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
         end = datetime.date.today() + datetime.timedelta(days=int(end))
@@ -1433,7 +1440,7 @@ def make_same_length(st):
     # apply the mask to all traces
     for tr in st:
         tr.data.mask = mask
-    
+
     # remove the masks from the stream 
     st = st.split()
     return st
