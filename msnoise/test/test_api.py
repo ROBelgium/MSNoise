@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import date
 
-from msnoise.api import build_movstack_datelist
+from msnoise.api import build_movstack_datelist, get_config, update_config
 from msnoise.msnoise_table_def import Base, Config
 
 
@@ -66,9 +66,61 @@ class TestBuildMovstackDatelist(TestCase):
         self.session.close()
 
 
-class TestGetConfig(TestCase):
-    def test_get_config(self):
-        self.fail()
+class TestUpdateConfigAndGetConfig(TestCase):
+    """
+    Test for msnoise.api.testconfig method
+
+    Those tests depend on both UpdateConfig and GetConfig methods.
+    It should be separated in the future.
+    """
+
+    startdate_name = "startdate"
+    analysis_duration_name = "analysis_duration"
+    cc_sampling_rate_name = "cc_sampling_rate"
+
+    startdate_str = "2017-01-01"
+    analysis_duration_int = str(3600)
+    cc_sampling_rate_float = str(20.0)
+
+    startdate_str_final = "2013-12-21"
+    analysis_duration_int_final = str(45000)
+    cc_sampling_rate_float_final = str(48.3)
+
+    def setUp(self):
+        # Create a in memory database only once for test suite
+        engine = create_engine('sqlite:///')
+        Base.metadata.create_all(engine)
+
+        make_session = sessionmaker(bind=engine)
+        self.session = make_session()
+
+        self.session.add(Config(name=self.startdate_name,
+                                value=self.startdate_str))
+        self.session.add(Config(name=self.analysis_duration_name,
+                                value=self.analysis_duration_int))
+        self.session.add(Config(name=self.cc_sampling_rate_name,
+                                value=self.cc_sampling_rate_float))
+        self.session.commit()
+
+    def test_update__and_get_config(self):
+        update_config(self.session, self.startdate_name,
+                      self.startdate_str_final)
+        self.assertEqual(get_config(self.session, self.startdate_name),
+                         self.startdate_str_final)
+
+        update_config(self.session, self.analysis_duration_name,
+                      self.analysis_duration_int_final)
+        self.assertEqual(get_config(self.session, self.analysis_duration_name),
+                         self.analysis_duration_int_final)
+
+        update_config(self.session, self.cc_sampling_rate_name,
+                      self.cc_sampling_rate_float_final)
+        self.assertEqual(get_config(self.session, self.cc_sampling_rate_name),
+                         self.cc_sampling_rate_float_final)
+
+    def tearDown(self):
+        self.session.close()
+
 
 class TestGetResults(TestCase):
     def test_get_results_fail_non_esisting_path(self):
@@ -78,7 +130,8 @@ class TestGetResults(TestCase):
 def suite():
     testsuite = TestSuite()
     testsuite.addTest(makeSuite(TestBuildMovstackDatelist))
-    testsuite.addTest(makeSuite(TestGetConfig))
+    testsuite.addTest(makeSuite(TestUpdateConfigAndGetConfig))
+    testsuite.addTest(makeSuite(TestGetResults))
 
     return testsuite
 
