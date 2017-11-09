@@ -1053,15 +1053,7 @@ def get_results(session, station1, station2, filterid, components, dates,
     i = 0
     base = os.path.join("STACKS", "%02i" % filterid,
                         "%03i_DAYS" % mov_stack, components,
-                        "%s_%s" % (station1, station2))
-
-    if not os.path.exists(base):
-        raise NotADirectoryError('Path ' + base + ' does not exist. Check if '
-                                 'provided station names are following '
-                                 'NETW.STATION pattern.')
-
-    base = os.path.join(base, "%s")
-
+                        "%s_%s" % (station1, station2), "%s")
     if export_format == "BOTH":
         base += ".MSEED"
         export_format = "MSEED"
@@ -1071,7 +1063,7 @@ def get_results(session, station1, station2, filterid, components, dates,
         base += ".MSEED"
     logging.debug("Reading files...")
     for j, date in enumerate(dates):
-        daystack = base  % str(date)
+        daystack = base % str(date)
         try:
             stack_data[j, :] = read(daystack, format=export_format)[0].data[:]
             i += 1

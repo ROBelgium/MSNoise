@@ -122,16 +122,10 @@ class TestUpdateConfigAndGetConfig(TestCase):
         self.session.close()
 
 
-class TestGetResults(TestCase):
-    def test_get_results_fail_non_esisting_path(self):
-        self.fail()
-
-
 def suite():
     testsuite = TestSuite()
     testsuite.addTest(makeSuite(TestBuildMovstackDatelist))
     testsuite.addTest(makeSuite(TestUpdateConfigAndGetConfig))
-    testsuite.addTest(makeSuite(TestGetResults))
 
     return testsuite
 
