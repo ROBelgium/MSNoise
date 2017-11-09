@@ -6,6 +6,9 @@ import shutil
 import glob
 from obspy import read
 
+# Uncomment it when the test_api will be merged in
+# from msnoise.test import test_api
+
 class MSNoiseTests(unittest.TestCase):
 
     def setUp(self):
@@ -390,7 +393,14 @@ def functional_tests():
         sys.exit(1)
 
 def unit_tests():
-    pass
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+
+    # Uncomment when the first test suite will be added
+    # suite.addTests(loader.loadTestsFromModule(test_api))
+
+    runner = unittest.TextTestRunner(verbosity=4)
+    result = runner.run(suite)
 
 if __name__ == '__main__':
     print("Running unit tests")
