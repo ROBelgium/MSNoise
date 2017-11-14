@@ -99,7 +99,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
                                                                   components,
                                                                   filterid,
                                                                   mov_stack))
-            outfile = "ccftime " + outfile
+            outfile = "ccffreq_" + outfile
             print("output to:", outfile)
             fig.savefig(outfile)
         if show:
