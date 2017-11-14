@@ -564,7 +564,7 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
 @click.pass_context
 def ccffreq(ctx, sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
             refilter, startdate, enddate):
-    """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
+    """Plots the ccf vs freq between sta1 and sta2 (parses the dt/t results)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
     if ctx.obj['MSNOISE_custom']:
         from ccffreq import main
