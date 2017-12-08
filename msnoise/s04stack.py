@@ -142,7 +142,8 @@ def main(stype, interval=1.0):
     pws_timegate = float(get_config(db, 'pws_timegate'))
     pws_power = float(get_config(db, 'pws_power'))
     goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-
+    # Get Configuration
+    params = get_params(db)
     plugins = get_config(db, "plugins")
     extra_jobtypes = []
     if plugins:
@@ -240,10 +241,10 @@ def main(stype, interval=1.0):
                                                 stack_path, str(date))
                                             if mseed:
                                                 export_mseed(
-                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate, params=params)
                                             if sac:
                                                 export_sac(
-                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate, params=params)
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
                                             if not jobadded:
@@ -286,10 +287,10 @@ def main(stype, interval=1.0):
                                                 stack_path, str(date))
                                             if mseed:
                                                 export_mseed(
-                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate, params=params)
                                             if sac:
                                                 export_sac(
-                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate, params=params)
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
                                             job = "%s %s" % (date, day_name)
@@ -316,10 +317,10 @@ def main(stype, interval=1.0):
 
                             if mseed:
                                 export_mseed(
-                                    db, filename, pair, components, filterid, stack_total)
+                                    db, filename, pair, components, filterid, stack_total, params=params)
                             if sac:
                                 export_sac(
-                                    db, filename, pair, components, filterid, stack_total)
+                                    db, filename, pair, components, filterid, stack_total,params=params)
                             ref_name = "%s:%s" % (sta1, sta2)
                             update_job(
                                 db, "REF", ref_name.replace('_', '.'), 'DTT', 'T')

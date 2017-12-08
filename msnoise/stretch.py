@@ -115,10 +115,6 @@ def main():
             filterid = int(f.ref)
 
             for mov_stack in mov_stacks:
-                alldays = []
-                alldeltas = []
-                allcoefs = []
-                allerrs = []
                 for components in components_to_compute:
                         rf = os.path.join("STACKS", "%02i" %
                                           filterid, "REF", components, ref_name + extension)
@@ -128,8 +124,11 @@ def main():
                             ref[mid-int(minlag*goal_sampling_rate):mid+int(minlag*goal_sampling_rate)] *= 0.
                             ref[:mid-int(maxlag2*goal_sampling_rate)] *= 0.
                             ref[mid+int(maxlag2*goal_sampling_rate):] *= 0.
-
-                        str_range = 0.01  ### HARD CODE!!! ###
+                        alldays = []
+                        alldeltas = []
+                        allcoefs = []
+                        allerrs = []
+                        str_range = 0.5  ### HARD CODE!!! ###
                         nstr = 1001  ### HARD CODE!!! ###
                         ref_stretched, deltas = stretch_mat_creation(ref,
                                                                      str_range=str_range,

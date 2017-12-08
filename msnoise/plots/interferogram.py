@@ -62,7 +62,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
         plt.grid()
 
         ax.xaxis.set_major_locator(YearLocator())
-        ax.xaxis.set_major_formatter(DateFormatter('%Y-%m'))
+        ax.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d'))
 
         for filterdb in get_filters(db, all=True):
             if filterid == filterdb.ref:

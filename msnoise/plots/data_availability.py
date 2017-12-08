@@ -75,7 +75,7 @@ def main(show=False, outfile=None):
     plt.gcf().autofmt_xdate()
     plt.grid()
 
-    ax = plt.subplot(gs[1])
+    ax = plt.subplot(gs[1], sharex=ax)
     plt.plot(datelist, np.sum(matrix, axis=0))
     ax.set_ylim((-0.1, np.amax(np.sum(matrix, axis=0))+0.1))
     plt.ylabel('N stations')
