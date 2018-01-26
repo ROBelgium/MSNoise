@@ -35,4 +35,18 @@ setup(version="1.5.1",
       keywords="noise monitoring seismic velocity change dvv dtt doublet"
                " stretching cross-correlation acoustics seismology",
       zip_safe=False,
+      platforms='OS Independent',
+      classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Environment :: Console',
+        'Intended Audience :: Science/Research',
+        'Intended Audience :: Developers',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
+        'Topic :: Scientific/Engineering',
+        'Topic :: Scientific/Engineering :: Physics'],
       )
