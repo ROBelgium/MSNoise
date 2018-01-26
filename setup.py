@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-setup(version="1.5",
+setup(version="1.5.1",
       name='msnoise',
       packages=find_packages(),
       include_package_data=True,

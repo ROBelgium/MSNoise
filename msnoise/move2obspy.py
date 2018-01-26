@@ -270,12 +270,13 @@ segment.
     time_axis = []
 
     window_length_samples = np.int(window_length * df)
-    try:
-        from scipy.fftpack.helper import next_fast_len
-    except ImportError:
-        from obspy.signal.util import next_pow_2 as next_fast_len
-
-    padd = next_fast_len(window_length_samples)
+    # try:
+    #     from scipy.fftpack.helper import next_fast_len
+    # except ImportError:
+    #     from obspy.signal.util import next_pow_2 as next_fast_len
+    from msnoise.api import nextpow2
+    padd = int(2 ** (nextpow2(window_length_samples) + 2))
+    # padd = next_fast_len(window_length_samples)
     count = 0
     tp = cosine_taper(window_length_samples, 0.85)
     minind = 0
