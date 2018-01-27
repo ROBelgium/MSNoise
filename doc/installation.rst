@@ -156,6 +156,19 @@ connection to this server in Workbench and you're good to go with the very
 same interface/tool !
 
 
+Using MariaDB
+-------------
+You can also set up a database server using MariaDB_, there are plenty tutorials
+of how to set it up as well. One pitfall regarding MSNoise is the default character
+set, make sure that the configuration file (/etc/mysql/my.cnf under Linux) contains the
+following lines:
+
+.. code-block:: sh
+
+    [mysqld]
+    character-set-server=utf8
+    collation-server=utf8_unicode_ci
+
 Database Structure - Tables
 ----------------------------
 MSNoise will create the tables automatically upon running the installer script
@@ -211,6 +224,7 @@ communicate about bugs and not the mailing list, preferably used for Releases.
 
 .. _obspy: http://www.obspy.org
 .. _Anaconda: http://www.continuum.io/downloads
+.. _MariaDB: https://mariadb.org
 .. _MySQLi: https://dev.mysql.com/downloads/installer
 .. _MySQLs: https://dev.mysql.com/downloads/mysql
 .. _MySQLw: https://dev.mysql.com/downloads/workbench
