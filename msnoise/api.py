@@ -316,8 +316,8 @@ def get_stations(session, all=False, net=None):
     :type net: str
     :param net: if set, limits the stations returned to this network
 
-    :rtype: list of :class:`msnoise.msnoise_table_def.Station`
-    :returns: list of :class:`~msnoise.msnoise_table_def.Station`
+    :rtype: :class:`sqlalchemy.orm.query.Query`
+    :returns: :class:`sqlalchemy.orm.query.Query` with desired stations
     """
     q = session.query(Station)
     if all:
@@ -325,7 +325,7 @@ def get_stations(session, all=False, net=None):
             stations = q.filter(Station.net == net).order_by(Station.net).\
                 order_by(Station.sta)
         else:
-            stations = q.order_by(Station.net).order_by(Station.sta).all()
+            stations = q.order_by(Station.net).order_by(Station.sta)
     else:
         stations = q.filter(Station.used == True).order_by(Station.net).\
             order_by(Station.sta)

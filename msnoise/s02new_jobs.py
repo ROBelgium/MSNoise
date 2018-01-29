@@ -114,7 +114,7 @@ def main(init=False, nocc=False):
     db.commit()
     count += len(all_jobs)
 
-    for sta in get_stations(db, all=True):
+    for sta in get_stations(db, all=True).all():
         mark_data_availability(db, sta.net, sta.sta, flag='A')
 
     db.commit()

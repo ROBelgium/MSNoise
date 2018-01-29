@@ -187,7 +187,7 @@ def info(jobs):
 
         click.echo('')
         click.echo('Stations:')
-        for s in get_stations(db, all=True):
+        for s in get_stations(db, all=True).all():
             data = (s.net, s.sta, s.X, s.Y, s.altitude, s.coordinates,
                     ['N', 'Y'][s.used])
             print('%s.%s %.4f %.4f %.1f %s %s' % data)
