@@ -31,6 +31,8 @@ class Filter(Base):
     :param mwcs_step: Step (in seconds) of the windowing procedure in MWCS
     :type used: bool
     :param used: Is the filter activated for the processing
+    :type whitening_method: str
+    :param whitening_method: Whitening method to use
     """
 
     __tablename__ = "filters"
@@ -44,6 +46,7 @@ class Filter(Base):
     mwcs_wlen = Column(Float())
     mwcs_step = Column(Float())
     used = Column(Boolean(True))
+    whitening_method = Column(String(50))
 
     def __init__(self, **kwargs):
         """"""
@@ -55,6 +58,7 @@ class Filter(Base):
         # self.mwcs_wlen = mwcs_wlen
         # self.mwcs_step = mwcs_step
         # self.used = used
+        # self.whitening_method = whitening_method
 
 
 class Job(Base):

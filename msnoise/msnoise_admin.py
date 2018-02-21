@@ -182,18 +182,27 @@ class FilterView(ModelView):
         if field.data > form.data['mwcs_wlen']:
             raise ValidationError("'mwcs_step' should be smaller or equal to"
                                   " 'mwcs_wlen'")
+
+    def whitening_method(form, field):
+        whitening_methods = ('brutal', 'smoothing', 'smooth_whitening', 'none')
+        if field.data not in whitening_methods:
+            raise ValidationError(
+                "'whitening_method' should be one of %s" % whitening_methods)
     
     form_args = dict(
         mwcs_low=dict(validators=[mwcs_low]),
         mwcs_high=dict(validators=[mwcs_high]),
         high=dict(validators=[high]),
         mwcs_step=dict(validators=[mwcs_step]),
+        whitening_method=dict(validators=[whitening_method]),
     )
     
     column_list = ('ref', 'low', 'mwcs_low', 'mwcs_high', 'high',
-                   'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used')
+                   'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used',
+                   'whitening_method')
     form_columns = ('low', 'mwcs_low', 'mwcs_high', 'high',
-                    'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used')
+                    'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used',
+                    'whitening_method')
     
     def __init__(self, session, **kwargs):
         # You can pass name and other parameters if you want to

@@ -226,7 +226,7 @@ def get_filters(session, all=False):
 
 
 def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
-                  rms_threshold, mwcs_wlen, mwcs_step, used):
+                  rms_threshold, mwcs_wlen, mwcs_step, used, whitening_method):
     """Updates or Insert a new Filter in the database.
 
     .. seealso:: :class:`msnoise.msnoise_table_def.Filter`
@@ -255,6 +255,8 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
     :param mwcs_step: Step (in seconds) of the windowing procedure in MWCS
     :type used: bool
     :param used: Is the filter activated for the processing
+    :type whitening_method: str
+    :param whitening_method: Whitening method to use
     """
     filter = session.query(Filter).filter(Filter.ref == ref).first()
     if filter is None:
@@ -267,6 +269,7 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
         filter.mwcs_wlen = mwcs_wlen
         filter.mwcs_step = mwcs_step
         filter.used = used
+        filter.whitening_method = whitening_method
         session.add(filter)
     else:
         filter.low = low
@@ -277,6 +280,7 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
         filter.mwcs_wlen = mwcs_wlen
         filter.mwcs_step = mwcs_step
         filter.used = used
+        filter.whitening_method = whitening_method
     session.commit()
     return
 

@@ -63,6 +63,7 @@ class MSNoiseTests(unittest.TestCase):
         f.mwcs_wlen = 10
         f.mwcs_step = 5
         f.used = True
+        f.whitening_method = 'brutal'
         filters.append(f)
         f = Filter()
         f.low = 0.1
@@ -73,16 +74,19 @@ class MSNoiseTests(unittest.TestCase):
         f.mwcs_wlen = 10
         f.mwcs_step = 5
         f.used = True
+        f.whitening_method = 'smooth_whitening'
         filters.append(f)
 
         for f in filters:
             update_filter(db, f.ref, f.low, f.mwcs_low, f.high, f.mwcs_high,
-                          f.rms_threshold, f.mwcs_wlen, f.mwcs_step, f.used)
+                          f.rms_threshold, f.mwcs_wlen, f.mwcs_step, f.used,
+                          f.whitening_method)
 
         dbfilters = get_filters(db)
         for i, filter in enumerate(dbfilters):
             for param in ['low', 'mwcs_low', 'high', 'mwcs_high',
-                          'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used']:
+                          'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used',
+                          'whitening_method']:
                 self.failUnlessEqual(eval("filter.%s" % param),
                                      eval("filters[i].%s" % param))
 
