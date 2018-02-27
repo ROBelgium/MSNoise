@@ -27,12 +27,12 @@ from ..api import *
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
-         show=False, outfile=None, envelope=False, refilter=None):
+         show=False, outfile=None, envelope=False, refilter=None,  startdate=None, enddate=None):
     db = connect()
     maxlag = float(get_config(db, 'maxlag'))
     samples = get_maxlag_samples(db)
     cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
-    start, end, datelist = build_movstack_datelist(db)
+    start, end, datelist = build_movstack_datelist(db, startdate, enddate)
     base = mdates.date2num(start) 
     plt.figure(figsize=(12, 9))
     sta1 = sta1.replace('.', '_')

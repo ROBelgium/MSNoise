@@ -1,4 +1,3 @@
-import traceback
 import logging
 import os
 import sys
@@ -6,9 +5,6 @@ import time
 
 import click
 import pkg_resources
-
-
-# from click_plugins import with_plugins
 
 
 @click.group()
@@ -94,7 +90,8 @@ def upgrade_db():
         db.rollback()
 
     try:
-        db.execute("CREATE INDEX da_index ON data_availability (path, file, net, sta, comp)")
+        db.execute("CREATE INDEX da_index ON data_availability "
+                   "(path, file, net, sta, comp)")
         db.commit()
     except:
         logging.info("It looks like the v1.5 'da_index' is already in the DB")
@@ -245,7 +242,7 @@ def config(set, sync):
         netsta = []
         for id, row in responses.iterrows():
             net, sta, loc, chan = row["channel_id"].split(".")
-            netsta.append("%s.%s"%(net,sta))
+            netsta.append("%s.%s" % (net,sta))
         responses["netsta"] = netsta
 
         for station in get_stations(db):
@@ -365,8 +362,9 @@ def compute_cc(ctx):
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-@click.option('-i', '--interval', default=1.0, help='Number of days before now to'
-                                                  ' search for modified Jobs')
+@click.option('-i', '--interval', default=1.0, help='Number of days before now '
+                                                    'to search for modified '
+                                                    'Jobs')
 def stack(ref, mov, step, interval):
     """Stacks the [REF] and/or [MOV] windows"""
     click.secho('Lets STACK !', fg='green')
@@ -406,8 +404,9 @@ def compute_stretching():
 
 
 @click.command()
-@click.option('-i', '--interval', default=1.0, help='Number of days before now to\
- search for modified Jobs')
+@click.option('-i', '--interval', default=1.0, help='Number of days before now '
+                                                    'to search for modified '
+                                                    'Jobs')
 def compute_dtt(interval):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt import main
@@ -543,6 +542,37 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
         from ..plots.interferogram import main
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile, refilter)
 
+@click.command()
+@click.argument('sta1')
+@click.argument('sta2')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1,
+              help='Mov Stack to read from disk')
+@click.option('-a', '--ampli', default=5.0, help='Amplification')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.option('--startdate', help='Change startdate. Use format yyyy-mm-dd',
+              default=None, type=str)
+@click.option('--enddate', help='Change enddate. Use format yyyy-mm-dd',
+              default=None, type=str)
+@click.pass_context
+def ccffreq(ctx, sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
+            refilter, startdate, enddate):
+    """Plots the ccf vs freq between sta1 and sta2 (parses the dt/t results)\n
+    STA1 and STA2 must be provided with this format: NET.STA !"""
+    if ctx.obj['MSNOISE_custom']:
+        from ccffreq import main
+    else:
+        from ..plots.ccffreq import main
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
+         refilter, startdate, enddate)
+
 
 @click.command()
 @click.argument('sta1')
@@ -562,17 +592,21 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.option('--startdate', help='Change startdate. Use format yyyy-mm-dd',
+              default=None, type=str)
+@click.option('--enddate', help='Change enddate. Use format yyyy-mm-dd',
+              default=None, type=str)
 @click.pass_context
-def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
-            ampli, seismic, show, outfile, envelope, refilter):
+def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show,
+            outfile, envelope, refilter, startdate, enddate):
     """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
     if ctx.obj['MSNOISE_custom']:
         from ccftime import main
     else:
         from ..plots.ccftime import main
-    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
-         envelope, refilter)
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show,
+         outfile, envelope, refilter, startdate, enddate)
 
 
 @click.command()
@@ -666,6 +700,7 @@ plot.add_command(data_availability)
 plot.add_command(dvv)
 plot.add_command(interferogram)
 plot.add_command(ccftime)
+plot.add_command(ccffreq)
 plot.add_command(mwcs)
 plot.add_command(distance)
 plot.add_command(station_map)

@@ -182,23 +182,23 @@ class FilterView(ModelView):
         if field.data > form.data['mwcs_wlen']:
             raise ValidationError("'mwcs_step' should be smaller or equal to"
                                   " 'mwcs_wlen'")
-    
+
     form_args = dict(
         mwcs_low=dict(validators=[mwcs_low]),
         mwcs_high=dict(validators=[mwcs_high]),
         high=dict(validators=[high]),
         mwcs_step=dict(validators=[mwcs_step]),
     )
-    
+
     column_list = ('ref', 'low', 'mwcs_low', 'mwcs_high', 'high',
                    'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used')
     form_columns = ('low', 'mwcs_low', 'mwcs_high', 'high',
                     'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used')
-    
+
     def __init__(self, session, **kwargs):
         # You can pass name and other parameters if you want to
         super(FilterView, self).__init__(Filter, session, **kwargs)
-        
+
     @action('used',
             lazy_gettext('Toggle Used'),
             lazy_gettext('Are you sure you want to update selected models?'))
@@ -211,7 +211,7 @@ class FilterView(ModelView):
             else:
                 s.used = True
         self.session.commit()
-        return  
+        return
 
 
 MY_DEFAULT_FORMATTERS = dict(typefmt.BASE_FORMATTERS)
@@ -224,10 +224,10 @@ class StationView(ModelView):
     view_title = "Station Configuration"
     column_filters = ('net', 'used')
     column_type_formatters = MY_DEFAULT_FORMATTERS
-    
+
     def __init__(self, session, **kwargs):
         super(StationView, self).__init__(Station, session, **kwargs)
-    
+
     @action('used',
             lazy_gettext('Toggle Used'),
             lazy_gettext('Are you sure you want to update selected models?'))
@@ -240,7 +240,7 @@ class StationView(ModelView):
             else:
                 s.used = True
         self.session.commit()
-        return  
+        return
 
 
 class DataAvailabilityView(ModelView):
@@ -255,7 +255,7 @@ class DataAvailabilityView(ModelView):
     def __init__(self, session, **kwargs):
         super(DataAvailabilityView, self).__init__(DataAvailability, session,
                                                    **kwargs)
-    
+
     @action('modified',
             lazy_gettext('Mark as (M)odified'),
             lazy_gettext('Are you sure you want to update selected models?'))
@@ -271,7 +271,7 @@ class DataAvailabilityView(ModelView):
                        '%(count)s models were successfully flagged (M)odified.',
               count, count=count))
         return
-    
+
 
 class JobView(ModelView):
     view_title = "Jobs"
@@ -284,7 +284,7 @@ class JobView(ModelView):
 
     def __init__(self, session, **kwargs):
         super(JobView, self).__init__(Job, session, **kwargs)
-    
+
     @action('todo',
             lazy_gettext('Mark as (T)odo'),
             lazy_gettext('Are you sure you want to update selected models?'))
@@ -295,7 +295,7 @@ class JobView(ModelView):
             s.flag = 'T'
         self.session.commit()
         return
-    
+
     @action('done',
             lazy_gettext('Mark as (D)one'),
             lazy_gettext('Are you sure you want to update selected models?'))
@@ -306,7 +306,7 @@ class JobView(ModelView):
             s.flag = 'D'
         self.session.commit()
         return
-    
+
     @action('deletetype',
             lazy_gettext('Delete all Jobs of the same "Type"'),
             lazy_gettext('Are you sure you want to delete all those models?'))
@@ -318,7 +318,7 @@ class JobView(ModelView):
         self.get_query().filter(Job.jobtype == type_to_delete).delete()
         self.session.commit()
         return
-    
+
     @action('massTodo',
             lazy_gettext('Mark all Jobs of the same Type as (T)odo'),
             lazy_gettext('Are you sure you want to update all those models?'))
@@ -327,7 +327,7 @@ class JobView(ModelView):
         query = self.get_query().filter(model_pk.in_(ids))
         for s in query.all():
             type_to_delete = s.jobtype
-        
+
         for s in self.get_query().filter(Job.jobtype == type_to_delete).all():
             s.flag = 'T'
         self.session.commit()
@@ -564,7 +564,7 @@ def allresults():
     start, end, dates = build_ref_datelist(db)
     i, result = get_results(db,station1, station2, filterid, components, dates,
                             format=format)
-    
+
     data = {}
     if format == 'stack':
         if i != 0:
@@ -603,7 +603,7 @@ def new_jobsTRIG():
     o['count'] = count
     o = json.dumps(o)
     return flask.Response(o, mimetype='application/json')
-    
+
 
 @app.route('/admin/jobs_list.json')
 def joblists():
@@ -666,7 +666,7 @@ def main(port=5000):
     db.close()
 
     admin = Admin(app, template_mode='bootstrap2')
-    
+
     if "msnoise_brand" in os.environ:
         tmp = eval(os.environ["msnoise_brand"])
         name, logo = tmp.split("|")
