@@ -155,7 +155,6 @@ def main(stype, interval=1.0):
                 for jobtype in jobtypes:
                     if jobtype["after"] == "refstack":
                         extra_jobtypes.append(jobtype["name"])
-    print(extra_jobtypes)
     
     if stype == "mov" or stype == "step":
         start, end, datelist = build_movstack_datelist(db)
@@ -201,7 +200,7 @@ def main(stype, interval=1.0):
                                   (pair, components, filterid))
                     #~ print updated_days
                     nstack, stack_total = get_results(
-                        db, sta1, sta2, filterid, components, datelist, format=format)
+                        db, sta1, sta2, filterid, components, datelist, format=format, params=params)
                     logging.debug("Data loaded")
                     if nstack > 0:
                         if stype == "mov":
@@ -249,7 +248,7 @@ def main(stype, interval=1.0):
                                                 sta1, sta2)
                                             if not jobadded:
                                                 update_job(
-                                                    db, date, day_name.replace('_', '.'), 'DTT', 'T')
+                                                    db, date, day_name.replace('_', '.'), 'MWCS', 'T')
                                                 jobadded = True
                                         del corr
                         elif stype == "step":
@@ -296,7 +295,7 @@ def main(stype, interval=1.0):
                                             job = "%s %s" % (date, day_name)
                                             if job not in jobs:
                                                 update_job(
-                                                    db, date, day_name.replace('_', '.'), 'DTT', 'T')
+                                                    db, date, day_name.replace('_', '.'), 'MWCS', 'T')
                                                 jobs.append(job)
                                         del corr
                             #~ for date in datelist:
@@ -323,7 +322,7 @@ def main(stype, interval=1.0):
                                     db, filename, pair, components, filterid, stack_total,params=params)
                             ref_name = "%s:%s" % (sta1, sta2)
                             update_job(
-                                db, "REF", ref_name.replace('_', '.'), 'DTT', 'T')
+                                db, "REF", ref_name.replace('_', '.'), 'MWCS', 'T')
                             for jobtype in extra_jobtypes:
                                 update_job(db, "REF", ref_name.replace('_', '.'), jobtype, 'T')
                             del stack_total

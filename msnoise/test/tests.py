@@ -314,7 +314,7 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, update_config, reset_jobs
         db = connect()
         update_config(db, "export_format", "MSEED")
-        reset_jobs(db, "DTT", alljobs=True)
+        reset_jobs(db, "MWCS", alljobs=True)
         db.close()
 
         from ..stretch import main

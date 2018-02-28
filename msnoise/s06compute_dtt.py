@@ -176,7 +176,8 @@ def main(interval=1):
     for sta1, sta2 in get_station_pairs(db):
         s1 = "%s_%s" % (sta1.net, sta1.sta)
         s2 = "%s_%s" % (sta2.net, sta2.sta)
-        interstations["%s_%s"%(s1,s2)] = get_interstation_distance(sta1, sta2)
+        interstations["%s_%s"%(s1,s2)] = get_interstation_distance(sta1, sta2,
+                                                                   sta1.coordinates)
         
     filters = get_filters(db, all=False)
     while is_next_job(db, jobtype='DTT'):

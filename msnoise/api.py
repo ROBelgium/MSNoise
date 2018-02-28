@@ -852,6 +852,10 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
         Days of the next DTT jobs -
         Job IDs (for later being able to update their flag).
     """
+    if get_tech() == 1:
+        rand = func.random
+    else:
+        rand = func.rand
     try:
         jobs = session.query(Job.ref, Job.day, Job.pair, Job.flag).filter(Job.flag == flag).\
             filter(Job.jobtype == jobtype).filter(Job.day != 'REF').\
@@ -860,7 +864,7 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
                    filter(Job.flag == flag).
                    filter(Job.jobtype == jobtype).
                    filter(Job.day != 'REF').
-                   order_by(func.rand()).first().pair).\
+                   order_by(rand()).first().pair).\
             with_for_update()
         tmp = jobs.all()
         mappings = [{'ref': job.ref, 'flag': "I"} for job in tmp]
