@@ -201,15 +201,12 @@ def info(jobs):
                     ['N', 'Y'][s.used])
             print('%s.%s %.4f %.4f %.1f %s %s' % data)
 
-    click.echo('')
-    click.echo('CC Jobs:')
-    for (n, jobtype) in get_job_types(db, 'CC'):
-        click.echo(" %s : %i" % (jobtype, n))
+    for jobtype in ["CC", "STACK", "MWCS", "DTT"]:
+        click.echo('')
+        click.echo('%s Jobs:' % jobtype)
+        for (n, jobtype) in get_job_types(db, jobtype):
+            click.echo(" %s : %i" % (jobtype, n))
 
-    click.echo('')
-    click.echo('DTT Jobs:')
-    for (n, jobtype) in get_job_types(db, 'DTT'):
-        click.echo(" %s : %i" % (jobtype, n))
 
 
 @click.command()
@@ -404,21 +401,49 @@ def compute_cc2(ctx):
 
 
 @click.command()
+@click.pass_context
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
 @click.option('-i', '--interval', default=1.0, help='Number of days before now to'
                                                   ' search for modified Jobs')
-def stack(ref, mov, step, interval):
+def stack(ctx, ref, mov, step, interval):
     """Stacks the [REF] and/or [MOV] windows"""
     click.secho('Lets STACK !', fg='green')
-    from ..s04stack import main
-    if ref:
-        main('ref', interval)
-    if mov:
-        main('mov', interval)
-    if step:
-        main('step', interval)
+    from ..s04stack_new import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    if threads == 1:
+        if ref:
+            main('ref', interval)
+        if mov:
+            main('mov', interval)
+        if step:
+            main('step', interval)
+    else:
+        from multiprocessing import Process
+        processes = []
+        if ref:
+            for i in range(threads):
+                p = Process(target=main, args=["ref", interval])
+                p.start()
+                processes.append(p)
+                time.sleep(delay)
+        if mov:
+            for i in range(threads):
+                p = Process(target=main, args=["mov", interval])
+                p.start()
+                processes.append(p)
+                time.sleep(delay)
+        if step:
+            for i in range(threads):
+                p = Process(target=main, args=["step", interval])
+                p.start()
+                processes.append(p)
+                time.sleep(delay)
+        for p in processes:
+            p.join()
+
 
 
 @click.command()
@@ -426,12 +451,12 @@ def stack(ref, mov, step, interval):
 def compute_mwcs(ctx):
     """Computes the MWCS based on the new stacked data"""
     from ..s05compute_mwcs import main
-    from multiprocessing import Process
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     if threads == 1:
         main()
     else:
+        from multiprocessing import Process
         processes = []
         for i in range(threads):
             p = Process(target=main)
@@ -450,12 +475,54 @@ def compute_stretching():
 
 
 @click.command()
+@click.pass_context
 @click.option('-i', '--interval', default=1.0, help='Number of days before now to\
  search for modified Jobs')
-def compute_dtt(interval):
+def compute_dtt(ctx, interval):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt import main
-    main(interval)
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    if threads == 1:
+        main(interval)
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main, args=[interval,])
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
+
+
+@click.command()
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
+@click.option('-p', '--pair', default=None, help='Plot a specific pair',
+              multiple=True)
+@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
+@click.option('-M', '--dttname', default="M", help='Plot M or M0?')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.pass_context
+def compute_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
+    """Plots the dv/v (parses the dt/t results)\n
+    Individual pairs can be plotted extra using the -p flag one or more times.\n
+    Example: msnoise plot dvv -p ID_KWUI_ID_POSI\n
+    Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
+    Remember to order stations alphabetically !
+    """
+    if ctx.obj['MSNOISE_custom']:
+        from s07_compute_dvv import main
+    else:
+        from ..s07_compute_dvv import main
+    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
 
 
 @click.command()
@@ -732,6 +799,7 @@ cli.add_command(stack)
 cli.add_command(compute_mwcs)
 cli.add_command(compute_stretching)
 cli.add_command(compute_dtt)
+cli.add_command(compute_dvv)
 cli.add_command(reset)
 cli.add_command(ipython)
 cli.add_command(test)

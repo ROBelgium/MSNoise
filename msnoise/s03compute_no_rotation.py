@@ -368,7 +368,8 @@ def main():
                 # TODO: AC will require a more clever handling, no whiten...
                 whiten2(ffts, nfft, low, high, p1, p2, psds,
                         params.whitening)  # inplace
-                energy = np.ones(ffts.shape[0])
+                # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
+                energy = np.real(np.sqrt( np.mean(scipy.fftpack.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
 
                 # logging.info("Pre-whitened %i traces"%(i+1))
                 corr = myCorr2(ffts,
@@ -415,8 +416,20 @@ def main():
                     ncorr=corrs.shape[0],
                     params=params)
 
+        # THIS SHOULD BE IN THE API
+        updated = False
+        mappings = [{'ref': job.ref, 'flag': "D"} for job in jobs]
+        while not updated:
+            try:
+                db.bulk_update_mappings(Job, mappings)
+                db.commit()
+                updated = True
+            except:
+                time.sleep(np.random.random())
+                pass
         for job in jobs:
-            update_job(db, job.day, job.pair, 'CC', 'D')
+            # update_job(db, job.day, job.pair, 'CC', 'D')
+            update_job(db, job.day, job.pair, 'STACK', 'T')
 
         logging.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & "
                      "process %.2f s)" % ((time.time() - jt),

@@ -86,7 +86,7 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None):
     :returns: The cross-correlation function between [-maxlag:maxlag]
     """
     # TODO: docsting
-    normalized = False
+    normalized = True
     maxlag = np.round(maxlag)
     Nt = data.shape[1]
 
@@ -374,19 +374,29 @@ segment.
         from scipy.fftpack.helper import next_fast_len
     except ImportError:
         from obspy.signal.util import next_pow_2 as next_fast_len
-
-    padd = next_fast_len(window_length_samples)
+    from msnoise.api import nextpow2
+    # padd = next_fast_len(window_length_samples)
+    padd = np.int(2 ** (nextpow2(window_length_samples) + 2))
+    padd = np.int(2 ** (nextpow2(window_length_samples) + 2))
+    # print("Padding by", padd)
     count = 0
     tp = cosine_taper(window_length_samples, 0.85)
     minind = 0
     maxind = window_length_samples
+    # print("Using NFFT=", padd)
     while maxind <= len(current):
         cci = current[minind:(minind + window_length_samples)]
         cci = scipy.signal.detrend(cci, type='linear')
+        cci -= cci.min()
+        cci /= cci.max()
+        cci -= np.mean(cci)
         cci *= tp
 
         cri = reference[minind:(minind + window_length_samples)]
         cri = scipy.signal.detrend(cri, type='linear')
+        cri -= cri.min()
+        cri /= cri.max()
+        cri -= np.mean(cri)
         cri *= tp
 
         minind += int(step*df)
@@ -437,6 +447,22 @@ segment.
         phi = np.unwrap(phi)
         phi = phi[index_range]
 
+        # if np.abs(tmin+window_length/2.+count*step) < 40:
+        #     plt.figure()
+        #     plt.subplot(311)
+        #     plt.plot(cci)
+        #     plt.plot(cri)
+        #     ax = plt.subplot(312)
+        #     plt.scatter(v / (2 * np.pi), phi, c=w, edgecolor='none',
+        #                 vmin=0.6, vmax=1)
+        #     plt.subplot(313, sharex=ax)
+        #     plt.plot(v / (2 * np.pi), coh[index_range])
+        #     plt.axhline(mcoh, c='r')
+        #     plt.axhline(1.0, c='k', ls='--')
+        #     plt.xlim(-0.1, 1.5)
+        #     plt.ylim(0, 1.5)
+        #     plt.show()
+        
         # Calculate the slope with a weighted least square linear regression
         # forced through the origin
         # weights for the WLS must be the variance !

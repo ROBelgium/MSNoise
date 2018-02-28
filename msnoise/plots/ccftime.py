@@ -61,7 +61,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
             if envelope:
                 line = obspy_envelope(line)
             line /= line.max()
-            plt.plot(t, line * ampli + i + base, c='k')
+            plt.plot(t, line * ampli + i + base, c='k', lw=0.5)
             if seismic:
                 y1 = np.ones(len(line)) * i
                 y2 = line*ampli + i + base

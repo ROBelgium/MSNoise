@@ -4,7 +4,7 @@ import itertools
 import logging
 import os
 import glob
-
+import traceback
 try:
     import cPickle
 except:
@@ -15,6 +15,7 @@ import pkg_resources
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
+from sqlalchemy.sql.expression import func
 import numpy as np
 import pandas as pd
 import scipy as sp
@@ -680,7 +681,8 @@ def count_data_availability_flags(session):
 # Jobs
 
 import time
-def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
+def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
+               ref=None):
     """
     Updates or Inserts a new :class:`~msnoise.msnoise_table_def.Job` in the
     database.
@@ -703,11 +705,14 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     :rtype: :class:`~msnoise.msnoise_table_def.Job` or None
     :returns: If returnjob is True, returns the modified/inserted Job.
     """
-    job = session.query(Job)\
-        .with_hint(Job, 'USE INDEX (job_index)')\
-        .filter(Job.day == day)\
-        .filter(Job.pair == pair)\
-        .filter(Job.jobtype == jobtype).first()
+    if ref:
+        job = session.query(Job).filter(Job.ref == ref).first()
+    else:
+        job = session.query(Job)\
+            .with_hint(Job, 'USE INDEX (job_index)')\
+            .filter(Job.day == day)\
+            .filter(Job.pair == pair)\
+            .filter(Job.jobtype == jobtype).first()
     if job is None:
         job = Job(day, pair, jobtype, 'T')
         session.add(job)
@@ -781,8 +786,12 @@ def get_next_job(session, flag='T', jobtype='CC'):
     """
     # day =
     jobs = session.query(Job).filter(Job.jobtype == jobtype).\
-        filter(Job.flag == flag).filter(Job.day == session.query(Job).with_hint(Job, 'USE INDEX (job_index2)').filter(Job.jobtype == jobtype).\
-        filter(Job.flag == flag).first().day).with_for_update()
+        filter(Job.flag == flag).\
+        filter(Job.day == session.query(Job).
+               with_hint(Job, 'USE INDEX (job_index)').
+               filter(Job.jobtype == jobtype).
+               filter(Job.flag == flag).first().day).\
+        with_for_update()
     # print(jobs.statement.compile(compile_kwargs={"literal_binds": True}))
     tmp = jobs.all()
     jobs.update({Job.flag: 'I'})
@@ -809,7 +818,8 @@ def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
     :rtype: bool
     :returns: True if at least one Job matches, False otherwise.
     """
-    q = session.query(Job.ref).filter(Job.flag == flag).\
+    q = session.query(Job.ref).with_hint(Job, 'USE INDEX (job_index2)').\
+        filter(Job.flag == flag).\
         filter(Job.jobtype == jobtype)
     if ref:
         job = q.filter(Job.pair == ref).filter(Job.day == 'REF').count()
@@ -842,16 +852,33 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
         Days of the next DTT jobs -
         Job IDs (for later being able to update their flag).
     """
-    pair = session.query(Job).filter(Job.flag == flag).\
-        filter(Job.jobtype == jobtype).filter(Job.day != 'REF').first().pair
-    jobs = session.query(Job.ref, Job.day).filter(Job.flag == flag).\
-        filter(Job.jobtype == jobtype).filter(Job.day != 'REF').\
-        filter(Job.pair == pair)
-    tmp = list(jobs)
-    jobs.update({Job.flag: 'I'}, synchronize_session=False)
-    session.commit()
-    refs, days = zip(*[[job.ref,job.day] for job in tmp])
-    return pair, days, refs
+    try:
+        jobs = session.query(Job.ref, Job.day, Job.pair, Job.flag).filter(Job.flag == flag).\
+            filter(Job.jobtype == jobtype).filter(Job.day != 'REF').\
+            filter(Job.pair == session.query(Job).
+                   with_hint(Job, 'USE INDEX (job_index)').
+                   filter(Job.flag == flag).
+                   filter(Job.jobtype == jobtype).
+                   filter(Job.day != 'REF').
+                   order_by(func.rand()).first().pair).\
+            with_for_update()
+        tmp = jobs.all()
+        mappings = [{'ref': job.ref, 'flag': "I"} for job in tmp]
+        updated = False
+        while not updated:
+            try:
+                session.bulk_update_mappings(Job, mappings)
+                session.commit()
+                updated=True
+            except:
+                traceback.print_exc()
+                time.sleep(np.random.random())
+                pass
+        return tmp
+    except:
+        traceback.print_exc()
+        return []
+
 
 
 def reset_jobs(session, jobtype, alljobs=False, rule=None):
@@ -1141,8 +1168,12 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
 
 
 def get_results(session, station1, station2, filterid, components, dates,
-                mov_stack = 1, format="stack"):
-    export_format = get_config(session, 'export_format')
+                mov_stack = 1, format="stack", params=None):
+    if not params:
+        export_format = get_config(session, 'export_format')
+    else:
+        export_format = params.export_format
+
     stack_data = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
     i = 0
     base = os.path.join("STACKS", "%02i" % filterid,
@@ -1169,7 +1200,7 @@ def get_results(session, station1, station2, filterid, components, dates,
 
     elif format == "stack":
         logging.debug("Stacking...")
-        params = get_params(session)
+
         corr = stack(stack_data, params.stack_method, params.pws_timegate,
                      params.pws_power, params.goal_sampling_rate)
 
