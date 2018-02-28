@@ -410,7 +410,7 @@ def compute_cc2(ctx):
 def stack(ctx, ref, mov, step, interval):
     """Stacks the [REF] and/or [MOV] windows"""
     click.secho('Lets STACK !', fg='green')
-    from ..s04stack_new import main
+    from ..s04stack import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     if threads == 1:

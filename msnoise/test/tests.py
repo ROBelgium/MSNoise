@@ -356,6 +356,8 @@ class MSNoiseTests(unittest.TestCase):
         self.test_013_s03compute_cc()
 
     def test_031_compute_cc2tmp(self):
+        import shutil
+        shutil.rmtree("STACKS")
         from ..api import connect, reset_jobs
         db = connect()
         reset_jobs(db, "CC", alljobs=True)

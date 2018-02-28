@@ -184,26 +184,43 @@ def main(stype, interval=1.0):
                 rng = pd.date_range(start, end, freq="%iD"%mov_stack)
             datelists[mov_stack] = rng.map(lambda t: t.date())
         #~ print datelists
+    filters = get_filters(db, all=False)
+    while is_dtt_next_job(db, flag='T', jobtype='STACK'):
+        jobs = get_dtt_next_job(db, flag='T', jobtype='STACK')
 
-    for f in get_filters(db, all=False):
-        filterid = int(f.ref)
-        for components in components_to_compute:
-            for station1, station2 in get_station_pairs(db, used=True):
-                sta1 = "%s_%s" % (station1.net, station1.sta)
-                sta2 = "%s_%s" % (station2.net, station2.sta)
+        if not len(jobs):
+            # edge case, should only occur when is_next returns true, but
+            # get_next receives no jobs (heavily parallelised calls).
+            time.sleep(np.random.random())
+            continue
+        pair = jobs[0].pair
+        refs, days = zip(*[[job.ref, job.day] for job in jobs])
+
+        logging.info(
+            "There are STACKS jobs for some days to recompute for %s" % pair)
+        sta1, sta2 = pair.split(':')
+        for f in filters:
+            filterid = int(f.ref)
+            for components in components_to_compute:
                 pair = "%s:%s" % (sta1, sta2)
+                sta1 = sta1.replace('.', '_')
+                sta2 = sta2.replace('.', '_')
                 logging.debug('Processing %s-%s-%i' %
                                   (pair, components, filterid))
-                updated_days = updated_days_for_dates(db, start, end, pair.replace('_', '.'), jobtype='CC', interval=datetime.timedelta(days=interval),returndays=True)
+                # updated_days = updated_days_for_dates(db, start, end, pair.replace('_', '.'), jobtype='CC', interval=datetime.timedelta(days=interval),returndays=True)
+                updated_days = [UTCDateTime(d).datetime.date() for d in days]
                 if len(updated_days) != 0:
                     logging.debug("New Data for %s-%s-%i" %
                                   (pair, components, filterid))
                     #~ print updated_days
                     nstack, stack_total = get_results(
                         db, sta1, sta2, filterid, components, datelist, format=format, params=params)
+                    if not nstack:
+                        logging.debug("No new data found, hmmm")
                     logging.debug("Data loaded")
                     if nstack > 0:
                         if stype == "mov":
+                            logging.debug("Mov Stack!")
                             for i, date in enumerate(datelist):
                                 jobadded = False
                                 for mov_stack in mov_stacks:
@@ -306,7 +323,7 @@ def main(stype, interval=1.0):
                                     #~ update_job(
                                         #~ db, date, day_name.replace('_', '.'), 'DTT', 'T')
                                     #~ jobs.append(job)
-                        
+
                         elif stype == "ref":
                             stack_path = os.path.join(
                                 "STACKS", "%02i" % filterid, "REF", components)
@@ -326,6 +343,22 @@ def main(stype, interval=1.0):
                             for jobtype in extra_jobtypes:
                                 update_job(db, "REF", ref_name.replace('_', '.'), jobtype, 'T')
                             del stack_total
+
+        # THIS SHOULD BE IN THE API
+        updated = False
+        mappings = [{'ref': job.ref, 'flag': "D"} for job in jobs]
+        while not updated:
+            try:
+                db.bulk_update_mappings(Job, mappings)
+                db.commit()
+                updated = True
+            except:
+                time.sleep(np.random.random())
+                pass
+        for job in jobs:
+            update_job(db, job.day, job.pair, 'MWCS', 'T')
+
+    logging.debug("Finished Stacking")
 
 
 def refstack(interval):

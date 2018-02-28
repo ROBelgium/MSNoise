@@ -441,6 +441,7 @@ def main():
                 del current, allcorr, t1, t2
             logging.debug("Updating Job")
             update_job(db, goal_day, orig_pair, 'CC', 'D')
+            update_job(db, goal_day, orig_pair, 'STACK', 'T')
 
             logging.info("Finished processing this pair. It took %.2f seconds" % (time.time() - tt))
         clean_scipy_cache()
