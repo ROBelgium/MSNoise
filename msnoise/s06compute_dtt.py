@@ -125,12 +125,8 @@ variations.
 
 """
 
+from obspy.signal.regression import linear_regression
 from .api import *
-
-try:
-    from obspy.signal.regression import linear_regression
-except ImportError:
-    from .api import linear_regression
 
 
 def wavg_wstd(data, errors):

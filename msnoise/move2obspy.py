@@ -8,11 +8,7 @@ import scipy.signal
 from scipy.stats import scoreatpercentile
 from obspy.signal.invsim import cosine_taper
 from scipy.fftpack.helper import next_fast_len
-
-try:
-    from obspy.signal.regression import linear_regression
-except ImportError:
-    from .api import linear_regression
+from obspy.signal.regression import linear_regression
 
 
 def myCorr(data, maxlag, plot=False, nfft=None):

@@ -31,6 +31,7 @@ from obspy.geodetics import gps2dist_azimuth
 
 from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
+# TODO do we really need this here?
 plugin_tables = {}
 for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.table_def'):
     plugin_tables[ep.name] = ep.load()
@@ -679,7 +680,7 @@ def count_data_availability_flags(session):
 
 
 # Jobs
-
+# TODO bad doing this here!
 import time
 def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
                ref=None):
@@ -884,7 +885,6 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
         return []
 
 
-
 def reset_jobs(session, jobtype, alljobs=False, rule=None):
     """
     Sets the flag of all `jobtype` Jobs to "T"odo.
@@ -947,6 +947,19 @@ def get_job_types(session, jobtype='CC'):
 
 
 def get_jobs_by_lastmod(session, jobtype='CC', lastmod=datetime.datetime.now()):
+    """
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type lastmod: datetime.datetime
+    :param lastmod: Jobs' modification time
+
+    :rtype: list
+    :return: list of Job objects.
+    """
     jobs = session.query(Job).filter(Job.jobtype == jobtype).\
         filter(Job.lastmod >= lastmod).all()
     return jobs
@@ -1017,6 +1030,9 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
         configuration). Defaults to True.
     :type ncorr: int
     :param ncorr: Number of CCF that have been stacked for this CCF.
+    :type params: dict
+    :param params: A dictionnary of MSNoise config parameters as returned by
+        :func:`get_params`.
     """
 
     output_folder = params.output_folder
@@ -1123,15 +1139,31 @@ def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
 
 def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
           goal_sampling_rate=20.0):
-    # stack_method = get_config(session, 'stack_method')
-    # pws_timegate = float(get_config(session, 'pws_timegate'))
-    # pws_power = float(get_config(session, 'pws_power'))
-    # goal_sampling_rate = float(get_config(session, "cc_sampling_rate"))
+    """
+    :type data: :class:`numpy.ndarray`
+    :param data: the data to stack, each row being one CCF
+    :type stack_method: str
+    :param stack_method: either ``linear``: average of all CCF or ``pws`` to
+        compute the phase weigthed stack. If ``pws`` is selected,
+        the function expects the ``pws_timegate`` and ``pws_power``.
+    :type pws_timegate: float
+    :param pws_timegate: PWS time gate in seconds. Width of the smoothing
+         window to convolve with the PWS spectrum.
+    :type pws_power: float
+    :param pws_power: Power of the PWS weights to be applied to the CCF stack.
+    :type goal_sampling_rate: float
+    :param goal_sampling_rate: Sampling rate of the CCF array submitted
+    :rtype: :class:`numpy.array`
+    :return: the stacked CCF.
+    """
     if len(data) == 0:
         logging.debug("No data to stack.")
         return []
     data = data[~np.isnan(data).any(axis=1)]
     sanitize = False
+    # TODO clean sanitize function, add param to config and make sure not to
+    # kill the data[i] if all data are corrcoeff >0.9 (either very stable
+    # corr or autocorr, then this sanitize should not occur.
     if len(data) != 1 and sanitize:
         threshold = 0.99
         npts = data.shape[1]
@@ -1170,9 +1202,36 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
     return corr
 
 
-
 def get_results(session, station1, station2, filterid, components, dates,
                 mov_stack = 1, format="stack", params=None):
+    """
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type station1: str
+    :param station1: The name of station 1 (formatted NET_STA)
+    :type station2: str
+    :param station2: The name of station 2 (formatted NET_STA)
+    :type filterid: int
+    :param filterid: The ID (ref) of the filter
+    :type components: str
+    :param components: The name of the components used (ZZ, ZR, ...)
+    :type dates: list
+    :param dates: List of TODO datetime.datetime
+    :type mov_stack: int
+    :param mov_stack: Moving window stack.
+    :type format: str
+    :param format: Either ``stack``: the data will be stacked according to
+        the parameters passed with ``params`` or ``matrix``: to get a 2D
+        array of CCF.
+    :type params: dict
+    :param params: A dictionnary of MSNoise config parameters as returned by
+        :func:`get_params`.
+    :rtype: :class:`numpy.ndarray`
+    :return: Either a 1D CCF (if format is ``stack`` or a 2D array (if format=
+        ``matrix``).
+    """
     if not params:
         export_format = get_config(session, 'export_format')
     else:
@@ -1214,8 +1273,25 @@ def get_results(session, station1, station2, filterid, components, dates,
             return 0, None
 
 
-def get_results_all(session, station1, station2, filterid, components, dates,
-                mov_stack = 1, format="stack"):
+def get_results_all(session, station1, station2, filterid, components, dates):
+    """
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type station1: str
+    :param station1: The name of station 1 (formatted NET_STA)
+    :type station2: str
+    :param station2: The name of station 2 (formatted NET_STA)
+    :type filterid: int
+    :param filterid: The ID (ref) of the filter
+    :type components: str
+    :param components: The name of the components used (ZZ, ZR, ...)
+    :type dates: list
+    :param dates: List of TODO datetime.datetime
+    :rtype: :class:`pandas.DataFrame`
+    :return: All CCF results in a :class:`pandas.DataFrame`, where the index
+        is the time of the CCF and the columns are the times in the coda.
+    """
 
     output_folder = get_config(session, 'output_folder')
     path = os.path.join(output_folder, "%02i" % int(filterid),
@@ -1245,7 +1321,7 @@ def get_maxlag_samples(session):
         obtained by :func:`connect`
 
     :rtype: int
-    :returns: the length of the CCF
+    :returns: the length of the CCF in samples
     """
 
     maxlag = float(get_config(session, 'maxlag'))
@@ -1263,7 +1339,7 @@ def get_t_axis(session):
         obtained by :func:`connect`
 
     :rtype: :class:`numpy.array`
-    :returns: the time axis
+    :returns: the time axis in seconds
     """
 
     maxlag = float(get_config(session, 'maxlag'))
@@ -1444,7 +1520,7 @@ def nextpow2(x):
 
 
 def check_and_phase_shift(trace):
-    # print trace
+    # TODO replace this hard coded taper length
     taper_length = 20.0
     if trace.stats.npts < 4 * taper_length*trace.stats.sampling_rate:
         trace.data = np.zeros(trace.stats.npts)
@@ -1556,6 +1632,8 @@ def make_same_length(st):
 
     # get the mask of all traces, i.e. the parts where at least one trace has
     # a gap
+    # TODO add cases with more than 2 or 3 traces (could append?)
+    # TODO is there a better way to AND masks ?
     if len(st) == 2:
         mask = np.logical_or(st[0].data.mask, st[1].data.mask)
     elif len(st) == 3:
@@ -1587,70 +1665,6 @@ def clean_scipy_cache():
     sff.destroy_ddst1_cache()
     sff.destroy_dst2_cache()
     sff.destroy_dst1_cache()
-
-
-### TMP
-
-def linear_regression(xdata, ydata, weights=None, p0=None,
-                      intercept_origin=True, **kwargs):
-    """
-    Use linear least squares to fit a function, f, to data.
-    This method is a generalized version of
-    :func:`scipy.optimize.minpack.curve_fit`; allowing for Ordinary Least
-    Square and Weighted Least Square regressions:
-
-    * OLS through origin: ``linear_regression(xdata, ydata)``
-    * OLS with any intercept: ``linear_regression(xdata, ydata,
-      intercept_origin=False)``
-    * WLS through origin: ``linear_regression(xdata, ydata, weights)``
-    * WLS with any intercept: ``linear_regression(xdata, ydata, weights,
-      intercept_origin=False)``
-
-    If the expected values of slope (and intercept) are different from 0.0,
-    provide the p0 value(s).
-
-    :param xdata: The independent variable where the data is measured.
-    :param ydata: The dependent data - nominally f(xdata, ...)
-    :param weights: If not None, the uncertainties in the ydata array. These
-        are used as weights in the least-squares problem. If ``None``, the
-        uncertainties are assumed to be 1. In SciPy vocabulary, our weights are
-        1/sigma.
-    :param p0: Initial guess for the parameters. If ``None``, then the initial
-        values will all be 0 (Different from SciPy where all are 1)
-    :param intercept_origin: If ``True``: solves ``y=a*x`` (default);
-        if ``False``: solves ``y=a*x+b``.
-
-    :rtype: tuple
-    :returns: (slope, std_slope) if ``intercept_origin`` is ``True``;
-        (slope, intercept, std_slope, std_intercept) if ``False``.
-    """
-    if weights is not None:
-        sigma = 1. / weights
-    else:
-        sigma = None
-
-    if p0 is None:
-        if intercept_origin:
-            p0 = 0.0
-        else:
-            p0 = [0.0, 0.0]
-
-    if intercept_origin:
-        p, cov = scipy.optimize.curve_fit(lambda x, a: a * x,
-                                          xdata, ydata, p0, sigma=sigma,
-                                          **kwargs)
-        slope = p[0]
-        std_slope = np.sqrt(cov[0, 0])
-        return slope, std_slope
-
-    else:
-        p, cov = scipy.optimize.curve_fit(lambda x, a, b: a * x + b,
-                                          xdata, ydata, p0, sigma=sigma,
-                                          **kwargs)
-        slope, intercept = p
-        std_slope = np.sqrt(cov[0, 0])
-        std_intercept = np.sqrt(cov[1, 1])
-        return slope, intercept, std_slope, std_intercept
 
 
 def preload_instrument_responses(session):
@@ -1721,18 +1735,4 @@ def preload_instrument_responses(session):
                                                "end_date", "paz", "latitude",
                                                "longitude"],)
     logging.debug('Finished Loading instrument responses')
-    return(channels)
-
-
-if __name__ == "__main__":
-    s = connect()
-    for filter in get_filters(s, False):
-        print(filter.ref, filter.low, filter.high)
-
-    print(get_networks(s))
-
-    for station in get_stations(s, False, net='BE'):
-        print( station.net, station.sta)
-
-    print(get_config(s))
-    print(get_config(s, 'data_folder'))
+    return channels
