@@ -1,6 +1,6 @@
 import logging
 
-import matplotlib.pyplot as plt
+
 import numpy as np
 import scipy.fftpack
 import scipy.optimize
@@ -41,6 +41,7 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     # data = scipy.fftpack.fft(data,int(Nfft),axis=1)
 
     if plot:
+        import matplotlib.pyplot as plt
         plt.subplot(211)
         plt.plot(np.arange(len(data[0])) * 0.05, np.abs(data[0]))
         plt.subplot(212)
@@ -131,6 +132,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     """
     # TODO: docsting
     if plot:
+        import matplotlib.pyplot as plt
         plt.subplot(411)
         plt.plot(np.arange(len(data)) * delta, data)
         plt.xlim(0, len(data) * delta)

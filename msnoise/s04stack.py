@@ -240,8 +240,8 @@ def main(stype, interval=1.0):
                                         if not np.all(np.isnan(corr)):
                                             day_name = "%s_%s" % (
                                                 sta1, sta2)
-                                            logging.debug("%s %s [%s - %s] (%i day stack)" % (
-                                                day_name, date, datelist[low], datelist[i], mov_stack))
+                                            logging.debug("%s %s %s [%s - %s] (%i day stack)" % (
+                                                day_name, components, date, datelist[low], datelist[i], mov_stack))
                                             corr = stack(corr, stack_method,
                                                          pws_timegate,
                                                          pws_power,
@@ -290,8 +290,8 @@ def main(stype, interval=1.0):
                                         if not np.all(np.isnan(corr)):
                                             day_name = "%s_%s" % (
                                                 sta1, sta2)
-                                            logging.debug("%s %s [%s - %s] (%i day stack)" % (
-                                                day_name, date, datelist[low], datelist[high-1], mov_stack))
+                                            logging.debug("%s %s %s [%s - %s] (%i day stack)" % (
+                                                day_name, components, date, datelist[low], datelist[high-1], mov_stack))
                                             corr = stack(corr, stack_method,
                                                          pws_timegate,
                                                          pws_power,

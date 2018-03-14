@@ -161,7 +161,7 @@ def main():
             try:
                 db.bulk_update_mappings(Job, mappings)
                 db.commit()
-                updated=True
+                updated = True
             except:
                 time.sleep(np.random.random())
                 pass
@@ -169,6 +169,3 @@ def main():
             update_job(db, job.day, job.pair, 'DTT', 'T')
 
     logging.info('*** Finished: Compute MWCS ***')
-
-if __name__ == "__main__":
-    main()
