@@ -26,6 +26,8 @@ History
 * 2015: MSNoise 1.3: MSNoise is real python package, with a documented API and new plots ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.3.html)).
 * 2016: MSNoise 1.4: new web admin interface, plugin support, instrument response removal and phase weighted stacking ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.4.html)).
 * 2017: MSNoise 1.5: Autocorrelation / Single Station correlation support, rewritten preprocessing, new_jobs and scan_archive for more performance, better instrument response preloading ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.5.html)).
+* 2018: MSNoise 1.6: Optimisation of the workflow (one job type per step), 
+HPC support, faster *compute_cc* step, post-CC rotation,... *TODO*
 
 Documentation
 -------------
