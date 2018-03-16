@@ -8,7 +8,7 @@ default['network'] = ["Network to analyse [*]",'*']
 default['channels'] = ["Channels need to match the value (ex: [\*], \*Z, BH\*, HHZ,...)",'*']
 
 default['startdate'] = ["Start Date to process: [1970-01-01]='since beginning of the archive'","1970-01-01"]
-default['enddate'] = ["End Date to process: [2100-01-01]='No end'","2018-01-01"]
+default['enddate'] = ["End Date to process: [2100-01-01]='No end'","2019-01-01"]
 
 default['analysis_duration'] = ["Duration of the Analysis (total in seconds : 3600, [86400])",'86400']
 default['cc_sampling_rate'] = ["Sampling Rate for the CrossCorrelation [20.0]",'20.0']
@@ -41,7 +41,7 @@ default['keep_all'] = ["Keep all cross-corr (length: corr_duration) [Y]/N",'N']
 default['keep_days'] = ["Keep all daily cross-corr [Y]/N",'Y']
 
 default['ref_begin'] = ["Beginning or REF stacks. Can be absolute (2012-01-01) or relative (-100) days",'1970-01-01']
-default['ref_end'] = ["End or REF stacks. Same as ref_begin",'2018-01-01']
+default['ref_end'] = ["End or REF stacks. Same as ref_begin",'2019-01-01']
 
 default['mov_stack'] = ["Number of days to stack for the Moving-window stacks ([5]= [day-4:day]), can be a comma-separated list 1,2,5,10","5"]
 
