@@ -54,12 +54,13 @@ def p():
 
 
 @click.command()
-def test():
+@click.option('-p', '--prefix', default="", help='Prefix for tables')
+def test(prefix):
     """Runs the test suite, should be executed in an empty folder!"""
     import matplotlib.pyplot as plt
     plt.switch_backend("agg")
     from ..test.tests import main
-    main()
+    main(prefix=prefix)
 
 
 @click.command()
@@ -805,23 +806,23 @@ cli.add_command(ipython)
 cli.add_command(test)
 # Finally add the plot group too:
 cli.add_command(plot)
-
-try:
-    from ..api import connect, get_config
-
-    db = connect()
-    plugins = get_config(db, "plugins")
-    db.close()
-except:
-    plugins = None
-
-if plugins:
-    plugins = plugins.split(",")
-    for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.commands'):
-        module_name = ep.module_name.split(".")[0]
-        if module_name in plugins:
-            plugin.add_command(ep.load())
-            p.add_command(ep.load())
+#
+# try:
+#     from ..api import connect, get_config
+#
+#     db = connect()
+#     plugins = get_config(db, "plugins")
+#     db.close()
+# except:
+#     plugins = None
+#
+# if plugins:
+#     plugins = plugins.split(",")
+#     for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.commands'):
+#         module_name = ep.module_name.split(".")[0]
+#         if module_name in plugins:
+#             plugin.add_command(ep.load())
+#             p.add_command(ep.load())
 
 cli.add_command(plugin)
 cli.add_command(p)

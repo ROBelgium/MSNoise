@@ -43,7 +43,8 @@ def get_tech():
     :rtype: int
     :returns: The database technology used: 1=sqlite 2=mysql
     """
-    tech, hostname, database, username, password = read_database_inifile()
+    tech, hostname, database, username, password, prefix = \
+        read_database_inifile()
     return tech
 
 
@@ -59,7 +60,8 @@ def get_engine(inifile=None):
     """
     if not inifile:
         inifile = os.path.join(os.getcwd(), 'db.ini')
-    tech, hostname, database, user, passwd = read_database_inifile(inifile)
+    tech, hostname, database, user, passwd, prefix = read_database_inifile(
+        inifile)
     if tech == 1:
         engine = create_engine('sqlite:///%s' % hostname, echo=False,
                                connect_args={'check_same_thread': False})
@@ -90,7 +92,8 @@ def connect(inifile=None):
     return Session()
 
 
-def create_database_inifile(tech, hostname, database, username, password):
+def create_database_inifile(tech, hostname, database, username, password,
+                            prefix=""):
     """Creates the db.ini file based on supplied parameters.
 
     :type tech: int
@@ -103,12 +106,15 @@ def create_database_inifile(tech, hostname, database, username, password):
     :type username: string
     :param username: The user name
     :type password: string
+    :param prefix: The prefix to use for all tables
+    :type prefix: string
     :param password: The password of `user`
 
     :return: None
     """
     f = open(os.path.join(os.getcwd(), 'db.ini'), 'wb')
-    cPickle.dump([tech, hostname, database, username, password], f, protocol=2)
+    cPickle.dump([tech, hostname, database, username, password, prefix], f,
+                 protocol=2)
     f.close()
 
 
@@ -126,9 +132,15 @@ def read_database_inifile(inifile=None):
         inifile = os.path.join(os.getcwd(), 'db.ini')
 
     f = open(inifile, 'rb')
-    tech, hostname, database, username, password = cPickle.load(f)
+    try:
+        # New ini file with prefix support
+        tech, hostname, database, username, password, prefix = cPickle.load(f)
+    except:
+        # Old ini file without prefix
+        tech, hostname, database, username, password = cPickle.load(f)
+        prefix = ""
     f.close()
-    return [tech, hostname, database, username, password]
+    return [tech, hostname, database, username, password, prefix]
 
 
 # CONFIG
@@ -1386,6 +1398,10 @@ def build_ref_datelist(session):
     if begin[0] == '-':
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
         end = datetime.date.today() + datetime.timedelta(days=int(end))
+    elif begin == "1970-01-01":
+        start = session.query(DataAvailability).order_by(
+            DataAvailability.starttime).first().starttime.date()
+        end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
     else:
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
@@ -1412,6 +1428,10 @@ def build_movstack_datelist(session):
     if begin[0] == '-':
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
         end = datetime.date.today() + datetime.timedelta(days=int(end))
+    elif begin == "1970-01-01":
+        start = session.query(DataAvailability).order_by(
+            DataAvailability.starttime).first().starttime.date()
+        end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
     else:
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()

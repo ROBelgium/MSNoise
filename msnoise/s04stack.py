@@ -269,7 +269,7 @@ def main(stype, interval=1.0):
                                                 jobadded = True
                                         del corr
                         elif stype == "step":
-                            jobs = []
+                            jobs_done = []
                             for mov_stack in mov_stacks:
                                 for i, date in enumerate(datelists[mov_stack]):
                                     if date not in datelist:
@@ -310,10 +310,10 @@ def main(stype, interval=1.0):
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
                                             job = "%s %s" % (date, day_name)
-                                            if job not in jobs:
+                                            if job not in jobs_done:
                                                 update_job(
                                                     db, date, day_name.replace('_', '.'), 'MWCS', 'T')
-                                                jobs.append(job)
+                                                jobs_done.append(job)
                                         del corr
                             #~ for date in datelist:
                                 #~ day_name = "%s:%s" % (
@@ -355,8 +355,9 @@ def main(stype, interval=1.0):
             except:
                 time.sleep(np.random.random())
                 pass
-        for job in jobs:
-            update_job(db, job.day, job.pair, 'MWCS', 'T')
+        if stype != "step":
+            for job in jobs:
+                update_job(db, job.day, job.pair, 'MWCS', 'T')
 
     logging.debug("Finished Stacking")
 

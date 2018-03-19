@@ -6,7 +6,9 @@ import shutil
 import glob
 from obspy import read
 
+
 class MSNoiseTests(unittest.TestCase):
+    prefix = ""
 
     def setUp(self):
         path = os.path.abspath(os.path.dirname(__file__))
@@ -18,7 +20,7 @@ class MSNoiseTests(unittest.TestCase):
     def test_001_S01installer(self):
         from ..s000installer import main
         try:
-            ret = main(tech=1)
+            ret = main(tech=1, prefix=self.prefix)
             msg = "Installation Done! - Go to Configuration Step!"
             self.failUnlessEqual(ret, msg)
         except:
@@ -271,18 +273,21 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
 
     def test_023_stack(self):
-        from ..api import connect, update_config
+        from ..api import connect, update_config, reset_jobs
         from ..s04stack import main
         db = connect()
         update_config(db, 'ref_begin', '2009-01-01')
         update_config(db, 'ref_end', '2011-01-01')
         update_config(db, 'startdate', '2009-01-01')
         update_config(db, 'enddate', '2011-01-01')
-        db.close()
+
         interval = 1.
         main('ref', interval)
+        reset_jobs(db, "STACK", alljobs=True)
         main('mov', interval)
+        reset_jobs(db, "STACK", alljobs=True)
         main('step', interval)
+        db.close()
 
     def test_024_mwcs(self):
         from ..s05compute_mwcs import main
@@ -383,7 +388,6 @@ class MSNoiseTests(unittest.TestCase):
                       "ZZ", filter.ref, 1)
                 self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
 
-
     def test_099_S01installer(self):
         if "TRAVIS" not in os.environ:
             print("Seems to be running on local machine, skipping MySQL test")
@@ -400,7 +404,8 @@ class MSNoiseTests(unittest.TestCase):
             traceback.print_exc()
             self.fail()
 
-def main():
+
+def main(prefix=""):
     import matplotlib.pyplot as plt
     plt.switch_backend("agg")
     import os
@@ -415,6 +420,7 @@ def main():
     result = runner.run(suite)
     if not result.wasSuccessful():
         sys.exit(1)
+
 
 if __name__ == '__main__':
     main()

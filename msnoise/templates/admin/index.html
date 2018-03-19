@@ -32,6 +32,26 @@ function update_CC_jobs(res) {
   $('#CC').css('width', x+'%').attr('aria-valuenow', x);
     $('#CC').text(x+'%');
 }
+
+function update_STACK_jobs(res) {
+    total = res['T'] + res['I'] + res['D'];
+    text = total + " STACK jobs in the database: " + res['T'] + " todo, ";
+    text = text + res['I'] + " in progress and " + res['D'] + " done";
+    $("#jobs_STACK").text(text);
+    var x = Math.floor(100*res['D']/total);
+  $('#STACK').css('width', x+'%').attr('aria-valuenow', x);
+    $('#STACK').text(x+'%');
+}
+function update_MWCS_jobs(res) {
+    total = res['T'] + res['I'] + res['D'];
+    text = total + " MWCS jobs in the database: " + res['T'] + " todo, ";
+    text = text + res['I'] + " in progress and " + res['D'] + " done";
+    $("#jobs_MWCS").text(text);
+    var x = Math.floor(100*res['D']/total);
+  $('#MWCS').css('width', x+'%').attr('aria-valuenow', x);
+    $('#MWCS').text(x+'%');
+}
+
 function update_DTT_jobs(res) {
     total = res['T'] + res['I'] + res['D'];
     text = total + " DTT jobs in the database: " + res['T'] + " todo, ";
@@ -52,9 +72,32 @@ function update_DA(res) {
     $('#DA').text(x+'%');
   console.debug(x);
 }
+
+function resetjobs(jobtype, all, consolename) {
+    $(consolename).text("Processing...");
+        $(consolename+"_div").show();
+        $.ajax({
+            url:'/admin/resetjobs.json',
+            type:'GET',
+            dataType: 'json',
+            data: {'type':jobtype, 'all':all},
+            success: function (res) {
+              console.debug('%o', res);
+              text = res['Done'];
+              $(consolename).text(text);
+              },
+            error: function (res) {
+                $(consolename).text("error...?");
+                }
+        });
+
+}
+
 function update_all() {
 
-   get_num_jobs('CC', update_CC_jobs); 
+   get_num_jobs('CC', update_CC_jobs);
+   get_num_jobs('STACK', update_STACK_jobs);
+   get_num_jobs('MWCS', update_MWCS_jobs);
    get_num_jobs('DTT', update_DTT_jobs); 
    data_availability_flags(update_DA); 
    
@@ -78,6 +121,36 @@ function update_all() {
                 }
         });
     });
+
+    $('#reset_CC').click(function() {
+        resetjobs("CC", 0, "#reset_CC_console")
+    });
+    $('#reset_CC_all').click(function() {
+        resetjobs("CC", 1, "#reset_CC_console")
+    });
+
+    $('#reset_STACK').click(function() {
+        resetjobs("STACK", 0, "#reset_STACK_console")
+    });
+    $('#reset_STACK_all').click(function() {
+        resetjobs("STACK", 1, "#reset_STACK_console")
+    });
+
+    $('#reset_MWCS').click(function() {
+        resetjobs("MWCS", 0, "#reset_MWCS_console")
+    });
+    $('#reset_MWCS_all').click(function() {
+        resetjobs("MWCS", 1, "#reset_MWCS_console")
+    });
+    
+    
+    $('#reset_DTT').click(function() {
+        resetjobs("DTT", 0, "#reset_DTT_console")
+    });
+    $('#reset_DTT_all').click(function() {
+        resetjobs("DTT", 1, "#reset_DTT_console")
+    });
+
     $('#shutdown').click(function() {
         $.ajax({
             url:'/shutdown',
@@ -99,7 +172,9 @@ function update_all() {
         $(this).parent().hide();
     });
     
-   get_num_jobs('CC', update_CC_jobs); 
+   get_num_jobs('CC', update_CC_jobs);
+   get_num_jobs('STACK', update_STACK_jobs);
+   get_num_jobs('MWCS', update_MWCS_jobs);
    get_num_jobs('DTT', update_DTT_jobs); 
    data_availability_flags(update_DA); 
    
@@ -128,13 +203,67 @@ function update_all() {
 </div>
 
 <h3>Cross-Correlation Jobs</h3>
+     <button id='reset_CC' value='Reset CC: ALL' class="btn
+  btn-success">Reset CC jobs "in progress"</button>
+
+     <button id='reset_CC_all' value='Reset CC' class="btn
+  btn-warning">Reset <b>all</b> CC jobs</button>
+  <div class="alert fade in" id="reset_CC_console_div" style="display:none;width:300px;">
+    <button type="button" class="close">x</button>
+    <div id='reset_CC_console'></div>
+  </div>
+    <br>
 <span id='jobs_CC'></span>
-<div class="progress">
+ <div class="progress">
   <div id='CC' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+</div>
+
+<h3>Stack Jobs</h3>
+         <button id='reset_STACK' value='STACK' class="btn
+  btn-success">Reset STACK jobs "in progress"</button>
+
+     <button id='reset_STACK_all' value='Reset CC' class="btn
+  btn-warning">Reset <b>all</b> STACK jobs</button>
+  <div class="alert fade in" id="reset_STACK_console_div" style="display:none;width:300px;">
+    <button type="button" class="close">x</button>
+    <div id='reset_STACK_console'></div>
+  </div>
+    <br>
+<span id='jobs_STACK'></span>
+<div class="progress">
+  <div id='STACK' class="progress bar" role="progressbar" aria-valuenow="0"
+       aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+</div>
+
+<h3>MWCS Jobs</h3>
+             <button id='reset_MWCS' value='MWCS' class="btn
+  btn-success">Reset MWCS jobs "in progress"</button>
+
+     <button id='reset_MWCS_all' value='Reset CC' class="btn
+  btn-warning">Reset <b>all</b> MWCS jobs</button>
+  <div class="alert fade in" id="reset_MWCS_console_div" style="display:none;width:300px;">
+    <button type="button" class="close">x</button>
+    <div id='reset_MWCS_console'></div>
+  </div>
+    <br>
+<span id='jobs_MWCS'></span>
+<div class="progress">
+  <div id='MWCS' class="progress bar" role="progressbar" aria-valuenow="0"
+       aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
 </div>
 
 
 <h3>Relative Travel Time Jobs</h3>
+             <button id='reset_DTT' value='DTT' class="btn
+  btn-success">Reset DTT jobs "in progress"</button>
+
+     <button id='reset_DTT_all' value='Reset CC' class="btn
+  btn-warning">Reset <b>all</b> DTT jobs</button>
+  <div class="alert fade in" id="reset_DTT_console_div" style="display:none;width:300px;">
+    <button type="button" class="close">x</button>
+    <div id='reset_DTT_console'></div>
+  </div>
+    <br>
 <span id='jobs_DTT'></span>
 <div class="progress">
   <div id='DTT' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
