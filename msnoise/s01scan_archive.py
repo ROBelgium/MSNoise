@@ -239,6 +239,7 @@ def main(init=False, threads=1):
     logging.info('*** Finished: Scan Archive ***')
     logging.info('It took %.2f seconds' % (time.time() - t))
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Scan the data archive and insert the\
     metadata in the database')

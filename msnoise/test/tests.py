@@ -18,7 +18,10 @@ class MSNoiseTests(unittest.TestCase):
         self.data_folder = "data"
 
     def test_001_S01installer(self):
+        import os
         from ..s000installer import main
+        if "PREFIX" in os.environ:
+            self.prefix=os.environ["PREFIX"]
         try:
             ret = main(tech=1, prefix=self.prefix)
             msg = "Installation Done! - Go to Configuration Step!"
@@ -414,7 +417,7 @@ def main(prefix=""):
     if c > 0:
         print("Directory is not empty, can't run tests here!")
         sys.exit()
-
+    os.environ["PREFIX"] = prefix
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
     runner = unittest.TextTestRunner(verbosity=4)
     result = runner.run(suite)

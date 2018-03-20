@@ -76,9 +76,12 @@ def upgrade_db():
     This procedure adds new parameters with their default value
     in the config database.
     """
-    from ..api import connect, Config
+    from ..api import connect, Config, read_database_inifile
     from ..default import default
     db = connect()
+    tech, hostname, database, username, password, prefix = \
+        read_database_inifile()
+    prefix = prefix + "_"
     for name in default.keys():
         try:
             db.add(Config(name=name, value=default[name][-1]))
@@ -88,22 +91,27 @@ def upgrade_db():
             # print("Passing %s: already in DB" % name)
             continue
     try:
-        db.execute("CREATE INDEX job_index ON jobs (day, pair, jobtype)")
+        db.execute("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
+                   "jobtype)" %
+                   prefix)
         db.commit()
     except:
         logging.info("It looks like the v1.5 'job_index' is already in the DB")
         db.rollback()
 
     try:
-        db.execute("CREATE INDEX job_index2 ON jobs (jobtype, flag)")
+        db.execute("CREATE INDEX job_index2 ON %sjobs (jobtype, flag)" %
+                   prefix)
         db.commit()
     except:
-        logging.info("It looks like the v1.5 'job_index2' is already in the DB")
+        logging.info("It looks like the v1.6 'job_index2' is already in the DB")
         db.rollback()
 
 
     try:
-        db.execute("CREATE INDEX da_index ON data_availability (path, file, net, sta, comp)")
+        db.execute("CREATE UNIQUE INDEX da_index ON %sdata_availability (path, "
+                   "file, net, sta, comp)" %
+                   prefix)
         db.commit()
     except:
         logging.info("It looks like the v1.5 'da_index' is already in the DB")

@@ -149,9 +149,10 @@ def main(tech=None, hostname="localhost", username="msnoise",
               " continue")
         return "Integrity Error - DB already exists"
 
+    prefix = prefix + "_"
     # TODO move those calls to a def and call it from install / msnoise.scripts
     try:
-        session.execute("CREATE INDEX job_index ON %sjobs (day, pair, "
+        session.execute("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
                         "jobtype)" % prefix)
         session.commit()
     except:
@@ -163,12 +164,12 @@ def main(tech=None, hostname="localhost", username="msnoise",
                         % prefix)
         session.commit()
     except:
-        logging.info("It looks like the v1.5 'job_index2' is already in the DB")
+        logging.info("It looks like the v1.6 'job_index2' is already in the DB")
         session.rollback()
 
     try:
-        session.execute("CREATE INDEX da_index ON %sdata_availability (path, "
-                        "file, net, sta, comp)" % prefix)
+        session.execute("CREATE UNIQUE INDEX da_index ON %sdata_availability ("
+                        "path, file, net, sta, comp)" % prefix)
         session.commit()
     except:
         logging.info("It looks like the v1.5 'da_index' is already in the DB")
