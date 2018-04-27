@@ -345,19 +345,21 @@ def main(stype, interval=1.0):
                             del stack_total
 
         # THIS SHOULD BE IN THE API
-        updated = False
-        mappings = [{'ref': job.ref, 'flag': "D"} for job in jobs]
-        while not updated:
-            try:
-                db.bulk_update_mappings(Job, mappings)
-                db.commit()
-                updated = True
-            except:
-                time.sleep(np.random.random())
-                pass
-        if stype != "step":
-            for job in jobs:
-                update_job(db, job.day, job.pair, 'MWCS', 'T')
+        # This doesn't set MWCS jobs for REF stacks
+        if stype != "ref":
+            updated = False
+            mappings = [{'ref': job.ref, 'flag': "D"} for job in jobs]
+            while not updated:
+                try:
+                    db.bulk_update_mappings(Job, mappings)
+                    db.commit()
+                    updated = True
+                except:
+                    time.sleep(np.random.random())
+                    pass
+            if stype != "step":
+                for job in jobs:
+                    update_job(db, job.day, job.pair, 'MWCS', 'T')
 
     logging.debug("Finished Stacking")
 
@@ -368,36 +370,3 @@ def refstack(interval):
 
 def movstack(interval):
     main('mov', interval)
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s [%(levelname)s] %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S')
-
-    parser = argparse.ArgumentParser(description='Compute [REF,MOV] stacks if\
-                                jobs have been modified in the last i days.',
-                                     epilog=__doc__)
-    parser.add_argument('-r', '--ref', action="store_true",
-                        help='Triggers the computation of REF stacks',
-                        default=False)
-    parser.add_argument('-m', '--mov', action="store_true",
-                        help='Triggers the computation of MOV stacks',
-                        default=False)
-    parser.add_argument('-i', '--interval',
-                        help='Number of days before now to search for\
-                        modified CC jobs [default:1]', default=1, type=int)
-    args = parser.parse_args()
-
-    logging.info('Starting this program with: ref=%s, mov=%s, interval=%i'
-                 % (args.ref, args.mov, args.interval))
-
-    db = connect()
-    if args.ref:
-        logging.info("*** Starting: REF Stack ***")
-        refstack(args.interval)
-        logging.info("*** Finished: REF Stack ***")
-    if args.mov:
-        logging.info("*** Starting: MOV Stack ***")
-        movstack(args.interval)
-        logging.info("*** Finished: MOV Stack ***")
