@@ -17,16 +17,18 @@ class PrefixerBase(Base):
     __abstract__ = True
     inifile = os.path.join(os.getcwd(), 'db.ini')
 
-    f = open(inifile, 'rb')
     try:
+        f = open(inifile, 'rb')
         # New ini file with prefix support
         tech, hostname, database, username, password, prefix = cPickle.load(f)
+        _the_prefix = prefix + "_"
+        f.close()
     except:
+        f = open(inifile, 'rb')
         # Old ini file without prefix
         tech, hostname, database, username, password = cPickle.load(f)
-        prefix = ""
-    f.close()
-    _the_prefix = prefix + "_"
+        _the_prefix = ""
+        f.close()
 
     @declared_attr
     def __tablename__(cls):
