@@ -79,7 +79,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                               starttime=UTCDateTime(gd),
                               endtime=UTCDateTime(gd)+86400)
                     except:
-                        logging.debug("ERROR reading file %s"%file)
+                        logging.debug("ERROR reading file %s" % file)
                         continue
                     tmp = st.select(network=net, station=sta, component=comp)
                     if not len(tmp):
@@ -152,35 +152,35 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
 
                 for trace in stream:
                     logging.debug(
-                        "%s.%s Highpass at %.2f Hz" % (station, comp, params.preprocess_highpass))
+                        "%s Highpass at %.2f Hz" % (trace.id, params.preprocess_highpass))
                     trace.filter("highpass", freq=params.preprocess_highpass, zerophase=True)
 
                     if trace.stats.sampling_rate != params.goal_sampling_rate:
                         logging.debug(
-                            "%s.%s Lowpass at %.2f Hz" % (station, comp, params.preprocess_lowpass))
+                            "%s Lowpass at %.2f Hz" % (trace.id, params.preprocess_lowpass))
                         trace.filter("lowpass", freq=params.preprocess_lowpass, zerophase=True, corners=8)
 
                         if params.resampling_method == "Resample":
-                            logging.debug("%s.%s Downsample to %.1f Hz" %
-                                          (station, comp, params.goal_sampling_rate))
+                            logging.debug("%s Downsample to %.1f Hz" %
+                                          (trace.id, params.goal_sampling_rate))
                             trace.data = resample(
                                 trace.data, params.goal_sampling_rate / trace.stats.sampling_rate, 'sinc_fastest')
 
                         elif params.resampling_method == "Decimate":
                             decimation_factor = trace.stats.sampling_rate / params.goal_sampling_rate
                             if not int(decimation_factor) == decimation_factor:
-                                logging.warning("%s.%s CANNOT be decimated by an integer factor, consider using Resample or Lanczos methods"
+                                logging.warning("%s CANNOT be decimated by an integer factor, consider using Resample or Lanczos methods"
                                                 " Trace sampling rate = %i ; Desired CC sampling rate = %i" %
-                                                (station, comp, trace.stats.sampling_rate, params.goal_sampling_rate))
+                                                (trace.id, trace.stats.sampling_rate, params.goal_sampling_rate))
                                 sys.stdout.flush()
                                 sys.exit()
-                            logging.debug("%s.%s Decimate by a factor of %i" %
-                                          (station, comp, decimation_factor))
+                            logging.debug("%s Decimate by a factor of %i" %
+                                          (trace.id, decimation_factor))
                             trace.data = trace.data[::int(decimation_factor)]
 
                         elif params.resampling_method == "Lanczos":
-                            logging.debug("%s.%s Downsample to %.1f Hz" %
-                                          (station, comp, params.goal_sampling_rate))
+                            logging.debug("%s Downsample to %.1f Hz" %
+                                          (trace.id, params.goal_sampling_rate))
                             trace.data = np.array(trace.data)
                             trace.interpolate(method="lanczos", sampling_rate=params.goal_sampling_rate, a=1.0)
 

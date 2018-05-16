@@ -210,12 +210,25 @@ def info(jobs):
                     ['N', 'Y'][s.used])
             print('%s.%s %.4f %.4f %.1f %s %s' % data)
 
+    click.echo("MSNoise")
     for jobtype in ["CC", "STACK", "MWCS", "DTT"]:
-        click.echo('')
-        click.echo('%s Jobs:' % jobtype)
+        click.echo(' %s:' % jobtype)
         for (n, jobtype) in get_job_types(db, jobtype):
-            click.echo(" %s : %i" % (jobtype, n))
+            click.echo("  %s : %i" % (jobtype, n))
 
+    plugins = get_config(db, "plugins")
+    if plugins:
+        plugins = plugins.split(",")
+        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
+            module_name = ep.module_name.split(".")[0]
+            if module_name in plugins:
+                click.echo('')
+                click.echo('Plugin: %s' % module_name)
+                for row in ep.load()():
+                    click.echo(' %s:' % row["name"])
+                    for (n, jobtype) in get_job_types(db, row["name"]):
+                        click.echo("  %s : %i" % (jobtype, n))
+    
 
 @click.command()
 def install():
