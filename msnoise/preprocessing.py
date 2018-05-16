@@ -107,11 +107,11 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     continue
                 stream = stream.split()
 
-                logging.debug("Checking sample alignment")
+                logging.debug("%s Checking sample alignment" % stream[0].id)
                 for i, trace in enumerate(stream):
                     stream[i] = check_and_phase_shift(trace)
 
-                logging.debug("Checking Gaps")
+                logging.debug("%s Checking Gaps" % stream[0].id)
                 if len(getGaps(stream)) > 0:
                     max_gap = 10
                     only_too_long = False

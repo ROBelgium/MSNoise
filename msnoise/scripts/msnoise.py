@@ -217,13 +217,23 @@ def info(jobs):
             click.echo(" %s : %i" % (jobtype, n))
 
 
-
 @click.command()
 def install():
     """This command launches the installer."""
-    click.echo('Launching the installer')
+    click.echo('DEPRECATED command since MSNoise 1.6, please use "msnoise init"'
+               ' instead')
     from ..s000installer import main
     main()
+
+
+@click.command()
+@click.option('--tech', help='Database technology: 1=SQLite 2=MySQL',
+              default=None)
+def init(tech):
+    """This command launches the installer."""
+    click.echo('Launching the installer')
+    from ..s000installer import main
+    main(tech)
 
 
 @click.command()
@@ -797,6 +807,7 @@ cli.add_command(info)
 cli.add_command(admin)
 cli.add_command(upgrade_db)
 cli.add_command(install)
+cli.add_command(init)
 cli.add_command(config)
 cli.add_command(populate)
 cli.add_command(bugreport)
