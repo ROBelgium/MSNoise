@@ -90,7 +90,7 @@ def main(tech=None, hostname="localhost", username="msnoise",
         print(" [1] sqlite")
         print(" [2] mysql")
         tech = int(raw_input('Choice:'))
-        
+
         if tech == 1:
             a = raw_input('Filename: [msnoise.sqlite]: ')
             hostname = a if len(a) != 0 else "msnoise.sqlite"
@@ -106,7 +106,7 @@ def main(tech=None, hostname="localhost", username="msnoise",
             hostname = a if len(a) != 0 else "127.0.0.1"
             a = raw_input('Database: [msnoise]: ')
             database = a if len(a) != 0 else "msnoise"
-            
+
             a = raw_input('Username: [msnoise]: ')
             username = a if len(a) != 0 else "msnoise"
             a = getpass('Password: [msnoise]: ')
@@ -114,7 +114,9 @@ def main(tech=None, hostname="localhost", username="msnoise",
 
             a = raw_input('Table prefix: []: ')
             prefix = a if len(a) != 0 else ""
-            
+    else:
+        tech = int(tech)
+
     if tech == 1:
         engine = create_engine('sqlite:///%s' % filename, echo=False)
         database = None
