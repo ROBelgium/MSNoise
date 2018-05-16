@@ -1648,6 +1648,8 @@ def make_same_length(st):
         endtimes.append(tr.stats.endtime)
 
     # trim stream to common starttimes
+    if max(starttimes) >= min(endtimes):
+        return Stream()
     st.trim(max(starttimes), min(endtimes))
 
     # get the mask of all traces, i.e. the parts where at least one trace has
