@@ -129,25 +129,31 @@ def info(jobs):
         get_stations
     from ..default import default
 
-    click.echo('')
-    click.echo('General:')
-
     def d(path):
         return os.path.split(path)[0]
 
-    click.echo('MSNoise is installed in: %s'
-               % d(d(d(os.path.abspath(__file__)))))
-
-    if os.path.isfile('db.ini'):
-        click.echo(' - db.ini is present')
-    else:
+    if not os.path.isfile('db.ini'):
         click.secho(' - db.ini is not present, is MSNoise installed here ?',
                     fg='red')
         return
-    click.echo('')
+
     db = connect()
 
     if not jobs:
+        click.echo('')
+        click.echo('General:')
+
+        click.echo('MSNoise is installed in: %s'
+                   % d(d(d(os.path.abspath(__file__)))))
+        
+        if os.path.isfile('db.ini'):
+            click.echo(' - db.ini is present')
+        else:
+            click.secho(' - db.ini is not present, is MSNoise installed here ?',
+                        fg='red')
+            return
+        click.echo('')
+        
         click.echo('')
         click.echo('Configuration:')
 
