@@ -16,6 +16,9 @@ class PrefixerBase(Base):
     # from .api import read_database_inifile
     __abstract__ = True
     inifile = os.path.join(os.getcwd(), 'db.ini')
+    if not os.path.isfile(inifile):
+        print("db.ini not found, exiting")
+        exit()
     _the_prefix = ""
     try:
         f = open(inifile, 'rb')
