@@ -13,25 +13,25 @@ Base = declarative_base()
 
 
 class PrefixerBase(Base):
-    # from .api import read_database_inifile
     __abstract__ = True
+    _the_prefix = ""
+
     inifile = os.path.join(os.getcwd(), 'db.ini')
     if not os.path.isfile(inifile):
-        print("db.ini not found, exiting")
-        exit()
-    _the_prefix = ""
-    try:
-        f = open(inifile, 'rb')
-        # New ini file with prefix support
-        tech, hostname, database, username, password, prefix = cPickle.load(f)
-        if prefix != "":
-            _the_prefix = prefix + "_"
-        f.close()
-    except:
-        f = open(inifile, 'rb')
-        # Old ini file without prefix
-        tech, hostname, database, username, password = cPickle.load(f)
-        f.close()
+        print("db.ini not found, ignoring prefix")
+    else:
+        try:
+            f = open(inifile, 'rb')
+            # New ini file with prefix support
+            tech, hostname, database, username, password, prefix = cPickle.load(f)
+            if prefix != "":
+                _the_prefix = prefix + "_"
+            f.close()
+        except:
+            f = open(inifile, 'rb')
+            # Old ini file without prefix
+            tech, hostname, database, username, password = cPickle.load(f)
+            f.close()
 
     @declared_attr
     def __tablename__(cls):

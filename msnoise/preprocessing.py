@@ -106,7 +106,8 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     traceback.print_exc()
                     continue
                 stream = stream.split()
-
+                if not len(stream):
+                    continue
                 logging.debug("%s Checking sample alignment" % stream[0].id)
                 for i, trace in enumerate(stream):
                     stream[i] = check_and_phase_shift(trace)

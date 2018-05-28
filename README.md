@@ -12,7 +12,7 @@ A Python Package for Monitoring Seismic Velocity Changes using Ambient Seismic N
 MSNoise is the first complete software package for computing and monitoring relative velocity variations using ambient seismic noise. 
 MSNoise is a fully-integrated solution that automatically scans data archives and determines which jobs need to be done whenever the scheduled task is executed. 
 
-MSNoise is developed by Thomas Lecocq (Royal Observatory of Belgium, ROB).
+MSNoise is developed by Thomas Lecocq (Royal Observatory of Belgium, ROB). Corentin Caudron used MSNoise during his PhD at ROB and still continuously provides invaluable debug information.
 The group of active users (providing questions, feedback, snippets of code) is growing and the full list of Contributors is available here: http://msnoise.org/doc/contributors.html. 
 
 
@@ -26,8 +26,7 @@ History
 * 2015: MSNoise 1.3: MSNoise is real python package, with a documented API and new plots ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.3.html)).
 * 2016: MSNoise 1.4: new web admin interface, plugin support, instrument response removal and phase weighted stacking ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.4.html)).
 * 2017: MSNoise 1.5: Autocorrelation / Single Station correlation support, rewritten preprocessing, new_jobs and scan_archive for more performance, better instrument response preloading ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.5.html)).
-* 2018: MSNoise 1.6: Optimisation of the workflow (one job type per step), 
-HPC support, faster *compute_cc* step, post-CC rotation,... *TODO*
+* 2018: MSNoise 1.6: Optimisation of the workflow (one job type per step), HPC support, faster *compute_cc* step, post-CC rotation,... *TODO*  ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.6.html))
 
 Documentation
 -------------
