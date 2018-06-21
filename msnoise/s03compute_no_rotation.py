@@ -233,7 +233,7 @@ def main():
             logging.info("Not enough data for this day !")
             logging.info("Marking job Done and continuing with next !")
             for job in jobs:
-                update_job(db, job.day, job.pair, 'CC', 'D')
+                update_job(db, job.day, job.pair, 'CC', 'D', ref=job.ref)
             continue
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.goal_sampling_rate
@@ -386,6 +386,9 @@ def main():
                     allcorr[ccfid][thistime] = corr[key]
                 del corr
 
+        # Needed to clean the FFT memory caching of SciPy
+        clean_scipy_cache()
+
         if params.keep_all:
             for ccfid in allcorr.keys():
                 export_allcorr2(db, ccfid, allcorr[ccfid])
@@ -417,18 +420,9 @@ def main():
                     params=params)
 
         # THIS SHOULD BE IN THE API
-        updated = False
-        mappings = [{'ref': job.ref, 'flag': "D"} for job in jobs]
-        while not updated:
-            try:
-                db.bulk_update_mappings(Job, mappings)
-                db.commit()
-                updated = True
-            except:
-                time.sleep(np.random.random())
-                pass
+        massive_update_job(db, jobs, "D")
+
         for job in jobs:
-            # update_job(db, job.day, job.pair, 'CC', 'D')
             update_job(db, job.day, job.pair, 'STACK', 'T')
 
         logging.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & "
@@ -438,7 +432,4 @@ def main():
         del stream
     logging.info('*** Finished: Compute CC ***')
 
-
-if __name__ == "__main__":
-    main()    
 

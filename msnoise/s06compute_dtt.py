@@ -407,16 +407,7 @@ def main(interval=1):
                         del tArray, dtArray, errArray, cohArray, pairArray
                         del output
         # THIS SHOULD BE IN THE API
-        updated = False
-        mappings = [{'ref': job.ref, 'flag': "D"} for job in jobs]
-        while not updated:
-            try:
-                db.bulk_update_mappings(Job, mappings)
-                db.commit()
-                updated = True
-            except:
-                time.sleep(np.random.random())
-                pass
+        massive_update_job(db, jobs, "D")
 
     logging.info('*** Finished: Compute DT/T ***')
 

@@ -206,7 +206,7 @@ def main():
             stations.append(netsta1)
             stations.append(netsta2)
             goal_day = job.day
-        del jobs
+        
 
         stations = np.unique(stations)
 
@@ -230,7 +230,8 @@ def main():
         start_processing = time.time()
         # ITERATING OVER PAIRS #####
         logging.info("Will do %i pairs" % len(pairs))
-        for pair in pairs:
+        for job in jobs:
+            pair = job.pair
             orig_pair = pair
 
             logging.info('Processing pair: %s' % pair.replace(':', ' vs '))
@@ -440,15 +441,15 @@ def main():
                         del corrs, corr, thisdate, thistime
                 del current, allcorr, t1, t2
             logging.debug("Updating Job")
-            update_job(db, goal_day, orig_pair, 'CC', 'D')
+            # Would be better after the massive update at the end of the day job
+            # but here it allows to only insert the stack job if the CC was 
+            # successful.
             update_job(db, goal_day, orig_pair, 'STACK', 'T')
 
             logging.info("Finished processing this pair. It took %.2f seconds" % (time.time() - tt))
+        massive_update_job(db, jobs, "D")
         clean_scipy_cache()
+
         logging.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & process %.2f s)" % ((time.time() - jt), start_processing-jt, time.time()-start_processing))
         del stream
     logging.info('*** Finished: Compute CC ***')
-
-if __name__ == "__main__":
-    main()    
-

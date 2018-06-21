@@ -72,6 +72,34 @@ def admin(port):
 
 @click.command()
 def upgrade_db():
+    """DEPRECATED since MSNoise 1.6. Please run 'msnoise db upgrade'"""
+    click.echo(upgrade_db.__doc__)
+    pass
+
+
+@click.group()
+def db():
+    """Top level command to interact with the database"""
+    pass
+
+
+@click.command()
+def clean_duplicates():
+    """Checks the Jobs table and deletes duplicate entries"""
+    from msnoise.api import connect, get_tech
+
+    db = connect()
+    if get_tech() == 1:
+        query = "DELETE FROM jobs WHERE rowid NOT IN (SELECT MIN(rowid) FROM jobs GROUP BY day,pair,jobtype)"
+    else:
+        query = "DELETE from jobs USING jobs, jobs as vtable WHERE (jobs.ref > vtable.ref) AND (jobs.day=vtable.day) AND (jobs.pair=vtable.pair) AND (jobs.jobtype=vtable.jobtype)"
+    db.execute(query)
+    db.commit()
+    db.close()
+
+
+@click.command()
+def upgrade():
     """Upgrade the database from previous to a new version.\n
     This procedure adds new parameters with their default value
     in the config database.
@@ -238,7 +266,7 @@ def info(jobs):
 
 @click.command()
 def install():
-    """This command launches the installer."""
+    """DEPRECATED: This command launches the installer."""
     click.echo('DEPRECATED command since MSNoise 1.6, please use "msnoise init"'
                ' instead')
     from ..s000installer import main
@@ -467,12 +495,16 @@ def stack(ctx, ref, mov, step, interval):
                 p.start()
                 processes.append(p)
                 time.sleep(delay)
+        for p in processes:
+            p.join()
         if mov:
             for i in range(threads):
                 p = Process(target=main, args=["mov", interval])
                 p.start()
                 processes.append(p)
                 time.sleep(delay)
+        for p in processes:
+            p.join()
         if step:
             for i in range(threads):
                 p = Process(target=main, args=["step", interval])
@@ -583,9 +615,9 @@ def reset(jobtype, all, rule):
 
 
 @click.command()
-def ipython():
+def jupyter():
     """Launches an ipython notebook in the current folder"""
-    os.system("ipython notebook --pylab inline --ip 0.0.0.0")
+    os.system("jupyter notebook --ip 0.0.0.0 --no-browser")
 
 
 #
@@ -809,6 +841,9 @@ def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
         from ..plots.dtt import main
     main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile)
 
+# Add DB commands to the db group:
+db.add_command(clean_duplicates)
+db.add_command(upgrade)
 
 # Add plot commands to the plot group:
 plot.add_command(data_availability)
@@ -840,7 +875,8 @@ cli.add_command(compute_stretching)
 cli.add_command(compute_dtt)
 cli.add_command(compute_dvv)
 cli.add_command(reset)
-cli.add_command(ipython)
+cli.add_command(db)
+cli.add_command(jupyter)
 cli.add_command(test)
 # Finally add the plot group too:
 cli.add_command(plot)

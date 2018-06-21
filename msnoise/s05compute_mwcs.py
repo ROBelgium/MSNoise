@@ -113,7 +113,7 @@ def main():
     time.sleep(np.random.random() * 5)
     while is_dtt_next_job(db, flag='T', jobtype='MWCS'):
         jobs = get_dtt_next_job(db, flag='T', jobtype='MWCS')
-        
+
         if not len(jobs):
             # edge case, should only occur when is_next returns true, but
             # get_next receives no jobs (heavily parallelised calls).
@@ -155,16 +155,7 @@ def main():
                             del output, cur
 
         # THIS SHOULD BE IN THE API
-        updated = False
-        mappings = [{'ref': job.ref, 'flag': "D"} for job in jobs]
-        while not updated:
-            try:
-                db.bulk_update_mappings(Job, mappings)
-                db.commit()
-                updated = True
-            except:
-                time.sleep(np.random.random())
-                pass
+        massive_update_job(db, jobs, "D")
         for job in jobs:
             update_job(db, job.day, job.pair, 'DTT', 'T')
 

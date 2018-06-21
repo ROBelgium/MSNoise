@@ -3,7 +3,7 @@
 MSNoise 1.6
 ===========
 
-Release date: XX May 2018
+Release date: XX June 2018
 
 
 Release type: major
@@ -16,41 +16,27 @@ Release notes:
 
 Introduction
 ------------
-About 1 year after the last major release (:doc:`msnoise-1.5`) we are proud
+More than 1 year after the last major release (:doc:`msnoise-1.5`) I'm proud
 to announce the new :doc:`msnoise-1.6`. It is a **major** release, with a
 massive amount of work since the last one: in `GitHub numbers
-<https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2017-04-28&to=2017-05-20&type=c>`_
+<https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2017-04-28&to=2017-06-25&type=c>`_
 , it's over TODO commits and over TODO lines of code and documentation changed
 or added!
 
 
 MSNoise 1.6 introduces a series of **new features** :
 
-* We have started to move core math functions to ObsPy, currently the only one
-  ready is `linear_regression`, a function I wrote to remove the dependency to
-  ``statsmodels``, required to move `mwcs` to ObsPy later.
+* The workflow has been rewritten to create "job types" per step, making it 
+  easier for users to reset a jobs before a specific step. 
+* This and other smaller adaptations to the code allows to run MSNoise more
+  effiently, e.g. on a HPC.
 
-* The preprocessing routine has been isolated, rewritten and optimized. It is
-  now a standalone script, callable by plugins. It returns a Stream object with
-  all the data needed for the analysis.
-
-* This change in preprocessing was done mostly to allow cross-component, auto-
-  correlation and cross-correlation, with or without rotation, to be done with
-  the same code. CC, SC and AC are now supported in MSNoise with proper
-  whitening (possible to disable spectral whitening for specific cases).
-
-* This documentation is now available in PDF_ too (easier for offline usage) and
-  it also includes a new tutorial for setting up the MySQL server and Workbench.
-
-* Last but not least: MSNoise is "tested" automatically on Linux (thanks to
-  TravisCI) & Windows (thanks to Appveyor), for Python versions 2.7 and 3.5.
-  With MSNoise 1.5 we also added the MacOSX tests on TravisCI. With these tests,
-  we can guarantee MSNoise works on different platforms and Anaconda
-  (or miniconda) python versions.
 
 
 This version has benefited from outputs/ideas/pull requests/questions from
 several users/friends (listed alphabetically):
+
+# TODO
 
 * Raphael De Plaen
 * Clare Donaldson
@@ -64,12 +50,11 @@ several users/friends (listed alphabetically):
 Thanks to all for using MSNoise, and please, let us know why/how you use it
 (and please cite it!)!
 
-To date, we found/are aware of 25 publications using MSNoise ! That's the best
-validation of our project ever ! See the full list on the
-`MSNoise website <http://www.msnoise.org/they-cite-msnoise/>`_.
+To date, we found/are aware of 48 publications using MSNoise ! That's the best
+validation of our project ever and it has doubled since last year !! 
 
 
-*Thomas, Corentin and others*
+*Thomas and friends...*
 
 
 ~~~~
@@ -85,119 +70,61 @@ for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
 Requirements
 ------------
 
-If you have any package older than those mentioned here, some things might not
-work as expected.
-
-* Pandas >= 0.18.0
-* obspy >= 1.1
-
-No longer needed:
-
-* scikits-samplerate
-* statsmodels
+There were no changes in the requirements. Note that MSNoise is always tested
+against the latest release versions of the main packages, so older installations
+that are not maintainted/updated regularly (years) could encounter issues.
 
 
 Web-based Admin Interface Changes
 ---------------------------------
 
-* Bugfix: Stations can now be added manually
-* Bugfix: Bulk operations on Job based on their jobtype is now possible
-* Bugfix: Set debug-mode to False to increase performance and remove the risk
-  of Werkzeug failing.
+* Feature: The pagination size (100, 200, etc. row) is now allowed on the
+  Station, Job and DataAvailability views are now 
 
-* Feature: Calling admin/data_availability.png should serve the image directly
-* Feature: It's now possible to "Brand" MSNoise:
-  The name and the logo of the page can be overriden by setting an environment
-  variable with a name and the HTML tag of the logo image:
-
-  .. code:: sh
-
-      set msnoise_brand="ROB|<img src='http://www.seismologie.be/img/oma/ROB-logo.svg' width=200 height=200>"
-
-  and then starting msnoise admin:
-
-  .. image:: ../.static/branding.png
-      :align: center
 
 Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-* REMOVED: ``decimation_factor``: it's now computed automatically from the
-  stream's sampling rate. If the decimation factor is non-integer, the routine
-  exits and the user is advised to use the Lanczos resampler.
-* REMOVED: `ZZ`, `RR`, `TT`, etc in favor of ``components_to_compute``.
-* ADDED: ``components_to_compute``: it's accepting a comma-separated list of
-  components.
-* ADDED: ``whitening`` method for disabling spectral whitening in specific
-  cases.
-
-Populate Station Table and Scan Archive
----------------------------------------
+* ADDED: ``hpc`` for flagging if MSNoise is running on HPC. Not yet used.
 
 
-* Because of platform-dependent issues, we dropped the need for the "find"
-  command to be present on each machine. The "cron" scan_archive procedure is
-  now a simple python routine. It might take a little longer, but much safer.
-  This also means the ``crondays`` parameter can be set to a floating point
-  value, "-1.0" meaning "files modified in the last 1 day".
+Top level DB command
+--------------------
 
-* The custom archive structure can now directly be input in the config.
-  This is still quite preliminary and needs at least one slash in the parameter
-  value to be identified as such by the code.
+I've added a new command group called `db` that gathers all db-related actions:
 
-* A change in the database structure (added an index on the
-  "path"+"file"+"net"+"sta"+"comp") allows running ``msnoise scan_archive``
-  a little more efficiently than before.
+* ``msnoise db upgrade`` is a replacement for the ``msnoise upgrade_db``
+* ``msnoise db clean_duplicates`` deletes duplicate jobs (might happen). Unique
+  sets of ``day``, ``pair`` and ``jobtypes``are considered.
 
-.. warning::
+In the future, this command will include the possibility to dump and load 
+entire databases, for example for switching from a local sqlite instance to a 
+large MySQL server.
 
-    The change in the database (adding an index) requires that you
-    ``msnoise upgrade_db`` every project!
+Workflow changes
+----------------
+The workflow has been rewritten to create "job types" per step, making it 
+easier for users to reset a jobs before a specific step.
+
+New job types are:
+  
+* A ``STACK`` job is created when a ``CC`` job is successful
+* A ``MWCS`` job is created when a ``STACK`` job is successful
+* A ``DTT`` job is created when a ``MWCS`` job is successful
+
+About the ``STACK`` jobs, it is important to call the "ref stack" before the
+"mov stack", as the "ref stack" will run on the ``STACK`` jobs, check if 
+any date matches the date range of the ``ref_begin`` - ``ref_end``, do the 
+stacks if needed, then will reset the ``STACK`` jobs to ``Todo`` so that "mov
+stacks can be done. Note that calling ``msnoise stack -r -m`` will execute 
+the steps in the right order.
+
 
 Expert/Lazy mode
 ~~~~~~~~~~~~~~~~
 
-* Added an Expert/Lazy mode to scan files directly by passing the path of their
-  containing folder to ``scan_archive --path``
-  :ref:`(see here)<scan-archive-expert>`.
-
-* Added an Expert/Lazy mode to input network/stations directly from the data
-  scanned using the new ``populate --fromDA`` procedure
-  (:ref:`(see here)<populate-expert>`).
-
-* The ``scan_archive`` is now capable of handling multiplexed files and inputs
-  one line in DataAvailability per unique "trace id" in files.
-
-Practically, the three changes above allow users to:
-
-#. Download a single or few mseed file with N stations, for example from webdc
-   or using FDSN webservices in ObsPy or else.
-#. Run ``msnoise install``
-#. Run ``msnoise scan_archive --path /path/to/the/big/file/``
-#. Run ``msnoise populate --fromDA``
-#. Run ``msnoise new_jobs --init``
-#. Run ``msnoise admin``, define (pre-)processing and filter parameters
-#. Run ``msnoise compute_cc``
-
-
-New Jobs
---------
-
-* The ``msnoise new_jobs`` routine has been rewritten to correct a few bugs
-  linked to start/end dates (missed days if a file of day 2 begins on day 1 and
-  ends on day 3, jobs were only created for day 1 and 3. This is corrected.
-
-* A change in the database structure (added an index on the
-  "day"+"pair"+"jobtype") allows running ``msnoise new_jobs`` much faster than
-  before. It took 5m40s for a test with 105381 jobs, while it would have taken
-  hours before. For the first run, it is still faster (20s for the example
-  above) to use ``msnoise new_jobs --init`` as this doesn't check for existing
-  jobs.
-
-.. warning::
-
-    The change in the database (adding an index) requires that you
-    ``msnoise upgrade_db`` every project!
+* Added the possibility to walk in subfolders recursively by using 
+  ``scan_archive --path -r``
 
 
 Preprocessing and Cross-Correlation
@@ -206,18 +133,11 @@ Preprocessing and Cross-Correlation
 Preprocessing
 ~~~~~~~~~~~~~
 
-* A complete rewrite of the preprocessing function to avoid padding and merging
-  with zeros. The preprocessing function is now separated from the
-  ``compute_cc`` code and can be called by external plugins. It returns a Stream
-  object that can easily be filtered or slided.
-* The instrument response removal has been accelerated by doing it after
-  decimation, on fewer data points (Thanks to Robert Green).
-  The response removal is done without the `evalresp` stuff from ObsPy, it's
-  faster but potentially a little less safe.
-* The default decimation tool is now Lanczos (builtin in ObsPy) and
-  scikits.samplerate is no longer needed.
+* Only small changes were done for this step, mainly checks of matching
+  sampling rates, empty streams. DB-related optimisations make this step 
+  faster too.
 
-Cross-Correlation
+Cross-Correlation TODO
 ~~~~~~~~~~~~~~~~~
 
 * It is now possible to do the Cross-Correlation (classic "CC"), the Auto-
@@ -246,16 +166,13 @@ Command Line changes
 --------------------
 
 
-* ``msnoise config --sync`` will try to parse the dataless files for existing
-  stations in the Station table and, if found, will input the coordinates.
-* ``msnoise scan_archive --path`` will only scan the ``path`` independently of
-  its structure. It will only read files, not "walk" in subfolders.
-* ``msnoise populate --fromDA`` will populate the station table from the
-  existing data_availability table.
-* ``msnoise p`` is a lazy alias to ``msnoise plugin``
-* add a default delay of 1 second (customizable) to start parallel
-  threads (using -t)
+* ``msnoise db`` a new top-level group command for gathering the db-related 
+  commands.
+* ``msnoise db clean_duplicates`` allows to remove duplicates from the jobs 
+  table.
 
+* ``msnoise scan_archive --path -r`` will only scan the ``path`` 
+independently of its structure. Passing the ``-r`` it will walk in subfolders.
 
 Note, all commands are documented: :doc:`../clickhelp/msnoise`.
 
@@ -263,27 +180,24 @@ Note, all commands are documented: :doc:`../clickhelp/msnoise`.
 API Changes
 -----------
 
-* New ``make_same_length`` API method to return common data for two traces, this
-  is necessary to compute the rotation of the horizontal traces to Radial/
-  Transverse.
-
-* New ``clean_scipy_cache`` API method to reduce the memory imprint caused by
-  scipy's automatic caching of FFT arrays.
+* New ``get_params`` API method to return a ``Params`` class containing all 
+  configuration bits, avoiding unnecessary calls to the DB later.
+* Many (many) small optimizations to the core functions to make them faster,
+  mostly when interacting with the DB, thanks to ``get_params``.
+* ``update_config`` can now modify parameters for installed plugins.
+* New ``massive_update_job`` to update a list of ``Jobs`` to a given flag.
+* ``build_ref_datelist`` and ``build_movstack_datelist`` return the smallest 
+  date from the data_availability table if the ``ref_begin`` or ``startdate``
+  have not been modified from ``1970-01-01``.
+* Removed ``linear_regression`` as this is now included in ObsPy.
+* Modified ``get_dtt_next_job`` returns jobs in random order (will maybe change
+  again later when the HPC mode gets more developed.
+* Added missing documentation for several methods.
 
 See :doc:`../api`.
 
-Plugin support
---------------
 
-* Plugins can now declare their own templates using the
-  `msnoise.plugins.templates` entry point.
-* Plugins can override the "components_to_compute" config bit and the MSNoise
-  API `get_components_to_compute(session, plugin=None)` works like `get_config`.
-
-See :doc:`../plugins`.
-
-
-Other Bugfixes
+Other Bugfixes TODO
 --------------
 
 * Removed the call to ``scipy.stats.nanmean`` and replaced by ``numpy.nanmean``
@@ -294,7 +208,7 @@ Other Bugfixes
 * Py3 error when ``msnoise scan_archive`` in cron mode
 
 
-Plot Updates
+Plot Updates TODO
 ------------
 
 * ``msnoise plot ccftime`` now accepts -e (--envelope) and will plot the
@@ -311,7 +225,7 @@ Plot Updates
 
 See :doc:`../plotting`.
 
-Performance and Code improvements
+Performance and Code improvements TODO
 ---------------------------------
 
 Improvements in terms of performances have also been done for MSNoise 1.5:
@@ -325,31 +239,24 @@ Improvements in terms of performances have also been done for MSNoise 1.5:
 * The preprocessing only reads files that should contain the right component.
 * The stretching code has been improved (thanks to Clare Donaldson)
 
-Documentation
+Documentation TODO
 -------------
 
 * New tutorial for installing and configuring MySQL and MySQL workbench.
 * The Workflow is separated in steps (See :ref:`workflow`))
 * The Documentation is now available in PDF format (PDF_).
 
-Upgrading an existing project to MSNoise 1.5
+Upgrading an existing project to MSNoise 1.6
 --------------------------------------------
 
 Some users will want to keep their current project without recomputing
 everything. This requires adding a few configuration parameters to the database
 
-Running the following command will take care of the upgrade from 1.4 to 1.5:
+Running the following command will take care of the upgrade from 1.5 to 1.6:
 
 .. code-block:: sh
 
-    msnoise upgrade_db
-
-
-.. warning::
-
-    Upgradind the database **will not** remove deprecated configuration bits, so
-    users should remember to define, for example, the ``components_to_compute``
-    parameter if anything else than ``ZZ`` was set before.
+    msnoise db upgrade
 
 
 A final note about development pace and choices

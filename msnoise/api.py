@@ -215,7 +215,7 @@ def update_config(session, name, value, plugin=None):
     else:
         table = Config
     config = session.query(table).filter(table.name == name).first()
-    if "NULL" in value: 
+    if "NULL" in value:
         config.value = None
     else:
         config.value = value
@@ -265,6 +265,7 @@ def get_params(session):
     params.stack_method = get_config(s, 'stack_method')
     params.pws_timegate = float(get_config(s, 'pws_timegate'))
     params.pws_power = float(get_config(s, 'pws_power'))
+    params.hpc = get_config(s, 'hpc')
     return params
 
 # FILTERS PART
@@ -752,6 +753,29 @@ def massive_insert_job(jobs):
         Job.__table__.insert(),
         jobs)
 
+
+def massive_update_job(session, jobs, flag="D"):
+    """
+    Routine to use a low level function to update much faster a list of
+    :class:`~msnoise.msnoise_table_def.Job`. This method uses the Job.ref
+    which is unique.
+
+    :type jobs: list
+    :param jobs: a list of :class:`~msnoise.msnoise_table_def.Job` to update.
+    :type flag: str
+    :param flag: The destination flag.
+    """
+    updated = False
+    mappings = [{'ref': job.ref, 'flag': flag} for job in jobs]
+    while not updated:
+        try:
+            session.bulk_update_mappings(Job, mappings)
+            session.commit()
+            updated = True
+        except:
+            time.sleep(np.random.random())
+            pass
+    return
 
 def is_next_job(session, flag='T', jobtype='CC'):
     """

@@ -224,7 +224,8 @@ class StationView(ModelView):
     view_title = "Station Configuration"
     column_filters = ('net', 'used')
     column_type_formatters = MY_DEFAULT_FORMATTERS
-    
+    can_set_page_size = True
+
     def __init__(self, session, **kwargs):
         super(StationView, self).__init__(Station, session, **kwargs)
     
@@ -249,6 +250,7 @@ class DataAvailabilityView(ModelView):
     can_delete = True
     can_edit = True
     page_size = 100
+    can_set_page_size = True
     column_filters = ('net', 'sta', 'comp', 'data_duration', 'gaps_duration',
                       'samplerate', 'flag')
 
@@ -281,6 +283,7 @@ class JobView(ModelView):
     column_filters = ('pair', 'jobtype', 'flag')
     page_size = 100
     edit_modal = True
+    can_set_page_size = True
 
     def __init__(self, session, **kwargs):
         super(JobView, self).__init__(Job, session, **kwargs)
@@ -343,6 +346,7 @@ class ConfigView(ModelView):
     can_create = False
     can_delete = False
     page_size = 100
+    can_set_page_size = True
 
     # Override displayed fields
     column_list = ('name', 'value')

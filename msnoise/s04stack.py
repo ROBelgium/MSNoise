@@ -184,6 +184,7 @@ def main(stype, interval=1.0):
                 rng = pd.date_range(start, end, freq="%iD"%mov_stack)
             datelists[mov_stack] = rng.map(lambda t: t.date())
         #~ print datelists
+    biglist = []
     filters = get_filters(db, all=False)
     while is_dtt_next_job(db, flag='T', jobtype='STACK'):
         jobs = get_dtt_next_job(db, flag='T', jobtype='STACK')
@@ -315,14 +316,6 @@ def main(stype, interval=1.0):
                                                     db, date, day_name.replace('_', '.'), 'MWCS', 'T')
                                                 jobs_done.append(job)
                                         del corr
-                            #~ for date in datelist:
-                                #~ day_name = "%s:%s" % (
-                                                    #~ sta1, sta2)
-                                #~ job = "%s %s" % (date, day_name)
-                                #~ if job not in jobs:
-                                    #~ update_job(
-                                        #~ db, date, day_name.replace('_', '.'), 'DTT', 'T')
-                                    #~ jobs.append(job)
 
                         elif stype == "ref":
                             stack_path = os.path.join(
@@ -347,19 +340,15 @@ def main(stype, interval=1.0):
         # THIS SHOULD BE IN THE API
         # This doesn't set MWCS jobs for REF stacks
         if stype != "ref":
-            updated = False
-            mappings = [{'ref': job.ref, 'flag': "D"} for job in jobs]
-            while not updated:
-                try:
-                    db.bulk_update_mappings(Job, mappings)
-                    db.commit()
-                    updated = True
-                except:
-                    time.sleep(np.random.random())
-                    pass
+            massive_update_job(db, jobs, "D")
             if stype != "step":
                 for job in jobs:
                     update_job(db, job.day, job.pair, 'MWCS', 'T')
+        if stype == "ref":
+            biglist += jobs
+
+    if stype == "ref":
+        massive_update_job(db, biglist, "T")
 
     logging.debug("Finished Stacking")
 
