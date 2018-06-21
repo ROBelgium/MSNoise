@@ -55,12 +55,14 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n"
         output += "\n" + "Only necessary if you plan to build the doc locally:"
         output += "\n" + ispresent('sphinx')
-
+        output += "\n" + ispresent('sphinx_bootstrap_theme')
 
         output += "\n"
         output += "\n" + "Graphical Backends: (at least one is required)"
         output += "\n" + ispresent('wx')
         output += "\n" + ispresent('pyqt')
+        output += "\n" + ispresent('PyQt4')
+        output += "\n" + ispresent('PyQt5')
         output += "\n" + ispresent('PySide')
         
         output += "\n"

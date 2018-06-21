@@ -125,12 +125,8 @@ variations.
 
 """
 
+from obspy.signal.regression import linear_regression
 from .api import *
-
-try:
-    from obspy.signal.regression import linear_regression
-except ImportError:
-    from .api import linear_regression
 
 
 def wavg_wstd(data, errors):
@@ -150,7 +146,7 @@ def main(interval=1):
 
     logging.info('*** Starting: Compute DT/T ***')
     db = connect()
-    
+
     dtt_lag = get_config(db, "dtt_lag")
     dtt_v = float(get_config(db, "dtt_v"))
     dtt_minlag = float(get_config(db, "dtt_minlag"))
@@ -159,41 +155,59 @@ def main(interval=1):
     minCoh = float(get_config(db, "dtt_mincoh"))
     maxErr = float(get_config(db, "dtt_maxerr"))
     maxDt = float(get_config(db, "dtt_maxdt"))
-    
+
     start, end, datelist = build_movstack_datelist(db)
-    
+
     mov_stack = get_config(db, "mov_stack")
     if mov_stack.count(',') == 0:
         mov_stacks = [int(mov_stack), ]
     else:
         mov_stacks = [int(mi) for mi in mov_stack.split(',')]
-    
+
     components_to_compute = get_components_to_compute(db)
     updated_dtt = updated_days_for_dates(
         db, start, end, '%', jobtype='DTT', returndays=True,
         interval=datetime.timedelta(days=interval))
-    
-    for f in get_filters(db, all=False):
-        filterid = int(f.ref)
-        for components in components_to_compute:
-            for mov_stack in mov_stacks:
-                logging.info('Loading mov=%i days for filter=%02i' %
-                             (mov_stack, filterid))
-                for current in updated_dtt:
-                    if current > datetime.date.today():
-                        break
-                    logging.debug("Processing %s - %02i - %02i mov" %
-                                  (current, filterid, mov_stack))
+    interstations = {}
+    for sta1, sta2 in get_station_pairs(db):
+        s1 = "%s_%s" % (sta1.net, sta1.sta)
+        s2 = "%s_%s" % (sta2.net, sta2.sta)
+        interstations["%s_%s"%(s1,s2)] = get_interstation_distance(sta1, sta2,
+                                                                   sta1.coordinates)
+        
+    filters = get_filters(db, all=False)
+    while is_next_job(db, jobtype='DTT'):
+        jobs = get_next_job(db, jobtype='DTT')
+        if len(jobs) == 0:
+            # edge case, should only occur when is_next returns true, but
+            # get_next receives no jobs (heavily parallelised calls).
+            continue
+        stations = []
+        pairs = []
+        refs = []
+        for f in filters:
+            filterid = int(f.ref)
+            for components in components_to_compute:
+                for mov_stack in mov_stacks:
+                    logging.info('Loading mov=%i days for filter=%02i' %
+                                 (mov_stack, filterid))
                     first = True
-                    for station1, station2 in get_station_pairs(db, used=True):
-                        sta1 = "%s_%s" % (station1.net, station1.sta)
-                        sta2 = "%s_%s" % (station2.net, station2.sta)
+                    for job in jobs:
+                        refs.append(job.ref)
+                        pairs.append(job.pair)
+                        netsta1, netsta2 = job.pair.split(':')
+                        stations.append(netsta1)
+                        stations.append(netsta2)
+                        current = job.day
+                        sta1 = netsta1.replace(".", "_")
+                        sta2 = netsta2.replace(".", "_")
                         pair = "%s_%s" % (sta1, sta2)
                         day = os.path.join('MWCS', "%02i" % filterid,
                                            "%03i_DAYS" % mov_stack, components,
                                            pair, '%s.txt' % current)
-                        dist = get_interstation_distance(station1, station2,
-                                                         station1.coordinates)
+                        # dist = get_interstation_distance(station1, station2,
+                        #                                  station1.coordinates)
+                        dist = interstations[pair]
                         if dist == 0. and dtt_lag == "dynamic":
                             logging.debug('%s: Distance is Zero?!' % pair)
                         if os.path.isfile(day):
@@ -392,6 +406,8 @@ def main(interval=1):
                         del df, M, EM, A, EA, M0, EM0, Pairs, Dates, used
                         del tArray, dtArray, errArray, cohArray, pairArray
                         del output
+        # THIS SHOULD BE IN THE API
+        massive_update_job(db, jobs, "D")
 
     logging.info('*** Finished: Compute DT/T ***')
 

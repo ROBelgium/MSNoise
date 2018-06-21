@@ -6,7 +6,9 @@ import shutil
 import glob
 from obspy import read
 
+
 class MSNoiseTests(unittest.TestCase):
+    prefix = ""
 
     def setUp(self):
         path = os.path.abspath(os.path.dirname(__file__))
@@ -16,9 +18,12 @@ class MSNoiseTests(unittest.TestCase):
         self.data_folder = "data"
 
     def test_001_S01installer(self):
+        import os
         from ..s000installer import main
+        if "PREFIX" in os.environ:
+            self.prefix=os.environ["PREFIX"]
         try:
-            ret = main(tech=1)
+            ret = main(tech=1, prefix=self.prefix)
             msg = "Installation Done! - Go to Configuration Step!"
             self.failUnlessEqual(ret, msg)
         except:
@@ -271,18 +276,21 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
 
     def test_023_stack(self):
-        from ..api import connect, update_config
+        from ..api import connect, update_config, reset_jobs
         from ..s04stack import main
         db = connect()
         update_config(db, 'ref_begin', '2009-01-01')
         update_config(db, 'ref_end', '2011-01-01')
         update_config(db, 'startdate', '2009-01-01')
         update_config(db, 'enddate', '2011-01-01')
-        db.close()
+
         interval = 1.
         main('ref', interval)
+        reset_jobs(db, "STACK", alljobs=True)
         main('mov', interval)
+        reset_jobs(db, "STACK", alljobs=True)
         main('step', interval)
+        db.close()
 
     def test_024_mwcs(self):
         from ..s05compute_mwcs import main
@@ -314,7 +322,7 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, update_config, reset_jobs
         db = connect()
         update_config(db, "export_format", "MSEED")
-        reset_jobs(db, "DTT", alljobs=True)
+        reset_jobs(db, "MWCS", alljobs=True)
         db.close()
 
         from ..stretch import main
@@ -355,6 +363,33 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
         self.test_013_s03compute_cc()
 
+    def test_031_compute_cc2tmp(self):
+        import shutil
+        shutil.rmtree("STACKS")
+        from ..api import connect, reset_jobs
+        db = connect()
+        reset_jobs(db, "CC", alljobs=True)
+        db.close()
+        from ..s03compute_no_rotation import main
+        main()
+
+    # PLOTS
+
+    def test_100_plot_cctfime(self):
+        from ..api import connect, get_station_pairs, get_filters
+        from ..plots.ccftime import main
+        db = connect()
+        for sta1, sta2 in get_station_pairs(db):
+            sta1 = "%s.%s" % (sta1.net, sta1.sta)
+            sta2 = "%s.%s" % (sta2.net, sta2.sta)
+            for filter in get_filters(db):
+                main(sta1, sta2, filter.ref, "ZZ",  1, show=False,
+                     outfile="?.png")
+                fn = 'ccftime %s-%s-f%i-m%i.png' % \
+                     ("%s-%s" % (sta1.replace(".", "_"),
+                                 sta2.replace(".", "_")),
+                      "ZZ", filter.ref, 1)
+                self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
 
     def test_099_S01installer(self):
         if "TRAVIS" not in os.environ:
@@ -372,7 +407,8 @@ class MSNoiseTests(unittest.TestCase):
             traceback.print_exc()
             self.fail()
 
-def main():
+
+def main(prefix=""):
     import matplotlib.pyplot as plt
     plt.switch_backend("agg")
     import os
@@ -381,12 +417,13 @@ def main():
     if c > 0:
         print("Directory is not empty, can't run tests here!")
         sys.exit()
-
+    os.environ["PREFIX"] = prefix
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
     runner = unittest.TextTestRunner(verbosity=4)
     result = runner.run(suite)
     if not result.wasSuccessful():
         sys.exit(1)
+
 
 if __name__ == '__main__':
     main()

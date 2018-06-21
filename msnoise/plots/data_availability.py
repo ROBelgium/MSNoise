@@ -27,13 +27,16 @@ def main(show=False, outfile=None):
     start, end, datelist = build_movstack_datelist(db)
     dates = []
     stations = []
+    used_stations = ["%s.%s" % (s.net, s.sta) for s in get_stations(db)]
     for day in datelist:
         daystart = datetime.datetime.combine(day, datetime.time(0, 0, 0))
         dayend = datetime.datetime.combine(day, datetime.time(23, 59, 59))
         data = get_data_availability(db, starttime=daystart, endtime=dayend)
         for di in data:
-            stations.append("%s.%s" % (di.net, di.sta))
-            dates.append(di.starttime)
+            _ = "%s.%s" % (di.net, di.sta)
+            if _ in used_stations:
+                stations.append(_)
+                dates.append(di.starttime)
 
     data = pd.DataFrame({"stations": stations}, index=dates)
     data = data.groupby('stations')
@@ -72,7 +75,7 @@ def main(show=False, outfile=None):
     plt.gcf().autofmt_xdate()
     plt.grid()
 
-    ax = plt.subplot(gs[1])
+    ax = plt.subplot(gs[1], sharex=ax)
     plt.plot(datelist, np.sum(matrix, axis=0))
     ax.set_ylim((-0.1, np.amax(np.sum(matrix, axis=0))+0.1))
     plt.ylabel('N stations')

@@ -75,7 +75,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
         
     plt.ylabel("Interstation Distance in km")
     plt.xlabel("Lag Time")
-
+    low = high = 0.0
     for filterdb in get_filters(db, all=True):
         if filterid == filterdb.ref:
             low = float(filterdb.low)

@@ -1,17 +1,14 @@
 import logging
 
-import matplotlib.pyplot as plt
+
 import numpy as np
 import scipy.fftpack
 import scipy.optimize
 import scipy.signal
+from scipy.stats import scoreatpercentile
 from obspy.signal.invsim import cosine_taper
 from scipy.fftpack.helper import next_fast_len
-
-try:
-    from obspy.signal.regression import linear_regression
-except ImportError:
-    from .api import linear_regression
+from obspy.signal.regression import linear_regression
 
 
 def myCorr(data, maxlag, plot=False, nfft=None):
@@ -26,6 +23,7 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     :rtype: :class:`numpy.ndarray`
     :returns: The cross-correlation function between [-maxlag:maxlag]
     """
+    # TODO: docsting
     if nfft is None:
         s1 = np.array(data[0].shape)
         shape = s1 - 1
@@ -43,6 +41,7 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     # data = scipy.fftpack.fft(data,int(Nfft),axis=1)
 
     if plot:
+        import matplotlib.pyplot as plt
         plt.subplot(211)
         plt.plot(np.arange(len(data[0])) * 0.05, np.abs(data[0]))
         plt.subplot(212)
@@ -59,7 +58,6 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     if normalized:
         E = np.prod(np.real(np.sqrt(
             np.mean(scipy.fftpack.ifft(data, n=nfft, axis=1) ** 2, axis=1))))
-
         corr /= np.real(E)
 
     if maxlag != Nt:
@@ -70,6 +68,45 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     del data
     return corr
 
+
+def myCorr2(data, maxlag, energy, index, plot=False, nfft=None):
+    """This function takes ndimensional *data* array, computes the
+    cross-correlation in the frequency domain and returns the cross-correlation
+    function between [-*maxlag*:*maxlag*].
+
+    :type data: :class:`numpy.ndarray`
+    :param data: This array contains the fft of each timeseries to be cross-correlated.
+    :type maxlag: int
+    :param maxlag: This number defines the number of samples (N=2*maxlag + 1) of the CCF that will be returned.
+
+    :rtype: :class:`numpy.ndarray`
+    :returns: The cross-correlation function between [-maxlag:maxlag]
+    """
+    # TODO: docsting
+    normalized = False
+    maxlag = np.round(maxlag)
+    Nt = data.shape[1]
+
+    if maxlag != Nt:
+        tcorr = np.arange(-Nt + 1, Nt)
+        dN = np.where(np.abs(tcorr) <= maxlag)[0]
+    corrs = {}
+    for id, sta1, sta2 in index:
+        corr = np.conj(data[sta1]) * data[sta2]
+        corr = np.real(scipy.fftpack.ifft(corr, nfft)) / Nt
+        corr = np.concatenate((corr[-Nt + 1:], corr[:Nt + 1]))
+
+        if normalized:
+            corr /= (energy[sta1] * energy[sta2])
+
+        if maxlag != Nt:
+            corr = corr[dN]
+        if len(corr) < (2*maxlag)+1:
+            continue
+        corrs[id] = corr
+
+
+    return corrs
 
 def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     """This function takes 1-dimensional *data* timeseries array,
@@ -92,9 +129,10 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
 
     :rtype: :class:`numpy.ndarray`
     :returns: The FFT of the input trace, whitened between the frequency bounds
-"""
-
+    """
+    # TODO: docsting
     if plot:
+        import matplotlib.pyplot as plt
         plt.subplot(411)
         plt.plot(np.arange(len(data)) * delta, data)
         plt.xlim(0, len(data) * delta)
@@ -161,11 +199,70 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
         plt.plot(np.arange(len(wdata)) * delta, wdata)
         plt.xlim(0, len(wdata) * delta)
         plt.show()
+
     return FFTRawSign
+
+
+def whiten2(fft, Nfft, low, high, porte1, porte2, psds, whiten_type):
+    """This function takes 1-dimensional *data* timeseries array,
+    goes to frequency domain using fft, whitens the amplitude of the spectrum
+    in frequency domain between *freqmin* and *freqmax*
+    and returns the whitened fft.
+
+    :type data: :class:`numpy.ndarray`
+    :param data: Contains the 1D time series to whiten
+    :type Nfft: int
+    :param Nfft: The number of points to compute the FFT
+    :type delta: float
+    :param delta: The sampling frequency of the `data`
+    :type freqmin: float
+    :param freqmin: The lower frequency bound
+    :type freqmax: float
+    :param freqmax: The upper frequency bound
+    :type plot: bool
+    :param plot: Whether to show a raw plot of the action (default: False)
+
+    :rtype: :class:`numpy.ndarray`
+    :returns: The FFT of the input trace, whitened between the frequency bounds
+    """
+    # TODO: docsting
+    taper = np.ones(Nfft//2+1)
+    taper[0:low] *= 0
+    taper[low:porte1] *= np.cos(np.linspace(np.pi / 2., 0, porte1 - low))**2
+    taper[porte2:high] *= np.cos(np.linspace(0., np.pi / 2., high - porte2))**2
+    taper[high:] *= 0
+    taper *= taper
+    for i in range(fft.shape[0]):
+        if whiten_type == "PSD":
+            fft[i][:Nfft//2+1] /= psds[i]
+            fft[i][:Nfft//2+1] *= taper
+            tmp = fft[i, porte1:porte2]
+            imin = scoreatpercentile(tmp, 5)
+            imax = scoreatpercentile(tmp, 95)
+            not_outliers = np.where((tmp >= imin) & (tmp <= imax))[0]
+            rms = tmp[not_outliers].std() * 1.0
+            np.clip(fft[i, porte1:porte2], -rms, rms, fft[i, porte1:porte2])  # inplace
+            fft[i, 0:low] *= 0
+            fft[i, high:] *= 0
+        else:
+            # print("Doing the classic Brutal Whiten")
+            # Left tapering:
+            fft[i,0:low] *= 0
+            fft[i,low:porte1] = np.cos(np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2 * np.exp(1j * np.angle(fft[i,low:porte1]))
+            # Pass band:
+            fft[i,porte1:porte2] = np.exp(1j * np.angle(fft[i,porte1:porte2]))
+            # Right tapering:
+            fft[i,porte2:high] = np.cos(np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(1j * np.angle(fft[i,porte2:high]))
+            fft[i,high:] *= 0
+
+        # Hermitian symmetry (because the input is real)
+        fft[i,-(Nfft // 2) + 1:] = np.conjugate(fft[i,1:(Nfft // 2)])[::-1]
+
 
 
 def smooth(x, window='boxcar', half_win=3):
     """ some window smoothing """
+    # TODO: docsting
     window_len = 2 * half_win + 1
     # extending the data at beginning and at the end
     # to apply the window at the borders
@@ -179,6 +276,7 @@ def smooth(x, window='boxcar', half_win=3):
 
 
 def getCoherence(dcs, ds1, ds2):
+    # TODO: docsting
     n = len(dcs)
     coh = np.zeros(n).astype('complex')
     valids = np.argwhere(np.logical_and(np.abs(ds1) > 0, np.abs(ds2 > 0)))

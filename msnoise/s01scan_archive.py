@@ -192,7 +192,7 @@ def main(init=False, threads=1):
                 'NET', sta.net).replace('STA', sta.sta))
                 folders_to_glob.append(tmp)
     folders_to_glob = np.unique(folders_to_glob)
-    logging.debug("Folders to glob: %s" % ",".join(folders_to_glob))
+    # logging.debug("Folders to glob: %s" % ",".join(folders_to_glob))
     clients = []
     mintime = UTCDateTime() + (86400 * float(mtime))
     for fi in sorted(folders_to_glob):
@@ -238,6 +238,7 @@ def main(init=False, threads=1):
 
     logging.info('*** Finished: Scan Archive ***')
     logging.info('It took %.2f seconds' % (time.time() - t))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Scan the data archive and insert the\

@@ -54,12 +54,13 @@ def p():
 
 
 @click.command()
-def test():
+@click.option('-p', '--prefix', default="", help='Prefix for tables')
+def test(prefix):
     """Runs the test suite, should be executed in an empty folder!"""
     import matplotlib.pyplot as plt
     plt.switch_backend("agg")
     from ..test.tests import main
-    main()
+    main(prefix=prefix)
 
 
 @click.command()
@@ -71,13 +72,44 @@ def admin(port):
 
 @click.command()
 def upgrade_db():
+    """DEPRECATED since MSNoise 1.6. Please run 'msnoise db upgrade'"""
+    click.echo(upgrade_db.__doc__)
+    pass
+
+
+@click.group()
+def db():
+    """Top level command to interact with the database"""
+    pass
+
+
+@click.command()
+def clean_duplicates():
+    """Checks the Jobs table and deletes duplicate entries"""
+    from msnoise.api import connect, get_tech
+
+    db = connect()
+    if get_tech() == 1:
+        query = "DELETE FROM jobs WHERE rowid NOT IN (SELECT MIN(rowid) FROM jobs GROUP BY day,pair,jobtype)"
+    else:
+        query = "DELETE from jobs USING jobs, jobs as vtable WHERE (jobs.ref > vtable.ref) AND (jobs.day=vtable.day) AND (jobs.pair=vtable.pair) AND (jobs.jobtype=vtable.jobtype)"
+    db.execute(query)
+    db.commit()
+    db.close()
+
+
+@click.command()
+def upgrade():
     """Upgrade the database from previous to a new version.\n
     This procedure adds new parameters with their default value
     in the config database.
     """
-    from ..api import connect, Config
+    from ..api import connect, Config, read_database_inifile
     from ..default import default
     db = connect()
+    tech, hostname, database, username, password, prefix = \
+        read_database_inifile()
+    prefix = prefix + "_"
     for name in default.keys():
         try:
             db.add(Config(name=name, value=default[name][-1]))
@@ -87,14 +119,27 @@ def upgrade_db():
             # print("Passing %s: already in DB" % name)
             continue
     try:
-        db.execute("CREATE INDEX job_index ON jobs (day, pair, jobtype)")
+        db.execute("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
+                   "jobtype)" %
+                   prefix)
         db.commit()
     except:
         logging.info("It looks like the v1.5 'job_index' is already in the DB")
         db.rollback()
 
     try:
-        db.execute("CREATE INDEX da_index ON data_availability (path, file, net, sta, comp)")
+        db.execute("CREATE INDEX job_index2 ON %sjobs (jobtype, flag)" %
+                   prefix)
+        db.commit()
+    except:
+        logging.info("It looks like the v1.6 'job_index2' is already in the DB")
+        db.rollback()
+
+
+    try:
+        db.execute("CREATE UNIQUE INDEX da_index ON %sdata_availability (path, "
+                   "file, net, sta, comp)" %
+                   prefix)
         db.commit()
     except:
         logging.info("It looks like the v1.5 'da_index' is already in the DB")
@@ -112,25 +157,31 @@ def info(jobs):
         get_stations
     from ..default import default
 
-    click.echo('')
-    click.echo('General:')
-
     def d(path):
         return os.path.split(path)[0]
 
-    click.echo('MSNoise is installed in: %s'
-               % d(d(d(os.path.abspath(__file__)))))
-
-    if os.path.isfile('db.ini'):
-        click.echo(' - db.ini is present')
-    else:
+    if not os.path.isfile('db.ini'):
         click.secho(' - db.ini is not present, is MSNoise installed here ?',
                     fg='red')
         return
-    click.echo('')
+
     db = connect()
 
     if not jobs:
+        click.echo('')
+        click.echo('General:')
+
+        click.echo('MSNoise is installed in: %s'
+                   % d(d(d(os.path.abspath(__file__)))))
+        
+        if os.path.isfile('db.ini'):
+            click.echo(' - db.ini is present')
+        else:
+            click.secho(' - db.ini is not present, is MSNoise installed here ?',
+                        fg='red')
+            return
+        click.echo('')
+        
         click.echo('')
         click.echo('Configuration:')
 
@@ -169,6 +220,7 @@ def info(jobs):
                 click.secho(" D %s: %s" % (key, tmp))
             else:
                 click.secho(" M %s: %s" % (key, tmp), fg='green')
+        # TODO add plugins params
 
         click.echo('')
         click.echo('Filters:')
@@ -192,23 +244,43 @@ def info(jobs):
                     ['N', 'Y'][s.used])
             print('%s.%s %.4f %.4f %.1f %s %s' % data)
 
-    click.echo('')
-    click.echo('CC Jobs:')
-    for (n, jobtype) in get_job_types(db, 'CC'):
-        click.echo(" %s : %i" % (jobtype, n))
+    click.echo("MSNoise")
+    for jobtype in ["CC", "STACK", "MWCS", "DTT"]:
+        click.echo(' %s:' % jobtype)
+        for (n, jobtype) in get_job_types(db, jobtype):
+            click.echo("  %s : %i" % (jobtype, n))
 
-    click.echo('')
-    click.echo('DTT Jobs:')
-    for (n, jobtype) in get_job_types(db, 'DTT'):
-        click.echo(" %s : %i" % (jobtype, n))
-
+    plugins = get_config(db, "plugins")
+    if plugins:
+        plugins = plugins.split(",")
+        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
+            module_name = ep.module_name.split(".")[0]
+            if module_name in plugins:
+                click.echo('')
+                click.echo('Plugin: %s' % module_name)
+                for row in ep.load()():
+                    click.echo(' %s:' % row["name"])
+                    for (n, jobtype) in get_job_types(db, row["name"]):
+                        click.echo("  %s : %i" % (jobtype, n))
+    
 
 @click.command()
 def install():
+    """DEPRECATED: This command launches the installer."""
+    click.echo('DEPRECATED command since MSNoise 1.6, please use "msnoise init"'
+               ' instead')
+    from ..s000installer import main
+    main()
+
+
+@click.command()
+@click.option('--tech', help='Database technology: 1=SQLite 2=MySQL',
+              default=None)
+def init(tech):
     """This command launches the installer."""
     click.echo('Launching the installer')
     from ..s000installer import main
-    main()
+    main(tech)
 
 
 @click.command()
@@ -313,8 +385,10 @@ def populate(fromda):
 @click.option('-i', '--init', is_flag=True, help='First run ?')
 @click.option('--path',  help='Scan all files in specific folder, overrides the'
                               ' default workflow step.')
+@click.option('-r', '--recursively', is_flag=True,
+              help='When scanning a path, walk subfolders automatically ?')
 @click.pass_context
-def scan_archive(ctx, init, path):
+def scan_archive(ctx, init, path, recursively):
     """Scan the archive and insert into the Data Availability table."""
     if path:
         logging.info("Overriding workflow...")
@@ -325,7 +399,15 @@ def scan_archive(ctx, init, path):
         enddate = UTCDateTime(get_config(db, "enddate"))
         cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
         db.close()
-
+        if recursively:
+            for root, dirs, _ in os.walk(path):
+                for d in dirs:
+                    tmppath = os.path.join(root, d)
+                    _ = os.listdir(tmppath)
+                    if not len(_):
+                        continue
+                    worker(sorted(_), tmppath, startdate, enddate,
+                           cc_sampling_rate, init=True)
         worker(sorted(os.listdir(path)), path, startdate, enddate,
                cc_sampling_rate, init=True)
     else:
@@ -351,32 +433,87 @@ def compute_cc(ctx):
     from multiprocessing import Process
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
-    processes = []
-    for i in range(threads):
-        p = Process(target=main)
-        p.start()
-        processes.append(p)
-        time.sleep(delay)
-    for p in processes:
-        p.join()
+    if threads == 1:
+        main()
+    else:
+        processes = []
+        for i in range(threads):
+            p = Process(target=main)
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
+@click.command()
+@click.pass_context
+def compute_cc2(ctx):
+    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    from ..s03compute_no_rotation import main
+    from multiprocessing import Process
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    if threads == 1:
+        main()
+    else:
+        processes = []
+        for i in range(threads):
+            p = Process(target=main)
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
 
 
 @click.command()
+@click.pass_context
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
 @click.option('-i', '--interval', default=1.0, help='Number of days before now to'
                                                   ' search for modified Jobs')
-def stack(ref, mov, step, interval):
+def stack(ctx, ref, mov, step, interval):
     """Stacks the [REF] and/or [MOV] windows"""
     click.secho('Lets STACK !', fg='green')
     from ..s04stack import main
-    if ref:
-        main('ref', interval)
-    if mov:
-        main('mov', interval)
-    if step:
-        main('step', interval)
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    if threads == 1:
+        if ref:
+            main('ref', interval)
+        if mov:
+            main('mov', interval)
+        if step:
+            main('step', interval)
+    else:
+        from multiprocessing import Process
+        processes = []
+        if ref:
+            for i in range(threads):
+                p = Process(target=main, args=["ref", interval])
+                p.start()
+                processes.append(p)
+                time.sleep(delay)
+        for p in processes:
+            p.join()
+        if mov:
+            for i in range(threads):
+                p = Process(target=main, args=["mov", interval])
+                p.start()
+                processes.append(p)
+                time.sleep(delay)
+        for p in processes:
+            p.join()
+        if step:
+            for i in range(threads):
+                p = Process(target=main, args=["step", interval])
+                p.start()
+                processes.append(p)
+                time.sleep(delay)
+        for p in processes:
+            p.join()
+
 
 
 @click.command()
@@ -384,18 +521,20 @@ def stack(ref, mov, step, interval):
 def compute_mwcs(ctx):
     """Computes the MWCS based on the new stacked data"""
     from ..s05compute_mwcs import main
-    from multiprocessing import Process
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
-
-    processes = []
-    for i in range(threads):
-        p = Process(target=main)
-        p.start()
-        processes.append(p)
-        time.sleep(delay)
-    for p in processes:
-        p.join()
+    if threads == 1:
+        main()
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main)
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
 
 
 @click.command()
@@ -406,12 +545,54 @@ def compute_stretching():
 
 
 @click.command()
+@click.pass_context
 @click.option('-i', '--interval', default=1.0, help='Number of days before now to\
  search for modified Jobs')
-def compute_dtt(interval):
+def compute_dtt(ctx, interval):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt import main
-    main(interval)
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    if threads == 1:
+        main(interval)
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main, args=[interval,])
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
+
+
+@click.command()
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
+@click.option('-p', '--pair', default=None, help='Plot a specific pair',
+              multiple=True)
+@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
+@click.option('-M', '--dttname', default="M", help='Plot M or M0?')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.pass_context
+def compute_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
+    """Plots the dv/v (parses the dt/t results)\n
+    Individual pairs can be plotted extra using the -p flag one or more times.\n
+    Example: msnoise plot dvv -p ID_KWUI_ID_POSI\n
+    Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
+    Remember to order stations alphabetically !
+    """
+    if ctx.obj['MSNOISE_custom']:
+        from s07_compute_dvv import main
+    else:
+        from ..s07_compute_dvv import main
+    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
 
 
 @click.command()
@@ -434,9 +615,9 @@ def reset(jobtype, all, rule):
 
 
 @click.command()
-def ipython():
+def jupyter():
     """Launches an ipython notebook in the current folder"""
-    os.system("ipython notebook --pylab inline --ip 0.0.0.0")
+    os.system("jupyter notebook --ip 0.0.0.0 --no-browser")
 
 
 #
@@ -660,6 +841,9 @@ def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
         from ..plots.dtt import main
     main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile)
 
+# Add DB commands to the db group:
+db.add_command(clean_duplicates)
+db.add_command(upgrade)
 
 # Add plot commands to the plot group:
 plot.add_command(data_availability)
@@ -677,18 +861,22 @@ cli.add_command(info)
 cli.add_command(admin)
 cli.add_command(upgrade_db)
 cli.add_command(install)
+cli.add_command(init)
 cli.add_command(config)
 cli.add_command(populate)
 cli.add_command(bugreport)
 cli.add_command(scan_archive)
 cli.add_command(new_jobs)
 cli.add_command(compute_cc)
+cli.add_command(compute_cc2)
 cli.add_command(stack)
 cli.add_command(compute_mwcs)
 cli.add_command(compute_stretching)
 cli.add_command(compute_dtt)
+cli.add_command(compute_dvv)
 cli.add_command(reset)
-cli.add_command(ipython)
+cli.add_command(db)
+cli.add_command(jupyter)
 cli.add_command(test)
 # Finally add the plot group too:
 cli.add_command(plot)
@@ -698,6 +886,7 @@ try:
 
     db = connect()
     plugins = get_config(db, "plugins")
+    db.close()
 except:
     plugins = None
 

@@ -142,7 +142,8 @@ def main(stype, interval=1.0):
     pws_timegate = float(get_config(db, 'pws_timegate'))
     pws_power = float(get_config(db, 'pws_power'))
     goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-
+    # Get Configuration
+    params = get_params(db)
     plugins = get_config(db, "plugins")
     extra_jobtypes = []
     if plugins:
@@ -154,7 +155,6 @@ def main(stype, interval=1.0):
                 for jobtype in jobtypes:
                     if jobtype["after"] == "refstack":
                         extra_jobtypes.append(jobtype["name"])
-    print(extra_jobtypes)
     
     if stype == "mov" or stype == "step":
         start, end, datelist = build_movstack_datelist(db)
@@ -184,26 +184,44 @@ def main(stype, interval=1.0):
                 rng = pd.date_range(start, end, freq="%iD"%mov_stack)
             datelists[mov_stack] = rng.map(lambda t: t.date())
         #~ print datelists
+    biglist = []
+    filters = get_filters(db, all=False)
+    while is_dtt_next_job(db, flag='T', jobtype='STACK'):
+        jobs = get_dtt_next_job(db, flag='T', jobtype='STACK')
 
-    for f in get_filters(db, all=False):
-        filterid = int(f.ref)
-        for components in components_to_compute:
-            for station1, station2 in get_station_pairs(db, used=True):
-                sta1 = "%s_%s" % (station1.net, station1.sta)
-                sta2 = "%s_%s" % (station2.net, station2.sta)
+        if not len(jobs):
+            # edge case, should only occur when is_next returns true, but
+            # get_next receives no jobs (heavily parallelised calls).
+            time.sleep(np.random.random())
+            continue
+        pair = jobs[0].pair
+        refs, days = zip(*[[job.ref, job.day] for job in jobs])
+
+        logging.info(
+            "There are STACKS jobs for some days to recompute for %s" % pair)
+        sta1, sta2 = pair.split(':')
+        for f in filters:
+            filterid = int(f.ref)
+            for components in components_to_compute:
                 pair = "%s:%s" % (sta1, sta2)
+                sta1 = sta1.replace('.', '_')
+                sta2 = sta2.replace('.', '_')
                 logging.debug('Processing %s-%s-%i' %
                                   (pair, components, filterid))
-                updated_days = updated_days_for_dates(db, start, end, pair.replace('_', '.'), jobtype='CC', interval=datetime.timedelta(days=interval),returndays=True)
+                # updated_days = updated_days_for_dates(db, start, end, pair.replace('_', '.'), jobtype='CC', interval=datetime.timedelta(days=interval),returndays=True)
+                updated_days = [UTCDateTime(d).datetime.date() for d in days]
                 if len(updated_days) != 0:
                     logging.debug("New Data for %s-%s-%i" %
                                   (pair, components, filterid))
                     #~ print updated_days
                     nstack, stack_total = get_results(
-                        db, sta1, sta2, filterid, components, datelist, format=format)
+                        db, sta1, sta2, filterid, components, datelist, format=format, params=params)
+                    if not nstack:
+                        logging.debug("No new data found, hmmm")
                     logging.debug("Data loaded")
                     if nstack > 0:
                         if stype == "mov":
+                            logging.debug("Mov Stack!")
                             for i, date in enumerate(datelist):
                                 jobadded = False
                                 for mov_stack in mov_stacks:
@@ -223,9 +241,14 @@ def main(stype, interval=1.0):
                                         if not np.all(np.isnan(corr)):
                                             day_name = "%s_%s" % (
                                                 sta1, sta2)
-                                            logging.debug("%s %s [%s - %s] (%i day stack)" % (
-                                                day_name, date, datelist[low], datelist[i], mov_stack))
-                                            corr = stack(db, corr)
+                                            logging.debug("%s %s %s [%s - %s] (%i day stack)" % (
+                                                day_name, components, date, datelist[low], datelist[i], mov_stack))
+                                            corr = stack(corr, stack_method,
+                                                         pws_timegate,
+                                                         pws_power,
+                                                         goal_sampling_rate)
+                                            if not len(corr):
+                                                continue
 
                                             corr = scipy.signal.detrend(
                                                 corr)
@@ -235,19 +258,19 @@ def main(stype, interval=1.0):
                                                 stack_path, str(date))
                                             if mseed:
                                                 export_mseed(
-                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate, params=params)
                                             if sac:
                                                 export_sac(
-                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate, params=params)
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
                                             if not jobadded:
                                                 update_job(
-                                                    db, date, day_name.replace('_', '.'), 'DTT', 'T')
+                                                    db, date, day_name.replace('_', '.'), 'MWCS', 'T')
                                                 jobadded = True
                                         del corr
                         elif stype == "step":
-                            jobs = []
+                            jobs_done = []
                             for mov_stack in mov_stacks:
                                 for i, date in enumerate(datelists[mov_stack]):
                                     if date not in datelist:
@@ -268,9 +291,12 @@ def main(stype, interval=1.0):
                                         if not np.all(np.isnan(corr)):
                                             day_name = "%s_%s" % (
                                                 sta1, sta2)
-                                            logging.debug("%s %s [%s - %s] (%i day stack)" % (
-                                                day_name, date, datelist[low], datelist[high-1], mov_stack))
-                                            corr = stack(db, corr)
+                                            logging.debug("%s %s %s [%s - %s] (%i day stack)" % (
+                                                day_name, components, date, datelist[low], datelist[high-1], mov_stack))
+                                            corr = stack(corr, stack_method,
+                                                         pws_timegate,
+                                                         pws_power,
+                                                         goal_sampling_rate)
                                             corr = scipy.signal.detrend(corr)
                                             stack_path = os.path.join(
                                                 "STACKS", "%02i" % filterid, "%03i_DAYS" % mov_stack, components, day_name)
@@ -278,27 +304,19 @@ def main(stype, interval=1.0):
                                                 stack_path, str(date))
                                             if mseed:
                                                 export_mseed(
-                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate, params=params)
                                             if sac:
                                                 export_sac(
-                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate)
+                                                    db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate, params=params)
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
                                             job = "%s %s" % (date, day_name)
-                                            if job not in jobs:
+                                            if job not in jobs_done:
                                                 update_job(
-                                                    db, date, day_name.replace('_', '.'), 'DTT', 'T')
-                                                jobs.append(job)
+                                                    db, date, day_name.replace('_', '.'), 'MWCS', 'T')
+                                                jobs_done.append(job)
                                         del corr
-                            #~ for date in datelist:
-                                #~ day_name = "%s:%s" % (
-                                                    #~ sta1, sta2)
-                                #~ job = "%s %s" % (date, day_name)
-                                #~ if job not in jobs:
-                                    #~ update_job(
-                                        #~ db, date, day_name.replace('_', '.'), 'DTT', 'T')
-                                    #~ jobs.append(job)
-                        
+
                         elif stype == "ref":
                             stack_path = os.path.join(
                                 "STACKS", "%02i" % filterid, "REF", components)
@@ -308,16 +326,31 @@ def main(stype, interval=1.0):
 
                             if mseed:
                                 export_mseed(
-                                    db, filename, pair, components, filterid, stack_total)
+                                    db, filename, pair, components, filterid, stack_total, params=params)
                             if sac:
                                 export_sac(
-                                    db, filename, pair, components, filterid, stack_total)
+                                    db, filename, pair, components, filterid, stack_total,params=params)
                             ref_name = "%s:%s" % (sta1, sta2)
                             update_job(
-                                db, "REF", ref_name.replace('_', '.'), 'DTT', 'T')
+                                db, "REF", ref_name.replace('_', '.'), 'MWCS', 'T')
                             for jobtype in extra_jobtypes:
                                 update_job(db, "REF", ref_name.replace('_', '.'), jobtype, 'T')
                             del stack_total
+
+        # THIS SHOULD BE IN THE API
+        # This doesn't set MWCS jobs for REF stacks
+        if stype != "ref":
+            massive_update_job(db, jobs, "D")
+            if stype != "step":
+                for job in jobs:
+                    update_job(db, job.day, job.pair, 'MWCS', 'T')
+        if stype == "ref":
+            biglist += jobs
+
+    if stype == "ref":
+        massive_update_job(db, biglist, "T")
+
+    logging.debug("Finished Stacking")
 
 
 def refstack(interval):
@@ -326,36 +359,3 @@ def refstack(interval):
 
 def movstack(interval):
     main('mov', interval)
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s [%(levelname)s] %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S')
-
-    parser = argparse.ArgumentParser(description='Compute [REF,MOV] stacks if\
-                                jobs have been modified in the last i days.',
-                                     epilog=__doc__)
-    parser.add_argument('-r', '--ref', action="store_true",
-                        help='Triggers the computation of REF stacks',
-                        default=False)
-    parser.add_argument('-m', '--mov', action="store_true",
-                        help='Triggers the computation of MOV stacks',
-                        default=False)
-    parser.add_argument('-i', '--interval',
-                        help='Number of days before now to search for\
-                        modified CC jobs [default:1]', default=1, type=int)
-    args = parser.parse_args()
-
-    logging.info('Starting this program with: ref=%s, mov=%s, interval=%i'
-                 % (args.ref, args.mov, args.interval))
-
-    db = connect()
-    if args.ref:
-        logging.info("*** Starting: REF Stack ***")
-        refstack(args.interval)
-        logging.info("*** Finished: REF Stack ***")
-    if args.mov:
-        logging.info("*** Starting: MOV Stack ***")
-        movstack(args.interval)
-        logging.info("*** Finished: MOV Stack ***")

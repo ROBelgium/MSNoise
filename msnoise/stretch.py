@@ -73,22 +73,32 @@ def main():
         extension = "."+export_format
 
     # First we reset all DTT jobs to "T"odo if the REF is new for a given pair
-    for station1, station2 in get_station_pairs(db, used=True):
-        sta1 = "%s.%s" % (station1.net, station1.sta)
-        sta2 = "%s.%s" % (station2.net, station2.sta)
-        pair = "%s:%s" % (sta1, sta2)
-        if is_dtt_next_job(db, jobtype='DTT', ref=pair):
-            logging.info(
-              "We will recompute all STR based on the new REF for %s" % pair)
-            reset_dtt_jobs(db, pair)
-            update_job(db, "REF", pair, jobtype='DTT', flag='D')
+    # for station1, station2 in get_station_pairs(db, used=True):
+    #     sta1 = "%s.%s" % (station1.net, station1.sta)
+    #     sta2 = "%s.%s" % (station2.net, station2.sta)
+    #     pair = "%s:%s" % (sta1, sta2)
+    #     if is_dtt_next_job(db, jobtype='DTT', ref=pair):
+    #         logging.info(
+    #           "We will recompute all STR based on the new REF for %s" % pair)
+    #         reset_dtt_jobs(db, pair)
+    #         update_job(db, "REF", pair, jobtype='DTT', flag='D')
 
+    filters = get_filters(db, all=False)
     # Then we compute the jobs
-    while is_dtt_next_job(db, flag='T', jobtype='DTT'):
-        pair, days, refs = get_dtt_next_job(db, flag='T', jobtype='DTT')
-        logging.info(
-            "There are STR jobs for some days to recompute for %s" % pair)
+    while is_dtt_next_job(db, flag='T', jobtype='MWCS'):
+        jobs = get_dtt_next_job(db, flag='T', jobtype='MWCS')
 
+        if not len(jobs):
+            # edge case, should only occur when is_next returns true, but
+            # get_next receives no jobs (heavily parallelised calls).
+            time.sleep(np.random.random())
+            continue
+        pair = jobs[0].pair
+        refs, days = zip(*[[job.ref, job.day] for job in jobs])
+
+        logging.info(
+            "There are MWCS jobs for some days to recompute for %s" % pair)
+        
         ref_name = pair.replace('.', '_').replace(':', '_')
         sta1, sta2 = pair.split(':')
         station1 = sta1.split(".")
@@ -115,10 +125,6 @@ def main():
             filterid = int(f.ref)
 
             for mov_stack in mov_stacks:
-                alldays = []
-                alldeltas = []
-                allcoefs = []
-                allerrs = []
                 for components in components_to_compute:
                         rf = os.path.join("STACKS", "%02i" %
                                           filterid, "REF", components, ref_name + extension)
@@ -128,8 +134,11 @@ def main():
                             ref[mid-int(minlag*goal_sampling_rate):mid+int(minlag*goal_sampling_rate)] *= 0.
                             ref[:mid-int(maxlag2*goal_sampling_rate)] *= 0.
                             ref[mid+int(maxlag2*goal_sampling_rate):] *= 0.
-
-                        str_range = 0.01  ### HARD CODE!!! ###
+                        alldays = []
+                        alldeltas = []
+                        allcoefs = []
+                        allerrs = []
+                        str_range = 0.5  ### HARD CODE!!! ###
                         nstr = 1001  ### HARD CODE!!! ###
                         ref_stretched, deltas = stretch_mat_creation(ref,
                                                                      str_range=str_range,
@@ -186,8 +195,18 @@ def main():
                         if not os.path.isdir(output):
                             os.makedirs(output)
                         df.to_csv(os.path.join(output, "%s.csv" % ref_name), index_label="Date")
-        for day in days:
-            update_job(db, day, pair, jobtype='DTT', flag='D')
+
+        # THIS SHOULD BE IN THE API
+        updated = False
+        mappings = [{'ref': job.ref, 'flag': "D"} for job in jobs]
+        while not updated:
+            try:
+                db.bulk_update_mappings(Job, mappings)
+                db.commit()
+                updated = True
+            except:
+                time.sleep(np.random.random())
+                pass
 
     logging.info('*** Finished: Compute STR ***')
 

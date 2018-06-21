@@ -62,7 +62,7 @@ def main(init=False, nocc=False):
                                  "jobtype": jobtype,
                                  "flag": "T", "lastmod": now})
 
-    all_jobs = list(np.unique(all_jobs))
+    # all_jobs = list(np.unique(all_jobs))
     updated_days = np.asarray(updated_days)
     updated_days = np.unique(updated_days)
     logging.debug('Determining available data for each "updated date"')

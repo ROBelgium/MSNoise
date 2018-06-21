@@ -4,7 +4,7 @@ import itertools
 import logging
 import os
 import glob
-
+import traceback
 try:
     import cPickle
 except:
@@ -15,6 +15,7 @@ import pkg_resources
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
+from sqlalchemy.sql.expression import func
 import numpy as np
 import pandas as pd
 import scipy as sp
@@ -30,6 +31,7 @@ from obspy.geodetics import gps2dist_azimuth
 
 from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
+# TODO do we really need this here?
 plugin_tables = {}
 for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.table_def'):
     plugin_tables[ep.name] = ep.load()
@@ -41,7 +43,8 @@ def get_tech():
     :rtype: int
     :returns: The database technology used: 1=sqlite 2=mysql
     """
-    tech, hostname, database, username, password = read_database_inifile()
+    tech, hostname, database, username, password, prefix = \
+        read_database_inifile()
     return tech
 
 
@@ -57,7 +60,8 @@ def get_engine(inifile=None):
     """
     if not inifile:
         inifile = os.path.join(os.getcwd(), 'db.ini')
-    tech, hostname, database, user, passwd = read_database_inifile(inifile)
+    tech, hostname, database, user, passwd, prefix = read_database_inifile(
+        inifile)
     if tech == 1:
         engine = create_engine('sqlite:///%s' % hostname, echo=False,
                                connect_args={'check_same_thread': False})
@@ -88,7 +92,8 @@ def connect(inifile=None):
     return Session()
 
 
-def create_database_inifile(tech, hostname, database, username, password):
+def create_database_inifile(tech, hostname, database, username, password,
+                            prefix=""):
     """Creates the db.ini file based on supplied parameters.
 
     :type tech: int
@@ -101,12 +106,15 @@ def create_database_inifile(tech, hostname, database, username, password):
     :type username: string
     :param username: The user name
     :type password: string
+    :param prefix: The prefix to use for all tables
+    :type prefix: string
     :param password: The password of `user`
 
     :return: None
     """
     f = open(os.path.join(os.getcwd(), 'db.ini'), 'wb')
-    cPickle.dump([tech, hostname, database, username, password], f, protocol=2)
+    cPickle.dump([tech, hostname, database, username, password, prefix], f,
+                 protocol=2)
     f.close()
 
 
@@ -124,9 +132,15 @@ def read_database_inifile(inifile=None):
         inifile = os.path.join(os.getcwd(), 'db.ini')
 
     f = open(inifile, 'rb')
-    tech, hostname, database, username, password = cPickle.load(f)
+    try:
+        # New ini file with prefix support
+        tech, hostname, database, username, password, prefix = cPickle.load(f)
+    except:
+        # Old ini file without prefix
+        tech, hostname, database, username, password = cPickle.load(f)
+        prefix = ""
     f.close()
-    return [tech, hostname, database, username, password]
+    return [tech, hostname, database, username, password, prefix]
 
 
 # CONFIG
@@ -176,7 +190,7 @@ def get_config(session, name=None, isbool=False, plugin=None):
     return config
 
 
-def update_config(session, name, value):
+def update_config(session, name, value, plugin=None):
     """Update one config bit in the database.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -190,15 +204,69 @@ def update_config(session, name, value):
     :param value: The value of parameter `name`. Can also be NULL if you don't
         want to use this particular parameter.
 
-    """
+    :type plugin: str
+    :param plugin: if provided, gives the name of the Plugin config to use. E.g.
+        if "Amazing" is provided, MSNoise will try to load the "AmazingConfig"
+        entry point. See :doc:`plugins` for details.
 
-    config = session.query(Config).filter(Config.name == name).first()
-    if "NULL" in value: 
+    """
+    if plugin:
+        table = plugin_tables["%sConfig"%plugin]
+    else:
+        table = Config
+    config = session.query(table).filter(table.name == name).first()
+    if "NULL" in value:
         config.value = None
     else:
         config.value = value
     session.commit()
     return
+
+
+def get_params(session):
+    """Get config parameters from the database.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :returns: a Param class containing the parameters
+    """
+    # TODO: this could be populated automatically from defauts iff defaults
+    # would mention types
+    class Params:
+        pass
+    s = session
+    params = Params()
+    params.output_folder = get_config(s, 'output_folder')
+    params.export_format = get_config(s, 'export_format')
+
+    params.goal_sampling_rate = float(get_config(s, "cc_sampling_rate"))
+    params.goal_duration = float(get_config(s, "analysis_duration"))
+    params.overlap = float(get_config(s, "overlap"))
+    params.maxlag = float(get_config(s, "maxlag"))
+    params.corr_duration = float(get_config(s, "corr_duration"))
+    params.min30 = float(get_config(s, "corr_duration")) * \
+                   params.goal_sampling_rate
+    params.windsorizing = float(get_config(s, "windsorizing"))
+    params.whitening = get_config(s, 'whitening')
+    params.resampling_method = get_config(s, "resampling_method")
+    params.remove_response = get_config(s, 'remove_response', isbool=True)
+    params.response_prefilt = eval(get_config(s, 'response_prefilt'))
+    params.preprocess_lowpass = float(get_config(s, "preprocess_lowpass"))
+    params.preprocess_highpass = float(get_config(s, "preprocess_highpass"))
+    params.keep_all = get_config(s, 'keep_all', isbool=True)
+    params.keep_days = get_config(s, 'keep_days', isbool=True)
+    params.autocorr = get_config(s, "autocorr", isbool=True)
+    params.components_to_compute = get_components_to_compute(s)
+    params.export_format = get_config(s, 'export_format')
+    params.sac_format = get_config(s, "sac_format")
+
+    params.stack_method = get_config(s, 'stack_method')
+    params.pws_timegate = float(get_config(s, 'pws_timegate'))
+    params.pws_power = float(get_config(s, 'pws_power'))
+    params.hpc = get_config(s, 'hpc')
+    return params
 
 # FILTERS PART
 
@@ -625,9 +693,10 @@ def count_data_availability_flags(session):
 
 
 # Jobs
-
+# TODO bad doing this here!
 import time
-def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
+def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
+               ref=None):
     """
     Updates or Inserts a new :class:`~msnoise.msnoise_table_def.Job` in the
     database.
@@ -650,11 +719,14 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True):
     :rtype: :class:`~msnoise.msnoise_table_def.Job` or None
     :returns: If returnjob is True, returns the modified/inserted Job.
     """
-    job = session.query(Job)\
-        .with_hint(Job, 'USE INDEX (job_index)')\
-        .filter(Job.day == day)\
-        .filter(Job.pair == pair)\
-        .filter(Job.jobtype == jobtype).first()
+    if ref:
+        job = session.query(Job).filter(Job.ref == ref).first()
+    else:
+        job = session.query(Job)\
+            .with_hint(Job, 'USE INDEX (job_index)')\
+            .filter(Job.day == day)\
+            .filter(Job.pair == pair)\
+            .filter(Job.jobtype == jobtype).first()
     if job is None:
         job = Job(day, pair, jobtype, 'T')
         session.add(job)
@@ -682,6 +754,29 @@ def massive_insert_job(jobs):
         jobs)
 
 
+def massive_update_job(session, jobs, flag="D"):
+    """
+    Routine to use a low level function to update much faster a list of
+    :class:`~msnoise.msnoise_table_def.Job`. This method uses the Job.ref
+    which is unique.
+
+    :type jobs: list
+    :param jobs: a list of :class:`~msnoise.msnoise_table_def.Job` to update.
+    :type flag: str
+    :param flag: The destination flag.
+    """
+    updated = False
+    mappings = [{'ref': job.ref, 'flag': flag} for job in jobs]
+    while not updated:
+        try:
+            session.bulk_update_mappings(Job, mappings)
+            session.commit()
+            updated = True
+        except:
+            time.sleep(np.random.random())
+            pass
+    return
+
 def is_next_job(session, flag='T', jobtype='CC'):
     """
     Are there any :class:`~msnoise.msnoise_table_def.Job` in the database,
@@ -699,7 +794,8 @@ def is_next_job(session, flag='T', jobtype='CC'):
     :returns: True if at least one :class:`~msnoise.msnoise_table_def.Job`
         matches, False otherwise.
     """
-    job = session.query(Job).filter(Job.jobtype == jobtype).\
+    job = session.query(Job).with_hint(Job, 'USE INDEX (job_index2)').\
+        filter(Job.jobtype == jobtype).\
         filter(Job.flag == flag).first()
     if job is None:
         return False
@@ -725,10 +821,15 @@ def get_next_job(session, flag='T', jobtype='CC'):
     :rtype: list
     :returns: list of :class:`~msnoise.msnoise_table_def.Job`
     """
-    day = session.query(Job).filter(Job.jobtype == jobtype).\
-        filter(Job.flag == flag).order_by(Job.day).first().day
+    # day =
     jobs = session.query(Job).filter(Job.jobtype == jobtype).\
-        filter(Job.flag == flag).filter(Job.day == day)
+        filter(Job.flag == flag).\
+        filter(Job.day == session.query(Job).
+               with_hint(Job, 'USE INDEX (job_index)').
+               filter(Job.jobtype == jobtype).
+               filter(Job.flag == flag).first().day).\
+        with_for_update()
+    # print(jobs.statement.compile(compile_kwargs={"literal_binds": True}))
     tmp = jobs.all()
     jobs.update({Job.flag: 'I'})
     session.commit()
@@ -754,7 +855,8 @@ def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
     :rtype: bool
     :returns: True if at least one Job matches, False otherwise.
     """
-    q = session.query(Job.ref).filter(Job.flag == flag).\
+    q = session.query(Job.ref).with_hint(Job, 'USE INDEX (job_index2)').\
+        filter(Job.flag == flag).\
         filter(Job.jobtype == jobtype)
     if ref:
         job = q.filter(Job.pair == ref).filter(Job.day == 'REF').count()
@@ -787,16 +889,36 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
         Days of the next DTT jobs -
         Job IDs (for later being able to update their flag).
     """
-    pair = session.query(Job).filter(Job.flag == flag).\
-        filter(Job.jobtype == jobtype).filter(Job.day != 'REF').first().pair
-    jobs = session.query(Job.ref, Job.day).filter(Job.flag == flag).\
-        filter(Job.jobtype == jobtype).filter(Job.day != 'REF').\
-        filter(Job.pair == pair)
-    tmp = list(jobs)
-    jobs.update({Job.flag: 'I'}, synchronize_session=False)
-    session.commit()
-    refs, days = zip(*[[job.ref,job.day] for job in tmp])
-    return pair, days, refs
+    if get_tech() == 1:
+        rand = func.random
+    else:
+        rand = func.rand
+    try:
+        jobs = session.query(Job.ref, Job.day, Job.pair, Job.flag).filter(Job.flag == flag).\
+            filter(Job.jobtype == jobtype).filter(Job.day != 'REF').\
+            filter(Job.pair == session.query(Job).
+                   with_hint(Job, 'USE INDEX (job_index)').
+                   filter(Job.flag == flag).
+                   filter(Job.jobtype == jobtype).
+                   filter(Job.day != 'REF').
+                   order_by(rand()).first().pair).\
+            with_for_update()
+        tmp = jobs.all()
+        mappings = [{'ref': job.ref, 'flag': "I"} for job in tmp]
+        updated = False
+        while not updated:
+            try:
+                session.bulk_update_mappings(Job, mappings)
+                session.commit()
+                updated=True
+            except:
+                traceback.print_exc()
+                time.sleep(np.random.random())
+                pass
+        return tmp
+    except:
+        traceback.print_exc()
+        return []
 
 
 def reset_jobs(session, jobtype, alljobs=False, rule=None):
@@ -861,6 +983,19 @@ def get_job_types(session, jobtype='CC'):
 
 
 def get_jobs_by_lastmod(session, jobtype='CC', lastmod=datetime.datetime.now()):
+    """
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type lastmod: datetime.datetime
+    :param lastmod: Jobs' modification time
+
+    :rtype: list
+    :return: list of Job objects.
+    """
     jobs = session.query(Job).filter(Job.jobtype == jobtype).\
         filter(Job.lastmod >= lastmod).all()
     return jobs
@@ -885,8 +1020,24 @@ def export_allcorr(session, ccfid, data):
     return
 
 
+def export_allcorr2(session, ccfid, data):
+    output_folder = get_config(session, 'output_folder')
+    station1, station2, components, filterid, date = ccfid.split('_')
+
+    path = os.path.join(output_folder, "%02i" % int(filterid),
+                        station1, station2, components)
+    if not os.path.isdir(path):
+        os.makedirs(path)
+
+    df = pd.DataFrame().from_dict(data).T
+    df.columns = get_t_axis(session)
+    df.to_hdf(os.path.join(path, date+'.h5'), 'data')
+    del df
+    return
+
+
 def add_corr(session, station1, station2, filterid, date, time, duration,
-             components, CF, sampling_rate, day=False, ncorr=0):
+             components, CF, sampling_rate, day=False, ncorr=0, params=None):
     """
     Adds a CCF to the data archive on disk.
     
@@ -915,10 +1066,13 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
         configuration). Defaults to True.
     :type ncorr: int
     :param ncorr: Number of CCF that have been stacked for this CCF.
+    :type params: dict
+    :param params: A dictionnary of MSNoise config parameters as returned by
+        :func:`get_params`.
     """
 
-    output_folder = get_config(session, 'output_folder')
-    export_format = get_config(session, 'export_format')
+    output_folder = params.output_folder
+    export_format = params.export_format
     sac, mseed = False, False
     if export_format == "BOTH":
         mseed = True
@@ -934,10 +1088,10 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
         pair = "%s:%s" % (station1, station2)
         if mseed:
             export_mseed(session, path, pair, components, filterid, CF,
-                         ncorr)
+                         ncorr, params=params)
         if sac:
             export_sac(session, path, pair, components, filterid, CF,
-                       ncorr)
+                       ncorr, params=params)
 
     else:
         file = '%s.cc' % time
@@ -959,7 +1113,11 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
 
 
 def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
-               sac_format=None, maxlag=None, cc_sampling_rate=None):
+               sac_format=None, maxlag=None, cc_sampling_rate=None,
+               params=None):
+    maxlag = params.maxlag
+    cc_sampling_rate = params.goal_sampling_rate
+    sac_format = params.sac_format
     if sac_format is None:
         sac_format = get_config(db, "sac_format")
     if maxlag is None:
@@ -990,13 +1148,14 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
 
 
 def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
-                 maxlag=None, cc_sampling_rate=None):
+                 maxlag=None, cc_sampling_rate=None, params=None):
     try:
         os.makedirs(os.path.split(filename)[0])
     except:
         pass
     filename += ".MSEED"
-    
+    maxlag = params.maxlag
+    cc_sampling_rate = params.goal_sampling_rate
     if maxlag is None:
         maxlag = float(get_config(db, "maxlag"))
     if cc_sampling_rate is None:
@@ -1014,16 +1173,50 @@ def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
     return
 
 
-def stack(session, data):
-    stack_method = get_config(session, 'stack_method')
-    pws_timegate = float(get_config(session, 'pws_timegate'))
-    pws_power = float(get_config(session, 'pws_power'))
-    goal_sampling_rate = float(get_config(session, "cc_sampling_rate"))
+def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
+          goal_sampling_rate=20.0):
+    """
+    :type data: :class:`numpy.ndarray`
+    :param data: the data to stack, each row being one CCF
+    :type stack_method: str
+    :param stack_method: either ``linear``: average of all CCF or ``pws`` to
+        compute the phase weigthed stack. If ``pws`` is selected,
+        the function expects the ``pws_timegate`` and ``pws_power``.
+    :type pws_timegate: float
+    :param pws_timegate: PWS time gate in seconds. Width of the smoothing
+         window to convolve with the PWS spectrum.
+    :type pws_power: float
+    :param pws_power: Power of the PWS weights to be applied to the CCF stack.
+    :type goal_sampling_rate: float
+    :param goal_sampling_rate: Sampling rate of the CCF array submitted
+    :rtype: :class:`numpy.array`
+    :return: the stacked CCF.
+    """
+    if len(data) == 0:
+        logging.debug("No data to stack.")
+        return []
     data = data[~np.isnan(data).any(axis=1)]
+    sanitize = False
+    # TODO clean sanitize function, add param to config and make sure not to
+    # kill the data[i] if all data are corrcoeff >0.9 (either very stable
+    # corr or autocorr, then this sanitize should not occur.
+    if len(data) != 1 and sanitize:
+        threshold = 0.99
+        npts = data.shape[1]
+        corr = data.mean(axis=0)
+        corrcoefs = np.array([np.corrcoef(di, corr)[1][0] for di in data])
+        toolarge = np.where(corrcoefs >= threshold)[0]
+        if len(toolarge):
+            data = data[np.where(corrcoefs <= threshold)[0]]
+
+    if len(data) == 0:
+        return []
     if stack_method == "linear":
+        logging.debug("Doing a linear stack")
         corr = data.mean(axis=0)
 
     elif stack_method == "pws":
+        logging.debug("Doing a PWS stack")
         corr = np.zeros(data.shape[1], dtype='f8')
         phasestack = np.zeros(data.shape[1], dtype='c8')
         for i in range(data.shape[0]):
@@ -1045,10 +1238,41 @@ def stack(session, data):
     return corr
 
 
-
 def get_results(session, station1, station2, filterid, components, dates,
-                mov_stack = 1, format="stack"):
-    export_format = get_config(session, 'export_format')
+                mov_stack = 1, format="stack", params=None):
+    """
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type station1: str
+    :param station1: The name of station 1 (formatted NET_STA)
+    :type station2: str
+    :param station2: The name of station 2 (formatted NET_STA)
+    :type filterid: int
+    :param filterid: The ID (ref) of the filter
+    :type components: str
+    :param components: The name of the components used (ZZ, ZR, ...)
+    :type dates: list
+    :param dates: List of TODO datetime.datetime
+    :type mov_stack: int
+    :param mov_stack: Moving window stack.
+    :type format: str
+    :param format: Either ``stack``: the data will be stacked according to
+        the parameters passed with ``params`` or ``matrix``: to get a 2D
+        array of CCF.
+    :type params: dict
+    :param params: A dictionnary of MSNoise config parameters as returned by
+        :func:`get_params`.
+    :rtype: :class:`numpy.ndarray`
+    :return: Either a 1D CCF (if format is ``stack`` or a 2D array (if format=
+        ``matrix``).
+    """
+    if not params:
+        export_format = get_config(session, 'export_format')
+    else:
+        export_format = params.export_format
+
     stack_data = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
     i = 0
     base = os.path.join("STACKS", "%02i" % filterid,
@@ -1075,7 +1299,9 @@ def get_results(session, station1, station2, filterid, components, dates,
 
     elif format == "stack":
         logging.debug("Stacking...")
-        corr = stack(session, stack_data)
+
+        corr = stack(stack_data, params.stack_method, params.pws_timegate,
+                     params.pws_power, params.goal_sampling_rate)
 
         if i > 0:
             return i, corr
@@ -1083,8 +1309,25 @@ def get_results(session, station1, station2, filterid, components, dates,
             return 0, None
 
 
-def get_results_all(session, station1, station2, filterid, components, dates,
-                mov_stack = 1, format="stack"):
+def get_results_all(session, station1, station2, filterid, components, dates):
+    """
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type station1: str
+    :param station1: The name of station 1 (formatted NET_STA)
+    :type station2: str
+    :param station2: The name of station 2 (formatted NET_STA)
+    :type filterid: int
+    :param filterid: The ID (ref) of the filter
+    :type components: str
+    :param components: The name of the components used (ZZ, ZR, ...)
+    :type dates: list
+    :param dates: List of TODO datetime.datetime
+    :rtype: :class:`pandas.DataFrame`
+    :return: All CCF results in a :class:`pandas.DataFrame`, where the index
+        is the time of the CCF and the columns are the times in the coda.
+    """
 
     output_folder = get_config(session, 'output_folder')
     path = os.path.join(output_folder, "%02i" % int(filterid),
@@ -1114,7 +1357,7 @@ def get_maxlag_samples(session):
         obtained by :func:`connect`
 
     :rtype: int
-    :returns: the length of the CCF
+    :returns: the length of the CCF in samples
     """
 
     maxlag = float(get_config(session, 'maxlag'))
@@ -1132,7 +1375,7 @@ def get_t_axis(session):
         obtained by :func:`connect`
 
     :rtype: :class:`numpy.array`
-    :returns: the time axis
+    :returns: the time axis in seconds
     """
 
     maxlag = float(get_config(session, 'maxlag'))
@@ -1179,6 +1422,10 @@ def build_ref_datelist(session):
     if begin[0] == '-':
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
         end = datetime.date.today() + datetime.timedelta(days=int(end))
+    elif begin == "1970-01-01":
+        start = session.query(DataAvailability).order_by(
+            DataAvailability.starttime).first().starttime.date()
+        end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
     else:
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
@@ -1205,6 +1452,10 @@ def build_movstack_datelist(session):
     if begin[0] == '-':
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
         end = datetime.date.today() + datetime.timedelta(days=int(end))
+    elif begin == "1970-01-01":
+        start = session.query(DataAvailability).order_by(
+            DataAvailability.starttime).first().starttime.date()
+        end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
     else:
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
@@ -1313,7 +1564,7 @@ def nextpow2(x):
 
 
 def check_and_phase_shift(trace):
-    # print trace
+    # TODO replace this hard coded taper length
     taper_length = 20.0
     if trace.stats.npts < 4 * taper_length*trace.stats.sampling_rate:
         trace.data = np.zeros(trace.stats.npts)
@@ -1421,10 +1672,14 @@ def make_same_length(st):
         endtimes.append(tr.stats.endtime)
 
     # trim stream to common starttimes
+    if max(starttimes) >= min(endtimes):
+        return Stream()
     st.trim(max(starttimes), min(endtimes))
 
     # get the mask of all traces, i.e. the parts where at least one trace has
     # a gap
+    # TODO add cases with more than 2 or 3 traces (could append?)
+    # TODO is there a better way to AND masks ?
     if len(st) == 2:
         mask = np.logical_or(st[0].data.mask, st[1].data.mask)
     elif len(st) == 3:
@@ -1458,70 +1713,6 @@ def clean_scipy_cache():
     sff.destroy_dst1_cache()
 
 
-### TMP
-
-def linear_regression(xdata, ydata, weights=None, p0=None,
-                      intercept_origin=True, **kwargs):
-    """
-    Use linear least squares to fit a function, f, to data.
-    This method is a generalized version of
-    :func:`scipy.optimize.minpack.curve_fit`; allowing for Ordinary Least
-    Square and Weighted Least Square regressions:
-
-    * OLS through origin: ``linear_regression(xdata, ydata)``
-    * OLS with any intercept: ``linear_regression(xdata, ydata,
-      intercept_origin=False)``
-    * WLS through origin: ``linear_regression(xdata, ydata, weights)``
-    * WLS with any intercept: ``linear_regression(xdata, ydata, weights,
-      intercept_origin=False)``
-
-    If the expected values of slope (and intercept) are different from 0.0,
-    provide the p0 value(s).
-
-    :param xdata: The independent variable where the data is measured.
-    :param ydata: The dependent data - nominally f(xdata, ...)
-    :param weights: If not None, the uncertainties in the ydata array. These
-        are used as weights in the least-squares problem. If ``None``, the
-        uncertainties are assumed to be 1. In SciPy vocabulary, our weights are
-        1/sigma.
-    :param p0: Initial guess for the parameters. If ``None``, then the initial
-        values will all be 0 (Different from SciPy where all are 1)
-    :param intercept_origin: If ``True``: solves ``y=a*x`` (default);
-        if ``False``: solves ``y=a*x+b``.
-
-    :rtype: tuple
-    :returns: (slope, std_slope) if ``intercept_origin`` is ``True``;
-        (slope, intercept, std_slope, std_intercept) if ``False``.
-    """
-    if weights is not None:
-        sigma = 1. / weights
-    else:
-        sigma = None
-
-    if p0 is None:
-        if intercept_origin:
-            p0 = 0.0
-        else:
-            p0 = [0.0, 0.0]
-
-    if intercept_origin:
-        p, cov = scipy.optimize.curve_fit(lambda x, a: a * x,
-                                          xdata, ydata, p0, sigma=sigma,
-                                          **kwargs)
-        slope = p[0]
-        std_slope = np.sqrt(cov[0, 0])
-        return slope, std_slope
-
-    else:
-        p, cov = scipy.optimize.curve_fit(lambda x, a, b: a * x + b,
-                                          xdata, ydata, p0, sigma=sigma,
-                                          **kwargs)
-        slope, intercept = p
-        std_slope = np.sqrt(cov[0, 0])
-        std_intercept = np.sqrt(cov[1, 1])
-        return slope, intercept, std_slope, std_intercept
-
-
 def preload_instrument_responses(session):
     """
     This function preloads all instrument responses from ``response_format``
@@ -1541,7 +1732,7 @@ def preload_instrument_responses(session):
         poles and zeros.
     
     """
-    logging.debug('Removing instrument response')
+    logging.debug('Preloading instrument response')
     response_format = get_config(session, 'response_format')
     files = glob.glob(os.path.join(get_config(session, 'response_path'), "*"))
     channels = []
@@ -1589,18 +1780,5 @@ def preload_instrument_responses(session):
     channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
                                                "end_date", "paz", "latitude",
                                                "longitude"],)
-    return(channels)
-
-
-if __name__ == "__main__":
-    s = connect()
-    for filter in get_filters(s, False):
-        print(filter.ref, filter.low, filter.high)
-
-    print(get_networks(s))
-
-    for station in get_stations(s, False, net='BE'):
-        print( station.net, station.sta)
-
-    print(get_config(s))
-    print(get_config(s, 'data_folder'))
+    logging.debug('Finished Loading instrument responses')
+    return channels

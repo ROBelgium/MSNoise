@@ -224,7 +224,8 @@ class StationView(ModelView):
     view_title = "Station Configuration"
     column_filters = ('net', 'used')
     column_type_formatters = MY_DEFAULT_FORMATTERS
-    
+    can_set_page_size = True
+
     def __init__(self, session, **kwargs):
         super(StationView, self).__init__(Station, session, **kwargs)
     
@@ -249,6 +250,7 @@ class DataAvailabilityView(ModelView):
     can_delete = True
     can_edit = True
     page_size = 100
+    can_set_page_size = True
     column_filters = ('net', 'sta', 'comp', 'data_duration', 'gaps_duration',
                       'samplerate', 'flag')
 
@@ -281,6 +283,7 @@ class JobView(ModelView):
     column_filters = ('pair', 'jobtype', 'flag')
     page_size = 100
     edit_modal = True
+    can_set_page_size = True
 
     def __init__(self, session, **kwargs):
         super(JobView, self).__init__(Job, session, **kwargs)
@@ -343,6 +346,7 @@ class ConfigView(ModelView):
     can_create = False
     can_delete = False
     page_size = 100
+    can_set_page_size = True
 
     # Override displayed fields
     column_list = ('name', 'value')
@@ -609,11 +613,23 @@ def new_jobsTRIG():
 def joblists():
     jobtype = flask.request.args['type']
     db = connect()
-    data = get_job_types(db,jobtype)
+    data = get_job_types(db, jobtype)
     db.close()
     o = {'T': 0, 'I': 0, 'D': 0}
     for count, flag in data:
         o[flag] = count
+    o = json.dumps(o)
+    return flask.Response(o, mimetype='application/json')
+
+
+@app.route('/admin/resetjobs.json')
+def resetjobs():
+    jobtype = flask.request.args['type']
+    alljobs = flask.request.args['all']
+    from msnoise.api import reset_jobs
+    reset_jobs(db, jobtype, alljobs=alljobs)
+    o = {}
+    o["Done"] = "Jobs reset: Done."
     o = json.dumps(o)
     return flask.Response(o, mimetype='application/json')
 
@@ -675,14 +691,17 @@ def main(port=5000):
     else:
         admin.name = "MSNoise"
     admin.project_folder = os.getcwd()
-    tech, hostname, database, username, password = read_database_inifile()
+    tech, hostname, database, username, password, prefix = \
+        read_database_inifile()
+    if prefix != "":
+        prefix = "/%s_*" % prefix
     if tech == 1:
-        database = "SQLite: %s" % hostname
+        database = "SQLite: %s%s" % (hostname, prefix)
     else:
-        database = "MySQL: %s@%s:%s" % (username, hostname, database)
+        database = "MySQL: %s@%s:%s%s" % (username, hostname, database, prefix)
     admin.project_database = database
 
-    jobtypes = ["CC", "DTT"]
+    jobtypes = ["CC", "STACK", "MWCS", "DTT"]
     template_folders = []
     if plugins:
         for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):

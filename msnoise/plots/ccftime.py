@@ -61,13 +61,13 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
             if envelope:
                 line = obspy_envelope(line)
             line /= line.max()
-            plt.plot(t, line * ampli + i + base, c='k')
+            plt.plot(t, line * ampli + i + base, c='k', lw=0.5)
             if seismic:
-                y1 = np.ones(len(line)) * i
+                y1 = np.ones(len(line)) * i + base
                 y2 = line*ampli + i + base
                 plt.fill_between(t, y1, y2, where=y2 >= y1, facecolor='k',
                                  interpolate=True)
-
+        low = high = 0.0
         for filterdb in get_filters(db, all=True):
             if filterid == filterdb.ref:
                 low = float(filterdb.low)

@@ -17,6 +17,7 @@ import matplotlib
 matplotlib.use('Agg')
 
 import msnoise.move2obspy
+import msnoise.preprocessing
 import sphinx_bootstrap_theme
 import datetime
 import click
@@ -361,7 +362,9 @@ intersphinx_mapping = {
 'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
 'matplotlib': ('http://matplotlib.org/', None),
 'sqlalchemy': ('http://docs.sqlalchemy.org/en/latest/', None),
-'click': ('http://click.pocoo.org/5/', None)
+'click': ('http://click.pocoo.org/5/', None,),
+'obspy': ('http://docs.obspy.org', None),
+'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None)
 }
 
 # If true, show URL addresses after external links.

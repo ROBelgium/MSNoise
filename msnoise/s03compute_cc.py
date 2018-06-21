@@ -155,20 +155,11 @@ could occur with SQLite.
 import sys
 import time
 
-try:
-    from scikits.samplerate import resample
-except:
-    pass
-
 from .api import *
 from .move2obspy import myCorr
 from .move2obspy import whiten
 
 from .preprocessing import preprocess
-
-
-class Params():
-    pass
 
 
 def main():
@@ -186,30 +177,12 @@ def main():
         sys.exit()
 
     # Get Configuration
-    params = Params()
-    params.goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-    params.goal_duration = float(get_config(db, "analysis_duration"))
-    params.overlap = float(get_config(db, "overlap"))
-    params.maxlag = float(get_config(db, "maxlag"))
-    params.corr_duration = float(get_config(db, "corr_duration"))
-    params.min30 = float(get_config(db, "corr_duration")) *\
-                   params.goal_sampling_rate
-    params.windsorizing = float(get_config(db, "windsorizing"))
-    params.whitening = get_config(db, 'whitening')
-    params.resampling_method = get_config(db, "resampling_method")
-    params.preprocess_lowpass = float(get_config(db, "preprocess_lowpass"))
-    params.preprocess_highpass = float(get_config(db, "preprocess_highpass"))
-    params.keep_all = get_config(db, 'keep_all', isbool=True)
-    params.keep_days = get_config(db, 'keep_days', isbool=True)
-    params.components_to_compute = get_components_to_compute(db)
-
-    params.stack_method = get_config(db, 'stack_method')
-    params.pws_timegate = float(get_config(db, 'pws_timegate'))
-    params.pws_power = float(get_config(db, 'pws_power'))
+    params = get_params(db)
+    filters = get_filters(db, all=False)
 
     logging.info("Will compute %s" % " ".join(params.components_to_compute))
 
-    if get_config(db, 'remove_response', isbool=True):
+    if params.remove_response:
         logging.debug('Pre-loading all instrument response')
         responses = preload_instrument_responses(db)
     else:
@@ -217,6 +190,11 @@ def main():
 
     while is_next_job(db, jobtype='CC'):
         jobs = get_next_job(db, jobtype='CC')
+        if len(jobs) == 0:
+            # edge case, should only occur when is_next returns true, but
+            # get_next receives no jobs (heavily parallelised calls).
+            continue
+
         stations = []
         pairs = []
         refs = []
@@ -228,7 +206,7 @@ def main():
             stations.append(netsta1)
             stations.append(netsta2)
             goal_day = job.day
-        del jobs
+        
 
         stations = np.unique(stations)
 
@@ -245,14 +223,15 @@ def main():
                 comps.append(comp[0])
                 comps.append(comp[1])
         comps = np.unique(comps)
-        basetime, stream = preprocess(db, stations, comps, goal_day, params,
-                                      responses)
+        stream = preprocess(db, stations, comps, goal_day, params, responses)
 
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.goal_sampling_rate
-
+        start_processing = time.time()
         # ITERATING OVER PAIRS #####
-        for pair in pairs:
+        logging.info("Will do %i pairs" % len(pairs))
+        for job in jobs:
+            pair = job.pair
             orig_pair = pair
 
             logging.info('Processing pair: %s' % pair.replace(':', ' vs '))
@@ -265,18 +244,18 @@ def main():
             s2 = get_station(db, station2.split('.')[0], station2.split('.')[1])
 
             if s1.X and params.components_to_compute != ["ZZ", ]:
-                X0, Y0, c0 = (s1.X, s1.Y, s1.coordinates)
-                X1, Y1, c1 = (s2.X, s2.Y, s1.coordinates)
+                x0, y0, c0 = (s1.X, s1.Y, s1.coordinates)
+                x1, y1, c1 = (s2.X, s2.Y, s1.coordinates)
 
                 if c0 == c1:
                     coordinates = c0
                 else:
                     coordinates = 'MIX'
 
-                cplAz = azimuth(coordinates, X0, Y0, X1, Y1)
-                logging.info("Azimuth=%.1f"%cplAz)
+                cpl_az = azimuth(coordinates, x0, y0, x1, y1)
+                logging.info("Azimuth=%.1f"%cpl_az)
             else:
-                cplAz = 0.
+                cpl_az = 0.
 
             for components in params.components_to_compute:
                 logging.debug("Processing {!s}".format(components))
@@ -302,7 +281,7 @@ def main():
                         if len(t1_novert):
                             # Make these streams contain the same gaps
                             t1_novert = make_same_length(t1_novert)
-                            t1 = t1_novert.rotate("NE->RT", cplAz).\
+                            t1 = t1_novert.rotate("NE->RT", cpl_az).\
                                 select(component=components[0])
                         else:
                             t1 = t1_novert
@@ -316,7 +295,7 @@ def main():
                         if len(t2_novert):
                             # Make these streams contain the same gaps
                             t2_novert = make_same_length(t2_novert)
-                            t2 = t2_novert.rotate("NE->RT", cplAz).\
+                            t2 = t2_novert.rotate("NE->RT", cpl_az).\
                                 select(component=components[1])
                         else:
                             t2 = t2_novert
@@ -359,6 +338,8 @@ def main():
                         elif params.windsorizing != 0:
                             rms = tr.data.std() * params.windsorizing
                             np.clip(tr.data, -rms, rms, tr.data)  # inplace
+
+                    # TODO should not hardcode 4 percent!
                     tmp.taper(0.04)
                     tmp1 = tmp.select(network=s1.net, station=s1.sta,
                                       component=components[0])
@@ -385,7 +366,7 @@ def main():
                     elif params.whitening == "N":
                         whitening = False
 
-                    for filterdb in get_filters(db, all=False):
+                    for filterdb in filters:
                         filterid = filterdb.ref
                         low = float(filterdb.low)
                         high = float(filterdb.high)
@@ -443,7 +424,9 @@ def main():
                         station1, station2, filterid, components, date = ccfid.split('_')
 
                         corrs = np.asarray(list(allcorr[ccfid].values()))
-                        corr = stack(db, corrs)
+                        corr = stack(corrs, params.stack_method,
+                                     params.pws_timegate, params.pws_power,
+                                     params.goal_sampling_rate)
 
                         thisdate = goal_day
                         thistime = "0_0"
@@ -454,18 +437,19 @@ def main():
                                 params.goal_sampling_rate,
                                 components, corr,
                                 params.goal_sampling_rate, day=True,
-                                ncorr=corrs.shape[0])
+                                ncorr=corrs.shape[0], params=params)
                         del corrs, corr, thisdate, thistime
                 del current, allcorr, t1, t2
             logging.debug("Updating Job")
-            update_job(db, goal_day, orig_pair, 'CC', 'D')
+            # Would be better after the massive update at the end of the day job
+            # but here it allows to only insert the stack job if the CC was 
+            # successful.
+            update_job(db, goal_day, orig_pair, 'STACK', 'T')
 
             logging.info("Finished processing this pair. It took %.2f seconds" % (time.time() - tt))
+        massive_update_job(db, jobs, "D")
         clean_scipy_cache()
-        logging.info("Job Finished. It took %.2f seconds" % (time.time() - jt))
+
+        logging.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & process %.2f s)" % ((time.time() - jt), start_processing-jt, time.time()-start_processing))
         del stream
     logging.info('*** Finished: Compute CC ***')
-
-if __name__ == "__main__":
-    main()    
-

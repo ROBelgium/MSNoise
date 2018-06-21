@@ -2,12 +2,43 @@ import datetime
 
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime,\
     text, TIMESTAMP, Enum, REAL, UniqueConstraint, Index
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.declarative import declarative_base, declared_attr
 
+import os
+try:
+    import cPickle
+except:
+    import pickle as cPickle
 Base = declarative_base()
 
 
-class Filter(Base):
+class PrefixerBase(Base):
+    __abstract__ = True
+    _the_prefix = ""
+
+    inifile = os.path.join(os.getcwd(), 'db.ini')
+    if not os.path.isfile(inifile):
+        print("db.ini not found, ignoring prefix")
+    else:
+        try:
+            f = open(inifile, 'rb')
+            # New ini file with prefix support
+            tech, hostname, database, username, password, prefix = cPickle.load(f)
+            if prefix != "":
+                _the_prefix = prefix + "_"
+            f.close()
+        except:
+            f = open(inifile, 'rb')
+            # Old ini file without prefix
+            tech, hostname, database, username, password = cPickle.load(f)
+            f.close()
+
+    @declared_attr
+    def __tablename__(cls):
+        return cls._the_prefix + cls.__incomplete_tablename__
+
+
+class Filter(PrefixerBase):
     """
     Filter base class.
 
@@ -33,7 +64,7 @@ class Filter(Base):
     :param used: Is the filter activated for the processing
     """
 
-    __tablename__ = "filters"
+    __incomplete_tablename__ = "filters"
 
     ref = Column(Integer, primary_key=True)
     low = Column(Float())
@@ -57,7 +88,7 @@ class Filter(Base):
         # self.used = used
 
 
-class Job(Base):
+class Job(PrefixerBase):
     """
     Job Object
 
@@ -72,7 +103,7 @@ class Job(Base):
     :type flag: str
     :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
     """
-    __tablename__ = "jobs"
+    __incomplete_tablename__ = "jobs"
 
     ref = Column(Integer, primary_key=True)
     day = Column(String(10))
@@ -81,7 +112,8 @@ class Job(Base):
     flag = Column(String(1))
     lastmod = Column(TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP'))
 
-    table_args__ = (Index('job_index', "day", "pair", "jobtype", unique=True),)
+    table_args__ = (Index('job_index', "day", "pair", "jobtype", unique=True),
+                    Index('job_index2', "jobtype", "flag", unique=False))
 
     def __init__(self, day, pair, jobtype, flag,
                  lastmod=datetime.datetime.utcnow()):
@@ -93,7 +125,7 @@ class Job(Base):
         self.lastmod = lastmod
 
 
-class Station(Base):
+class Station(PrefixerBase):
     """
     Station Object
 
@@ -117,7 +149,7 @@ class Station(Base):
     :type used: bool
     :param used: Whether this station must be used in the computations.
     """
-    __tablename__ = "stations"
+    __incomplete_tablename__ = "stations"
     ref = Column(Integer, primary_key=True)
     net = Column(String(10))
     sta = Column(String(10))
@@ -143,7 +175,7 @@ class Station(Base):
 ########################################################################
 
 
-class Config(Base):
+class Config(PrefixerBase):
     """
     Config Object
 
@@ -153,7 +185,7 @@ class Config(Base):
     :type value: str
     :param value: The value of parameter `name`
     """
-    __tablename__ = "config"
+    __incomplete_tablename__ = "config"
     name = Column(String(255), primary_key=True)
     value = Column(String(255))
 
@@ -165,7 +197,7 @@ class Config(Base):
 ########################################################################
 
 
-class DataAvailability(Base):
+class DataAvailability(PrefixerBase):
     """
     DataAvailability Object
 
@@ -194,7 +226,7 @@ class DataAvailability(Base):
     :type flag: str
     :param flag: The status of the entry: "N"ew, "M"odified or "A"rchive
     """
-    __tablename__ = "data_availability"
+    __incomplete_tablename__ = "data_availability"
     ref = Column(Integer, primary_key=True, autoincrement=True)
     net = Column(String(10))
     sta = Column(String(10))
