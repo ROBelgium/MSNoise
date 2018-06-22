@@ -174,6 +174,9 @@ Command Line changes
 * ``msnoise scan_archive --path -r`` will only scan the ``path`` 
 independently of its structure. Passing the ``-r`` it will walk in subfolders.
 
+* ``msnoise info -j`` reports all jobs types, including those of plugins.
+
+
 Note, all commands are documented: :doc:`../clickhelp/msnoise`.
 
 
