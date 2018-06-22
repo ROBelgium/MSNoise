@@ -19,7 +19,8 @@ Introduction
 More than 1 year after the last major release (:doc:`msnoise-1.5`) I'm proud
 to announce the new :doc:`msnoise-1.6`. It is a **major** release, with a
 massive amount of work since the last one: in `GitHub numbers
-<https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2017-04-28&to=2017-06-25&type=c>`_
+<https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2017-04-28&to
+=2018-06-25&type=c>`_
 , it's over TODO commits and over TODO lines of code and documentation changed
 or added!
 
