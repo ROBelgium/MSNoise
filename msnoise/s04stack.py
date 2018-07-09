@@ -347,8 +347,8 @@ def main(stype, interval=1.0):
         if stype == "ref":
             biglist += jobs
 
-    if stype == "ref":
-        massive_update_job(db, biglist, "T")
+    # if stype == "ref":
+    #     massive_update_job(db, biglist, "T")
 
     logging.debug("Finished Stacking")
 

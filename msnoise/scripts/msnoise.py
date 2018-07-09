@@ -109,7 +109,8 @@ def upgrade():
     db = connect()
     tech, hostname, database, username, password, prefix = \
         read_database_inifile()
-    prefix = prefix + "_"
+    if prefix != "":
+        prefix = prefix + "_"
     for name in default.keys():
         try:
             db.add(Config(name=name, value=default[name][-1]))
@@ -125,6 +126,7 @@ def upgrade():
         db.commit()
     except:
         logging.info("It looks like the v1.5 'job_index' is already in the DB")
+        traceback.print_exc()
         db.rollback()
 
     try:
