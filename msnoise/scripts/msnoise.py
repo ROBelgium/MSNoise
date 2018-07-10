@@ -400,6 +400,7 @@ def scan_archive(ctx, init, path, recursively):
         startdate = UTCDateTime(get_config(db, "startdate"))
         enddate = UTCDateTime(get_config(db, "enddate"))
         cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
+        network = get_config(db, 'network')
         db.close()
         if recursively:
             for root, dirs, _ in os.walk(path):
@@ -409,7 +410,7 @@ def scan_archive(ctx, init, path, recursively):
                     if not len(_):
                         continue
                     worker(sorted(_), tmppath, startdate, enddate,
-                           cc_sampling_rate, init=True)
+                           cc_sampling_rate, init=True, network=network)
         worker(sorted(os.listdir(path)), path, startdate, enddate,
                cc_sampling_rate, init=True)
     else:

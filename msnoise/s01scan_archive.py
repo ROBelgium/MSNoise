@@ -58,7 +58,8 @@ from .data_structures import data_structure
 
 
 
-def worker(files, folder, startdate, enddate, goal_sampling_rate, init):
+def worker(files, folder, startdate, enddate, goal_sampling_rate, init, 
+           network=None):
     db = connect()
     added = 0
     modified = 0
@@ -100,10 +101,14 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate, init):
                             stop = trace.stats.endtime.datetime
 
                     net = trace.stats.network.upper()
+                    if len(net) == 0 or net is None:
+                        net = network
                     sta = trace.stats.station.upper()
                     comp = trace.stats.channel.upper()
                     path = folder.replace('\\', '/')
 
+                    if loc in ["Z", "N", "E"] and len(comp) == 2:
+                        comp = comp+loc
                     starttime = starttime.datetime.replace(microsecond=0)
                     endtime = endtime.datetime.replace(microsecond=0)
                     result = update_data_availability(
@@ -120,6 +125,7 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate, init):
 
         except Exception as e:
             logging.debug("ERROR: %s", e)
+            # traceback.print_exc()
 
     db.close()
     logging.info("%s: Added %i | Modified %i | Unchanged %i", str(folder),
@@ -160,6 +166,8 @@ def main(init=False, threads=1):
 
     data_folder = get_config(db, 'data_folder')
     data_struc = get_config(db, 'data_structure')
+    network = get_config(db, 'network')
+
 
     channels = [c for c in get_config(db, 'channels').split(',')]
     logging.debug("Will search for channels: %s" % channels)
@@ -219,7 +227,7 @@ def main(init=False, threads=1):
                 client = Process(target=worker, args=([files, folder,
                                                        startdate, enddate,
                                                        goal_sampling_rate,
-                                                       init]))
+                                                       init, network]))
                 client.start()
                 clients.append(client)
             while len(clients) >= nthreads:
