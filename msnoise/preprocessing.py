@@ -81,6 +81,9 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     except:
                         logging.debug("ERROR reading file %s" % file)
                         continue
+                    for tr in st:
+                        if len(tr.stats.channel) == 2:
+                            tr.stats.channel += tr.stats.location
                     tmp = st.select(network=net, station=sta, component=comp)
                     if not len(tmp):
                         for tr in st:
@@ -114,7 +117,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
 
                 logging.debug("%s Checking Gaps" % stream[0].id)
                 if len(getGaps(stream)) > 0:
-                    max_gap = 10
+                    max_gap = params.preprocess_max_gap*stream[0].stats.sampling_rate
                     only_too_long = False
                     while getGaps(stream) and not only_too_long:
                         too_long = 0

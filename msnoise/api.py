@@ -255,6 +255,7 @@ def get_params(session):
     params.response_prefilt = eval(get_config(s, 'response_prefilt'))
     params.preprocess_lowpass = float(get_config(s, "preprocess_lowpass"))
     params.preprocess_highpass = float(get_config(s, "preprocess_highpass"))
+    params.preprocess_max_gap = float(get_config(s, "preprocess_max_gap"))
     params.keep_all = get_config(s, 'keep_all', isbool=True)
     params.keep_days = get_config(s, 'keep_days', isbool=True)
     params.autocorr = get_config(s, "autocorr", isbool=True)

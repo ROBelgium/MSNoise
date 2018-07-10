@@ -16,6 +16,8 @@ default['resampling_method'] = ["Resampling method Resample/Decimate/[Lanczos]",
 default['preprocess_lowpass'] = ["Preprocessing Low-pass value in Hz [8.0]",'8.0']
 default['preprocess_highpass'] = ["Preprocessing High-pass value in Hz [0.01]",'0.01']
 
+default['preprocess_max_gap'] = ["Preprocessing maximum gap length that will be filled by interpolation [10.0] seconds", '10.0']
+
 default['remove_response'] = ["Remove instrument response Y/[N]",'N']
 default['response_format'] = ["Remove instrument file format [dataless]/inventory/paz/resp",'dataless']
 default['response_path'] = ["Instrument correction file(s) location (path relative to db.ini), defaults to './inventory', i.e."

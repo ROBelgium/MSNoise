@@ -150,8 +150,8 @@ def main(tech=None, hostname="localhost", username="msnoise",
         print("The database seems to already exist and is not empty, cannot"
               " continue")
         return "Integrity Error - DB already exists"
-
-    prefix = prefix + "_"
+    if prefix != "":
+        prefix = prefix + "_"
     # TODO move those calls to a def and call it from install / msnoise.scripts
     try:
         session.execute("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
