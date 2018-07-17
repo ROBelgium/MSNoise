@@ -134,10 +134,10 @@ def main(tech=None, hostname="localhost", username="msnoise",
     create_database_inifile(tech, hostname, database, username, password,
                             prefix)
 
-    from .msnoise_table_def import Base, Config
+    from .msnoise_table_def import PrefixerBase, Config
+    PrefixerBase._the_prefix = prefix
     # create tables
-    Base.metadata.create_all(engine)
-    
+    PrefixerBase.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     session = Session()
     

@@ -84,6 +84,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     for tr in st:
                         if len(tr.stats.channel) == 2:
                             tr.stats.channel += tr.stats.location
+                            tr.stats.location = "00"
                     tmp = st.select(network=net, station=sta, component=comp)
                     if not len(tmp):
                         for tr in st:
