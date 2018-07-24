@@ -412,7 +412,7 @@ def scan_archive(ctx, init, path, recursively):
                     worker(sorted(_), tmppath, startdate, enddate,
                            cc_sampling_rate, init=True, network=network)
         worker(sorted(os.listdir(path)), path, startdate, enddate,
-               cc_sampling_rate, init=True)
+               cc_sampling_rate, init=True, network=network)
     else:
         from ..s01scan_archive import main
         main(init, threads=ctx.obj['MSNOISE_threads'])
