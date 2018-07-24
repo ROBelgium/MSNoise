@@ -343,9 +343,9 @@ def main(interval=1):
     
                         # then process all pairs + the ALL
                         if len(dtArray.shape) == 1:  # if there is only one pair:
-                            dtArray = dtArray.reshape((1, dtArray.shape[0]))
-                            cohArray = cohArray.reshape((1, cohArray.shape[0]))
-                            errArray = errArray.reshape((1, errArray.shape[0]))
+                            dtArray = dtArray.values.reshape((1, dtArray.shape[0]))
+                            cohArray = cohArray.values.reshape((1, cohArray.shape[0]))
+                            errArray = errArray.values.reshape((1, errArray.shape[0]))
     
                         used = np.zeros(dtArray.shape)
     
