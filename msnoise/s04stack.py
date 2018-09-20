@@ -264,7 +264,7 @@ def main(stype, interval=1.0):
                                                     db, filename, pair, components, filterid, corr, maxlag=maxlag, cc_sampling_rate=cc_sampling_rate, params=params)
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
-                                            if not jobadded:
+                                            if not jobadded and not params.hpc:
                                                 update_job(
                                                     db, date, day_name.replace('_', '.'), 'MWCS', 'T')
                                                 jobadded = True
@@ -311,7 +311,7 @@ def main(stype, interval=1.0):
                                             day_name = "%s:%s" % (
                                                 sta1, sta2)
                                             job = "%s %s" % (date, day_name)
-                                            if job not in jobs_done:
+                                            if job not in jobs_done and not params.hpc:
                                                 update_job(
                                                     db, date, day_name.replace('_', '.'), 'MWCS', 'T')
                                                 jobs_done.append(job)
@@ -341,7 +341,7 @@ def main(stype, interval=1.0):
         # This doesn't set MWCS jobs for REF stacks
         if stype != "ref":
             massive_update_job(db, jobs, "D")
-            if stype != "step":
+            if stype != "step" and not params.hpc:
                 for job in jobs:
                     update_job(db, job.day, job.pair, 'MWCS', 'T')
         if stype == "ref":

@@ -60,4 +60,4 @@ default['dtt_maxerr'] = ["Maximum error on dt measurement, MWCS points with valu
 default['dtt_maxdt'] = ["Maximum dt values, MWCS points with values larger than that will **not** be used in the WLS","0.1"]
 
 default['plugins'] = ["Comma separated list of plugin names. Plugins names should be importable Python modules.",""]
-default['hpc'] = ["Is MSNoise going to run on an HPC? Y/[N]","N"]
+default['hpc'] = ["Is MSNoise going to run on an HPC? Y/[N]", "N"]

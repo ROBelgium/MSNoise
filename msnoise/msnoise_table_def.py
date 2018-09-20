@@ -110,7 +110,8 @@ class Job(PrefixerBase):
     pair = Column(String(20))
     jobtype = Column(String(10))
     flag = Column(String(1))
-    lastmod = Column(TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP'))
+    lastmod = Column(TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP'),
+                     server_default=text("CURRENT_TIMESTAMP"))
 
     table_args__ = (Index('job_index', "day", "pair", "jobtype", unique=True),
                     Index('job_index2', "jobtype", "flag", unique=False))

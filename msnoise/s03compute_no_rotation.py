@@ -421,9 +421,9 @@ def main():
 
         # THIS SHOULD BE IN THE API
         massive_update_job(db, jobs, "D")
-
-        for job in jobs:
-            update_job(db, job.day, job.pair, 'STACK', 'T')
+        if not params.hpc:
+            for job in jobs:
+                update_job(db, job.day, job.pair, 'STACK', 'T')
 
         logging.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & "
                      "process %.2f s)" % ((time.time() - jt),

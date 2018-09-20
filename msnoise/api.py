@@ -266,7 +266,7 @@ def get_params(session):
     params.stack_method = get_config(s, 'stack_method')
     params.pws_timegate = float(get_config(s, 'pws_timegate'))
     params.pws_power = float(get_config(s, 'pws_power'))
-    params.hpc = get_config(s, 'hpc')
+    params.hpc = get_config(s, 'hpc', isbool=True)
     return params
 
 # FILTERS PART

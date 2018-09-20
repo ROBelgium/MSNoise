@@ -90,8 +90,8 @@ function resetjobs(jobtype, all, consolename) {
                 $(consolename).text("error...?");
                 }
         });
-
 }
+
 
 function update_all() {
 
@@ -222,8 +222,10 @@ function update_all() {
          <button id='reset_STACK' value='STACK' class="btn
   btn-success">Reset STACK jobs "in progress"</button>
 
-     <button id='reset_STACK_all' value='Reset CC' class="btn
+     <button id='reset_STACK_all' value='Reset STACK' class="btn
   btn-warning">Reset <b>all</b> STACK jobs</button>
+        <button id='delete_STACK_all' value='Reset STACK' class="btn
+  btn-danger">DELETE <b>all</b> STACK jobs</button>
   <div class="alert fade in" id="reset_STACK_console_div" style="display:none;width:300px;">
     <button type="button" class="close">x</button>
     <div id='reset_STACK_console'></div>

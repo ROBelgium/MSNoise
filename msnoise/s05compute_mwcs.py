@@ -94,6 +94,7 @@ def main():
     
     goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
     maxlag = float(get_config(db, "maxlag"))
+    params = get_params(db)
 
     # First we reset all DTT jobs to "T"odo if the REF is new for a given pair
     # for station1, station2 in get_station_pairs(db, used=True):
@@ -156,7 +157,8 @@ def main():
 
         # THIS SHOULD BE IN THE API
         massive_update_job(db, jobs, "D")
-        for job in jobs:
-            update_job(db, job.day, job.pair, 'DTT', 'T')
+        if not params.hpc:
+            for job in jobs:
+                update_job(db, job.day, job.pair, 'DTT', 'T')
 
     logging.info('*** Finished: Compute MWCS ***')

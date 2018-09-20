@@ -151,6 +151,23 @@ def upgrade():
 
 
 @click.command()
+@click.argument('sql_command')
+def execute(sql_command):
+    """Checks the Jobs table and deletes duplicate entries"""
+    from msnoise.api import connect, get_tech
+
+    db = connect()
+    r = db.execute(sql_command)
+
+    if sql_command.count("select") or sql_command.count("SELECT"):
+        print(r.fetchall())
+    db.commit()
+    db.close()
+
+
+
+
+@click.command()
 @click.option('-j', '--jobs', is_flag=True, help='Jobs Info only')
 def info(jobs):
     """Outputs general information about the current install and config, plus
@@ -422,11 +439,19 @@ def scan_archive(ctx, init, path, recursively):
 @click.option('-i', '--init', is_flag=True, help='First run ?')
 @click.option('--nocc', is_flag=True, default=False, help='Disable the creation'
                                                           ' of CC jobs')
-def new_jobs(init, nocc):
+@click.option('--hpc', help='Format PREVIOUS:NEXT. When running on HPC, create the next jobs in the workflow based on the previous step mentioned here')
+def new_jobs(init, nocc, hpc=""):
     """Determines if new CC jobs are to be defined"""
-    from ..s02new_jobs import main
-    main(init, nocc)
-
+    if not hpc:
+        from ..s02new_jobs import main
+        main(init, nocc)
+    if hpc:
+        from ..api import connect
+        left, right = hpc.split(":")
+        db = connect()
+        db.execute("INSERT INTO jobs (pair, day, jobtype, flag) SELECT pair, day, '%s', 'T' from jobs where jobtype='%s' and flag='D';" % (right, left))
+        db.commit()
+        db.close()
 
 @click.command()
 @click.pass_context
@@ -721,6 +746,9 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
                   refilter):
     """Plots the interferogram between sta1 and sta2 (parses the CCFs)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
+    if sta1 > sta2:
+        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+        return
     if ctx.obj['MSNOISE_custom']:
         from interferogram import main
     else:
@@ -751,6 +779,9 @@ def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
             ampli, seismic, show, outfile, envelope, refilter):
     """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
+    if sta1 > sta2:
+        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+        return
     if ctx.obj['MSNOISE_custom']:
         from ccftime import main
     else:
@@ -774,6 +805,9 @@ def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
 def mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
     """Plots the mwcs results between sta1 and sta2 (parses the CCFs)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
+    if sta1 > sta2:
+        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+        return
     if ctx.obj['MSNOISE_custom']:
         from mwcs import main
     else:
@@ -838,6 +872,9 @@ def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
     """Plots a graph of dt against t\n
     STA1 and STA2 must be provided with this format: NET.STA !\n
     DAY must be provided in the ISO format: YYYY-MM-DD"""
+    if sta1 > sta2:
+        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+        return
     if ctx.obj['MSNOISE_custom']:
         from dtt import main
     else:
@@ -847,6 +884,7 @@ def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
 # Add DB commands to the db group:
 db.add_command(clean_duplicates)
 db.add_command(upgrade)
+db.add_command(execute)
 
 # Add plot commands to the plot group:
 plot.add_command(data_availability)

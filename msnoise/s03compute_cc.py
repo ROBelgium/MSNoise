@@ -444,7 +444,8 @@ def main():
             # Would be better after the massive update at the end of the day job
             # but here it allows to only insert the stack job if the CC was 
             # successful.
-            update_job(db, goal_day, orig_pair, 'STACK', 'T')
+            if not params.hpc:
+                update_job(db, goal_day, orig_pair, 'STACK', 'T')
 
             logging.info("Finished processing this pair. It took %.2f seconds" % (time.time() - tt))
         massive_update_job(db, jobs, "D")
