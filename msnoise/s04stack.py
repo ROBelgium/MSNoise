@@ -9,9 +9,10 @@ The corresponding configuration bits are ``ref_begin`` and ``ref_end``. In the
 future, we plan on allowing multiple references to be defined.
 
 Only data for new/modified dates need to be exported. If any CC-job has been
-marked "Done" within the last day, the stacks will be calculated and a new DTT
-job will be inserted in the database. For dates in the period of interest, the
-moving-window stack will only be exported if new/modified CCF is available.
+marked "Done" within the last day and triggered the creation of STACK jobs,
+the stacks will be calculated and a new MWCS job will be inserted in the
+database. For dates in the period of interest, the moving-window stack will
+only be exported if new/modified CCF is available.
 The export directory are "REF/" and "DAY%03i/" where %03i will be replaced by
 the number of days stacked together (DAYS_005 for a 5-days stack, e.g.).
 
@@ -51,50 +52,35 @@ Configuration Parameters
 * |stack_method| | *new in 1.4*
 * |pws_timegate| | *new in 1.4*
 * |pws_power| | *new in 1.4*
+* |hpc| | *new in 1.6*
 
+
+Once done, each job is marked "D"one in the database and, unless ``hpc`` is 
+``Y``, MWCS jobs are inserted/updated in the database.
 
 Usage:
 ~~~~~~
 The best way to call this code is to start it from the console (-h shows the
 help)
 
-.. code-block:: sh
+.. include:: ../clickhelp/msnoise-stack.rst
 
-    $ msnoise stack --help
-
-    Usage: msnoise-script.py stack [OPTIONS]
-
-      Stacks the [REF] and/or [MOV] windows
-
-    Options:
-      -r, --ref               Compute the REF Stack
-      -m, --mov               Compute the MOV Stacks
-      -s, --step              Compute the STEP Stacks
-      -i, --interval INTEGER  Number of days before now to search for modified
-                              Jobs
-      --help                  Show this message and exit.
 
 On a routine basis, one should thus run the following to compute REF *and* MOV
 stacks:
+
+.. TODO:: finalize the difference between REF and MOV/STEP stacks.
 
 .. code-block:: sh
 
     $ msnoise stack -r -m
 
-While, when playing around with data, and surely on the first run, one should
-define the *-i INTERVAL*, as jobs might have been marked "Done" more than 24
-hours before running the stack. This, for example, will tell the code to search
-for jobs marked in the last 10 days:
-
-.. code-block:: sh
-
-    $ msnoise stack -r -m -i 10
-
-
-
 
 .. versionadded:: 1.4
     The Phase Weighted Stack.
+
+.. versionadded:: 1.6
+    The ``hpc`` parameter that can prevent the automatic creation of MWCS jobs.
 """
 
 import argparse

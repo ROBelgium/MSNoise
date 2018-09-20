@@ -34,7 +34,8 @@ Home
 The index page shows
 
 * The project location and its database
-* Stats of the Data Availability, the CC jobs and the DTT jobs
+* Stats of the Data Availability, the CC, STACK, MWCS and DTT jobs.
+* Quick action buttons for resetting or deleting jobs.
 
 The name and the logo of the page can be overriden by setting an environment
 variable with a name and the HTML tag of the logo image:

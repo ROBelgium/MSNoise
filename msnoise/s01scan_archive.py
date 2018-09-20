@@ -4,9 +4,10 @@ previous day, MSNoise needs to check the data archive for new or modified
 files. Those files could have been acquired during the last day, but be data of
 a previously offline station and contain useful information for, say, a month
 ago. The time to search for is defined in the config. The scan_archive script
-uses the find command (gnufind on Windows) with the -mtime argument to locate
-new or modified files. Once located, they are inserted (if new) or updated (if
-modified) in the data availability table.
+finds new or modified files. Once located, they are inserted (if new) or
+updated (if modified) in the data availability table. If the data files don't
+contain any network code, it can be forced by setting the ``network``
+configuration parameter (2 char capital letters, e.g. BE or IU).
 
 To run the code on two Process, execute the following in console:
 
@@ -43,6 +44,14 @@ simply run:
 and MSNoise will read anything ObsPy can (provided the files have a proper
 header (network code, station code and channel code). Then, once done, simply
 run the :ref:`"populate from DataAvailability"<populate-expert>` procedure.
+
+This command can also scan folders recursively:
+
+.. code-block:: sh
+
+    $ msnoise scan_archive --path /path/to/archive --recursively
+
+
 """
 import argparse
 import glob
@@ -101,7 +110,7 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate, init,
                             stop = trace.stats.endtime.datetime
 
                     net = trace.stats.network.upper()
-                    if len(net) == 0 or net is None:
+                    if len(net) == 0 or net is None and network != "*":
                         net = network
                     sta = trace.stats.station.upper()
                     comp = trace.stats.channel.upper()

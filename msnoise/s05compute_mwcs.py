@@ -1,7 +1,7 @@
 """
-.. warning:: if using only ``mov_stack`` = 1, no DTT jobs is inserted in the
+.. warning:: if using only ``mov_stack`` = 1, no MWCS jobs is inserted in the
     database and consequently, no MWCS calculation will be done! FIX!
-    
+
 Following Clarke et al (2011), we apply the :ref:`mwcs`
 to study the relative dephasing between Moving-Window stacks ("Current") and a
 Reference using Moving-Window Cross-Spectral analysis. The *jobs* "T"o do have
@@ -18,6 +18,7 @@ Filter Configuration Parameters
 * ``mwcs_wlen``: Window length (in seconds) to perform MWCS
 * ``mwcs_step``: Step (in seconds) of the windowing procedure in MWCS
 
+* |hpc| | *new in 1.6*
 
 In short, both time series are sliced in several overlapping windows and
 preprocessed. The similarity of the two time-series is assessed using the
@@ -47,6 +48,9 @@ In this case, the window length was 10 seconds with an overlap of 5 seconds.
 
 This process is job-based, so it is possible to run several instances in
 parallel.
+
+Once done, each job is marked "D"one in the database and, unless ``hpc`` is 
+``Y``, DTT jobs are inserted/updated in the database.
 
 To run this step:
 

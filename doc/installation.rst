@@ -11,8 +11,11 @@ To run MSNoise, you need:
 
 * A recent version of Python (3.x recommended). We suggest using Anaconda_
   with a few extra modules. MSNoise is tested "continuously" by automatic
-  build systems (TravisCI and Appeveyor) for **Python 2.7** and **Python 3.5**,
-  on **Windows, Linux and MacOSX** 64 bits systems!
+  build systems (TravisCI and Appeveyor) for **Python 2.7** and **Python 3.6**,
+  on **Windows, Linux and MacOSX** 64 bits systems! Support for **Python 2
+  .7** will be dropped as soon as the TravisCI test don't pass and the 
+  corrections would take too much dev time. **Python 3.7** has not been 
+  tested yet.
 
   * Those modules are already distributed with Anaconda_:
 
@@ -155,8 +158,33 @@ When moving your project to a larger server, HPC or else, just add the
 connection to this server in Workbench and you're good to go with the very
 same interface/tool !
 
+MySQL/MariaDB  configuration
+----------------------------
+You can also set up a database server using MariaDB_, there are plenty tutorials
+of how to set it up as well. The new default character set for MySQL or 
+MariaDB is not simple utf8, so make sure that the configuration file
+(/etc/mysql/my.cnf under Linux) contains the following lines. There are 
+issues with the latest MySQL versions which prevent a "traditionnal group by"
+statement.
 
-Database Structure - Tables
+.. code-block:: sh
+
+    [mysqld]
+    character-set-server=utf8
+    collation-server=utf8_unicode_ci
+    sql_mode="TRADITIONAL,NO_AUTO_CREATE_USER"
+
+
+For Mac, this seemed to work for users (see Issue72_):
+
+.. code-block:: sh
+
+    [mysqld]
+     sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+
+
+
+Database Structure - Tables
 ----------------------------
 MSNoise will create the tables automatically upon running the installer script
 (see :ref:`Workflow`).
@@ -214,4 +242,5 @@ communicate about bugs and not the mailing list, preferably used for Releases.
 .. _MySQLi: https://dev.mysql.com/downloads/installer
 .. _MySQLs: https://dev.mysql.com/downloads/mysql
 .. _MySQLw: https://dev.mysql.com/downloads/workbench
-
+.. _MariaDB: https://mariadb.org
+.. _Issue72: https://github.com/ROBelgium/MSNoise/issues/72

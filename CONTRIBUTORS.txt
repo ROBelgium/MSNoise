@@ -6,3 +6,4 @@ Thomas Lecocq
 Aurélien Mordret
 Lukas E. Preiswerk
 Carmelo Sammarco
+Arnaud Watlet

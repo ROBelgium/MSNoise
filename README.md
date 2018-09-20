@@ -44,7 +44,7 @@ Remember, always consider the current GitHub *master* as not stable!
 Getting Help
 ------------
 The best way to get help is to subscribe to the Mailing List and ask your question directly there. It is available on 
-http://mailman-as.oma.be/mailman/listinfo/msnoise and the archive is http://mailman-as.oma.be/pipermail/msnoise/.
+http://mailman-as.oma.be/mailman/listinfo/msnoise and the archive is http://mailman-as.oma.be/pipermail/msnoise/ or https://www.mail-archive.com/msnoise@mailman-as.oma.be/.
 
 Citing MSNoise
 --------------

@@ -434,10 +434,15 @@ def scan_archive(ctx, init, path, recursively):
 
 
 @click.command()
-@click.option('-i', '--init', is_flag=True, help='First run ?')
+@click.option('-i', '--init', is_flag=True, help='First run ? This disables '
+                                                 'the check for existing jobs.')
 @click.option('--nocc', is_flag=True, default=False, help='Disable the creation'
-                                                          ' of CC jobs')
-@click.option('--hpc', help='Format PREVIOUS:NEXT. When running on HPC, create the next jobs in the workflow based on the previous step mentioned here')
+                                                          ' of CC jobs.')
+@click.option('--hpc', help='Format PREVIOUS:NEXT. When running on HPC, '
+                            'create the next jobs in the workflow based on the'
+                            'previous step mentioned here. Example:'
+                            '"msnoise new_jobs --hpc CC:STACK" will create '
+                            'STACK jobs based on CC jobs marked "D"one.')
 def new_jobs(init, nocc, hpc=""):
     """Determines if new CC jobs are to be defined"""
     if not hpc:
@@ -497,9 +502,7 @@ def compute_cc2(ctx):
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-@click.option('-i', '--interval', default=1.0, help='Number of days before now to'
-                                                  ' search for modified Jobs')
-def stack(ctx, ref, mov, step, interval):
+def stack(ctx, ref, mov, step):
     """Stacks the [REF] and/or [MOV] windows"""
     click.secho('Lets STACK !', fg='green')
     from ..s04stack import main
@@ -507,17 +510,17 @@ def stack(ctx, ref, mov, step, interval):
     delay = ctx.obj['MSNOISE_threadsdelay']
     if threads == 1:
         if ref:
-            main('ref', interval)
+            main('ref')
         if mov:
-            main('mov', interval)
+            main('mov')
         if step:
-            main('step', interval)
+            main('step')
     else:
         from multiprocessing import Process
         processes = []
         if ref:
             for i in range(threads):
-                p = Process(target=main, args=["ref", interval])
+                p = Process(target=main, args=["ref",])
                 p.start()
                 processes.append(p)
                 time.sleep(delay)
@@ -525,7 +528,7 @@ def stack(ctx, ref, mov, step, interval):
             p.join()
         if mov:
             for i in range(threads):
-                p = Process(target=main, args=["mov", interval])
+                p = Process(target=main, args=["mov",])
                 p.start()
                 processes.append(p)
                 time.sleep(delay)
@@ -533,13 +536,12 @@ def stack(ctx, ref, mov, step, interval):
             p.join()
         if step:
             for i in range(threads):
-                p = Process(target=main, args=["step", interval])
+                p = Process(target=main, args=["step",])
                 p.start()
                 processes.append(p)
                 time.sleep(delay)
         for p in processes:
             p.join()
-
 
 
 @click.command()

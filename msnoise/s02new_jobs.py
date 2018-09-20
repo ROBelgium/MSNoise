@@ -9,10 +9,29 @@ To run it from the console:
 
     $ msnoise new_jobs
 
-.. warning:: Upon first run, if you expect the number of jobs to be large (many
-    days, many stations), pass the ``--init`` parameter to optimize the insert.
-    Only use this flag once, otherwise problems will arise from duplicate
-    entries in the jobs table.
+Upon first run, if you expect the number of jobs to be large (many days,
+many stations), pass the ``--init`` parameter to optimize the insert. Only use
+this flag once, otherwise problems will arise from duplicate entries in
+the jobs table.
+
+.. code-block:: sh
+
+    $ msnoise new_jobs --init
+
+Performance / running on HPC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By setting the ``hpc`` configuration parameter to ``Y``, you will disable the
+automatic creation of jobs during the workflow, to avoid numerous
+interactions with the database (select & update or insert). The jobs have
+then to be inserted manually:
+
+.. code-block:: sh
+
+    $ msnoise new_jobs --hpc CC:STACK
+    
+should be run after the ``msnoise compute_cc`` step in order to create the 
+``STACK`` jobs.
 """
 
 from .api import *

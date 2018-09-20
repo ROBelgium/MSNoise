@@ -22,12 +22,14 @@ Configuration Parameters
 * |response_prefilt|
 * |preprocess_lowpass|
 * |preprocess_highpass|
+* |preprocess_max_gap|  | *new in 1.6*
 * |keep_all|
 * |keep_days|
 * |stack_method|
 * |pws_timegate|
 * |pws_power|
 * |whitening|  | *new in 1.5*
+* |hpc| | *new in 1.6*
 
 Waveform Pre-processing
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -38,26 +40,20 @@ the most continuous chunks possible. The different chunks are then demeaned,
 tapered and merged again to a 1-day long trace. If a chunk is not aligned
 on the sampling grid (that is, start at a integer times the sample spacing in s)
 , the chunk is phase-shifted in the frequency domain. This requires tapering and
-fft/ifft. If the gap between two chunks is small, compared to a currently
-hard-coded value (10 samples), the gap is filled with interpolated values.
+fft/ifft. If the gap between two chunks is small, compared to a configurable
+value (``preprocess_max_gap``), the gap is filled with interpolated values.
 Larger gaps will not be filled with interpolated values.
 
 .. warning::
     As from MSNoise 1.5, traces are no longer padded by or merged with 0s.
 
-Each 1-day long trace is then low-passed (at ``preprocess_lowpass`` Hz),
-high-passed (at ``preprocess_highpass`` Hz), then if needed,
+Each 1-day long trace is then high-passed (at ``preprocess_highpass`` Hz),
+then if needed low-passed (at ``preprocess_lowpass`` Hz) and
 decimated/downsampled. Decimation/Downsampling are configurable
 (``resampling_method``) and users are advised testing Decimate. One advantage of
 Downsampling over Decimation is that it is able to downsample the data by any
 factor, not only integer factors. Downsampling can be achieved with the new
-ObsPy Lanczos resampler, giving results similar to those by scikits.samplerate.
-
-.. note:: Python 3 users will most probably struggle installing
-    scikits.samplerate, and therefore will have to use either Decimate or
-    Lanczos instead of Resample. This is not a problem because the Lanczos
-    resampling gives results similar to those by scikits.samplerate.
-
+ObsPy Lanczos resampler.
 
 If configured, each 1-day long trace is corrected for its instrument response.
 Currently, only dataless seed and inventory XML are supported.
@@ -118,7 +114,8 @@ value is 2.
     of weak, coherent signals through phase-weighted stacks". Geophysical
     Journal International 130, 2 (1997): 497-505.
 
-Once done, each job is marked "D"one in the database.
+Once done, each job is marked "D"one in the database and, unless ``hpc`` is
+``Y``, STACK jobs are inserted/updated in the database.
 
 To run this script:
 
@@ -150,6 +147,12 @@ could occur with SQLite.
 .. versionadded:: 1.5
     The preprocessing routine is separated from the compute_cc and can be called
     by external plugins.
+
+.. versionadded:: 1.6
+    The ``preprocess_max_gap`` parameter.
+    The ``hpc`` parameter that can prevent the automatic creation of STACK jobs.
+    
+
 
 """
 import sys

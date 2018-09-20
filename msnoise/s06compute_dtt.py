@@ -2,12 +2,6 @@
 This code is responsible for the calculation of dt/t using the result of the
 MWCS calculations.
 
-.. warning:: Previously, all pairs were analysed using the same parameters,
-    which were hard-coded in the s06compute_dtt.py file.
-    This has changed now, and MSNoise uses parameters set in the database via
-    the configurator. Pre-1.3 users should upgrade their database using the
-    "$ msnoise upgrade_db" command.
-
 
 Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~
