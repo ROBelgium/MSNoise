@@ -15,7 +15,7 @@ To run MSNoise, you need:
   on **Windows, Linux and MacOSX** 64 bits systems! Support for **Python 2
   .7** will be dropped as soon as the TravisCI test don't pass and the 
   corrections would take too much dev time. **Python 3.7** has not been 
-  tested yet.
+  tested yet and will only be when ObsPy has a Python 3.7 release version.
 
   * Those modules are already distributed with Anaconda_:
 
