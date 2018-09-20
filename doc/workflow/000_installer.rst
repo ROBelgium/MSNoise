@@ -1,6 +1,6 @@
 .. include:: ../configs.hrst
 
-Installer (initialize Project)
-------------------------------
+Initialize Project
+------------------
 
 .. automodule:: msnoise.s000installer

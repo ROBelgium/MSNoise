@@ -88,8 +88,13 @@ for command in sorted(C):
     if hasattr(C[command], "group"):
         group = command
         out.write("\n")
-        out.write('%s\n'%group)
-        out.write('-'*len(group)+'\n')
+        out.write("\n")
+        out.write("------------")
+        out.write("\n")
+        out.write("\n")
+        fullgroup = "msnoise %s" % group
+        out.write('%s\n'%fullgroup)
+        out.write('-'*len(fullgroup)+'\n')
         out.write("\n")
         if command in ["plugin", "p"]:
             out.write(
@@ -98,18 +103,25 @@ for command in sorted(C):
             continue
         CC = C[command].commands
         for command in sorted(CC):
-            out.write('%s\n'%command)
-            out.write('~'*len(command)+'\n')
+            fullcommand = "msnoise %s %s" % (group, command)
+            out.write('%s\n'%fullcommand)
+            out.write('~'*len(fullcommand)+'\n')
 
             c = click.Context(command=eval('M.%s'%(command)))
             data = c.get_help()
             out.write(write_click_help(group, command, data))
             # out.write('.. include:: msnoise-%s-%s.rst\n\n'%(group,command))
             out.write("\n\n")
+        out.write("\n")
+        out.write("\n")
+        out.write("------------")
+        out.write("\n")
+        out.write("\n")
 
     else:
-        out.write('%s\n'%command)
-        out.write('-'*len(command)+'\n')
+        fullcommand = "msnoise %s" % command
+        out.write('%s\n'%fullcommand)
+        out.write('-'*len(fullcommand)+'\n')
         c = click.Context(command=eval('M.%s'%command))
         data = c.get_help()
         out.write(write_click_help(group, command, data))

@@ -72,7 +72,7 @@ def admin(port):
 
 @click.command()
 def upgrade_db():
-    """DEPRECATED since MSNoise 1.6. Please run 'msnoise db upgrade'"""
+    """DEPRECATED: since MSNoise 1.6, please use "msnoise db upgrade" instead"""
     click.echo(upgrade_db.__doc__)
     pass
 
@@ -153,7 +153,8 @@ def upgrade():
 @click.command()
 @click.argument('sql_command')
 def execute(sql_command):
-    """Checks the Jobs table and deletes duplicate entries"""
+    """EXPERT MODE: Executes 'sql_command' on the database. Use this command
+    at your own risk!!"""
     from msnoise.api import connect, get_tech
 
     db = connect()
@@ -163,8 +164,6 @@ def execute(sql_command):
         print(r.fetchall())
     db.commit()
     db.close()
-
-
 
 
 @click.command()
@@ -281,23 +280,22 @@ def info(jobs):
                     click.echo(' %s:' % row["name"])
                     for (n, jobtype) in get_job_types(db, row["name"]):
                         click.echo("  %s : %i" % (jobtype, n))
-    
+
 
 @click.command()
 def install():
-    """DEPRECATED: This command launches the installer."""
-    click.echo('DEPRECATED command since MSNoise 1.6, please use "msnoise init"'
-               ' instead')
-    from ..s000installer import main
-    main()
+    """DEPRECATED: since MSNoise 1.6, please use "msnoise db init" instead"""
+    click.echo(install.__doc__)
+    pass
 
 
 @click.command()
 @click.option('--tech', help='Database technology: 1=SQLite 2=MySQL',
               default=None)
 def init(tech):
-    """This command launches the installer."""
-    click.echo('Launching the installer')
+    """This command initializes the current folder to be a MSNoise Project
+    by creating a database and a db.ini file."""
+    click.echo('Launching the init')
     from ..s000installer import main
     main(tech)
 
@@ -884,6 +882,7 @@ def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
 # Add DB commands to the db group:
 db.add_command(clean_duplicates)
 db.add_command(upgrade)
+db.add_command(init)
 db.add_command(execute)
 
 # Add plot commands to the plot group:
@@ -902,7 +901,6 @@ cli.add_command(info)
 cli.add_command(admin)
 cli.add_command(upgrade_db)
 cli.add_command(install)
-cli.add_command(init)
 cli.add_command(config)
 cli.add_command(populate)
 cli.add_command(bugreport)
