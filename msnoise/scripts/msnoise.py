@@ -113,7 +113,7 @@ def upgrade():
         prefix = prefix + "_"
     for name in default.keys():
         try:
-            db.add(Config(name=name, value=default[name][-1]))
+            db.add(Config(name=name, value=default[name][1]))
             db.commit()
         except:
             db.rollback()
@@ -126,7 +126,6 @@ def upgrade():
         db.commit()
     except:
         logging.info("It looks like the v1.5 'job_index' is already in the DB")
-        traceback.print_exc()
         db.rollback()
 
     try:
@@ -136,7 +135,6 @@ def upgrade():
     except:
         logging.info("It looks like the v1.6 'job_index2' is already in the DB")
         db.rollback()
-
 
     try:
         db.execute("CREATE UNIQUE INDEX da_index ON %sdata_availability (path, "
