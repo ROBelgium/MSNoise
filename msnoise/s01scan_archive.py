@@ -145,13 +145,14 @@ def worker(files, folder, startdate, enddate, goal_sampling_rate, init,
 def main(init=False, threads=1):
     import numpy as np
     t = time.time()
-    logging.info('*** Starting: Scan Archive ***')
+    logger = logging.getLogger('scan_archive')
+    logger.info('*** Starting: Scan Archive ***')
     db = connect()
 
     mtime = get_config(db, 'crondays')
 
     if init:
-        logging.info("Initializing (should be run only once)")
+        logger.info("Initializing (should be run only once)")
         mtime = "-20000"
     else:
         mtime = "%s" % mtime
@@ -160,17 +161,17 @@ def main(init=False, threads=1):
     if threads:
         nthreads = threads
     if get_tech() == 1 and nthreads > 1:
-        logging.info("You can not work on %i threads because SQLite only"
+        logger.info("You can not work on %i threads because SQLite only"
                      " supports 1 connection at a time" % nthreads)
         nthreads = 1
 
-    logging.info("Will work on %i thread(s)" % nthreads)
+        logger.info("Will work on %i thread(s)" % nthreads)
 
     startdate = get_config(db, 'startdate')
     startdate = datetime.datetime.strptime(startdate, '%Y-%m-%d').date()
     enddate = get_config(db, 'enddate')
     enddate = datetime.datetime.strptime(enddate, '%Y-%m-%d').date()
-    logging.info("Will search for files between %s and %s"%(startdate, enddate))
+    logger.info("Will search for files between %s and %s"%(startdate, enddate))
     goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
 
     data_folder = get_config(db, 'data_folder')
@@ -179,26 +180,26 @@ def main(init=False, threads=1):
 
 
     channels = [c for c in get_config(db, 'channels').split(',')]
-    logging.debug("Will search for channels: %s" % channels)
+    logger.debug("Will search for channels: %s" % channels)
     folders_to_glob = []
     if data_struc in data_structure:
         rawpath = data_structure[data_struc]
     elif data_struc.count('/') != 0:
         rawpath = data_struc
     else:
-        logging.info("Can't parse the archive for format %s !" % data_struc)
-        logging.info("trying to import local parser (should return a station"
+        logger.info("Can't parse the archive for format %s !" % data_struc)
+        logger.info("trying to import local parser (should return a station"
                      " list)")
 
         if os.path.isfile(os.path.join(os.getcwd(), 'custom.py')):
             sys.path.append(os.getcwd())
             from custom import data_structure as rawpath
         else:
-            logging.info("No file named custom.py in the %s"
+            logger.info("No file named custom.py in the %s"
                          " folder" % os.getcwd())
             return
     data_folder = os.path.realpath(data_folder)
-    logging.debug("Data Folder: %s" % data_folder)
+    logger.debug("Data Folder: %s" % data_folder)
     for year in range(startdate.year, min(datetime.datetime.now().year, enddate.year) + 1):
         for channel in channels:
             stafol = os.path.split(rawpath)[0].replace('YEAR', "%04i" % year).replace('DAY', '*').replace(
@@ -219,7 +220,7 @@ def main(init=False, threads=1):
                 files = os.listdir(folder)
             else:
                 items = glob.glob(os.path.join(folder, "*"))
-                logging.debug("Will search for files more recent than %s" %
+                logger.debug("Will search for files more recent than %s" %
                               mintime)
                 files = []
                 for item in items:
@@ -228,11 +229,11 @@ def main(init=False, threads=1):
                     if os.stat(item).st_mtime >= mintime:
                         files.append(item)
 
-            logging.debug("Files detected in %s folder: %i" %
+            logger.debug("Files detected in %s folder: %i" %
                          (folder,len(files)))
             if len(files) != 0:
                 files = np.asarray(files, dtype=np.str)
-                logging.info('%s: Started' % folder)
+                logger.info('%s: Started' % folder)
                 client = Process(target=worker, args=([files, folder,
                                                        startdate, enddate,
                                                        goal_sampling_rate,
@@ -253,8 +254,8 @@ def main(init=False, threads=1):
                 client.join(0.01)
                 clients.remove(client)
 
-    logging.info('*** Finished: Scan Archive ***')
-    logging.info('It took %.2f seconds' % (time.time() - t))
+    logger.info('*** Finished: Scan Archive ***')
+    logger.info('It took %.2f seconds' % (time.time() - t))
 
 
 if __name__ == "__main__":
