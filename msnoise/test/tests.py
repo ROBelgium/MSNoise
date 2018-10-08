@@ -4,6 +4,12 @@ import os
 import datetime
 import shutil
 import glob
+
+import logging
+logger = logging.getLogger('matplotlib')
+# set WARNING for Matplotlib
+logger.setLevel(logging.CRITICAL)
+
 from obspy import read
 
 
@@ -411,6 +417,7 @@ class MSNoiseTests(unittest.TestCase):
 def main(prefix=""):
     import matplotlib.pyplot as plt
     plt.switch_backend("agg")
+
     import os
     import sys
     c = len(os.listdir(os.getcwd()))

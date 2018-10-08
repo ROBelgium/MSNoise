@@ -22,6 +22,11 @@ import pkg_resources
 @click.option('-v', '--verbose', default=2, count=True)
 @click.pass_context
 def cli(ctx, threads, delay, custom, verbose):
+    import logging
+    logger = logging.getLogger('matplotlib')
+    # set WARNING for Matplotlib
+    logger.setLevel(logging.CRITICAL)
+
     ctx.obj['MSNOISE_threads'] = threads
     ctx.obj['MSNOISE_threadsdelay'] = delay
     if verbose == 0:

@@ -246,7 +246,7 @@ def main(init=False, threads=1):
                     if not client.is_alive():
                         client.join(0.01)
                         clients.remove(client)
-                
+
     while len(clients) > 0:
         for client in clients:
             client.join(0.01)
@@ -257,17 +257,3 @@ def main(init=False, threads=1):
     logger.info('*** Finished: Scan Archive ***')
     logger.info('It took %.2f seconds' % (time.time() - t))
 
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Scan the data archive and insert the\
-    metadata in the database')
-    parser.add_argument('-i', '--init', action="store_true",
-                        help='Initialize the archive: should only be done upon first run.\
-                        Will read all files in the archive that match the station/component\
-                        (check that)',
-                        default=False)
-    parser.add_argument('-t', '--threads',
-                        help='Number of parellel threads to use [default:1]',
-                        default=1, type=int)
-    args = parser.parse_args()
-    main(args.init, args.threads)
