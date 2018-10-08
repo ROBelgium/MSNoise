@@ -3,6 +3,7 @@ import datetime
 import itertools
 import logging
 import os
+import sys
 import glob
 import traceback
 try:
@@ -87,6 +88,7 @@ def connect(inifile=None):
     """
     if not inifile:
         inifile = os.path.join(os.getcwd(), 'db.ini')
+
     engine = get_engine(inifile)
     Session = sessionmaker(bind=engine)
     return Session()
@@ -131,7 +133,13 @@ def read_database_inifile(inifile=None):
     if not inifile:
         inifile = os.path.join(os.getcwd(), 'db.ini')
 
-    f = open(inifile, 'rb')
+    try:
+        f = open(inifile, 'rb')
+    except FileNotFoundError:
+        print("No db.ini file in this directory, please run "
+                     "'msnoise db init' in this folder to initialize it as "
+                     "an MSNoise project folder.")
+        sys.exit(1)
     try:
         # New ini file with prefix support
         tech, hostname, database, username, password, prefix = cPickle.load(f)
