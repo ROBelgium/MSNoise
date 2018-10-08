@@ -142,7 +142,7 @@ def main(tech=None, hostname="localhost", username="msnoise",
     session = Session()
     
     for name in default.keys():
-        session.add(Config(name=name, value=default[name][-1]))
+        session.add(Config(name=name, value=default[name][1]))
     
     try:
         session.commit()

@@ -234,39 +234,28 @@ def get_params(session):
     """
     # TODO: this could be populated automatically from defauts iff defaults
     # would mention types
-    class Params:
-        pass
+    from obspy.core.util.attribdict import AttribDict
+    from .default import default
     s = session
-    params = Params()
-    params.output_folder = get_config(s, 'output_folder')
-    params.export_format = get_config(s, 'export_format')
+    params = AttribDict()
+    for name in default.keys():
+        if len(default[name]) == 2:
+            params[name] = get_config(s, name)
+        else:
+            txt, _, itemtype = default[name]
+            if itemtype is bool:
+                params[name] = get_config(s, name, isbool=True)
+            else:
+                params[name] = itemtype(get_config(s, name))
 
-    params.goal_sampling_rate = float(get_config(s, "cc_sampling_rate"))
-    params.goal_duration = float(get_config(s, "analysis_duration"))
-    params.overlap = float(get_config(s, "overlap"))
-    params.maxlag = float(get_config(s, "maxlag"))
-    params.corr_duration = float(get_config(s, "corr_duration"))
-    params.min30 = float(get_config(s, "corr_duration")) * \
-                   params.goal_sampling_rate
-    params.windsorizing = float(get_config(s, "windsorizing"))
-    params.whitening = get_config(s, 'whitening')
-    params.resampling_method = get_config(s, "resampling_method")
-    params.remove_response = get_config(s, 'remove_response', isbool=True)
-    params.response_prefilt = eval(get_config(s, 'response_prefilt'))
-    params.preprocess_lowpass = float(get_config(s, "preprocess_lowpass"))
-    params.preprocess_highpass = float(get_config(s, "preprocess_highpass"))
-    params.preprocess_max_gap = float(get_config(s, "preprocess_max_gap"))
-    params.keep_all = get_config(s, 'keep_all', isbool=True)
-    params.keep_days = get_config(s, 'keep_days', isbool=True)
-    params.autocorr = get_config(s, "autocorr", isbool=True)
+    # TODO remove reference to goal_sampling_rate
+    params.goal_sampling_rate = params.cc_sampling_rate
+    params.min30 = params.corr_duration * params.goal_sampling_rate
     params.components_to_compute = get_components_to_compute(s)
-    params.export_format = get_config(s, 'export_format')
-    params.sac_format = get_config(s, "sac_format")
-
-    params.stack_method = get_config(s, 'stack_method')
-    params.pws_timegate = float(get_config(s, 'pws_timegate'))
-    params.pws_power = float(get_config(s, 'pws_power'))
-    params.hpc = get_config(s, 'hpc', isbool=True)
+    params.components_to_compute_single_station = get_components_to_compute_single_station(s)
+    params.all_components = params.components_to_compute_single_station + \
+                            params.components_to_compute
+    
     return params
 
 # FILTERS PART
@@ -822,18 +811,19 @@ def get_next_job(session, flag='T', jobtype='CC'):
     :rtype: list
     :returns: list of :class:`~msnoise.msnoise_table_def.Job`
     """
-    # day =
-    jobs = session.query(Job).filter(Job.jobtype == jobtype).\
-        filter(Job.flag == flag).\
-        filter(Job.day == session.query(Job).
-               with_hint(Job, 'USE INDEX (job_index)').
-               filter(Job.jobtype == jobtype).
-               filter(Job.flag == flag).first().day).\
-        with_for_update()
-    # print(jobs.statement.compile(compile_kwargs={"literal_binds": True}))
-    tmp = jobs.all()
-    jobs.update({Job.flag: 'I'})
-    session.commit()
+    tmp = []
+    while not len(tmp):
+        jobs = session.query(Job).filter(Job.jobtype == jobtype).\
+            filter(Job.flag == flag).\
+            filter(Job.day == session.query(Job).
+                   with_hint(Job, 'USE INDEX (job_index)').
+                   filter(Job.jobtype == jobtype).
+                   filter(Job.flag == flag).first().day).\
+            with_for_update()
+        # print(jobs.statement.compile(compile_kwargs={"literal_binds": True}))
+        tmp = jobs.all()
+        jobs.update({Job.flag: 'I'})
+        session.commit()
     return tmp
 
 
@@ -1398,7 +1388,32 @@ def get_components_to_compute(session, plugin=None):
 
     components_to_compute = get_config(session, "components_to_compute",
                                        plugin=plugin)
-    if components_to_compute.count(",") == 0:
+    if len(components_to_compute) == 0:
+        return []
+    elif components_to_compute.count(",") == 0:
+        components_to_compute = [components_to_compute,]
+    else:
+        components_to_compute = components_to_compute.split(",")
+    return components_to_compute
+
+
+def get_components_to_compute_single_station(session, plugin=None):
+    """
+    Returns the components configured in the database.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :rtype: list of str
+    :returns: a list of components to compute
+    """
+
+    components_to_compute = get_config(session, "components_to_compute_single_station",
+                                       plugin=plugin)
+    if len(components_to_compute) == 0:
+        return []
+    elif components_to_compute.count(",") == 0:
         components_to_compute = [components_to_compute,]
     else:
         components_to_compute = components_to_compute.split(",")
@@ -1681,7 +1696,9 @@ def make_same_length(st):
     # a gap
     # TODO add cases with more than 2 or 3 traces (could append?)
     # TODO is there a better way to AND masks ?
-    if len(st) == 2:
+    if len(st) < 2:
+        return st
+    elif len(st) == 2:
         mask = np.logical_or(st[0].data.mask, st[1].data.mask)
     elif len(st) == 3:
         mask = np.logical_or(st[0].data.mask, st[1].data.mask, st[2].data.mask)
@@ -1689,8 +1706,7 @@ def make_same_length(st):
     # apply the mask to all traces
     for tr in st:
         tr.data.mask = mask
-    
-    # remove the masks from the stream 
+
     st = st.split()
     return st
 

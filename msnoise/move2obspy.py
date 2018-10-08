@@ -11,6 +11,7 @@ from scipy.fftpack.helper import next_fast_len
 from obspy.signal.regression import linear_regression
 
 
+
 def myCorr(data, maxlag, plot=False, nfft=None):
     """This function takes ndimensional *data* array, computes the cross-correlation in the frequency domain
     and returns the cross-correlation function between [-*maxlag*:*maxlag*].
@@ -69,7 +70,8 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     return corr
 
 
-def myCorr2(data, maxlag, energy, index, plot=False, nfft=None):
+def myCorr2(data, maxlag, energy, index, plot=False, nfft=None, 
+            normalized=False):
     """This function takes ndimensional *data* array, computes the
     cross-correlation in the frequency domain and returns the cross-correlation
     function between [-*maxlag*:*maxlag*].
@@ -83,7 +85,7 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None):
     :returns: The cross-correlation function between [-maxlag:maxlag]
     """
     # TODO: docsting
-    normalized = False
+
     maxlag = np.round(maxlag)
     Nt = data.shape[1]
 
@@ -105,8 +107,30 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None):
             continue
         corrs[id] = corr
 
-
     return corrs
+
+
+def pcc_xcorr(data, maxlag, energy, index, plot=False, nfft=None, 
+            normalized=False):
+    """
+    
+    :param data: 
+    :param maxlag: 
+    :param energy: 
+    :param index: 
+    :param plot: 
+    :param nfft: 
+    :param normalized: 
+    :return: 
+    """
+    from phasecorr.phasecorr import xcorr
+    corr = {}
+    ml = int(maxlag)
+    for id, sta1, sta2 in index:
+        corr[id] = xcorr(data[sta1], data[sta2],
+                         lags=range(-ml, ml + 1),
+                         parallel=True)
+    return corr
 
 def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     """This function takes 1-dimensional *data* timeseries array,

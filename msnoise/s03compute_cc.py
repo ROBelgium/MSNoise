@@ -193,10 +193,6 @@ def main():
 
     while is_next_job(db, jobtype='CC'):
         jobs = get_next_job(db, jobtype='CC')
-        if len(jobs) == 0:
-            # edge case, should only occur when is_next returns true, but
-            # get_next receives no jobs (heavily parallelised calls).
-            continue
 
         stations = []
         pairs = []
@@ -209,7 +205,6 @@ def main():
             stations.append(netsta1)
             stations.append(netsta2)
             goal_day = job.day
-        
 
         stations = np.unique(stations)
 
@@ -218,7 +213,7 @@ def main():
         jt = time.time()
 
         comps = []
-        for comp in params.components_to_compute:
+        for comp in params.all_components:
             if comp[0] in ["R", "T"] or comp[1] in ["R", "T"]:
                 comps.append("E")
                 comps.append("N")

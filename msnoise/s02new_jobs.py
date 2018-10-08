@@ -43,7 +43,7 @@ def main(init=False, nocc=False):
     logging.info('*** Starting: New Jobs ***')
 
     db = connect()
-
+    params = get_params(db)
     logging.debug("Checking plugins' entry points")
     plugins = get_config(db, "plugins")
     extra_jobtypes_scan_archive = []
@@ -60,7 +60,11 @@ def main(init=False, nocc=False):
                     elif jobtype["after"] == "new_files":
                         extra_jobtypes_new_files.append(jobtype["name"])
 
-    autocorr = get_config(db, name="autocorr", isbool=True)
+    # autocorr = get_config(db, name="autocorr", isbool=True)
+    autocorr = False
+    if len(params.components_to_compute_single_station):
+        autocorr = True
+
     logging.debug('Scanning New/Modified files')
     stations_to_analyse = ["%s.%s" % (sta.net, sta.sta) for sta in get_stations(db, all=False)]
     all_jobs = []

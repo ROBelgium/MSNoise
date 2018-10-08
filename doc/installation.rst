@@ -56,7 +56,7 @@ Full Installation
    
    .. code-block:: sh
 
-        pip install flask-admin flask-wtf markdown folium
+        conda install -c conda-forge flask-admin flask-wtf markdown folium
         conda install -c conda-forge obspy
 
 3. Install a MySQL server and MySQL Workbench:

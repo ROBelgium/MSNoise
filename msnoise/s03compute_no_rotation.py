@@ -161,10 +161,12 @@ import matplotlib.mlab as mlab
 from .api import *
 from .move2obspy import myCorr2
 from .move2obspy import whiten2
+from .move2obspy import pcc_xcorr
 
 from .preprocessing import preprocess
 
 from scipy.stats import scoreatpercentile
+from obspy.signal.filter import bandpass
 
 
 def main():
@@ -196,11 +198,6 @@ def main():
         logging.info("Getting the next job")
         jobs = get_next_job(db, jobtype='CC')
 
-        if len(jobs) == 0:
-            # edge case, should only occur when is_next returns true, but
-            # get_next receives no jobs (heavily parallelised code)
-            continue
-
         stations = []
         pairs = []
         refs = []
@@ -220,13 +217,14 @@ def main():
         jt = time.time()
 
         comps = []
-        for comp in params.components_to_compute:
+        for comp in params.all_components:
             if comp[0] in ["R", "T"] or comp[1] in ["R", "T"]:
                 comps.append("E")
                 comps.append("N")
             else:
                 comps.append(comp[0])
                 comps.append(comp[1])
+        
         comps = np.unique(comps)
         stream = preprocess(db, stations, comps, goal_day, params, responses)
         if not len(stream):
@@ -332,59 +330,141 @@ def main():
             tmptime = tmp[0].stats.starttime.datetime
             thisdate = tmptime.strftime("%Y-%m-%d")
             thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
+
+            # Standard operator for CC
             pair_index = []
+            if len(params.components_to_compute):
+                for sta1, sta2 in itertools.combinations(names, 2):
+                    n1, s1, l1, c1 = sta1
+                    n2, s2, l2, c2 = sta2
+                    comp = "%s%s" % (c1[-1], c2[-1])
+                    if comp in params.components_to_compute:
+                        pair_index.append(
+                            ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
+                             names.index(sta1), names.index(sta2)])
 
-            # Different iterator func if autocorr:
-            if params.autocorr:
-                iterfunc = itertools.combinations_with_replacement
-            else:
-                iterfunc = itertools.combinations
-            for sta1, sta2 in iterfunc(names, 2):
-                n1, s1, l1, c1 = sta1
-                n2, s2, l2, c2 = sta2
-                comp = "%s%s" % (c1[-1], c2[-1])
-                if comp in params.components_to_compute:
-                    pair_index.append(
-                        ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
-                         names.index(sta1), names.index(sta2)])
+            # Different iterator func for single station AC or SC:
+            single_station_pair_index = []
+            #TODO here, select AC and SC and then assign them to one or the 
+            # other processing, depending on their cc_type
+            if len(params.components_to_compute_single_station):
+                for sta1, sta2 in itertools.combinations_with_replacement(names, 2):
+                    n1, s1, l1, c1 = sta1
+                    n2, s2, l2, c2 = sta2
+                    if n1 != n2 or s1 != s2:
+                        continue
 
+                    comp = "%s%s" % (c1[-1], c2[-1])
+                    if comp in params.components_to_compute_single_station:
+                        if c1[-1] == c2[-1]:
+                            single_station_pair_index.append(
+                                ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
+                                 names.index(sta1), names.index(sta2)])
+                        else:
+                        # If the components are different, we can just
+                        # process them using the default CC code (should warn)
+                            pair_index.append(
+                                ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
+                                 names.index(sta1), names.index(sta2)])
+                    if comp[::-1] in params.components_to_compute_single_station:
+                        if c1[-1] != c2[-1]:
+                            # If the components are different, we can just
+                            # process them using the default CC code (should warn)
+                            pair_index.append(
+                                ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, 
+                                                     comp[::-1]),
+                                 names.index(sta2), names.index(sta1)])
+
+            print("pair_index", pair_index)
+            print("single_station", single_station_pair_index)
+            
             for filterdb in filters:
                 filterid = filterdb.ref
-                low = float(filterdb.low)
-                high = float(filterdb.high)
+                filterlow = float(filterdb.low)
+                filterhigh = float(filterdb.high)
 
                 freq_vec = scipy.fftpack.fftfreq(nfft, d=dt)[:nfft // 2]
-                freq_sel = np.where((freq_vec >= low) & (freq_vec <= high))[0]
+                freq_sel = np.where((freq_vec >= filterlow) & (freq_vec <= filterhigh))[0]
                 low = freq_sel[0] - napod
                 if low <= 0:
-                    low = 1
+                    low = 0
                 p1 = freq_sel[0]
                 p2 = freq_sel[-1]
                 high = freq_sel[-1] + napod
                 if high > nfft / 2:
                     high = int(nfft // 2)
 
-                ffts = scipy.fftpack.fftn(data, shape=[nfft, ], axes=[1, ])
-                # TODO: AC will require a more clever handling, no whiten...
-                whiten2(ffts, nfft, low, high, p1, p2, psds,
-                        params.whitening)  # inplace
-                # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
-                energy = np.real(np.sqrt( np.mean(scipy.fftpack.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
+                # First let's compute the AC and SC
+                if len(single_station_pair_index):
+                    corr = {}
+                    tmp = data.copy()
+                    for i, _ in enumerate(tmp):
+                        tmp[i] = bandpass(_, freqmin=filterlow,
+                                          freqmax=filterhigh,
+                                          df=params.goal_sampling_rate,
+                                          corners=8)
+                    if params.cc_type_single_station == "CC":
+                        logging.debug("Computer AC and SC using %s"%params.cc_type_single_station)
+                        
+                        ffts = scipy.fftpack.fftn(tmp, shape=[nfft, ], 
+                                                  axes=[1, ])
+                        energy = np.real(np.sqrt(np.mean(
+                            scipy.fftpack.ifft(ffts, n=nfft, axis=1) ** 2,
+                            axis=1)))
 
-                # logging.info("Pre-whitened %i traces"%(i+1))
-                corr = myCorr2(ffts,
-                               np.ceil(params.maxlag / dt),
-                               energy,
-                               pair_index,
-                               plot=False,
-                               nfft=nfft)
+                        # Computing standard CC
+                        corr = myCorr2(ffts,
+                                       np.ceil(params.maxlag / dt),
+                                       energy,
+                                       single_station_pair_index,
+                                       plot=False,
+                                       nfft=nfft)
 
-                for key in corr:
-                    ccfid = key + "_%02i" % filterid + "_" + thisdate
-                    if ccfid not in allcorr:
-                        allcorr[ccfid] = {}
-                    allcorr[ccfid][thistime] = corr[key]
-                del corr
+                    elif params.cc_type_single_station == "PCC":
+                        logging.debug(
+                            "Compute AC and SC using %s" % params.cc_type_single_station)
+                        corr = pcc_xcorr(tmp, np.ceil(params.maxlag / dt),
+                                         None, single_station_pair_index)
+                    else:
+                        print("cc_type_single_station = %s not implemented, "
+                              "exiting")
+                        exit(1)
+
+                    for key in corr:
+                        ccfid = key + "_%02i" % filterid + "_" + thisdate
+                        if ccfid not in allcorr:
+                            allcorr[ccfid] = {}
+                        allcorr[ccfid][thistime] = corr[key]
+                    del corr
+                
+                if len(pair_index):
+                    if params.cc_type == "CC":
+                        logging.debug("Compute CC using %s" % params.cc_type)
+                        ffts = scipy.fftpack.fftn(data, shape=[nfft, ], axes=[1, ])
+                        whiten2(ffts, nfft, low, high, p1, p2, psds,
+                                params.whitening)  # inplace
+                        # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
+                        energy = np.real(np.sqrt( np.mean(scipy.fftpack.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
+        
+                        # logging.info("Pre-whitened %i traces"%(i+1))
+                        # Computing standard CC
+                        corr = myCorr2(ffts,
+                                       np.ceil(params.maxlag / dt),
+                                       energy,
+                                       pair_index,
+                                       plot=False,
+                                       nfft=nfft)
+                        
+                        for key in corr:
+                            ccfid = key + "_%02i" % filterid + "_" + thisdate
+                            if ccfid not in allcorr:
+                                allcorr[ccfid] = {}
+                            allcorr[ccfid][thistime] = corr[key]
+                        del corr
+                    else:
+                        print("cc_type_single_station = %s not implemented, "
+                              "exiting")
+                        exit(1)
 
         # Needed to clean the FFT memory caching of SciPy
         clean_scipy_cache()
@@ -395,6 +475,7 @@ def main():
 
         if params.keep_days:
             for ccfid in allcorr.keys():
+                print("Exporting %s" % ccfid)
                 station1, station2, components, filterid, date = \
                     ccfid.split('_')
 

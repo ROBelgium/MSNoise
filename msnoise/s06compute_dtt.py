@@ -6,33 +6,33 @@ MWCS calculations.
 Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-* |dtt_lag|
-* |dtt_v|
-* |dtt_minlag|
-* |dtt_width|
-* |dtt_sides|
-* |dtt_mincoh|
-* |dtt_maxerr|
-* |dtt_maxdt|
+* |params.dtt_lag|
+* |params.dtt_v|
+* |params.dtt_minlag|
+* |params.dtt_width|
+* |params.dtt_sides|
+* |dtt_params.dtt_mincoh|
+* |dtt_params.dtt_maxerr|
+* |dtt_params.dtt_maxdt|
 
 The dt/t is determined as the slope of the delays vs time lags. The slope is
 calculated a weighted linear regression (WLS) through selected points.
 
 1. The selection of points is first based on the time lag criteria.
 The minimum time lag can either be defined absolutely or dynamically.
-When ``dtt_lag`` is set to "dynamic" in the database, the inter-station distance
+When ``params.dtt_lag`` is set to "dynamic" in the database, the inter-station distance
 is used to determine the minimum time lag. This lag is calculated from the
-distance and a velocity configured (``dtt_v``). The velocity is determined by
+distance and a velocity configured (``params.dtt_v``). The velocity is determined by
 the user so that the minlag doesn't include the ballistic waves. For example,
 if ballistic waves are visible with a velocity of 2 km/s, one could configure
-dtt_v=1.0.
+params.dtt_v=1.0.
 This way, if stations are located 15 km apart, the minimum lag time will be
-set to 15 s. The ``dtt_width`` determines the width of the lag window used. A
+set to 15 s. The ``params.dtt_width`` determines the width of the lag window used. A
 value of 30.0 means the process will use time lags between 15 and 45 s in the
-example above, on both sides if configured (``dtt_sides``), or only causal or
+example above, on both sides if configured (``params.dtt_sides``), or only causal or
 acausal parts of the CCF. The following figure shows the static time lags of
-``dtt_width`` = 40s starting at ``dtt_minlag`` = 10s and the dynamic time lags
-for a ``dtt_v`` = 1.0 km/s for the Piton de La Fournaise network (including
+``params.dtt_width`` = 40s starting at ``params.dtt_minlag`` = 10s and the dynamic time lags
+for a ``params.dtt_v`` = 1.0 km/s for the Piton de La Fournaise network (including
 stations *not* on the volcano),
 
 .. note:: It seems obvious that these parameters are frequency-dependent, but
@@ -48,8 +48,8 @@ stations *not* on the volcano),
 
 2. Using example values above, we chose to use only 15-45 s coda part of the
 signal, neglecting direct waves in the 0-15 seconds range. We then select data
-which match three other thresholds: ``dtt_mincoh``, ``dtt_maxerr`` and
-``dtt_maxdt``.
+which match three other thresholds: ``dtt_params.dtt_mincoh``, ``dtt_params.dtt_maxerr`` and
+``dtt_params.dtt_maxdt``.
 
 .. image:: ../.static/Figure04_dttmatrix_01_005DAYS_ZZ-2010-10-12_cmyk.png
 
@@ -140,15 +140,7 @@ def main(interval=1):
 
     logging.info('*** Starting: Compute DT/T ***')
     db = connect()
-
-    dtt_lag = get_config(db, "dtt_lag")
-    dtt_v = float(get_config(db, "dtt_v"))
-    dtt_minlag = float(get_config(db, "dtt_minlag"))
-    dtt_width = float(get_config(db, "dtt_width"))
-    dtt_sides = get_config(db, "dtt_sides")
-    minCoh = float(get_config(db, "dtt_mincoh"))
-    maxErr = float(get_config(db, "dtt_maxerr"))
-    maxDt = float(get_config(db, "dtt_maxdt"))
+    params = get_params(db)
 
     start, end, datelist = build_movstack_datelist(db)
 
@@ -166,16 +158,17 @@ def main(interval=1):
     for sta1, sta2 in get_station_pairs(db):
         s1 = "%s_%s" % (sta1.net, sta1.sta)
         s2 = "%s_%s" % (sta2.net, sta2.sta)
-        interstations["%s_%s"%(s1,s2)] = get_interstation_distance(sta1, sta2,
-                                                                   sta1.coordinates)
+        if s1 == s2:
+            interstations["%s_%s" % (s1, s2)] = 0.0
+        else:
+            interstations["%s_%s"%(s1,s2)] = get_interstation_distance(sta1,
+                                                                       sta2,
+                                                                       sta1.coordinates)
         
     filters = get_filters(db, all=False)
     while is_next_job(db, jobtype='DTT'):
         jobs = get_next_job(db, jobtype='DTT')
-        if len(jobs) == 0:
-            # edge case, should only occur when is_next returns true, but
-            # get_next receives no jobs (heavily parallelised calls).
-            continue
+
         stations = []
         pairs = []
         refs = []
@@ -202,25 +195,25 @@ def main(interval=1):
                         # dist = get_interstation_distance(station1, station2,
                         #                                  station1.coordinates)
                         dist = interstations[pair]
-                        if dist == 0. and dtt_lag == "dynamic":
+                        if dist == 0. and params.dtt_lag == "dynamic":
                             logging.debug('%s: Distance is Zero?!' % pair)
                         if os.path.isfile(day):
                             df = pd.read_csv(
                                 day, delimiter=' ', header=None, index_col=0,
                                 names=['t', 'dt', 'err', 'coh'])
                             tArray = df.index.values
-                            if dtt_lag == "static":
-                                lmlag = -dtt_minlag
-                                rmlag = dtt_minlag
+                            if params.dtt_lag == "static":
+                                lmlag = -params.dtt_minlag
+                                rmlag = params.dtt_minlag
                             else:
-                                lmlag = -dist / dtt_v
-                                rmlag = dist / dtt_v
-                            lMlag = lmlag - dtt_width
-                            rMlag = rmlag + dtt_width
+                                lmlag = -dist / params.dtt_v
+                                rmlag = dist / params.dtt_v
+                            lMlag = lmlag - params.dtt_width
+                            rMlag = rmlag + params.dtt_width
 
-                            if dtt_sides == "both":
+                            if params.dtt_sides == "both":
                                 tindex = np.where(((tArray >= lMlag) & (tArray <= lmlag)) | ((tArray >= rmlag) & (tArray <= rMlag)))[0]
-                            elif dtt_sides == "left":
+                            elif params.dtt_sides == "left":
                                 tindex = np.where((tArray >= lMlag) & (tArray <= lmlag))[0]
                             else:
                                 tindex = np.where((tArray >= rmlag) & (tArray <= rMlag))[0]
@@ -266,11 +259,11 @@ def main(interval=1):
                                 #~ if i in tindex:
                                 if 1:
                                     cohindex = np.where(
-                                        cohArray[:, i] >= minCoh)[0]
+                                        cohArray[:, i] >= params.dtt_mincoh)[0]
                                     errindex = np.where(
-                                        errArray[:, i] <= maxErr)[0]
+                                        errArray[:, i] <= params.dtt_maxerr)[0]
                                     dtindex = np.where(
-                                        np.abs(dtArray[:, i]) <= maxDt)[0]
+                                        np.abs(dtArray[:, i]) <= params.dtt_maxdt)[0]
     
                                     index = np.intersect1d(cohindex, errindex)
                                     index = np.intersect1d(index, dtindex)
@@ -308,11 +301,11 @@ def main(interval=1):
                                     #~ if i in tindex:
                                     if 1:
                                         cohindex = np.where(
-                                            cohArray[:, i] >= minCoh)[0]
+                                            cohArray[:, i] >= params.dtt_mincoh)[0]
                                         errindex = np.where(
-                                            errArray[:, i] <= maxErr)[0]
+                                            errArray[:, i] <= params.dtt_maxerr)[0]
                                         dtindex = np.where(
-                                            np.abs(dtArray[:, i]) <= maxDt)[0]
+                                            np.abs(dtArray[:, i]) <= params.dtt_maxdt)[0]
         
                                         index = np.intersect1d(cohindex,
                                                                errindex)
@@ -344,9 +337,9 @@ def main(interval=1):
                         used = np.zeros(dtArray.shape)
     
                         for i, pair in enumerate(pairArray):
-                            cohindex = np.where(cohArray[i] >= minCoh)[0]
-                            errindex = np.where(errArray[i] <= maxErr)[0]
-                            dtindex = np.where(np.abs(dtArray[i]) <= maxDt)[0]
+                            cohindex = np.where(cohArray[i] >= params.dtt_mincoh)[0]
+                            errindex = np.where(errArray[i] <= params.dtt_maxerr)[0]
+                            dtindex = np.where(np.abs(dtArray[i]) <= params.dtt_maxdt)[0]
     
                             #~ index = np.intersect1d(tindex, cohindex)
                             index = np.intersect1d(cohindex, errindex)

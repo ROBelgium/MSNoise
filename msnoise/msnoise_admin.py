@@ -348,6 +348,7 @@ class ConfigView(ModelView):
     can_delete = False
     page_size = 100
     can_set_page_size = True
+    column_sortable_list = ["name",]
 
     # Override displayed fields
     column_list = ('name', 'value')
