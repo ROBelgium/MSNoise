@@ -44,7 +44,7 @@ f.close()
 
 output = ""
 for key in default.keys():
-    descr, defvalue = default[key]
+    descr, defvalue = default[key][:2]
     output += ".. |%s| replace:: ``%s``: %s (default=%s)\n" % (key, key, descr,
                                                             defvalue)
 

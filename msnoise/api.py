@@ -1211,11 +1211,11 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
     if len(data) == 0:
         return []
     if stack_method == "linear":
-        logging.debug("Doing a linear stack")
+        # logging.debug("Doing a linear stack")
         corr = data.mean(axis=0)
 
     elif stack_method == "pws":
-        logging.debug("Doing a PWS stack")
+        # logging.debug("Doing a PWS stack")
         corr = np.zeros(data.shape[1], dtype='f8')
         phasestack = np.zeros(data.shape[1], dtype='c8')
         for i in range(data.shape[0]):

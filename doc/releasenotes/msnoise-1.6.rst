@@ -16,11 +16,11 @@ Release notes:
 
 Introduction
 ------------
-More than 1 year after the last major release (:doc:`msnoise-1.5`) I'm proud
+More than 1.5 years after the last major release (:doc:`msnoise-1.5`) I'm proud
 to announce the new :doc:`msnoise-1.6`. It is a **major** release, with a
 massive amount of work since the last one: in `GitHub numbers
 <https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2017-04-28&to
-=2018-06-25&type=c>`_
+=2018-10-20&type=c>`_
 , it's over TODO commits and over TODO lines of code and documentation changed
 or added!
 
@@ -30,7 +30,12 @@ MSNoise 1.6 introduces a series of **new features** :
 * The workflow has been rewritten to create "job types" per step, making it 
   easier for users to reset a jobs before a specific step. 
 * This and other smaller adaptations to the code allows to run MSNoise more
-  effiently, e.g. on a HPC.
+  effiently, e.g. on a HPC (see hpc_).
+* The components to compute can be defined for "single-station" and 
+  "cross-station" independently.
+* The CC, AC and SC can be processed with different schemes TODO
+
+.. todo
 
 
 
@@ -71,22 +76,41 @@ for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
 Requirements
 ------------
 
+This version will be the last to be tested on and support Python 2.7. The EOL
+(end of life) of 2.7 is 2020, which means it is high time for users to migrate.
+For users having a complete set of tools in Python 2.7 and not keen to move 
+to 3.x soon, the incredible easiness of creating a Python 3.x environment in 
+conda, for example, will allow them to run MSNoise in the future.
+
+Please note that as long as ObsPy doesn't have Python 3.7 binary packages, I
+recommend using Python 3.6.
+
 There were no changes in the requirements. Note that MSNoise is always tested
 against the latest release versions of the main packages, so older installations
-that are not maintainted/updated regularly (years) could encounter issues.
+that are not maintained/updated regularly (years) could encounter issues. 
+Please make sure you have the latest version of Numpy and Scipy (and MKL), as
+performance gets better and better (especially since Anaconda Inc. released 
+its fast MKL implementations for all users, in the conda-forge channel). 
 
 
 Web-based Admin Interface Changes
 ---------------------------------
 
 * Feature: The pagination size (100, 200, etc. row) is now allowed on the
-  Station, Job and DataAvailability views are now 
+  Station, Job and DataAvailability views.
+* Feature: The Config list view can be sorted by name.
+* Feature: The home page has changed to show all job types and exposes 
+  buttons to execute actions equivalent to `msnoise reset` in the console.
 
 
 Configuration Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------
 
-* ADDED: ``hpc`` for flagging if MSNoise is running on HPC. Not yet used.
+* ADDED: ``hpc`` for flagging if MSNoise is running High Performance. If 
+  True, the jobs processed at each step are marked Done when finished, but the
+  next jobtype according to the workflow is not created. This removes a lot 
+  of select/update/insert actions on the database and makes the whole much 
+  faster (See hpc_).
 
 
 Top level DB command
@@ -94,13 +118,16 @@ Top level DB command
 
 I've added a new command group called `db` that gathers all db-related actions:
 
+* ``msnoise db init`` is a replacement for the ``msnoise install``
 * ``msnoise db upgrade`` is a replacement for the ``msnoise upgrade_db``
 * ``msnoise db clean_duplicates`` deletes duplicate jobs (might happen). Unique
-  sets of ``day``, ``pair`` and ``jobtypes``are considered.
+  sets of ``day``, ``pair`` and ``jobtypes`` are considered.
+* ``msnoise db execute`` allows executing queries on the database (Expert Mode)
 
 In the future, this command will include the possibility to dump and load 
 entire databases, for example for switching from a local sqlite instance to a 
 large MySQL server.
+
 
 Workflow changes
 ----------------
@@ -116,9 +143,11 @@ New job types are:
 About the ``STACK`` jobs, it is important to call the "ref stack" before the
 "mov stack", as the "ref stack" will run on the ``STACK`` jobs, check if 
 any date matches the date range of the ``ref_begin`` - ``ref_end``, do the 
-stacks if needed, then will reset the ``STACK`` jobs to ``Todo`` so that "mov
-stacks can be done. Note that calling ``msnoise stack -r -m`` will execute 
-the steps in the right order.
+stacks if needed, then will **not** reset the ``STACK`` jobs to ``Todo`` so 
+that "mov stacks" can be done. 
+
+TODO:: Note that calling ``msnoise stack -r -m`` will 
+execute the steps in the right order.
 
 
 Expert/Lazy mode
@@ -171,10 +200,8 @@ Command Line changes
   commands.
 * ``msnoise db clean_duplicates`` allows to remove duplicates from the jobs 
   table.
-
 * ``msnoise scan_archive --path -r`` will only scan the ``path`` 
 independently of its structure. Passing the ``-r`` it will walk in subfolders.
-
 * ``msnoise info -j`` reports all jobs types, including those of plugins.
 
 
@@ -185,7 +212,9 @@ API Changes
 -----------
 
 * New ``get_params`` API method to return a ``Params`` class containing all 
-  configuration bits, avoiding unnecessary calls to the DB later.
+  configuration bits, avoiding unnecessary calls to the DB later. This method
+  will automatically populate from the ``defaults`` and return elements 
+  having the right type. 
 * Many (many) small optimizations to the core functions to make them faster,
   mostly when interacting with the DB, thanks to ``get_params``.
 * ``update_config`` can now modify parameters for installed plugins.
@@ -194,8 +223,7 @@ API Changes
   date from the data_availability table if the ``ref_begin`` or ``startdate``
   have not been modified from ``1970-01-01``.
 * Removed ``linear_regression`` as this is now included in ObsPy.
-* Modified ``get_dtt_next_job`` returns jobs in random order (will maybe change
-  again later when the HPC mode gets more developed.
+* Modified ``get_dtt_next_job`` returns jobs in random order.
 * Added missing documentation for several methods.
 
 See :doc:`../api`.
@@ -214,41 +242,103 @@ Other Bugfixes TODO
 
 Plot Updates TODO
 ------------
-
-* ``msnoise plot ccftime`` now accepts -e (--envelope) and will plot the
-  envelope of the ccfs.
-* ``msnoise plot ccftime``, ``msnoise plot interferogram`` and
-  ``msnoise plot distance`` now accept -r (--refilter) to refilter the CCFs
-  before plotting. The argument must be a column-separated string (e.g.
-  ``-r 4:8`` for filtering between 4.0 and 8.0 Hz).
-* ``msnoise plot distance`` accepts a new ``--virtual-source`` NET.STA parameter
-  to only plot the pairs including this station.
-* Most plots have better titles (filter details, etc).
-* The dv/v plot now allows averaging over components by passing them as comma-
-  separated values.
+Not sure we did modify something here
 
 See :doc:`../plotting`.
 
 Performance and Code improvements TODO
----------------------------------
+--------------------------------------
 
-Improvements in terms of performances have also been done for MSNoise 1.5:
+.. _hpc:
 
-* Added fftpack optimized nfft (scipy's next_fast_len). This could lead to some
-  small differences in the final result of the MWCS procedure, because of the
-  number of points used for smoothing the (cross-)spectra.
-* Replaced binarization (sign) and windsorizing (clip) by standard numpy
-  functions operating directly inplace on the arrays, avoiding unecessary
-  copies.
-* The preprocessing only reads files that should contain the right component.
-* The stretching code has been improved (thanks to Clare Donaldson)
+High Performance - Reducing DB access
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Most of the API calls have been cleaned from calling the database, for 
+example the ``def stack()`` called a SELECT on the database for each call, 
+which is useless as configuration parameters are not supposed to change 
+during the execution of the code. This modification allows running MSNoise on
+an HPC infrastructure with a remote central MySQL database.
+
+The new configuration parameter ``hpc`` is used for flagging if MSNoise is 
+running High Performance. If True, the jobs processed at each step are marked
+Done when finished, but the next jobtype according to the workflow is not
+created. This removes a lot of select/update/insert actions on the database
+and makes the whole much faster (one INSERT instead of tons of 
+SELECT/UPDATE/INSERT).
+
+Commands and actions with ``hpc`` = N :
+
+* ``msnoise new_jobs``: creates the CC jobs
+* ``msnoise compute_cc``: processes the CC jobs and creates the STACK jobs
+* ``msnoise stack -m``: processes the STACK jobs and creates the MWCS jobs
+
+Commands and actions with ``hpc`` = Y :
+
+* ``msnoise new_jobs``: creates the CC jobs
+* ``msnoise compute_cc``: processes the CC jobs
+* ``msnoise new_jobs --hpc CC:STACK``: creates the STACK jobs based on the CC 
+  jobs marked "D"one
+* ``msnoise stack -m``: processes the STACK jobs
+* ``msnoise new_jobs --hpc STACK:MWCS``: creates the MWCS jobs based on the 
+  STACK jobs marked "D"one
+
+
+Comparison with MSNoise 1.2 as published in the SRL article:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the SRL article, we computed the dv/v for the UnderVolc project on a 4vCPU
+virtual machine running on a powerfull ESX system. For this test, I analyzed 
+the same dataset on a 4 year-old 16 CPU blade. The timings mentionned below 
+are then multiplied by 4 to account for the CPU number difference.
+
+Summing the total time needed, we reach 37 hours for the SRL version, and 12 
+hours for MSNoise 1.6. The seedup is not fully linear, as the current code 
+supports running on over 500 CPUs (as long as your MySQL server can handle 
+it) but no MySQL server could have handled the so many connections/requests 
+from the old version. The ``compute_cc2`` computation time scales roughly 
+linearly with the amount of components, contrary to the old ``compute_cc`` 
+which was exponential).
+
+	
++--------------+--------------+---------------+---------------+--------+
+|STEP          |v1.6 (16 CPU) |v1.6 (4 CPU)   |SRL (4 vCPU)   |SPEEDUP |
++==============+==============+===============+===============+========+
+|scan_archive  |385 seconds   |1540 seconds   |1800 seconds   |1.2x    |
++--------------+--------------+---------------+---------------+--------+
+|new_jobs      |27 seconds    |27 seconds     |1800 seconds   |66.0x   |
++--------------+--------------+---------------+---------------+--------+
+|compute_cc2   |4817 seconds  |19268 seconds  |75600 seconds  |3.9x    |
++--------------+--------------+---------------+---------------+--------+
+|stack -r      |58 seconds    |232 seconds    |1980 seconds   |8.5x    |
++--------------+--------------+---------------+---------------+--------+
+|stack -m      |1124 seconds  |4496 seconds   |21600 seconds  |4.8x    |
++--------------+--------------+---------------+---------------+--------+
+|compute_mwcs  |4209 seconds  |16836 seconds  |28800 seconds  |1.7x    |
++--------------+--------------+---------------+---------------+--------+
+|compute_dtt   |264 seconds   |1056 seconds   |3600 seconds   |3.4x    |
++--------------+--------------+---------------+---------------+--------+
+|Total         |10884 seconds |43455 seconds  |135180 seconds |3.1x    |
++--------------+--------------+---------------+---------------+--------+
+|Total (hours) |3 hours       |12 hours       |37 hours       |3.1x    |
++--------------+--------------+---------------+---------------+--------+
+
+Next steps of improving this workflow will be:
+
+* Reduce I/O: by storing the ``mov_stack`` elements in two-dimensional HDF5 
+  dataframes
+* Reduce CPU: by computing the ``mov_stack`` in a 2D Pandas DataFrame directly
+* Reduce CPU: by pre-computing MWCS windows and pair-wise computing the 
+  delays (reduces drastically the number of FFT calls)
+
+**If anyone feels like focusing on those aspects and providing Pull Requests, 
+welcome!**
 
 Documentation TODO
 -------------
 
-* New tutorial for installing and configuring MySQL and MySQL workbench.
-* The Workflow is separated in steps (See :ref:`workflow`))
-* The Documentation is now available in PDF format (PDF_).
+* New elements for configuring MySQL and MariaDB, thanks to Lukas Preiswerk.
+* The description of the new steps and the HPC mode.
+
 
 Upgrading an existing project to MSNoise 1.6
 --------------------------------------------
