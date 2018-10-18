@@ -136,6 +136,9 @@ def main():
                 rf = os.path.join("STACKS", "%02i" %
                                   filterid, "REF", components,
                                   ref_name + extension)
+                # check to see if the ref file exists for this component
+                if not os.path.isfile(rf):
+                    continue
                 ref = read(rf)[0].data
                 for day in days:
                     for mov_stack in mov_stacks:
