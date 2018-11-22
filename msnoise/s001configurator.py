@@ -22,12 +22,12 @@ Default Global Parameters
 Network-Station Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. seealso :: :class:`msnoise.msnoise_table_def.Station`
+.. seealso :: :class:`msnoise.msnoise_table_def.declare_tables.Station`
 
 Filter Parameters
 ~~~~~~~~~~~~~~~~~
 
-.. seealso :: :class:`msnoise.msnoise_table_def.Filter`
+.. seealso :: :class:`msnoise.msnoise_table_def.declare_tables.Filter`
 
 """
 
@@ -38,7 +38,6 @@ from traitsui.table_column import ObjectColumn
 
 from .api import *
 from .default import *
-from .msnoise_table_def import *
 
 
 class StationColumn (ObjectColumn):

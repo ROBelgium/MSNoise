@@ -61,7 +61,8 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
 
     def test_004_set_and_get_filters(self):
-        from ..msnoise_table_def import Filter
+        from ..msnoise_table_def import declare_tables
+        Filter = declare_tables().Filter
         from ..api import connect, update_filter, get_filters
         db = connect()
         filters = []
@@ -168,7 +169,8 @@ class MSNoiseTests(unittest.TestCase):
 
     def test_011_control_jobs(self):
         from ..api import connect, is_next_job, get_next_job
-        from ..msnoise_table_def import Job
+        from ..msnoise_table_def import declare_tables
+        Job = declare_tables().Job
         db = connect()
 
         self.failUnlessEqual(is_next_job(db), True)

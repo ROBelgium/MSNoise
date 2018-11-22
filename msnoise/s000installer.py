@@ -11,8 +11,8 @@ Questions are:
 
   * mysql: this will connect to a local or remote mysql server, additional
     information is then required:
- 
-    - hostname: of the mysql server, defaults to 127.0.0.1  
+
+    - hostname: of the mysql server, defaults to 127.0.0.1
     - database: must already exist on `hostname`
     - username: as registered in the privileged users of the mysql server
     - password: his password
@@ -30,27 +30,37 @@ To run this script:
     directory. It's not very safe, but until now we haven't thought of another
     solution.
 """
-import argparse
-import sys
-import logging
-from getpass import getpass
 
+import argparse
+import logging
+import os
+import sys
+from getpass import getpass
 from sqlalchemy import create_engine
 from sqlalchemy.exc import *
 from sqlalchemy.orm import sessionmaker
-
+try:
+    import cPickle
+except ImportError:
+    import pickle as cPickle
 
 from .default import default
+from .msnoise_table_def import declare_tables
 
 
 if sys.version_info[0] >= 3:
     raw_input = input
 
-import os
-try:
-    import cPickle
-except:
-    import pickle as cPickle
+
+DEFAULT_INPUTS = {
+        'sqlite_filename': 'msnoise.sqlite',
+        'table_prefix': '',
+        'mysql_host': 'localhost',
+        'mysql_db': 'msnoise',
+        'mysql_user': 'msnoise',
+        }
+
+
 
 def create_database_inifile(tech, hostname, database, username, password,
                             prefix=""):
@@ -78,80 +88,10 @@ def create_database_inifile(tech, hostname, database, username, password,
     f.close()
 
 
-def main(tech=None, hostname="localhost", username="msnoise",
-         password="msnoise", database="msnoise", filename="msnoise.sqlite",
-         prefix=""):
-    global install_mode
-    install_mode = True
-    if tech is None:
-        print("Welcome to MSNoise")
-        print()
-        print("What database technology do you want to use?")
-        print(" [1] sqlite")
-        print(" [2] mysql")
-        tech = int(raw_input('Choice:'))
-
-        if tech == 1:
-            a = raw_input('Filename: [msnoise.sqlite]: ')
-            hostname = a if len(a) != 0 else "msnoise.sqlite"
-
-            a = raw_input('Table prefix: []: ')
-            prefix = a if len(a) != 0 else ""
-
-            database = None
-            username = None
-            password = None
-        else:
-            a = raw_input('Server: [127.0.0.1]: ')
-            hostname = a if len(a) != 0 else "127.0.0.1"
-            a = raw_input('Database: [msnoise]: ')
-            database = a if len(a) != 0 else "msnoise"
-
-            a = raw_input('Username: [msnoise]: ')
-            username = a if len(a) != 0 else "msnoise"
-            a = getpass('Password: [msnoise]: ')
-            password = a if len(a) != 0 else "msnoise"
-
-            a = raw_input('Table prefix: []: ')
-            prefix = a if len(a) != 0 else ""
-    else:
-        tech = int(tech)
-
-    if tech == 1:
-        engine = create_engine('sqlite:///%s' % filename, echo=False)
-        database = None
-        username = None
-        password = None
-        hostname = filename
-    else:
-        engine = create_engine('mysql+pymysql://%s:%s@%s/%s' % (username,
-                                                                password,
-                                                                hostname,
-                                                                database),
-                               echo=False)
-
-    # from .api import create_database_inifile
-    create_database_inifile(tech, hostname, database, username, password,
-                            prefix)
-
-    from .msnoise_table_def import PrefixerBase, Config
-    PrefixerBase._the_prefix = prefix
-    # create tables
-    PrefixerBase.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    
-    for name in default.keys():
-        session.add(Config(name=name, value=default[name][1]))
-    
-    try:
-        session.commit()
-    except IntegrityError:
-        print("The database seems to already exist and is not empty, cannot"
-              " continue")
-        return "Integrity Error - DB already exists"
-    if prefix != "":
-        prefix = prefix + "_"
+def create_indices(session):
+    """
+    Create indices in the database, using the provided sqlalchemy session.
+    """
     # TODO move those calls to a def and call it from install / msnoise.scripts
     try:
         session.execute("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
@@ -177,6 +117,84 @@ def main(tech=None, hostname="localhost", username="msnoise",
         logging.info("It looks like the v1.5 'da_index' is already in the DB")
         session.rollback()
 
+
+def main(tech=None):
+    """
+    """
+    if tech is None:
+        print("Welcome to MSNoise")
+        print()
+        print("What database technology do you want to use?")
+        while not tech:
+            if tech == 0:
+                print('Sorry, your choice is invalid. Please enter 1 or 2.')
+            print(" [1] sqlite")
+            print(" [2] mysql")
+            try:
+                tech = int(raw_input('Choice: '))
+            except ValueError:
+                tech = 0
+            else:
+                if tech not in (1, 2):
+                    tech = 0
+
+        def ask(prompt, default, input_func=raw_input):
+            return input_func(prompt.format(default)) or default
+
+        if tech == 1:
+            filename = ask('Filename: [{}]: ',
+                           DEFAULT_INPUTS['sqlite_filename'])
+            prefix = ask('Table prefix: []: ', '')
+            database = None
+            username = None
+            password = None
+        else:
+            hostname = ask('Server: [{}]: ', DEFAULT_INPUTS['mysql_host'])
+            database = ask('Database: [{}]: ', DEFAULT_INPUTS['mysql_db'])
+            username = ask('Username: [{}]: ', DEFAULT_INPUTS['mysql_user'])
+            password = ''
+            while not password:
+                password = ask('Password (not shown as you type): ',
+                               '', getpass)
+                if not password:
+                    print('Sorry, you must define a password.')
+            prefix = ask('Table prefix: [{}]: ',
+                         DEFAULT_INPUTS['table_prefix'])
+    else:
+        tech = int(tech)
+
+    if tech == 1:
+        engine = create_engine('sqlite:///%s' % filename, echo=False)
+        database = None
+        username = None
+        password = None
+        hostname = filename
+    else:
+        engine = create_engine('mysql+pymysql://%s:%s@%s/%s'
+                               % (username, password, hostname, database),
+                               echo=False)
+
+    create_database_inifile(tech, hostname, database, username, password,
+                            prefix)
+
+    schema = declare_tables(prefix)
+    schema.Base.metadata.create_all(engine)
+
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    # Add default configuration values to the database
+    for name in default.keys():
+        session.add(schema.Config(name=name, value=default[name][1]))
+
+    try:
+        session.commit()
+    except IntegrityError:
+        logging.error("The database seems to already exist and is not empty, "
+                      "cannot continue")
+        return
+
+    create_indices(session)
+
     session.close()
-    msg = "Installation Done! - Go to Configuration Step!"
-    return msg
+    print("Installation Done! - Go to Configuration Step!")
