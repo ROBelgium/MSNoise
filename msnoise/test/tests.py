@@ -403,9 +403,8 @@ class MSNoiseTests(unittest.TestCase):
         from ..s000installer import main
         try:
             ret = main(tech=2, username="root", password="",
-                       hostname="localhost", database="msnoise")
-            msg = "Installation Done! - Go to Configuration Step!"
-            self.failUnlessEqual(ret, msg)
+                       hostname="localhost", database="msnoise", prefix="")
+            self.failUnlessEqual(ret, 0)
         except:
             traceback.print_exc()
             self.fail()
