@@ -24,16 +24,15 @@ def read_prefix(db_ini_filename=DB_INI):
     """
     Returns the table prefix set in the db_ini_filename file.
     """
-    with open(db_ini_filename, 'rb') as ini_file:
-        data = cPickle.load(ini_file)
-        # Note: data should contain the following table
-        # [tech hostname database username password prefix]
-        # with prefix being optional for backward compatibility
-        try:
-            prefix = data[5]
-        except IndexError:
-            prefix = ''
-    return prefix
+    try:
+        with open(db_ini_filename, 'rb') as ini_file:
+            data = cPickle.load(ini_file)
+            # Note: data should contain the following table
+            # [tech hostname database username password prefix]
+            # with prefix being optional for backward compatibility
+            return data[5]
+    except (IndexError, FileNotFoundError):
+        return ''
 
 
 def declare_tables(prefix=None):
