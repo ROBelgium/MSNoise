@@ -88,11 +88,13 @@ def create_database_inifile(tech, hostname, database, username, password,
     f.close()
 
 
-def create_indices(session):
+def create_indices(session, prefix):
     """
     Create indices in the database, using the provided sqlalchemy session.
     """
     # TODO move those calls to a def and call it from install / msnoise.scripts
+    if prefix:
+        prefix += '_'
     try:
         session.execute("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
                         "jobtype)" % prefix)
@@ -208,7 +210,7 @@ def main(tech=None, hostname=None, username=None, password=None,
                       "cannot continue")
         return 1
 
-    create_indices(session)
+    create_indices(session, prefix)
 
     session.close()
     print("Installation Done! - Go to Configuration Step!")
