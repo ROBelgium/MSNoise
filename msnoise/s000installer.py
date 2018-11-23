@@ -118,8 +118,15 @@ def create_indices(session):
         session.rollback()
 
 
-def main(tech=None):
+def main(tech=None, hostname=None, username=None, password=None,
+         database=None, filename=None, prefix=None):
     """
+    Create the db.ini file and create database.
+
+    Interactively ask database type and connection information to the user,
+    write them to the db.ini file and create the database tables.
+    Information input by the user must also be allowed to be passed as function
+    argument for the automatic tests.
     """
     if tech is None:
         print("Welcome to MSNoise")
@@ -142,24 +149,31 @@ def main(tech=None):
             return input_func(prompt.format(default)) or default
 
         if tech == 1:
-            filename = ask('Filename: [{}]: ',
-                           DEFAULT_INPUTS['sqlite_filename'])
-            prefix = ask('Table prefix: []: ', '')
+            if filename is None:
+                filename = ask('Filename: [{}]: ',
+                               DEFAULT_INPUTS['sqlite_filename'])
+            if prefix is None:
+                prefix = ask('Table prefix: []: ', '')
             database = None
             username = None
             password = None
         else:
-            hostname = ask('Server: [{}]: ', DEFAULT_INPUTS['mysql_host'])
-            database = ask('Database: [{}]: ', DEFAULT_INPUTS['mysql_db'])
-            username = ask('Username: [{}]: ', DEFAULT_INPUTS['mysql_user'])
-            password = ''
-            while not password:
-                password = ask('Password (not shown as you type): ',
-                               '', getpass)
-                if not password:
-                    print('Sorry, you must define a password.')
-            prefix = ask('Table prefix: [{}]: ',
-                         DEFAULT_INPUTS['table_prefix'])
+            if hostname is None:
+                hostname = ask('Server: [{}]: ', DEFAULT_INPUTS['mysql_host'])
+            if database is None:
+                database = ask('Database: [{}]: ', DEFAULT_INPUTS['mysql_db'])
+            if username is None:
+                username = ask('Username: [{}]: ', DEFAULT_INPUTS['mysql_user'])
+            if password is None:
+                password = ''
+                while not password:
+                    password = ask('Password (not shown as you type): ',
+                                   '', getpass)
+                    if not password:
+                        print('Sorry, you must define a password.')
+            if prefix is None:
+                prefix = ask('Table prefix: [{}]: ',
+                             DEFAULT_INPUTS['table_prefix'])
     else:
         tech = int(tech)
 
@@ -192,9 +206,10 @@ def main(tech=None):
     except IntegrityError:
         logging.error("The database seems to already exist and is not empty, "
                       "cannot continue")
-        return
+        return 1
 
     create_indices(session)
 
     session.close()
     print("Installation Done! - Go to Configuration Step!")
+    return 0

@@ -30,8 +30,7 @@ class MSNoiseTests(unittest.TestCase):
             self.prefix=os.environ["PREFIX"]
         try:
             ret = main(tech=1, prefix=self.prefix)
-            msg = "Installation Done! - Go to Configuration Step!"
-            self.failUnlessEqual(ret, msg)
+            self.failUnlessEqual(ret, 0)
         except:
             traceback.print_exc()
             self.fail()
@@ -61,9 +60,7 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
 
     def test_004_set_and_get_filters(self):
-        from ..msnoise_table_def import declare_tables
-        Filter = declare_tables().Filter
-        from ..api import connect, update_filter, get_filters
+        from ..api import connect, update_filter, get_filters, Filter
         db = connect()
         filters = []
         f = Filter()
@@ -168,9 +165,7 @@ class MSNoiseTests(unittest.TestCase):
             self.fail()
 
     def test_011_control_jobs(self):
-        from ..api import connect, is_next_job, get_next_job
-        from ..msnoise_table_def import declare_tables
-        Job = declare_tables().Job
+        from ..api import connect, is_next_job, get_next_job, Job
         db = connect()
 
         self.failUnlessEqual(is_next_job(db), True)
