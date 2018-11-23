@@ -31,7 +31,7 @@ def read_prefix(db_ini_filename=DB_INI):
             # [tech hostname database username password prefix]
             # with prefix being optional for backward compatibility
             return data[5]
-    except (IndexError, FileNotFoundError):
+    except (IndexError, IOError):
         return ''
 
 
