@@ -30,7 +30,17 @@ from obspy import read_inventory
 from obspy.io.xseed import Parser
 from obspy.geodetics import gps2dist_azimuth
 
-from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
+from .msnoise_table_def import declare_tables
+
+
+# Declare mapped tables
+sqlschema = declare_tables()
+Filter = sqlschema.Filter
+Job = sqlschema.Job
+Config = sqlschema.Config
+Station = sqlschema.Station
+DataAvailability = sqlschema.DataAvailability
+
 
 
 def get_tech():
@@ -281,7 +291,7 @@ def get_filters(session, all=False):
     :param all: Returns all filters from the database if True, or only filters
         where `used` = 1 if False (default)
 
-    :rtype: list of :class:`~msnoise.msnoise_table_def.Filter`
+    :rtype: list of :class:`~msnoise.msnoise_table_def.declare_tables.Filter`
     :returns: a list of Filter
     """
 
@@ -296,7 +306,7 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
                   rms_threshold, mwcs_wlen, mwcs_step, used):
     """Updates or Insert a new Filter in the database.
 
-    .. seealso:: :class:`msnoise.msnoise_table_def.Filter`
+    .. seealso:: :class:`msnoise.msnoise_table_def.declare_tables.Filter`
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
@@ -383,8 +393,8 @@ def get_stations(session, all=False, net=None):
     :type net: str
     :param net: if set, limits the stations returned to this network
 
-    :rtype: list of :class:`msnoise.msnoise_table_def.Station`
-    :returns: list of :class:`~msnoise.msnoise_table_def.Station`
+    :rtype: list of :class:`msnoise.msnoise_table_def.declare_tables.Station`
+    :returns: list of :class:`~msnoise.msnoise_table_def.declare_tables.Station`
     """
     q = session.query(Station)
     if all:
@@ -413,8 +423,8 @@ def get_station(session, net, sta):
     :type sta: str
     :param sta: the station code
 
-    :rtype: :class:`msnoise.msnoise_table_def.Station`
-    :returns: a :class:`~msnoise.msnoise_table_def.Station` Object
+    :rtype: :class:`msnoise.msnoise_table_def.declare_tables.Station`
+    :returns: a :class:`~msnoise.msnoise_table_def.declare_tables.Station` Object
 
     """
     station = session.query(Station).filter(Station.net == net).\
@@ -426,7 +436,7 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
                    instrument='N/A', used=1):
     """Updates or Insert a new Station in the database.
 
-    .. seealso :: :class:`msnoise.msnoise_table_def.Station`
+    .. seealso :: :class:`msnoise.msnoise_table_def.declare_tables.Station`
     
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
@@ -481,7 +491,7 @@ def get_station_pairs(session, used=None, net=None):
     :param net: Network code to filter for the pairs.
 
     :rtype: iterable
-    :returns: An iterable of :class:`~msnoise.msnoise_table_def.Station` object
+    :returns: An iterable of :class:`~msnoise.msnoise_table_def.declare_tables.Station` object
         pairs
     """
     stations = get_stations(session, all=False, net=net)
@@ -496,9 +506,9 @@ def get_interstation_distance(station1, station2, coordinates="DEG"):
 
     .. warning:: Currently the stations coordinates system have to be the same!
 
-    :type station1: :class:`~msnoise.msnoise_table_def.Station`
+    :type station1: :class:`~msnoise.msnoise_table_def.declare_tables.Station`
     :param station1: A Station object
-    :type station2: :class:`~msnoise.msnoise_table_def.Station`
+    :type station2: :class:`~msnoise.msnoise_table_def.declare_tables.Station`
     :param station2: A Station object
     :type coordinates: str
     :param coordinates: The coordinates system. "DEG" is WGS84 latitude/
@@ -599,7 +609,7 @@ def get_new_files(session):
         obtained by :func:`connect`
 
     :rtype: list
-    :returns: list of :class:`~msnoise.msnoise_table_def.DataAvailability`
+    :returns: list of :class:`~msnoise.msnoise_table_def.declare_tables.DataAvailability`
     """
 
     files = session.query(DataAvailability).\
@@ -611,7 +621,7 @@ def get_new_files(session):
 def get_data_availability(session, net=None, sta=None, comp=None,
                           starttime=None, endtime=None):
     """
-    Returns the :class:`~msnoise.msnoise_table_def.DataAvailability` objects
+    Returns the :class:`~msnoise.msnoise_table_def.declare_tables.DataAvailability` objects
     for specific `net`, `sta`, `starttime` or `endtime`
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -627,7 +637,7 @@ def get_data_availability(session, net=None, sta=None, comp=None,
     :param endtime: End time of the search
 
     :rtype: list
-    :returns: list of :class:`~msnoise.msnoise_table_def.DataAvailability`
+    :returns: list of :class:`~msnoise.msnoise_table_def.declare_tables.DataAvailability`
     """
 
     if not starttime:
@@ -651,7 +661,7 @@ def get_data_availability(session, net=None, sta=None, comp=None,
 def mark_data_availability(session, net, sta, flag):
     """
     Updates the flag of all
-    :class:`~msnoise.msnoise_table_def.DataAvailability` objects matching
+    :class:`~msnoise.msnoise_table_def.declare_tables.DataAvailability` objects matching
     `net.sta` in the database
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -675,7 +685,7 @@ def mark_data_availability(session, net, sta, flag):
 
 def count_data_availability_flags(session):
     """
-    Count the number of :class:`~msnoise.msnoise_table_def.DataAvailability`,
+    Count the number of :class:`~msnoise.msnoise_table_def.declare_tables.DataAvailability`,
     grouped by `flag`
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -697,7 +707,7 @@ import time
 def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
                ref=None):
     """
-    Updates or Inserts a new :class:`~msnoise.msnoise_table_def.Job` in the
+    Updates or Inserts a new :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the
     database.
 
     :type day: str
@@ -715,7 +725,7 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
         (False)
 
 
-    :rtype: :class:`~msnoise.msnoise_table_def.Job` or None
+    :rtype: :class:`~msnoise.msnoise_table_def.declare_tables.Job` or None
     :returns: If returnjob is True, returns the modified/inserted Job.
     """
     if ref:
@@ -741,11 +751,11 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
 def massive_insert_job(jobs):
     """
     Routine to use a low level function to insert much faster a list of
-    :class:`~msnoise.msnoise_table_def.Job`. This method uses the Engine
+    :class:`~msnoise.msnoise_table_def.declare_tables.Job`. This method uses the Engine
     directly, no need to pass a Session object.
 
     :type jobs: list
-    :param jobs: a list of :class:`~msnoise.msnoise_table_def.Job` to insert.
+    :param jobs: a list of :class:`~msnoise.msnoise_table_def.declare_tables.Job` to insert.
     """
     engine = get_engine()
     engine.execute(
@@ -756,11 +766,11 @@ def massive_insert_job(jobs):
 def massive_update_job(session, jobs, flag="D"):
     """
     Routine to use a low level function to update much faster a list of
-    :class:`~msnoise.msnoise_table_def.Job`. This method uses the Job.ref
+    :class:`~msnoise.msnoise_table_def.declare_tables.Job`. This method uses the Job.ref
     which is unique.
 
     :type jobs: list
-    :param jobs: a list of :class:`~msnoise.msnoise_table_def.Job` to update.
+    :param jobs: a list of :class:`~msnoise.msnoise_table_def.declare_tables.Job` to update.
     :type flag: str
     :param flag: The destination flag.
     """
@@ -778,7 +788,7 @@ def massive_update_job(session, jobs, flag="D"):
 
 def is_next_job(session, flag='T', jobtype='CC'):
     """
-    Are there any :class:`~msnoise.msnoise_table_def.Job` in the database,
+    Are there any :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
     with flag=`flag` and jobtype=`type`
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -790,7 +800,7 @@ def is_next_job(session, flag='T', jobtype='CC'):
     :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
 
     :rtype: bool
-    :returns: True if at least one :class:`~msnoise.msnoise_table_def.Job`
+    :returns: True if at least one :class:`~msnoise.msnoise_table_def.declare_tables.Job`
         matches, False otherwise.
     """
     job = session.query(Job).with_hint(Job, 'USE INDEX (job_index2)').\
@@ -804,7 +814,7 @@ def is_next_job(session, flag='T', jobtype='CC'):
 
 def get_next_job(session, flag='T', jobtype='CC'):
     """
-    Get the next :class:`~msnoise.msnoise_table_def.Job` in the database,
+    Get the next :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
     with flag=`flag` and jobtype=`jobtype`. Jobs of the same `type` are grouped
     per day. This function also sets the flag of all selected Jobs to "I"n
     progress.
@@ -818,7 +828,7 @@ def get_next_job(session, flag='T', jobtype='CC'):
     :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
 
     :rtype: list
-    :returns: list of :class:`~msnoise.msnoise_table_def.Job`
+    :returns: list of :class:`~msnoise.msnoise_table_def.declare_tables.Job`
     """
     tmp = []
     while not len(tmp):
@@ -838,7 +848,7 @@ def get_next_job(session, flag='T', jobtype='CC'):
 
 def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
     """
-    Are there any DTT :class:`~msnoise.msnoise_table_def.Job` in the database,
+    Are there any DTT :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
     with flag=`flag` and jobtype=`jobtype`. If `ref` is provided, checks if a
     DTT "REF" job is present.
 
@@ -870,7 +880,7 @@ def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
 
 def get_dtt_next_job(session, flag='T', jobtype='DTT'):
     """
-    Get the next DTT :class:`~msnoise.msnoise_table_def.Job` in the database,
+    Get the next DTT :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
     with flag=`flag` and jobtype=`jobtype`. Jobs are then grouped per station
     pair. This function also sets the flag of all selected Jobs to "I"n
     progress.

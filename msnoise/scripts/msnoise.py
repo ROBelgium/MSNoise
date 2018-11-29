@@ -7,8 +7,8 @@ import time
 import click
 import pkg_resources
 
-
-# from click_plugins import with_plugins
+from ..msnoise_table_def import declare_tables
+from ..api import update_station
 
 
 @click.group()
@@ -382,8 +382,8 @@ def populate(fromda):
     """Rapidly scan the archive filenames and find Network/Stations"""
     if fromda:
         logging.info("Overriding workflow...")
-        from ..msnoise_table_def import DataAvailability
-        from ..api import update_station
+        sqlschema = declare_tables()
+        DataAvailability = sqlschema.DataAvailability
         db = connect()
         stations = db.query(DataAvailability.net, DataAvailability.sta). \
             group_by(DataAvailability.net, DataAvailability.sta)
