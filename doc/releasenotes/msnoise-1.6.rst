@@ -3,7 +3,7 @@
 MSNoise 1.6
 ===========
 
-Release date: XX June 2018
+Release date: XX October 2018
 
 
 Release type: major
@@ -24,6 +24,13 @@ massive amount of work since the last one: in `GitHub numbers
 , it's over TODO commits and over TODO lines of code and documentation changed
 or added!
 
+*October is also a very special month for MSNoise, as it has been 8 years since 
+Corentin contacted Florent and that I immediately started working 
+on this package. 2010-2018. Height years. Wow. MSNoise has now a few thousand 
+lines of code and more than 100 pages of documentation, it is widely used and
+scientists around the globe use it and even make super cool publications out 
+of their results! So proud!* 
+
 
 MSNoise 1.6 introduces a series of **new features** :
 
@@ -37,30 +44,17 @@ MSNoise 1.6 introduces a series of **new features** :
 
 .. todo
 
-
-
-This version has benefited from outputs/ideas/pull requests/questions from
-several users/friends (listed alphabetically):
-
-# TODO
-
-* Raphael De Plaen
-* Clare Donaldson
-* Robert Green
-* Aurelien Mordret
-* Lukas Preiswerk
-* The participants to the NERC MSNoise Liverpool Workshop in January 2017
-* all others (don't be mad :-) )
-
+As always, this version has benefited from outputs/ideas/pull 
+requests/questions from several users/friends.
 
 Thanks to all for using MSNoise, and please, let us know why/how you use it
 (and please cite it!)!
 
-To date, we found/are aware of 48 publications using MSNoise ! That's the best
-validation of our project ever and it has doubled since last year !! 
+To date, we found/are aware of 54 publications using MSNoise! That's the best
+validation of our project ever and it has doubled since last release!! 
 
 
-*Thomas and friends...*
+*Thomas*
 
 
 ~~~~
@@ -76,7 +70,7 @@ for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
 Requirements
 ------------
 
-This version will be the last to be tested on and support Python 2.7. The EOL
+This version will be the last to be tested on Python 2.7. The EOL
 (end of life) of 2.7 is 2020, which means it is high time for users to migrate.
 For users having a complete set of tools in Python 2.7 and not keen to move 
 to 3.x soon, the incredible easiness of creating a Python 3.x environment in 
@@ -93,15 +87,6 @@ performance gets better and better (especially since Anaconda Inc. released
 its fast MKL implementations for all users, in the conda-forge channel). 
 
 
-Web-based Admin Interface Changes
----------------------------------
-
-* Feature: The pagination size (100, 200, etc. row) is now allowed on the
-  Station, Job and DataAvailability views.
-* Feature: The Config list view can be sorted by name.
-* Feature: The home page has changed to show all job types and exposes 
-  buttons to execute actions equivalent to `msnoise reset` in the console.
-
 
 Configuration Parameters
 ------------------------
@@ -111,22 +96,6 @@ Configuration Parameters
   next jobtype according to the workflow is not created. This removes a lot 
   of select/update/insert actions on the database and makes the whole much 
   faster (See hpc_).
-
-
-Top level DB command
---------------------
-
-I've added a new command group called `db` that gathers all db-related actions:
-
-* ``msnoise db init`` is a replacement for the ``msnoise install``
-* ``msnoise db upgrade`` is a replacement for the ``msnoise upgrade_db``
-* ``msnoise db clean_duplicates`` deletes duplicate jobs (might happen). Unique
-  sets of ``day``, ``pair`` and ``jobtypes`` are considered.
-* ``msnoise db execute`` allows executing queries on the database (Expert Mode)
-
-In the future, this command will include the possibility to dump and load 
-entire databases, for example for switching from a local sqlite instance to a 
-large MySQL server.
 
 
 Workflow changes
@@ -149,12 +118,6 @@ that "mov stacks" can be done.
 TODO:: Note that calling ``msnoise stack -r -m`` will 
 execute the steps in the right order.
 
-
-Expert/Lazy mode
-~~~~~~~~~~~~~~~~
-
-* Added the possibility to walk in subfolders recursively by using 
-  ``scan_archive --path -r``
 
 
 Preprocessing and Cross-Correlation
@@ -196,14 +159,28 @@ Command Line changes
 --------------------
 
 
-* ``msnoise db`` a new top-level group command for gathering the db-related 
-  commands.
-* ``msnoise db clean_duplicates`` allows to remove duplicates from the jobs 
-  table.
-* ``msnoise scan_archive --path -r`` will only scan the ``path`` 
-independently of its structure. Passing the ``-r`` it will walk in subfolders.
-* ``msnoise info -j`` reports all jobs types, including those of plugins.
+Top level DB command
+~~~~~~~~~~~~~~~~~~~~
 
+I've added a new command group called `db` that gathers all db-related actions:
+
+* ``msnoise db init`` is a replacement for the ``msnoise install``
+* ``msnoise db upgrade`` is a replacement for the ``msnoise upgrade_db``
+* ``msnoise db clean_duplicates`` deletes duplicate jobs (might happen). Unique
+  sets of ``day``, ``pair`` and ``jobtypes`` are considered.
+* ``msnoise db execute`` allows executing SQL queries on the database (Expert 
+  Mode)
+
+In the future, this command will include the possibility to dump and load 
+entire databases, for example for switching from a local sqlite instance to a 
+large MySQL server.
+
+Other changes
+~~~~~~~~~~~~~
+
+* ``msnoise info -j`` reports all jobs types, including those of plugins.
+* Added the possibility to walk in subfolders recursively by using 
+  ``scan_archive --path -r``
 
 Note, all commands are documented: :doc:`../clickhelp/msnoise`.
 
@@ -221,7 +198,7 @@ API Changes
 * New ``massive_update_job`` to update a list of ``Jobs`` to a given flag.
 * ``build_ref_datelist`` and ``build_movstack_datelist`` return the smallest 
   date from the data_availability table if the ``ref_begin`` or ``startdate``
-  have not been modified from ``1970-01-01``.
+  have not been modified from their default value of ``1970-01-01``.
 * Removed ``linear_regression`` as this is now included in ObsPy.
 * Modified ``get_dtt_next_job`` returns jobs in random order.
 * Added missing documentation for several methods.
@@ -229,25 +206,8 @@ API Changes
 See :doc:`../api`.
 
 
-Other Bugfixes TODO
---------------
-
-* Removed the call to ``scipy.stats.nanmean`` and replaced by ``numpy.nanmean``
-* Better error message in compute_cc when the content of the slice is only zeros
-  or smaller than ``rms_threshold``
-* Checked all "integer" - "float" warnings from numpy/scipy
-* crondays were hardcoded to -2, now taking the ``crondays`` value from the DB
-* Py3 error when ``msnoise scan_archive`` in cron mode
-
-
-Plot Updates TODO
-------------
-Not sure we did modify something here
-
-See :doc:`../plotting`.
-
-Performance and Code improvements TODO
---------------------------------------
+Performance and Code improvements
+---------------------------------
 
 .. _hpc:
 
@@ -267,7 +227,7 @@ created. This removes a lot of select/update/insert actions on the database
 and makes the whole much faster (one INSERT instead of tons of 
 SELECT/UPDATE/INSERT).
 
-Commands and actions with ``hpc`` = N :
+*Commands and actions with ``hpc`` = N :
 
 * ``msnoise new_jobs``: creates the CC jobs
 * ``msnoise compute_cc``: processes the CC jobs and creates the STACK jobs
@@ -286,10 +246,11 @@ Commands and actions with ``hpc`` = Y :
 
 Comparison with MSNoise 1.2 as published in the SRL article:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In the SRL article, we computed the dv/v for the UnderVolc project on a 4vCPU
-virtual machine running on a powerfull ESX system. For this test, I analyzed 
-the same dataset on a 4 year-old 16 CPU blade. The timings mentionned below 
-are then multiplied by 4 to account for the CPU number difference.
+In the 2014 SRL article, we computed the dv/v for the UnderVolc project on a 
+4vCPU virtual machine running on a powerful ESX system. For this test, I 
+analyzed the same data set on a 4 year-old 16 CPU blade. The timings 
+mentioned below are then multiplied by 4 to account for the CPU number 
+difference.
 
 Summing the total time needed, we reach 37 hours for the SRL version, and 12 
 hours for MSNoise 1.6. The seedup is not fully linear, as the current code 
@@ -333,11 +294,42 @@ Next steps of improving this workflow will be:
 **If anyone feels like focusing on those aspects and providing Pull Requests, 
 welcome!**
 
-Documentation TODO
+
+Other changes
 -------------
+
+Web-based Admin Interface Changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Feature: The pagination size (100, 200, etc. row) is now allowed on the
+  Station, Job and DataAvailability views.
+* Feature: The Config list view can be sorted by name.
+* Feature: The home page has changed to show all job types and exposes 
+  buttons to execute actions equivalent to `msnoise reset` in the console.
+
+Other Bugfixes TODO
+~~~~~~~~~~~~~~~~~~~
+
+* Removed the call to ``scipy.stats.nanmean`` and replaced by ``numpy.nanmean``
+* Better error message in compute_cc when the content of the slice is only zeros
+  or smaller than ``rms_threshold``
+* Checked all "integer" - "float" warnings from numpy/scipy
+* crondays were hardcoded to -2, now taking the ``crondays`` value from the DB
+* Py3 error when ``msnoise scan_archive`` in cron mode
+
+
+Plot Updates TODO
+~~~~~~~~~~~~~~~~~
+Not sure we did modify something here
+
+See :doc:`../plotting`.
+
+Documentation TODO
+~~~~~~~~~~~~~~~~~~
 
 * New elements for configuring MySQL and MariaDB, thanks to Lukas Preiswerk.
 * The description of the new steps and the HPC mode.
+
 
 
 Upgrading an existing project to MSNoise 1.6

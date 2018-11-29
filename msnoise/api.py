@@ -32,11 +32,6 @@ from obspy.geodetics import gps2dist_azimuth
 
 from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
-# TODO do we really need this here?
-plugin_tables = {}
-for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.table_def'):
-    plugin_tables[ep.name] = ep.load()
-
 
 def get_tech():
     """Returns the current DB technology used (reads from the db.ini file)
@@ -175,7 +170,10 @@ def get_config(session, name=None, isbool=False, plugin=None):
     :returns: the value for `name` or a dict of all config values
     """
     if plugin:
-        table = plugin_tables["%sConfig"%plugin]
+        for ep in pkg_resources.iter_entry_points(
+                group='msnoise.plugins.table_def'):
+            if ep.name.replace("Config", "") == plugin:
+                table = ep.load()
     else:
         table = Config
     if name:
@@ -219,7 +217,10 @@ def update_config(session, name, value, plugin=None):
 
     """
     if plugin:
-        table = plugin_tables["%sConfig"%plugin]
+        for ep in pkg_resources.iter_entry_points(
+                group='msnoise.plugins.table_def'):
+            if ep.name.replace("Config", "") == plugin:
+                table = ep.load()
     else:
         table = Config
     config = session.query(table).filter(table.name == name).first()

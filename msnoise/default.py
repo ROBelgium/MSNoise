@@ -56,7 +56,11 @@ default['cc_type'] = ["Cross-Correlation type [CC]/PCC/DECONV", 'CC']
 # TODO add cc_type_SC, cc_type_CC, cc_type_AC ?
 
 default['components_to_compute_single_station'] = ["List (comma separated) of components within a single station. ZZ would  be the autocorrelation of Z component, while ZE or ZN are the cross-components. Defaults to [], no single-station computations are done.", '']
-default['cc_type_single_station'] = ["Cross-Correlation type [CC]/PCC/DECONV", 'CC']
+default['cc_type_single_station_AC'] = ["Auto-Correlation type ["
+                                      "CC]/PCC/DECONV", 'CC']
+default['cc_type_single_station_SC'] = ["Cross-Correlation type for "
+                                        "Cross-Components ["
+                                      "CC]/PCC/DECONV", 'CC']
 
 default['autocorr'] = ["DEPRECATED, add the components to compute on single "
                        "stations in the "

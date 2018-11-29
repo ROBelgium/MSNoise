@@ -332,19 +332,20 @@ def main():
             thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
 
             # Standard operator for CC
-            pair_index = []
+            cc_index = []
             if len(params.components_to_compute):
                 for sta1, sta2 in itertools.combinations(names, 2):
                     n1, s1, l1, c1 = sta1
                     n2, s2, l2, c2 = sta2
                     comp = "%s%s" % (c1[-1], c2[-1])
                     if comp in params.components_to_compute:
-                        pair_index.append(
+                        cc_index.append(
                             ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
                              names.index(sta1), names.index(sta2)])
 
             # Different iterator func for single station AC or SC:
-            single_station_pair_index = []
+            single_station_pair_index_sc = []
+            single_station_pair_index_ac = []
             #TODO here, select AC and SC and then assign them to one or the 
             # other processing, depending on their cc_type
             if len(params.components_to_compute_single_station):
@@ -357,26 +358,31 @@ def main():
                     comp = "%s%s" % (c1[-1], c2[-1])
                     if comp in params.components_to_compute_single_station:
                         if c1[-1] == c2[-1]:
-                            single_station_pair_index.append(
+                            single_station_pair_index_ac.append(
                                 ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
                                  names.index(sta1), names.index(sta2)])
                         else:
                         # If the components are different, we can just
                         # process them using the default CC code (should warn)
-                            pair_index.append(
+                            single_station_pair_index_sc.append(
                                 ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
                                  names.index(sta1), names.index(sta2)])
                     if comp[::-1] in params.components_to_compute_single_station:
                         if c1[-1] != c2[-1]:
                             # If the components are different, we can just
                             # process them using the default CC code (should warn)
-                            pair_index.append(
+                            single_station_pair_index_sc.append(
                                 ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, 
                                                      comp[::-1]),
                                  names.index(sta2), names.index(sta1)])
 
-            print("pair_index", pair_index)
-            print("single_station", single_station_pair_index)
+            print("cc_index", cc_index)
+            print("single_station sc", single_station_pair_index_sc)
+            print("single_station ac", single_station_pair_index_ac)
+            
+            # TODO : handle the three different corrs: CC SC and AC
+            # TODO : and handle the fact they could use the same processing 
+            # TODO : or not
             
             for filterdb in filters:
                 filterid = filterdb.ref
@@ -395,7 +401,7 @@ def main():
                     high = int(nfft // 2)
 
                 # First let's compute the AC and SC
-                if len(single_station_pair_index):
+                if len(single_station_pair_index_ac):
                     corr = {}
                     tmp = data.copy()
                     for i, _ in enumerate(tmp):
@@ -416,7 +422,7 @@ def main():
                         corr = myCorr2(ffts,
                                        np.ceil(params.maxlag / dt),
                                        energy,
-                                       single_station_pair_index,
+                                       single_station_pair_index_ac,
                                        plot=False,
                                        nfft=nfft)
 
@@ -424,7 +430,7 @@ def main():
                         logging.debug(
                             "Compute AC and SC using %s" % params.cc_type_single_station)
                         corr = pcc_xcorr(tmp, np.ceil(params.maxlag / dt),
-                                         None, single_station_pair_index)
+                                         None, single_station_pair_index_ac)
                     else:
                         print("cc_type_single_station = %s not implemented, "
                               "exiting")
@@ -437,7 +443,7 @@ def main():
                         allcorr[ccfid][thistime] = corr[key]
                     del corr
                 
-                if len(pair_index):
+                if len(cc_index):
                     if params.cc_type == "CC":
                         logging.debug("Compute CC using %s" % params.cc_type)
                         ffts = scipy.fftpack.fftn(data, shape=[nfft, ], axes=[1, ])
@@ -451,7 +457,7 @@ def main():
                         corr = myCorr2(ffts,
                                        np.ceil(params.maxlag / dt),
                                        energy,
-                                       pair_index,
+                                       cc_index,
                                        plot=False,
                                        nfft=nfft)
                         

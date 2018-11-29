@@ -6,33 +6,33 @@ MWCS calculations.
 Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-* |params.dtt_lag|
-* |params.dtt_v|
-* |params.dtt_minlag|
-* |params.dtt_width|
-* |params.dtt_sides|
-* |dtt_params.dtt_mincoh|
-* |dtt_params.dtt_maxerr|
-* |dtt_params.dtt_maxdt|
+* |dtt_lag|
+* |dtt_v|
+* |dtt_minlag|
+* |dtt_width|
+* |dtt_sides|
+* |dtt_mincoh|
+* |dtt_maxerr|
+* |dtt_maxdt|
 
 The dt/t is determined as the slope of the delays vs time lags. The slope is
 calculated a weighted linear regression (WLS) through selected points.
 
 1. The selection of points is first based on the time lag criteria.
 The minimum time lag can either be defined absolutely or dynamically.
-When ``params.dtt_lag`` is set to "dynamic" in the database, the inter-station distance
+When ``dtt_lag`` is set to "dynamic" in the database, the inter-station distance
 is used to determine the minimum time lag. This lag is calculated from the
-distance and a velocity configured (``params.dtt_v``). The velocity is determined by
+distance and a velocity configured (``dtt_v``). The velocity is determined by
 the user so that the minlag doesn't include the ballistic waves. For example,
 if ballistic waves are visible with a velocity of 2 km/s, one could configure
-params.dtt_v=1.0.
+dtt_v=1.0.
 This way, if stations are located 15 km apart, the minimum lag time will be
-set to 15 s. The ``params.dtt_width`` determines the width of the lag window used. A
+set to 15 s. The ``dtt_width`` determines the width of the lag window used. A
 value of 30.0 means the process will use time lags between 15 and 45 s in the
-example above, on both sides if configured (``params.dtt_sides``), or only causal or
+example above, on both sides if configured (``dtt_sides``), or only causal or
 acausal parts of the CCF. The following figure shows the static time lags of
-``params.dtt_width`` = 40s starting at ``params.dtt_minlag`` = 10s and the dynamic time lags
-for a ``params.dtt_v`` = 1.0 km/s for the Piton de La Fournaise network (including
+``dtt_width`` = 40s starting at ``dtt_minlag`` = 10s and the dynamic time lags
+for a ``dtt_v`` = 1.0 km/s for the Piton de La Fournaise network (including
 stations *not* on the volcano),
 
 .. note:: It seems obvious that these parameters are frequency-dependent, but
@@ -48,8 +48,8 @@ stations *not* on the volcano),
 
 2. Using example values above, we chose to use only 15-45 s coda part of the
 signal, neglecting direct waves in the 0-15 seconds range. We then select data
-which match three other thresholds: ``dtt_params.dtt_mincoh``, ``dtt_params.dtt_maxerr`` and
-``dtt_params.dtt_maxdt``.
+which match three other thresholds: ``dtt_mincoh``, ``dtt_maxerr`` and
+``dtt_maxdt``.
 
 .. image:: ../.static/Figure04_dttmatrix_01_005DAYS_ZZ-2010-10-12_cmyk.png
 

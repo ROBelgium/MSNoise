@@ -71,6 +71,7 @@ def test(prefix):
 @click.command()
 @click.option('-p', '--port', default=5000, help='Port to open')
 def admin(port):
+    """Starts the Web Admin on http://localhost:5000 by default"""
     from ..msnoise_admin import main
     main(port)
 
@@ -647,7 +648,7 @@ def reset(jobtype, all, rule):
 
 @click.command()
 def jupyter():
-    """Launches an ipython notebook in the current folder"""
+    """Launches an jupyter notebook in the current folder"""
     os.system("jupyter notebook --ip 0.0.0.0 --no-browser")
 
 
