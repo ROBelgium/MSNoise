@@ -7,3 +7,10 @@ __maintainer__ = "Thomas LECOCQ"
 __email__ = "Thomas.Lecocq at seismology.be"
 __status__ = "Production"
 
+
+class MSNoiseError(Exception):
+    pass
+
+
+class DBConfigNotFoundError(MSNoiseError):
+    pass

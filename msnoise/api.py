@@ -3,7 +3,6 @@ import datetime
 import itertools
 import logging
 import os
-import sys
 import glob
 import traceback
 try:
@@ -30,6 +29,7 @@ from obspy import read_inventory
 from obspy.io.xseed import Parser
 from obspy.geodetics import gps2dist_azimuth
 
+from . import DBConfigNotFoundError
 from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
 
@@ -130,11 +130,12 @@ def read_database_inifile(inifile=None):
 
     try:
         f = open(inifile, 'rb')
-    except FileNotFoundError:
-        print("No db.ini file in this directory, please run "
-                     "'msnoise db init' in this folder to initialize it as "
-                     "an MSNoise project folder.")
-        sys.exit(1)
+    #except FileNotFoundError:  # This is better but only for python3
+    except IOError:
+        raise DBConfigNotFoundError(
+                "No db.ini file in this directory, please run "
+                "'msnoise db init' in this folder to initialize it as "
+                "an MSNoise project folder.")
     try:
         # New ini file with prefix support
         tech, hostname, database, username, password, prefix = cPickle.load(f)
