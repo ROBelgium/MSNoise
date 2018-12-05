@@ -50,8 +50,8 @@ def declare_tables(prefix=None):
         prefix = read_prefix()
 
     # Define the namedtuple to return
-    sqlschema = namedtuple('SQLSchema', ['Base', 'Filter', 'Job', 'Station',
-        'Config', 'DataAvailability'])
+    sqlschema = namedtuple('SQLSchema', ['Base', 'PrefixerBase', 'Filter',
+        'Job', 'Station', 'Config', 'DataAvailability'])
 
     # Create the SQLAlchemy base and subclass it to prefix the table names
     Base = declarative_base()
@@ -296,5 +296,11 @@ def declare_tables(prefix=None):
 
     ########################################################################
 
-    return sqlschema(Base, Filter, Job, Station, Config, DataAvailability)
+    return sqlschema(Base, PrefixerBase,
+                     Filter, Job, Station, Config, DataAvailability)
     # end of declare_tables()
+
+
+# These module objects only use the prefix defined in db.ini.
+# They should be re-defined if the prefix is to be changed.
+Base, PrefixerBase, Filter, Job, Station, Config, DataAvailability = declare_tables()

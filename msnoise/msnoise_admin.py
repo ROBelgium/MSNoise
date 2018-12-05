@@ -149,16 +149,7 @@ from flask_wtf import Form
 from .api import *
 from .default import default
 
-from .msnoise_table_def import declare_tables
-
-
-# Declare mapped tables
-sqlschema = declare_tables()
-Filter = sqlschema.Filter
-Job = sqlschema.Job
-Config = sqlschema.Config
-Station = sqlschema.Station
-DataAvailability = sqlschema.DataAvailability
+from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
 
 class GenericView(BaseView):

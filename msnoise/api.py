@@ -30,17 +30,7 @@ from obspy import read_inventory
 from obspy.io.xseed import Parser
 from obspy.geodetics import gps2dist_azimuth
 
-from .msnoise_table_def import declare_tables
-
-
-# Declare mapped tables
-sqlschema = declare_tables()
-Filter = sqlschema.Filter
-Job = sqlschema.Job
-Config = sqlschema.Config
-Station = sqlschema.Station
-DataAvailability = sqlschema.DataAvailability
-
+from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
 
 def get_tech():
