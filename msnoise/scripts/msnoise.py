@@ -7,8 +7,10 @@ import time
 import click
 import pkg_resources
 
+from .. import DBConfigNotFoundError
+from ..api import connect, get_config, update_station
 from ..msnoise_table_def import DataAvailability
-from ..api import update_station
+
 
 
 @click.group()
@@ -925,12 +927,10 @@ cli.add_command(test)
 cli.add_command(plot)
 
 try:
-    from ..api import connect, get_config
-
     db = connect()
     plugins = get_config(db, "plugins")
     db.close()
-except:
+except DBConfigNotFoundError:
     plugins = None
 
 if plugins:
@@ -946,4 +946,7 @@ cli.add_command(p)
 
 
 def run():
-    cli(obj={})
+    try:
+        cli(obj={})
+    except DBConfigNotFoundError as e:
+        logging.critical(str(e))
