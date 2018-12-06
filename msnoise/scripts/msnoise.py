@@ -305,20 +305,21 @@ def init(tech):
 
 
 @click.command()
-@click.option('-s', '--set', help='Modify config value: usage --set name=value')
+@click.option('-g', '--get', help='Read config value: usage --get name')
+@click.option('-s', '--set', 'set_', help='Modify config value: usage --set name=value')
 @click.option('-S', '--sync', is_flag=True, help='Sync station metadata from'
                                                  ' inventory/dataless')
-def config(set, sync):
+def config(get, set_, sync):
     """This command should now only be used to use the command line to set
-    a parameter value in the data base. It used to launch the Configurator but
-    the recommended way to configure MSNoise is to use the "msnoise admin" web
-    interface."""
-    if set:
+    a parameter value in the database or get its value. It used to launch the
+    Configurator but the recommended way to configure MSNoise is to use the
+    "msnoise admin" web interface."""
+    if set_:
         from ..default import default
-        if not set.count("="):
+        if not set_.count("="):
             click.echo("!! format of the set command is name=value !!")
             return
-        name, value = set.split("=")
+        name, value = set_.split("=")
         if name not in default:
             click.echo("!! unknown parameter %s !!" % name)
             return
@@ -328,6 +329,16 @@ def config(set, sync):
         db.commit()
         db.close()
         click.echo("Successfully updated parameter %s = %s" % (name, value))
+    elif get:
+        from ..default import default
+        if get not in default:
+            click.echo("!! unknown parameter %s !!" % get)
+            return
+        from ..api import connect, get_config
+        db = connect()
+        value = get_config(db, get)
+        db.close()
+        click.echo("Parameter configuration for %s = %s" % (get, value))
     elif sync:
         import glob
         from ..api import connect, get_config, get_stations, update_station,\
