@@ -304,57 +304,107 @@ def init(tech):
     main(tech)
 
 
-@click.command()
-@click.option('-s', '--set', help='Modify config value: usage --set name=value')
-@click.option('-S', '--sync', is_flag=True, help='Sync station metadata from'
-                                                 ' inventory/dataless')
-def config(set, sync):
-    """This command should now only be used to use the command line to set
-    a parameter value in the data base. It used to launch the Configurator but
-    the recommended way to configure MSNoise is to use the "msnoise admin" web
-    interface."""
-    if set:
-        from ..default import default
-        if not set.count("="):
-            click.echo("!! format of the set command is name=value !!")
-            return
-        name, value = set.split("=")
+@click.group()
+def config():
+    """
+    This command allows to set a parameter value in the database, show
+    parameter values, or synchronise station metadata, depending on the
+    invoked subcommands.
+
+    Called without argument, it used to launch the Configurator (now
+    accessible using 'msnoise config gui') but the recommended way to
+    configure MSNoise is now to use the web interface through the command
+    'msnoise admin'.
+    """
+    pass
+
+
+@click.command(name='gui')
+def config_gui():
+    """
+    Run the deprecated configuration GUI tool.  Please use the configuration
+    web interface using 'msnoise admin' instead.
+    """
+    from ..s001configurator import main
+    click.echo("Let's Configure MSNoise !")
+    main()
+
+
+@click.command(name='sync')
+def config_sync():
+    """
+    Synchronise station metadata from inventory/dataless.
+    """
+    import glob
+    from ..api import connect, get_config, get_stations, update_station,\
+        preload_instrument_responses
+
+    db = connect()
+    responses = preload_instrument_responses(db)
+    netsta = []
+    for id, row in responses.iterrows():
+        net, sta, loc, chan = row["channel_id"].split(".")
+        netsta.append("%s.%s"%(net,sta))
+    responses["netsta"] = netsta
+
+    for station in get_stations(db):
+        id = "%s.%s" % (station.net, station.sta)
+        coords = responses[responses["netsta"] == id]
+        lon = float(coords["longitude"].values[0])
+        lat = float(coords["latitude"].values[0])
+        update_station(db, station.net, station.sta, lon, lat, 0, "DEG", )
+        logging.info("Added coordinates (%.5f %.5f) for station %s.%s" %
+                    (lon, lat, station.net, station.sta))
+    db.close()
+
+
+@click.command(name='set')
+@click.argument('name_value')
+def config_set(name_value):
+    """
+    Set a configuration value. The argument should be of the form
+    'variable=value'.
+    """
+    from ..default import default
+    if not name_value.count("="):
+        click.echo("!! format of the set command is name=value !!")
+        return
+    name, value = name_value.split("=")
+    if name not in default:
+        click.echo("!! unknown parameter %s !!" % name)
+        return
+    from ..api import connect, update_config
+    db = connect()
+    update_config(db, name, value)
+    db.commit()
+    db.close()
+    click.echo("Successfully updated parameter %s = %s" % (name, value))
+
+
+@click.command(name='show')
+@click.argument('names', nargs=-1, required=False)
+def config_show(names):
+    """
+    Display the value of the given configuration variable(s). If no variable
+    name is provided, show the value of all variables in the current project
+    configuration.
+    """
+    from ..default import default
+    from ..api import connect, get_config
+    db = connect()
+    if not names:
+        # No variable names are provided: show all existing variables
+        names = default.keys()
+    for name in names:
         if name not in default:
-            click.echo("!! unknown parameter %s !!" % name)
-            return
-        from ..api import connect, update_config
-        db = connect()
-        update_config(db, name, value)
-        db.commit()
-        db.close()
-        click.echo("Successfully updated parameter %s = %s" % (name, value))
-    elif sync:
-        import glob
-        from ..api import connect, get_config, get_stations, update_station,\
-            preload_instrument_responses
-
-        db = connect()
-        responses = preload_instrument_responses(db)
-        netsta = []
-        for id, row in responses.iterrows():
-            net, sta, loc, chan = row["channel_id"].split(".")
-            netsta.append("%s.%s"%(net,sta))
-        responses["netsta"] = netsta
-
-        for station in get_stations(db):
-            id = "%s.%s" % (station.net, station.sta)
-            coords = responses[responses["netsta"] == id]
-            lon = float(coords["longitude"].values[0])
-            lat = float(coords["latitude"].values[0])
-            update_station(db, station.net, station.sta, lon, lat, 0, "DEG", )
-            logging.info("Added coordinates (%.5f %.5f) for station %s.%s" %
-                        (lon, lat, station.net, station.sta))
-        db.close()
-
-    else:
-        from ..s001configurator import main
-        click.echo('Let\'s Configure MSNoise !')
-        main()
+            click.echo("'%s': unknown configuration parameter" % name)
+            continue
+        value = get_config(db, name)
+        if value == '':
+            # Use a more explicit representation of the empty string
+            value = "''"
+        click.echo('%s = %s' % (name, value))
+    db.close()
 
 
 @click.command()
@@ -899,6 +949,12 @@ plot.add_command(distance)
 plot.add_command(station_map)
 plot.add_command(timing)
 plot.add_command(dtt)
+
+# Add config subcommands to the config group:
+config.add_command(config_gui)
+config.add_command(config_sync)
+config.add_command(config_set)
+config.add_command(config_show)
 
 # Add all commands to the cli group:
 cli.add_command(info)
