@@ -2,6 +2,7 @@ import traceback
 import logging
 import os
 import sys
+import sqlalchemy
 import time
 
 import click
@@ -932,6 +933,9 @@ try:
     db.close()
 except DBConfigNotFoundError:
     plugins = None
+except sqlalchemy.exc.OperationalError as e:
+    logging.critical('Unable to read project configuration: error connecting to the database:\n{}'.format(str(e)))
+    sys.exit(1)
 
 if plugins:
     plugins = plugins.split(",")
