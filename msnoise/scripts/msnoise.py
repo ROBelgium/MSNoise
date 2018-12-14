@@ -13,6 +13,19 @@ from ..api import connect, get_config, update_station, get_logger
 from ..msnoise_table_def import DataAvailability
 
 
+def validate_verbosity(ctx, param, value):
+    """
+    Validate the --quiet and --verbose options to have it conflict with one
+    another.
+    """
+    if param.name == 'quiet':
+        excluded = 'verbose'
+    elif param.name == 'verbose':
+        excluded = 'quiet'
+    if value and excluded in ctx.params:
+        raise click.BadParameter('Cannot use both --quiet and --verbose option.')
+    return value
+
 
 @click.group()
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
@@ -22,17 +35,17 @@ from ..msnoise_table_def import DataAvailability
                     'the next thread. Defaults to [1] second ')
 @click.option('-c', '--custom', default=False, is_flag=True, help='Use custom \
  file for plots. To use this, copy the plot script here and edit it.')
-@click.option('-v', '--verbose', count=True)
+@click.option('-v', '--verbose', is_flag=True, callback=validate_verbosity)
+@click.option('-q', '--quiet', is_flag=True, callback=validate_verbosity)
 @click.pass_context
-def cli(ctx, threads, delay, custom, verbose):
+def cli(ctx, threads, delay, custom, verbose, quiet):
     ctx.obj['MSNOISE_threads'] = threads
     ctx.obj['MSNOISE_threadsdelay'] = delay
     ctx.obj['MSNOISE_custom'] = custom
-    if verbose == 0:
+    ctx.obj['MSNOISE_verbosity'] = "INFO"
+    if quiet:
         ctx.obj['MSNOISE_verbosity'] = "WARNING"
-    elif verbose == 1:
-        ctx.obj['MSNOISE_verbosity'] = "INFO"
-    elif verbose > 1:
+    elif verbose:
         ctx.obj['MSNOISE_verbosity'] = "DEBUG"
     logger = get_logger('msnoise', ctx.obj['MSNOISE_verbosity'])
     # Is this really needed?
