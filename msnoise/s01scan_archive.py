@@ -445,7 +445,8 @@ def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
         await_children(pool, children)
 
 
-def main(init=False, threads=1, forced_path=None, forced_path_recursive=True):
+def main(init=False, threads=1, crondays=None, forced_path=None,
+         forced_path_recursive=True):
     """
     Update data availibility information from modified miniseed files.
 
@@ -456,6 +457,9 @@ def main(init=False, threads=1, forced_path=None, forced_path_recursive=True):
         time (if not None, crondays is ignored).
     :param threads: the maximum number of threads/processes to use while
         scanning the files.
+    :para crondays: scan only files modified in crondays number of days in the
+        past (according to the file's modification time); if None, read its
+        value from the configuration.
     :para forced_path: scan files from this path instead of the configured
         archive path.
     :para forced_path_recursive: whether to also scan files from subdirectories
@@ -476,7 +480,12 @@ def main(init=False, threads=1, forced_path=None, forced_path_recursive=True):
         logger.info('Initializing: updating availability using the whole'
                     ' archive (should be run only once)')
     else:
-        crondays = int(api.get_config(db, 'crondays'))
+        if crondays is None:
+            crondays = int(api.get_config(db, 'crondays'))
+        # Convert negative values to positive ones for backward compatibility
+        # with msnoise < 1.6.
+        if crondays < 0:
+            crondays = -crondays
         logger.info('Updating availability: scanning the archive for files'
                     ' modified %d days ago or less.' % crondays)
 
@@ -495,7 +504,7 @@ def main(init=False, threads=1, forced_path=None, forced_path_recursive=True):
         # does not work correctly with naive datetime representing UTC.
         # (See the official doc for datetime.timestamp())
         mintime = (datetime.datetime.utcnow()
-                   + datetime.timedelta(days=crondays)
+                   - datetime.timedelta(days=crondays)
                    - datetime.datetime(1970, 1, 1, 0, 0)).total_seconds()
 
     if forced_path is None:

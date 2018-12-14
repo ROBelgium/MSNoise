@@ -451,8 +451,11 @@ def populate(fromda):
                               ' default workflow step.')
 @click.option('-r', '--recursively', is_flag=True,
               help='When scanning a path, walk subfolders automatically ?')
+@click.option('--crondays', type=int,
+              help='Number of days to monitor with cron. Must be a negative'
+                   " number (Override the 'crondays' configuration value).")
 @click.pass_context
-def scan_archive(ctx, init, path, recursively):
+def scan_archive(ctx, init, crondays, path, recursively):
     """Scan the archive and insert into the Data Availability table."""
     from .. import s01scan_archive
     nthreads = ctx.obj['MSNOISE_threads']
@@ -463,9 +466,9 @@ def scan_archive(ctx, init, path, recursively):
         logging.info('Overriding workflow: only scanning path'
                      ' %s (%srecursively)'
                      % (path, '' if recursively else 'non-'))
-        s01scan_archive.main(init, nthreads, path, recursively)
+        s01scan_archive.main(init, nthreads, crondays, path, recursively)
     else:
-        s01scan_archive.main(init, nthreads)
+        s01scan_archive.main(init, nthreads, crondays)
 
 
 @cli.command(name='new_jobs')
