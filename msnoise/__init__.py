@@ -11,6 +11,8 @@ __status__ = "Production"
 class MSNoiseError(Exception):
     pass
 
-
 class DBConfigNotFoundError(MSNoiseError):
+    pass
+
+class FatalError(MSNoiseError):
     pass

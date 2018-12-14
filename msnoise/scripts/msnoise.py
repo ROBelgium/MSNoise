@@ -8,8 +8,8 @@ import time
 import click
 import pkg_resources
 
-from .. import DBConfigNotFoundError
-from ..api import connect, get_config, update_station
+from .. import MSNoiseError, DBConfigNotFoundError
+from ..api import connect, get_config, update_station, get_logger
 from ..msnoise_table_def import DataAvailability
 
 
@@ -22,29 +22,21 @@ from ..msnoise_table_def import DataAvailability
                     'the next thread. Defaults to [1] second ')
 @click.option('-c', '--custom', default=False, is_flag=True, help='Use custom \
  file for plots. To use this, copy the plot script here and edit it.')
-@click.option('-v', '--verbose', default=2, count=True)
+@click.option('-v', '--verbose', count=True)
 @click.pass_context
 def cli(ctx, threads, delay, custom, verbose):
-    import logging
-    logger = logging.getLogger('matplotlib')
-    # set WARNING for Matplotlib
-    logger.setLevel(logging.CRITICAL)
-
     ctx.obj['MSNOISE_threads'] = threads
     ctx.obj['MSNOISE_threadsdelay'] = delay
+    ctx.obj['MSNOISE_custom'] = custom
     if verbose == 0:
         ctx.obj['MSNOISE_verbosity'] = "WARNING"
     elif verbose == 1:
         ctx.obj['MSNOISE_verbosity'] = "INFO"
     elif verbose > 1:
         ctx.obj['MSNOISE_verbosity'] = "DEBUG"
-    logging.basicConfig(level=ctx.obj['MSNOISE_verbosity'],
-                        format='%(asctime)s [%(levelname)s] %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
+    logger = get_logger('msnoise', ctx.obj['MSNOISE_verbosity'])
+    # Is this really needed?
     sys.path.append(os.getcwd())
-    ctx.obj['MSNOISE_custom'] = custom
-
-    pass
 
 
 # @with_plugins(iter_entry_points('msnoise.plugins'))
@@ -209,7 +201,7 @@ def info(jobs):
 
         click.echo('MSNoise is installed in: %s'
                    % d(d(d(os.path.abspath(__file__)))))
-        
+
         if os.path.isfile('db.ini'):
             click.echo(' - db.ini is present')
         else:
@@ -217,7 +209,7 @@ def info(jobs):
                         fg='red')
             return
         click.echo('')
-        
+
         click.echo('')
         click.echo('Configuration:')
 
@@ -462,30 +454,18 @@ def populate(fromda):
 @click.pass_context
 def scan_archive(ctx, init, path, recursively):
     """Scan the archive and insert into the Data Availability table."""
+    from .. import s01scan_archive
+    nthreads = ctx.obj['MSNOISE_threads']
     if path:
-        logging.info("Overriding workflow...")
-        from obspy import UTCDateTime
-        from ..s01scan_archive import worker
-        db = connect()
-        startdate = UTCDateTime(get_config(db, "startdate"))
-        enddate = UTCDateTime(get_config(db, "enddate"))
-        cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-        network = get_config(db, 'network')
-        db.close()
-        if recursively:
-            for root, dirs, _ in os.walk(path):
-                for d in dirs:
-                    tmppath = os.path.join(root, d)
-                    _ = os.listdir(tmppath)
-                    if not len(_):
-                        continue
-                    worker(sorted(_), tmppath, startdate, enddate,
-                           cc_sampling_rate, init=True, network=network)
-        worker(sorted(os.listdir(path)), path, startdate, enddate,
-               cc_sampling_rate, init=True, network=network)
+        if not os.path.isdir(path):
+            logging.critical('Cannot scan from %s: not such directory.' % path)
+            sys.exit(1)
+        logging.info('Overriding workflow: only scanning path'
+                     ' %s (%srecursively)'
+                     % (path, '' if recursively else 'non-'))
+        s01scan_archive.main(init, nthreads, path, recursively)
     else:
-        from ..s01scan_archive import main
-        main(init, threads=ctx.obj['MSNOISE_threads'])
+        s01scan_archive.main(init, nthreads)
 
 
 @cli.command(name='new_jobs')
@@ -961,5 +941,5 @@ if plugins:
 def run():
     try:
         cli(obj={})
-    except DBConfigNotFoundError as e:
+    except MSNoiseError as e:
         logging.critical(str(e))
