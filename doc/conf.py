@@ -82,11 +82,14 @@ out = open('clickhelp/msnoise.rst', 'w')
 out.write('Help on the msnoise commands\n')
 out.write('============================\n\n')
 out.write('This page shows all the command line interface commands\n\n')
-C = M.cli.commands
-for command in sorted(C):
-    group = ""
-    if hasattr(C[command], "group"):
-        group = command
+for command_name, command in sorted(M.cli.commands.items()):
+    try:
+        group = command.group
+    except AttributeError:
+        group = ''
+
+    if group:
+        group = command_name
         out.write("\n")
         out.write("\n")
         out.write("------------")
@@ -96,21 +99,18 @@ for command in sorted(C):
         out.write('%s\n'%fullgroup)
         out.write('-'*len(fullgroup)+'\n')
         out.write("\n")
-        if command in ["plugin", "p"]:
+        if command_name in ["plugin", "p"]:
             out.write(
                 "Will be automatically populated with the commands declared "
                 "by the plugins (`p` is an alias for `plugin`)\n\n")
             continue
-        CC = C[command].commands
-        for command in sorted(CC):
-            fullcommand = "msnoise %s %s" % (group, command)
-            out.write('%s\n'%fullcommand)
-            out.write('~'*len(fullcommand)+'\n')
-
-            c = click.Context(command=eval('M.%s'%(command)))
-            data = c.get_help()
-            out.write(write_click_help(group, command, data))
-            # out.write('.. include:: msnoise-%s-%s.rst\n\n'%(group,command))
+        for subcommand_name, subcommand in sorted(command.commands.items()):
+            fullcommand = "msnoise %s %s" % (group, subcommand_name)
+            out.write('%s\n' % fullcommand)
+            out.write('~' * len(fullcommand) + '\n')
+            help_text = click.Context(command=subcommand).get_help()
+            out.write(write_click_help(group, subcommand_name, help_text))
+            # out.write('.. include:: msnoise-%s-%s.rst\n\n' % (group, subcommand_name))
             out.write("\n\n")
         out.write("\n")
         out.write("\n")
@@ -119,13 +119,12 @@ for command in sorted(C):
         out.write("\n")
 
     else:
-        fullcommand = "msnoise %s" % command
-        out.write('%s\n'%fullcommand)
-        out.write('-'*len(fullcommand)+'\n')
-        c = click.Context(command=eval('M.%s'%command))
-        data = c.get_help()
-        out.write(write_click_help(group, command, data))
-        # out.write('.. include:: msnoise-%s.rst\n\n'%(command))
+        fullcommand = "msnoise %s" % command_name
+        out.write('%s\n' % fullcommand)
+        out.write('-' * len(fullcommand) + '\n')
+        help_text = click.Context(command=command).get_help()
+        out.write(write_click_help(group, command_name, help_text))
+        # out.write('.. include:: msnoise-%s.rst\n\n' % command_name)
         out.write("\n\n")
 out.close()
 
