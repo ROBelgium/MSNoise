@@ -403,3 +403,9 @@ texinfo_documents = [
 
 # How to display URL addresses: 'footnote', 'no', or 'inline'.
 #texinfo_show_urls = 'footnote'
+
+
+# Add our customized style sheet
+# See https://github.com/ryan-roemer/sphinx-bootstrap-theme
+def setup(app):
+    app.add_stylesheet('my-styles.css')
