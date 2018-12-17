@@ -20,6 +20,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
     to "Y" in the config and to provide the ``responses`` DataFrame.
 
     :Example:
+
     >>> from msnoise.api import connect, get_params, preload_instrument_responses
     >>> from msnoise.preprocessing import preprocess
     >>> db = connect()

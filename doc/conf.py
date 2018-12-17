@@ -114,9 +114,6 @@ for command_name, command in sorted(M.cli.commands.items()):
             out.write("\n\n")
         out.write("\n")
         out.write("\n")
-        out.write("------------")
-        out.write("\n")
-        out.write("\n")
 
     else:
         fullcommand = "msnoise %s" % command_name

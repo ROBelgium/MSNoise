@@ -131,7 +131,7 @@ Preprocessing
   faster too.
 
 Cross-Correlation TODO
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 * It is now possible to do the Cross-Correlation (classic "CC"), the Auto-
   Correlation ("AC") or the Cross-Components within the same station ("SC").
@@ -227,7 +227,7 @@ created. This removes a lot of select/update/insert actions on the database
 and makes the whole much faster (one INSERT instead of tons of 
 SELECT/UPDATE/INSERT).
 
-*Commands and actions with ``hpc`` = N :
+Commands and actions with ``hpc`` = N :
 
 * ``msnoise new_jobs``: creates the CC jobs
 * ``msnoise compute_cc``: processes the CC jobs and creates the STACK jobs
