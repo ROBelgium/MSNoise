@@ -69,7 +69,7 @@ help)
 On a routine basis, one should thus run the following to compute REF *and* MOV
 stacks:
 
-.. TODO:: finalize the difference between REF and MOV/STEP stacks.
+.. todo:: finalize the difference between REF and MOV/STEP stacks.
 
 .. code-block:: sh
 

@@ -150,6 +150,7 @@ extensions = ['sphinx.ext.intersphinx',
               'sphinx.ext.autodoc',
               'sphinx.ext.coverage',
               'sphinx.ext.mathjax',
+              'sphinx.ext.todo',
               'numpydoc',]
 math_number_all = False
 todo_include_todos = True
