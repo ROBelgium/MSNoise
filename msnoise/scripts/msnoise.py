@@ -76,7 +76,7 @@ def admin(port):
     main(port)
 
 
-@cli.command()
+@cli.command(name='upgrade-db')
 def upgrade_db():
     """DEPRECATED: since MSNoise 1.6, please use "msnoise db upgrade" instead"""
     click.echo(upgrade_db.__doc__)
@@ -89,7 +89,7 @@ def db():
     pass
 
 
-@db.command()
+@db.command(name='clean_duplicates')
 def clean_duplicates():
     """Checks the Jobs table and deletes duplicate entries"""
     from msnoise.api import connect, get_tech
@@ -450,7 +450,7 @@ def populate(fromda):
         main()
 
 
-@cli.command()
+@cli.command(name='scan_archive')
 @click.option('-i', '--init', is_flag=True, help='First run ?')
 @click.option('--path',  help='Scan all files in specific folder, overrides the'
                               ' default workflow step.')
@@ -485,7 +485,7 @@ def scan_archive(ctx, init, path, recursively):
         main(init, threads=ctx.obj['MSNOISE_threads'])
 
 
-@cli.command()
+@cli.command(name='new_jobs')
 @click.option('-i', '--init', is_flag=True, help='First run ? This disables '
                                                  'the check for existing jobs.')
 @click.option('--nocc', is_flag=True, default=False, help='Disable the creation'
@@ -508,7 +508,7 @@ def new_jobs(init, nocc, hpc=""):
         db.commit()
         db.close()
 
-@cli.command()
+@cli.command(name='compute_cc')
 @click.pass_context
 def compute_cc(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
@@ -528,7 +528,7 @@ def compute_cc(ctx):
         for p in processes:
             p.join()
 
-@cli.command()
+@cli.command(name='compute_cc2')
 @click.pass_context
 def compute_cc2(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
@@ -596,7 +596,7 @@ def stack(ctx, ref, mov, step):
             p.join()
 
 
-@cli.command()
+@cli.command(name='compute_mwcs')
 @click.pass_context
 def compute_mwcs(ctx):
     """Computes the MWCS based on the new stacked data"""
@@ -617,14 +617,14 @@ def compute_mwcs(ctx):
             p.join()
 
 
-@cli.command()
+@cli.command(name='compute_stretching')
 def compute_stretching():
     """[experimental] Computes the stretching based on the new stacked data"""
     from ..stretch import main
     main()
 
 
-@cli.command()
+@cli.command(name='compute_dtt')
 @click.pass_context
 @click.option('-i', '--interval', default=1.0, help='Number of days before now to\
  search for modified Jobs')
@@ -648,7 +648,7 @@ def compute_dtt(ctx, interval):
 
 
 
-@cli.command()
+@cli.command(name='compute_dvv')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
@@ -710,7 +710,7 @@ def plot():
     pass
 
 
-@plot.command()
+@plot.command(name='data_availability')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
@@ -892,7 +892,7 @@ def distance(ctx, filterid, comp, ampli, show, outfile, refilter,
     main(filterid, comp, ampli, show, outfile, refilter, virtual_source)
 
 
-@plot.command()
+@plot.command(name='station_map')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
