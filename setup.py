@@ -24,8 +24,8 @@ setup(version="1.5.1",
       ],
       extras_require={
           'doc': [
-              'sphinx',
-              'sphinx_bootstrap_theme',
+              'sphinx>=1.6.1',
+              'sphinx_bootstrap_theme>=0.5.0',
               'numpydoc',
               ],
           },
