@@ -2,13 +2,16 @@ import traceback
 import logging
 import os
 import sys
+import sqlalchemy
 import time
 
 import click
 import pkg_resources
 
+from .. import DBConfigNotFoundError
+from ..api import connect, get_config, update_station
 from ..msnoise_table_def import DataAvailability
-from ..api import update_station
+
 
 
 @click.group()
@@ -937,13 +940,14 @@ def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
 ## Main script
 
 try:
-    from ..api import connect, get_config
-
     db = connect()
     plugins = get_config(db, "plugins")
     db.close()
-except:
+except DBConfigNotFoundError:
     plugins = None
+except sqlalchemy.exc.OperationalError as e:
+    logging.critical('Unable to read project configuration: error connecting to the database:\n{}'.format(str(e)))
+    sys.exit(1)
 
 if plugins:
     plugins = plugins.split(",")
@@ -955,4 +959,7 @@ if plugins:
 
 
 def run():
-    cli(obj={})
+    try:
+        cli(obj={})
+    except DBConfigNotFoundError as e:
+        logging.critical(str(e))
