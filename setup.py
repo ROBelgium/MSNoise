@@ -22,6 +22,13 @@ setup(version="1.5.1",
           'wtforms',
           'jinja2'
       ],
+      extras_require={
+          'doc': [
+              'sphinx>=1.6.1',
+              'sphinx_bootstrap_theme>=0.5.0',
+              'numpydoc',
+              ],
+          },
       entry_points='''
           [console_scripts]
           msnoise=msnoise.scripts.msnoise:run

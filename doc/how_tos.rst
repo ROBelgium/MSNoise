@@ -72,7 +72,7 @@ The data_structure.py file contains the known data archive formats. If another
 data format needs to be defined, it will be done in the ``custom.py`` file
 in the current project folder:
 
-.. seealso:: Check the "Populate Station Table" step in the :doc:`workflow`.
+.. seealso:: Check the "Populate Station Table" step in the :doc:`workflow/002_populate`.
 
 
 How to have MSNoise work with 2+ data structures at the same time
@@ -104,7 +104,7 @@ The usage is such:
 
     usage: msnoise bugreport [-h] [-s] [-m] [-e] [-a]
     
-    Helps determining what didn't work
+    Helps determining what didn\'t work
     
     optional arguments:
       -h, --help     show this help message and exit

@@ -45,20 +45,20 @@ def cli(ctx, threads, delay, custom, verbose):
 
 
 # @with_plugins(iter_entry_points('msnoise.plugins'))
-@click.group()
+@cli.group()
 def plugin():
     """Runs a command in a named plugin"""
     pass
 
 
 # @with_plugins(iter_entry_points('msnoise.plugins'))
-@click.group()
+@cli.group()
 def p():
     """Short cut for plugins"""
     pass
 
 
-@click.command()
+@cli.command()
 @click.option('-p', '--prefix', default="", help='Prefix for tables')
 def test(prefix):
     """Runs the test suite, should be executed in an empty folder!"""
@@ -68,7 +68,7 @@ def test(prefix):
     main(prefix=prefix)
 
 
-@click.command()
+@cli.command()
 @click.option('-p', '--port', default=5000, help='Port to open')
 def admin(port):
     """Starts the Web Admin on http://localhost:5000 by default"""
@@ -76,20 +76,20 @@ def admin(port):
     main(port)
 
 
-@click.command()
+@cli.command(name='upgrade-db')
 def upgrade_db():
     """DEPRECATED: since MSNoise 1.6, please use "msnoise db upgrade" instead"""
     click.echo(upgrade_db.__doc__)
     pass
 
 
-@click.group()
+@cli.group()
 def db():
     """Top level command to interact with the database"""
     pass
 
 
-@click.command()
+@db.command(name='clean_duplicates')
 def clean_duplicates():
     """Checks the Jobs table and deletes duplicate entries"""
     from msnoise.api import connect, get_tech
@@ -104,7 +104,7 @@ def clean_duplicates():
     db.close()
 
 
-@click.command()
+@db.command()
 def upgrade():
     """Upgrade the database from previous to a new version.\n
     This procedure adds new parameters with their default value
@@ -154,7 +154,18 @@ def upgrade():
     db.close()
 
 
-@click.command()
+@db.command()
+@click.option('--tech', help='Database technology: 1=SQLite 2=MySQL',
+              default=None)
+def init(tech):
+    """This command initializes the current folder to be a MSNoise Project
+    by creating a database and a db.ini file."""
+    click.echo('Launching the init')
+    from ..s000installer import main
+    main(tech)
+
+
+@db.command()
 @click.argument('sql_command')
 def execute(sql_command):
     """EXPERT MODE: Executes 'sql_command' on the database. Use this command
@@ -170,7 +181,7 @@ def execute(sql_command):
     db.close()
 
 
-@click.command()
+@cli.command()
 @click.option('-j', '--jobs', is_flag=True, help='Jobs Info only')
 def info(jobs):
     """Outputs general information about the current install and config, plus
@@ -286,78 +297,117 @@ def info(jobs):
                         click.echo("  %s : %i" % (jobtype, n))
 
 
-@click.command()
+@cli.command()
 def install():
     """DEPRECATED: since MSNoise 1.6, please use "msnoise db init" instead"""
     click.echo(install.__doc__)
     pass
 
 
-@click.command()
-@click.option('--tech', help='Database technology: 1=SQLite 2=MySQL',
-              default=None)
-def init(tech):
-    """This command initializes the current folder to be a MSNoise Project
-    by creating a database and a db.ini file."""
-    click.echo('Launching the init')
-    from ..s000installer import main
-    main(tech)
+@cli.group()
+def config():
+    """
+    This command allows to set a parameter value in the database, show
+    parameter values, or synchronise station metadata, depending on the
+    invoked subcommands.
+
+    Called without argument, it used to launch the Configurator (now
+    accessible using 'msnoise config gui') but the recommended way to
+    configure MSNoise is now to use the web interface through the command
+    'msnoise admin'.
+    """
+    pass
 
 
-@click.command()
-@click.option('-s', '--set', help='Modify config value: usage --set name=value')
-@click.option('-S', '--sync', is_flag=True, help='Sync station metadata from'
-                                                 ' inventory/dataless')
-def config(set, sync):
-    """This command should now only be used to use the command line to set
-    a parameter value in the data base. It used to launch the Configurator but
-    the recommended way to configure MSNoise is to use the "msnoise admin" web
-    interface."""
-    if set:
-        from ..default import default
-        if not set.count("="):
-            click.echo("!! format of the set command is name=value !!")
-            return
-        name, value = set.split("=")
+@config.command(name='gui')
+def config_gui():
+    """
+    Run the deprecated configuration GUI tool.  Please use the configuration
+    web interface using 'msnoise admin' instead.
+    """
+    from ..s001configurator import main
+    click.echo("Let's Configure MSNoise !")
+    main()
+
+
+@config.command(name='sync')
+def config_sync():
+    """
+    Synchronise station metadata from inventory/dataless.
+    """
+    import glob
+    from ..api import connect, get_config, get_stations, update_station,\
+        preload_instrument_responses
+
+    db = connect()
+    responses = preload_instrument_responses(db)
+    netsta = []
+    for id, row in responses.iterrows():
+        net, sta, loc, chan = row["channel_id"].split(".")
+        netsta.append("%s.%s"%(net,sta))
+    responses["netsta"] = netsta
+
+    for station in get_stations(db):
+        id = "%s.%s" % (station.net, station.sta)
+        coords = responses[responses["netsta"] == id]
+        lon = float(coords["longitude"].values[0])
+        lat = float(coords["latitude"].values[0])
+        update_station(db, station.net, station.sta, lon, lat, 0, "DEG", )
+        logging.info("Added coordinates (%.5f %.5f) for station %s.%s" %
+                    (lon, lat, station.net, station.sta))
+    db.close()
+
+
+@config.command(name='set')
+@click.argument('name_value')
+def config_set(name_value):
+    """
+    Set a configuration value. The argument should be of the form
+    'variable=value'.
+    """
+    from ..default import default
+    if not name_value.count("="):
+        click.echo("!! format of the set command is name=value !!")
+        return
+    name, value = name_value.split("=")
+    if name not in default:
+        click.echo("!! unknown parameter %s !!" % name)
+        return
+    from ..api import connect, update_config
+    db = connect()
+    update_config(db, name, value)
+    db.commit()
+    db.close()
+    click.echo("Successfully updated parameter %s = %s" % (name, value))
+
+
+@config.command(name='show')
+@click.argument('names', nargs=-1, required=False)
+def config_show(names):
+    """
+    Display the value of the given configuration variable(s). If no variable
+    name is provided, show the value of all variables in the current project
+    configuration.
+    """
+    from ..default import default
+    from ..api import connect, get_config
+    db = connect()
+    if not names:
+        # No variable names are provided: show all existing variables
+        names = default.keys()
+    for name in names:
         if name not in default:
-            click.echo("!! unknown parameter %s !!" % name)
-            return
-        from ..api import connect, update_config
-        db = connect()
-        update_config(db, name, value)
-        db.commit()
-        db.close()
-        click.echo("Successfully updated parameter %s = %s" % (name, value))
-    elif sync:
-        import glob
-        from ..api import connect, get_config, get_stations, update_station,\
-            preload_instrument_responses
-
-        db = connect()
-        responses = preload_instrument_responses(db)
-        netsta = []
-        for id, row in responses.iterrows():
-            net, sta, loc, chan = row["channel_id"].split(".")
-            netsta.append("%s.%s"%(net,sta))
-        responses["netsta"] = netsta
-
-        for station in get_stations(db):
-            id = "%s.%s" % (station.net, station.sta)
-            coords = responses[responses["netsta"] == id]
-            lon = float(coords["longitude"].values[0])
-            lat = float(coords["latitude"].values[0])
-            update_station(db, station.net, station.sta, lon, lat, 0, "DEG", )
-            logging.info("Added coordinates (%.5f %.5f) for station %s.%s" %
-                        (lon, lat, station.net, station.sta))
-        db.close()
-
-    else:
-        from ..s001configurator import main
-        click.echo('Let\'s Configure MSNoise !')
-        main()
+            click.echo("'%s': unknown configuration parameter" % name)
+            continue
+        value = get_config(db, name)
+        if value == '':
+            # Use a more explicit representation of the empty string
+            value = "''"
+        click.echo('%s = %s' % (name, value))
+    db.close()
 
 
-@click.command()
+@cli.command()
 @click.option('-s', '--sys', is_flag=True, help='System Info')
 @click.option('-m', '--modules', is_flag=True, help='Modules Info')
 @click.option('-e', '--env', is_flag=True, help='Environment Info')
@@ -371,7 +421,7 @@ def bugreport(ctx, sys, modules, env, all):
     main(sys, modules, env, all)
 
 
-@click.command()
+@cli.command()
 @click.option('--fromDA',  help='Populates the station table '
                                 'using network and station codes'
                                 ' found in the data_availability'
@@ -400,7 +450,7 @@ def populate(fromda):
         main()
 
 
-@click.command()
+@cli.command(name='scan_archive')
 @click.option('-i', '--init', is_flag=True, help='First run ?')
 @click.option('--path',  help='Scan all files in specific folder, overrides the'
                               ' default workflow step.')
@@ -435,7 +485,7 @@ def scan_archive(ctx, init, path, recursively):
         main(init, threads=ctx.obj['MSNOISE_threads'])
 
 
-@click.command()
+@cli.command(name='new_jobs')
 @click.option('-i', '--init', is_flag=True, help='First run ? This disables '
                                                  'the check for existing jobs.')
 @click.option('--nocc', is_flag=True, default=False, help='Disable the creation'
@@ -458,7 +508,7 @@ def new_jobs(init, nocc, hpc=""):
         db.commit()
         db.close()
 
-@click.command()
+@cli.command(name='compute_cc')
 @click.pass_context
 def compute_cc(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
@@ -478,7 +528,7 @@ def compute_cc(ctx):
         for p in processes:
             p.join()
 
-@click.command()
+@cli.command(name='compute_cc2')
 @click.pass_context
 def compute_cc2(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
@@ -499,7 +549,7 @@ def compute_cc2(ctx):
             p.join()
 
 
-@click.command()
+@cli.command()
 @click.pass_context
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
@@ -546,7 +596,7 @@ def stack(ctx, ref, mov, step):
             p.join()
 
 
-@click.command()
+@cli.command(name='compute_mwcs')
 @click.pass_context
 def compute_mwcs(ctx):
     """Computes the MWCS based on the new stacked data"""
@@ -567,14 +617,14 @@ def compute_mwcs(ctx):
             p.join()
 
 
-@click.command()
+@cli.command(name='compute_stretching')
 def compute_stretching():
     """[experimental] Computes the stretching based on the new stacked data"""
     from ..stretch import main
     main()
 
 
-@click.command()
+@cli.command(name='compute_dtt')
 @click.pass_context
 @click.option('-i', '--interval', default=1.0, help='Number of days before now to\
  search for modified Jobs')
@@ -598,7 +648,7 @@ def compute_dtt(ctx, interval):
 
 
 
-@click.command()
+@cli.command(name='compute_dvv')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
@@ -625,7 +675,7 @@ def compute_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfil
     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
 
 
-@click.command()
+@cli.command()
 @click.argument('jobtype')
 @click.option('-a', '--all', is_flag=True, help='Reset all jobs')
 @click.option('-r', '--rule', help='Reset job that match this SQL rule')
@@ -644,7 +694,7 @@ def reset(jobtype, all, rule):
     session.close()
 
 
-@click.command()
+@cli.command()
 def jupyter():
     """Launches an jupyter notebook in the current folder"""
     os.system("jupyter notebook --ip 0.0.0.0 --no-browser")
@@ -654,13 +704,13 @@ def jupyter():
 # PLOT GROUP
 #
 
-@click.group()
+@cli.group()
 def plot():
     """Top level command to trigger different plots"""
     pass
 
 
-@click.command()
+@plot.command(name='data_availability')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
@@ -675,7 +725,7 @@ def data_availability(ctx, show, outfile):
     main(show, outfile)
 
 
-@click.command()
+@plot.command()
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
@@ -702,7 +752,7 @@ def dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
 
 
-@click.command()
+@plot.command()
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
@@ -729,7 +779,7 @@ def timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
 
 
-@click.command()
+@plot.command()
 @click.argument('sta1')
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
@@ -758,7 +808,7 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile, refilter)
 
 
-@click.command()
+@plot.command()
 @click.argument('sta1')
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
@@ -792,7 +842,7 @@ def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
          envelope, refilter)
 
 
-@click.command()
+@plot.command()
 @click.argument('sta1')
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
@@ -817,7 +867,7 @@ def mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
 
 
-@click.command()
+@plot.command()
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-a', '--ampli', default=1.0, help='Amplification')
@@ -842,7 +892,7 @@ def distance(ctx, filterid, comp, ampli, show, outfile, refilter,
     main(filterid, comp, ampli, show, outfile, refilter, virtual_source)
 
 
-@click.command()
+@plot.command(name='station_map')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
@@ -857,7 +907,7 @@ def station_map(ctx, show, outfile):
     main(show, outfile)
 
 
-@click.command()
+@plot.command()
 @click.argument('sta1')
 @click.argument('sta2')
 @click.argument('day')
@@ -883,46 +933,8 @@ def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
         from ..plots.dtt import main
     main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile)
 
-# Add DB commands to the db group:
-db.add_command(clean_duplicates)
-db.add_command(upgrade)
-db.add_command(init)
-db.add_command(execute)
 
-# Add plot commands to the plot group:
-plot.add_command(data_availability)
-plot.add_command(dvv)
-plot.add_command(interferogram)
-plot.add_command(ccftime)
-plot.add_command(mwcs)
-plot.add_command(distance)
-plot.add_command(station_map)
-plot.add_command(timing)
-plot.add_command(dtt)
-
-# Add all commands to the cli group:
-cli.add_command(info)
-cli.add_command(admin)
-cli.add_command(upgrade_db)
-cli.add_command(install)
-cli.add_command(config)
-cli.add_command(populate)
-cli.add_command(bugreport)
-cli.add_command(scan_archive)
-cli.add_command(new_jobs)
-cli.add_command(compute_cc)
-cli.add_command(compute_cc2)
-cli.add_command(stack)
-cli.add_command(compute_mwcs)
-cli.add_command(compute_stretching)
-cli.add_command(compute_dtt)
-cli.add_command(compute_dvv)
-cli.add_command(reset)
-cli.add_command(db)
-cli.add_command(jupyter)
-cli.add_command(test)
-# Finally add the plot group too:
-cli.add_command(plot)
+## Main script
 
 try:
     from ..api import connect, get_config
@@ -940,9 +952,6 @@ if plugins:
         if module_name in plugins:
             plugin.add_command(ep.load())
             p.add_command(ep.load())
-
-cli.add_command(plugin)
-cli.add_command(p)
 
 
 def run():
