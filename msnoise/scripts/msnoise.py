@@ -465,8 +465,8 @@ def populate(fromda):
 @click.option('-r', '--recursively', is_flag=True,
               help='When scanning a path, walk subfolders automatically ?')
 @click.option('--crondays', type=int,
-              help='Number of days to monitor with cron. Must be a negative'
-                   " number (Override the 'crondays' configuration value).")
+              help='Number of past days to monitor, typically in cron jobs '
+                   "(overrides the 'crondays' configuration value).")
 @click.pass_context
 def scan_archive(ctx, init, crondays, path, recursively):
     """Scan the archive and insert into the Data Availability table."""
