@@ -374,6 +374,12 @@ class ConfigView(ModelView):
         self._template_args['helpstringdefault'] = default[id][1]
         return super(ConfigView, self).edit_view()
 
+    def on_model_change(self, form, model, is_created):
+        if form.data['value']:
+            model.value = form.data['value'].strip()
+        else:
+            model.value = ''
+
 
 def getitem(obj, item, default):
     if item not in obj:
