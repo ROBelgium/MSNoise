@@ -152,7 +152,7 @@ def process_stream(db, folder, basename, stream, id_, startdate, enddate,
 
 
 def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
-        logger):
+        archive_format, logger):
     """
     Processes a list of files from a folder, and update the data availability
     table in the database whenever their data matches our dates and sampling
@@ -175,7 +175,9 @@ def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
         pathname = os.path.join(folder, basename)
         #logger.debug('reading file %s' % pathname)
         try:
-            stream = obspy.core.read(pathname, headonly=True, format='MSEED')
+            # Note: if format is None or unknown, obspy will use auto-detection.
+            # See https://docs.obspy.org/packages/autogen/obspy.core.stream.read.html
+            stream = obspy.core.read(pathname, headonly=True, format=archive_format)
             for id in set([t.id for t in stream]):
                 update_rv = process_stream(db, folder, basename, stream, id,
                                            startdate, enddate,
@@ -228,7 +230,7 @@ def list_directory(folder, mintime):
 
 
 def scan_folders(folders, mintime, startdate, enddate, goal_sampling_rate,
-        loglevel=None):
+        archive_format, loglevel=None):
     """
     Reads files in a list of folders and updates their data availability in
     database, silently ignoring non-matching files and empty folders.
@@ -269,7 +271,7 @@ def scan_folders(folders, mintime, startdate, enddate, goal_sampling_rate,
             # no file were found in this directory, silently ignore it
             continue
         scan_data_files(db, folder, files, startdate, enddate,
-                        goal_sampling_rate, logger)
+                        goal_sampling_rate, archive_format, logger)
     db.close()
 
 
@@ -401,7 +403,7 @@ def await_children(pool, children):
 
 
 def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
-                 goal_sampling_rate):
+                 goal_sampling_rate, archive_format):
     """
     For each files in the archive folders, fork a process to read its data, and
     updates the availibility in the database. If mintime is not None, only
@@ -427,10 +429,13 @@ def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
     logger.info('Scanning {} directories...'.format(len(dir_list)))
     if nproc == 1:
         # In single process mode, we simply call scan_folder()
-        scan_folders(dir_list, mintime, startdate, enddate, goal_sampling_rate)
+        scan_folders(dir_list, mintime, startdate, enddate, archive_format,
+                     goal_sampling_rate)
     else:
-        # In multiprocesses mode, we split the folders into nproc lists of
+        # In multiprocessing mode, we split the folders into nproc lists of
         # similar size and have them processed by as many child processes.
+        # (This reduces the number of process spawning, as it is a slow
+        # operation.)
 
         # Note: consider using a context manager instead of try/except
         # once python 2 support will be dropped in msnoise:
@@ -440,13 +445,13 @@ def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
         # Launch nproc children working on a mostly equal number of folders
         children = spawn_processes(pool, nproc, dir_list, scan_folders,
                 (mintime, startdate, enddate, goal_sampling_rate,
-                 logger.getEffectiveLevel()))
+                 archive_format, logger.getEffectiveLevel()))
         # Wait for children to finish, or terminate them if one crashes
         await_children(pool, children)
 
 
-def main(init=False, threads=1, crondays=None, forced_path=None,
-         forced_path_recursive=True):
+def main(init=False, threads=1, crondays=None, archive_format=None,
+         forced_path=None, forced_path_recursive=True):
     """
     Update data availibility information from modified miniseed files.
 
@@ -493,9 +498,13 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
             api.get_config(db, 'startdate'),'%Y-%m-%d').date()
     enddate = datetime.datetime.strptime(
             api.get_config(db, 'enddate'), '%Y-%m-%d').date()
-    logger.info('Will search for files between %s and %s'
-                % (startdate, enddate))
+    archive_format = api.get_config(db, 'archive_format') or None
     goal_sampling_rate = float(api.get_config(db, 'cc_sampling_rate'))
+    search_info_log = 'Will search for files between {} and {}'\
+                      .format(startdate, enddate)
+    if archive_format:
+        search_info_log += ", forcing format '{}'".format(archive_format)
+    logger.info(search_info_log + '.')
 
     if init:
         mintime = None
@@ -544,7 +553,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
     # Run the main scan
     try:
         scan_archive(folders_to_glob, threads, mintime, startdate, enddate,
-                     goal_sampling_rate)
+                     goal_sampling_rate, archive_format)
     except Exception as e:
         logger.critical('Scan aborted because the following error occured '
                         'while scanning the archive:\n{}'.format(e))

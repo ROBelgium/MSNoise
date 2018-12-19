@@ -4,6 +4,9 @@ default['data_folder'] = ["Data Folder",'']
 default['output_folder'] = ["CC Output Folder",'CROSS_CORRELATIONS']
 default['data_structure'] = ["Either a predefined acronym [SDS]/BUD/IDDS,<br> "
                              "or /-separated path (e.g. NET/STA/YEAR/NET.STA.YEAR.DAY.MSEED).", 'SDS']
+default['archive_format'] = ["Force format of archive files to read? Leave "
+        "empty for slightly slower auto-detection by Obspy, or specify any "
+        "format supported by obspy.core.stream.read.", ""]
 default['network'] = ["Network to analyse [*]",'*']
 default['channels'] = ["Channels need to match the value (ex: [\*], \*Z, BH\*, HHZ,...)",'*']
 
