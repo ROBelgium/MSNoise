@@ -27,6 +27,23 @@ def validate_verbosity(ctx, param, value):
     return value
 
 
+def show_config_values(db, names):
+    """
+    Show configuration value of parameters provided in the 'names' list.
+    """
+    from ..api import get_config
+    from ..default import default
+    for key in names:
+        display_value = value = get_config(db, key)
+        if value == '':
+            # Use a more explicit representation of the empty string
+            display_value = "''"
+        if value == default[key][1]:
+            click.secho("   %s: %s" % (key, display_value))
+        else:
+            click.secho(" M %s: %s" % (key, display_value), fg='green')
+
+
 def info_db_ini():
     """
     Show information stored in the db.ini file.
@@ -170,7 +187,7 @@ def info_plugins(db):
     """
     Show information about configured plugins.
     """
-    from ..api import get_config
+    from ..api import get_config, get_job_types
     plugins = get_config(db, "plugins")
     if not plugins:
         return
@@ -348,7 +365,7 @@ def execute(sql_command):
     db.close()
 
 
-@click.command()
+@cli.command()
 @click.option('-j', '--jobs', is_flag=True, help='Jobs Info only')
 def info(jobs):
     """Outputs general information about the current install and config, plus
