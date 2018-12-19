@@ -177,7 +177,7 @@ def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
         try:
             # Note: if format is None or unknown, obspy will use auto-detection.
             # See https://docs.obspy.org/packages/autogen/obspy.core.stream.read.html
-            stream = obspy.core.read(pathname, headonly=True, format=archive_format)
+            stream = obspy.core.read(pathname, headonly=True, format=archive_format or None)
             for id in set([t.id for t in stream]):
                 update_rv = process_stream(db, folder, basename, stream, id,
                                            startdate, enddate,
@@ -429,8 +429,8 @@ def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
     logger.info('Scanning {} directories...'.format(len(dir_list)))
     if nproc == 1:
         # In single process mode, we simply call scan_folder()
-        scan_folders(dir_list, mintime, startdate, enddate, archive_format,
-                     goal_sampling_rate)
+        scan_folders(dir_list, mintime, startdate, enddate, goal_sampling_rate,
+                     archive_format)
     else:
         # In multiprocessing mode, we split the folders into nproc lists of
         # similar size and have them processed by as many child processes.
@@ -450,8 +450,8 @@ def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
         await_children(pool, children)
 
 
-def main(init=False, threads=1, crondays=None, archive_format=None,
-         forced_path=None, forced_path_recursive=True):
+def main(init=False, threads=1, crondays=None, forced_path=None,
+         forced_path_recursive=True):
     """
     Update data availibility information from modified miniseed files.
 
@@ -498,7 +498,7 @@ def main(init=False, threads=1, crondays=None, archive_format=None,
             api.get_config(db, 'startdate'),'%Y-%m-%d').date()
     enddate = datetime.datetime.strptime(
             api.get_config(db, 'enddate'), '%Y-%m-%d').date()
-    archive_format = api.get_config(db, 'archive_format') or None
+    archive_format = api.get_config(db, 'archive_format')
     goal_sampling_rate = float(api.get_config(db, 'cc_sampling_rate'))
     search_info_log = 'Will search for files between {} and {}'\
                       .format(startdate, enddate)
