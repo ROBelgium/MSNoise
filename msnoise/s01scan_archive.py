@@ -5,7 +5,9 @@ MSNoise needs to check the data archive for new or modified files.
 
 Those files could have been acquired during the last day, but be data of a
 previously offline station and contain useful information for, say, a month ago.
-The time to search for is defined in the config from the 'crondays' value.
+The time to search for is defined in the config from the 'crondays' value. For
+convenience, this parameter can be temporarily redefined on the command line
+using the `--crondays` option of the `scan_archive` subcommand.
 
 The scan_archive script inspects the modified time attribute ('mtime') of files
 in the archives to locate new or modified files. Once located, they are inserted
