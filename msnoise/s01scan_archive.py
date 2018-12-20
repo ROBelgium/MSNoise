@@ -267,11 +267,10 @@ def scan_folders(folders, mintime, startdate, enddate, goal_sampling_rate,
         else:
             debug_msg = 'Found %d files in %s' % (len(files), folder)
         logger.debug(debug_msg)
-        if not files:
-            # no file were found in this directory, silently ignore it
-            continue
-        scan_data_files(db, folder, files, startdate, enddate,
-                        goal_sampling_rate, archive_format, logger)
+        if files:
+            scan_data_files(db, folder, files, startdate, enddate,
+                            goal_sampling_rate, archive_format, logger)
+        # else: no matching files found in this directory, nothing to do
     db.close()
 
 
@@ -360,8 +359,7 @@ def spawn_processes(pool, nproc, dir_list, scan_func, scan_args):
     children = []
     for i in range(nproc):
         folder_slice = dir_list[n*i:n*(i+1)]
-        logger.debug('Spawning a child process to process {}'
-                     ' of the {} directories.'
+        logger.debug('Spawning a child to process {} of the {} directories.'
                      .format(len(folder_slice), len(dir_list)))
         children.append(pool.apply_async(scan_func,
             [folder_slice] + list(scan_args)))
