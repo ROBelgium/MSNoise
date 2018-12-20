@@ -38,7 +38,12 @@ def show_config_values(db, names):
         if value == '':
             # Use a more explicit representation of the empty string
             display_value = "''"
-        if value == default[key][1]:
+        try:
+            default_value = default[key][1]
+        except KeyError:
+            click.secho("Error: unknown parameter '%s'" % key)
+            continue
+        if value == default_value:
             click.secho("   %s: %s" % (key, display_value))
         else:
             click.secho(" M %s: %s" % (key, display_value), fg='green')
