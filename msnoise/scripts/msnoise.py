@@ -55,11 +55,7 @@ def info_db_ini():
     """
     from ..api import read_database_inifile
     ini_values = read_database_inifile()
-    if len(ini_values) == 5:
-        tech, hostname, database, username, password = ini_values
-    else:
-        tech, hostname, database, username, password, prefix = ini_values
-        prefix = None
+    tech, hostname, database, username, password, prefix = ini_values
     click.echo('\nDatabase information stored in the db.ini file:')
     if tech == 1:
         click.echo(' - database type: SQLite')
