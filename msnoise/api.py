@@ -11,6 +11,7 @@ except:
     import pickle as cPickle
 import math
 import pkg_resources
+import sys
 
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
@@ -31,6 +32,29 @@ from obspy.geodetics import gps2dist_azimuth
 
 from . import DBConfigNotFoundError
 from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
+
+
+def get_logger(name, loglevel=None, with_pid=False):
+    """
+    Returns the current configured logger or configure a new one.
+    """
+    if with_pid:
+        log_fmt='%(asctime)s msnoise [pid %(process)d] '\
+                '[%(levelname)s] %(message)s'
+    else:
+        log_fmt='%(asctime)s msnoise [%(levelname)s] %(message)s'
+    logger = logging.getLogger(name)
+    # Remove any inherited StreamHandler to avoid duplicate lines
+    for h in logger.handlers:
+        if isinstance(h, logging.StreamHandler):
+            logger.removeHandler(h)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(
+            logging.Formatter(fmt=log_fmt, datefmt='%Y-%m-%d %H:%M:%S'))
+    logger.addHandler(handler)
+    logger.setLevel(loglevel)
+    logger.propagate = False
+    return logger
 
 
 def get_tech():
