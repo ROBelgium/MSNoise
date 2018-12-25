@@ -11,19 +11,24 @@ logger = logging.getLogger('matplotlib')
 # set WARNING for Matplotlib
 logger.setLevel(logging.CRITICAL)
 
+from click.testing import CliRunner
 from obspy import read
 from .. import FatalError, s01scan_archive
+from ..scripts import msnoise as msnoise_script
 
 
 class MSNoiseTests(unittest.TestCase):
     prefix = ""
 
     def setUp(self):
+        # Copy test/data directory to ./data
         path = os.path.abspath(os.path.dirname(__file__))
         data_folder = os.path.join(path, 'data')
         if not os.path.isdir("data"):
             shutil.copytree(data_folder, "data/")
         self.data_folder = "data"
+        # Create a click runner
+        self.runner = CliRunner()
 
     def test_001_S01installer(self):
         import os
@@ -31,7 +36,8 @@ class MSNoiseTests(unittest.TestCase):
         if "PREFIX" in os.environ:
             self.prefix=os.environ["PREFIX"]
         try:
-            ret = main(tech=1, prefix=self.prefix)
+            ret = main(tech=1, prefix=self.prefix,
+                       filename='testmsnoise.sqlite')
             self.failUnlessEqual(ret, 0)
         except:
             traceback.print_exc()
@@ -411,6 +417,32 @@ class MSNoiseTests(unittest.TestCase):
             traceback.print_exc()
             self.fail()
 
+    ### A few click CLI interface tests
+
+    def test_201_config_get_unknown_param(self):
+        result = self.runner.invoke(msnoise_script.config_get,
+                                    ['inexistant_param'])
+        self.assertEqual(result.exit_code, 0)
+        self.assertTrue('unknown parameter' in result.output)
+
+    def test_202_config_set_unknown_param(self):
+        result = self.runner.invoke(msnoise_script.config_set,
+                                    ['inexistant_param=value'])
+        self.assertEqual(result.exit_code, 0)
+        self.assertTrue('unknown parameter' in result.output)
+
+    def test_203_config_set_param(self):
+        result = self.runner.invoke(msnoise_script.config_set,
+                                    ['channels=XXX'])
+        self.assertEqual(result.exit_code, 0)
+        result = self.runner.invoke(msnoise_script.config_get,
+                                    ['channels'])
+        self.assertEqual(result.exit_code, 0)
+        self.assertTrue('XXX' in result.output)
+        result = self.runner.invoke(msnoise_script.config_set,
+                                    ['channels=*'])
+
+    ### Tests on the 'crondays' parameter format
 
     def test_210_crondays_positive_float(self):
         """
