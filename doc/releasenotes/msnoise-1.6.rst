@@ -104,10 +104,13 @@ Configuration Parameters
   If left empty, `obspy.core.stream.read` will automatically detect the format
   of the file, which results in a slightly slower reading.
 
-* CHANGED: ``cronday`` can now be a positive number (negative number are still
-  accepted for backward compatibility) but its meaning is unchanged:
-  if the ``--init`` option is not used, `scan_archive` will only scan files
-  modified during `crondays` days in the past.
+* CHANGED: ``cronday`` should now be a positive float number (negative numbers
+  are still accepted for backward compatibility) or a string designating any
+  optional number of weeks, days and/or hours in the format 'Xw Xd Xw' in this
+  order, where a week represents 7 days (some valid examples would be:
+  '1w 3d 6h', '2w 1d', '1d 12h', or '6h').  Its meaning is unchanged: if the
+  ``--init`` option is not used, `scan_archive` will only scan files modified
+  during the time in the past designated by `crondays` .
 
 
 Workflow changes
