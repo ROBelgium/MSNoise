@@ -5,7 +5,10 @@ MSNoise needs to check the data archive for new or modified files.
 
 Those files could have been acquired during the last day, but be data of a
 previously offline station and contain useful information for, say, a month ago.
-The time to search for is defined in the config from the 'crondays' value.
+The time to search for is defined in the config from the 'crondays' value, which
+can be a float designating a number of days in the past, or a string
+designating a number of weeks, days, and/or hours in the format 'Xw Xd Xh'
+(each group being optional, as well as the separating blanks).
 
 The scan_archive script inspects the modified time attribute ('mtime') of files
 in the archives to locate new or modified files. Once located, they are inserted
@@ -62,6 +65,7 @@ import logging
 import multiprocessing
 import obspy
 import os
+import re
 import sys
 import time
 
@@ -448,6 +452,29 @@ def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
         await_children(pool, children)
 
 
+def parse_crondays(crondays):
+    """
+    Parse the 'crondays' option and return it as a datetime.timedelta object.
+    """
+    try:
+        crondays = float(crondays)
+    except ValueError:
+        # The provided value is not a float: it must match '[Xw][Xd][Xh]'
+        # (with optional blank characters between groups)
+        match = re.search('^(?:(\d+)w\s*)?(?:(\d+)d\s*)?(?:(\d+)h\s*)?$', crondays)
+        if not match:
+            raise FatalError("Unrecognized format for "
+                    "configuration parameter 'crondays'")
+        delta_days = 7 * int(match.group(1) or 0) + int(match.group(2) or 0)
+        delta_seconds = 3600 * int(match.group(3) or 0)
+    else:
+        # Use abs() to accept negative values for
+        # backward compatibility with MSNoise < 1.6.
+        delta_days = abs(crondays)
+        delta_seconds = 0
+    return datetime.timedelta(days=delta_days, seconds=delta_seconds)
+
+
 def main(init=False, threads=1, crondays=None, forced_path=None,
          forced_path_recursive=True):
     """
@@ -460,8 +487,9 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
         time (if not None, crondays is ignored).
     :param threads: the maximum number of threads/processes to use while
         scanning the files.
-    :para crondays: scan only files modified in crondays number of days in the
-        past (according to the file's modification time); if None, read its
+    :para crondays: override the 'crondays' configuration value for this run to
+        limit the scan to files modified since the designated relative date in
+        the past (according to the file's modification time); if None, use the
         value from the configuration.
     :para forced_path: scan files from this path instead of the configured
         archive path.
@@ -482,15 +510,13 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
     if init:
         logger.info('Initializing: updating availability using the whole'
                     ' archive (should be run only once)')
+        modification_delta = 0
     else:
         if crondays is None:
-            crondays = int(api.get_config(db, 'crondays'))
-        # Convert negative values to positive ones for backward compatibility
-        # with msnoise < 1.6.
-        if crondays < 0:
-            crondays = -crondays
+            crondays = api.get_config(db, 'crondays')
+        modification_delta = parse_crondays(crondays)
         logger.info('Updating availability: scanning the archive for files'
-                    ' modified %d days ago or less.' % crondays)
+                    ' modified {} ago or less.'.format(modification_delta))
 
     startdate = datetime.datetime.strptime(
             api.get_config(db, 'startdate'),'%Y-%m-%d').date()
@@ -510,8 +536,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
         # Note: avoid datetime.timestamp() below as it is python3 only *and*
         # does not work correctly with naive datetime representing UTC.
         # (See the official doc for datetime.timestamp())
-        mintime = (datetime.datetime.utcnow()
-                   - datetime.timedelta(days=crondays)
+        mintime = (datetime.datetime.utcnow() - modification_delta
                    - datetime.datetime(1970, 1, 1, 0, 0)).total_seconds()
 
     if forced_path is None:

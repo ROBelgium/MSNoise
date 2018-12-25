@@ -50,7 +50,10 @@ default['pws_timegate'] = ["If stack_method='pws', width of the smoothing in "
 default['pws_power'] = ["If stack_method='pws', Power of the Weighting: 2.0 "
                         "",'2.0', float]
 
-default['crondays'] = ["Number of days to monitor with cron [1]", '1']
+default['crondays'] = ["Number of days to monitor with scan_archive,"
+        " typically used in cron (should be a float representing a number of"
+        " days, or a string designating weeks, days, and/or hours using the"
+        " format 'Xw Xd Xh') [1]", '1']
 
 default['components_to_compute'] = ["List (comma separated) of components to "
                                     "compute between two different stations ["

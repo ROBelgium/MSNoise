@@ -464,9 +464,11 @@ def populate(fromda):
                               ' default workflow step.')
 @click.option('-r', '--recursively', is_flag=True,
               help='When scanning a path, walk subfolders automatically ?')
-@click.option('--crondays', type=int,
-              help='Number of past days to monitor, typically in cron jobs '
-                   "(overrides the 'crondays' configuration value).")
+@click.option('--crondays',
+              help='Number of past days to monitor, typically used in cron jobs '
+                   "(overrides the 'crondays' configuration value). "
+                   'Must be a float representing a number of days, or designate '
+                   " weeks, days, and/or hours using the format 'Xw Xd Xh'.")
 @click.pass_context
 def scan_archive(ctx, init, crondays, path, recursively):
     """Scan the archive and insert into the Data Availability table."""
