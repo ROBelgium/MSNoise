@@ -17,7 +17,8 @@ Example:
 """
 # plot interferogram
 import matplotlib.pyplot as plt
-from matplotlib.dates import date2num, DateFormatter, YearLocator
+from matplotlib.dates import date2num, DateFormatter, YearLocator, DayLocator,\
+    HourLocator
 from matplotlib.widgets import Cursor
 
 from obspy.signal.filter import bandpass
@@ -35,7 +36,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
         freqmin, freqmax = refilter.split(':')
         freqmin = float(freqmin)
         freqmax = float(freqmax)
-    plt.figure(figsize=(12, 9))
+    fig = plt.figure(figsize=(12, 9))
     sta1 = sta1.replace('.', '_')
     sta2 = sta2.replace('.', '_')
     if sta2 >= sta1:
@@ -54,15 +55,19 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
             for i, d in enumerate(data):
                 data[i] = bandpass(data[i], freqmin, freqmax, cc_sampling_rate,
                                    zerophase=True)
+        vmax = np.nanmax(data) * 0.9
         plt.imshow(data.T, extent=xextent, aspect="auto",
                    interpolation='none', origin='lower', cmap='seismic',
-                   vmin=-1e-2, vmax=1e-2)
+                   vmin=-vmax, vmax=vmax)
         plt.ylabel("Lag Time (s)")
         plt.axhline(0, lw=0.5, c='k')
         plt.grid()
 
-        ax.xaxis.set_major_locator(YearLocator())
-        ax.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d'))
+        # ax.xaxis.set_major_locator(DayLocator())
+        # ax.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d'))
+        ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))
+        # ax.xaxis.set_minor_locator(DayLocator())
+        # ax.xaxis.set_minor_formatter(DateFormatter('%Y-%m-%d %H:%M'))
 
         for filterdb in get_filters(db, all=True):
             if filterid == filterdb.ref:
@@ -77,6 +82,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
         if refilter:
             title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
         plt.title(title)
+        fig.autofmt_xdate()
         cursor = Cursor(ax, useblit=True, color='black', linewidth=1.2)
         if outfile:
             if outfile.startswith("?"):

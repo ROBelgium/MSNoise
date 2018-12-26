@@ -1,27 +1,34 @@
-import unittest
-import traceback
-import os
 import datetime
-import shutil
 import glob
-
 import logging
+import os
+import re
+import shutil
+import traceback
+import unittest
+
 logger = logging.getLogger('matplotlib')
 # set WARNING for Matplotlib
 logger.setLevel(logging.CRITICAL)
 
+from click.testing import CliRunner
 from obspy import read
+from .. import FatalError, s01scan_archive
+from ..scripts import msnoise as msnoise_script
 
 
 class MSNoiseTests(unittest.TestCase):
     prefix = ""
 
     def setUp(self):
+        # Copy test/data directory to ./data
         path = os.path.abspath(os.path.dirname(__file__))
         data_folder = os.path.join(path, 'data')
         if not os.path.isdir("data"):
             shutil.copytree(data_folder, "data/")
         self.data_folder = "data"
+        # Create a click runner
+        self.runner = CliRunner()
 
     def test_001_S01installer(self):
         import os
@@ -29,7 +36,8 @@ class MSNoiseTests(unittest.TestCase):
         if "PREFIX" in os.environ:
             self.prefix=os.environ["PREFIX"]
         try:
-            ret = main(tech=1, prefix=self.prefix)
+            ret = main(tech=1, prefix=self.prefix,
+                       filename='testmsnoise.sqlite')
             self.failUnlessEqual(ret, 0)
         except:
             traceback.print_exc()
@@ -394,6 +402,22 @@ class MSNoiseTests(unittest.TestCase):
                       "ZZ", filter.ref, 1)
                 self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
 
+    def test_101_plot_spectime(self):
+        from ..api import connect, get_station_pairs, get_filters
+        from ..plots.spectime import main
+        db = connect()
+        for sta1, sta2 in get_station_pairs(db):
+            sta1 = "%s.%s" % (sta1.net, sta1.sta)
+            sta2 = "%s.%s" % (sta2.net, sta2.sta)
+            for filter in get_filters(db):
+                main(sta1, sta2, filter.ref, "ZZ", 1, show=False,
+                     outfile="?.png")
+                fn = 'ccftime %s-%s-f%i-m%i.png' % \
+                     ("%s-%s" % (sta1.replace(".", "_"),
+                                 sta2.replace(".", "_")),
+                      "ZZ", filter.ref, 1)
+                self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
+
     def test_099_S01installer(self):
         if "TRAVIS" not in os.environ:
             print("Seems to be running on local machine, skipping MySQL test")
@@ -408,6 +432,113 @@ class MSNoiseTests(unittest.TestCase):
         except:
             traceback.print_exc()
             self.fail()
+
+    ### A few click CLI interface tests
+
+    def test_201_config_get_unknown_param(self):
+        result = self.runner.invoke(msnoise_script.config_get,
+                                    ['inexistant_param'])
+        self.assertEqual(result.exit_code, 0)
+        self.assertTrue('unknown parameter' in result.output)
+
+    def test_202_config_set_unknown_param(self):
+        result = self.runner.invoke(msnoise_script.config_set,
+                                    ['inexistant_param=value'])
+        self.assertEqual(result.exit_code, 0)
+        self.assertTrue('unknown parameter' in result.output)
+
+    def test_203_config_set_param(self):
+        result = self.runner.invoke(msnoise_script.config_set,
+                                    ['channels=XXX'])
+        self.assertEqual(result.exit_code, 0)
+        result = self.runner.invoke(msnoise_script.config_get,
+                                    ['channels'])
+        self.assertEqual(result.exit_code, 0)
+        self.assertTrue('XXX' in result.output)
+        result = self.runner.invoke(msnoise_script.config_set,
+                                    ['channels=*'])
+
+    ### Tests on the 'crondays' parameter format
+
+    def test_210_crondays_positive_float(self):
+        """
+        The crondays parameter can be a positive float that represents a
+        number of days.
+        """
+        parsed_crondays = s01scan_archive.parse_crondays('2.5')
+        self.assertEqual(parsed_crondays, datetime.timedelta(days=2.5))
+
+    def test_211_crondays_negative_float(self):
+        """
+        A negative crondays parameter representing a number of days should be
+        accepted for backward compatibility with MSNoise < 1.6.
+        """
+        parsed_crondays = s01scan_archive.parse_crondays('-3')
+        self.assertEqual(parsed_crondays, datetime.timedelta(days=3))
+
+    def test_212_crondays_weeks(self):
+        """
+        The crondays parameter can designate a number of weeks (7 days) using a
+        string in the format 'Xw'.
+        """
+        parsed_crondays = s01scan_archive.parse_crondays('2w')
+        self.assertEqual(parsed_crondays, datetime.timedelta(days=7*2))
+
+    def test_213_crondays_days(self):
+        """
+        The crondays parameter can designate a number of days using a string in
+        the format 'Xd'.
+        """
+        parsed_crondays = s01scan_archive.parse_crondays('5d')
+        self.assertEqual(parsed_crondays, datetime.timedelta(days=5))
+
+    def test_214_crondays_hours(self):
+        """
+        The crondays parameter can designate a number of hours using a string
+        in the format 'Xh'.
+        """
+        parsed_crondays = s01scan_archive.parse_crondays('12h')
+        self.assertEqual(parsed_crondays, datetime.timedelta(seconds=12*3600))
+
+    def test_215_crondays_weeks_days_hours(self):
+        """
+        The crondays parameter can designate a number of weeks, days, and hours
+        in the same string.
+        """
+        parsed_crondays = s01scan_archive.parse_crondays('2w 3d 12h')
+        self.assertEqual(parsed_crondays, datetime.timedelta(days=2*7+3, seconds=12*3600))
+
+    def test_216_crondays_weeks_hours(self):
+        """
+        The crondays parameter does not have to designate the three units
+        weeks, days and hours in the string.
+        """
+        parsed_crondays = s01scan_archive.parse_crondays('1w 6h')
+        self.assertEqual(parsed_crondays, datetime.timedelta(days=1*7, seconds=6*3600))
+
+    def test_217_crondays_weeks_days_hours_order_matters(self):
+        """
+        If the crondays parameter designates any weeks, days or hours in the
+        string, they must be in the right order.
+        """
+        with self.assertRaises(FatalError):
+            s01scan_archive.parse_crondays('16h 3d')
+
+    def test_218_crondays_weeks_days_hours_alone(self):
+        """
+        The crondays parameter can designate any weeks, days and hours, but the
+        format must be [Xw][Xd][Xh] only.
+        """
+        with self.assertRaises(FatalError):
+            s01scan_archive.parse_crondays('about 16h')
+
+    def test_219_crondays_weeks_days_hours_optional_blank(self):
+        """
+        If the crondays parameter designates any weeks, days and hours in
+        the string, the separation blank is optional.
+        """
+        parsed_crondays = s01scan_archive.parse_crondays('3w4d12h')
+        self.assertEqual(parsed_crondays, datetime.timedelta(days=3*7+4, seconds=12*3600))
 
 
 def main(prefix=""):

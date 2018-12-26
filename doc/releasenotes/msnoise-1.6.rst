@@ -97,6 +97,21 @@ Configuration Parameters
   of select/update/insert actions on the database and makes the whole much 
   faster (See hpc_).
 
+* ADDED: ``archive_format`` will tell the `obspy.core.stream.read ObsPy
+  function
+  <https://docs.obspy.org/packages/autogen/obspy.core.stream.read.html>`_ the
+  format of the files to read in the archive during the `scan_archive` stage.
+  If left empty, `obspy.core.stream.read` will automatically detect the format
+  of the file, which results in a slightly slower reading.
+
+* CHANGED: ``cronday`` should now be a positive float number (negative numbers
+  are still accepted for backward compatibility) or a string designating any
+  optional number of weeks, days and/or hours in the format 'Xw Xd Xw' in this
+  order, where a week represents 7 days (some valid examples would be:
+  '1w 3d 6h', '2w 1d', '1d 12h', or '6h').  Its meaning is unchanged: if the
+  ``--init`` option is not used, `scan_archive` will only scan files modified
+  during the time in the past designated by `crondays` .
+
 
 Workflow changes
 ----------------
@@ -175,9 +190,26 @@ In the future, this command will include the possibility to dump and load
 entire databases, for example for switching from a local sqlite instance to a 
 large MySQL server.
 
+The ``config`` command group has been reworked and the ``get`` subcommand has
+been added to retrieve the values of a list of configuration parameters:
+
+* ``msnoise config get <param>`` will display the value of the configuration
+  parameter `<param>`.
+* ``msnoise config set <param>=<value>`` will set the value of the configuration
+  parameter `<param>` to `<value>`.
+* ``msnoise config gui`` will run the deprecated configuration graphical
+  interface (that was previously available through ``msnoise config`` but
+  supersed by the web interface using ``msnoise admin``).
+* ``msnoise config sync`` synchronises station metadata from inventory/dataless
+  (was previously available as ``msnoise config --sync``).
+
+
 Other changes
 ~~~~~~~~~~~~~
 
+* ``msnoise info`` also prints information stored in the `db.ini` file (for
+  security reason, the password is masked in the output but be aware that it is
+  still stored in clear text in the file.).
 * ``msnoise info -j`` reports all jobs types, including those of plugins.
 * Added the possibility to walk in subfolders recursively by using 
   ``scan_archive --path -r``
@@ -243,6 +275,31 @@ Commands and actions with ``hpc`` = Y :
 * ``msnoise new_jobs --hpc STACK:MWCS``: creates the MWCS jobs based on the 
   STACK jobs marked "D"one
 
+.. _scan-archive:
+
+Rework of scan_archive
+~~~~~~~~~~~~~~~~~~~~~~
+
+The code behind the ``scan_archive`` command has been deeply reworked to ease
+maintenance and debugging, and the reading of the files and directories has
+been improved thanks to the `scandir function
+<https://github.com/benhoyt/scandir>`_ included in Python 3.5 and backported in
+the `scandir` module.  The multiprocessing strategy (used if the
+``-t``/``--threads`` option is provided) has also been reworked to limit the
+expensive step of process creation: the list of directories to scan is now
+split at startup and each child process concurrently treats an equal part of
+it.
+
+.. _table-prefix:
+
+Prefix of database tables
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The new ``msnoise db init`` project initialisation command now prompts you to
+choose an optional prefix for the name of the tables that will be created in
+the chosen database.  If you enter the prefix `myprefix`, the tables will be
+named using the prefix `myprefix_`.  This allows to share the same database
+with several MSNoise projects.
 
 Comparison with MSNoise 1.2 as published in the SRL article:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -316,6 +373,8 @@ Other Bugfixes TODO
 * Checked all "integer" - "float" warnings from numpy/scipy
 * crondays were hardcoded to -2, now taking the ``crondays`` value from the DB
 * Py3 error when ``msnoise scan_archive`` in cron mode
+* ``msnoise info`` does not crash any more if some station information are
+  `NULL` in the database
 
 
 Plot Updates TODO

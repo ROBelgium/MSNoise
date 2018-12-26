@@ -20,7 +20,8 @@ setup(version="1.5.1",
           'markdown',
           'folium',
           'wtforms',
-          'jinja2'
+          'jinja2',
+          'scandir',  # useful for python < 3.5
       ],
       extras_require={
           'doc': [

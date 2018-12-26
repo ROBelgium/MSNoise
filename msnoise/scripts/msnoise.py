@@ -2,13 +2,206 @@ import traceback
 import logging
 import os
 import sys
+import sqlalchemy
 import time
 
 import click
 import pkg_resources
 
+from .. import MSNoiseError, DBConfigNotFoundError
+from ..api import connect, get_config, update_station, get_logger
 from ..msnoise_table_def import DataAvailability
-from ..api import update_station
+
+
+def validate_verbosity(ctx, param, value):
+    """
+    Validate the --quiet and --verbose options to have it conflict with one
+    another.
+    """
+    if param.name == 'quiet':
+        excluded = 'verbose'
+    elif param.name == 'verbose':
+        excluded = 'quiet'
+    if value and excluded in ctx.params:
+        raise click.BadParameter('Cannot use both --quiet and --verbose option.')
+    return value
+
+
+def show_config_values(db, names):
+    """
+    Show configuration value of parameters provided in the 'names' list.
+    """
+    from ..api import get_config
+    from ..default import default
+    for key in names:
+        display_value = value = get_config(db, key)
+        if value == '':
+            # Use a more explicit representation of the empty string
+            display_value = "''"
+        try:
+            default_value = default[key][1]
+        except KeyError:
+            click.secho("Error: unknown parameter '%s'" % key)
+            continue
+        if value == default_value:
+            click.secho("   %s: %s" % (key, display_value))
+        else:
+            click.secho(" M %s: %s" % (key, display_value), fg='green')
+
+
+def info_db_ini():
+    """
+    Show information stored in the db.ini file.
+    """
+    from ..api import read_database_inifile
+    ini_values = read_database_inifile()
+    tech, hostname, database, username, password, prefix = ini_values
+    click.echo('\nDatabase information stored in the db.ini file:')
+    if tech == 1:
+        click.echo(' - database type: SQLite')
+        click.echo(' - filename: {}'.format(hostname))
+    elif tech == 2:
+        click.echo(' - database type: MySQL')
+        click.echo(' - hostname: {}'.format(hostname))
+        click.echo(' - database: {}'.format(database))
+        click.echo(' - username: {}'.format(username))
+        click.echo(' - password: {}'.format('*' * len(password)))
+        click.echo(' - table prefix: {}'.format(prefix if prefix else 'none'))
+
+
+def info_folders(db):
+    """
+    Show information about folders used by MSNoise.
+    """
+    from ..api import get_config
+    click.echo('')
+    click.echo('General:')
+
+    click.echo(' - the MSNoise module is installed in: %s'
+               % os.path.abspath(os.path.join(
+                   os.path.dirname(__file__), '..', '..')))
+
+    if os.path.isfile('db.ini'):
+        click.echo(' - db.ini is present in the current directory')
+    else:
+        click.secho(' - db.ini not found in the present directory, is MSNoise installed here ?',
+                    fg='red')
+        return
+    info_db_ini()
+
+    click.echo('')
+    click.echo('Configuration:')
+
+    data_folder = get_config(db, "data_folder")
+    if os.path.isdir(data_folder):
+        click.echo(" - %s exists" % data_folder)
+    else:
+        click.secho(" - %s does not exists !" % data_folder, fg='red')
+
+    output_folder = get_config(db, "output_folder")
+    if os.path.isdir(output_folder):
+        click.echo(" - %s exists" % output_folder)
+    else:
+        if get_config(db, 'keep_all') in ['Y', 'y']:
+            for job in get_job_types(db):
+                if job[1] == 'D':
+                    if job[0] > 0:
+                        click.secho(
+                            " - %s does not exists and that is not normal"
+                            " (%i CC jobs done)" % (output_folder, job[0]),
+                            fg='red')
+                    else:
+                        click.secho(
+                            " - %s does not exists and that is normal"
+                            " (%i CC jobs done)" % (output_folder, job[0]))
+        else:
+            click.secho(
+                " - %s does not exists (and that is normal because"
+                " keep_all=False)" % output_folder)
+
+
+def info_parameters(db):
+    """
+    Show values of each configuration parameters.
+    """
+    from ..api import get_filters
+    from ..default import default
+    click.echo('')
+    click.echo('Configuration values:\n'
+            '   | Normal colour indicates that the default value is used\n'
+            '   | Green indicates "M"odified values')
+    # TODO: add plugins params
+    show_config_values(db, default.keys())
+
+    click.echo('')
+    click.echo('Filters:')
+    click.echo(' ID:   [low:high]   [mwcs_low:mwcs_high] mwcs_wlen mwcs_step Used?')
+
+    for f in get_filters(db, all=True):
+        click.echo(' {:2d}: {:^15s} {:^20s} {:^9s} {:^9s}  {:1s}'
+            .format(f.ref,
+                '[{:.3f}:{:.3f}]'.format(f.low, f.high),
+                '[{:.3f}:{:.3f}]'.format(f.mwcs_low, f.mwcs_high),
+                '{:.0f}'.format(f.mwcs_wlen),
+                '{:.0f}'.format(f.mwcs_step),
+                'Y' if f.used else 'N'))
+
+
+def info_stations(db):
+    """
+    Show information about configured stations.
+    """
+    from ..api import get_stations
+    click.echo('')
+    click.echo('Stations:')
+    click.echo('  NET.STA    Long.     Lat.    Alt.   Coord. Used?')
+    s = None
+    na_sign = '-'
+    for s in get_stations(db, all=True):
+        click.echo(' {:>8s}  {:>9s} {:>8s}  {:>6s}  {:3s}    {:1s}'.format(
+                '{}.{}'.format(s.net, s.sta),
+                '{:.4f}'.format(s.X) if s.X is not None else na_sign,
+                '{:.4f}'.format(s.Y) if s.Y is not None else na_sign,
+                '{:.1f}'.format(s.altitude) if s.altitude is not None else na_sign,
+                s.coordinates or na_sign,
+                'Y' if s.used else 'N'))
+    if s is None:
+        click.echo(' ')
+
+
+def info_jobs(db):
+    """
+    Show information about jobs registered in database.
+    """
+    from ..api import get_job_types
+    click.echo("\nJobs:")
+    for jobtype in ["CC", "STACK", "MWCS", "DTT"]:
+        click.echo(' %s:' % jobtype)
+        n = None
+        for (n, jobtype) in get_job_types(db, jobtype):
+            click.echo("  %s : %i" % (jobtype, n))
+        if n is None:
+            click.echo('  none defined')
+
+
+def info_plugins(db):
+    """
+    Show information about configured plugins.
+    """
+    from ..api import get_config, get_job_types
+    plugins = get_config(db, "plugins")
+    if not plugins:
+        return
+    plugins = plugins.split(",")
+    for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
+        module_name = ep.module_name.split(".")[0]
+        if module_name in plugins:
+            click.echo('')
+            click.echo('Plugin: %s' % module_name)
+            for row in ep.load()():
+                click.echo(' %s:' % row["name"])
+                for (n, jobtype) in get_job_types(db, row["name"]):
+                    click.echo("  %s : %i" % (jobtype, n))
 
 
 @click.group()
@@ -19,29 +212,21 @@ from ..api import update_station
                     'the next thread. Defaults to [1] second ')
 @click.option('-c', '--custom', default=False, is_flag=True, help='Use custom \
  file for plots. To use this, copy the plot script here and edit it.')
-@click.option('-v', '--verbose', default=2, count=True)
+@click.option('-v', '--verbose', is_flag=True, callback=validate_verbosity)
+@click.option('-q', '--quiet', is_flag=True, callback=validate_verbosity)
 @click.pass_context
-def cli(ctx, threads, delay, custom, verbose):
-    import logging
-    logger = logging.getLogger('matplotlib')
-    # set WARNING for Matplotlib
-    logger.setLevel(logging.CRITICAL)
-
+def cli(ctx, threads, delay, custom, verbose, quiet):
     ctx.obj['MSNOISE_threads'] = threads
     ctx.obj['MSNOISE_threadsdelay'] = delay
-    if verbose == 0:
-        ctx.obj['MSNOISE_verbosity'] = "WARNING"
-    elif verbose == 1:
-        ctx.obj['MSNOISE_verbosity'] = "INFO"
-    elif verbose > 1:
-        ctx.obj['MSNOISE_verbosity'] = "DEBUG"
-    logging.basicConfig(level=ctx.obj['MSNOISE_verbosity'],
-                        format='%(asctime)s [%(levelname)s] %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
-    sys.path.append(os.getcwd())
     ctx.obj['MSNOISE_custom'] = custom
-
-    pass
+    ctx.obj['MSNOISE_verbosity'] = "INFO"
+    if quiet:
+        ctx.obj['MSNOISE_verbosity'] = "WARNING"
+    elif verbose:
+        ctx.obj['MSNOISE_verbosity'] = "DEBUG"
+    logger = get_logger('msnoise', ctx.obj['MSNOISE_verbosity'])
+    # Is this really needed?
+    sys.path.append(os.getcwd())
 
 
 # @with_plugins(iter_entry_points('msnoise.plugins'))
@@ -186,12 +371,7 @@ def execute(sql_command):
 def info(jobs):
     """Outputs general information about the current install and config, plus
     information about jobs and their status."""
-    from ..api import connect, get_config, get_job_types, get_filters, \
-        get_stations
-    from ..default import default
-
-    def d(path):
-        return os.path.split(path)[0]
+    from ..api import connect
 
     if not os.path.isfile('db.ini'):
         click.secho(' - db.ini is not present, is MSNoise installed here ?',
@@ -199,102 +379,13 @@ def info(jobs):
         return
 
     db = connect()
-
     if not jobs:
-        click.echo('')
-        click.echo('General:')
-
-        click.echo('MSNoise is installed in: %s'
-                   % d(d(d(os.path.abspath(__file__)))))
-        
-        if os.path.isfile('db.ini'):
-            click.echo(' - db.ini is present')
-        else:
-            click.secho(' - db.ini is not present, is MSNoise installed here ?',
-                        fg='red')
-            return
-        click.echo('')
-        
-        click.echo('')
-        click.echo('Configuration:')
-
-        data_folder = get_config(db, "data_folder")
-        if os.path.isdir(data_folder):
-            click.echo(" - %s exists" % data_folder)
-        else:
-            click.secho(" - %s does not exists !" % data_folder, fg='red')
-
-        output_folder = get_config(db, "output_folder")
-        if os.path.isdir(output_folder):
-            click.echo(" - %s exists" % output_folder)
-        else:
-            if get_config(db, 'keep_all') in ['Y', 'y']:
-                for job in get_job_types(db):
-                    if job[1] == 'D':
-                        if job[0] > 0:
-                            click.secho(
-                                " - %s does not exists and that is not normal"
-                                " (%i CC jobs done)" % (output_folder, job[0]),
-                                fg='red')
-                        else:
-                            click.secho(
-                                " - %s does not exists and that is normal"
-                                " (%i CC jobs done)" % (output_folder, job[0]))
-            else:
-                click.secho(
-                    " - %s does not exists (and that is normal because"
-                    " keep_all=False)" % output_folder)
-
-        click.echo('')
-        click.echo('Raw config bits: "D"efault or "M"odified (green)')
-        for key in default.keys():
-            tmp = get_config(db, key)
-            if tmp == default[key][1]:
-                click.secho(" D %s: %s" % (key, tmp))
-            else:
-                click.secho(" M %s: %s" % (key, tmp), fg='green')
-        # TODO add plugins params
-
-        click.echo('')
-        click.echo('Filters:')
-        print('ID: [low:high]  [mwcs_low:mwcs_high]    mwcs_wlen    mwcs_step'
-              '   used')
-        for f in get_filters(db, all=True):
-            data = (f.ref,
-                    f.low,
-                    f.high,
-                    f.mwcs_low,
-                    f.mwcs_high,
-                    f.mwcs_wlen,
-                    f.mwcs_step,
-                    ['N', 'Y'][f.used])
-            print('%02i: [%.03f:%.03f] [%.03f:%.03f] %.03i %.03i %s' % data)
-
-        click.echo('')
-        click.echo('Stations:')
-        for s in get_stations(db, all=True):
-            data = (s.net, s.sta, s.X, s.Y, s.altitude, s.coordinates,
-                    ['N', 'Y'][s.used])
-            print('%s.%s %.4f %.4f %.1f %s %s' % data)
-
-    click.echo("MSNoise")
-    for jobtype in ["CC", "STACK", "MWCS", "DTT"]:
-        click.echo(' %s:' % jobtype)
-        for (n, jobtype) in get_job_types(db, jobtype):
-            click.echo("  %s : %i" % (jobtype, n))
-
-    plugins = get_config(db, "plugins")
-    if plugins:
-        plugins = plugins.split(",")
-        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
-            module_name = ep.module_name.split(".")[0]
-            if module_name in plugins:
-                click.echo('')
-                click.echo('Plugin: %s' % module_name)
-                for row in ep.load()():
-                    click.echo(' %s:' % row["name"])
-                    for (n, jobtype) in get_job_types(db, row["name"]):
-                        click.echo("  %s : %i" % (jobtype, n))
+        info_folders(db)
+        info_parameters(db)
+        info_stations(db)
+    info_jobs(db)
+    info_plugins(db)
+    db.close()
 
 
 @cli.command()
@@ -381,29 +472,15 @@ def config_set(name_value):
     click.echo("Successfully updated parameter %s = %s" % (name, value))
 
 
-@config.command(name='show')
-@click.argument('names', nargs=-1, required=False)
-def config_show(names):
+@config.command(name='get')
+@click.argument('names', nargs=-1)
+def config_get(names):
     """
-    Display the value of the given configuration variable(s). If no variable
-    name is provided, show the value of all variables in the current project
-    configuration.
+    Display the value of the given configuration variable(s).
     """
-    from ..default import default
     from ..api import connect, get_config
     db = connect()
-    if not names:
-        # No variable names are provided: show all existing variables
-        names = default.keys()
-    for name in names:
-        if name not in default:
-            click.echo("'%s': unknown configuration parameter" % name)
-            continue
-        value = get_config(db, name)
-        if value == '':
-            # Use a more explicit representation of the empty string
-            value = "''"
-        click.echo('%s = %s' % (name, value))
+    show_config_values(db, names)
     db.close()
 
 
@@ -456,33 +533,26 @@ def populate(fromda):
                               ' default workflow step.')
 @click.option('-r', '--recursively', is_flag=True,
               help='When scanning a path, walk subfolders automatically ?')
+@click.option('--crondays',
+              help='Number of past days to monitor, typically used in cron jobs '
+                   "(overrides the 'crondays' configuration value). "
+                   'Must be a float representing a number of days, or designate '
+                   " weeks, days, and/or hours using the format 'Xw Xd Xh'.")
 @click.pass_context
-def scan_archive(ctx, init, path, recursively):
+def scan_archive(ctx, init, crondays, path, recursively):
     """Scan the archive and insert into the Data Availability table."""
+    from .. import s01scan_archive
+    nthreads = ctx.obj['MSNOISE_threads']
     if path:
-        logging.info("Overriding workflow...")
-        from obspy import UTCDateTime
-        from ..s01scan_archive import worker
-        db = connect()
-        startdate = UTCDateTime(get_config(db, "startdate"))
-        enddate = UTCDateTime(get_config(db, "enddate"))
-        cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-        network = get_config(db, 'network')
-        db.close()
-        if recursively:
-            for root, dirs, _ in os.walk(path):
-                for d in dirs:
-                    tmppath = os.path.join(root, d)
-                    _ = os.listdir(tmppath)
-                    if not len(_):
-                        continue
-                    worker(sorted(_), tmppath, startdate, enddate,
-                           cc_sampling_rate, init=True, network=network)
-        worker(sorted(os.listdir(path)), path, startdate, enddate,
-               cc_sampling_rate, init=True, network=network)
+        if not os.path.isdir(path):
+            logging.critical('Cannot scan from %s: not such directory.' % path)
+            sys.exit(1)
+        logging.info('Overriding workflow: only scanning path'
+                     ' %s (%srecursively)'
+                     % (path, '' if recursively else 'non-'))
+        s01scan_archive.main(init, nthreads, crondays, path, recursively)
     else:
-        from ..s01scan_archive import main
-        main(init, threads=ctx.obj['MSNOISE_threads'])
+        s01scan_archive.main(init, nthreads, crondays)
 
 
 @cli.command(name='new_jobs')
@@ -829,7 +899,7 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
 @click.pass_context
 def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
             ampli, seismic, show, outfile, envelope, refilter):
-    """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
+    """Plots the ccf vs time between sta1 and sta2\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
     if sta1 > sta2:
         click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
@@ -840,6 +910,37 @@ def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
         from ..plots.ccftime import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
          envelope, refilter)
+
+
+@plot.command()
+@click.argument('sta1')
+@click.argument('sta2')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1,
+              help='Mov Stack to read from disk')
+@click.option('-a', '--ampli', default=5.0, help='Amplification')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.pass_context
+def spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
+            ampli, show, outfile, refilter):
+    """Plots the ccf's spectrum vs time between sta1 and sta2\n
+    STA1 and STA2 must be provided with this format: NET.STA !"""
+    if sta1 > sta2:
+        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+        return
+    if ctx.obj['MSNOISE_custom']:
+        from spectime import main
+    else:
+        from ..plots.spectime import main
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
+         refilter)
 
 
 @plot.command()
@@ -937,13 +1038,14 @@ def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
 ## Main script
 
 try:
-    from ..api import connect, get_config
-
     db = connect()
     plugins = get_config(db, "plugins")
     db.close()
-except:
+except DBConfigNotFoundError:
     plugins = None
+except sqlalchemy.exc.OperationalError as e:
+    logging.critical('Unable to read project configuration: error connecting to the database:\n{}'.format(str(e)))
+    sys.exit(1)
 
 if plugins:
     plugins = plugins.split(",")
@@ -955,4 +1057,7 @@ if plugins:
 
 
 def run():
-    cli(obj={})
+    try:
+        cli(obj={})
+    except MSNoiseError as e:
+        logging.critical(str(e))

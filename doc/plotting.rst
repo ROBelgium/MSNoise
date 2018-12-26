@@ -73,6 +73,12 @@ CCF vs Time
 .. automodule:: msnoise.plots.ccftime
 
 
+CCF's spectrum vs Time
+----------------------
+
+.. automodule:: msnoise.plots.spectime
+
+
 MWCS Plot
 ---------
 

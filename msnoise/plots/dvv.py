@@ -16,6 +16,8 @@ Example:
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
+from matplotlib.dates import DateFormatter
+
 from ..api import *
 
 
@@ -69,8 +71,15 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
     else:
         components = [components, ]
 
+    low = high = 0.0
+    for filterdb in get_filters(db, all=True):
+        if filterid == filterdb.ref:
+            low = float(filterdb.low)
+            high = float(filterdb.high)
+            break
+
     gs = gridspec.GridSpec(len(mov_stacks), 1)
-    plt.figure(figsize=(12, 9))
+    fig = plt.figure(figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
     first_plot = True
     for i, mov_stack in enumerate(mov_stacks):
@@ -135,15 +144,18 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
                          label='ALL: $\delta v/v$ of the mean network')
 
             tmp2 = allbut[dttname].resample('D').mean()
-            tmp2.plot(label='mean',)
+            plt.plot(tmp2.index, tmp2, label="mean")
+            # tmp2.plot(label='mean',)
 
             tmp3 = allbut[dttname].resample('D').median()
-            tmp3.plot(label='median')
+            # tmp3.plot(label='median')
+            plt.plot(tmp3.index, tmp3, label="median")
             plt.ylabel('dv/v (%)')
+
             if first_plot == 1:
                 plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=4,
                            ncol=2, borderaxespad=0.)
-                left, right = plt.xlim()
+                left, right = tmp2.index[0], tmp2.index[-1]
                 if mov_stack == 1:
                     plt.title('1 Day')
                 else:
@@ -154,6 +166,11 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
                 plt.title('%i Days Moving Window' % mov_stack)
 
             plt.grid(True)
+            plt.gca().xaxis.set_major_formatter(DateFormatter("%Y-%m-%d %H:%M"))
+            fig.autofmt_xdate()
+            title = '%s, Filter %d (%.2f - %.2f Hz)' % \
+                    (",".join(components), filterid, low, high)
+            plt.suptitle(title)
             del alldf
     if outfile:
         if outfile.startswith("?"):

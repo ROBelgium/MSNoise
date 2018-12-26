@@ -84,6 +84,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
             title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
         plt.title(title)
         plt.scatter(0, [start, ], alpha=0)
+        plt.xlabel("Time Lag (s)")
         plt.ylim(start-datetime.timedelta(days=ampli),
                  end+datetime.timedelta(days=ampli))
         plt.xlim(-maxlag, maxlag)

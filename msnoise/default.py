@@ -4,6 +4,9 @@ default['data_folder'] = ["Data Folder",'']
 default['output_folder'] = ["CC Output Folder",'CROSS_CORRELATIONS']
 default['data_structure'] = ["Either a predefined acronym [SDS]/BUD/IDDS,<br> "
                              "or /-separated path (e.g. NET/STA/YEAR/NET.STA.YEAR.DAY.MSEED).", 'SDS']
+default['archive_format'] = ["Force format of archive files to read? Leave "
+        "empty for slightly slower auto-detection by Obspy, or specify any "
+        "format supported by obspy.core.stream.read.", ""]
 default['network'] = ["Network to analyse [*]",'*']
 default['channels'] = ["Channels need to match the value (ex: [\*], \*Z, BH\*, HHZ,...)",'*']
 
@@ -47,7 +50,10 @@ default['pws_timegate'] = ["If stack_method='pws', width of the smoothing in "
 default['pws_power'] = ["If stack_method='pws', Power of the Weighting: 2.0 "
                         "",'2.0', float]
 
-default['crondays'] = ["Number of days to monitor with cron [-1], must be a negative number", '-1']
+default['crondays'] = ["Number of days to monitor with scan_archive,"
+        " typically used in cron (should be a float representing a number of"
+        " days, or a string designating weeks, days, and/or hours using the"
+        " format 'Xw Xd Xh') [1]", '1']
 
 default['components_to_compute'] = ["List (comma separated) of components to "
                                     "compute between two different stations ["
