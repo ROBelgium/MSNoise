@@ -95,6 +95,8 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
         plt.plot([0, np.max(dists)/velocity], [0, np.max(dists)], c=colors[i])
 
     plt.xlim(-maxlag, maxlag)
+    plt.xlabel("Time Lag (s)")
+    plt.grid(True)
     plt.legend(loc=4)
     if outfile:
         if outfile.startswith("?"):
