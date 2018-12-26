@@ -899,7 +899,7 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
 @click.pass_context
 def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
             ampli, seismic, show, outfile, envelope, refilter):
-    """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
+    """Plots the ccf vs time between sta1 and sta2\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
     if sta1 > sta2:
         click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
@@ -930,7 +930,7 @@ def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
 @click.pass_context
 def spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
             ampli, show, outfile, refilter):
-    """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
+    """Plots the ccf's spectrum vs time between sta1 and sta2\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
     if sta1 > sta2:
         click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
