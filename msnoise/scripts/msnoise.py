@@ -919,6 +919,37 @@ def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=1,
               help='Mov Stack to read from disk')
+@click.option('-a', '--ampli', default=5.0, help='Amplification')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.pass_context
+def spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
+            ampli, show, outfile, refilter):
+    """Plots the ccf vs time between sta1 and sta2 (parses the dt/t results)\n
+    STA1 and STA2 must be provided with this format: NET.STA !"""
+    if sta1 > sta2:
+        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+        return
+    if ctx.obj['MSNOISE_custom']:
+        from spectime import main
+    else:
+        from ..plots.spectime import main
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
+         refilter)
+
+
+@plot.command()
+@click.argument('sta1')
+@click.argument('sta2')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1,
+              help='Mov Stack to read from disk')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
