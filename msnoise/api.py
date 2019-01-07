@@ -948,10 +948,12 @@ def reset_jobs(session, jobtype, alljobs=False, rule=None):
     :param alljobs: If True, resets all jobs. If False (default), only resets
         jobs "I"n progress.
     """
+    dbini = read_db_inifile()
+    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
     jobs = session.query(Job).filter(Job.jobtype == jobtype)
     if rule:
-        session.execute("UPDATE jobs set flag='T' where jobtype='%s' and  %s"
-                        % (jobtype, rule))
+        session.execute("UPDATE %sjobs set flag='T' where jobtype='%s' and  %s"
+                        % (prefix, jobtype, rule))
         session.commit()
         return
     if not alljobs:
