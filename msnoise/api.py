@@ -74,7 +74,7 @@ def get_engine(inifile=None):
                                connect_args={'check_same_thread': False})
     else:
         engine = create_engine('mysql+pymysql://%s:%s@%s/%s'
-                               % (dbini.user, dbini.password,
+                               % (dbini.username, dbini.password,
                                   dbini.hostname, dbini.database),
                                echo=False, poolclass=NullPool,
                                connect_args={'connect_timeout': 15})
