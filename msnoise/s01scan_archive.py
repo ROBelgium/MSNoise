@@ -502,7 +502,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
     logger.info('*** Starting: Scan Archive ***')
     db = api.connect()
 
-    if api.get_tech() == 1 and threads != 1:
+    if api.read_db_inifile().tech == 1 and threads != 1:
         logger.warning('You can not work on %i threads because SQLite only'
                        ' supports 1 connection at a time. Continuing with '
                        ' 1 process only.' % threads)

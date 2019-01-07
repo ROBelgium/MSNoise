@@ -53,20 +53,19 @@ def info_db_ini():
     """
     Show information stored in the db.ini file.
     """
-    from ..api import read_database_inifile
-    ini_values = read_database_inifile()
-    tech, hostname, database, username, password, prefix = ini_values
+    from ..api import read_db_inifile
+    dbini = read_db_inifile()
     click.echo('\nDatabase information stored in the db.ini file:')
-    if tech == 1:
+    if dbini.tech == 1:
         click.echo(' - database type: SQLite')
-        click.echo(' - filename: {}'.format(hostname))
-    elif tech == 2:
+        click.echo(' - filename: {}'.format(dbini.hostname))
+    elif dbini.tech == 2:
         click.echo(' - database type: MySQL')
-        click.echo(' - hostname: {}'.format(hostname))
-        click.echo(' - database: {}'.format(database))
-        click.echo(' - username: {}'.format(username))
-        click.echo(' - password: {}'.format('*' * len(password)))
-        click.echo(' - table prefix: {}'.format(prefix if prefix else 'none'))
+        click.echo(' - hostname: {}'.format(dbini.hostname))
+        click.echo(' - database: {}'.format(dbini.database))
+        click.echo(' - username: {}'.format(dbini.username))
+        click.echo(' - password: {}'.format('*' * len(dbini.password)))
+        click.echo(' - table prefix: {}'.format(dbini.prefix if dbini.prefix else '(none)'))
 
 
 def info_folders(db):
@@ -277,13 +276,20 @@ def db():
 @db.command(name='clean_duplicates')
 def clean_duplicates():
     """Checks the Jobs table and deletes duplicate entries"""
-    from msnoise.api import connect, get_tech
+    from msnoise.api import connect, read_db_inifile
 
+    dbini = read_db_inifile()
+    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
     db = connect()
-    if get_tech() == 1:
-        query = "DELETE FROM jobs WHERE rowid NOT IN (SELECT MIN(rowid) FROM jobs GROUP BY day,pair,jobtype)"
+    if dbini.tech == 1:
+        query = 'DELETE FROM {0}jobs WHERE rowid NOT IN '\
+                '(SELECT MIN(rowid) FROM {0}jobs GROUP BY day,pair,jobtype)'\
+                .format(prefix)
     else:
-        query = "DELETE from jobs USING jobs, jobs as vtable WHERE (jobs.ref > vtable.ref) AND (jobs.day=vtable.day) AND (jobs.pair=vtable.pair) AND (jobs.jobtype=vtable.jobtype)"
+        query = 'DELETE from {0}jobs USING {0}jobs as j1, {0}jobs as j2 '\
+                'WHERE (j1.ref > j2.ref) AND (j1.day=j2.day) '\
+                'AND (j1.pair=j2.pair) AND (j1.jobtype=j2.jobtype)'\
+                .format(prefix)
     db.execute(query)
     db.commit()
     db.close()
@@ -295,13 +301,11 @@ def upgrade():
     This procedure adds new parameters with their default value
     in the config database.
     """
-    from ..api import connect, Config, read_database_inifile
+    from ..api import connect, Config, read_db_inifile
     from ..default import default
     db = connect()
-    tech, hostname, database, username, password, prefix = \
-        read_database_inifile()
-    if prefix != "":
-        prefix = prefix + "_"
+    dbini = read_db_inifile()
+    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
     for name in default.keys():
         try:
             db.add(Config(name=name, value=default[name][1]))
@@ -355,7 +359,7 @@ def init(tech):
 def execute(sql_command):
     """EXPERT MODE: Executes 'sql_command' on the database. Use this command
     at your own risk!!"""
-    from msnoise.api import connect, get_tech
+    from msnoise.api import connect
 
     db = connect()
     r = db.execute(sql_command)
@@ -571,12 +575,18 @@ def new_jobs(init, nocc, hpc=""):
         from ..s02new_jobs import main
         main(init, nocc)
     if hpc:
-        from ..api import connect
-        left, right = hpc.split(":")
+        from ..api import connect, read_db_inifile
+        dbini = read_db_inifile()
+        prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
+        left, right = hpc.split(':')
         db = connect()
-        db.execute("INSERT INTO jobs (pair, day, jobtype, flag) SELECT pair, day, '%s', 'T' from jobs where jobtype='%s' and flag='D';" % (right, left))
+        db.execute("INSERT INTO {prefix}jobs (pair, day, jobtype, flag) "
+                   "SELECT pair, day, '{right_type}', 'T' FROM {prefix}jobs "
+                   "WHERE jobtype='{left_type}' AND flag='D';"
+                   .format(prefix=prefix, right_type=right, left_type=left))
         db.commit()
         db.close()
+
 
 @cli.command(name='compute_cc')
 @click.pass_context
@@ -597,6 +607,7 @@ def compute_cc(ctx):
             time.sleep(delay)
         for p in processes:
             p.join()
+
 
 @cli.command(name='compute_cc2')
 @click.pass_context
@@ -753,10 +764,13 @@ def reset(jobtype, all, rule):
     """Resets the job to "T"odo. ARG is [CC] or [DTT]. By default
     only resets jobs "I"n progress. --all resets all jobs, whatever
     the flag value"""
-    from ..api import connect, reset_jobs
+    from ..api import connect, reset_jobs, read_db_inifile
+    dbini = read_db_inifile()
+    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
     session = connect()
     if jobtype == "DA":
-        session.execute("update data_availability set flag='M' where 1")
+        session.execute("UPDATE {0}data_availability SET flag='M'"
+                        .format(prefix))
     elif jobtype != jobtype.upper():
         logging.info("The jobtype %s is not uppercase (usually jobtypes"
                      " are uppercase...)"%jobtype)

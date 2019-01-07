@@ -700,14 +700,16 @@ def main(port=5000):
     else:
         admin.name = "MSNoise"
     admin.project_folder = os.getcwd()
-    tech, hostname, database, username, password, prefix = \
-        read_database_inifile()
-    if prefix != "":
-        prefix = "/%s_*" % prefix
-    if tech == 1:
-        database = "SQLite: %s%s" % (hostname, prefix)
+    dbini = read_db_inifile()
+    if dbini.prefix != "":
+        prefix = "/%s_*" % dbini.prefix
     else:
-        database = "MySQL: %s@%s:%s%s" % (username, hostname, database, prefix)
+        prefix = ""
+    if dbini.tech == 1:
+        database = "SQLite: %s%s" % (dbini.hostname, prefix)
+    else:
+        database = "MySQL: %s@%s:%s%s" % (dbini.username, dbini.hostname,
+                                          dbini.database, prefix)
     admin.project_database = database
 
     jobtypes = ["CC", "STACK", "MWCS", "DTT"]
