@@ -1,3 +1,4 @@
+import collections
 import copy
 import datetime
 import itertools
@@ -57,17 +58,6 @@ def get_logger(name, loglevel=None, with_pid=False):
     return logger
 
 
-def get_tech():
-    """Returns the current DB technology used (reads from the db.ini file)
-
-    :rtype: int
-    :returns: The database technology used: 1=sqlite 2=mysql
-    """
-    tech, hostname, database, username, password, prefix = \
-        read_database_inifile()
-    return tech
-
-
 def get_engine(inifile=None):
     """Returns the a SQLAlchemy Engine
 
@@ -78,17 +68,14 @@ def get_engine(inifile=None):
     :rtype: :class:`sqlalchemy.engine.Engine`
     :returns: An :class:`~sqlalchemy.engine.Engine` Object
     """
-    if not inifile:
-        inifile = os.path.join(os.getcwd(), 'db.ini')
-    tech, hostname, database, user, passwd, prefix = read_database_inifile(
-        inifile)
-    if tech == 1:
-        engine = create_engine('sqlite:///%s' % hostname, echo=False,
+    dbini = read_db_inifile(inifile)
+    if dbini.tech == 1:
+        engine = create_engine('sqlite:///%s' % dbini.hostname, echo=False,
                                connect_args={'check_same_thread': False})
     else:
-        engine = create_engine('mysql+pymysql://%s:%s@%s/%s' % (user, passwd,
-                                                                hostname,
-                                                                database),
+        engine = create_engine('mysql+pymysql://%s:%s@%s/%s'
+                               % (dbini.username, dbini.password,
+                                  dbini.hostname, dbini.database),
                                echo=False, poolclass=NullPool,
                                connect_args={'connect_timeout': 15})
     return engine
@@ -139,7 +126,7 @@ def create_database_inifile(tech, hostname, database, username, password,
     f.close()
 
 
-def read_database_inifile(inifile=None):
+def read_db_inifile(inifile=None):
     """Reads the parameters from the db.ini file.
 
     :type inifile: string
@@ -149,6 +136,8 @@ def read_database_inifile(inifile=None):
     :rtype: tuple
     :returns: tech, hostname, database, username, password
     """
+    IniFile = collections.namedtuple('IniFile', ['tech', 'hostname',
+        'database', 'username', 'password', 'prefix'])
     if not inifile:
         inifile = os.path.join(os.getcwd(), 'db.ini')
 
@@ -168,7 +157,7 @@ def read_database_inifile(inifile=None):
         tech, hostname, database, username, password = cPickle.load(f)
         prefix = ""
     f.close()
-    return [tech, hostname, database, username, password, prefix]
+    return IniFile(tech, hostname, database, username, password, prefix)
 
 
 # CONFIG
@@ -914,7 +903,7 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
         Days of the next DTT jobs -
         Job IDs (for later being able to update their flag).
     """
-    if get_tech() == 1:
+    if read_db_inifile().tech == 1:
         rand = func.random
     else:
         rand = func.rand
@@ -959,10 +948,12 @@ def reset_jobs(session, jobtype, alljobs=False, rule=None):
     :param alljobs: If True, resets all jobs. If False (default), only resets
         jobs "I"n progress.
     """
+    dbini = read_db_inifile()
+    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
     jobs = session.query(Job).filter(Job.jobtype == jobtype)
     if rule:
-        session.execute("UPDATE jobs set flag='T' where jobtype='%s' and  %s"
-                        % (jobtype, rule))
+        session.execute("UPDATE %sjobs set flag='T' where jobtype='%s' and  %s"
+                        % (prefix, jobtype, rule))
         session.commit()
         return
     if not alljobs:
