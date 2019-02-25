@@ -163,30 +163,29 @@ from .move2obspy import myCorr
 from .move2obspy import whiten
 
 from .preprocessing import preprocess
+# get a logger name 'msnoise.xxxxxx' that will
+# inherit the 'msnoise' logger settings.
+logger = logging.getLogger(__name__)
 
 
 def main():
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s [%(levelname)s] %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
-
-    logging.info('*** Starting: Compute CC ***')
+    logger.info('*** Starting: Compute CC ***')
 
     # Connection to the DB
     db = connect()
 
     if len(get_filters(db, all=False)) == 0:
-        logging.info("NO FILTERS DEFINED, exiting")
+        logger.info("NO FILTERS DEFINED, exiting")
         sys.exit()
 
     # Get Configuration
     params = get_params(db)
     filters = get_filters(db, all=False)
 
-    logging.info("Will compute %s" % " ".join(params.components_to_compute))
+    logger.info("Will compute %s" % " ".join(params.components_to_compute))
 
     if params.remove_response:
-        logging.debug('Pre-loading all instrument response')
+        logger.debug('Pre-loading all instrument response')
         responses = preload_instrument_responses(db)
     else:
         responses = None
@@ -208,7 +207,7 @@ def main():
 
         stations = np.unique(stations)
 
-        logging.info("New CC Job: %s (%i pairs with %i stations)" %
+        logger.info("New CC Job: %s (%i pairs with %i stations)" %
                      (goal_day, len(pairs), len(stations)))
         jt = time.time()
 
@@ -227,12 +226,12 @@ def main():
         dt = 1. / params.goal_sampling_rate
         start_processing = time.time()
         # ITERATING OVER PAIRS #####
-        logging.info("Will do %i pairs" % len(pairs))
+        logger.info("Will do %i pairs" % len(pairs))
         for job in jobs:
             pair = job.pair
             orig_pair = pair
 
-            logging.info('Processing pair: %s' % pair.replace(':', ' vs '))
+            logger.info('Processing pair: %s' % pair.replace(':', ' vs '))
             tt = time.time()
             station1, station2 = pair.split(':')
             pair = (np.where(stations == station1)
@@ -251,12 +250,12 @@ def main():
                     coordinates = 'MIX'
 
                 cpl_az = azimuth(coordinates, x0, y0, x1, y1)
-                logging.info("Azimuth=%.1f"%cpl_az)
+                logger.info("Azimuth=%.1f"%cpl_az)
             else:
                 cpl_az = 0.
 
             for components in params.components_to_compute:
-                logging.debug("Processing {!s}".format(components))
+                logger.debug("Processing {!s}".format(components))
                 t1 = stream.select(network=s1.net, station=s1.sta)
                 t2 = stream.select(network=s2.net, station=s2.sta)
                 if (components == "ZZ") \
@@ -267,7 +266,7 @@ def main():
                     t1 = t1.select(component=components[0])
                     t2 = t2.select(component=components[1])
                 else:
-                    logging.debug('Rotating streams, making sure they are'
+                    logger.debug('Rotating streams, making sure they are'
                                   ' aligned')
 
                     if components[0] == "Z":
@@ -299,11 +298,11 @@ def main():
                             t2 = t2_novert
 
                 if not len(t1):
-                    logging.info("No Data for %s.%s..%s" % (
+                    logger.info("No Data for %s.%s..%s" % (
                         s1.net, s1.sta, components[0]))
                     continue
                 if not len(t2):
-                    logging.info("No Data for %s.%s..%s" % (
+                    logger.info("No Data for %s.%s..%s" % (
                         s2.net, s2.sta, components[1]))
                     continue
 
@@ -319,7 +318,7 @@ def main():
                             gaps.append(gap)
 
                     if len(gaps) > 0:
-                        logging.debug("Sliding Windows %s contains gaps,"
+                        logger.debug("Sliding Windows %s contains gaps,"
                                       " skipping..." % tmp[0].stats.starttime)
                         continue
                     if tmp[0].stats.npts < 2*(params.maxlag *
@@ -375,27 +374,27 @@ def main():
                         for i, station in enumerate(pair):
                             if tmp[i].data.std() > rms_threshold:
                                 if whitening:
-                                    #logging.debug("Whitening %s" % components)
+                                    #logger.debug("Whitening %s" % components)
                                     trames2hWb[i] = whiten(tmp[i].data, nfft,
                                                            dt, low, high,
                                                            plot=False)
                                 else:
-                                    #logging.debug("Autocorr %s"%components)
+                                    #logger.debug("Autocorr %s"%components)
                                     X = tmp[i].copy()
                                     X.filter("bandpass", freqmin=low,
                                              freqmax=high, zerophase=True)
                                     trames2hWb[i] = scipy.fftpack.fft(X.data, nfft)
                             else:
                                 skip = True
-                                logging.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'
+                                logger.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'
                                               % (tmp[i].data.std(), rms_threshold))
                         if not skip:
                             corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False, nfft=nfft)
                             if not np.all(np.isfinite(corr)):
-                                logging.debug("corr object contains NaNs, skipping")
+                                logger.debug("corr object contains NaNs, skipping")
                                 continue
                             if len(corr) < 2 * (params.maxlag * params.goal_sampling_rate) + 1:
-                                logging.debug(
+                                logger.debug(
                                     "corr object is too small, skipping")
                                 continue
                             tmptime = tmp[0].stats.starttime.datetime
@@ -438,17 +437,17 @@ def main():
                                 ncorr=corrs.shape[0], params=params)
                         del corrs, corr, thisdate, thistime
                 del current, allcorr, t1, t2
-            logging.debug("Updating Job")
+            logger.debug("Updating Job")
             # Would be better after the massive update at the end of the day job
             # but here it allows to only insert the stack job if the CC was 
             # successful.
             if not params.hpc:
                 update_job(db, goal_day, orig_pair, 'STACK', 'T')
 
-            logging.info("Finished processing this pair. It took %.2f seconds" % (time.time() - tt))
+            logger.info("Finished processing this pair. It took %.2f seconds" % (time.time() - tt))
         massive_update_job(db, jobs, "D")
         clean_scipy_cache()
 
-        logging.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & process %.2f s)" % ((time.time() - jt), start_processing-jt, time.time()-start_processing))
+        logger.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & process %.2f s)" % ((time.time() - jt), start_processing-jt, time.time()-start_processing))
         del stream
-    logging.info('*** Finished: Compute CC ***')
+    logger.info('*** Finished: Compute CC ***')

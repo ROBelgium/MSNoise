@@ -122,6 +122,10 @@ variations.
 from obspy.signal.regression import linear_regression
 from .api import *
 
+# get a logger name 'msnoise.xxxxxx' that will
+# inherit the 'msnoise' logger settings.
+logger = logging.getLogger(__name__)
+
 
 def wavg_wstd(data, errors):
     d = data
@@ -134,11 +138,7 @@ def wavg_wstd(data, errors):
 
 
 def main(interval=1):
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s [%(levelname)s] %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
-
-    logging.info('*** Starting: Compute DT/T ***')
+    logger.info('*** Starting: Compute DT/T ***')
     db = connect()
     params = get_params(db)
 
@@ -176,7 +176,7 @@ def main(interval=1):
             filterid = int(f.ref)
             for components in components_to_compute:
                 for mov_stack in mov_stacks:
-                    logging.info('Loading mov=%i days for filter=%02i' %
+                    logger.info('Loading mov=%i days for filter=%02i' %
                                  (mov_stack, filterid))
                     first = True
                     for job in jobs:
@@ -196,7 +196,7 @@ def main(interval=1):
                         #                                  station1.coordinates)
                         dist = interstations[pair]
                         if dist == 0. and params.dtt_lag == "dynamic":
-                            logging.debug('%s: Distance is Zero?!' % pair)
+                            logger.debug('%s: Distance is Zero?!' % pair)
                         if os.path.isfile(day):
                             df = pd.read_csv(
                                 day, delimiter=' ', header=None, index_col=0,
@@ -374,7 +374,7 @@ def main(interval=1):
                             del VecXfilt, VecYfilt, w
                             del index, cohindex, errindex, dtindex
     
-                        logging.debug(
+                        logger.debug(
                             "%s: exporting: %i pairs" % (current,
                                                          len(pairArray)))
                         df = pd.DataFrame(
@@ -396,7 +396,7 @@ def main(interval=1):
         # THIS SHOULD BE IN THE API
         massive_update_job(db, jobs, "D")
 
-    logging.info('*** Finished: Compute DT/T ***')
+    logger.info('*** Finished: Compute DT/T ***')
 
 
 if __name__ == "__main__":

@@ -89,6 +89,10 @@ import scipy.signal
 
 from .api import *
 
+# get a logger name 'msnoise.xxxxxx' that will
+# inherit the 'msnoise' logger settings.
+logger = logging.getLogger(__name__)
+
 
 def main(stype, interval=1.0):
     """Computes the REF/MOV stacks.
@@ -101,12 +105,7 @@ def main(stype, interval=1.0):
         Number of days before now to search for modified CC jobs
 
     """
-    logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s [%(levelname)s] %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S')
-
-    
-    logging.debug('Starting the %s stack' % stype)
+    logger.debug('Starting the %s stack' % stype)
     db = connect()
     components_to_compute = get_components_to_compute(db)
     export_format = get_config(db, 'export_format')
@@ -183,7 +182,7 @@ def main(stype, interval=1.0):
         pair = jobs[0].pair
         refs, days = zip(*[[job.ref, job.day] for job in jobs])
 
-        logging.info(
+        logger.info(
             "There are STACKS jobs for some days to recompute for %s" % pair)
         sta1, sta2 = pair.split(':')
         for f in filters:
@@ -192,22 +191,22 @@ def main(stype, interval=1.0):
                 pair = "%s:%s" % (sta1, sta2)
                 sta1 = sta1.replace('.', '_')
                 sta2 = sta2.replace('.', '_')
-                logging.debug('Processing %s-%s-%i' %
+                logger.debug('Processing %s-%s-%i' %
                                   (pair, components, filterid))
                 # updated_days = updated_days_for_dates(db, start, end, pair.replace('_', '.'), jobtype='CC', interval=datetime.timedelta(days=interval),returndays=True)
                 updated_days = [UTCDateTime(d).datetime.date() for d in days]
                 if len(updated_days) != 0:
-                    logging.debug("New Data for %s-%s-%i" %
+                    logger.debug("New Data for %s-%s-%i" %
                                   (pair, components, filterid))
                     #~ print updated_days
                     nstack, stack_total = get_results(
                         db, sta1, sta2, filterid, components, datelist, format=format, params=params)
                     if not nstack:
-                        logging.debug("No new data found, hmmm")
-                    logging.debug("Data loaded")
+                        logger.debug("No new data found, hmmm")
+                    logger.debug("Data loaded")
                     if nstack > 0:
                         if stype == "mov":
-                            logging.debug("Mov Stack!")
+                            logger.debug("Mov Stack!")
                             for i, date in enumerate(datelist):
                                 jobadded = False
                                 for mov_stack in mov_stacks:
@@ -227,7 +226,7 @@ def main(stype, interval=1.0):
                                         if not np.all(np.isnan(corr)):
                                             day_name = "%s_%s" % (
                                                 sta1, sta2)
-                                            logging.debug("%s %s %s [%s - %s] (%i day stack)" % (
+                                            logger.debug("%s %s %s [%s - %s] (%i day stack)" % (
                                                 day_name, components, date, datelist[low], datelist[i], mov_stack))
                                             corr = stack(corr, stack_method,
                                                          pws_timegate,
@@ -277,7 +276,7 @@ def main(stype, interval=1.0):
                                         if not np.all(np.isnan(corr)):
                                             day_name = "%s_%s" % (
                                                 sta1, sta2)
-                                            logging.debug("%s %s %s [%s - %s] (%i day stack)" % (
+                                            logger.debug("%s %s %s [%s - %s] (%i day stack)" % (
                                                 day_name, components, date, datelist[low], datelist[high-1], mov_stack))
                                             corr = stack(corr, stack_method,
                                                          pws_timegate,
@@ -336,7 +335,7 @@ def main(stype, interval=1.0):
     # if stype == "ref":
     #     massive_update_job(db, biglist, "T")
 
-    logging.debug("Finished Stacking")
+    logger.debug("Finished Stacking")
 
 
 def refstack(interval):

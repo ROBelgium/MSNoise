@@ -75,13 +75,13 @@ could occur with SQLite.
 from .api import *
 from .move2obspy import mwcs
 
+# get a logger name 'msnoise.xxxxxx' that will
+# inherit the 'msnoise' logger settings.
+logger = logging.getLogger(__name__)
+
 
 def main():
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s [%(levelname)s] %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
-
-    logging.info('*** Starting: Compute MWCS ***')
+    logger.info('*** Starting: Compute MWCS ***')
     
     db = connect()
     components_to_compute = get_components_to_compute(db)
@@ -106,12 +106,12 @@ def main():
     #     sta2 = "%s.%s" % (station2.net, station2.sta)
     #     pair = "%s:%s" % (sta1, sta2)
     #     if is_dtt_next_job(db, jobtype='DTT', ref=pair):
-    #         logging.info(
+    #         logger.info(
     #             "We will recompute all MWCS based on the new REF for %s" % pair)
     #         reset_dtt_jobs(db, pair)
     #         update_job(db, "REF", pair, jobtype='DTT', flag='D')
     # 
-    logging.debug('Ready to compute')
+    logger.debug('Ready to compute')
     # Then we compute the jobs
     outfolders = []
     filters = get_filters(db, all=False)
@@ -127,7 +127,7 @@ def main():
         pair = jobs[0].pair
         refs, days = zip(*[[job.ref, job.day] for job in jobs])
 
-        logging.info(
+        logger.info(
             "There are MWCS jobs for some days to recompute for %s" % pair)
         for f in filters:
             filterid = int(f.ref)
@@ -145,7 +145,7 @@ def main():
                             str(day) + extension)
                         if os.path.isfile(df):
                             cur = read(df)[0].data
-                            logging.debug(
+                            logger.debug(
                                 'Processing MWCS for: %s.%s.%02i - %s - %02i days' %
                                 (ref_name, components, filterid, day, mov_stack))
                             output = mwcs(
@@ -165,4 +165,4 @@ def main():
             for job in jobs:
                 update_job(db, job.day, job.pair, 'DTT', 'T')
 
-    logging.info('*** Finished: Compute MWCS ***')
+    logger.info('*** Finished: Compute MWCS ***')

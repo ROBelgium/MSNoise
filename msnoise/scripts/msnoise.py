@@ -212,7 +212,8 @@ def info_plugins(db):
 @click.option('-c', '--custom', default=False, is_flag=True, help='Use custom \
  file for plots. To use this, copy the plot script here and edit it.')
 @click.option('-v', '--verbose', is_flag=True, callback=validate_verbosity)
-@click.option('-q', '--quiet', is_flag=True, callback=validate_verbosity)
+@click.option('-q', '--quiet', is_flag=True, default=False,
+              callback=validate_verbosity)
 @click.pass_context
 def cli(ctx, threads, delay, custom, verbose, quiet):
     ctx.obj['MSNOISE_threads'] = threads
@@ -225,7 +226,7 @@ def cli(ctx, threads, delay, custom, verbose, quiet):
         ctx.obj['MSNOISE_verbosity'] = "DEBUG"
     logger = get_logger('msnoise', ctx.obj['MSNOISE_verbosity'])
     # Is this really needed?
-    sys.path.append(os.getcwd())
+    # sys.path.append(os.getcwd())
 
 
 # @with_plugins(iter_entry_points('msnoise.plugins'))

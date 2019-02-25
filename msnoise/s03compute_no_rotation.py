@@ -168,34 +168,34 @@ from .preprocessing import preprocess
 from scipy.stats import scoreatpercentile
 from obspy.signal.filter import bandpass
 
+# get a logger name 'msnoise.xxxxxx' that will
+# inherit the 'msnoise' logger settings.
+logger = logging.getLogger(__name__)
+
 
 def main():
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s [%(levelname)s] %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
-
-    logging.info('*** Starting: Compute CC ***')
+    logger.info('*** Starting: Compute CC ***')
 
     # Connection to the DB
     db = connect()
 
     if len(get_filters(db, all=False)) == 0:
-        logging.info("NO FILTERS DEFINED, exiting")
+        logger.info("NO FILTERS DEFINED, exiting")
         sys.exit()
 
     # Get Configuration
     params = get_params(db)
     filters = get_filters(db, all=False)
-    logging.info("Will compute %s" % " ".join(params.components_to_compute))
+    logger.info("Will compute %s" % " ".join(params.components_to_compute))
 
     if params.remove_response:
-        logging.debug('Pre-loading all instrument response')
+        logger.debug('Pre-loading all instrument response')
         responses = preload_instrument_responses(db)
     else:
         responses = None
-    logging.info("Checking if there are jobs to do")
+    logger.info("Checking if there are jobs to do")
     while is_next_job(db, jobtype='CC'):
-        logging.info("Getting the next job")
+        logger.info("Getting the next job")
         jobs = get_next_job(db, jobtype='CC')
 
         stations = []
@@ -212,7 +212,7 @@ def main():
 
         stations = np.unique(stations)
 
-        logging.info("New CC Job: %s (%i pairs with %i stations)" %
+        logger.info("New CC Job: %s (%i pairs with %i stations)" %
                      (goal_day, len(pairs), len(stations)))
         jt = time.time()
 
@@ -228,19 +228,19 @@ def main():
         comps = np.unique(comps)
         stream = preprocess(db, stations, comps, goal_day, params, responses)
         if not len(stream):
-            logging.info("Not enough data for this day !")
-            logging.info("Marking job Done and continuing with next !")
+            logger.info("Not enough data for this day !")
+            logger.info("Marking job Done and continuing with next !")
             for job in jobs:
                 update_job(db, job.day, job.pair, 'CC', 'D', ref=job.ref)
             continue
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.goal_sampling_rate
-        logging.info("Starting slides")
+        logger.info("Starting slides")
         start_processing = time.time()
         allcorr = {}
         for tmp in stream.slide(params.corr_duration,
                                 params.corr_duration * (1 - params.overlap)):
-            logging.info("Processing %s - %s" % (tmp[0].stats.starttime,
+            logger.info("Processing %s - %s" % (tmp[0].stats.starttime,
                                                  tmp[0].stats.endtime))
             tmp = tmp.copy().sort()
 
@@ -251,7 +251,7 @@ def main():
                         ".".join([gap[0], gap[1], gap[2], gap[3]]))
 
             for chan in np.unique(channels_to_remove):
-                logging.debug("%s contains gap(s), removing it" % chan)
+                logger.debug("%s contains gap(s), removing it" % chan)
                 net, sta, loc, chan = chan.split(".")
                 for tr in tmp.select(network=net,
                                      station=sta,
@@ -259,22 +259,22 @@ def main():
                                      channel=chan):
                     tmp.remove(tr)
             if len(tmp) == 0:
-                logging.debug("No traces without gaps")
+                logger.debug("No traces without gaps")
                 continue
 
             base = np.amax([tr.stats.npts for tr in tmp])
             if base <= (params.maxlag*params.goal_sampling_rate*2+1):
-                logging.debug("All traces shorter are too short to export"
+                logger.debug("All traces shorter are too short to export"
                               " +-maxlag")
                 continue
 
             for tr in tmp:
                 if tr.stats.npts != base:
                     tmp.remove(tr)
-                    logging.debug("One trace is too short, removing it")
+                    logger.debug("One trace is too short, removing it")
 
             if len(tmp) == 0:
-                logging.debug("No traces left in slice")
+                logger.debug("No traces left in slice")
                 continue
 
             nfft = next_fast_len(tmp[0].stats.npts)
@@ -409,8 +409,8 @@ def main():
                                           freqmax=filterhigh,
                                           df=params.goal_sampling_rate,
                                           corners=8)
-                    if params.cc_type_single_station == "CC":
-                        logging.debug("Computer AC and SC using %s"%params.cc_type_single_station)
+                    if params.cc_type_single_station_AC == "CC":
+                        logger.debug("Computer AC and SC using %s"%params.cc_type_single_station_AC)
                         
                         ffts = scipy.fftpack.fftn(tmp, shape=[nfft, ], 
                                                   axes=[1, ])
@@ -426,9 +426,9 @@ def main():
                                        plot=False,
                                        nfft=nfft)
 
-                    elif params.cc_type_single_station == "PCC":
-                        logging.debug(
-                            "Compute AC and SC using %s" % params.cc_type_single_station)
+                    elif params.cc_type_single_station_AC == "PCC":
+                        logger.debug(
+                            "Compute AC and SC using %s" % params.cc_type_single_station_AC)
                         corr = pcc_xcorr(tmp, np.ceil(params.maxlag / dt),
                                          None, single_station_pair_index_ac)
                     else:
@@ -445,14 +445,14 @@ def main():
                 
                 if len(cc_index):
                     if params.cc_type == "CC":
-                        logging.debug("Compute CC using %s" % params.cc_type)
+                        logger.debug("Compute CC using %s" % params.cc_type)
                         ffts = scipy.fftpack.fftn(data, shape=[nfft, ], axes=[1, ])
                         whiten2(ffts, nfft, low, high, p1, p2, psds,
                                 params.whitening)  # inplace
                         # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
                         energy = np.real(np.sqrt( np.mean(scipy.fftpack.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
         
-                        # logging.info("Pre-whitened %i traces"%(i+1))
+                        # logger.info("Pre-whitened %i traces"%(i+1))
                         # Computing standard CC
                         corr = myCorr2(ffts,
                                        np.ceil(params.maxlag / dt),
@@ -487,12 +487,12 @@ def main():
 
                 corrs = np.asarray(list(allcorr[ccfid].values()))
                 if not len(corrs):
-                    logging.debug("No data to stack.")
+                    logger.debug("No data to stack.")
                     continue
                 corr = stack(corrs, params.stack_method, params.pws_timegate,
                              params.pws_power, params.goal_sampling_rate)
                 if not len(corr):
-                    logging.debug("No data to save.")
+                    logger.debug("No data to save.")
                     continue
                 thisdate = goal_day
                 thistime = "0_0"
@@ -512,11 +512,11 @@ def main():
             for job in jobs:
                 update_job(db, job.day, job.pair, 'STACK', 'T')
 
-        logging.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & "
+        logger.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & "
                      "process %.2f s)" % ((time.time() - jt),
                                           start_processing - jt,
                                           time.time() - start_processing))
         del stream
-    logging.info('*** Finished: Compute CC ***')
+    logger.info('*** Finished: Compute CC ***')
 
 

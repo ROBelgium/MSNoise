@@ -37,14 +37,16 @@ should be run after the ``msnoise compute_cc`` step in order to create the
 from .api import *
 import pandas as pd
 
+# get a logger name 'msnoise.s02new_jobs' that will
+# inherit the 'msnoise' logger settings.
+logger = logging.getLogger(__name__)
 
 def main(init=False, nocc=False):
-
-    logging.info('*** Starting: New Jobs ***')
+    logger.info('*** Starting: New Jobs ***')
 
     db = connect()
     params = get_params(db)
-    logging.debug("Checking plugins' entry points")
+    logger.debug("Checking plugins' entry points")
     plugins = get_config(db, "plugins")
     extra_jobtypes_scan_archive = []
     extra_jobtypes_new_files = []
@@ -65,9 +67,10 @@ def main(init=False, nocc=False):
     if len(params.components_to_compute_single_station):
         autocorr = True
 
-    logging.debug('Scanning New/Modified files')
+    logger.debug('Scanning New/Modified files')
     stations_to_analyse = ["%s.%s" % (sta.net, sta.sta) for sta in get_stations(db, all=False)]
     all_jobs = []
+    crap_all_jobs_text = []
     updated_days = []
     nfs = get_new_files(db)
     now = datetime.datetime.utcnow()
@@ -80,15 +83,22 @@ def main(init=False, nocc=False):
         for date in pd.date_range(start, end, freq="D"):
             updated_days.append(date.date())
             for jobtype in extra_jobtypes_new_files:
-                all_jobs.append({"day": date.date(),
+                job = {"day": date.date(),
                                  "pair": "%s.%s" % (nf.net, nf.sta),
                                  "jobtype": jobtype,
-                                 "flag": "T", "lastmod": now})
+                                 "flag": "T", "lastmod": now}
+                jobtxt = ''.join(str(x) for x in job.values())
+                if jobtxt not in crap_all_jobs_text:
+                    all_jobs.append(job)
+                    crap_all_jobs_text.append(jobtxt)
 
-    # all_jobs = list(np.unique(all_jobs))
+    # all_jobs = pd.DataFrame(all_jobs)
+    # all_jobs.drop_duplicates(inplace=True)
+    # print(len(all_jobs))
+    # all_jobs = all_jobs.to_dict()
     updated_days = np.asarray(updated_days)
     updated_days = np.unique(updated_days)
-    logging.debug('Determining available data for each "updated date"')
+    logger.debug('Determining available data for each "updated date"')
     count = 0
     if len(extra_jobtypes_scan_archive) != 0 or not nocc:
         for day in updated_days:
@@ -119,14 +129,14 @@ def main(init=False, nocc=False):
                             jobs.append(pair)
 
             if init and len(all_jobs) > 1e5:
-                logging.debug('Already 100.000 jobs, inserting/updating')
+                logger.debug('Already 100.000 jobs, inserting/updating')
                 massive_insert_job(all_jobs)
                 all_jobs = []
                 count += 1e5
     else:
-        logging.debug("skipping the CC jobs creation & the extrajobtype creation")
+        logger.debug("skipping the CC jobs creation & the extrajobtype creation")
     if len(all_jobs) != 0:
-        logging.debug('Inserting/Updating %i jobs' % len(all_jobs))
+        logger.debug('Inserting/Updating %i jobs' % len(all_jobs))
         if init:
             massive_insert_job(all_jobs)
         else:
@@ -141,7 +151,7 @@ def main(init=False, nocc=False):
         mark_data_availability(db, sta.net, sta.sta, flag='A')
 
     db.commit()
-    logging.info('*** Finished: New Jobs ***')
+    logger.info('*** Finished: New Jobs ***')
 
     return count
 
