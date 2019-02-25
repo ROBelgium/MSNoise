@@ -10,7 +10,7 @@ import unittest
 logger = logging.getLogger('matplotlib')
 # set WARNING for Matplotlib
 logger.setLevel(logging.CRITICAL)
-
+import tempfile
 from click.testing import CliRunner
 from obspy import read
 from .. import FatalError, s01scan_archive
@@ -547,16 +547,21 @@ def main(prefix=""):
 
     import os
     import sys
-    c = len(os.listdir(os.getcwd()))
-    if c > 0:
-        print("Directory is not empty, can't run tests here!")
-        sys.exit()
+    test_dir = tempfile.mkdtemp()
+    os.chdir(test_dir)
+    print("Tests will be executed in %s" % test_dir)
+    # c = len(os.listdir(os.getcwd()))
+    # if c > 0:
+    #     print("Directory is not empty, can't run tests here!")
+    #     sys.exit()
     os.environ["PREFIX"] = prefix
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
     runner = unittest.TextTestRunner(verbosity=4)
     result = runner.run(suite)
+    print("Tests executed in %s" % test_dir)
     if not result.wasSuccessful():
         sys.exit(1)
+    
 
 
 if __name__ == '__main__':
