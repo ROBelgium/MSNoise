@@ -561,7 +561,6 @@ def main(prefix=""):
     print("Tests executed in %s" % test_dir)
     if not result.wasSuccessful():
         sys.exit(1)
-    
 
 
 if __name__ == '__main__':
