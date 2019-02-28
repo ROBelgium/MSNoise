@@ -14,6 +14,9 @@ import math
 import pkg_resources
 import sys
 
+from logbook import Logger, StreamHandler
+import sys
+
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
@@ -56,17 +59,16 @@ def get_logger(name, loglevel=None, with_pid=False):
     # logger.setLevel(loglevel)
     # logger.propagate = False
 
-    from logbook import Logger, StreamHandler
-    import sys
-
     if with_pid:
-        log_fmt="{record.time} msnoise [pid {record.process}] [{record.level_name}]: {record.message}"
+        log_fmt="{record.time} msnoise [pid {record.process}]" \
+                "[{record.level_name}]: {record.message}"
     else:
         log_fmt="{record.time} msnoise [{record.level_name}]: {record.message}"
-    
-    StreamHandler(sys.stdout, format_string=log_fmt, level=loglevel).push_application()
+
+    StreamHandler(sys.stdout, format_string=log_fmt, 
+                  level=loglevel).push_application()
     logger = Logger(name)
-    
+
     return logger
 
 
