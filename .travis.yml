@@ -50,6 +50,7 @@ before_install:
   - conda install --yes -q lxml pyqt
   - conda install --yes -q -c conda-forge obspy
   - conda install --yes -q -c conda-forge flask-admin markdown codecov
+  - pip install logbook
   - ls -la
 
 install:

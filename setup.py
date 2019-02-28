@@ -22,6 +22,7 @@ setup(version="1.5.1",
           'wtforms',
           'jinja2',
           'scandir',  # useful for python < 3.5
+          'logbook'
       ],
       extras_require={
           'doc': [
