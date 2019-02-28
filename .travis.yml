@@ -32,7 +32,7 @@ before_install:
     fi
   - if [[ $TRAVIS_OS_NAME == "osx" ]]; then brew update > /dev/null && brew install mariadb && brew services start mariadb; fi
   # MySQL database
-  - mysql -u root -e 'create database msnoise;'
+  - mysql -u root -e "create database msnoise;"
   # Python and related stuff
   - if [[ "${PYTHON_VERSION:0:1}" == '2' ]]; then
       wget https://repo.continuum.io/miniconda/Miniconda2-latest-${OS}-x86_64.sh -O miniconda.sh;
