@@ -170,10 +170,10 @@ from obspy.signal.filter import bandpass
 
 import logbook
 
-def main():
+def main(loglevel="INFO"):
     logger = logbook.Logger(__name__)
     # Reconfigure logger to show the pid number in log records
-    logger = get_logger('msnoise.compute_cc_norot_child', logger.level,
+    logger = get_logger('msnoise.compute_cc_norot_child', loglevel,
                         with_pid=True)
     logger.info('*** Starting: Compute CC ***')
 
@@ -229,19 +229,19 @@ def main():
         comps = np.unique(comps)
         stream = preprocess(db, stations, comps, goal_day, params, responses)
         if not len(stream):
-            logger.info("Not enough data for this day !")
-            logger.info("Marking job Done and continuing with next !")
+            logger.debug("Not enough data for this day !")
+            logger.debug("Marking job Done and continuing with next !")
             for job in jobs:
                 update_job(db, job.day, job.pair, 'CC', 'D', ref=job.ref)
             continue
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.goal_sampling_rate
-        logger.info("Starting slides")
+        logger.debug("Starting slides")
         start_processing = time.time()
         allcorr = {}
         for tmp in stream.slide(params.corr_duration,
                                 params.corr_duration * (1 - params.overlap)):
-            logger.info("Processing %s - %s" % (tmp[0].stats.starttime,
+            logger.debug("Processing %s - %s" % (tmp[0].stats.starttime,
                                                  tmp[0].stats.endtime))
             tmp = tmp.copy().sort()
 
@@ -301,20 +301,23 @@ def main():
 
             # index net.sta comps for energy later
             channel_index = {}
-            psds = []
-            for i, name in enumerate(names):
-                n1, s1, l1, c1 = name
-                netsta = "%s.%s" % (n1, s1)
-                if netsta not in channel_index:
-                    channel_index[netsta] = {}
-                channel_index[netsta][c1[-1]] = i
-
-                pxx, freqs = mlab.psd(tmp[i].data,
-                                      Fs=tmp[i].stats.sampling_rate,
-                                      NFFT=nfft,
-                                      detrend='mean')
-                psds.append(np.sqrt(pxx))
-            psds = np.asarray(psds)
+            if params.whitening == "PSD": #TODO not the unique case!
+                psds = []
+                for i, name in enumerate(names):
+                    n1, s1, l1, c1 = name
+                    netsta = "%s.%s" % (n1, s1)
+                    if netsta not in channel_index:
+                        channel_index[netsta] = {}
+                    channel_index[netsta][c1[-1]] = i
+    
+                    pxx, freqs = mlab.psd(tmp[i].data,
+                                          Fs=tmp[i].stats.sampling_rate,
+                                          NFFT=nfft,
+                                          detrend='mean')
+                    psds.append(np.sqrt(pxx))
+                psds = np.asarray(psds)
+            else:
+                psds = np.zeros(1)
 
             for chan in channel_index:
                 comps = channel_index[chan].keys()
@@ -377,9 +380,9 @@ def main():
                                                      comp[::-1]),
                                  names.index(sta2), names.index(sta1)])
 
-            print("cc_index", cc_index)
-            print("single_station sc", single_station_pair_index_sc)
-            print("single_station ac", single_station_pair_index_ac)
+            # print("cc_index", cc_index)
+            # print("single_station sc", single_station_pair_index_sc)
+            # print("single_station ac", single_station_pair_index_ac)
             
             # TODO : handle the three different corrs: CC SC and AC
             # TODO : and handle the fact they could use the same processing 
@@ -482,7 +485,7 @@ def main():
 
         if params.keep_days:
             for ccfid in allcorr.keys():
-                print("Exporting %s" % ccfid)
+                # print("Exporting %s" % ccfid)
                 station1, station2, components, filterid, date = \
                     ccfid.split('_')
 

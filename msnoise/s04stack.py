@@ -93,7 +93,7 @@ from .api import *
 import logbook
 
 
-def main(stype, interval=1.0):
+def main(stype, interval=1.0, loglevel="INFO"):
     """Computes the REF/MOV stacks.
     
     Parameters
@@ -106,7 +106,7 @@ def main(stype, interval=1.0):
     """
     logger = logbook.Logger(__name__)
     # Reconfigure logger to show the pid number in log records
-    logger = get_logger('msnoise.stack_child', logger.level,
+    logger = get_logger('msnoise.stack_child', loglevel,
                         with_pid=True)
     logger.debug('Starting the %s stack' % stype)
     db = connect()

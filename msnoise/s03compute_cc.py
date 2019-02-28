@@ -168,11 +168,10 @@ from .preprocessing import preprocess
 import logbook
 
 
-
-def main():
+def main(loglevel="INFO"):
     logger = logbook.Logger("msnoise")
     # Reconfigure logger to show the pid number in log records
-    logger = get_logger('msnoise.compute_cc_child', logger.level,
+    logger = get_logger('msnoise.compute_cc_child', loglevel,
                         with_pid=True)
 
     logger.info('*** Starting: Compute CC ***')

@@ -598,15 +598,16 @@ def new_jobs(init, nocc, hpc=""):
 def compute_cc(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
     from ..s03compute_cc import main
-    from multiprocessing import Process
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if threads == 1:
-        main()
+        main(loglevel=loglevel)
     else:
+        from multiprocessing import Process
         processes = []
         for i in range(threads):
-            p = Process(target=main)
+            p = Process(target=main, kwargs={"loglevel": loglevel})
             p.start()
             processes.append(p)
             time.sleep(delay)
@@ -619,15 +620,16 @@ def compute_cc(ctx):
 def compute_cc2(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
     from ..s03compute_no_rotation import main
-    from multiprocessing import Process
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if threads == 1:
-        main()
+        main(loglevel=loglevel)
     else:
+        from multiprocessing import Process
         processes = []
         for i in range(threads):
-            p = Process(target=main)
+            p = Process(target=main, kwargs={"loglevel": loglevel})
             p.start()
             processes.append(p)
             time.sleep(delay)
@@ -646,19 +648,21 @@ def stack(ctx, ref, mov, step):
     from ..s04stack import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if threads == 1:
         if ref:
-            main('ref')
+            main('ref', loglevel=loglevel)
         if mov:
-            main('mov')
+            main('mov', loglevel=loglevel)
         if step:
-            main('step')
+            main('step', loglevel=loglevel)
     else:
         from multiprocessing import Process
         processes = []
         if ref:
             for i in range(threads):
-                p = Process(target=main, args=["ref",])
+                p = Process(target=main, args=["ref",],
+                            kwargs={"loglevel": loglevel})
                 p.start()
                 processes.append(p)
                 time.sleep(delay)
@@ -666,7 +670,8 @@ def stack(ctx, ref, mov, step):
             p.join()
         if mov:
             for i in range(threads):
-                p = Process(target=main, args=["mov",])
+                p = Process(target=main, args=["mov",],
+                            kwargs={"loglevel": loglevel})
                 p.start()
                 processes.append(p)
                 time.sleep(delay)
@@ -674,7 +679,8 @@ def stack(ctx, ref, mov, step):
             p.join()
         if step:
             for i in range(threads):
-                p = Process(target=main, args=["step",])
+                p = Process(target=main, args=["step",],
+                            kwargs={"loglevel": loglevel})
                 p.start()
                 processes.append(p)
                 time.sleep(delay)
@@ -689,13 +695,14 @@ def compute_mwcs(ctx):
     from ..s05compute_mwcs import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if threads == 1:
-        main()
+        main(loglevel=loglevel)
     else:
         from multiprocessing import Process
         processes = []
         for i in range(threads):
-            p = Process(target=main)
+            p = Process(target=main, kwargs={"loglevel": loglevel})
             p.start()
             processes.append(p)
             time.sleep(delay)
@@ -718,14 +725,14 @@ def compute_dtt(ctx, interval):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt import main
     threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if threads == 1:
-        main(interval)
+        main(loglevel=loglevel)
     else:
         from multiprocessing import Process
         processes = []
         for i in range(threads):
-            p = Process(target=main, args=[interval,])
+            p = Process(target=main, kwargs={"loglevel": loglevel})
             p.start()
             processes.append(p)
             time.sleep(delay)

@@ -136,10 +136,10 @@ def wavg_wstd(data, errors):
     return wavg, wstd
 
 
-def main(interval=1):
+def main(interval=1, loglevel="INFO"):
     logger = logbook.Logger(__name__)
     # Reconfigure logger to show the pid number in log records
-    logger = get_logger('msnoise.compute_dtt_child', logger.level,
+    logger = get_logger('msnoise.compute_dtt_child', loglevel,
                         with_pid=True)
     logger.info('*** Starting: Compute DT/T ***')
     db = connect()
