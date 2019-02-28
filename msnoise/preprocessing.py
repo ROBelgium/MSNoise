@@ -10,6 +10,8 @@ except:
 
 from .api import *
 
+import logbook
+logger = logbook.Logger(__name__)
 
 def preprocess(db, stations, comps, goal_day, params, responses=None):
     """
@@ -71,7 +73,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
         for comp in comps:
             files = eval("datafiles['%s']['%s']" % (station, comp))
             if len(files) != 0:
-                logging.debug("%s.%s Reading %i Files" %
+                logger.debug("%s.%s Reading %i Files" %
                               (station, comp, len(files)))
                 stream = Stream()
                 for file in sorted(files):
@@ -80,7 +82,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                               starttime=UTCDateTime(gd),
                               endtime=UTCDateTime(gd)+86400)
                     except:
-                        logging.debug("ERROR reading file %s" % file)
+                        logger.debug("ERROR reading file %s" % file)
                         continue
                     for tr in st:
                         if len(tr.stats.channel) == 2:
@@ -107,17 +109,17 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     # same trace id with different sps to occur
                     stream.merge(method=1, interpolation_samples=3, fill_value=None)
                 except:
-                    logging.debug("Error while merging...")
+                    logger.debug("Error while merging...")
                     traceback.print_exc()
                     continue
                 stream = stream.split()
                 if not len(stream):
                     continue
-                logging.debug("%s Checking sample alignment" % stream[0].id)
+                logger.debug("%s Checking sample alignment" % stream[0].id)
                 for i, trace in enumerate(stream):
                     stream[i] = check_and_phase_shift(trace)
 
-                logging.debug("%s Checking Gaps" % stream[0].id)
+                logger.debug("%s Checking Gaps" % stream[0].id)
                 if len(getGaps(stream)) > 0:
                     max_gap = params.preprocess_max_gap*stream[0].stats.sampling_rate
                     only_too_long = False
@@ -153,21 +155,21 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         trace.taper(max_percentage=None, max_length=1.0)
 
                 if not len(stream):
-                    logging.debug(" has only too small traces, skipping...")
+                    logger.debug(" has only too small traces, skipping...")
                     continue
 
                 for trace in stream:
-                    logging.debug(
+                    logger.debug(
                         "%s Highpass at %.2f Hz" % (trace.id, params.preprocess_highpass))
                     trace.filter("highpass", freq=params.preprocess_highpass, zerophase=True)
 
                     if trace.stats.sampling_rate != params.goal_sampling_rate:
-                        logging.debug(
+                        logger.debug(
                             "%s Lowpass at %.2f Hz" % (trace.id, params.preprocess_lowpass))
                         trace.filter("lowpass", freq=params.preprocess_lowpass, zerophase=True, corners=8)
 
                         if params.resampling_method == "Resample":
-                            logging.debug("%s Downsample to %.1f Hz" %
+                            logger.debug("%s Downsample to %.1f Hz" %
                                           (trace.id, params.goal_sampling_rate))
                             trace.data = resample(
                                 trace.data, params.goal_sampling_rate / trace.stats.sampling_rate, 'sinc_fastest')
@@ -175,17 +177,17 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         elif params.resampling_method == "Decimate":
                             decimation_factor = trace.stats.sampling_rate / params.goal_sampling_rate
                             if not int(decimation_factor) == decimation_factor:
-                                logging.warning("%s CANNOT be decimated by an integer factor, consider using Resample or Lanczos methods"
+                                logger.warning("%s CANNOT be decimated by an integer factor, consider using Resample or Lanczos methods"
                                                 " Trace sampling rate = %i ; Desired CC sampling rate = %i" %
                                                 (trace.id, trace.stats.sampling_rate, params.goal_sampling_rate))
                                 sys.stdout.flush()
                                 sys.exit()
-                            logging.debug("%s Decimate by a factor of %i" %
+                            logger.debug("%s Decimate by a factor of %i" %
                                           (trace.id, decimation_factor))
                             trace.data = trace.data[::int(decimation_factor)]
 
                         elif params.resampling_method == "Lanczos":
-                            logging.debug("%s Downsample to %.1f Hz" %
+                            logger.debug("%s Downsample to %.1f Hz" %
                                           (trace.id, params.goal_sampling_rate))
                             trace.data = np.array(trace.data)
                             trace.interpolate(method="lanczos", sampling_rate=params.goal_sampling_rate, a=1.0)
@@ -193,7 +195,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         trace.stats.sampling_rate = params.goal_sampling_rate
 
                 if params.remove_response:
-                    logging.debug('%s Removing instrument response'%stream[0].id)
+                    logger.debug('%s Removing instrument response'%stream[0].id)
 
                     response = responses[responses["channel_id"] == stream[0].id]
                     if len(response) > 1:
@@ -201,13 +203,13 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     if len(response) > 1:
                         response = response[response["end_date"] >= UTCDateTime(gd)]
                     elif len(response) == 0:
-                        logging.info("No instrument response information "
+                        logger.info("No instrument response information "
                                      "for %s, skipping" % stream[0].id)
                         continue
                     try:
                         datalesspz = response["paz"].values[0]
                     except:
-                        logging.error("Bad instrument response information "
+                        logger.error("Bad instrument response information "
                                       "for %s, skipping" % stream[0].id)
                         continue
                     stream.simulate(paz_remove=datalesspz,
