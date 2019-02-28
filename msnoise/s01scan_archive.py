@@ -447,7 +447,7 @@ def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
         # Launch nproc children working on a mostly equal number of folders
         children = spawn_processes(pool, nproc, dir_list, scan_folders,
                 (mintime, startdate, enddate, goal_sampling_rate,
-                 archive_format, logger.getEffectiveLevel()))
+                 archive_format, logger.level))
         # Wait for children to finish, or terminate them if one crashes
         await_children(pool, children)
 
