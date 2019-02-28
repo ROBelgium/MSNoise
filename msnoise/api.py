@@ -39,22 +39,34 @@ def get_logger(name, loglevel=None, with_pid=False):
     """
     Returns the current configured logger or configure a new one.
     """
+    # if with_pid:
+    #     log_fmt='%(asctime)s msnoise [pid %(process)d] '\
+    #             '[%(levelname)s] %(message)s'
+    # else:
+    #     log_fmt='%(asctime)s msnoise [%(levelname)s] %(message)s'
+    # logger = logging.getLogger(name)
+    # # Remove any inherited StreamHandler to avoid duplicate lines
+    # for h in logger.handlers:
+    #     if isinstance(h, logging.StreamHandler):
+    #         logger.removeHandler(h)
+    # handler = logging.StreamHandler(sys.stderr)
+    # handler.setFormatter(
+    #         logging.Formatter(fmt=log_fmt, datefmt='%Y-%m-%d %H:%M:%S'))
+    # logger.addHandler(handler)
+    # logger.setLevel(loglevel)
+    # logger.propagate = False
+
+    from logbook import Logger, StreamHandler
+    import sys
+
     if with_pid:
-        log_fmt='%(asctime)s msnoise [pid %(process)d] '\
-                '[%(levelname)s] %(message)s'
+        log_fmt="{record.time} msnoise [pid {record.process}] [{record.level_name}]: {record.message}"
     else:
-        log_fmt='%(asctime)s msnoise [%(levelname)s] %(message)s'
-    logger = logging.getLogger(name)
-    # Remove any inherited StreamHandler to avoid duplicate lines
-    for h in logger.handlers:
-        if isinstance(h, logging.StreamHandler):
-            logger.removeHandler(h)
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(
-            logging.Formatter(fmt=log_fmt, datefmt='%Y-%m-%d %H:%M:%S'))
-    logger.addHandler(handler)
-    logger.setLevel(loglevel)
-    logger.propagate = False
+        log_fmt="{record.time} msnoise [{record.level_name}]: {record.message}"
+    
+    StreamHandler(sys.stdout, format_string=log_fmt, level=loglevel).push_application()
+    logger = Logger(name)
+    
     return logger
 
 

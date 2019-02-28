@@ -75,12 +75,15 @@ could occur with SQLite.
 from .api import *
 from .move2obspy import mwcs
 
-# get a logger name 'msnoise.xxxxxx' that will
-# inherit the 'msnoise' logger settings.
-logger = logging.getLogger(__name__)
+
+import logbook
 
 
 def main():
+    logger = logbook.Logger(__name__)
+    # Reconfigure logger to show the pid number in log records
+    logger = get_logger('msnoise.compute_mwcs_child', logger.level,
+                        with_pid=True)
     logger.info('*** Starting: Compute MWCS ***')
     
     db = connect()

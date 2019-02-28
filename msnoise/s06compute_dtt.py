@@ -122,9 +122,8 @@ variations.
 from obspy.signal.regression import linear_regression
 from .api import *
 
-# get a logger name 'msnoise.xxxxxx' that will
-# inherit the 'msnoise' logger settings.
-logger = logging.getLogger(__name__)
+
+import logbook
 
 
 def wavg_wstd(data, errors):
@@ -138,6 +137,10 @@ def wavg_wstd(data, errors):
 
 
 def main(interval=1):
+    logger = logbook.Logger(__name__)
+    # Reconfigure logger to show the pid number in log records
+    logger = get_logger('msnoise.compute_dtt_child', logger.level,
+                        with_pid=True)
     logger.info('*** Starting: Compute DT/T ***')
     db = connect()
     params = get_params(db)

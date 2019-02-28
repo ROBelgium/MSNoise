@@ -163,12 +163,18 @@ from .move2obspy import myCorr
 from .move2obspy import whiten
 
 from .preprocessing import preprocess
-# get a logger name 'msnoise.xxxxxx' that will
-# inherit the 'msnoise' logger settings.
-logger = logging.getLogger(__name__)
+
+
+import logbook
+
 
 
 def main():
+    logger = logbook.Logger("msnoise")
+    # Reconfigure logger to show the pid number in log records
+    logger = get_logger('msnoise.compute_cc_child', logger.level,
+                        with_pid=True)
+
     logger.info('*** Starting: Compute CC ***')
 
     # Connection to the DB

@@ -83,9 +83,8 @@ from . import FatalError
 from . import data_structures
 
 
-# get a logger name 'msnoise.s01scan_archive' that will
-# inherit the 'msnoise' logger settings.
-logger = logging.getLogger(__name__)
+import logbook
+logger = logbook.Logger(__name__)
 
 
 def update_availability(db, folder, basename, data):
@@ -142,17 +141,16 @@ def process_stream(db, folder, basename, stream, id_, startdate, enddate,
     :param enddate: the enddate configuration value
     :param goal_sampling_rate: the sampling rate
     """
-    net, sta, loc, chan = id_.split('.')
-    data = stream.select(network=net, station=sta, location=loc, channel=chan)
+    data = stream.select(id=id_)
     if data[-1].stats.endtime.date < startdate:
-        #logger.debug('ignoring %s: before start date!' % id)
+        logger.debug('ignoring %s: before start date!' % id_)
         return 0
     if data[0].stats.starttime.date > enddate:
-        #logger.debug('ignoring %s: after end date!' % id)
+        logger.debug('ignoring %s: after end date!' % id_)
         return 0
     if data[0].stats.sampling_rate < goal_sampling_rate:
-        #logger.debug('ignoring %s: sampling rate smaller than '
-        #              'CC sampling rate' % id)
+        logger.debug('ignoring %s: sampling rate smaller than '
+                     'CC sampling rate' % id_)
         return 0
     return update_availability(db, folder, basename, data)
 
@@ -179,7 +177,7 @@ def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
     unchanged = 0
     for basename in files:
         pathname = os.path.join(folder, basename)
-        #logger.debug('reading file %s' % pathname)
+        # logger.debug('reading file %s' % pathname)
         try:
             # Note: if format is None or unknown, obspy will use auto-detection.
             # See https://docs.obspy.org/packages/autogen/obspy.core.stream.read.html
@@ -196,17 +194,17 @@ def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
                     unchanged += 1
         except obspy.io.mseed.ObsPyMSEEDFilesizeTooSmallError as e:
             logger.warning("Ignoring possible empty file '%s'."
-                           ' Got error %s: %s',
-                           pathname, e.__class__.__name__, str(e))
+                           ' Got error %s: %s' %
+                           (pathname, e.__class__.__name__, str(e)))
         except OSError as e:
             # This should catch errors about file accesses
-            logger.error("Error while processing file '%s': %s",
-                         pathname, str(e))
+            logger.error("Error while processing file '%s': %s" %
+                         (pathname, str(e)))
             db.close()
             # Re-raise the exception to end the scan
             raise
-    logger.info('%s: Added %i | Modified %i | Unchanged %i',
-                folder, added, modified, unchanged)
+    logger.info('%s: Added %i | Modified %i | Unchanged %i' %
+                (folder, added, modified, unchanged))
 
 
 def list_directory(folder, mintime):
@@ -256,8 +254,8 @@ def scan_folders(folders, mintime, startdate, enddate, goal_sampling_rate,
     """
     global logger
     # Reconfigure logger to show the pid number in log records
-    logger = api.get_logger('msnoise.scan_archive_child',
-                            logger.getEffectiveLevel(), with_pid=True)
+    logger = api.get_logger('msnoise.scan_archive_child', logger.level,
+                            with_pid=True)
     db = api.connect()
     for folder in folders:
         logger.debug('scanning dir %s' % folder)
@@ -502,11 +500,11 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
     logger.info('*** Starting: Scan Archive ***')
     db = api.connect()
 
-    if api.read_db_inifile().tech == 1 and threads != 1:
-        logger.warning('You can not work on %i threads because SQLite only'
-                       ' supports 1 connection at a time. Continuing with '
-                       ' 1 process only.' % threads)
-        threads = 1
+    # if api.read_db_inifile().tech == 1 and threads != 1:
+    #     logger.warning('You can not work on %i threads because SQLite only'
+    #                    ' supports 1 connection at a time. Continuing with '
+    #                    ' 1 process only.' % threads)
+    #     threads = 1
     logger.info('Will work on %i thread(s)' % threads)
 
     if init:
@@ -545,7 +543,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
         data_folder = os.path.realpath(api.get_config(db, 'data_folder'))
         channels = api.get_config(db, 'channels').split(',')
         logger.debug('Will search for channels: %s' % channels)
-        logger.debug('Data Folder: %s' % data_folder)
+
 
         rawpath = get_data_structure(api.get_config(db, 'data_structure'))
         if rawpath is None:
@@ -586,19 +584,3 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
         logger.info('*** Finished: Scan Archive ***')
         logger.info('It took %.2f seconds' % (time.time() - scanning_starttime))
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-            description='Scan the data archive and insert the metadata'
-                        ' in the database')
-    parser.add_argument('-i', '--init', action='store_true',
-                        help='Initialize the archive: should only be done'
-                             ' upon first run. Will read all files in the'
-                             ' archive that match the station/component'
-                             ' (check that)',
-                        default=False)
-    parser.add_argument('-t', '--threads',
-                        help='Number of parallel threads to use [default:1]',
-                        default=1, type=int)
-    args = parser.parse_args()
-    main(args.init, args.threads)

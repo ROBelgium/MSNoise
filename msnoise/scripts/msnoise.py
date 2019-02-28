@@ -224,7 +224,11 @@ def cli(ctx, threads, delay, custom, verbose, quiet):
         ctx.obj['MSNOISE_verbosity'] = "WARNING"
     elif verbose:
         ctx.obj['MSNOISE_verbosity'] = "DEBUG"
-    logger = get_logger('msnoise', ctx.obj['MSNOISE_verbosity'])
+    global logger
+    if threads > 1:
+        logger = get_logger('msnoise', ctx.obj['MSNOISE_verbosity'], with_pid=True)
+    else:
+        logger = get_logger('msnoise', ctx.obj['MSNOISE_verbosity'])
     # Is this really needed?
     # sys.path.append(os.getcwd())
 

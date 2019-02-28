@@ -37,9 +37,9 @@ should be run after the ``msnoise compute_cc`` step in order to create the
 from .api import *
 import pandas as pd
 
-# get a logger name 'msnoise.s02new_jobs' that will
-# inherit the 'msnoise' logger settings.
-logger = logging.getLogger(__name__)
+
+import logbook
+logger = logbook.Logger(__name__)
 
 def main(init=False, nocc=False):
     logger.info('*** Starting: New Jobs ***')

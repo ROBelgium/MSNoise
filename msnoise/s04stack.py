@@ -89,9 +89,8 @@ import scipy.signal
 
 from .api import *
 
-# get a logger name 'msnoise.xxxxxx' that will
-# inherit the 'msnoise' logger settings.
-logger = logging.getLogger(__name__)
+
+import logbook
 
 
 def main(stype, interval=1.0):
@@ -105,6 +104,10 @@ def main(stype, interval=1.0):
         Number of days before now to search for modified CC jobs
 
     """
+    logger = logbook.Logger(__name__)
+    # Reconfigure logger to show the pid number in log records
+    logger = get_logger('msnoise.stack_child', logger.level,
+                        with_pid=True)
     logger.debug('Starting the %s stack' % stype)
     db = connect()
     components_to_compute = get_components_to_compute(db)
