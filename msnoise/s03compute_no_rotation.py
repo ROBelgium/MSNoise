@@ -301,7 +301,7 @@ def main(loglevel="INFO"):
 
             # index net.sta comps for energy later
             channel_index = {}
-            if params.whitening == "PSD": #TODO not the unique case!
+            if params.whitening_type == "PSD": #TODO not the unique case!
                 psds = []
                 for i, name in enumerate(names):
                     n1, s1, l1, c1 = name
@@ -414,7 +414,7 @@ def main(loglevel="INFO"):
                                           df=params.goal_sampling_rate,
                                           corners=8)
                     if params.cc_type_single_station_AC == "CC":
-                        logger.debug("Computer AC and SC using %s"%params.cc_type_single_station_AC)
+                        logger.debug("Computer AC using %s"%params.cc_type_single_station_AC)
                         
                         ffts = scipy.fftpack.fftn(tmp, shape=[nfft, ], 
                                                   axes=[1, ])
@@ -432,11 +432,11 @@ def main(loglevel="INFO"):
 
                     elif params.cc_type_single_station_AC == "PCC":
                         logger.debug(
-                            "Compute AC and SC using %s" % params.cc_type_single_station_AC)
+                            "Compute AC using %s" % params.cc_type_single_station_AC)
                         corr = pcc_xcorr(tmp, np.ceil(params.maxlag / dt),
                                          None, single_station_pair_index_ac)
                     else:
-                        print("cc_type_single_station = %s not implemented, "
+                        print("cc_type_single_station_AC = %s not implemented, "
                               "exiting")
                         exit(1)
 
@@ -447,12 +447,13 @@ def main(loglevel="INFO"):
                         allcorr[ccfid][thistime] = corr[key]
                     del corr
                 
+                cc_index += single_station_pair_index_sc
                 if len(cc_index):
                     if params.cc_type == "CC":
                         logger.debug("Compute CC using %s" % params.cc_type)
                         ffts = scipy.fftpack.fftn(data, shape=[nfft, ], axes=[1, ])
                         whiten2(ffts, nfft, low, high, p1, p2, psds,
-                                params.whitening)  # inplace
+                                params.whitening_type)  # inplace
                         # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
                         energy = np.real(np.sqrt( np.mean(scipy.fftpack.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
         
@@ -472,7 +473,7 @@ def main(loglevel="INFO"):
                             allcorr[ccfid][thistime] = corr[key]
                         del corr
                     else:
-                        print("cc_type_single_station = %s not implemented, "
+                        print("cc_type = %s not implemented, "
                               "exiting")
                         exit(1)
 

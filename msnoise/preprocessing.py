@@ -122,10 +122,10 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                 logger.debug("%s Checking Gaps" % stream[0].id)
                 if len(getGaps(stream)) > 0:
                     max_gap = params.preprocess_max_gap*stream[0].stats.sampling_rate
-                    only_too_long = False
-                    while getGaps(stream) and not only_too_long:
+
+                    gaps = getGaps(stream)
+                    while len(gaps):
                         too_long = 0
-                        gaps = getGaps(stream)
                         for gap in gaps:
                             if int(gap[-1]) <= max_gap:
                                 try:
@@ -138,8 +138,11 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                                 break
                             else:
                                 too_long += 1
+
                         if too_long == len(gaps):
-                            only_too_long = True
+                            break
+                        gaps = getGaps(stream)
+                    del gaps
 
                 stream = stream.split()
                 for tr in stream:
@@ -161,7 +164,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                 for trace in stream:
                     logger.debug(
                         "%s Highpass at %.2f Hz" % (trace.id, params.preprocess_highpass))
-                    trace.filter("highpass", freq=params.preprocess_highpass, zerophase=True)
+                    trace.filter("highpass", freq=params.preprocess_highpass, zerophase=True, corners=4)
 
                     if trace.stats.sampling_rate != params.goal_sampling_rate:
                         logger.debug(
@@ -193,6 +196,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                             trace.interpolate(method="lanczos", sampling_rate=params.goal_sampling_rate, a=1.0)
 
                         trace.stats.sampling_rate = params.goal_sampling_rate
+                    del trace
 
                 if params.remove_response:
                     logger.debug('%s Removing instrument response'%stream[0].id)

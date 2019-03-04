@@ -42,7 +42,8 @@ default['overlap'] = ["Amount of overlap between data windows [0:1[ [0.]",
 default['windsorizing'] = ["Windsorizing at N time RMS , 0 disables "
                            "windsorizing, -1 enables 1-bit normalization ["
                            "3]",'3', float]
-default['whitening'] = ["Whiten Traces before cross-correlation: All (except for autocorr), None, or only if components are different [A]/N/C",'A']
+default['whitening'] = ["Whiten Traces before cross-correlation: [A]ll (except for autocorr), [N]one, or only if [C]omponents are different: [A]/N/C",'A']
+default['whitening_type'] = ["Type of spectral whitening function to use: [B]rutal (amplitude to 1.0), divide spectrum by its [PSD]: [B]/PSD. WARNING: only works for compute_cc2, not compute_cc, where it will always be [B]",'B']
 
 default['stack_method'] = ["Stack Method: Linear Mean or Phase Weighted Stack: [linear]/pws ",'linear']
 default['pws_timegate'] = ["If stack_method='pws', width of the smoothing in "
@@ -59,7 +60,6 @@ default['components_to_compute'] = ["List (comma separated) of components to "
                                     "compute between two different stations ["
                                     "ZZ]", 'ZZ']
 default['cc_type'] = ["Cross-Correlation type [CC]/PCC", 'CC']
-# TODO add cc_type_SC, cc_type_CC, cc_type_AC ?
 
 default['components_to_compute_single_station'] = ["List (comma separated) of components within a single station. ZZ would  be the autocorrelation of Z component, while ZE or ZN are the cross-components. Defaults to [], no single-station computations are done.", '']
 default['cc_type_single_station_AC'] = ["Auto-Correlation type ["
