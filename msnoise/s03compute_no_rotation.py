@@ -445,7 +445,7 @@ def main(loglevel="INFO"):
                         if ccfid not in allcorr:
                             allcorr[ccfid] = {}
                         allcorr[ccfid][thistime] = corr[key]
-                    del corr
+                    del corr, energy
                 
                 cc_index += single_station_pair_index_sc
                 if len(cc_index):
@@ -471,12 +471,12 @@ def main(loglevel="INFO"):
                             if ccfid not in allcorr:
                                 allcorr[ccfid] = {}
                             allcorr[ccfid][thistime] = corr[key]
-                        del corr
+                        del corr, energy, ffts
                     else:
                         print("cc_type = %s not implemented, "
                               "exiting")
                         exit(1)
-
+            del psds
         # Needed to clean the FFT memory caching of SciPy
         clean_scipy_cache()
 
@@ -521,7 +521,7 @@ def main(loglevel="INFO"):
                      "process %.2f s)" % ((time.time() - jt),
                                           start_processing - jt,
                                           time.time() - start_processing))
-        del stream
+        del stream, allcorr
     logger.info('*** Finished: Compute CC ***')
 
 

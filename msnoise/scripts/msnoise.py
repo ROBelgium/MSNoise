@@ -725,6 +725,7 @@ def compute_dtt(ctx, interval):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt import main
     threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
     if threads == 1:
         main(loglevel=loglevel)
