@@ -147,7 +147,12 @@ def main(loglevel="INFO"):
                             mov_stack, components, ref_name,
                             str(day) + extension)
                         if os.path.isfile(df):
-                            cur = read(df)[0].data
+                            try:
+                                cur = read(df)[0].data
+                            except:
+                                logging.debug("Error reading %s, skipping." %
+                                              df)
+                                continue
                             logger.debug(
                                 'Processing MWCS for: %s.%s.%02i - %s - %02i days' %
                                 (ref_name, components, filterid, day, mov_stack))
