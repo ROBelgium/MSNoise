@@ -22,7 +22,7 @@ from ..api import *
 
 
 def main(filterid, components, ampli=1, show=True, outfile=None,
-         refilter=None, virtual_source=None):
+         refilter=None, virtual_source=None, **kwargs):
     db = connect()
 
     pairs = get_station_pairs(db, used=1)
@@ -94,7 +94,10 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
                  c=colors[i], label='%.1f $km s^{-1}$' % velocity)
         plt.plot([0, np.max(dists)/velocity], [0, np.max(dists)], c=colors[i])
 
-    plt.xlim(-maxlag, maxlag)
+    if "xlim" in kwargs:
+        plt.xlim(kwargs["xlim"][0], kwargs["xlim"][1])
+    else:
+        plt.xlim(-maxlag, maxlag)
     plt.xlabel("Time Lag (s)")
     plt.grid(True)
     plt.legend(loc=4)

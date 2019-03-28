@@ -27,7 +27,7 @@ from ..api import *
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
-         show=False, outfile=None, envelope=False, refilter=None):
+         show=False, outfile=None, envelope=False, refilter=None, **kwargs):
     db = connect()
     maxlag = float(get_config(db, 'maxlag'))
     samples = get_maxlag_samples(db)
@@ -87,7 +87,10 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
         plt.xlabel("Time Lag (s)")
         plt.ylim(start-datetime.timedelta(days=ampli),
                  end+datetime.timedelta(days=ampli))
-        plt.xlim(-maxlag, maxlag)
+        if "xlim" in kwargs:
+            plt.xlim(kwargs["xlim"][0],kwargs["xlim"][1])
+        else:
+            plt.xlim(-maxlag, maxlag)
         ax.fmt_ydata = mdates.DateFormatter('%Y-%m-%d')
         cursor = Cursor(ax, useblit=True, color='red', linewidth=1.2)
 

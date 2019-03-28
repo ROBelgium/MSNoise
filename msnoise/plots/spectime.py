@@ -31,7 +31,7 @@ from msnoise.api import build_movstack_datelist, connect, get_config, \
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
-         outfile=False, refilter=None, startdate=None, enddate=None):
+         outfile=False, refilter=None, startdate=None, enddate=None, **kwargs):
 
     db = connect()
     cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
@@ -79,6 +79,9 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
         ax.set_ylim(start-datetime.timedelta(days=ampli),
                     end+datetime.timedelta(days=ampli))
         ax.yaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+
+        if "xlim" in kwargs:
+            plt.xlim(kwargs["xlim"][0],kwargs["xlim"][1])
 
         ax.set_xlabel("Frequency [Hz]")
         ax.set_xscale('log')

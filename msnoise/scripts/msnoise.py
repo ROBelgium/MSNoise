@@ -12,6 +12,14 @@ from .. import MSNoiseError, DBConfigNotFoundError
 from ..api import connect, get_config, update_station, get_logger
 from ..msnoise_table_def import DataAvailability
 
+def parse_extra_args(extra_args):
+    # extra_args = extra_args.split(" ")
+    kwargs = {}
+    for e in extra_args:
+        kw, value = e.split("=")
+        kwargs[kw.replace("--","")] = eval(value)
+    return kwargs
+
 
 def validate_verbosity(ctx, param, value):
     """
@@ -876,7 +884,7 @@ def timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
 
 
-@plot.command()
+@plot.command(context_settings=dict(ignore_unknown_options=True,))
 @click.argument('sta1')
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
@@ -890,11 +898,15 @@ def timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED)
 @click.pass_context
 def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
-                  refilter):
+                  refilter, extra_args):
     """Plots the interferogram between sta1 and sta2 (parses the CCFs)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
+    if extra_args:
+        extra_args = parse_extra_args(extra_args)
+
     if sta1 > sta2:
         click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
         return
@@ -902,10 +914,12 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
         from interferogram import main
     else:
         from ..plots.interferogram import main
-    main(sta1, sta2, filterid, comp, mov_stack, show, outfile, refilter)
+    main(sta1, sta2, filterid, comp, mov_stack, show, outfile, refilter,
+         **extra_args)
 
 
-@plot.command()
+
+@plot.command(context_settings=dict(ignore_unknown_options=True,))
 @click.argument('sta1')
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
@@ -923,11 +937,15 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED)
 @click.pass_context
 def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
-            ampli, seismic, show, outfile, envelope, refilter):
+            ampli, seismic, show, outfile, envelope, refilter, extra_args):
     """Plots the ccf vs time between sta1 and sta2\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
+    if extra_args:
+        extra_args = parse_extra_args(extra_args)
+
     if sta1 > sta2:
         click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
         return
@@ -936,10 +954,10 @@ def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
     else:
         from ..plots.ccftime import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
-         envelope, refilter)
+         envelope, refilter, **extra_args)
 
 
-@plot.command()
+@plot.command(context_settings=dict(ignore_unknown_options=True,))
 @click.argument('sta1')
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
@@ -954,11 +972,15 @@ def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED)
 @click.pass_context
 def spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
-            ampli, show, outfile, refilter):
+            ampli, show, outfile, refilter, extra_args):
     """Plots the ccf's spectrum vs time between sta1 and sta2\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
+    if extra_args:
+        extra_args = parse_extra_args(extra_args)
+
     if sta1 > sta2:
         click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
         return
@@ -967,7 +989,7 @@ def spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
     else:
         from ..plots.spectime import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
-         refilter)
+         refilter, **extra_args)
 
 
 @plot.command()
@@ -995,7 +1017,7 @@ def mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
 
 
-@plot.command()
+@plot.command(context_settings=dict(ignore_unknown_options=True,))
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-a', '--ampli', default=1.0, help='Amplification')
@@ -1009,15 +1031,20 @@ def mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
 @click.option('--virtual-source', default=None,
               help='Use only pairs including this station. Format must be '
                    'NET.STA')
+@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED)
 @click.pass_context
 def distance(ctx, filterid, comp, ampli, show, outfile, refilter,
-             virtual_source):
+             virtual_source, extra_args):
     """Plots the REFs of all pairs vs distance"""
+    if extra_args:
+        extra_args = parse_extra_args(extra_args)
+        
     if ctx.obj['MSNOISE_custom']:
         from distance import main
     else:
         from ..plots.distance import main
-    main(filterid, comp, ampli, show, outfile, refilter, virtual_source)
+    main(filterid, comp, ampli, show, outfile, refilter, virtual_source,
+         **extra_args)
 
 
 @plot.command(name='station_map')

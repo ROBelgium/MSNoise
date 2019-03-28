@@ -27,7 +27,7 @@ from ..api import *
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
-         outfile=None, refilter=None):
+         outfile=None, refilter=None, **kwargs):
     db = connect()
     maxlag = float(get_config(db, 'maxlag'))
     cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
@@ -74,8 +74,12 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
                 low = float(filterdb.low)
                 high = float(filterdb.high)
                 break
-        
-        plt.ylim(-maxlag, maxlag)
+
+        if "ylim" in kwargs:
+            plt.ylim(kwargs["ylim"][0],kwargs["ylim"][1])
+        else:
+            plt.ylim(-maxlag, maxlag)
+
         title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' % \
                 (sta1.replace('_', '.'), sta2.replace('_', '.'), components,
                  filterid, low, high, mov_stack)
