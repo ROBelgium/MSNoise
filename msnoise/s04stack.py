@@ -73,7 +73,9 @@ stacks:
 
 .. code-block:: sh
 
-    $ msnoise stack -r -m
+    $ msnoise stack -r
+    $ msnoise reset STACK
+    $ msnoise stack -m
 
 
 .. versionadded:: 1.4
