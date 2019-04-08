@@ -143,11 +143,11 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
                 plt.plot(ALL.index, ALL[dttname], c='r',
                          label='ALL: $\delta v/v$ of the mean network')
 
-            tmp2 = allbut[dttname].resample('D').mean()
+            tmp2 = allbut[dttname].resample('D', how=np.mean)
             plt.plot(tmp2.index, tmp2, label="mean")
             # tmp2.plot(label='mean',)
 
-            tmp3 = allbut[dttname].resample('D').median()
+            tmp3 = allbut[dttname].resample('D',how=np.median)
             # tmp3.plot(label='median')
             plt.plot(tmp3.index, tmp3, label="median")
             plt.ylabel('dv/v (%)')
