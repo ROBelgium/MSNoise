@@ -12,12 +12,12 @@ from .. import MSNoiseError, DBConfigNotFoundError
 from ..api import connect, get_config, update_station, get_logger
 from ..msnoise_table_def import DataAvailability
 
-def parse_extra_args(extra_args):
+def parse_extra_args(ctx, param, extra_args):
     # extra_args = extra_args.split(" ")
     kwargs = {}
     for e in extra_args:
         kw, value = e.split("=")
-        kwargs[kw.replace("--","")] = eval(value)
+        kwargs[kw.replace("--", "")] = eval(value)
     return kwargs
 
 
@@ -898,14 +898,14 @@ def timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
-@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED)
+@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED, callback=parse_extra_args)
 @click.pass_context
 def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
                   refilter, extra_args):
     """Plots the interferogram between sta1 and sta2 (parses the CCFs)\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
-    if extra_args:
-        extra_args = parse_extra_args(extra_args)
+    
+        
 
     if sta1 > sta2:
         click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
@@ -937,14 +937,14 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
-@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED)
+@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED, callback=parse_extra_args)
 @click.pass_context
 def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
             ampli, seismic, show, outfile, envelope, refilter, extra_args):
     """Plots the ccf vs time between sta1 and sta2\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
-    if extra_args:
-        extra_args = parse_extra_args(extra_args)
+    
+    
 
     if sta1 > sta2:
         click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
@@ -972,14 +972,14 @@ def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
-@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED)
+@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED, callback=parse_extra_args)
 @click.pass_context
 def spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
             ampli, show, outfile, refilter, extra_args):
     """Plots the ccf's spectrum vs time between sta1 and sta2\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
-    if extra_args:
-        extra_args = parse_extra_args(extra_args)
+    
+        
 
     if sta1 > sta2:
         click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
@@ -1031,13 +1031,13 @@ def mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
 @click.option('--virtual-source', default=None,
               help='Use only pairs including this station. Format must be '
                    'NET.STA')
-@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED)
+@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED, callback=parse_extra_args)
 @click.pass_context
 def distance(ctx, filterid, comp, ampli, show, outfile, refilter,
              virtual_source, extra_args):
     """Plots the REFs of all pairs vs distance"""
-    if extra_args:
-        extra_args = parse_extra_args(extra_args)
+    
+        
         
     if ctx.obj['MSNOISE_custom']:
         from distance import main
