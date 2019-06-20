@@ -446,8 +446,7 @@ def main(loglevel="INFO"):
                             allcorr[ccfid] = {}
                         allcorr[ccfid][thistime] = corr[key]
                     del corr, energy
-                
-                cc_index += single_station_pair_index_sc
+
                 if len(cc_index):
                     if params.cc_type == "CC":
                         logger.debug("Compute CC using %s" % params.cc_type)
@@ -474,6 +473,38 @@ def main(loglevel="INFO"):
                         del corr, energy, ffts
                     else:
                         print("cc_type = %s not implemented, "
+                              "exiting")
+                        exit(1)
+
+                if len(single_station_pair_index_sc):
+                    if params.cc_type_single_station_SC == "CC":
+                        logger.debug("Compute SC using %s" % params.cc_type)
+                        ffts = scipy.fftpack.fftn(data, shape=[nfft, ],
+                                                  axes=[1, ])
+                        whiten2(ffts, nfft, low, high, p1, p2, psds,
+                                params.whitening_type)  # inplace
+                        # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
+                        energy = np.real(np.sqrt(np.mean(
+                            scipy.fftpack.ifft(ffts, n=nfft, axis=1) ** 2,
+                            axis=1)))
+
+                        # logger.info("Pre-whitened %i traces"%(i+1))
+                        # Computing standard CC
+                        corr = myCorr2(ffts,
+                                       np.ceil(params.maxlag / dt),
+                                       energy,
+                                       cc_index,
+                                       plot=False,
+                                       nfft=nfft)
+
+                        for key in corr:
+                            ccfid = key + "_%02i" % filterid + "_" + thisdate
+                            if ccfid not in allcorr:
+                                allcorr[ccfid] = {}
+                            allcorr[ccfid][thistime] = corr[key]
+                        del corr, energy, ffts
+                    else:
+                        print("cc_type_single_station_SC = %s not implemented, "
                               "exiting")
                         exit(1)
             del psds
