@@ -59,14 +59,14 @@ default['crondays'] = ["Number of days to monitor with scan_archive,"
 default['components_to_compute'] = ["List (comma separated) of components to "
                                     "compute between two different stations ["
                                     "ZZ]", 'ZZ']
-default['cc_type'] = ["Cross-Correlation type [CC]/PCC", 'CC']
+default['cc_type'] = ["Cross-Correlation type [CC]", 'CC']
 
 default['components_to_compute_single_station'] = ["List (comma separated) of components within a single station. ZZ would  be the autocorrelation of Z component, while ZE or ZN are the cross-components. Defaults to [], no single-station computations are done.", '']
 default['cc_type_single_station_AC'] = ["Auto-Correlation type ["
-                                      "CC]/PCC", 'CC']
+                                      "CC]", 'CC']
 default['cc_type_single_station_SC'] = ["Cross-Correlation type for "
                                         "Cross-Components ["
-                                      "CC]/PCC", 'CC']
+                                      "CC]", 'CC']
 
 default['autocorr'] = ["DEPRECATED, add the components to compute on single "
                        "stations in the "

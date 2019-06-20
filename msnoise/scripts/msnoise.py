@@ -9,7 +9,7 @@ import click
 import pkg_resources
 
 from .. import MSNoiseError, DBConfigNotFoundError
-from ..api import connect, get_config, update_station, get_logger
+from ..api import connect, get_config, update_station, get_logger, get_job_types
 from ..msnoise_table_def import DataAvailability
 
 def parse_extra_args(ctx, param, extra_args):
@@ -937,10 +937,11 @@ def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.option("--normalize", default="individual")
 @click.argument('extra_args', nargs=-1, type=click.UNPROCESSED, callback=parse_extra_args)
 @click.pass_context
 def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
-            ampli, seismic, show, outfile, envelope, refilter, extra_args):
+            ampli, seismic, show, outfile, envelope, refilter, normalize, extra_args):
     """Plots the ccf vs time between sta1 and sta2\n
     STA1 and STA2 must be provided with this format: NET.STA !"""
     
@@ -954,7 +955,7 @@ def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
     else:
         from ..plots.ccftime import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
-         envelope, refilter, **extra_args)
+         envelope, refilter, normalize, **extra_args)
 
 
 @plot.command(context_settings=dict(ignore_unknown_options=True,))

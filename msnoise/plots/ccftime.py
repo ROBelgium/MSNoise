@@ -27,7 +27,8 @@ from ..api import *
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
-         show=False, outfile=None, envelope=False, refilter=None, **kwargs):
+         show=False, outfile=None, envelope=False, refilter=None,
+         normalize=None, **kwargs):
     db = connect()
     maxlag = float(get_config(db, 'maxlag'))
     samples = get_maxlag_samples(db)
@@ -51,6 +52,8 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
                                             mov_stack))
         nstack, stack_total = get_results(db, sta1, sta2, filterid, components,
                                           datelist, mov_stack, format="matrix")
+        if normalize == "common":
+            stack_total /= np.nanmax(stack_total)
         ax = plt.subplot(111)
         for i, line in enumerate(stack_total):
             if np.all(np.isnan(line)):
@@ -60,7 +63,8 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
                                 zerophase=True)
             if envelope:
                 line = obspy_envelope(line)
-            line /= line.max()
+            if normalize == "individual":
+                line /= line.max()
             plt.plot(t, line * ampli + i + base, c='k', lw=0.5)
             if seismic:
                 y1 = np.ones(len(line)) * i + base
@@ -85,8 +89,8 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
         plt.title(title)
         plt.scatter(0, [start, ], alpha=0)
         plt.xlabel("Time Lag (s)")
-        plt.ylim(start-datetime.timedelta(days=ampli),
-                 end+datetime.timedelta(days=ampli))
+        plt.ylim(start-datetime.timedelta(days=10),
+                 end+datetime.timedelta(days=10))
         if "xlim" in kwargs:
             plt.xlim(kwargs["xlim"][0],kwargs["xlim"][1])
         else:
