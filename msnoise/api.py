@@ -1462,7 +1462,7 @@ def get_components_to_compute_single_station(session, plugin=None):
         components_to_compute = [components_to_compute,]
     else:
         components_to_compute = components_to_compute.split(",")
-    return components_to_compute
+    return np.unique([''.join(sorted(a)) for a in components_to_compute])
 
 
 def build_ref_datelist(session):
