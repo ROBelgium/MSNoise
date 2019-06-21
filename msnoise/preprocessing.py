@@ -104,13 +104,13 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         st = file.select(network=net, station=sta, component=comp).copy()
                     else:
                         try:
-                            print("Reading %s" % file)
-                            t=  time.time()
+                            # print("Reading %s" % file)
+                            # t=  time.time()
                             st = read(file, dytpe=np.float,
                                   starttime=UTCDateTime(gd),
                                   endtime=UTCDateTime(gd)+86400,
                                       station=sta)
-                            print("done in", time.time()-t)
+                            # print("done in", time.time()-t)
                         except:
                             logger.debug("ERROR reading file %s" % file)
                             continue

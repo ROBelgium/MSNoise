@@ -493,7 +493,7 @@ def main(loglevel="INFO"):
                         corr = myCorr2(ffts,
                                        np.ceil(params.maxlag / dt),
                                        energy,
-                                       cc_index,
+                                       single_station_pair_index_sc,
                                        plot=False,
                                        nfft=nfft)
 
