@@ -84,8 +84,9 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                             _ = read(fn)
                             traces = []
                             for tr in _:
-                                if "%s.%s" % (tr.stats.network, tr.stats.station) in stations:
+                                if "%s.%s" % (tr.stats.network, tr.stats.station) in stations and tr.stats.channel[-1] in comps:
                                     traces.append(tr)
+                            del _
                             _ = Stream(traces=traces)
                             MULTIPLEX_files[fn] = _
                         datafiles[station][comp].append(_)
@@ -262,4 +263,5 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                 del stream
             del files
     clean_scipy_cache()
+    del MULTIPLEX_files
     return output
