@@ -134,7 +134,8 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         traces.append(tr)
                     del st
                 stream = Stream(traces=traces)
-
+                if not(len(stream)):
+                    continue
                 f = io.BytesIO()
                 stream.write(f, format='MSEED')
                 f.seek(0)
