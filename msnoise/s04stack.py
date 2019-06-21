@@ -239,7 +239,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                                                 continue
 
                                             corr = scipy.signal.detrend(
-                                                corr)
+                                                corr).astype(np.float32)
                                             stack_path = os.path.join(
                                                 "STACKS", "%02i" % filterid, "%03i_DAYS" % mov_stack, components, day_name)
                                             filename = os.path.join(

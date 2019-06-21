@@ -200,9 +200,9 @@ def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
             # This should catch errors about file accesses
             logger.error("Error while processing file '%s': %s" %
                          (pathname, str(e)))
-            db.close()
+            # db.close()
             # Re-raise the exception to end the scan
-            raise
+            # raise
     logger.info('%s: Added %i | Modified %i | Unchanged %i' %
                 (folder, added, modified, unchanged))
 
