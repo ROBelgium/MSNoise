@@ -673,6 +673,12 @@ def get_data_availability(session, net=None, sta=None, comp=None,
             filter(DataAvailability.sta == sta).\
             filter(func.DATE(DataAvailability.starttime) <= endtime.date()).\
             filter(func.DATE(DataAvailability.endtime) >= starttime.date()).all()
+        if not len(data):
+            data = session.query(DataAvailability). \
+                filter(DataAvailability.sta == "MULTIPLEX"). \
+                filter(func.DATE(DataAvailability.starttime) <= endtime.date()).\
+                filter(
+                func.DATE(DataAvailability.endtime) >= starttime.date()).all()
     return data
 
 
@@ -1507,7 +1513,7 @@ def build_movstack_datelist(session):
     if begin[0] == '-':
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
         end = datetime.date.today() + datetime.timedelta(days=int(end))
-    elif begin == "1970-01-01":
+    elif begin == "1970-01-01": # TODO this fails when the DA is empty
         start = session.query(DataAvailability).order_by(
             DataAvailability.starttime).first().starttime.date()
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()

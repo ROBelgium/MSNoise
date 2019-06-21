@@ -54,6 +54,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
     """
     datafiles = {}
     output = Stream()
+    MULTIPLEX = False
     for station in stations:
         datafiles[station] = {}
         net, sta = station.split('.')
@@ -63,10 +64,18 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
         for comp in comps:
             datafiles[station][comp] = []
         for file in files:
-            if file.comp[-1] not in comps:
-                continue
-            fullpath = os.path.join(file.path, file.file)
-            datafiles[station][file.comp[-1]].append(fullpath)
+            if file.sta != "MULTIPLEX":
+                if file.comp[-1] not in comps:
+                    continue
+                fullpath = os.path.join(file.path, file.file)
+                datafiles[station][file.comp[-1]].append(fullpath)
+            else:
+                MULTIPLEX = True
+                fullpath = os.path.join(file.path, file.file)
+                multiplexed = sorted(glob.glob(fullpath))
+                for comp in comps:
+                    for _ in multiplexed:
+                        datafiles[station][comp].append(_)
 
     for istation, station in enumerate(stations):
         net, sta = station.split(".")
@@ -75,12 +84,16 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
             if len(files) != 0:
                 logger.debug("%s.%s Reading %i Files" %
                               (station, comp, len(files)))
-                stream = Stream()
+                traces = []
                 for file in sorted(files):
                     try:
+                        # print("Reading %s" % file)
+                        # t=  time.time()
                         st = read(file, dytpe=np.float,
                               starttime=UTCDateTime(gd),
-                              endtime=UTCDateTime(gd)+86400)
+                              endtime=UTCDateTime(gd)+86400,
+                                  station=sta)
+                        # print("done in")
                     except:
                         logger.debug("ERROR reading file %s" % file)
                         continue
@@ -101,8 +114,9 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         tr.stats.station = tr.stats.station.upper()
                         tr.stats.channel = tr.stats.channel.upper()
 
-                    stream += st
+                        traces.append(tr)
                     del st
+                stream = Stream(traces=traces)
                 stream.sort()
                 try:
                     # HACK not super clean... should find a way to prevent the
