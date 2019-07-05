@@ -71,6 +71,8 @@ import re
 import sys
 import time
 
+import traceback
+
 # Use the built-in version of scandir/walk if possible,
 # otherwise use the scandir module version
 try:
@@ -203,6 +205,9 @@ def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
             # db.close()
             # Re-raise the exception to end the scan
             # raise
+        except Exception as e:
+            logger.error("Error while processing file '%s': %s" %
+                         (pathname, str(e)))
     logger.info('%s: Added %i | Modified %i | Unchanged %i' %
                 (folder, added, modified, unchanged))
 
@@ -229,7 +234,11 @@ def list_directory(folder, mintime):
         logger.error('Error while reading folder %s (%s)'
                      % (folder, str(e)))
         # Re-raise the exception to end the scan
-        raise
+        # raise
+    except Exception as e:
+        logger.error('Error while reading folder %s (%s)'
+                     % (folder, str(e)))
+        # Re-raise the exception to end the scan
     return files
 
 
@@ -580,6 +589,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
     except Exception as e:
         logger.critical('Scan aborted because the following error occured '
                         'while scanning the archive:\n{}'.format(e))
+        traceback.print_exc()
     else:
         logger.info('*** Finished: Scan Archive ***')
         logger.info('It took %.2f seconds' % (time.time() - scanning_starttime))
