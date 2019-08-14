@@ -290,8 +290,8 @@ def get_params(session):
     params.min30 = params.corr_duration * params.goal_sampling_rate
     params.components_to_compute = get_components_to_compute(s)
     params.components_to_compute_single_station = get_components_to_compute_single_station(s)
-    params.all_components = params.components_to_compute_single_station + \
-                            params.components_to_compute
+    params.all_components = np.unique(params.components_to_compute_single_station + \
+                            params.components_to_compute)
     
     return params
 

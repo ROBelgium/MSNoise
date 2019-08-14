@@ -110,7 +110,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                         with_pid=True)
     logger.debug('Starting the %s stack' % stype)
     db = connect()
-    components_to_compute = get_components_to_compute(db)
+    
     export_format = get_config(db, 'export_format')
 
     if export_format == "BOTH":
@@ -190,7 +190,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
         sta1, sta2 = pair.split(':')
         for f in filters:
             filterid = int(f.ref)
-            for components in components_to_compute:
+            for components in params.all_components:
                 pair = "%s:%s" % (sta1, sta2)
                 sta1 = sta1.replace('.', '_')
                 sta2 = sta2.replace('.', '_')
@@ -202,6 +202,8 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     logger.debug("New Data for %s-%s-%i" %
                                   (pair, components, filterid))
                     #~ print updated_days
+                    # TODO: load only the updated dates +- max(mov_stack)+1
+                    # Note: this would no longer be needed if the stack is h5
                     nstack, stack_total = get_results(
                         db, sta1, sta2, filterid, components, datelist, format=format, params=params)
                     if not nstack:

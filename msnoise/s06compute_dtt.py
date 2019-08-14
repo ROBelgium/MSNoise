@@ -177,7 +177,7 @@ def main(interval=1, loglevel="INFO"):
         refs = []
         for f in filters:
             filterid = int(f.ref)
-            for components in components_to_compute:
+            for components in params.all_components:
                 for mov_stack in mov_stacks:
                     logger.info('Loading mov=%i days for filter=%02i' %
                                  (mov_stack, filterid))

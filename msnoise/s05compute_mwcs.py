@@ -87,7 +87,7 @@ def main(loglevel="INFO"):
     logger.info('*** Starting: Compute MWCS ***')
     
     db = connect()
-    components_to_compute = get_components_to_compute(db)
+
     export_format = get_config(db, 'export_format')
     if export_format == "BOTH":
         extension = ".MSEED"
@@ -134,12 +134,16 @@ def main(loglevel="INFO"):
             "There are MWCS jobs for some days to recompute for %s" % pair)
         for f in filters:
             filterid = int(f.ref)
-            for components in components_to_compute:
+            for components in params.all_components:
                 ref_name = pair.replace('.', '_').replace(':', '_')
                 rf = os.path.join("STACKS", "%02i" %
                                   filterid, "REF", components,
                                   ref_name + extension)
+                if not os.path.isfile(rf):
+                    logging.debug("No REF file named %s, skipping." % rf)
+                    continue
                 ref = read(rf)[0].data
+
                 for day in days:
                     for mov_stack in mov_stacks:
                         df = os.path.join(
@@ -165,6 +169,7 @@ def main(loglevel="INFO"):
                                     os.makedirs(outfolder)
                                 outfolders.append(outfolder)
                             np.savetxt(os.path.join(outfolder, "%s.txt" % str(day)), output)
+                            clean_scipy_cache()
                             del output, cur
 
         # THIS SHOULD BE IN THE API
