@@ -20,7 +20,7 @@ import msnoise.move2obspy
 import msnoise.preprocessing
 # import sphinx_bootstrap_theme
 
-import guzzle_sphinx_theme
+
 
 import datetime
 import click
