@@ -417,7 +417,7 @@ def main(loglevel="INFO"):
                                           df=params.goal_sampling_rate,
                                           corners=8)
                     if params.cc_type_single_station_AC == "CC":
-                        logger.debug("Computer AC using %s"%params.cc_type_single_station_AC)
+                        # logger.debug("Computer AC using %s"%params.cc_type_single_station_AC)
 
                         ffts = scipy.fftpack.fftn(tmp, shape=[nfft, ], 
                                                   axes=[1, ])
@@ -434,8 +434,8 @@ def main(loglevel="INFO"):
                                        nfft=nfft)
 
                     elif params.cc_type_single_station_AC == "PCC":
-                        logger.debug(
-                            "Compute AC using %s" % params.cc_type_single_station_AC)
+                        # logger.debug(
+                        #     "Compute AC using %s" % params.cc_type_single_station_AC)
                         corr = pcc_xcorr(tmp, np.ceil(params.maxlag / dt),
                                          None, single_station_pair_index_ac)
                     else:
@@ -452,7 +452,7 @@ def main(loglevel="INFO"):
 
                 if len(cc_index):
                     if params.cc_type == "CC":
-                        logger.debug("Compute CC using %s" % params.cc_type)
+                        # logger.debug("Compute CC using %s" % params.cc_type)
                         ffts = scipy.fftpack.fftn(data, shape=[nfft, ], axes=[1, ])
                         whiten2(ffts, nfft, low, high, p1, p2, psds,
                                 params.whitening_type)  # inplace
@@ -481,7 +481,7 @@ def main(loglevel="INFO"):
 
                 if len(single_station_pair_index_sc):
                     if params.cc_type_single_station_SC == "CC":
-                        logger.debug("Compute SC using %s" % params.cc_type)
+                        # logger.debug("Compute SC using %s" % params.cc_type)
                         ffts = scipy.fftpack.fftn(data, shape=[nfft, ],
                                                   axes=[1, ])
                         whiten2(ffts, nfft, low, high, p1, p2, psds,

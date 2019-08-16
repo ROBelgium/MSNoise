@@ -65,17 +65,14 @@ def main(init=False, nocc=False):
     crosscorr = False
     if len(params.components_to_compute):
         crosscorr = True
-        logger.info("components_to_compute is populated, computing CC")
-    else:
-        print("cc:", params.components_to_compute, len(params.components_to_compute))
+        logger.debug("components_to_compute is populated, creating cross-station CC jobs")
+
     autocorr = False
     if len(params.components_to_compute_single_station):
         autocorr = True
-        logger.info("components_to_compute_single_station is populated, computing AC/SC")
+        logger.debug("components_to_compute_single_station is populated, creating single-station CC jobs")
 
-
-
-    logger.debug('Scanning New/Modified files')
+    logger.info('Scanning New/Modified files')
     stations_to_analyse = ["%s.%s" % (sta.net, sta.sta) for sta in get_stations(db, all=False)]
     all_jobs = []
     crap_all_jobs_text = []
@@ -106,7 +103,7 @@ def main(init=False, nocc=False):
     # all_jobs = all_jobs.to_dict()
     updated_days = np.asarray(updated_days)
     updated_days = np.unique(updated_days)
-    logger.debug('Determining available data for each "updated date"')
+    logger.info('Determining available data for each "updated date"')
     count = 0
     if len(extra_jobtypes_scan_archive) != 0 or not nocc:
         for day in updated_days:
@@ -159,6 +156,7 @@ def main(init=False, nocc=False):
         mark_data_availability(db, sta.net, sta.sta, flag='A')
 
     db.commit()
+    logger.info("Inserted %i jobs" % count)
     logger.info('*** Finished: New Jobs ***')
 
     return count

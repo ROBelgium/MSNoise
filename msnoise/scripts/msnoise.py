@@ -378,7 +378,13 @@ def execute(sql_command):
     r = db.execute(sql_command)
 
     if sql_command.count("select") or sql_command.count("SELECT"):
-        print(r.fetchall())
+        result = r.fetchall()
+        if not len(result):
+            print("The query returned no results, sorry.")
+        else:
+            import pandas as pd
+            df = pd.DataFrame(result)
+            print(df)
     db.commit()
     db.close()
 
@@ -499,6 +505,62 @@ def config_get(names):
     db = connect()
     show_config_values(db, names)
     db.close()
+
+
+@db.command(name="dump")
+@click.option("--format", default="csv")
+def db_dump(format):
+    """
+    Dumps the complete database in a formatted structure.
+    """
+    from ..api import connect, get_engine
+    from sqlalchemy import MetaData
+    import pandas as pd
+
+    if format == "csv":
+        engine = get_engine(inifile=os.path.join(os.getcwd(), 'db.ini'))
+
+        meta = MetaData()
+        meta.reflect(bind=engine)
+
+        for table in meta.sorted_tables:
+            r = [dict(row) for row in engine.execute(table.select())]
+            df = pd.DataFrame(r)
+            print("Dumping table %s to %s.csv" % (table.name, table.name))
+            df.to_csv("%s.csv" % table.name, index=False)
+    else:
+        print("Currently only the csv format is supported, sorry.")
+
+
+@db.command(name="import")
+@click.argument("table")
+@click.option("--format", default="csv")
+@click.option("--force", is_flag=True, default=False)
+def db_import(table, format, force):
+    """
+    Imports msnoise tables from formatted files (csv).
+    """
+    from ..api import connect, get_engine
+    from sqlalchemy import MetaData
+    import pandas as pd
+
+    if format == "csv":
+        engine = get_engine(inifile=os.path.join(os.getcwd(), 'db.ini'))
+        print("Loading table %s from %s.csv" % (table, table))
+        df = pd.read_csv("%s.csv" % table)
+        if force:
+            df.to_sql(table, engine, if_exists="replace")
+        else:
+            try:
+                df.to_sql(table, engine)
+            except ValueError:
+                traceback.print_exc()
+                print("!"*80)
+                print("You're probably getting the error above because the "
+                      "table already exists, if you want to replace the table "
+                      "with the imported data, then pass the --force option")
+    else:
+        print("Currently only the csv format is supported, sorry.")
 
 
 @cli.command()
