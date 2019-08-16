@@ -3,4 +3,4 @@
 Compute Cross-Correlations
 --------------------------
 
-.. automodule:: msnoise.s03compute_cc
+.. automodule:: msnoise.s03compute_no_rotation

@@ -193,7 +193,7 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
 
     def test_013_s03compute_cc(self):
-        from ..s03compute_cc import main
+        from ..s03compute_no_rotation import main
         try:
             main()
         except:
@@ -374,14 +374,14 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
         self.test_013_s03compute_cc()
 
-    def test_031_compute_cc2tmp(self):
+    def test_031_compute_cc_rot(self):
         import shutil
         shutil.rmtree("STACKS")
         from ..api import connect, reset_jobs
         db = connect()
         reset_jobs(db, "CC", alljobs=True)
         db.close()
-        from ..s03compute_no_rotation import main
+        from ..s03compute_cc import main
         main()
 
     # PLOTS

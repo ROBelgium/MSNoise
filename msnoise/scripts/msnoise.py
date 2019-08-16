@@ -605,7 +605,7 @@ def new_jobs(init, nocc, hpc=""):
 @click.pass_context
 def compute_cc(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
-    from ..s03compute_cc import main
+    from ..s03compute_no_rotation import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -623,11 +623,11 @@ def compute_cc(ctx):
             p.join()
 
 
-@cli.command(name='compute_cc2')
+@cli.command(name='compute_cc_rot')
 @click.pass_context
-def compute_cc2(ctx):
+def compute_cc_rot(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
-    from ..s03compute_no_rotation import main
+    from ..s03compute_cc import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']

@@ -151,6 +151,13 @@ could occur with SQLite.
     The preprocessing routine is separated from the compute_cc and can be called
     by external plugins.
 
+.. versionadded:: 1.6
+    The compute_cc has been completely rewritten to be much faster, taking
+    advantage from 2D FFT computation and in-place array modifications.
+    The standard compute_cc does process CC, AC and SC in the same code. Only
+    if users need to compute R and/or T components, they will have to use the
+    slower previous code, now called compute_cc_rot.
+
 """
 #TODO docstring
 import sys
@@ -187,7 +194,12 @@ def main(loglevel="INFO"):
     # Get Configuration
     params = get_params(db)
     filters = get_filters(db, all=False)
-    logger.info("Will compute %s" % " ".join(params.components_to_compute))
+    logger.info("Will compute [%s] for different stations" % " ".join(params.components_to_compute))
+    logger.info("Will compute [%s] for single stations" % " ".join(params.components_to_compute_single_station))
+
+    if "R" in ''.join(params.components_to_compute) or "T" in ''.join(params.components_to_compute):
+        logger.info("You seem to have configured R and/or T components, thus rotations ARE needed. You should therefore use the 'msnoise compute_cc_rot' instead.")
+        return()
 
     if params.remove_response:
         logger.debug('Pre-loading all instrument response')
@@ -301,7 +313,7 @@ def main(loglevel="INFO"):
 
             # index net.sta comps for energy later
             channel_index = {}
-            if params.whitening_type == "PSD": #TODO not the unique case!
+            if params.whitening_type == "PSD":
                 psds = []
                 for i, name in enumerate(names):
                     n1, s1, l1, c1 = name
@@ -350,8 +362,7 @@ def main(loglevel="INFO"):
             # Different iterator func for single station AC or SC:
             single_station_pair_index_sc = []
             single_station_pair_index_ac = []
-            #TODO here, select AC and SC and then assign them to one or the 
-            # other processing, depending on their cc_type
+
             if len(params.components_to_compute_single_station):
                 for sta1, sta2 in itertools.combinations_with_replacement(names, 2):
                     n1, s1, l1, c1 = sta1
@@ -380,14 +391,6 @@ def main(loglevel="INFO"):
                                                      comp[::-1]),
                                  names.index(sta2), names.index(sta1)])
 
-            # print("cc_index", cc_index)
-            # print("single_station sc", single_station_pair_index_sc)
-            # print("single_station ac", single_station_pair_index_ac)
-            
-            # TODO : handle the three different corrs: CC SC and AC
-            # TODO : and handle the fact they could use the same processing 
-            # TODO : or not
-            
             for filterdb in filters:
                 filterid = filterdb.ref
                 filterlow = float(filterdb.low)
@@ -415,7 +418,7 @@ def main(loglevel="INFO"):
                                           corners=8)
                     if params.cc_type_single_station_AC == "CC":
                         logger.debug("Computer AC using %s"%params.cc_type_single_station_AC)
-                        
+
                         ffts = scipy.fftpack.fftn(tmp, shape=[nfft, ], 
                                                   axes=[1, ])
                         energy = np.real(np.sqrt(np.mean(

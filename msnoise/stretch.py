@@ -84,6 +84,7 @@ def main():
     #         update_job(db, "REF", pair, jobtype='DTT', flag='D')
 
     filters = get_filters(db, all=False)
+    params = get_params(db)
     # Then we compute the jobs
     while is_dtt_next_job(db, flag='T', jobtype='MWCS'):
         jobs = get_dtt_next_job(db, flag='T', jobtype='MWCS')
@@ -125,7 +126,7 @@ def main():
             filterid = int(f.ref)
 
             for mov_stack in mov_stacks:
-                for components in components_to_compute:
+                for components in params.all_components:
                         rf = os.path.join("STACKS", "%02i" %
                                           filterid, "REF", components, ref_name + extension)
                         if os.path.isfile(rf):
@@ -134,6 +135,10 @@ def main():
                             ref[mid-int(minlag*goal_sampling_rate):mid+int(minlag*goal_sampling_rate)] *= 0.
                             ref[:mid-int(maxlag2*goal_sampling_rate)] *= 0.
                             ref[mid+int(maxlag2*goal_sampling_rate):] *= 0.
+                        else:
+                            logging.debug(
+                                "No REF file named %s, skipping." % rf)
+                            continue
                         alldays = []
                         alldeltas = []
                         allcoefs = []

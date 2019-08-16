@@ -43,7 +43,7 @@ default['windsorizing'] = ["Windsorizing at N time RMS , 0 disables "
                            "windsorizing, -1 enables 1-bit normalization ["
                            "3]",'3', float]
 default['whitening'] = ["Whiten Traces before cross-correlation: [A]ll (except for autocorr), [N]one, or only if [C]omponents are different: [A]/N/C",'A']
-default['whitening_type'] = ["Type of spectral whitening function to use: [B]rutal (amplitude to 1.0), divide spectrum by its [PSD]: [B]/PSD. WARNING: only works for compute_cc2, not compute_cc, where it will always be [B]",'B']
+default['whitening_type'] = ["Type of spectral whitening function to use: [B]rutal (amplitude to 1.0), divide spectrum by its [PSD]: [B]/PSD. WARNING: only works for compute_cc, not compute_cc_rot, where it will always be [B]",'B']
 
 default['stack_method'] = ["Stack Method: Linear Mean or Phase Weighted Stack: [linear]/pws ",'linear']
 default['pws_timegate'] = ["If stack_method='pws', width of the smoothing in "

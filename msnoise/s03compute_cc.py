@@ -188,6 +188,9 @@ def main(loglevel="INFO"):
     filters = get_filters(db, all=False)
 
     logger.info("Will compute %s" % " ".join(params.components_to_compute))
+    
+    if "R" not in ''.join(params.components_to_compute) and "T" not in ''.join(params.components_to_compute):
+        logger.info("You seem to have configured no R nor T components, thus no rotation are needed. You should therefore use the 'msnoise compute_cc' instead, which is much faster")
 
     if params.remove_response:
         logger.debug('Pre-loading all instrument response')
