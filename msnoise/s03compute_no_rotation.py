@@ -557,5 +557,3 @@ def main(loglevel="INFO"):
                                           time.time() - start_processing))
         del stream, allcorr
     logger.info('*** Finished: Compute CC ***')
-
-

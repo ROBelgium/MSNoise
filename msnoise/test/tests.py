@@ -381,7 +381,7 @@ class MSNoiseTests(unittest.TestCase):
         db = connect()
         reset_jobs(db, "CC", alljobs=True)
         db.close()
-        from ..s03compute_cc import main
+        from ..s03compute_no_rotation import main
         main()
 
     # PLOTS
@@ -539,6 +539,17 @@ class MSNoiseTests(unittest.TestCase):
         """
         parsed_crondays = s01scan_archive.parse_crondays('3w4d12h')
         self.assertEqual(parsed_crondays, datetime.timedelta(days=3*7+4, seconds=12*3600))
+
+    def test_db_dump(self):
+        """
+        Tests the dump of the database and the creation of csv files
+        """
+        os.system("msnoise db dump")
+        self.assertTrue(os.path.isfile("config.csv"))
+        self.assertTrue(os.path.isfile("stations.csv"))
+        self.assertTrue(os.path.isfile("filters.csv"))
+        self.assertTrue(os.path.isfile("jobs.csv"))
+        self.assertTrue(os.path.isfile("data_availability.csv"))
 
 
 def main(prefix=""):
