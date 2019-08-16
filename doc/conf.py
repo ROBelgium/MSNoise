@@ -18,7 +18,10 @@ matplotlib.use('Agg')
 
 import msnoise.move2obspy
 import msnoise.preprocessing
-import sphinx_bootstrap_theme
+# import sphinx_bootstrap_theme
+
+import guzzle_sphinx_theme
+
 import datetime
 import click
 
@@ -147,7 +150,14 @@ extensions = ['sphinx.ext.intersphinx',
               'sphinx.ext.coverage',
               'sphinx.ext.mathjax',
               'sphinx.ext.todo',
-              'numpydoc',]
+              'numpydoc',
+              'sphinx_gallery.gen_gallery',]
+
+sphinx_gallery_conf = {
+     'examples_dirs': '../examples',   # path to your example scripts
+     'gallery_dirs': 'auto_examples',  # path where to save gallery generated examples
+}
+
 math_number_all = False
 todo_include_todos = True
 # Add any paths that contain templates here, relative to this directory.
@@ -213,18 +223,21 @@ autodoc_member_order = 'bysource'
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 # html_theme = 'sphinxdoc'
-html_theme = 'bootstrap'
-html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
+# html_theme = 'bootstrap'
+# html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
+
+html_theme = "sphinx_rtd_theme"
+html_theme_path = ["_themes", ]
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 # html_theme_options = {}
-html_theme_options = {'bootswatch_theme': "lumen",
-                    "navbar_site_name":"Menu",
-                    "navbar_sidebarrel":True,
-                    "source_link_position":"footer",
-                    }
+html_theme_options = {'navigation_depth': 2,
+                     }
+
+# Register the theme as an extension to generate a sitemap.xml
+
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = []
@@ -244,6 +257,10 @@ html_logo = ".static/msnoise.png"
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
 html_favicon = ".static/favicon.png"
+
+html_css_files = [
+    'my-styles.css',
+]
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

@@ -1,7 +1,8 @@
 .. include:: configs.hrst
 
+******************************
 Extending MSNoise with Plugins
-==============================
+******************************
 
 .. versionadded:: 1.4
 

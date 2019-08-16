@@ -29,4 +29,8 @@
 
 {{ plot_div|indent(4)|safe }}
 
+    {% if result != None %}
+<img src="data:image/png;base64,{{ result }}"\>
+{% endif %}
+
 {% endblock body %}

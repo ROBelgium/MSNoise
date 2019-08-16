@@ -4,7 +4,7 @@ MSNoise - Documentation
 Originally, MSNoise was a "Python Package for Monitoring Seismic Velocity
 Changes using Ambient Seismic Noise". With the release of MSNoise 1.4, and
 because of the Plugin Support, we could call MSNoise: "Measuring with Seismic
-Noise". The current release version of MSNoise is **MSNoise 1.5**.
+Noise". The current release version of MSNoise is **MSNoise 1.6**.
 
 The standard MSNoise workflow is designed to go from seismic data archives to
 dv/v curves. The monitoring is achieved by computing the cross-correlation of
@@ -34,18 +34,19 @@ Installation
 ============
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     installation
 
 Workflow
 ========
 
-.. toctree::
-    :glob:
-    :maxdepth: 1
+.. image:: .static/Figure01_workflow_summary_cmyk.png
 
-    workflow/*
+.. toctree::
+    :maxdepth: 2
+
+    workflow/0000_intro.rst
 
 Plotting
 ========
@@ -55,6 +56,23 @@ Plotting
 
     plotting
 
+Interacting with MSNoise
+========================
+
+
+.. toctree::
+    :maxdepth: 2
+
+    api
+    plugins
+    core
+    how_tos
+    auto_examples/index
+
+.. toctree::
+    :maxdepth: 1
+
+    clickhelp/msnoise
 
 Development & Miscellaneous
 ===========================
@@ -62,43 +80,11 @@ Development & Miscellaneous
 .. toctree::
     :maxdepth: 2
 
-    api
-    core
     table_def
-    plugins
-
-    how_tos
     about_db_performances
     references
     contributors
-
-
-.. toctree::
-    :maxdepth: 1
-
-    clickhelp/msnoise
-
-
-
-
-
-Release Notes
-=============
-.. toctree::
-    :maxdepth: 1
-    
-    releasenotes/msnoise-1.6
-    releasenotes/msnoise-1.5
-    releasenotes/msnoise-1.4
-    releasenotes/msnoise-1.3.1
-    releasenotes/msnoise-1.3
-    releasenotes/msnoise-1.2.5
-    releasenotes/msnoise-1.2.4
-    releasenotes/msnoise-1.2.3
-    releasenotes/msnoise-1.2.2
-    releasenotes/msnoise-1.2.1
-    releasenotes/msnoise-1.2
-    releasenotes/msnoise-1.0
+    releasenotes
 
 
 .. _PDF: http://msnoise.org/doc/MSNoise.pdf

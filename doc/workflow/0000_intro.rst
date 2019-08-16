@@ -2,9 +2,9 @@
 
 .. _workflow:
 
-
+******************************
 Workflow
---------
+******************************
 
 
 .. image:: ../.static/Figure01_workflow_summary_cmyk.png

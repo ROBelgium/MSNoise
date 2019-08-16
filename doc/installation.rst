@@ -1,8 +1,9 @@
 .. _installation:
 
-
+******************************
 Installation
-------------
+******************************
+
 MSNoise is a python package that uses a database (sqlite or MySQL) for storing
 station and files metadata together with jobs. When installed, it provides a top
 level command ``msnoise`` in the console.

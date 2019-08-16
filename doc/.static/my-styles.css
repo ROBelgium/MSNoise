@@ -86,3 +86,17 @@ div .section h2 {
     text-decoration: underline;
 }
 
+body {
+    font-size: 16px;
+}
+
+#right-column {
+    padding: 20px 0;
+    margin-left: 300px;
+    background-color: #fff;
+     max-width: none;
+}
+
+.wy-nav-content {
+max-width:none;
+}

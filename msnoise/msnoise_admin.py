@@ -431,18 +431,19 @@ class ResultPlotter(BaseView):
         format = getitem(args, 'format', 'stack')
 
         db = connect()
+        params = get_params(db)
         station1, station2 = pairs[pair]['text'].replace('.', '_').split(' - ')
-        start, end, dates = build_ref_datelist(db)
+        start, end, dates = build_movstack_datelist(db)
+        print(station1, station2, filter, component, dates, format)
         i, result = get_results(db,station1, station2, filter, component, dates,
-                                format=format)
+                                format=format, params=params)
 
         if format == 'stack':
             if i != 0:
-                maxlag = float(get_config(db, 'maxlag'))
-                x = np.linspace(-maxlag, maxlag, get_maxlag_samples(db))
+                x = get_t_axis(db)
                 y = result
         db.close()
-
+        # print(result)
         # fig = figure(title=pairs[pair]['text'], plot_width=1000)
         # fig.line(x, y, line_width=2)
         #
@@ -454,12 +455,27 @@ class ResultPlotter(BaseView):
         # )
         #
         # script, div = components(fig, INLINE)
-        # return self.render(
-        #     'admin/results.html',
-        #     plot_script=script, plot_div=div, plot_resources=plot_resources,
-        #     filter_list=filters,
-        #     pair_list=pairs
-        # )
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(12,5))
+        plt.plot(x, y)
+
+        from io import BytesIO
+        figfile = BytesIO()
+        plt.savefig(figfile, format='png')
+        figfile.seek(0)  # rewind to beginning of file
+        import base64
+        # figdata_png = base64.b64encode(figfile.read())
+        figdata_png = base64.b64encode(figfile.getvalue())
+        result= figdata_png
+
+        plot_div = ""
+
+        return self.render(
+            'admin/results.html',
+            plot_script="", plot_div=plot_div, plot_resources="",
+            filter_list=filters,
+            pair_list=pairs, result=result.decode('utf8')
+        )
 
 
 class InterferogramPlotter(BaseView):
@@ -744,11 +760,11 @@ def main(port=5000):
     admin.add_view(JobView(db,endpoint='jobs',category='Database'))
 
 
-    # admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',
-                                        # category='Results'))
-    # admin.add_view(ResultPlotter(endpoint='results',category='Results'))
-    # admin.add_view(InterferogramPlotter(endpoint='interferogram',
-                                        # category='Results'))
+    admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',
+                                        category='Results'))
+    admin.add_view(ResultPlotter(endpoint='results',category='Results'))
+    admin.add_view(InterferogramPlotter(endpoint='interferogram',
+                                        category='Results'))
 
     if plugins:
         plugins = plugins.split(',')

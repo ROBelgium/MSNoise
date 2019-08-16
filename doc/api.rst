@@ -1,5 +1,6 @@
+***********
 MSNoise API
-===========
+***********
 
 .. module:: msnoise
 
