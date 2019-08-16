@@ -62,10 +62,18 @@ def main(init=False, nocc=False):
                     elif jobtype["after"] == "new_files":
                         extra_jobtypes_new_files.append(jobtype["name"])
 
-    # autocorr = get_config(db, name="autocorr", isbool=True)
+    crosscorr = False
+    if len(params.components_to_compute):
+        crosscorr = True
+        logger.info("components_to_compute is populated, computing CC")
+    else:
+        print("cc:", params.components_to_compute, len(params.components_to_compute))
     autocorr = False
     if len(params.components_to_compute_single_station):
         autocorr = True
+        logger.info("components_to_compute_single_station is populated, computing AC/SC")
+
+
 
     logger.debug('Scanning New/Modified files')
     stations_to_analyse = ["%s.%s" % (sta.net, sta.sta) for sta in get_stations(db, all=False)]
@@ -115,7 +123,7 @@ def main(init=False, nocc=False):
             available = np.unique(available)
             for m in modified:
                 for a in available:
-                    if m != a or autocorr:
+                    if (m != a and crosscorr) or (m == a and autocorr):
                         pair = ':'.join(sorted([m, a]))
                         if pair not in jobs:
                             if not nocc:
