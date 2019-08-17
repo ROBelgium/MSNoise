@@ -374,15 +374,15 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
         self.test_013_s03compute_cc()
 
-    def test_031_compute_cc_rot(self):
-        import shutil
-        shutil.rmtree("STACKS")
-        from ..api import connect, reset_jobs
-        db = connect()
-        reset_jobs(db, "CC", alljobs=True)
-        db.close()
-        from ..s03compute_no_rotation import main
-        main()
+    # def test_031_compute_cc_rot(self):
+    #     import shutil
+    #     shutil.rmtree("STACKS")
+    #     from ..api import connect, reset_jobs
+    #     db = connect()
+    #     reset_jobs(db, "CC", alljobs=True)
+    #     db.close()
+    #     from ..s03compute_no_rotation import main
+    #     main()
 
     # PLOTS
 
@@ -461,9 +461,6 @@ class MSNoiseTests(unittest.TestCase):
         main(show=False, outfile="?.png")
         fn = glob.glob("data availability on*.png")
         self.assertEqual(len(fn), 1)
-
-
-
 
     def test_099_S01installer(self):
         if "TRAVIS" not in os.environ:

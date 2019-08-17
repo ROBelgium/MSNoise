@@ -21,6 +21,9 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Cursor
 
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
+
 from obspy.signal.filter import envelope as obspy_envelope
 from obspy.signal.filter import bandpass
 from ..api import *
