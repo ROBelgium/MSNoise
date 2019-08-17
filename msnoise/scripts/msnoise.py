@@ -713,12 +713,20 @@ def compute_cc_rot(ctx):
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
 def stack(ctx, ref, mov, step):
-    """Stacks the [REF] and/or [MOV] windows"""
+    """Stacks the [REF] or [MOV] windows.
+    Computes the STACK jobs.
+    """
     click.secho('Lets STACK !', fg='green')
     from ..s04stack import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
+
+    if ref and mov:
+        click.secho("With MSNoise 1.6, you can't run REF & MOV stacks"
+                    "simultaneously, please run them one after the other.")
+        sys.exit()
+
     if threads == 1:
         if ref:
             main('ref', loglevel=loglevel)
@@ -761,7 +769,7 @@ def stack(ctx, ref, mov, step):
 @cli.command(name='compute_mwcs')
 @click.pass_context
 def compute_mwcs(ctx):
-    """Computes the MWCS based on the new stacked data"""
+    """Computes the MWCS jobs"""
     from ..s05compute_mwcs import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
@@ -812,31 +820,31 @@ def compute_dtt(ctx, interval):
 
 
 
-@cli.command(name='compute_dvv')
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
-@click.option('-p', '--pair', default=None, help='Plot a specific pair',
-              multiple=True)
-@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
-@click.option('-M', '--dttname', default="M", help='Plot M or M0?')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
-              default=None, type=str)
-@click.pass_context
-def compute_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
-    """Plots the dv/v (parses the dt/t results)\n
-    Individual pairs can be plotted extra using the -p flag one or more times.\n
-    Example: msnoise plot dvv -p ID_KWUI_ID_POSI\n
-    Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
-    Remember to order stations alphabetically !
-    """
-    if ctx.obj['MSNOISE_custom']:
-        from s07_compute_dvv import main
-    else:
-        from ..s07_compute_dvv import main
-    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
+# @cli.command(name='compute_dvv')
+# @click.option('-f', '--filterid', default=1, help='Filter ID')
+# @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+# @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
+# @click.option('-p', '--pair', default=None, help='Plot a specific pair',
+#               multiple=True)
+# @click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
+# @click.option('-M', '--dttname', default="M", help='Plot M or M0?')
+# @click.option('-s', '--show', help='Show interactively?',
+#               default=True, type=bool)
+# @click.option('-o', '--outfile', help='Output filename (?=auto)',
+#               default=None, type=str)
+# @click.pass_context
+# def compute_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
+#     """Plots the dv/v (parses the dt/t results)\n
+#     Individual pairs can be plotted extra using the -p flag one or more times.\n
+#     Example: msnoise plot dvv -p ID_KWUI_ID_POSI\n
+#     Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
+#     Remember to order stations alphabetically !
+#     """
+#     if ctx.obj['MSNOISE_custom']:
+#         from s07_compute_dvv import main
+#     else:com
+#         from ..s07_compute_dvv import main
+#     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
 
 
 @cli.command()

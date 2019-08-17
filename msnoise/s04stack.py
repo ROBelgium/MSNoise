@@ -337,7 +337,12 @@ def main(stype, interval=1.0, loglevel="INFO"):
         if stype == "ref":
             biglist += jobs
 
-    # if stype == "ref":
+    if stype == "ref":
+        logger.info("You just finished REF stacking, remember to reset the "
+                    "STACK jobs if you need to compute a MOV stacks. "
+                    "Run 'msnoise reset STACK' when all process have finished.")
+        logger.info("The current STACK jobs have been intentionnaly left "
+                    "'I'n progress so they can be reset.")
     #     massive_update_job(db, biglist, "T")
 
     logger.debug("Finished Stacking")
