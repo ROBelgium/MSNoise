@@ -462,21 +462,6 @@ class MSNoiseTests(unittest.TestCase):
         fn = glob.glob("data availability on*.png")
         self.assertEqual(len(fn), 1)
 
-    def test_099_S01installer(self):
-        if "TRAVIS" not in os.environ:
-            print("Seems to be running on local machine, skipping MySQL test")
-            return
-        import shutil
-        shutil.move('db.ini', 'db.bak')
-        from ..s000installer import main
-        try:
-            ret = main(tech=2, username="root", password="",
-                       hostname="localhost", database="msnoise", prefix="")
-            self.failUnlessEqual(ret, 0)
-        except:
-            traceback.print_exc()
-            self.fail()
-
     ### A few click CLI interface tests
 
     def test_201_config_get_unknown_param(self):
@@ -594,6 +579,21 @@ class MSNoiseTests(unittest.TestCase):
         self.assertTrue(os.path.isfile("filters.csv"))
         self.assertTrue(os.path.isfile("jobs.csv"))
         self.assertTrue(os.path.isfile("data_availability.csv"))
+
+    def test_999_S01installer(self):
+        if "TRAVIS" not in os.environ:
+            print("Seems to be running on local machine, skipping MySQL test")
+            return
+        import shutil
+        shutil.move('db.ini', 'db.bak')
+        from ..s000installer import main
+        try:
+            ret = main(tech=2, username="root", password="",
+                       hostname="localhost", database="msnoise", prefix="")
+            self.failUnlessEqual(ret, 0)
+        except:
+            traceback.print_exc()
+            self.fail()
 
 
 def main(prefix=""):
