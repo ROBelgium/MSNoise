@@ -402,6 +402,22 @@ class MSNoiseTests(unittest.TestCase):
                       "ZZ", filter.ref, 1)
                 self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
 
+    def test_100_plot_interferogram(self):
+        from ..api import connect, get_station_pairs, get_filters
+        from ..plots.interferogram import main
+        db = connect()
+        for sta1, sta2 in get_station_pairs(db):
+            sta1 = "%s.%s" % (sta1.net, sta1.sta)
+            sta2 = "%s.%s" % (sta2.net, sta2.sta)
+            for filter in get_filters(db):
+                main(sta1, sta2, filter.ref, "ZZ",  1, show=False,
+                     outfile="?.png")
+                fn = 'interferogram %s-%s-f%i-m%i.png' % \
+                     ("%s-%s" % (sta1.replace(".", "_"),
+                                 sta2.replace(".", "_")),
+                      "ZZ", filter.ref, 1)
+                self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
+
     def test_101_plot_spectime(self):
         from ..api import connect, get_station_pairs, get_filters
         from ..plots.spectime import main
@@ -417,6 +433,37 @@ class MSNoiseTests(unittest.TestCase):
                                  sta2.replace(".", "_")),
                       "ZZ", filter.ref, 1)
                 self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
+
+    def test_102_plot_distance(self):
+        from ..plots.distance import main
+        main(filterid=1, components="ZZ", show=False, outfile="?.png")
+        fn = "distance ZZ-f1.png"
+        self.assertTrue(os.path.isfile(fn),
+                        msg="%s doesn't exist" % fn)
+
+        main(filterid=1, components="ZZ", show=False, outfile="?_refilter.png",
+             refilter="0.2:0.9")
+        fn = "distance ZZ-f1_refilter.png"
+        self.assertTrue(os.path.isfile(fn),
+                        msg="%s doesn't exist" % fn)
+
+    def test_103_plot_mwcs(self):
+        from ..plots.mwcs import main
+        main("YA.UV05", "YA.UV06", filterid=1, components="ZZ",
+             mov_stack=5, show=False, outfile="?.png")
+        fn = "mwcs YA_UV05_YA_UV06-ZZ-f1-m5.png"
+        self.assertTrue(os.path.isfile(fn),
+                        msg="%s doesn't exist" % fn)
+
+    def test_104_plot_data_availability(self):
+        import glob
+        from ..plots.data_availability import main
+        main(show=False, outfile="?.png")
+        fn = glob.glob("data availability on*.png")
+        self.assertEqual(len(fn), 1)
+
+
+
 
     def test_099_S01installer(self):
         if "TRAVIS" not in os.environ:

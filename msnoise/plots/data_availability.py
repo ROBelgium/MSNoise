@@ -19,6 +19,9 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num
 
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
+
 from ..api import *
 
 
@@ -82,10 +85,10 @@ def main(show=False, outfile=None):
     plt.gcf().autofmt_xdate()
     plt.grid()
     if outfile:
-        # if outfile.startswith("?"):
-        #     now = datetime.datetime.now()
-        #     now = now.strftime('data availability on %Y-%m-%d %H.%M.%S')
-        #     outfile = outfile.replace('?', now)
+        if outfile.startswith("?"):
+            now = datetime.datetime.now()
+            now = now.strftime('data availability on %Y-%m-%d %H.%M.%S')
+            outfile = outfile.replace('?', now)
         print("output to:", outfile)
         plt.savefig(outfile)
     if show:
