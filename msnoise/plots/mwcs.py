@@ -109,7 +109,8 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
         plt.title('%s : %s : dt' % (sta1, sta2))
         plot_lags(minlag, maxlag2)
         plt.setp(ax1.get_xticklabels(), visible=False)
-        
+        print(type(alldt))
+        print(alldt)
         plt.subplot(gs[1], sharey=ax1)
         plt.plot(alldt.mean(axis=0), alldt.columns, c='k')
         plt.grid()
