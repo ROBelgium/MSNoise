@@ -447,13 +447,13 @@ class MSNoiseTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(fn),
                         msg="%s doesn't exist" % fn)
 
-    def test_103_plot_mwcs(self):
-        from ..plots.mwcs import main
-        main("YA.UV05", "YA.UV06", filterid=1, components="ZZ",
-             mov_stack=5, show=False, outfile="?.png")
-        fn = "mwcs YA_UV05_YA_UV06-ZZ-f1-m5.png"
-        self.assertTrue(os.path.isfile(fn),
-                        msg="%s doesn't exist" % fn)
+    # def test_103_plot_mwcs(self):
+    #     from ..plots.mwcs import main
+    #     main("YA.UV05", "YA.UV06", filterid=1, components="ZZ",
+    #          mov_stack=5, show=False, outfile="?.png")
+    #     fn = "mwcs YA_UV05_YA_UV06-ZZ-f1-m5.png"
+    #     self.assertTrue(os.path.isfile(fn),
+    #                     msg="%s doesn't exist" % fn)
 
     def test_104_plot_data_availability(self):
         import glob

@@ -112,10 +112,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
         print(type(alldt))
         print(alldt)
         plt.subplot(gs[1], sharey=ax1)
-        try:
-            plt.plot(alldt.mean(axis=0), alldt.columns, c='k')
-        except:
-            pass
+        plt.plot(alldt.mean(axis=0), alldt.columns, c='k')
         plt.grid()
         plot_lags(minlag, maxlag2)
         plt.axvline(-maxDt, c='r', ls='--')
