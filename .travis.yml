@@ -7,9 +7,6 @@ language: c
 services:
   - mysql
 
-addons:
-  mariadb: '10.4'
-
 matrix:
   include:
     # do one build run with our minimum dependencies
