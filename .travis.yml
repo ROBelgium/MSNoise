@@ -36,10 +36,10 @@ before_install:
     else
       export OS="Linux";
     fi
-#  - if [[ $TRAVIS_OS_NAME == "osx" ]]; then brew update > /dev/null && brew install mariadb && brew services start mariadb; fi
-#  - if [[ $TRAVIS_OS_NAME == "osx" ]]; then mkdir /usr/local/etc/my.cnf.d; fi
+  - if [[ $TRAVIS_OS_NAME == "osx" ]]; then brew update > /dev/null && brew install mariadb && brew services start mariadb; fi
+  - if [[ $TRAVIS_OS_NAME == "osx" ]]; then mkdir /usr/local/etc/my.cnf.d; fi
   # Wait for mysql service to respond
-#  - which mysql && until mysql -u root -e "show status" &>/dev/null; do sleep 1; done
+  - which mysql && until mysql -u root -e "show status" &>/dev/null; do sleep 1; done
   # MySQL database
   - mysql -u root -e "create database msnoise;"
   # Python and related stuff
