@@ -38,7 +38,7 @@ before_install:
   # Wait for mysql service to respond
 #  - which mysql && until mysql -u root -e "show status" &>/dev/null; do sleep 1; done
   # MySQL database
-  - mysql -u root -p"" -e "create database msnoise;"
+  - mysql -u root -e "create database msnoise;"
   # Python and related stuff
   - if [[ "${PYTHON_VERSION:0:1}" == '2' ]]; then
       wget https://repo.continuum.io/miniconda/Miniconda2-latest-${OS}-x86_64.sh -O miniconda.sh;
