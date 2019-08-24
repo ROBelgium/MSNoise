@@ -3,7 +3,7 @@
 MSNoise 1.6
 ===========
 
-Release date: XX October 2018
+Release date: XX August 2019
 
 
 Release type: major
@@ -16,17 +16,17 @@ Release notes:
 
 Introduction
 ------------
-More than 1.5 years after the last major release (:doc:`msnoise-1.5`) I'm proud
+More than 2 years after the last major release (:doc:`msnoise-1.5`) I'm proud
 to announce the new :doc:`msnoise-1.6`. It is a **major** release, with a
 massive amount of work since the last one: in `GitHub numbers
 <https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2017-04-28&to
-=2018-10-20&type=c>`_
+=2019-08-12&type=c>`_
 , it's over TODO commits and over TODO lines of code and documentation changed
 or added!
 
-*October is also a very special month for MSNoise, as it has been 8 years since 
-Corentin contacted Florent and that I immediately started working 
-on this package. 2010-2018. Height years. Wow. MSNoise has now a few thousand 
+*End of summer is also a very special period for MSNoise, as it has been 9
+years since Corentin contacted Florent and that I immediately started working
+on this package. 2010-2019. Nine years. Wow. MSNoise has now a few thousand
 lines of code and more than 100 pages of documentation, it is widely used and
 scientists around the globe use it and even make super cool publications out 
 of their results! So proud!* 
@@ -40,7 +40,10 @@ MSNoise 1.6 introduces a series of **new features** :
   effiently, e.g. on a HPC (see hpc_).
 * The components to compute can be defined for "single-station" and 
   "cross-station" independently.
-* The CC, AC and SC can be processed with different schemes TODO
+* The compute_cc step has been completely rewritten to be much, much faster.
+* A new ``db`` top level command, which among others include ``dump`` and
+  ``import`` commands for handling the tables from the database.
+
 
 .. todo
 
@@ -50,7 +53,7 @@ requests/questions from several users/friends.
 Thanks to all for using MSNoise, and please, let us know why/how you use it
 (and please cite it!)!
 
-To date, we found/are aware of 54 publications using MSNoise! That's the best
+To date, we found/are aware of 70 publications using MSNoise! That's the best
 validation of our project ever and it has doubled since last release!! 
 
 
@@ -76,9 +79,6 @@ For users having a complete set of tools in Python 2.7 and not keen to move
 to 3.x soon, the incredible easiness of creating a Python 3.x environment in 
 conda, for example, will allow them to run MSNoise in the future.
 
-Please note that as long as ObsPy doesn't have Python 3.7 binary packages, I
-recommend using Python 3.6.
-
 There were no changes in the requirements. Note that MSNoise is always tested
 against the latest release versions of the main packages, so older installations
 that are not maintained/updated regularly (years) could encounter issues. 
@@ -103,6 +103,14 @@ Configuration Parameters
   format of the files to read in the archive during the `scan_archive` stage.
   If left empty, `obspy.core.stream.read` will automatically detect the format
   of the file, which results in a slightly slower reading.
+
+* ADDED: ``whitening_type`` to allow for the standard brutal whitening (all-to-
+  1.0) or whitening by dividing by the PSD of the singnal.
+
+* ADDED: ``components_to_compute_single_station`` to separate the components
+  computed for single stations and cross-stations. For example, the ``ZZ`` can
+  be computed for STA1 vs STA2 and, at the same time, ``EZ,EN,EZ`` for STA1 and
+  for STA2.
 
 * CHANGED: ``cronday`` should now be a positive float number (negative numbers
   are still accepted for backward compatibility) or a string designating any
@@ -177,18 +185,19 @@ Command Line changes
 Top level DB command
 ~~~~~~~~~~~~~~~~~~~~
 
-I've added a new command group called `db` that gathers all db-related actions:
+I've added a new command group called ``db`` that gathers all db-related actions:
 
 * ``msnoise db init`` is a replacement for the ``msnoise install``
 * ``msnoise db upgrade`` is a replacement for the ``msnoise upgrade_db``
 * ``msnoise db clean_duplicates`` deletes duplicate jobs (might happen). Unique
   sets of ``day``, ``pair`` and ``jobtypes`` are considered.
 * ``msnoise db execute`` allows executing SQL queries on the database (Expert 
-  Mode)
+  Mode). If the query includes a SELECT command, the result is returned as a
+  table.
+* ``msnoise db dump`` allows dumping all tables from the database to CSV files
+* ``msnoise db import`` allows importing individual tables and replace them in
+  the database.
 
-In the future, this command will include the possibility to dump and load 
-entire databases, for example for switching from a local sqlite instance to a 
-large MySQL server.
 
 The ``config`` command group has been reworked and the ``get`` subcommand has
 been added to retrieve the values of a list of configuration parameters:

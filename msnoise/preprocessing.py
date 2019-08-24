@@ -1,3 +1,33 @@
+"""
+Waveform Pre-processing
+-----------------------
+Pairs are first split and a station list is created. The database is then
+queried to get file paths. For each station, all files potentially containing
+data for the day are opened. The traces are then merged and splitted, to obtain
+the most continuous chunks possible. The different chunks are then demeaned,
+tapered and merged again to a 1-day long trace. If a chunk is not aligned
+on the sampling grid (that is, start at a integer times the sample spacing in s)
+, the chunk is phase-shifted in the frequency domain. This requires tapering and
+fft/ifft. If the gap between two chunks is small, compared to a currently
+hard-coded value (10 samples), the gap is filled with interpolated values.
+Larger gaps will not be filled with interpolated values.
+
+Each 1-day long trace is then low-passed (at ``preprocess_lowpass`` Hz),
+high-passed (at ``preprocess_highpass`` Hz), then if needed,
+decimated/downsampled. Decimation/Downsampling are configurable
+(``resampling_method``) and users are advised testing Decimate. One advantage of
+Downsampling over Decimation is that it is able to downsample the data by any
+factor, not only integer factors. Downsampling is achieved with the
+ObsPy Lanczos resampler which we tested against the old scikits.samplerate.
+
+If configured, each 1-day long trace is corrected for its instrument response.
+Currently, only dataless seed and inventory XML are supported.
+
+As from MSNoise 1.5, the preprocessing routine is separated from the compute_cc
+and can be used by plugins with their own parameters. The routine returns a
+Stream object containing all the traces for all the stations/components.
+"""
+
 import sys
 import traceback
 

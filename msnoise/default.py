@@ -1,7 +1,7 @@
 from collections import OrderedDict
 default = OrderedDict()
 default['data_folder'] = ["Data Folder",'']
-default['output_folder'] = ["CC Output Folder",'CROSS_CORRELATIONS']
+default['output_folder'] = ["CC Output Folder in case keep_all=Y, to store the individual windows. The daily CCF will always be stored in the STACKS/001_DAYS folder.",'CROSS_CORRELATIONS']
 default['data_structure'] = ["Either a predefined acronym [SDS]/BUD/IDDS,<br> "
                              "or /-separated path (e.g. NET/STA/YEAR/NET.STA.YEAR.DAY.MSEED).", 'SDS']
 default['archive_format'] = ["Force format of archive files to read? Leave "

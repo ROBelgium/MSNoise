@@ -346,11 +346,3 @@ def main(stype, interval=1.0, loglevel="INFO"):
     #     massive_update_job(db, biglist, "T")
 
     logger.debug("Finished Stacking")
-
-
-def refstack(interval):
-    main('ref', interval)
-
-
-def movstack(interval):
-    main('mov', interval)

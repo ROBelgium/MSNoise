@@ -12,6 +12,9 @@
 # serve to show the default.
 import os
 
+import sys
+sys.path.append(r"C:\Program Files (x86)\Graphviz2.38\bin")
+
 import matplotlib
 
 matplotlib.use('Agg')
@@ -41,9 +44,8 @@ header = formatter.format(*['=' * c for c in colsizes])
 
 output = header +'\n' + headformatted +'\n' + header + '\n' + '\n'.join(rowsformatted) + '\n' + header
 
-f = open('defaults.rst','w')
-f.write(output)
-f.close()
+with open('defaults.rst', 'w') as f:
+    f.write(output)
 
 output = ""
 for key in default.keys():
@@ -150,6 +152,7 @@ extensions = ['sphinx.ext.intersphinx',
               'sphinx.ext.coverage',
               'sphinx.ext.mathjax',
               'sphinx.ext.todo',
+              'sphinx.ext.graphviz',
               'numpydoc',
               'sphinx_gallery.gen_gallery',]
 

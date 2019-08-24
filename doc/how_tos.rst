@@ -3,6 +3,38 @@
 How To's
 ========
 
+Run the simplest MSNoise run ever
+---------------------------------
+
+This recipe is a kind of "let's check this data rapidly":
+
+.. code-block:: sh
+
+    msnoise db init --tech 1
+
+    msnoise config set startdate=2019-01-01
+    msnoise config set enddate=2019-02-01
+    msnoise config set overlap=0.5
+    msnoise config set mov_stack=1,5,10
+
+    msnoise scan_archive --path /path/to/archive --recursively
+    msnoise populate --fromDA
+    msnoise new_jobs --init
+
+    msnoise admin # add 1 filter in the Filter table
+    # or
+    msnoise db execute "insert into filters (ref, low, mwcs_low, high, mwcs_high, rms_threshold, mwcs_wlen, mwcs_step, used) values (1, 0.1, 0.1, 1.0, 1.0, 0.0, 12.0, 4.0, 1)"
+
+    msnoise compute_cc
+    msnoise stack -r
+    msnoise reset STACK
+    msnoise stack -m
+    msnoise compute_mwcs
+    msnoise compute_dtt
+    msnoise plot dvv
+
+
+
 Reprocess data
 --------------
 
@@ -35,23 +67,33 @@ for 'filter id'=2, etc.
 When changing the REF
 ~~~~~~~~~~~~~~~~~~~~~
 
-When changing the REF, the REF stack has to be re-computed:
+When changing the REF (``ref_begin`` and ``ref_end``), the REF stack has to be
+re-computed:
 
-``msnoise stack -r -i 999`` will ensure all jobs marked done in the last 999
-days are checked for modification. The REF will then be re-output.
+.. code-block:: sh
 
+    msnoise reset STACK --all
+    msnoise stack -r
+
+The REF will then be re-output, and you probably should reset the MWCS jobs to
+recompute daily correlations against this new ref:
+
+.. code-block:: sh
+
+    msnoise reset MWCS --all
+    msnoise compute_mwcs
 
 
 When changing the MWCS parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If the MWCS parameters are changed in the database, all MWCS jobs need to be
-reprocessed.
+reprocessed:
 
+.. code-block:: sh
 
-``msnoise reset DTT --all``
-
-``msnoise compute_mwcs``
+    msnoise reset MWCS --all
+    msnoise compute_mwcs
 
 shoud do the trick.
 
@@ -59,9 +101,32 @@ shoud do the trick.
 When changing the dt/t parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. code-block:: sh
 
-``msnoise compute_dtt -i 999`` will ensure all MWCS jobs marked done in the
-last 999 days are checked for modification.
+    msnoise reset DTT --all
+    msnoise compute_dtt
+
+
+Recompute only the specific days
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You want to recompute CC jobs after a certain date only, for whatever reason:
+
+.. code-block:: sh
+
+    msnoise reset CC --rule="day>='2019-01-01'"
+
+SQL experts can also use the ``msnoise db execute`` command (with caution!):
+
+.. code-block:: sh
+
+    msnoise db execute "update jobs set flag='T' where jobtype='CC' and day>='2019-01-01'"
+
+If you want to only reprocess one day:
+
+.. code-block:: sh
+
+    msnoise reset CC --rule="day='2019-01-15'"
 
 
 
@@ -78,13 +143,46 @@ in the current project folder:
 How to have MSNoise work with 2+ data structures at the same time
 -----------------------------------------------------------------
 
-Not yet implemented.
+In this case, the easiest solution is to scan the archive(s) with the "Lazy
+Mode":
+
+.. code-block:: sh
+
+    msnoise scan_archive --path /path/to/archive1/ --recursively
+    msnoise scan_archive --path /path/to/archive2/ --recursively
+
+etc.
+
+Remember to either manually fill in the station table, or
+
+.. code-block:: sh
+
+    msnoise populate --fromDA
+
 
 
 How to duplicate/dump the MSNoise configuration
 -----------------------------------------------
 
-Not yet implemented.
+To export all tables of the current database, run
+
+.. code-block:: sh
+
+    msnoise db dump
+
+This will create as many CSV files as there are tables in the database.
+
+Then, on a new location, init a new msnoise project and import the tables
+one by one:
+
+.. code-block:: sh
+
+    msnoise db init
+    msnoise db import config --force
+    msnoise db import stations --force
+    msnoise db import filters --force
+    msnoise db import data_availability --force
+    msnoise db import jobs --force
 
 
 .. _testing:

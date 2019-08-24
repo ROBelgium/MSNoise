@@ -30,7 +30,7 @@ each window between two signals is the slope of a weighted linear regression
 
 For each filter, the frequency band can be configured using ``mwcs_low``
 and ``mwcs_high``, and the window and overlap lengths using ``mwcs_wlen`` and
-``mwcs_overlap``.
+``mwcs_step``.
 
 The output of this process is a table of delays measured at each window in the
 functions. The following is an example for lag times between -115 and -90.

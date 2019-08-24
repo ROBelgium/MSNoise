@@ -16,6 +16,9 @@ Questions are:
     - database: must already exist on `hostname`
     - username: as registered in the privileged users of the mysql server
     - password: his password
+    - prefix: useful when users have only access to a single database. Similar
+      to the way wordpress handles prefixes. The tables will be named
+      ``%prefix%_config`` (etc) instead of ``config``, for example.
 
 The SQLite choice will create a xxx.sqlite file in the current (project) folder,
 while, for MySQL, one has to create an empty database first on the mysql server,
@@ -121,7 +124,7 @@ def create_indices(session, prefix):
 
 
 def main(tech=None, hostname=None, username=None, password=None,
-         database=None, filename=None, prefix=None):
+         database="msnoise", filename="msnoise.sqlite", prefix=None):
     """
     Create the db.ini file and create database.
 
@@ -178,6 +181,7 @@ def main(tech=None, hostname=None, username=None, password=None,
                              DEFAULT_INPUTS['table_prefix'])
     else:
         tech = int(tech)
+        prefix = ""
 
     if tech == 1:
         engine = create_engine('sqlite:///%s' % filename, echo=False)

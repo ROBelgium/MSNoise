@@ -7,8 +7,10 @@ corresponding jobs are marked "I"n Progress in the database. This allows
 running several instances of this script in parallel.
 
 Configuration Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------
 
+* |components_to_compute|
+* |components_to_compute_single_station|  | *new in 1.6*
 * |cc_sampling_rate|
 * |analysis_duration|
 * |overlap|
@@ -28,46 +30,22 @@ Configuration Parameters
 * |pws_timegate|
 * |pws_power|
 * |whitening|  | *new in 1.5*
+* |whitening_type|  | *new in 1.6*
+* |hpc| | *new in 1.6*
 
-Waveform Pre-processing
-~~~~~~~~~~~~~~~~~~~~~~~
-Pairs are first split and a station list is created. The database is then
-queried to get file paths. For each station, all files potentially containing
-data for the day are opened. The traces are then merged and splitted, to obtain
-the most continuous chunks possible. The different chunks are then demeaned,
-tapered and merged again to a 1-day long trace. If a chunk is not aligned
-on the sampling grid (that is, start at a integer times the sample spacing in s)
-, the chunk is phase-shifted in the frequency domain. This requires tapering and
-fft/ifft. If the gap between two chunks is small, compared to a currently
-hard-coded value (10 samples), the gap is filled with interpolated values.
-Larger gaps will not be filled with interpolated values.
-
-.. warning::
-    As from MSNoise 1.5, traces are no longer padded by or merged with 0s.
-
-Each 1-day long trace is then low-passed (at ``preprocess_lowpass`` Hz),
-high-passed (at ``preprocess_highpass`` Hz), then if needed,
-decimated/downsampled. Decimation/Downsampling are configurable
-(``resampling_method``) and users are advised testing Decimate. One advantage of
-Downsampling over Decimation is that it is able to downsample the data by any
-factor, not only integer factors. Downsampling can be achieved with the new
-ObsPy Lanczos resampler, giving results similar to those by scikits.samplerate.
-
-.. note:: Python 3 users will most probably struggle installing
-    scikits.samplerate, and therefore will have to use either Decimate or
-    Lanczos instead of Resample. This is not a problem because the Lanczos
-    resampling gives results similar to those by scikits.samplerate.
+.. automodule:: msnoise.preprocessing
 
 
-If configured, each 1-day long trace is corrected for its instrument response.
-Currently, only dataless seed and inventory XML are supported.
+Computing the Cross-Correlations
+--------------------------------
 
-As from MSNoise 1.5, the preprocessing routine is separated from the compute_cc
-and can be used by plugins with their own parameters. The routine returns a
-Stream object containing all the traces for all the stations/components.
+Processing using ``msnoise compute_cc``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Processing
-~~~~~~~~~~
+.. todo:: DESCRIBE THE NEW PROCESSING !
+
+Processing using ``msnoise compute_cc_rot``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Once all traces are preprocessed, station pairs are processed sequentially.
 If a component different from *ZZ* is to be computed, the traces are first
@@ -90,7 +68,7 @@ corresponding to ``maxlag`` in the acausal (negative lags) and causal
 (positive lags) parts.
 
 Stacking and Saving Results
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------
 
 If configured (setting ``keep_all`` to 'Y'), each ``corr_duration`` CCF is
 saved to the hard disk. By default, the ``keep_days`` setting is set to True
@@ -119,6 +97,10 @@ value is 2.
     Journal International 130, 2 (1997): 497-505.
 
 Once done, each job is marked "D"one in the database.
+
+
+Usage
+-----
 
 To run this script:
 
@@ -156,7 +138,7 @@ could occur with SQLite.
     advantage from 2D FFT computation and in-place array modifications.
     The standard compute_cc does process CC, AC and SC in the same code. Only
     if users need to compute R and/or T components, they will have to use the
-    slower previous code, now called compute_cc_rot.
+    slower previous code, now called ``compute_cc_rot``.
 
 """
 #TODO docstring

@@ -8,15 +8,18 @@ MSNoise is a python package that uses a database (sqlite or MySQL) for storing
 station and files metadata together with jobs. When installed, it provides a top
 level command ``msnoise`` in the console.
 
+This version will be the last to be tested on Python 2.7. The EOL (end of life) of 2.7 is 2020, which means it is high time for users to migrate. For users having a complete set of tools in Python 2.7 and not keen to move to 3.x soon, the incredible easiness of creating a Python 3.x environment in conda, for example, will allow them to run MSNoise in the future.
+
+Note that MSNoise is always tested against the latest release versions of the main packages, so older installations that are not maintained/updated regularly (years) could encounter issues. Please make sure you have the latest version of Numpy and Scipy (and MKL), as performance gets better and better (especially since Anaconda Inc. released its fast MKL implementations for all users, in the conda-forge channel).
+
 To run MSNoise, you need:
 
 * A recent version of Python (3.x recommended). We suggest using Anaconda_
   with a few extra modules. MSNoise is tested "continuously" by automatic
-  build systems (TravisCI and Appeveyor) for **Python 2.7** and **Python 3.6**,
+  build systems (TravisCI and Appeveyor) for **Python 2.7** and **Python 3.7**,
   on **Windows, Linux and MacOSX** 64 bits systems! Support for **Python 2
   .7** will be dropped as soon as the TravisCI test don't pass and the 
-  corrections would take too much dev time. **Python 3.7** has not been 
-  tested yet and will only be when ObsPy has a Python 3.7 release version.
+  corrections would take too much dev time.
 
   * Those modules are already distributed with Anaconda_:
 
@@ -89,9 +92,9 @@ Full Installation
 6. Check which required packages you are still missing by executing the
    ``msnoise bugreport`` command. (See :ref:`testing`)
 
-7. To be sure all is running OK, one could start the ``msnoise test`` command
-   in an empty directory. This will start the standard MSNoise test suite, which
-   should end with a "Ran xx tests in yy seconds : OK".
+7. To be sure all is running OK, one could start the ``msnoise test`` command.
+   This will start the standard MSNoise test suite, which should end with a
+   "Ran xx tests in yy seconds : OK".
 
 8. Proceed to the :ref:`Workflow` description to start MSNoise!
 
@@ -159,8 +162,8 @@ When moving your project to a larger server, HPC or else, just add the
 connection to this server in Workbench and you're good to go with the very
 same interface/tool !
 
-MySQL/MariaDB  configuration
-----------------------------
+MySQL/MariaDB configuration
+---------------------------
 You can also set up a database server using MariaDB_, there are plenty tutorials
 of how to set it up as well. The new default character set for MySQL or 
 MariaDB is not simple utf8, so make sure that the configuration file
