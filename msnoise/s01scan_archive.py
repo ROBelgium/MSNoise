@@ -46,7 +46,7 @@ simply run:
 
 .. code-block:: sh
 
-    $ msnoise scan_archive --path /path/to/where/files/are
+    $ msnoise scan_archive --path /path/to/where/files/are --init
 
 and MSNoise will read anything ObsPy can (provided the files have a proper
 header (network code, station code and channel code). Then, once done, simply
@@ -56,7 +56,7 @@ This command can also scan folders recursively:
 
 .. code-block:: sh
 
-    $ msnoise scan_archive --path /path/to/archive --recursively
+    $ msnoise scan_archive --path /path/to/archive --recursively --init
 """
 
 
