@@ -8,3 +8,5 @@ References
 * De Castro Lopo, Erik. 2013. Secret Rabbit Code (aka libsamplerate).
 * Hunter, J.D. 2007. Matplotlib: A 2D Graphics Environment. *Computing in Science Engineering* 9 (3)
 * McKinney, Wes. 2012. Python for Data Analysis. *O'Reilly Media*.
+.. [Clarke2011] * Clarke, D., Zaccarelli, L., Shapiro, N.M., Brenguier, F., 2011. Assessment of resolution and accuracy of the Moving Window Cross Spectral technique for monitoring crustal temporal variations using ambient seismic noise. *Geophysical Journal International* 186, 867–882. https://doi.org/10.1111/j.1365-246X.2011.05074.x
+.. [Poupinet1984] * Poupinet, G., Ellsworth, W.L., Frechet, J., 1984. Monitoring Velocity Variations in the Crust Using Earthquake Doublets: An Application to the Calaveras Fault, California. *Journal of Geophysical Research* 89, 5719–5731.
