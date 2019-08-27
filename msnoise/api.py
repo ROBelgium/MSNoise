@@ -513,7 +513,7 @@ def get_station_pairs(session, used=None, net=None):
         pairs
     """
     stations = get_stations(session, all=False, net=net)
-    if get_config(session, name="autocorr", isbool=True):
+    if len(get_config(session, name="components_to_compute_single_station")):
         return itertools.combinations_with_replacement(stations, 2)
     else:
         return itertools.combinations(stations, 2)
