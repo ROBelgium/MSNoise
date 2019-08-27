@@ -852,9 +852,10 @@ def compute_dtt(ctx, interval):
 @click.option('-a', '--all', is_flag=True, help='Reset all jobs')
 @click.option('-r', '--rule', help='Reset job that match this SQL rule')
 def reset(jobtype, all, rule):
-    """Resets the job to "T"odo. ARG is [CC] or [DTT]. By default
-    only resets jobs "I"n progress. --all resets all jobs, whatever
-    the flag value"""
+    """Resets the job to "T"odo. JOBTYPE is the acronym of the job type.
+    By default only resets jobs "I"n progress. --all resets all jobs, whatever
+    the flag value. Standard Job Types are CC, STACK, MWCS and DTT, but
+    plugins can define their own."""
     from ..api import connect, reset_jobs, read_db_inifile
     dbini = read_db_inifile()
     prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
