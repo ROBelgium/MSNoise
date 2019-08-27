@@ -213,12 +213,13 @@ def main(loglevel="INFO"):
 
         comps = []
         for comp in params.all_components:
+            if comp[0] in ["Z", "E", "N", "1", "2"]:
+                comps.append(comp[0])
+            if comp[1] in ["Z", "E", "N", "1", "2"]:
+                comps.append(comp[1])
             if comp[0] in ["R", "T"] or comp[1] in ["R", "T"]:
                 comps.append("E")
                 comps.append("N")
-            else:
-                comps.append(comp[0])
-                comps.append(comp[1])
         
         comps = np.unique(comps)
         stream = preprocess(db, stations, comps, goal_day, params, responses)
