@@ -383,16 +383,24 @@ def main(interval=1, loglevel="INFO"):
                         df = pd.DataFrame(
                             {'Pairs': Pairs, 'M': M, 'EM': EM, 'A': A, 'EA': EA,
                              'M0': M0, 'EM0': EM0},
-                            index=pd.DatetimeIndex(Dates))
+                            index=Dates)
                         # Needs to be changed !
                         output = os.path.join(
                             'DTT', "%02i" % filterid, "%03i_DAYS" % mov_stack,
                             components)
                         if not os.path.isdir(output):
                             os.makedirs(output)
-                        df.to_csv(
-                            os.path.join(output, '%s.txt' % current),
-                            index_label='Date')
+                        fn = os.path.join(output, '%s.txt' % current)
+                        if os.path.isfile(fn):
+                            existing = pd.read_csv(fn, index_col="Pairs", parse_dates=True)
+                            for id, row in df.iterrows():
+                                if row.Pairs in existing.index.values:
+                                    existing.drop(row.Pairs, inplace=True)
+                                    logger.debug("Pair: %s is already in the output file, overwriting" % row.Pairs)
+                            existing["Pairs"] = existing.index.values
+                            existing.set_index("Date", inplace=True)
+                            df = pd.concat([df, existing])
+                        df.to_csv(fn, index_label='Date')
                         del df, M, EM, A, EA, M0, EM0, Pairs, Dates, used
                         del tArray, dtArray, errArray, cohArray, pairArray
                         del output
