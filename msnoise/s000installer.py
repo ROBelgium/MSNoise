@@ -134,6 +134,7 @@ def main(tech=None, hostname=None, username=None, password=None,
     argument for the automatic tests.
     """
     if tech is None:
+        database = None
         print("Welcome to MSNoise")
         print()
         print("What database technology do you want to use?")
