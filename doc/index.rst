@@ -62,12 +62,14 @@ Interacting with MSNoise
 
 .. toctree::
     :maxdepth: 2
+    :glob:
 
-    api
-    plugins
-    core
     how_tos
     auto_examples/index
+    api
+    core
+    plugins
+    
 
 .. toctree::
     :maxdepth: 1
