@@ -100,3 +100,18 @@ body {
 .wy-nav-content {
 max-width:none;
 }
+
+.sphx-glr-thumbcontainer {
+    min-height: 320px !important;
+    margin: 20px !important;
+}
+.sphx-glr-thumbcontainer .figure {
+    width: 250px !important;
+}
+.sphx-glr-thumbcontainer img {
+    max-height: 250px !important;
+    width: 250px !important;
+}
+.sphx-glr-thumbcontainer a.internal {
+    padding: 270px 10px 0 !important;
+}

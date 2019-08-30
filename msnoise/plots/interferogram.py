@@ -9,7 +9,7 @@ CCFs before plotting (new in 1.5).
 
 Example:
 
-``msnoise plot interferogram YA.UV06 YA.UV10 -m5`` will plot the ZZ component
+``msnoise plot interferogram YA.UV06 YA.UV11 -m5`` will plot the ZZ component
 (default), filter 1 (default) and mov_stack 5:
 
 .. image:: .static/interferogram.png
@@ -87,6 +87,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
             title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
         plt.title(title)
         fig.autofmt_xdate()
+        plt.tight_layout()
         cursor = Cursor(ax, useblit=True, color='black', linewidth=1.2)
         if outfile:
             if outfile.startswith("?"):

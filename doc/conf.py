@@ -15,15 +15,16 @@ import os
 import sys
 sys.path.append(r"C:\Program Files (x86)\Graphviz2.38\bin")
 
-import matplotlib
+import sphinx_gallery
 
-matplotlib.use('Agg')
+import matplotlib
+matplotlib.use('TkAgg')
 
 import msnoise.move2obspy
 import msnoise.preprocessing
 # import sphinx_bootstrap_theme
 
-
+os.environ["SPHINX_DOC_BUILD"] = "YES"
 
 import datetime
 import click
@@ -50,6 +51,7 @@ with open('defaults.rst', 'w') as f:
 output = ""
 for key in default.keys():
     descr, defvalue = default[key][:2]
+    descr = descr.replace("<br>", " | ")
     output += ".. |%s| replace:: ``%s``: %s (default=%s)\n" % (key, key, descr,
                                                             defvalue)
 
@@ -159,6 +161,8 @@ extensions = ['sphinx.ext.intersphinx',
 sphinx_gallery_conf = {
      'examples_dirs': '../examples',   # path to your example scripts
      'gallery_dirs': 'auto_examples',  # path where to save gallery generated examples
+     'show_memory': False,
+     'thumbnail_size': (250, 250),
 }
 
 math_number_all = False

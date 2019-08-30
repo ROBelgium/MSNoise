@@ -84,6 +84,7 @@ def main(show=False, outfile=None):
     plt.ylabel('N stations')
     plt.gcf().autofmt_xdate()
     plt.grid()
+    plt.tight_layout()
     if outfile:
         if outfile.startswith("?"):
             now = datetime.datetime.now()

@@ -273,12 +273,4 @@ The [X] marks the presence of the module. In the case above, PyQt4 is missing, b
 `wx` or `PySide` are present, so traitsui has a backend to render the GUI for the Configurator. The "not-required"
 packages are checked for information, those packages can be useful for reporting / hacking / rendering the data.
 
-To install a missing package, for example *obspy*, use the pip command:
-
-.. code-block:: sh
-
-    $ pip install obspy
-
-
-
 

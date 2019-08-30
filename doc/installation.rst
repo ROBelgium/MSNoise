@@ -133,15 +133,19 @@ perform all tasks on the database server) and click "Apply".
 Create an empty database
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Each "project" needs a database. That is, if one has two different volcanoes and
-wants to run MSNoise the two datasets, one needs to create two empty databases.
+Ideally, each "project" needs a database. For example, if one has two different
+volcanoes and wants to run MSNoise using the these distinct datasets, one needs
+to create two empty databases. For users who have access to only 1 database,
+the ```msnoise db init`` allows to provide a ``prefix```, which works like the
+Wordpress prefixes: for example if a prefix is "vA", the ```config`` 
+table that will be created is ``vA_config`` in the database.
 
 Click on the "Create new schema" button in the taskbar:
 
 .. image:: .static/workbench_4.png
 
-and give the database a name (for example msnoise; or msnoise_project1, or
-project1, or else, you choose) ; and click "Apply":
+and provide a name for the database (for example msnoise; or msnoise_project1,
+or project1, or anything else) ; and click "Apply":
 
 .. image:: .static/workbench_5.png
 
@@ -151,7 +155,7 @@ and click "Apply" again and it should state all is OK:
 
 .. image:: .static/workbench_7.png
 
-When done, the database we created is present in the left sidebar:
+When done, the database we can be seen in the left sidebar:
 
 .. image:: .static/workbench_8.png
 

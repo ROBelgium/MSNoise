@@ -156,26 +156,45 @@ Preprocessing
 Cross-Correlation TODO
 ~~~~~~~~~~~~~~~~~~~~~~
 
+* The ``compute_cc`` step has been completely rewritten to make use of 2D arrays
+  holding the data, processing them "in place" for the different steps (FFT,
+  whitening, etc). This results in much more efficient computation. The process
+  slides on time windows and computes the correlations using indexes in a 2D
+  array, therefore avoiding an exponential number of identical operations on
+  data windows.
+
+* This new code is the default ``compute_cc``, and it doesn't allow computing
+  rotated components. For users needing ``R`` or ``T`` components, there are two
+  options: either use the old code, now named ``compute_cc_rot``, or compute the
+  full (6 components actually are enough) tensor using the new code, and rotate
+  the components afterwards. From initial tests, this latter solution is a lot
+  faster than the first, thanks to the new processing in 2D.
+
 * It is now possible to do the Cross-Correlation (classic "CC"), the Auto-
   Correlation ("AC") or the Cross-Components within the same station ("SC").
   To achieve this, we removed the `ZZ`, `ZT`, etc parameters from the
   configuration and replaced it with ``components_to_compute`` which takes a list:
   e.g. `ZZ,ZE,ZN,EZ,EE,EN,NZ,NE,NN` for the full non-rotated tensor between
-  stations. If `autocorr` is set to "Y", then the cross-components (SC) of each
-  station will also be computed (of course, `ZE` and `EZ` are identical).
+  stations. Adding components to the new
+  ``components_to_compute_single_station`` will allow computing the
+  cross-components (SC) or auto-correlation (AC) of each station.
 
-* The cross-correlation is done on sliding windows on the available data. If one
-  trace contains a gap, the window is skipped. This corrects previous errors
-  linked with gaps synchronised in time that lead to perfect sinc autocorr
-  functions. The windows should have a duration of at least 2 times the `maxlag`
-  configuration value.
+* The cross-correlation is done on sliding windows on the available data. For
+  each window, if one trace contains a gap, it is eliminated from the
+  computation. This corrects previous errors linked with gaps synchronised in
+  time that lead to perfect sinc autocorrelation functions. The windows should
+  have a duration of at least "2 times the `maxlag`+1" to be computable.
+
+.. todo:: params.whiten is not used in the new compute_cc
 
 * The whitening procedure can be skipped by setting the ``whitening``
   configuration to `None`. The two other ``whitening`` modes are "[A]ll except
   for auto-correlation" or "Only if [C]omponents are different". This allows
   skipping the whitening when, for example, computing ZZ components for very
   close by stations (much closer than the wavelength sampled), leading to
-  spatial autocorrelation issues.
+  spatial autocorrelation issues. "A" and "N" are supported by the new
+  ``compute_cc``, while "C" is only supported by the old version, now named
+  ``compute_cc_rot``.
 
 
 Command Line changes

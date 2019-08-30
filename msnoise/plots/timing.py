@@ -23,11 +23,6 @@ def main(mov_stack=None, dttname="A", components='ZZ', filterid=1,
          pairs=[], showALL=False, show=False, outfile=None):
     db = connect()
 
-    if get_config(db, name="autocorr", isbool=True):
-        condition = "sta2 >= sta1"
-    else:
-        condition = "sta2 > sta1"
-
     start, end, datelist = build_movstack_datelist(db)
 
     if mov_stack != 0:
@@ -118,5 +113,7 @@ def main(mov_stack=None, dttname="A", components='ZZ', filterid=1,
         plt.savefig(outfile)
     if show:
         plt.show()
+        
+
 if __name__ == "__main__":
     main()

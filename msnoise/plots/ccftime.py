@@ -11,9 +11,19 @@ CCFs before plotting (new in 1.5).
 
 Example:
 
-``msnoise plot ccftime ID.KWUI ID.POSI`` will plot all defaults:
+``msnoise plot ccftime YA.UV06 YA.UV11`` will plot all defaults:
 
 .. image:: .static/ccftime.png
+
+For zooming in the CCFs:
+
+
+``msnoise plot ccftime YA.UV06 YA.UV11  --xlim=-10,10 --ampli=30``:
+
+.. image:: .static/ccftime_zoom.png
+
+
+
 """
 # plot interferogram
 
@@ -100,7 +110,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
             plt.xlim(-maxlag, maxlag)
         ax.fmt_ydata = mdates.DateFormatter('%Y-%m-%d')
         cursor = Cursor(ax, useblit=True, color='red', linewidth=1.2)
-
+        plt.tight_layout()
         if outfile:
             if outfile.startswith("?"):
                 pair = pair.replace(':', '-')
