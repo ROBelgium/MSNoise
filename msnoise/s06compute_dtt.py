@@ -114,7 +114,7 @@ of the ```Not Forced`` WLS.
 Mean of All Pairs vs Mean Pair
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. warning:: the ``ÀLL`` pair is still calculated and output in the DTT files,
+.. warning:: the ``ALL`` pair is still calculated and output in the DTT files,
     but its output is no longer displayed on the graphs. *new in 1.6*.
 
 The dt/t calculated using the mean pair (ALL, in red on subplots 4 and 5)

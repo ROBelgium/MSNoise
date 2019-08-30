@@ -12,11 +12,28 @@ plotted. By default the plot uses dates determined in database.
 
 Example:
 
-``msnoise plot spectime ID.KWUI ID.POSI`` will plot all defaults:
+``msnoise plot spectime YA.UV05 YA.UV11`` will plot all defaults:
 
 .. image:: .static/spectime.png
+
+
+Zooming in the X-axis and playing with the amplitude:
+
+``msnoise plot spectime YA.UV05 YA.UV11 --xlim=0.08,1.1 --ampli=10``:
+
+.. image:: .static/spectime_zoom.png
+
+
+And refiltering to enhance high frequency content:
+
+``msnoise plot spectime YA.UV05 YA.UV11 --xlim=0.5,1.1 --ampli=10 -r0.7:1.0``:
+
+.. image:: .static/spectime_refilter.png
+
+
+
 """
-# plot ccffreq
+
 
 import datetime
 
@@ -68,7 +85,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
             freq, line = prepare_abs_postitive_fft(line, cc_sampling_rate)
             line /= line.max()
 
-            ax.plot(freq, line * ampli + i + base, c='k')
+            ax.plot(freq, line * ampli + i + base, c='k', lw=1)
 
         for filterdb in get_filters(db, all=True):
             if filterid == filterdb.ref:

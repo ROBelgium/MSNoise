@@ -17,10 +17,16 @@ Example:
 
 For zooming in the CCFs:
 
-
-``msnoise plot ccftime YA.UV06 YA.UV11  --xlim=-10,10 --ampli=30``:
+``msnoise plot ccftime YA.UV05 YA.UV11 --xlim=-10,10 --ampli=15``:
 
 .. image:: .static/ccftime_zoom.png
+
+
+It is sometimes useful to refilter the CCFs on the fly:
+
+``msnoise plot ccftime YA.UV05 YA.UV11 -r 0.5:1.0``:
+
+.. image:: .static/ccftime_refilter.png
 
 
 
