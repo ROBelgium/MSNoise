@@ -22,11 +22,12 @@ To run the code on two Process, execute the following in console:
 
     $ msnoise -t 2 scan_archive
 
-Special case: first run
-~~~~~~~~~~~~~~~~~~~~~~~~
+Compulsory Special case: first run
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This script is the same as for the routine, but one has to pass the --init
-option:
+option. The ``scan_archive`` will scan all files in the data folders,
+regardless of their modification time.
 
 .. code-block:: sh
 

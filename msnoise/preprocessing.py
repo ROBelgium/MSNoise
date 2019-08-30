@@ -8,20 +8,25 @@ the most continuous chunks possible. The different chunks are then demeaned,
 tapered and merged again to a 1-day long trace. If a chunk is not aligned
 on the sampling grid (that is, start at a integer times the sample spacing in s)
 , the chunk is phase-shifted in the frequency domain. This requires tapering and
-fft/ifft. If the gap between two chunks is small, compared to a currently
-hard-coded value (10 samples), the gap is filled with interpolated values.
+fft/ifft. If the gap between two chunks is small, compared to
+``preprocess_max_gap``, the gap is filled with interpolated values.
 Larger gaps will not be filled with interpolated values.
 
-Each 1-day long trace is then low-passed (at ``preprocess_lowpass`` Hz),
-high-passed (at ``preprocess_highpass`` Hz), then if needed,
-decimated/downsampled. Decimation/Downsampling are configurable
-(``resampling_method``) and users are advised testing Decimate. One advantage of
-Downsampling over Decimation is that it is able to downsample the data by any
-factor, not only integer factors. Downsampling is achieved with the
-ObsPy Lanczos resampler which we tested against the old scikits.samplerate.
+Each 1-day long trace is then high-passed (at ``preprocess_highpass`` Hz), then
+if needed, low-passed (at ``preprocess_lowpass`` Hz) and decimated/downsampled.
+Decimation/Downsampling are configurable (``resampling_method``) and users are
+advised testing Decimate. One advantage of Downsampling over Decimation is that
+it is able to downsample the data by any factor, not only integer factors.
+Downsampling is achieved with the ObsPy Lanczos resampler which we tested
+against the old scikits.samplerate.
 
 If configured, each 1-day long trace is corrected for its instrument response.
 Currently, only dataless seed and inventory XML are supported.
+
+
+.. image:: ../.static/preprocessing.png
+    :align: center
+
 
 As from MSNoise 1.5, the preprocessing routine is separated from the compute_cc
 and can be used by plugins with their own parameters. The routine returns a
@@ -186,7 +191,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     continue
                 logger.debug("%s Checking sample alignment" % stream[0].id)
                 for i, trace in enumerate(stream):
-                    stream[i] = check_and_phase_shift(trace)
+                    stream[i] = check_and_phase_shift(trace, params.preprocess_taper_length)
 
                 logger.debug("%s Checking Gaps" % stream[0].id)
                 if len(getGaps(stream)) > 0:
@@ -199,7 +204,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                             if int(gap[-1]) <= max_gap:
                                 try:
                                     stream[gap[0]] = stream[gap[0]].__add__(stream[gap[1]], method=1,
-                                                                        fill_value="interpolate")
+                                                                            fill_value="interpolate")
                                     stream.remove(stream[gap[1]])
                                 except:
                                     stream.remove(stream[gap[1]])
@@ -217,14 +222,15 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                 for tr in stream:
                     if tr.stats.sampling_rate < (params.goal_sampling_rate-1):
                         stream.remove(tr)
-                taper_length = 20.0  # seconds
+                taper_length = params.preprocess_taper_length  # seconds
                 for trace in stream:
-                    if trace.stats.npts < 4 * taper_length * trace.stats.sampling_rate:
+                    if trace.stats.npts < (4 * taper_length * trace.stats.sampling_rate):
                         stream.remove(trace)
                     else:
                         trace.detrend(type="demean")
                         trace.detrend(type="linear")
-                        trace.taper(max_percentage=None, max_length=1.0)
+                        trace.taper(max_percentage=None,
+                                    max_length=taper_length)
 
                 if not len(stream):
                     logger.debug(" has only too small traces, skipping...")

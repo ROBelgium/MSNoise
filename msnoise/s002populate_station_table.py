@@ -1,10 +1,11 @@
 """
-This script is responsible for rapidly scanning the data archive and
-identifying the Networks/Stations and insert them in the *stations* table in
+This script is responsible for rapidly scanning the data archive,
+identifying the Networks/Stations and inserting them in the *stations* table in
 the database.
 
-The ``data_folder`` (as defined in the config) is scanned expecting the
-``data_structure`` and possible values are defined in *data_structures.py*:
+The ``data_folder`` (as defined in the config) is scanned following the
+``data_structure``. Possible values for the data_structure are defined in
+*data_structures.py*:
 
 .. code-block:: python
     
@@ -13,8 +14,9 @@ The ``data_folder`` (as defined in the config) is scanned expecting the
     data_structure['IDDS'] = "YEAR/NET/STA/CHAN.TYPE/DAY/NET.STA.LOC.CHAN.TYPE.YEAR.DAY.HOUR"
     data_structure['PDF'] = "YEAR/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.DAY"
 
-If one's data structure is one of those, then the ``data_structure``
-configuration bit needs to be set to the acronym (SDS, BUD, IDDS or PDF).
+If your data structure corresponds to one of these 4 structures, you need to
+select the corresponding acronym (SDS, BUD, IDDS or PDF) for the data_structure
+field.
 
 More info on the recommended SDS ("SeisComP Data Structure") can be found here:
 https://www.seiscomp3.org/wiki/doc/applications/slarchive/SDS
@@ -32,9 +34,9 @@ To run this script:
 Custom data structure & station table population
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If one's data structure is not one of the pre-defined, it can be defined
-directly in the ``data_structure`` configuration bit using forward slashes,
-e.g.:
+If one's data structure does not belong to the pre-defined ones, it can be
+defined directly in the ``data_structure`` configuration field using forward
+slashes, e.g.:
 
 ``data_structure`` = "NET/STA/YEAR/NET.STA.YEAR.DAY.MSEED"
 

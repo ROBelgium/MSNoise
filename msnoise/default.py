@@ -25,6 +25,10 @@ default['preprocess_highpass'] = ["Preprocessing High-pass value in Hz ["
 default['preprocess_max_gap'] = ["Preprocessing maximum gap length that will "
                                  "be filled by interpolation [10.0] seconds",
                                  '10.0', float]
+default['preprocess_taper_length'] = ["Duration of the taper applied at the "
+                                      "beginning and end of trace during the "
+                                      "preprocessing, to allow highpass"
+                                      "filtering", '20.0', float]
 
 default['remove_response'] = ["Remove instrument response Y/[N]",'N', bool]
 default['response_format'] = ["Remove instrument file format [dataless]/inventory/paz/resp",'dataless']

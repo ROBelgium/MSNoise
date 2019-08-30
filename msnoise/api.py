@@ -1624,9 +1624,8 @@ def nextpow2(x):
     return np.ceil(np.log2(np.abs(x)))
 
 
-def check_and_phase_shift(trace):
+def check_and_phase_shift(trace, taper_length=20.0):
     # TODO replace this hard coded taper length
-    taper_length = 20.0
     if trace.stats.npts < 4 * taper_length*trace.stats.sampling_rate:
         trace.data = np.zeros(trace.stats.npts)
         return trace

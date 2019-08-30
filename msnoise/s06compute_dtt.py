@@ -104,18 +104,24 @@ is saved to the output file, as visible above. In the future, MSNoise will be
 able to treat as many groups as the user want, allowing, e.g. a "crater" and
 a "slopes" groups.
 
+Forcing vs No Forcing through Origin
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The reason for allowing the WLS to cross the axis elsewhere than on (0,0) is,
+for example, to study the potential clock drifts or noise source position
+variations. By default, the ``msnoise plot dvv`` plot shows the results
+of the ```Not Forced`` WLS.
+
 Mean of All Pairs vs Mean Pair
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. warning:: the ``ÀLL`` pair is still calculated and output in the DTT files,
+    but its output is no longer displayed on the graphs. *new in 1.6*.
+
 The dt/t calculated using the mean pair (ALL, in red on subplots 4 and 5)
 and by calculating the weighted mean of the dt/t of all pairs (in green)
 don't show a significant difference. The standard deviation around the latter
 is more spread than on the former, but this has to be investigated.
 
-Forcing vs No Forcing through Origin
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The reason for allowing the WLS to cross the axis elsewhere than on (0,0) is,
-for example, to study the potential clock drifts or noise source position
-variations.
 
 """
 

@@ -1,7 +1,7 @@
 """MSNoise Admin is a web interface that helps the user define the
-configuration for all the processing steps, it also allows configuring the
-stations and filters to be used in the processes. It gives a view on the
-database tables.
+configuration for all the processing steps. It allows configuring the
+stations and filters to be used in the different steps of the workflow and
+provides a view on the database tables.
 
 To start the admin:
 
@@ -18,8 +18,8 @@ Which, by default, starts a web server listening on all interfaces on port
     $ msnoise admin -p 5099
 
 
-Next step is to open a web browser and open the ip address of the machine,
-by default on the current machine, it'll be http://localhost:5000/ or
+The next step consists of opening a web browser and open the ip address of the
+machine, by default on the current machine, it'll be http://localhost:5000/ or
 http://127.0.0.1:5000/.
 
 .. image:: ../.static/msnoise_admin_home.png
@@ -87,7 +87,7 @@ Example view:
 .. image:: ../.static/msnoise_admin_config.png
     :align: center
 
-The table below repeats this
+The table below lists the different fields:
 
 .. include:: ../defaults.rst
 

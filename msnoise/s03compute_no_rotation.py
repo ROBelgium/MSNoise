@@ -6,8 +6,43 @@ them using the following scheme. As soon as one day is selected, the
 corresponding jobs are marked "I"n Progress in the database. This allows
 running several instances of this script in parallel.
 
+As of MSNoise 1.6, the ``compute`` step has been completely rewritten:
+
+* The ``compute_cc`` step has been completely rewritten to make use of 2D arrays
+  holding the data, processing them "in place" for the different steps (FFT,
+  whitening, etc). This results in much more efficient computation. The process
+  slides on time windows and computes the correlations using indexes in a 2D
+  array, therefore avoiding an exponential number of identical operations on
+  data windows.
+
+* This new code is the default ``compute_cc``, and it doesn't allow computing
+  rotated components. For users needing ``R`` or ``T`` components, there are two
+  options: either use the old code, now named ``compute_cc_rot``, or compute the
+  full (6 components actually are enough) tensor using the new code, and rotate
+  the components afterwards. From initial tests, this latter solution is a lot
+  faster than the first, thanks to the new processing in 2D.
+
+* It is now possible to do the Cross-Correlation (classic "CC"), the Auto-
+  Correlation ("AC") or the Cross-Components within the same station ("SC").
+  To achieve this, we removed the `ZZ`, `ZT`, etc parameters from the
+  configuration and replaced it with ``components_to_compute`` which takes a
+  list: e.g. `ZZ,ZE,ZN,EZ,EE,EN,NZ,NE,NN` for the full non-rotated tensor
+  between stations. Adding components to the new
+  ``components_to_compute_single_station`` will allow computing the
+  cross-components (SC) or auto-correlation (AC) of each station.
+
+* The cross-correlation is done on sliding windows on the available data. For
+  each window, if one trace contains a gap, it is eliminated from the
+  computation. This corrects previous errors linked with gaps synchronised in
+  time that lead to perfect sinc autocorrelation functions. The windows should
+  have a duration of at least "2 times the `maxlag`+1" to be computable.
+
+
 Configuration Parameters
 ------------------------
+
+The following parameters (modifiable via ```msnoise admin```) are used for
+this step:
 
 * |components_to_compute|
 * |components_to_compute_single_station|  | *new in 1.6*
@@ -24,6 +59,8 @@ Configuration Parameters
 * |response_prefilt|
 * |preprocess_lowpass|
 * |preprocess_highpass|
+* |preprocess_max_gap|  | *new in 1.6*
+* |preprocess_taper_length|  | *new in 1.6*
 * |keep_all|
 * |keep_days|
 * |stack_method|
@@ -42,7 +79,19 @@ Computing the Cross-Correlations
 Processing using ``msnoise compute_cc``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: DESCRIBE THE NEW PROCESSING !
+.. todo:: We still need to describe the workflow in plain text, but the
+    following graph should help you understand how the code is structured
+
+
+.. image:: ../.static/compute_cc.png
+    :align: center
+
+
+.. image:: ../.static/MyCorr2.png
+    :align: center
+
+
+
 
 Processing using ``msnoise compute_cc_rot``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,13 +116,14 @@ When both traces are ready, the cross-correlation function is computed
 corresponding to ``maxlag`` in the acausal (negative lags) and causal
 (positive lags) parts.
 
-Stacking and Saving Results
----------------------------
+Saving Results (stacking the daily correlations)
+------------------------------------------------
 
 If configured (setting ``keep_all`` to 'Y'), each ``corr_duration`` CCF is
-saved to the hard disk. By default, the ``keep_days`` setting is set to True
-and so "N = 1 day / corr_duration" CCF are stacked and saved to the hard disk
-in the STACKS/001_DAYS folder.
+saved to the hard disk in the ``output_folder``. By default, the ``keep_days``
+setting is set to True and so "N = 1 day / corr_duration" CCF are stacked to
+produce a daily cross-correlation function, which is saved to the hard disk in
+the ``STACKS/001_DAYS`` folder.
 
 .. note:: Currently, the keep-all data (every CCF) are not used by next steps.
 
@@ -182,6 +232,10 @@ def main(loglevel="INFO"):
     if "R" in ''.join(params.components_to_compute) or "T" in ''.join(params.components_to_compute):
         logger.info("You seem to have configured R and/or T components, thus rotations ARE needed. You should therefore use the 'msnoise compute_cc_rot' instead.")
         return()
+    
+    if params.whitening not in ["A", "N"]:
+        logger.info("The 'whitening' parameter is set to '%s', which is not supported by this process. Set it to 'A' or 'N', or use the 'msnoise compute_cc_rot' instead." % params.whitening)
+        return ()
 
     if params.remove_response:
         logger.debug('Pre-loading all instrument response')
@@ -217,10 +271,7 @@ def main(loglevel="INFO"):
                 comps.append(comp[0])
             if comp[1] in ["Z", "E", "N", "1", "2"]:
                 comps.append(comp[1])
-            if comp[0] in ["R", "T"] or comp[1] in ["R", "T"]:
-                comps.append("E")
-                comps.append("N")
-        
+
         comps = np.unique(comps)
         stream = preprocess(db, stations, comps, goal_day, params, responses)
         if not len(stream):
@@ -296,7 +347,7 @@ def main(loglevel="INFO"):
 
             # index net.sta comps for energy later
             channel_index = {}
-            if params.whitening_type == "PSD":
+            if params.whitening != "N" and params.whitening_type == "PSD":
                 psds = []
                 for i, name in enumerate(names):
                     n1, s1, l1, c1 = name
@@ -390,18 +441,29 @@ def main(loglevel="INFO"):
                 if high > nfft / 2:
                     high = int(nfft // 2)
 
+                # Make a copy of the original data to prevent modifying it
+                _data = data.copy()
+                if params.whitening == "N":
+                    # if the data doesn't need to be whitened, we can simply
+                    # band-pass filter the traces now:
+                    for i, _ in enumerate(_data):
+                        _data[i] = bandpass(_, freqmin=filterlow,
+                                            freqmax=filterhigh,
+                                            df=params.goal_sampling_rate,
+                                            corners=8)
+
                 # First let's compute the AC and SC
                 if len(single_station_pair_index_ac):
-                    corr = {}
-                    tmp = data.copy()
-                    for i, _ in enumerate(tmp):
-                        tmp[i] = bandpass(_, freqmin=filterlow,
-                                          freqmax=filterhigh,
-                                          df=params.goal_sampling_rate,
-                                          corners=8)
+                    tmp = _data.copy()
+                    if params.whitening == "A":
+                        # if the data isn't already filtered, we still need to
+                        # do it for the AutoCorrelation:
+                        for i, _ in enumerate(tmp):
+                            tmp[i] = bandpass(_, freqmin=filterlow,
+                                              freqmax=filterhigh,
+                                              df=params.goal_sampling_rate,
+                                              corners=8)
                     if params.cc_type_single_station_AC == "CC":
-                        # logger.debug("Computer AC using %s"%params.cc_type_single_station_AC)
-
                         ffts = scipy.fftpack.fftn(tmp, shape=[nfft, ], 
                                                   axes=[1, ])
                         energy = np.real(np.sqrt(np.mean(
@@ -417,8 +479,6 @@ def main(loglevel="INFO"):
                                        nfft=nfft)
 
                     elif params.cc_type_single_station_AC == "PCC":
-                        # logger.debug(
-                        #     "Compute AC using %s" % params.cc_type_single_station_AC)
                         corr = pcc_xcorr(tmp, np.ceil(params.maxlag / dt),
                                          None, single_station_pair_index_ac)
                     else:
@@ -435,10 +495,10 @@ def main(loglevel="INFO"):
 
                 if len(cc_index):
                     if params.cc_type == "CC":
-                        # logger.debug("Compute CC using %s" % params.cc_type)
-                        ffts = scipy.fftpack.fftn(data, shape=[nfft, ], axes=[1, ])
-                        whiten2(ffts, nfft, low, high, p1, p2, psds,
-                                params.whitening_type)  # inplace
+                        ffts = scipy.fftpack.fftn(_data, shape=[nfft, ], axes=[1, ])
+                        if params.whitening != "N":
+                            whiten2(ffts, nfft, low, high, p1, p2, psds,
+                                    params.whitening_type)  # inplace
                         # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
                         energy = np.real(np.sqrt( np.mean(scipy.fftpack.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
         
@@ -465,10 +525,11 @@ def main(loglevel="INFO"):
                 if len(single_station_pair_index_sc):
                     if params.cc_type_single_station_SC == "CC":
                         # logger.debug("Compute SC using %s" % params.cc_type)
-                        ffts = scipy.fftpack.fftn(data, shape=[nfft, ],
+                        ffts = scipy.fftpack.fftn(_data, shape=[nfft, ],
                                                   axes=[1, ])
-                        whiten2(ffts, nfft, low, high, p1, p2, psds,
-                                params.whitening_type)  # inplace
+                        if params.whitening != "N":
+                            whiten2(ffts, nfft, low, high, p1, p2, psds,
+                                    params.whitening_type)  # inplace
                         # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
                         energy = np.real(np.sqrt(np.mean(
                             scipy.fftpack.ifft(ffts, n=nfft, axis=1) ** 2,

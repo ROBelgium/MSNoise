@@ -22,7 +22,8 @@ cross-correlation functions computed for January 6, 7, 8, 9 AND 10!
 The graphical representation centered on a "January 10" tick might then display
 changes in the CCF that occurred *on* the 10th !
 
-Moving-window stack length(s) are configured using the ``mov_stack`` bit.
+Moving-window stacks are configured using the ``mov_stack`` parameter in
+``msnoise admin``.
 
 If ``stack_method`` is 'linear', then a simple mean CFF of all daily is saved
 as the mov or ref CCF. On the other hand, if ``stack_method`` is 'pws', then
@@ -60,20 +61,31 @@ Once done, each job is marked "D"one in the database and, unless ``hpc`` is
 
 Usage:
 ~~~~~~
-The best way to call this code is to start it from the console (-h shows the
-help)
 
 .. include:: ../clickhelp/msnoise-stack.rst
 
 
-On a routine basis, one should thus run the following to compute REF *and* MOV
-stacks:
+For most users, the REF stack will need to be computed only once for specific
+dates and then, on routine basis, only compute the MOV stacks:
 
-.. todo:: finalize the difference between REF and MOV/STEP stacks.
+.. warning With MSNoise 1.6, we have splitted the two actions, and the REF
+    stacks need to be computed first ! This process will put the corresponding
+    STACK jobs "I"n progress and you will need to reset them before running the
+    MOV stacks.
 
 .. code-block:: sh
 
-    $ msnoise stack -r -m
+    $ msnoise stack -r
+    $ msnoise reset STACK
+    $ msnoise stack -m
+
+as for all other steps, this procedure can be run in parallel:
+
+.. code-block:: sh
+
+    $ msnoise -t 4 stack -r
+    $ msnoise reset STACK
+    $ msnoise -t 4 stack -m
 
 
 .. versionadded:: 1.4
@@ -81,6 +93,7 @@ stacks:
 
 .. versionadded:: 1.6
     The ``hpc`` parameter that can prevent the automatic creation of MWCS jobs.
+    The REF and MOV stacks have been separated and need to be run independently.
 """
 
 import argparse

@@ -1,7 +1,6 @@
 """
-This console script is responsible asking questions about the database
-connection, to create the db.ini file in order to store the answers and
-to create the tables in the database.
+This console script is responsible for asking questions about the database
+connection, to create the db.ini file and to create the tables in the database.
 
 Questions are:
 
