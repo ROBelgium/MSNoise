@@ -33,6 +33,126 @@ This recipe is a kind of "let's check this data rapidly":
     msnoise compute_dtt
     msnoise plot dvv
 
+Run MSNoise using lots of cores on a HPC
+----------------------------------------
+
+Avoid Database I/O by using the ``hpc`` flag
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+With MSNoise 1.6, most of the API calls have been cleaned from calling the
+database, for example the ``def stack()`` called a SELECT on the database for
+each call, which is useless as configuration parameters are not supposed to
+change during the execution of the code. This modification allows running
+MSNoise on an HPC infrastructure with a remote central MySQL database.
+
+The new configuration parameter ``hpc`` is used for flagging if MSNoise is 
+running High Performance. If True, the jobs processed at each step are marked
+Done when finished, but the next jobtype according to the workflow is not
+created. This removes a lot of select/update/insert actions on the database
+and makes the whole much faster (one INSERT instead of tons of 
+SELECT/UPDATE/INSERT).
+
+Commands and actions with ``hpc`` = N :
+
+* ``msnoise new_jobs``: creates the CC jobs
+* ``msnoise compute_cc``: processes the CC jobs and creates the STACK jobs
+* ``msnoise stack -m``: processes the STACK jobs and creates the MWCS jobs
+* etc...
+
+Commands and actions with ``hpc`` = Y :
+
+* ``msnoise new_jobs``: creates the CC jobs
+* ``msnoise compute_cc``: processes the CC jobs
+* ``msnoise new_jobs --hpc CC:STACK``: creates the STACK jobs based on the CC 
+  jobs marked "D"one
+* ``msnoise stack -m``: processes the STACK jobs
+* ``msnoise new_jobs --hpc STACK:MWCS``: creates the MWCS jobs based on the 
+  STACK jobs marked "D"one
+* etc...
+
+Set up the HPC
+~~~~~~~~~~~~~~
+
+To avoid having to rewrite MSNoise for using techniques relying on MPI or other
+parallel computing tools, I decided to go "simple", and this actually works. The
+only limitation of the following is that you need to have a strong MySQL server
+machine that accepts hundreds or thousands of connections. In my case, the
+MySQL server is running on a computing blade, and its my.cnf is configured to
+allow 1000 users/connections, and to listen on all its IPs.
+
+The easiest set up (maybe not your sysadmin's preferred, please check), is to
+
+* install miniconda on your home directory and make miniconda's python
+  executable your default python (I add the paths to .profile).
+* Then install the requirements and finally MSNoise.
+* As usual, create a project folder and ``msnoise db init`` there, choose MySQL
+  and provide the hostname of the machine running the MySQL server.
+
+At that point, your project is ready. I usually request an interactive node on
+the HPC for doing the ``msnoise populate`` and ```msnoise scan_archive``. Our
+jobs scheduler is PBS, so this command
+
+.. code-block:: sh
+
+    qsub -I -l walltime=02:00:00 -l select=1:ncpus=16:mem=1g
+
+requests an Interactive node with 16 cpus, 1GB ram, for 2 hours. Once connected,
+check that the python version is correct (or source .profile again). Because
+we requested 16 cores, we can ``msnoise -t 16 scan_archive --init``.
+
+Depending on the server configuration, you can maybe run the ``msnoise admin``
+on the login node, and access it via its hostname:5000 in your browser. If not,
+the easiest way to set up the config is running
+``msnoise config set <parameter>=<value>`` from the console. To add filters,
+do it either:
+
+* in the Admin 
+* using MySQL workbench connected to your MySQL server
+* using such commands ``msnoise db execute "insert into filters (ref, low, mwcs_low, high, mwcs_high, rms_threshold, mwcs_wlen, mwcs_step, used) values (1, 0.1, 0.1, 1.0, 1.0, 0.0, 12.0, 4.0, 1)"``
+* using ``msnoise db dump``, edit the filter table in CSV format, then ``msnoise db import filters --force``
+
+Once done, the project is set up and should run. Again, test if all goes OK in
+an interactive node.
+
+To run on N cores in parallel, we have the advantage that, e.g. for CC jobs, the
+day-jobs are independent. We can thus request an "Array" of single cores, which
+is usually quite easy to get on HPCs (most users run heavily parallel codes and
+request large number of "connected" cores, while we can run "shared").
+
+The job file in my PBS case looks like this for computing the CC:
+
+.. code-block:: sh
+
+    #!/bin/bash
+    #PBS -N MSNoise_PDF_CC
+    #PBS -l walltime=01:00:00
+    #PBS -l select=1:ncpus=1:mem=1g
+    #PBS -l place=shared
+    #PBS -J 1-400
+    cd /scratch-a/thomas/2019_PDF
+    source /space/hpc-home/thomas/.profile
+    msnoise compute_cc2
+
+This requests 400 cores with 1GB of RAM. The content of my .profile file
+contains:
+
+.. code-block:: text
+
+    # added by Miniconda3 installer
+    export PATH="/home/thomas/miniconda3/bin:$PATH"
+    export MPLBACKEND="Agg"
+
+The last line is important as nodes are usually "head-less" and matplotlib and
+packages relating to it would fail if they expect a gui-capable system.
+
+For submitting this job, run ``qsub qc.job``. The process usually routes stdout
+and stderr to files in the current directory, make sure to check them if jobs
+seem to have failed. If all goes well, calling ``msnoise info -j`` repeatedly
+from the login or interactive node's console should show the evolution of Todo,
+In Progress and Done jobs.
+
+.. note:: HPC experts are welcome to suggest, comment, etc... It's a quick'n'dirty
+    solution, but it works for me!
 
 
 Reprocess data
@@ -226,51 +346,66 @@ results in:
     
     ----------------+SYSTEM+-------------------
     Windows
-    seis31
-    7
-    6.1.7601
+    PC1577-as
+    10
+    10.0.17134
     AMD64
-    Intel64 Family 6 Model 42 Stepping 7, GenuineIntel
+    Intel64 Family 6 Model 158 Stepping 9, GenuineIntel
     
     ----------------+PYTHON+-------------------
-    Python: 2.7.5 |Anaconda 1.7.0 (64-bit)| (default, Jul  1 2013, 12:37:52) [MSC v.1500 64 bit (AMD64)]
+    Python:3.7.3 | packaged by conda-forge | (default, Jul  1 2019, 22:01:29) [MSC v.1900 64 bit (AMD64)]
+    
+    This script is at d:\pythonforsource\msnoise_stack\msnoise\msnoise\bugreport.py
     
     ---------------+MODULES+-------------------
     
     Required:
-    [X] numpy: 1.7.1
-    [X] scipy: 0.12.0
-    [X] pandas: 0.12.0
-    [X] matplotlib: 1.3.0
-    [X] statsmodels: 0.5.0
-    [X] sqlalchemy: 0.8.2
-    [X] traitsui: 4.3.0
-    [X] traits: 4.3.0
-    [X] enable: 4.3.0
-    [X] scikits.samplerate: present (no version)
-    [X] obspy: present (no version)
-    [X] sphinx: 1.1.3
-    [X] jinja2: 2.7.1
+    [X] setuptools: 41.2.0
+    [X] numpy: 1.15.4
+    [X] scipy: 1.3.0
+    [X] pandas: 0.25.0
+    [X] matplotlib: 3.1.1
+    [X] sqlalchemy: 1.3.8
+    [X] obspy: 1.1.0
+    [X] click: 7.0
+    [X] pymysql: 0.9.3
+    [X] flask: 1.1.1
+    [X] flask_admin: 1.5.3
+    [X] markdown: 3.1.1
+    [X] wtforms: 2.2.1
+    [X] folium: 0.10.0
+    [X] jinja2: 2.10.1
     
-    Backends: (at least one is required)
-    [X] wx: 2.8.12.1
+    Only necessary if you plan to build the doc locally:
+    [X] sphinx: 2.2.0
+    [X] sphinx_bootstrap_theme: 0.7.1
+    
+    Graphical Backends: (at least one is required)
+    [ ] wx: not found
+    [ ] pyqt: not found
     [ ] PyQt4: not found
-    [X] PySide: 1.2.1
+    [X] PyQt5: present (no version)
+    [ ] PySide: not found
     
     Not required, just checking:
-    [X] setuptools: 0.6
-    [X] reportlab:  $Id$
-    [X] configobj: 4.7.2
+    [X] json: 2.0.9
+    [X] psutil: 5.6.3
+    [ ] reportlab: not found
+    [ ] configobj: not found
     [X] pkg_resources: present (no version)
     [ ] paramiko: not found
     [X] ctypes: 1.1.0
-    [X] pyparsing: 1.5.6
-    [X] distutils: 2.7.5
-    [X] IPython: 1.0.0
-    [X] vtk: present (no version)
+    [X] pyparsing: 2.4.2
+    [X] distutils: 3.7.3
+    [X] IPython: 7.7.0
+    [ ] vtk: not found
+    [ ] enable: not found
+    [ ] traitsui: not found
+    [ ] traits: not found
+    [ ] scikits.samplerate: not found
+
 
 The [X] marks the presence of the module. In the case above, PyQt4 is missing, but that's not a problem because
-`wx` or `PySide` are present, so traitsui has a backend to render the GUI for the Configurator. The "not-required"
-packages are checked for information, those packages can be useful for reporting / hacking / rendering the data.
+`PyQt5` is present. The "not-required" packages are checked for information, those packages can be useful for reporting / hacking / rendering the data.
 
 

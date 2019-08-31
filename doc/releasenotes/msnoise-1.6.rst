@@ -43,6 +43,9 @@ MSNoise 1.6 introduces a series of **new features** :
 * The compute_cc step has been completely rewritten to be much, much faster.
 * A new ``db`` top level command, which among others include ``dump`` and
   ``import`` commands for handling the tables from the database.
+* A new :doc:`../auto_examples/index` section of the documentation in order to
+  demonstrate how users can interact with the MSNoise API, e.g. for creating
+  custom plots.
 
 
 .. todo
@@ -105,7 +108,7 @@ Configuration Parameters
   of the file, which results in a slightly slower reading.
 
 * ADDED: ``whitening_type`` to allow for the standard brutal whitening (all-to-
-  1.0) or whitening by dividing by the PSD of the singnal.
+  1.0) or whitening by dividing by the PSD of the signal.
 
 * ADDED: ``components_to_compute_single_station`` to separate the components
   computed for single stations and cross-stations. For example, the ``ZZ`` can
@@ -143,11 +146,11 @@ execute the steps in the right order.
 
 
 
-Preprocessing and Cross-Correlation
------------------------------------
+Pre-processing and Cross-Correlation
+------------------------------------
 
-Preprocessing
-~~~~~~~~~~~~~
+Pre-processing
+~~~~~~~~~~~~~~
 
 * Only small changes were done for this step, mainly checks of matching
   sampling rates, empty streams. DB-related optimisations make this step 
@@ -185,8 +188,6 @@ Cross-Correlation TODO
   time that lead to perfect sinc autocorrelation functions. The windows should
   have a duration of at least "2 times the `maxlag`+1" to be computable.
 
-.. todo:: params.whiten is not used in the new compute_cc
-
 * The whitening procedure can be skipped by setting the ``whitening``
   configuration to `None`. The two other ``whitening`` modes are "[A]ll except
   for auto-correlation" or "Only if [C]omponents are different". This allows
@@ -218,7 +219,7 @@ I've added a new command group called ``db`` that gathers all db-related actions
   the database.
 
 
-The ``config`` command group has been reworked and the ``get`` subcommand has
+The ``config`` command group has been reworked and the ``get`` sub-command has
 been added to retrieve the values of a list of configuration parameters:
 
 * ``msnoise config get <param>`` will display the value of the configuration
@@ -239,7 +240,7 @@ Other changes
   security reason, the password is masked in the output but be aware that it is
   still stored in clear text in the file.).
 * ``msnoise info -j`` reports all jobs types, including those of plugins.
-* Added the possibility to walk in subfolders recursively by using 
+* Added the possibility to walk in sub-folders recursively by using 
   ``scan_archive --path -r``
 
 Note, all commands are documented: :doc:`../clickhelp/msnoise`.
@@ -338,7 +339,7 @@ mentioned below are then multiplied by 4 to account for the CPU number
 difference.
 
 Summing the total time needed, we reach 37 hours for the SRL version, and 12 
-hours for MSNoise 1.6. The seedup is not fully linear, as the current code 
+hours for MSNoise 1.6. The speedup is not fully linear, as the current code 
 supports running on over 500 CPUs (as long as your MySQL server can handle 
 it) but no MySQL server could have handled the so many connections/requests 
 from the old version. The ``compute_cc2`` computation time scales roughly 
@@ -392,30 +393,33 @@ Web-based Admin Interface Changes
 * Feature: The home page has changed to show all job types and exposes 
   buttons to execute actions equivalent to `msnoise reset` in the console.
 
-Other Bugfixes TODO
-~~~~~~~~~~~~~~~~~~~
+Other Bug-fixes
+~~~~~~~~~~~~~~~
+.. todo TODO
 
-* Removed the call to ``scipy.stats.nanmean`` and replaced by ``numpy.nanmean``
-* Better error message in compute_cc when the content of the slice is only zeros
-  or smaller than ``rms_threshold``
-* Checked all "integer" - "float" warnings from numpy/scipy
-* crondays were hardcoded to -2, now taking the ``crondays`` value from the DB
-* Py3 error when ``msnoise scan_archive`` in cron mode
-* ``msnoise info`` does not crash any more if some station information are
-  `NULL` in the database
+* ...
 
 
-Plot Updates TODO
-~~~~~~~~~~~~~~~~~
-Not sure we did modify something here
+Plot Updates
+~~~~~~~~~~~~
+
+* Some plots now accept extra arguments, like setting the x-axis limits for
+  the ``ccftime`` plots to zoom automatically on a portion of the time-lag axis.
+  The command is ``msnoise plot ccftime --xlim=-10,10``. This is particularly
+  useful when producing the images in routine, like in an Observatory.
 
 See :doc:`../plotting`.
 
-Documentation TODO
-~~~~~~~~~~~~~~~~~~
+Documentation
+~~~~~~~~~~~~~
 
+* The layout/theme of the Documentation has been changed to be more readable.
 * New elements for configuring MySQL and MariaDB, thanks to Lukas Preiswerk.
 * The description of the new steps and the HPC mode.
+* Most of the plots for the documentation have been remade using the
+  Undervolc dataset provided during MSNoise Workshops. The new 
+  :doc:`../auto_examples/index` section of the Documentation provides new ways
+  for users to generate their own plots easily.
 
 
 
@@ -440,7 +444,7 @@ A final note about development pace and choices
   * **1 developper** (Thomas)
   * 1 dedicated debugger (Corentin)
   * less than 10 really *active* users, providing feedback and/or lines of codes
-    (Esteban, Raphaël, Aurélien, Carmelo, Clare, Rob ...)
+    (Arnaud, Esteban, Raphaël, Aurélien, Carmelo, Clare, Rob ...)
 
 * All software engineering ideas are coming from too infrequent beerstormings
   between Thomas & others

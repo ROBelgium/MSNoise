@@ -1,3 +1,4 @@
+.. _msnoiseapi:
 ***********
 MSNoise API
 ***********
