@@ -104,3 +104,6 @@ default['dtt_maxdt'] = ["Maximum dt values, MWCS points with values larger "
 
 default['plugins'] = ["Comma separated list of plugin names. Plugins names should be importable Python modules.",""]
 default['hpc'] = ["Is MSNoise going to run on an HPC? Y/[N]", "N", bool]
+
+default['stretching_max'] = ["Maximum stretching coefficient, e.g. 0.5 = 50%, 0.01 = 1% ", "0.01", float]
+default['stretching_nsteps'] = ["Number of stretching steps between 1-stretching_max and 1+stretching_max ", "1000", int]

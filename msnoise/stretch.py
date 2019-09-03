@@ -20,7 +20,7 @@ def stretch_mat_creation(refcc, str_range=0.01, nstr=1001):
     :type refcc: :class:`~numpy.ndarray`
     :param refcc: 1d ndarray. The reference trace that will be stretched
     :type str_range: float
-    :param str_range: Amount, in percent, of the desired stretching (one side)
+    :param str_range: Amount of the desired stretching (one side)
     :type nstr: int
     :param nstr: Number of stretching steps (one side)
 
@@ -63,7 +63,7 @@ def main():
         mov_stacks = [int(mov_stack), ]
     else:
         mov_stacks = [int(mi) for mi in mov_stack.split(',')]
-
+    params = get_params(db)
     goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
     maxlag = float(get_config(db, "maxlag"))
     export_format = get_config(db, 'export_format')
@@ -85,6 +85,8 @@ def main():
 
     filters = get_filters(db, all=False)
     params = get_params(db)
+    str_range = params.stretching_max
+    nstr = params.stretching_nsteps
     # Then we compute the jobs
     while is_dtt_next_job(db, flag='T', jobtype='MWCS'):
         jobs = get_dtt_next_job(db, flag='T', jobtype='MWCS')
@@ -98,7 +100,7 @@ def main():
         refs, days = zip(*[[job.ref, job.day] for job in jobs])
 
         logging.info(
-            "There are MWCS jobs for some days to recompute for %s" % pair)
+            "There are STR (MWCS) jobs for some days to recompute for %s" % pair)
         
         ref_name = pair.replace('.', '_').replace(':', '_')
         sta1, sta2 = pair.split(':')
@@ -143,8 +145,7 @@ def main():
                         alldeltas = []
                         allcoefs = []
                         allerrs = []
-                        str_range = 0.5  ### HARD CODE!!! ###
-                        nstr = 1001  ### HARD CODE!!! ###
+                        
                         ref_stretched, deltas = stretch_mat_creation(ref,
                                                                      str_range=str_range,
                                                                      nstr=nstr)

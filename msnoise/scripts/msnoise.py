@@ -789,10 +789,25 @@ def compute_mwcs(ctx):
 
 
 @cli.command(name='compute_stretching')
-def compute_stretching():
+@click.pass_context
+def compute_stretching(ctx):
     """[experimental] Computes the stretching based on the new stacked data"""
     from ..stretch import main
-    main()
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    if threads == 1:
+        main()
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main)
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
 
 
 @cli.command(name='compute_dtt')
