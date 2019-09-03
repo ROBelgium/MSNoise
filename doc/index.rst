@@ -9,7 +9,7 @@ Noise". The current release version of MSNoise is **MSNoise 1.6**.
 The standard MSNoise workflow is designed to go from seismic data archives to
 dv/v curves. The monitoring is achieved by computing the cross-correlation of
 continuous seismic records for each pair of a network and by studying the
-changes in the crosscorrelation function relative to a reference.
+changes in the cross-correlation function relative to a reference.
 
 The goal of the "suite" is to provide researchers with an efficient processing
 tool, while keeping the need for coding to a minimum and avoiding being a black

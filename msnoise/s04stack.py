@@ -17,7 +17,7 @@ The export directory are "REF/" and "DAY%03i/" where %03i will be replaced by
 the number of days stacked together (DAYS_005 for a 5-days stack, e.g.).
 
 Please note that within MSNoise, stacks are always *inclusive* of the time/day
-mentionned. For example, a 5-days stack on January 10, will contain
+mentioned. For example, a 5-days stack on January 10, will contain
 cross-correlation functions computed for January 6, 7, 8, 9 AND 10!
 The graphical representation centered on a "January 10" tick might then display
 changes in the CCF that occurred *on* the 10th !
@@ -28,7 +28,7 @@ Moving-window stacks are configured using the ``mov_stack`` parameter in
 If ``stack_method`` is 'linear', then a simple mean CFF of all daily is saved
 as the mov or ref CCF. On the other hand, if ``stack_method`` is 'pws', then
 all the Phase Weighted Stack (PWS) is computed and saved as the mov or ref CCF.
-The PWS is done in two steps: first the mean coherence between the instataneous
+The PWS is done in two steps: first the mean coherence between the instantaneous
 phases of all windows is calculated, and eventually serves a weighting factor
 on the mean. The smoothness of this weighting array is defined using the
 ``pws_timegate`` parameter in the configuration. The weighting array is the
@@ -68,7 +68,7 @@ Usage:
 For most users, the REF stack will need to be computed only once for specific
 dates and then, on routine basis, only compute the MOV stacks:
 
-.. warning With MSNoise 1.6, we have splitted the two actions, and the REF
+.. warning With MSNoise 1.6, we have split the two actions, and the REF
     stacks need to be computed first ! This process will put the corresponding
     STACK jobs "I"n progress and you will need to reset them before running the
     MOV stacks.

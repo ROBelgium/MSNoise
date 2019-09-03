@@ -25,7 +25,7 @@ generate the filename automatically (using the `?` question mark), for example:
 Customizing Plots
 -----------------
 
-All plots commands can be overriden using a `-c` agument *in front of the
+All plots commands can be overridden using a `-c` argument *in front of the
 plot command* !!
 
 Examples:

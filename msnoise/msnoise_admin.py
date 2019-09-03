@@ -10,7 +10,7 @@ To start the admin:
     $ msnoise admin
 
 Which, by default, starts a web server listening on all interfaces on port
-5000. This can be overriden by passing parameters to the command, e.g. for port
+5000. This can be overridden by passing parameters to the command, e.g. for port
 5099:
 
 .. code-block:: sh
@@ -37,7 +37,7 @@ The index page shows
 * Stats of the Data Availability, the CC, STACK, MWCS and DTT jobs.
 * Quick action buttons for resetting or deleting jobs.
 
-The name and the logo of the page can be overriden by setting an environment
+The name and the logo of the page can be overridden by setting an environment
 variable with a name and the HTML tag of the logo image:
 
 .. code:: sh

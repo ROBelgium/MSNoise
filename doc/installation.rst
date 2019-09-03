@@ -172,7 +172,7 @@ You can also set up a database server using MariaDB_, there are plenty tutorials
 of how to set it up as well. The new default character set for MySQL or 
 MariaDB is not simple utf8, so make sure that the configuration file
 (/etc/mysql/my.cnf under Linux) contains the following lines. There are 
-issues with the latest MySQL versions which prevent a "traditionnal group by"
+issues with the latest MySQL versions which prevent a "traditional group by"
 statement.
 
 .. code-block:: sh

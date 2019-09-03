@@ -123,9 +123,9 @@ if "%1" == "epub" (
 )
 
 if "%1" == "latex" (
-	%SPHINXBUILD% -b latex %ALLSPHINXOPTS% %BUILDDIR%/latex
+	%SPHINXBUILD% -t latexmode -b latex %ALLSPHINXOPTS% %BUILDDIR%/latex
 	cd %BUILDDIR%/latex
-	pdflatex -synctex=1 -interaction=nonstopmode MSNoise.tex
+	pdflatex -synctex=1 -interacction=nonstopmode MSNoise.tex
 	pdflatex -synctex=1 -interaction=nonstopmode MSNoise.tex
 	if errorlevel 1 exit /b 1
 	xcopy MSNoise.pdf L:\msnoise.org\doc\master /s /y /e /Q

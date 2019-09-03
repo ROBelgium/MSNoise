@@ -24,7 +24,7 @@ To quote the SQLite website:
     Another way to look at SQLite is this: SQLite is not designed to replace Oracle. It is designed to replace fopen(). 
     
 
-To test MSNoise, one can work with a SQLite database. SQLite communication is supported by default in Python (part of the standard library). The major drawack of SQLite is that it doesn't support high concurency. In the case of MSNoise, this means that only one
+To test MSNoise, one can work with a SQLite database. SQLite communication is supported by default in Python (part of the standard library). The major drawback of SQLite is that it doesn't support high concurrency. In the case of MSNoise, this means that only one
 Thread (or Process) can interact with the database "at a time". For small batch tests or small runs, that is OK, but when processing larger archives (years of data of 5+ stations), then
 the implementation of a MySQL database will allow to process the jobs in parallel.
 

@@ -2,6 +2,10 @@
 Release Notes
 *************
 
+.. only:: latexmode
+
+    The release notes are not converted to PDF, please read them online.
+
 .. toctree::
     :maxdepth: 1
 

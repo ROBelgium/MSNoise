@@ -179,7 +179,7 @@ reprocess all CC jobs, but not for filters already existing. The recipe is:
 * Set back the other filters 'used' value to 1
 
 The compute_cc will only compute the CC's for the new filter(s) and
-output the results in the STACKS/ folder, in a subfolder named by a formatted
+output the results in the STACKS/ folder, in a sub-folder named by a formatted
 integer from the filter ID. For example: STACKS/01 for 'filter id'=1, STACKS/02
 for 'filter id'=2, etc.
 

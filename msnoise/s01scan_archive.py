@@ -7,7 +7,7 @@ Those files could have been acquired during the last day, but be data of a
 previously offline station and contain useful information for, say, a month ago.
 The time to search for is defined in the config from the 'crondays' value. For
 convenience, this parameter can be temporarily redefined on the command line
-using the `--crondays` option of the `scan_archive` subcommand. In both cases,
+using the `--crondays` option of the `scan_archive` sub-command. In both cases,
 it can be a float designating a number of days in the past, or a string
 designating a number of weeks, days, and/or hours in the format 'Xw Xd Xh'
 (each group being optional, as well as the separating blanks).

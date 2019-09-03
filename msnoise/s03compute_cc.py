@@ -35,7 +35,7 @@ Waveform Pre-processing
 ~~~~~~~~~~~~~~~~~~~~~~~
 Pairs are first split and a station list is created. The database is then
 queried to get file paths. For each station, all files potentially containing
-data for the day are opened. The traces are then merged and splitted, to obtain
+data for the day are opened. The traces are then merged and split, to obtain
 the most continuous chunks possible. The different chunks are then demeaned,
 tapered and merged again to a 1-day long trace. If a chunk is not aligned
 on the sampling grid (that is, start at a integer times the sample spacing in s)

@@ -20,8 +20,8 @@ More than 2 years after the last major release (:doc:`msnoise-1.5`) I'm proud
 to announce the new :doc:`msnoise-1.6`. It is a **major** release, with a
 massive amount of work since the last one: in `GitHub numbers
 <https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2017-04-28&to
-=2019-08-12&type=c>`_
-, it's over TODO commits and over TODO lines of code and documentation changed
+=2019-09-03&type=c>`_
+, it's over 191 commits and over 4000 lines of code and documentation changed
 or added!
 
 *End of summer is also a very special period for MSNoise, as it has been 9
@@ -37,7 +37,7 @@ MSNoise 1.6 introduces a series of **new features** :
 * The workflow has been rewritten to create "job types" per step, making it 
   easier for users to reset a jobs before a specific step. 
 * This and other smaller adaptations to the code allows to run MSNoise more
-  effiently, e.g. on a HPC (see hpc_).
+  efficiently, e.g. on a HPC (see hpc_).
 * The components to compute can be defined for "single-station" and 
   "cross-station" independently.
 * The compute_cc step has been completely rewritten to be much, much faster.
@@ -115,6 +115,10 @@ Configuration Parameters
   be computed for STA1 vs STA2 and, at the same time, ``EZ,EN,EZ`` for STA1 and
   for STA2.
 
+* ADDED: ``stretching_max`` and ``stretching_nsteps`` for computing the
+  stretched reference function between ``[1-stretching_max:1+stretching_max]``
+  with ``stretching_nsteps`` number of steps.
+
 * CHANGED: ``cronday`` should now be a positive float number (negative numbers
   are still accepted for backward compatibility) or a string designating any
   optional number of weeks, days and/or hours in the format 'Xw Xd Xw' in this
@@ -141,10 +145,6 @@ any date matches the date range of the ``ref_begin`` - ``ref_end``, do the
 stacks if needed, then will **not** reset the ``STACK`` jobs to ``Todo`` so 
 that "mov stacks" can be done. 
 
-TODO:: Note that calling ``msnoise stack -r -m`` will 
-execute the steps in the right order.
-
-
 
 Pre-processing and Cross-Correlation
 ------------------------------------
@@ -156,8 +156,8 @@ Pre-processing
   sampling rates, empty streams. DB-related optimisations make this step 
   faster too.
 
-Cross-Correlation TODO
-~~~~~~~~~~~~~~~~~~~~~~
+Cross-Correlation
+~~~~~~~~~~~~~~~~~
 
 * The ``compute_cc`` step has been completely rewritten to make use of 2D arrays
   holding the data, processing them "in place" for the different steps (FFT,
@@ -392,12 +392,6 @@ Web-based Admin Interface Changes
 * Feature: The Config list view can be sorted by name.
 * Feature: The home page has changed to show all job types and exposes 
   buttons to execute actions equivalent to `msnoise reset` in the console.
-
-Other Bug-fixes
-~~~~~~~~~~~~~~~
-.. todo TODO
-
-* ...
 
 
 Plot Updates
