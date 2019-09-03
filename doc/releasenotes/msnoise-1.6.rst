@@ -21,7 +21,7 @@ to announce the new :doc:`msnoise-1.6`. It is a **major** release, with a
 massive amount of work since the last one: in `GitHub numbers
 <https://github.com/ROBelgium/MSNoise/graphs/contributors?from=2017-04-28&to
 =2019-09-03&type=c>`_
-, it's over 191 commits and over 4000 lines of code and documentation changed
+, it's over 190 commits and over 4000 lines of code and documentation changed
 or added!
 
 *End of summer is also a very special period for MSNoise, as it has been 9
@@ -46,9 +46,6 @@ MSNoise 1.6 introduces a series of **new features** :
 * A new :doc:`../auto_examples/index` section of the documentation in order to
   demonstrate how users can interact with the MSNoise API, e.g. for creating
   custom plots.
-
-
-.. todo
 
 As always, this version has benefited from outputs/ideas/pull 
 requests/questions from several users/friends.

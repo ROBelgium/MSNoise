@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-setup(version="1.5.1",
+setup(version="1.6",
       name='msnoise',
       packages=find_packages(),
       include_package_data=True,
@@ -55,7 +55,7 @@ setup(version="1.5.1",
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Physics'],
       )
