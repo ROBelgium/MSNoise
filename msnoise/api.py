@@ -26,7 +26,7 @@ import pandas as pd
 import scipy as sp
 import scipy.fftpack
 from scipy.fftpack.helper import next_fast_len
-import scipy.fftpack._fftpack as sff
+#import scipy.fftpack._fftpack as sff
 import scipy.optimize
 
 from obspy.core import Stream, Trace, read, AttribDict, UTCDateTime
@@ -1655,7 +1655,7 @@ def check_and_phase_shift(trace, taper_length=20.0):
         trace.data = np.real(FFTdata[:len(trace.data)]).astype(np.float)
         trace.stats.starttime += dt
         del FFTdata, fftfreq
-        clean_scipy_cache()
+        #clean_scipy_cache()
         return trace
     else:
         return trace
