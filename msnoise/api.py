@@ -24,6 +24,7 @@ from sqlalchemy.sql.expression import func
 import numpy as np
 import pandas as pd
 import scipy as sp
+import scipy.signal as ss
 if sp.__version__ < "1.4.0":
     import scipy.fftpack as sf
     from scipy.fftpack.helper import next_fast_len
@@ -1264,13 +1265,13 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
         for i in range(data.shape[0]):
             data[i] -= data[i].mean()
         for c in data:
-            phase = np.angle(sp.signal.hilbert(c))
+            phase = np.angle(ss.hilbert(c))
             phasestack.real += np.cos(phase)
             phasestack.imag += np.sin(phase)
         coh = 1. / data.shape[0] * np.abs(phasestack)
 
         timegate_samples = int(pws_timegate * goal_sampling_rate)
-        coh = np.convolve(sp.signal.boxcar(timegate_samples) /
+        coh = np.convolve(ss.boxcar(timegate_samples) /
                           timegate_samples, coh, 'same')
         coh = np.power(coh, pws_power)
         for c in data:
