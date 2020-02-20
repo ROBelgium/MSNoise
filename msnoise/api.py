@@ -1800,30 +1800,35 @@ def preload_instrument_responses(session):
     response_format = get_config(session, 'response_format')
     files = glob.glob(os.path.join(get_config(session, 'response_path'), "*"))
     channels = []
+    print(files)
     if response_format == "inventory":
         for file in files:
             logging.debug("Processing %s" % file)
             try:
-                inv = read_inventory(file, format='STATIONXML')
+                inv = read_inventory(file, format="STATIONXML")
                 for net in inv.networks:
                     for sta in net.stations:
                         for cha in sta.channels:
-                            seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
-                                                       cha.location_code,
-                                                       cha.code)
-                            resp = inv.get_response(seed_id, cha.start_date+10)
-                            polezerostage = resp.get_paz()
-                            totalsensitivity = resp.instrument_sensitivity
-                            pzdict = {}
-                            pzdict['poles'] = polezerostage.poles
-                            pzdict['zeros'] = polezerostage.zeros
-                            pzdict['gain'] = polezerostage.normalization_factor
-                            pzdict['sensitivity'] = totalsensitivity.value
-                            channels.append([seed_id, cha.start_date,
-                                             cha.end_date or UTCDateTime(),
-                                             pzdict, cha.latitude,
-                                             cha.longitude])
+                            try:
+                                seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
+                                                           cha.location_code,
+                                                           cha.code)
+                                resp = inv.get_response(seed_id, cha.start_date+10)
+                                polezerostage = resp.get_paz()
+                                totalsensitivity = resp.instrument_sensitivity
+                                pzdict = {}
+                                pzdict['poles'] = polezerostage.poles
+                                pzdict['zeros'] = polezerostage.zeros
+                                pzdict['gain'] = polezerostage.normalization_factor
+                                pzdict['sensitivity'] = totalsensitivity.value
+                                channels.append([seed_id, cha.start_date,
+                                                 cha.end_date or UTCDateTime(),
+                                                 pzdict, cha.latitude,
+                                                 cha.longitude])
+                            except:
+                                traceback.print_exc()
             except:
+                traceback.print_exc()
                 pass
 
     elif response_format == "dataless":

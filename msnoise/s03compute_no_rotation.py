@@ -387,6 +387,9 @@ def main(loglevel="INFO"):
                 for sta1, sta2 in itertools.combinations(names, 2):
                     n1, s1, l1, c1 = sta1
                     n2, s2, l2, c2 = sta2
+                    pair = "%s.%s:%s.%s" % (n1, s1, n2, s2)
+                    if pair not in pairs:
+                        continue
                     comp = "%s%s" % (c1[-1], c2[-1])
                     if comp in params.components_to_compute:
                         cc_index.append(
@@ -403,7 +406,9 @@ def main(loglevel="INFO"):
                     n2, s2, l2, c2 = sta2
                     if n1 != n2 or s1 != s2:
                         continue
-
+                    pair = "%s.%s:%s.%s" % (n1, s1, n2, s2)
+                    if pair not in pairs:
+                        continue
                     comp = "%s%s" % (c1[-1], c2[-1])
                     if comp in params.components_to_compute_single_station:
                         if c1[-1] == c2[-1]:
