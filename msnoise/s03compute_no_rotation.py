@@ -435,7 +435,7 @@ def main(loglevel="INFO"):
                 filterlow = float(filterdb.low)
                 filterhigh = float(filterdb.high)
 
-                freq_vec = scipy.fftpack.fftfreq(nfft, d=dt)[:nfft // 2]
+                freq_vec = sf.fftfreq(nfft, d=dt)[:nfft // 2]
                 freq_sel = np.where((freq_vec >= filterlow) & (freq_vec <= filterhigh))[0]
                 low = freq_sel[0] - napod
                 if low <= 0:
@@ -469,10 +469,9 @@ def main(loglevel="INFO"):
                                               df=params.goal_sampling_rate,
                                               corners=8)
                     if params.cc_type_single_station_AC == "CC":
-                        ffts = scipy.fftpack.fftn(tmp, shape=[nfft, ], 
-                                                  axes=[1, ])
+                        ffts = sf.fftn(tmp, [nfft, ], axes=[1, ])
                         energy = np.real(np.sqrt(np.mean(
-                            scipy.fftpack.ifft(ffts, n=nfft, axis=1) ** 2,
+                            sf.ifft(ffts, n=nfft, axis=1) ** 2,
                             axis=1)))
 
                         # Computing standard CC
@@ -500,12 +499,12 @@ def main(loglevel="INFO"):
 
                 if len(cc_index):
                     if params.cc_type == "CC":
-                        ffts = scipy.fftpack.fftn(_data, shape=[nfft, ], axes=[1, ])
+                        ffts = sf.fftn(_data, [nfft, ], axes=[1, ])
                         if params.whitening != "N":
                             whiten2(ffts, nfft, low, high, p1, p2, psds,
                                     params.whitening_type)  # inplace
                         # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
-                        energy = np.real(np.sqrt( np.mean(scipy.fftpack.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
+                        energy = np.real(np.sqrt( np.mean(sf.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
         
                         # logger.info("Pre-whitened %i traces"%(i+1))
                         # Computing standard CC
@@ -530,14 +529,13 @@ def main(loglevel="INFO"):
                 if len(single_station_pair_index_sc):
                     if params.cc_type_single_station_SC == "CC":
                         # logger.debug("Compute SC using %s" % params.cc_type)
-                        ffts = scipy.fftpack.fftn(_data, shape=[nfft, ],
-                                                  axes=[1, ])
+                        ffts = sf.fftn(_data, [nfft, ], axes=[1, ])
                         if params.whitening != "N":
                             whiten2(ffts, nfft, low, high, p1, p2, psds,
                                     params.whitening_type)  # inplace
                         # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
                         energy = np.real(np.sqrt(np.mean(
-                            scipy.fftpack.ifft(ffts, n=nfft, axis=1) ** 2,
+                            sf.ifft(ffts, n=nfft, axis=1) ** 2,
                             axis=1)))
 
                         # logger.info("Pre-whitened %i traces"%(i+1))

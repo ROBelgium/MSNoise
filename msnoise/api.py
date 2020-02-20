@@ -24,9 +24,15 @@ from sqlalchemy.sql.expression import func
 import numpy as np
 import pandas as pd
 import scipy as sp
-import scipy.fftpack
-from scipy.fftpack.helper import next_fast_len
-import scipy.fftpack._fftpack as sff
+if sp.__version__ < "1.4.0":
+    import scipy.fftpack as sf
+    from scipy.fftpack.helper import next_fast_len
+    import scipy.fftpack._fftpack as sff
+else:
+    import scipy.fft as sf
+    from scipy.fft import next_fast_len
+
+
 import scipy.optimize
 
 from obspy.core import Stream, Trace, read, AttribDict, UTCDateTime
@@ -1647,11 +1653,11 @@ def check_and_phase_shift(trace, taper_length=20.0):
         trace.taper(max_percentage=None, max_length=1.0)
 
         n = next_fast_len(int(trace.stats.npts))
-        FFTdata = scipy.fftpack.fft(trace.data, n=n)
-        fftfreq = scipy.fftpack.fftfreq(n, d=trace.stats.delta)
+        FFTdata = sf.fft(trace.data, n=n)
+        fftfreq = sf.fftfreq(n, d=trace.stats.delta)
         FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
         FFTdata = FFTdata.astype(np.complex64)
-        scipy.fftpack.ifft(FFTdata, n=n, overwrite_x=True)
+        sf.ifft(FFTdata, n=n, overwrite_x=True)
         trace.data = np.real(FFTdata[:len(trace.data)]).astype(np.float)
         trace.stats.starttime += dt
         del FFTdata, fftfreq
@@ -1758,6 +1764,8 @@ def make_same_length(st):
 def clean_scipy_cache():
     """This functions wraps all destroy scipy cache at once. It is a workaround
     to the memory leak induced by the "caching" functions in scipy fft."""
+    if scipy.__version__ >= "1.4.0":
+        return
     sff.destroy_zfft_cache()
     sff.destroy_zfftnd_cache()
     sff.destroy_drfft_cache()
@@ -1774,7 +1782,7 @@ def clean_scipy_cache():
     sff.destroy_ddst1_cache()
     sff.destroy_dst2_cache()
     sff.destroy_dst1_cache()
-    scipy.fftpack.convolve.destroy_convolve_cache()
+    sf.convolve.destroy_convolve_cache()
 
 
 def preload_instrument_responses(session):

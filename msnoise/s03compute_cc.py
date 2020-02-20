@@ -394,7 +394,7 @@ def main(loglevel="INFO"):
                                     X = tmp[i].copy()
                                     X.filter("bandpass", freqmin=low,
                                              freqmax=high, zerophase=True)
-                                    trames2hWb[i] = scipy.fftpack.fft(X.data, nfft)
+                                    trames2hWb[i] = sf.fft(X.data, nfft)
                             else:
                                 skip = True
                                 logger.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'
