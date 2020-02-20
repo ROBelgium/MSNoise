@@ -1747,12 +1747,15 @@ def make_same_length(st):
     # a gap
     # TODO add cases with more than 2 or 3 traces (could append?)
     # TODO is there a better way to AND masks ?
+    mask = []
     if len(st) < 2:
         return st
     elif len(st) == 2:
         mask = np.logical_or(st[0].data.mask, st[1].data.mask)
     elif len(st) == 3:
         mask = np.logical_or(st[0].data.mask, st[1].data.mask, st[2].data.mask)
+    if not len(mask):
+        return st.split()
 
     # apply the mask to all traces
     for tr in st:
