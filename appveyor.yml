@@ -35,11 +35,11 @@ install:
   # Install default dependencies
   - "%CMD_IN_ENV% conda install --yes -q pip"
   - "%CMD_IN_ENV% conda install --yes -q scipy matplotlib pandas sqlalchemy"
-  - "%CMD_IN_ENV% conda install --yes -q 'branca<0.4'"
   - "%CMD_IN_ENV% conda install --yes -q sphinx jinja2 flask pymysql click"
   - "%CMD_IN_ENV% conda install --yes -q lxml"
   - "%CMD_IN_ENV% conda install --yes -c conda-forge obspy"
   - "%CMD_IN_ENV% conda install --yes -c conda-forge flask-admin markdown"
+  - "%CMD_IN_ENV% conda install --yes -q 'branca=0.3.1""
   # list package versions
   - "%CMD_IN_ENV% conda list"
 
