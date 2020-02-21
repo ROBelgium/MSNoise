@@ -39,7 +39,7 @@ install:
   - "%CMD_IN_ENV% conda install --yes -q lxml"
   - "%CMD_IN_ENV% conda install --yes -c conda-forge obspy"
   - "%CMD_IN_ENV% conda install --yes -c conda-forge flask-admin markdown"
-  - "%CMD_IN_ENV% conda install --yes -q 'branca=0.3.1""
+  - "%CMD_IN_ENV% conda install --yes -q branca=0.3.1"
   # list package versions
   - "%CMD_IN_ENV% conda list"
 
