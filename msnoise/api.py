@@ -1738,14 +1738,13 @@ def make_same_length(st):
 
     # get the mask of all traces, i.e. the parts where at least one trace has
     # a gap
-    # TODO add cases with more than 2 or 3 traces (could append?)
-    # TODO is there a better way to AND masks ?
+
     if len(st) < 2:
         return st
-    elif len(st) == 2:
-        mask = np.logical_or(st[0].data.mask, st[1].data.mask)
-    elif len(st) == 3:
-        mask = np.logical_or(st[0].data.mask, st[1].data.mask, st[2].data.mask)
+    masks=[]
+    for tr in st:
+        masks.append(tr.data.mask)
+    mask =  np.any(masks,axis=0)
 
     # apply the mask to all traces
     for tr in st:
