@@ -3,7 +3,7 @@
 MSNoise 1.6
 ===========
 
-Release date: 2 September 2019
+Release date: 3 September 2019
 
 
 Release type: major

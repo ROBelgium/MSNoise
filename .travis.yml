@@ -56,6 +56,7 @@ before_install:
   - conda install --yes -q lxml pyqt
   - conda install --yes -q -c conda-forge obspy
   - conda install --yes -q -c conda-forge flask-admin markdown codecov
+  - if [[ "${PYTHON_VERSION:0:1}" == '2' ]]; then conda install --yes -q -c conda-forge branca=0.3.1; fi
   - pip install logbook
   - ls -la
 

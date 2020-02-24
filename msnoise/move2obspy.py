@@ -2,12 +2,19 @@ import logging
 
 
 import numpy as np
-import scipy.fftpack
+import scipy
+if scipy.__version__ < "1.4.0":
+    import scipy.fftpack as sf
+    from scipy.fftpack.helper import next_fast_len
+    import scipy.fftpack._fftpack as sff
+else:
+    import scipy.fft as sf
+    from scipy.fft import next_fast_len
+
 import scipy.optimize
 import scipy.signal
 from scipy.stats import scoreatpercentile
 from obspy.signal.invsim import cosine_taper
-from scipy.fftpack.helper import next_fast_len
 from obspy.signal.regression import linear_regression
 
 
@@ -49,7 +56,7 @@ def myCorr(data, maxlag, plot=False, nfft=None):
         plt.plot(np.arange(len(data[1])) * 0.05, np.abs(data[1]))
 
     corr = np.conj(data[0]) * data[1]
-    corr = np.real(scipy.fftpack.ifft(corr, nfft)) / Nt
+    corr = np.real(sf.ifft(corr, nfft)) / Nt
     corr = np.concatenate((corr[-Nt + 1:], corr[:Nt + 1]))
 
     if plot:
@@ -58,7 +65,7 @@ def myCorr(data, maxlag, plot=False, nfft=None):
 
     if normalized:
         E = np.prod(np.real(np.sqrt(
-            np.mean(scipy.fftpack.ifft(data, n=nfft, axis=1) ** 2, axis=1))))
+            np.mean(sf.ifft(data, n=nfft, axis=1) ** 2, axis=1))))
         corr /= np.real(E)
 
     if maxlag != Nt:
@@ -95,7 +102,7 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None,
     corrs = {}
     for id, sta1, sta2 in index:
         corr = np.conj(data[sta1]) * data[sta2]
-        corr = np.real(scipy.fftpack.ifft(corr, nfft)) / Nt
+        corr = np.real(sf.ifft(corr, nfft)) / Nt
         corr = np.concatenate((corr[-Nt + 1:], corr[:Nt + 1]))
 
         if normalized:
@@ -164,7 +171,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
 
     Napod = 100
     Nfft = int(Nfft)
-    freqVec = scipy.fftpack.fftfreq(Nfft, d=delta)[:Nfft // 2]
+    freqVec = sf.fftfreq(Nfft, d=delta)[:Nfft // 2]
 
     J = np.where((freqVec >= freqmin) & (freqVec <= freqmax))[0]
     low = J[0] - Napod
@@ -177,7 +184,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     if high > Nfft / 2:
         high = int(Nfft // 2)
 
-    FFTRawSign = scipy.fftpack.fft(data, Nfft)
+    FFTRawSign = sf.fft(data, Nfft)
 
     if plot:
         plt.subplot(412)
@@ -218,7 +225,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
         plt.plot(axis, np.abs(FFTRawSign))
         plt.xlim(0, max(axis))
 
-        wdata = np.real(scipy.fftpack.ifft(FFTRawSign, Nfft))
+        wdata = np.real(sf.ifft(FFTRawSign, Nfft))
         plt.subplot(414)
         plt.plot(np.arange(len(wdata)) * delta, wdata)
         plt.xlim(0, len(wdata) * delta)
@@ -393,7 +400,7 @@ segment.
 
     window_length_samples = np.int(window_length * df)
     # try:
-    #     from scipy.fftpack.helper import next_fast_len
+    #     from sf.helper import next_fast_len
     # except ImportError:
     #     from obspy.signal.util import next_pow_2 as next_fast_len
     from msnoise.api import nextpow2
@@ -415,8 +422,8 @@ segment.
         minind += int(step*df)
         maxind += int(step*df)
 
-        fcur = scipy.fftpack.fft(cci, n=padd)[:padd // 2]
-        fref = scipy.fftpack.fft(cri, n=padd)[:padd // 2]
+        fcur = sf.fft(cci, n=padd)[:padd // 2]
+        fref = sf.fft(cri, n=padd)[:padd // 2]
 
         fcur2 = np.real(fcur) ** 2 + np.imag(fcur) ** 2
         fref2 = np.real(fref) ** 2 + np.imag(fref) ** 2
@@ -437,7 +444,7 @@ segment.
         dcs = np.abs(X)
 
         # Find the values the frequency range of interest
-        freq_vec = scipy.fftpack.fftfreq(len(X) * 2, 1. / df)[:padd // 2]
+        freq_vec = sf.fftfreq(len(X) * 2, 1. / df)[:padd // 2]
         index_range = np.argwhere(np.logical_and(freq_vec >= freqmin,
                                                  freq_vec <= freqmax))
 

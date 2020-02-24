@@ -24,9 +24,16 @@ from sqlalchemy.sql.expression import func
 import numpy as np
 import pandas as pd
 import scipy as sp
-import scipy.fftpack
-from scipy.fftpack.helper import next_fast_len
-import scipy.fftpack._fftpack as sff
+import scipy.signal as ss
+if sp.__version__ < "1.4.0":
+    import scipy.fftpack as sf
+    from scipy.fftpack.helper import next_fast_len
+    import scipy.fftpack._fftpack as sff
+else:
+    import scipy.fft as sf
+    from scipy.fft import next_fast_len
+
+
 import scipy.optimize
 
 from obspy.core import Stream, Trace, read, AttribDict, UTCDateTime
@@ -1258,13 +1265,13 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
         for i in range(data.shape[0]):
             data[i] -= data[i].mean()
         for c in data:
-            phase = np.angle(sp.signal.hilbert(c))
+            phase = np.angle(ss.hilbert(c))
             phasestack.real += np.cos(phase)
             phasestack.imag += np.sin(phase)
         coh = 1. / data.shape[0] * np.abs(phasestack)
 
         timegate_samples = int(pws_timegate * goal_sampling_rate)
-        coh = np.convolve(sp.signal.boxcar(timegate_samples) /
+        coh = np.convolve(ss.boxcar(timegate_samples) /
                           timegate_samples, coh, 'same')
         coh = np.power(coh, pws_power)
         for c in data:
@@ -1647,11 +1654,11 @@ def check_and_phase_shift(trace, taper_length=20.0):
         trace.taper(max_percentage=None, max_length=1.0)
 
         n = next_fast_len(int(trace.stats.npts))
-        FFTdata = scipy.fftpack.fft(trace.data, n=n)
-        fftfreq = scipy.fftpack.fftfreq(n, d=trace.stats.delta)
+        FFTdata = sf.fft(trace.data, n=n)
+        fftfreq = sf.fftfreq(n, d=trace.stats.delta)
         FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
         FFTdata = FFTdata.astype(np.complex64)
-        scipy.fftpack.ifft(FFTdata, n=n, overwrite_x=True)
+        sf.ifft(FFTdata, n=n, overwrite_x=True)
         trace.data = np.real(FFTdata[:len(trace.data)]).astype(np.float)
         trace.stats.starttime += dt
         del FFTdata, fftfreq
@@ -1740,12 +1747,15 @@ def make_same_length(st):
     # a gap
     # TODO add cases with more than 2 or 3 traces (could append?)
     # TODO is there a better way to AND masks ?
+    mask = []
     if len(st) < 2:
         return st
     elif len(st) == 2:
         mask = np.logical_or(st[0].data.mask, st[1].data.mask)
     elif len(st) == 3:
         mask = np.logical_or(st[0].data.mask, st[1].data.mask, st[2].data.mask)
+    if not len(mask):
+        return st.split()
 
     # apply the mask to all traces
     for tr in st:
@@ -1758,6 +1768,8 @@ def make_same_length(st):
 def clean_scipy_cache():
     """This functions wraps all destroy scipy cache at once. It is a workaround
     to the memory leak induced by the "caching" functions in scipy fft."""
+    if scipy.__version__ >= "1.4.0":
+        return
     sff.destroy_zfft_cache()
     sff.destroy_zfftnd_cache()
     sff.destroy_drfft_cache()
@@ -1774,7 +1786,7 @@ def clean_scipy_cache():
     sff.destroy_ddst1_cache()
     sff.destroy_dst2_cache()
     sff.destroy_dst1_cache()
-    scipy.fftpack.convolve.destroy_convolve_cache()
+    sf.convolve.destroy_convolve_cache()
 
 
 def preload_instrument_responses(session):
@@ -1800,30 +1812,35 @@ def preload_instrument_responses(session):
     response_format = get_config(session, 'response_format')
     files = glob.glob(os.path.join(get_config(session, 'response_path'), "*"))
     channels = []
+    print(files)
     if response_format == "inventory":
         for file in files:
             logging.debug("Processing %s" % file)
             try:
-                inv = read_inventory(file, format='STATIONXML')
+                inv = read_inventory(file, format="STATIONXML")
                 for net in inv.networks:
                     for sta in net.stations:
                         for cha in sta.channels:
-                            seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
-                                                       cha.location_code,
-                                                       cha.code)
-                            resp = inv.get_response(seed_id, cha.start_date+10)
-                            polezerostage = resp.get_paz()
-                            totalsensitivity = resp.instrument_sensitivity
-                            pzdict = {}
-                            pzdict['poles'] = polezerostage.poles
-                            pzdict['zeros'] = polezerostage.zeros
-                            pzdict['gain'] = polezerostage.normalization_factor
-                            pzdict['sensitivity'] = totalsensitivity.value
-                            channels.append([seed_id, cha.start_date,
-                                             cha.end_date or UTCDateTime(),
-                                             pzdict, cha.latitude,
-                                             cha.longitude])
+                            try:
+                                seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
+                                                           cha.location_code,
+                                                           cha.code)
+                                resp = inv.get_response(seed_id, cha.start_date+10)
+                                polezerostage = resp.get_paz()
+                                totalsensitivity = resp.instrument_sensitivity
+                                pzdict = {}
+                                pzdict['poles'] = polezerostage.poles
+                                pzdict['zeros'] = polezerostage.zeros
+                                pzdict['gain'] = polezerostage.normalization_factor
+                                pzdict['sensitivity'] = totalsensitivity.value
+                                channels.append([seed_id, cha.start_date,
+                                                 cha.end_date or UTCDateTime(),
+                                                 pzdict, cha.latitude,
+                                                 cha.longitude])
+                            except:
+                                traceback.print_exc()
             except:
+                traceback.print_exc()
                 pass
 
     elif response_format == "dataless":

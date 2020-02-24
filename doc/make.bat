@@ -49,7 +49,7 @@ if "%1" == "html" (
 	if errorlevel 1 exit /b 1
 	echo.
 	echo.Build finished. The HTML pages are in %BUILDDIR%/html.
-	xcopy .build\html L:\msnoise.org\doc\master /s /y /e /Q
+	xcopy .build\html L:\msnoise.org\doc /s /y /e /Q
 	goto end
 )
 
@@ -128,7 +128,7 @@ if "%1" == "latex" (
 	pdflatex -synctex=1 -interacction=nonstopmode MSNoise.tex
 	pdflatex -synctex=1 -interaction=nonstopmode MSNoise.tex
 	if errorlevel 1 exit /b 1
-	xcopy MSNoise.pdf L:\msnoise.org\doc\master /s /y /e /Q
+	xcopy MSNoise.pdf L:\msnoise.org\doc /s /y /e /Q
 	echo.
 	echo.Build finished; the LaTeX files are in %BUILDDIR%/latex.
 	cd ../..

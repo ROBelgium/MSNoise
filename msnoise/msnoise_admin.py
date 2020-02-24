@@ -652,7 +652,7 @@ def resetjobs():
     jobtype = flask.request.args['type']
     alljobs = flask.request.args['all']
     from msnoise.api import reset_jobs
-    reset_jobs(db, jobtype, alljobs=alljobs)
+    reset_jobs(db, jobtype, alljobs=eval(alljobs))
     o = {}
     o["Done"] = "Jobs reset: Done."
     o = json.dumps(o)
