@@ -27,6 +27,8 @@ services:
 
 install:
   - "set PATH=%MINICONDA%;%MINICONDA%\\Scripts;%PATH%"
+  - conda config --add channels conda-forge
+  - conda config --add channels conda-forge
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
