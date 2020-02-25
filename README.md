@@ -2,12 +2,13 @@ MSNoise
 =======
 A Python Package for Monitoring Seismic Velocity Changes using Ambient Seismic Noise.
 
-[![Join the chat at https://gitter.im/ROBelgium/MSNoise](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/ROBelgium/MSNoise?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-[![Build Status](https://travis-ci.org/ROBelgium/MSNoise.png)](https://travis-ci.org/ROBelgium/MSNoise)
+CI Builds: [![Build Status](https://travis-ci.org/ROBelgium/MSNoise.png)](https://travis-ci.org/ROBelgium/MSNoise)
 [![Build status](https://ci.appveyor.com/api/projects/status/82k4dw58jhadfung?svg=true)](https://ci.appveyor.com/project/ThomasLecocq/msnoise)
 [![codecov](https://codecov.io/gh/ROBelgium/MSNoise/branch/master/graph/badge.svg)](https://codecov.io/gh/ROBelgium/MSNoise)
-[![Analytics](https://ga-beacon.appspot.com/UA-55331253-1/MSNoise/readme)](https://github.com/ROBelgium/MSNoise)
 
+PyPI: [![PyPI version](https://badge.fury.io/py/msnoise.svg)](https://pypi.org/project/msnoise/) [![PyPI downloads](https://img.shields.io/pypi/dm/msnoise.svg)](https://pypi.org/project/msnoise/)
+
+Conda: [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/msnoise.svg)](https://anaconda.org/conda-forge/msnoise) [![Conda Version](https://img.shields.io/conda/vn/conda-forge/msnoise.svg)](https://anaconda.org/conda-forge/msnoise) [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/msnoise.svg)](https://anaconda.org/conda-forge/msnoise)
 
 MSNoise is the first complete software package for computing and monitoring relative velocity variations using ambient seismic noise. 
 MSNoise is a fully-integrated solution that automatically scans data archives and determines which jobs need to be done whenever the scheduled task is executed. 
@@ -46,6 +47,8 @@ Getting Help
 The best way to get help is to subscribe to the Mailing List and ask your question directly there. It is available on 
 http://mailman-as.oma.be/mailman/listinfo/msnoise and the archive is http://mailman-as.oma.be/pipermail/msnoise/ or https://www.mail-archive.com/msnoise@mailman-as.oma.be/.
 
+Join us on the Gitter Chat: [![Join the chat at https://gitter.im/ROBelgium/MSNoise](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/ROBelgium/MSNoise?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Citing MSNoise
 --------------
 
@@ -68,3 +71,5 @@ Licence
 -------
 
 MSNoise is released under EUPL v1.1
+
+[![Analytics](https://ga-beacon.appspot.com/UA-55331253-1/MSNoise/readme)](https://github.com/ROBelgium/MSNoise)
