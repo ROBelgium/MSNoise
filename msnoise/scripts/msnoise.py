@@ -47,7 +47,7 @@ def show_config_values(db, names):
             # Use a more explicit representation of the empty string
             display_value = "''"
         try:
-            default_value = default[key][1]
+            default_value = default[key].default
         except KeyError:
             click.secho("Error: unknown parameter '%s'" % key)
             continue
@@ -182,7 +182,7 @@ def info_jobs(db):
     """
     from ..api import get_job_types
     click.echo("\nJobs:")
-    for jobtype in ["CC", "STACK", "MWCS", "DTT"]:
+    for jobtype in ["QC", "CC", "STACK", "MWCS", "DTT"]:
         click.echo(' %s:' % jobtype)
         n = None
         for (n, jobtype) in get_job_types(db, jobtype):
@@ -321,7 +321,7 @@ def upgrade():
     prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
     for name in default.keys():
         try:
-            db.add(Config(name=name, value=default[name][1]))
+            db.add(Config(name=name, value=default[name].default))
             db.commit()
         except:
             db.rollback()
@@ -1176,8 +1176,58 @@ def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
     main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile)
 
 
-## Main script
+@cli.group()
+def qc():
+    """Top level command to interact with the database"""
+    pass
 
+
+@qc.command(name='info')
+def qc_info():
+    """Prints whatever info on the QC jobs"""
+    print("You know what...")
+
+
+@qc.command(name='compute_psd')
+@click.option('-n', '--njobs_per_worker', default=9999,
+              help='Reduce this number when processing a small number of days '
+                   'but a large number of stations')
+@click.pass_context
+def compute_psd(ctx, njobs_per_worker):
+    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    from ..ppsd_compute import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    print(loglevel)
+    if threads == 1:
+        main(loglevel=loglevel, njobs_per_worker=njobs_per_worker)
+    else:
+        from multiprocessing import Process
+        processes = []
+        kwargs = {"loglevel": loglevel, "njobs_per_worker": njobs_per_worker}
+        for i in range(threads):
+            p = Process(target=main, kwargs=kwargs)
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
+
+@qc.command(name='plot_psd')
+@click.argument('seed_id')
+@click.pass_context
+def plot_psd(ctx, seed_id):
+    """Plots the PSD and spectrogram based on NPZ files"""
+    from ..plots.ppsd import main
+    net,sta,loc,chan = seed_id.split(".")
+    main(net, sta, chan, time_of_weekday=None,
+         period_lim=(0.02, 50.0), cmap="viridis",
+         color_lim=(-160, -100), show=True)
+
+
+# Main script
 try:
     db = connect()
     plugins = get_config(db, "plugins")

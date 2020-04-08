@@ -142,12 +142,14 @@ from flask_admin.babel import ngettext, lazy_gettext
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.model import typefmt
 from wtforms.validators import ValidationError
-from wtforms.fields import SelectField, StringField
+from wtforms.fields import SelectField, StringField, BooleanField
+from wtforms.fields.html5 import DateField
 from wtforms.utils import unset_value
 from flask_wtf import Form
+from flask_admin.form import widgets
 
 from .api import *
-from .default import default
+from .default import default, default_datetime_fields
 
 from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
@@ -349,34 +351,76 @@ class ConfigView(ModelView):
     can_delete = False
     page_size = 100
     can_set_page_size = True
-    column_sortable_list = ["name",]
-
     # Override displayed fields
-    column_list = ('name', 'value')
+    column_list = ('name', 'value', 'definition')
+
+    column_sortable_list = ["name",]
+    column_searchable_list = ["name"]
+
+    def _value_formatter(view, context, model, name):
+        n = default[model.name].default
+        if n != model.value:
+            helpstring = "<strike>%s</strike><br><b><span style='color:green'>%s</span></b>" % (n, model.value)
+        else:
+            helpstring = n
+        return Markup(markdown.markdown(helpstring))
+
+    def _def_formatter(view, context, model, name):
+        helpstring = default[model.name].definition
+        # helpstring =
+        return Markup(markdown.markdown(helpstring))
+
+    def _used_formatter(view, context, model, name):
+        helpstring = default[model.name].used_in
+        # helpstring =
+        return Markup(markdown.markdown(helpstring))
+
+    column_formatters = {
+        'value': _value_formatter,
+        'definition': _def_formatter,
+        'used_for_step': _used_formatter,
+    }
 
     def __init__(self, session, **kwargs):
         super(ConfigView, self).__init__(Config, session, **kwargs)
 
-    # def edit_form(self, obj=None):
-    #     form = super(ModelView, self).edit_form(obj)
-    #     nf = SelectField("Value", choices=[("E:\\", "YREAHHHH"), ("2", "KO")])
-    #     nf = nf.bind(form, "value")
-    #     nf.data = "E:\\"
-    #     form._fields["value"] = nf
-    #     return form
+    def edit_form(self, obj=None):
+        form = super(ModelView, self).edit_form(obj)
+        d = default[obj.name]
+        if obj.name in default_datetime_fields:
+            nf = DateField("value", widget=widgets.DatePickerWidget())
+            nf = nf.bind(form, "value")
+            nf.data = datetime.datetime.strptime(obj.value, "%Y-%m-%d")
+            form._fields["value"] = nf
+
+        elif len(d.possible_values):
+            choices = [(val, val) for val in d.possible_values.split("/")]
+            nf = SelectField("Value", choices=choices)
+            nf = nf.bind(form, "value")
+            nf.data = obj.value
+            form._fields["value"] = nf
+
+        elif default[obj.name].type is bool:
+            nf = SelectField("Value", choices=[("Y", "Yes"),
+                                               ("N", "No")])
+            nf = nf.bind(form, "value")
+            nf.data = obj.value
+            form._fields["value"] = nf
+
+        return form
 
     @expose('/edit/', methods=['GET', 'POST'])
     def edit_view(self):
         id = request.args.get('id')
-        helpstring = default[id][0]
+        helpstring = default[id].definition
         helpstring = Markup(markdown.markdown(helpstring))
         self._template_args['helpstring'] = helpstring
-        self._template_args['helpstringdefault'] = default[id][1]
+        self._template_args['helpstringdefault'] = default[id].default
         return super(ConfigView, self).edit_view()
 
     def on_model_change(self, form, model, is_created):
         if form.data['value']:
-            model.value = form.data['value'].strip()
+            model.value = form.value.data.strip()
         else:
             model.value = ''
 

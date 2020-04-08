@@ -374,6 +374,7 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
         self.test_013_s03compute_cc()
 
+
     # def test_031_compute_cc_rot(self):
     #     import shutil
     #     shutil.rmtree("STACKS")

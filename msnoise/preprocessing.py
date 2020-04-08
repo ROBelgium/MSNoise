@@ -275,27 +275,18 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     del trace
 
                 if params.remove_response:
-                    logger.debug('%s Removing instrument response'%stream[0].id)
-
-                    response = responses[responses["channel_id"] == stream[0].id]
-                    if len(response) > 1:
-                        response = response[response["start_date"] <= UTCDateTime(gd)]
-                    if len(response) > 1:
-                        response = response[response["end_date"] >= UTCDateTime(gd)]
-                    elif len(response) == 0:
-                        logger.info("No instrument response information "
-                                     "for %s, skipping" % stream[0].id)
-                        continue
+                    logger.debug('%s Removing instrument response' %
+                                 stream[0].id)
                     try:
-                        datalesspz = response["paz"].values[0]
+                        stream.attach_response(responses)
+                        stream.remove_response(pre_filt=params.response_prefilt,
+                                               taper=False)
                     except:
-                        logger.error("Bad instrument response information "
-                                      "for %s, skipping" % stream[0].id)
+                        logger.error("Bad or no instrument response "
+                                     "information for %s, skipping" %
+                                     stream[0].id)
                         continue
-                    stream.simulate(paz_remove=datalesspz,
-                                    remove_sensitivity=True,
-                                    pre_filt=params.response_prefilt,
-                                    paz_simulate=None, )
+
                 for tr in stream:
                     tr.data = tr.data.astype(np.float32)
                 output += stream

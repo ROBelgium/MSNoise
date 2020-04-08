@@ -37,6 +37,7 @@ else:
 import scipy.optimize
 
 from obspy.core import Stream, Trace, read, AttribDict, UTCDateTime
+from obspy.core.inventory import Inventory
 from obspy import read_inventory
 from obspy.io.xseed import Parser
 from obspy.geodetics import gps2dist_azimuth
@@ -283,14 +284,11 @@ def get_params(session):
     s = session
     params = AttribDict()
     for name in default.keys():
-        if len(default[name]) == 2:
-            params[name] = get_config(s, name)
+        itemtype = default[name].type
+        if itemtype is bool:
+            params[name] = get_config(s, name, isbool=True)
         else:
-            txt, _, itemtype = default[name]
-            if itemtype is bool:
-                params[name] = get_config(s, name, isbool=True)
-            else:
-                params[name] = itemtype(get_config(s, name))
+            params[name] = itemtype(get_config(s, name))
 
     # TODO remove reference to goal_sampling_rate
     params.goal_sampling_rate = params.cc_sampling_rate
@@ -843,7 +841,7 @@ def is_next_job(session, flag='T', jobtype='CC'):
         return True
 
 
-def get_next_job(session, flag='T', jobtype='CC'):
+def get_next_job(session, flag='T', jobtype='CC', limit=99999):
     """
     Get the next :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
     with flag=`flag` and jobtype=`jobtype`. Jobs of the same `type` are grouped
@@ -861,6 +859,7 @@ def get_next_job(session, flag='T', jobtype='CC'):
     :rtype: list
     :returns: list of :class:`~msnoise.msnoise_table_def.declare_tables.Job`
     """
+    from sqlalchemy import update
     tmp = []
     while not len(tmp):
         jobs = session.query(Job).filter(Job.jobtype == jobtype).\
@@ -869,10 +868,13 @@ def get_next_job(session, flag='T', jobtype='CC'):
                    with_hint(Job, 'USE INDEX (job_index)').
                    filter(Job.jobtype == jobtype).
                    filter(Job.flag == flag).first().day).\
-            with_for_update()
+            limit(limit).with_for_update()
         # print(jobs.statement.compile(compile_kwargs={"literal_binds": True}))
         tmp = jobs.all()
-        jobs.update({Job.flag: 'I'})
+        refs = [_.ref for _ in tmp]
+        q = update(Job).values({"flag":"I"}).where(Job.ref.in_(refs))
+        session.execute(q)
+        # jobs.update({Job.flag: 'I'})
         session.commit()
     return tmp
 
@@ -1786,7 +1788,7 @@ def clean_scipy_cache():
     sf.convolve.destroy_convolve_cache()
 
 
-def preload_instrument_responses(session):
+def preload_instrument_responses(session, return_format="dataframe"):
     """
     This function preloads all instrument responses from ``response_format``
     and stores the seed ids, start and end dates, and paz for every channel
@@ -1809,54 +1811,65 @@ def preload_instrument_responses(session):
     response_format = get_config(session, 'response_format')
     files = glob.glob(os.path.join(get_config(session, 'response_path'), "*"))
     channels = []
-    print(files)
-    if response_format == "inventory":
-        for file in files:
-            logging.debug("Processing %s" % file)
-            try:
-                inv = read_inventory(file, format="STATIONXML")
-                for net in inv.networks:
-                    for sta in net.stations:
-                        for cha in sta.channels:
-                            try:
-                                seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
-                                                           cha.location_code,
-                                                           cha.code)
-                                resp = inv.get_response(seed_id, cha.start_date+10)
-                                polezerostage = resp.get_paz()
-                                totalsensitivity = resp.instrument_sensitivity
-                                pzdict = {}
-                                pzdict['poles'] = polezerostage.poles
-                                pzdict['zeros'] = polezerostage.zeros
-                                pzdict['gain'] = polezerostage.normalization_factor
-                                pzdict['sensitivity'] = totalsensitivity.value
-                                channels.append([seed_id, cha.start_date,
-                                                 cha.end_date or UTCDateTime(),
-                                                 pzdict, cha.latitude,
-                                                 cha.longitude])
-                            except:
-                                traceback.print_exc()
-            except:
-                traceback.print_exc()
-                pass
+    all_inv = Inventory()
+    for file in files:
+        logging.debug("Processing %s" % file)
+        try:
+            inv = read_inventory(file)
+            all_inv += inv
+            if return_format == "inventory":
+                continue
+            for net in inv.networks:
+                for sta in net.stations:
+                    for cha in sta.channels:
+                        seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
+                                                   cha.location_code,
+                                                   cha.code)
+                        try:
+                            resp = inv.get_response(seed_id,
+                                                    cha.start_date + 10)
+                            polezerostage = resp.get_paz()
+                            totalsensitivity = resp.instrument_sensitivity
+                            pzdict = {}
+                            pzdict['poles'] = polezerostage.poles
+                            pzdict['zeros'] = polezerostage.zeros
+                            pzdict['gain'] = polezerostage.normalization_factor
+                            pzdict['sensitivity'] = totalsensitivity.value
+                            channels.append([seed_id, cha.start_date,
+                                             cha.end_date or UTCDateTime(),
+                                             pzdict, cha.latitude,
+                                             cha.longitude])
+                        except:
+                            logging.debug("There was an error loading PAZ for"
+                                          " %s" % seed_id)
+                            traceback.print_exc()
+        except:
+            logging.debug("Can't read this file using obspy's read_inventory():"
+                          " %s" % file)
+            continue
 
-    elif response_format == "dataless":
-        for file in files:
-            try:
-                p = Parser(file)
-                for channel in p.get_inventory()["channels"]:
-                    resp = p.get_paz(channel["channel_id"],
-                                     channel["start_date"]+10)
-                    channels.append([channel["channel_id"],
-                                     channel["start_date"],
-                                     channel["end_date"] or UTCDateTime(),
-                                     resp,
-                                     channel["latitude"],
-                                     channel["longitude"]])
-            except:
-                pass
-    channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
-                                               "end_date", "paz", "latitude",
-                                               "longitude"],)
     logging.debug('Finished Loading instrument responses')
-    return channels
+    if return_format == "inventory":
+        return all_inv
+
+    if return_format == "dataframe":
+        channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
+                                                   "end_date", "paz", "latitude",
+                                                   "longitude"],)
+        return channels
+
+
+
+# Needed for QC/PPSD, should re-order the defs
+
+
+def to_sds(stats,year, jday):
+    SDS="YEAR/NET/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.JDAY"
+    file=SDS.replace('YEAR', "%04i"%year)
+    file=file.replace('NET', stats.network)
+    file=file.replace('STA', stats.station)
+    file=file.replace('LOC', stats.location)
+    file=file.replace('CHAN', stats.channel)
+    file=file.replace('JDAY', "%03i"%jday)
+    file=file.replace('TYPE', "D")
+    return file

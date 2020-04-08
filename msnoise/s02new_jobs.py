@@ -49,7 +49,7 @@ def main(init=False, nocc=False):
     logger.debug("Checking plugins' entry points")
     plugins = get_config(db, "plugins")
     extra_jobtypes_scan_archive = []
-    extra_jobtypes_new_files = []
+    extra_jobtypes_new_files = ["QC"]
     if plugins:
         plugins = plugins.split(",")
         for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):

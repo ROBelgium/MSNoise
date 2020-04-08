@@ -194,7 +194,7 @@ def main(loglevel="INFO"):
 
     if params.remove_response:
         logger.debug('Pre-loading all instrument response')
-        responses = preload_instrument_responses(db)
+        responses = preload_instrument_responses(db, return_format="inventory")
     else:
         responses = None
 
