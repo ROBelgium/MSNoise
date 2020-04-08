@@ -3,3 +3,4 @@ recursive-include msnoise/templates *
 recursive-include msnoise/static *
 include versioneer.py
 include msnoise/_version.py
+include msnoise/default.csv
