@@ -13,17 +13,16 @@ matrix:
     # (or, well, at least the lowest version number that is available through
     #  anaconda..)
     - os: linux
-      env: PYTHON_VERSION=2.7
+      env: PYTHON_VERSION=3.7
 
     - os: linux
-      env: PYTHON_VERSION=3.7
-
-    - os: osx
-      env: PYTHON_VERSION=2.7
+      env: PYTHON_VERSION=3.8
 
     - os: osx
       env: PYTHON_VERSION=3.7
 
+    - os: osx
+      env: PYTHON_VERSION=3.8
 
 sudo: false
 
@@ -40,14 +39,11 @@ before_install:
   # MySQL database
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then mysql -u root -e "create database msnoise;"; fi
   # Python and related stuff
-  - if [[ "${PYTHON_VERSION:0:1}" == '2' ]]; then
-      wget https://repo.continuum.io/miniconda/Miniconda2-latest-${OS}-x86_64.sh -O miniconda.sh;
-    else
-      wget https://repo.continuum.io/miniconda/Miniconda3-latest-${OS}-x86_64.sh -O miniconda.sh;
-    fi
+  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-${OS}-x86_64.sh -O miniconda.sh;
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
   - hash -r
+  - conda config --add channels conda-forge
   - conda config --add channels conda-forge
   - conda update -q --yes conda
   # Installs required packages
@@ -57,7 +53,6 @@ before_install:
   - conda install --yes -q lxml pyqt
   - conda install --yes -q -c conda-forge obspy
   - conda install --yes -q -c conda-forge flask-admin markdown codecov
-  - if [[ "${PYTHON_VERSION:0:1}" == '2' ]]; then conda install --yes -q -c conda-forge branca=0.3.1; fi
   - pip install logbook
   - ls -la
 
