@@ -23,8 +23,6 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n"
         output += "\n" + "----------------+SYSTEM+-------------------"
         output += "\n" + "\n".join(platform.uname())
-        if platform.system() == "Linux":
-            output += "\n" + " - ".join(platform.linux_distribution())
         output += "\n"
 
     output += "\n" + "----------------+PYTHON+-------------------"
