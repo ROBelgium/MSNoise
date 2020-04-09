@@ -305,6 +305,35 @@ one by one:
     msnoise db import jobs --force
 
 
+Check if my response file works
+-------------------------------
+
+To check if your response file can be used by msnoise, you simply should
+check that it is readable with ObsPy and contains the response information.
+In a python shell, do the following:
+
+.. code-block:: python
+
+    from obspy.core import UTCDateTime, read_inventory, read
+    st = read("/path/to/a/file/for/station/XX.BBB")
+    inv = read_inventory("/path/to/the/response/for/station/XX.BBB)
+    print(inv)
+    response = inv.get_response(st[0].id, st[0].stats.starttime)
+    print(response)
+
+
+alternatively, if you have configured the path to the response files
+(``response_path``) correctly you can also call the msnoise api:
+
+.. code-block:: python
+
+    from msnoise.api import connect, preload_instrument_responses
+    st = read("/path/to/a/file/for/station/XX.BBB")
+    db = connect()
+    inv = preload_instrument_responses(db, return_format="inventory")
+    response = inv.get_response(st[0].id, st[0].stats.starttime)
+    print(response)
+
 .. _testing:
 
 Testing the Dependencies
