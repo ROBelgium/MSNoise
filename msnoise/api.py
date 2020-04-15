@@ -1830,15 +1830,13 @@ def preload_instrument_responses(session, return_format="dataframe"):
                                                     cha.start_date + 10)
                             polezerostage = resp.get_paz()
                             totalsensitivity = resp.instrument_sensitivity
-                            pzdict = {}
-                            pzdict['poles'] = polezerostage.poles
-                            pzdict['zeros'] = polezerostage.zeros
-                            pzdict['gain'] = polezerostage.normalization_factor
-                            pzdict['sensitivity'] = totalsensitivity.value
+                            pz = {'poles': polezerostage.poles,
+                                  'zeros': polezerostage.zeros,
+                                  'gain': polezerostage.normalization_factor,
+                                  'sensitivity': totalsensitivity.value}
                             channels.append([seed_id, cha.start_date,
                                              cha.end_date or UTCDateTime(),
-                                             pzdict, cha.latitude,
-                                             cha.longitude])
+                                             pz, cha.latitude, cha.longitude])
                         except:
                             logging.debug("There was an error loading PAZ for"
                                           " %s" % seed_id)
@@ -1854,8 +1852,8 @@ def preload_instrument_responses(session, return_format="dataframe"):
 
     if return_format == "dataframe":
         channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
-                                                   "end_date", "paz", "latitude",
-                                                   "longitude"],)
+                                                   "end_date", "paz",
+                                                   "latitude", "longitude"],)
         return channels
 
 
