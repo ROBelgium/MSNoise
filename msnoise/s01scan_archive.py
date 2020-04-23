@@ -60,18 +60,15 @@ This command can also scan folders recursively:
     $ msnoise scan_archive --path /path/to/archive --recursively --init
 """
 
-
-import argparse
 import datetime
 import glob
 import logging
 import multiprocessing
-import obspy
 import os
+import random
 import re
 import sys
 import time
-
 import traceback
 
 # Use the built-in version of scandir/walk if possible,
@@ -80,6 +77,8 @@ try:
     from os import scandir, walk
 except ImportError:
     from scandir import scandir, walk
+
+import obspy
 
 from . import api
 from . import FatalError
@@ -125,8 +124,9 @@ def update_availability(db, folder, basename, data):
     endtime = endtime.datetime.replace(microsecond=0)
 
     return api.update_data_availability(db, net, sta, comp, path, basename,
-            starttime, endtime, data_duration, gaps_duration,
-            data[0].stats.sampling_rate)
+                                        starttime, endtime, data_duration,
+                                        gaps_duration,
+                                        data[0].stats.sampling_rate)
 
 
 def process_stream(db, folder, basename, stream, id_, startdate, enddate,
@@ -159,7 +159,7 @@ def process_stream(db, folder, basename, stream, id_, startdate, enddate,
 
 
 def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
-        archive_format, logger):
+                    archive_format, logger):
     """
     Processes a list of files from a folder, and update the data availability
     table in the database whenever their data matches our dates and sampling
@@ -183,8 +183,8 @@ def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
         # logger.debug('reading file %s' % pathname)
         try:
             # Note: if format is None or unknown, obspy will use auto-detection.
-            # See https://docs.obspy.org/packages/autogen/obspy.core.stream.read.html
-            stream = obspy.core.read(pathname, headonly=True, format=archive_format or None)
+            stream = obspy.core.read(pathname, headonly=True,
+                                     format=archive_format or None)
             for id in set([t.id for t in stream]):
                 update_rv = process_stream(db, folder, basename, stream, id,
                                            startdate, enddate,
@@ -244,7 +244,7 @@ def list_directory(folder, mintime):
 
 
 def scan_folders(folders, mintime, startdate, enddate, goal_sampling_rate,
-        archive_format, loglevel=None):
+                 archive_format, loglevel=None):
     """
     Reads files in a list of folders and updates their data availability in
     database, silently ignoring non-matching files and empty folders.
@@ -316,7 +316,7 @@ def get_archives_folders(data_folder, data_structure,
             for sta in stations:
                 folders.append(os.path.join(
                     data_folder,
-                    stafolder.replace('NET', sta.net) \
+                    stafolder.replace('NET', sta.net)
                              .replace('STA', sta.sta)))
     # returns a set to make sure we only get unique folder globs
     # (to be verified: could there really be duplicates?)
@@ -368,15 +368,18 @@ def spawn_processes(pool, nproc, dir_list, scan_func, scan_args):
     represent the list of children to wait for.
     """
     # Get the ceiling of (len(dir_list) / nproc) (w/o importing math.ceil)
+
     n = int((len(dir_list) + nproc - 1) / nproc)
 
+    # Shuffling the folders to (try to) mix small and large folders:
+    random.shuffle(dir_list)
     children = []
     for i in range(nproc):
         folder_slice = dir_list[n*i:n*(i+1)]
         logger.debug('Spawning a child to process {} of the {} directories.'
                      .format(len(folder_slice), len(dir_list)))
         children.append(pool.apply_async(scan_func,
-            [folder_slice] + list(scan_args)))
+                        [folder_slice] + list(scan_args)))
     return children
 
 
@@ -454,10 +457,15 @@ def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
         # with multiprocessing.Pool(processes=nproc) as pool:
         pool = multiprocessing.Pool(processes=nproc)
 
+        # MSNoise 2 trying to revamp in Queue ... pfffffffff:
+        # the_queue = multiprocessing.Queue()
+        # pool = multiprocessing.Pool(nproc, scan_folders, (the_queue,))
+
         # Launch nproc children working on a mostly equal number of folders
         children = spawn_processes(pool, nproc, dir_list, scan_folders,
-                (mintime, startdate, enddate, goal_sampling_rate,
-                 archive_format, logger.level))
+                                   (mintime, startdate, enddate,
+                                    goal_sampling_rate, archive_format,
+                                    logger.level))
         # Wait for children to finish, or terminate them if one crashes
         await_children(pool, children)
 
@@ -471,10 +479,11 @@ def parse_crondays(crondays):
     except ValueError:
         # The provided value is not a float: it must match '[Xw][Xd][Xh]'
         # (with optional blank characters between groups)
-        match = re.search('^(?:(\d+)w\s*)?(?:(\d+)d\s*)?(?:(\d+)h\s*)?$', crondays)
+        match = re.search('^(?:(\d+)w\s*)?(?:(\d+)d\s*)?(?:(\d+)h\s*)?$',
+                          crondays)
         if not match:
             raise FatalError("Unrecognized format for "
-                    "configuration parameter 'crondays'")
+                             "configuration parameter 'crondays'")
         delta_days = 7 * int(match.group(1) or 0) + int(match.group(2) or 0)
         delta_seconds = 3600 * int(match.group(3) or 0)
     else:
@@ -542,6 +551,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
 
     if init:
         mintime = None
+
     else:
         # Note: avoid datetime.timestamp() below as it is python3 only *and*
         # does not work correctly with naive datetime representing UTC.
@@ -554,13 +564,12 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
         channels = api.get_config(db, 'channels').split(',')
         logger.debug('Will search for channels: %s' % channels)
 
-
         rawpath = get_data_structure(api.get_config(db, 'data_structure'))
         if rawpath is None:
-            raise FatalError("Cannot read configured data_structure '%s' anywhere "
-                    "(tried file custom.py in folder '%s')."
-                    % (api.get_config(db, 'data_structure'), os.getcwd()))
-            return
+            raise FatalError("Cannot read configured data_structure '%s'"
+                             "anywhere (tried file custom.py in folder '%s')."
+                             % (api.get_config(db, 'data_structure'),
+                                os.getcwd()))
 
         if not os.path.isdir(data_folder):
             raise FatalError("Cannot find directory '{}'. Aborting."
@@ -572,7 +581,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
                       min(datetime.datetime.utcnow().year, enddate.year) + 1),
                 api.get_stations(db, all=False),
                 channels)
-        #logger.debug('Folders to glob: %s' % ','.join(folders_to_glob))
+        # logger.debug('Folders to glob: %s' % ','.join(folders_to_glob))
     elif forced_path_recursive:
         # Scan directory and all subdirectories in the tree
         folders_to_glob = [d[0] for d in walk(forced_path)]
@@ -594,4 +603,3 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
     else:
         logger.info('*** Finished: Scan Archive ***')
         logger.info('It took %.2f seconds' % (time.time() - scanning_starttime))
-
