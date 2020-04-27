@@ -1,0 +1,41 @@
+master
+======
+
+Changes:
+ - msnoise
+  * drop Continuous Integrations for Python 2.7. Only test on 3.7 and 3.8.
+ - msnoise.api:
+  * preload_instrument_response now reads anything
+    obspy.inventory.read_inventory can read
+  * preload_instrument_response() returns either a pandas.DataFrame or and
+    Inventory object (should eventually be default)
+  * get_next_job() now allows setting a max number of returned job (useful
+    when processing many stations/pairs for a limited number of days in
+    parallel on multiple cores).
+  * get_results_all() now returns an empty DataFrame if there are no data
+ - msnoise.qc:
+  * new group, commands (TODO temporary naming): compute_psd, plot_psd
+  * computes PPSD using obspy, saves daily NPZ and PNG files in SDS-like
+    structure
+  * new parameters in the database (PSD length, overlap, and smoothing
+    parameters, see obspy's doc for PPSD.__init__)
+ - msnoise.default:
+  * now the default config bits are stored in a CSV file, with name, default
+    value, definition, type, and enum values
+  * the default.default dict is an AttribDict containing all information
+  * deprecated bits: "autocorr", TODO: response_format?
+ - msnoise.admin:
+  * changed the visualisation of the config table, allows filtering names,
+    shows modified/new values, definition and enum values
+  * when a type or enum is defined, the field in the Edit Form view is set to a
+    select box/date picker
+ - msnoise.preprocessing:
+  * replaced "stream.simulate" by "stream.remove_response"
+ - msnoise.doc:
+  * added how-to for checking the instrument response
+
+1.6.1
+=====
+
+Changes from all versions up to this one are described in the Release Notes
+published with the documentation. This file will start with MSNoise 2.0
