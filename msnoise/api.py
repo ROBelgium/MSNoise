@@ -1360,9 +1360,9 @@ def get_results_all(session, station1, station2, filterid, components, dates):
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
     :type station1: str
-    :param station1: The name of station 1 (formatted NET_STA)
+    :param station1: The name of station 1 (formatted NET.STA)
     :type station2: str
-    :param station2: The name of station 2 (formatted NET_STA)
+    :param station2: The name of station 2 (formatted NET.STA)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type components: str
@@ -1384,9 +1384,13 @@ def get_results_all(session, station1, station2, filterid, components, dates):
             df = pd.read_hdf(fname, 'data', parse_dates=True)
             df.index = pd.to_datetime(df.index)
             results.append(df)
-    result = pd.concat(results)
-    del results
-    return result
+    if len(results):
+        result = pd.concat(results)
+        del results
+        return result
+    else:
+        return pd.DataFrame()
+
 
 # Some helper functions
 
