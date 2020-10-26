@@ -1324,7 +1324,7 @@ def get_ref(session, station1, station2, filterid, components, params=None):
                       ref_name + extension)
     if not os.path.isfile(rf):
         logging.debug("No REF file named %s, skipping." % rf)
-        return Stream()[0]
+        return Trace()
 
     return read(rf)[0]
 
