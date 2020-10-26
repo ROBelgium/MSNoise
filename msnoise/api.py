@@ -1290,6 +1290,8 @@ def get_extension(export_format):
         return ".SAC"
     elif export_format == "MSEED":
         return ".MSEED"
+    else:
+        return ".MSEED"
 
 
 def get_ref(session, station1, station2, filterid, components, params=None):
@@ -1364,6 +1366,8 @@ def get_results(session, station1, station2, filterid, components, dates,
     else:
         export_format = params.export_format
         extension = get_extension(params.export_format)
+    if export_format == "BOTH":
+        export_format = "MSEED"
 
     stack_data = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
     i = 0

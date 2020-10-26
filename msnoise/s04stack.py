@@ -221,8 +221,9 @@ def main(stype, interval=1.0, loglevel="INFO"):
                         db, sta1, sta2, filterid, components, datelist, format=format, params=params)
                     if not nstack:
                         logger.debug("No new data found, hmmm")
-                    logger.debug("Data loaded")
+
                     if nstack > 0:
+                        logger.debug("Data loaded")
                         if stype == "mov":
                             logger.debug("Mov Stack!")
                             for i, date in enumerate(datelist):
