@@ -136,41 +136,39 @@ def main(loglevel="INFO"):
             filterid = int(f.ref)
             for components in params.all_components:
                 ref_name = pair.replace('.', '_').replace(':', '_')
-                rf = os.path.join("STACKS", "%02i" %
-                                  filterid, "REF", components,
-                                  ref_name + extension)
-                if not os.path.isfile(rf):
-                    logging.debug("No REF file named %s, skipping." % rf)
+                station1, station2 = pair.split(":")
+                ref = get_ref(db, station1, station2, filterid, components,
+                              params)
+                if not len(ref):
+                    logging.debug("No REF file found for %s.%i.%s, skipping." %
+                                  (ref_name, filterid, components))
                     continue
-                ref = read(rf)[0].data
+                ref = ref.data
 
-                for day in days:
-                    for mov_stack in mov_stacks:
-                        df = os.path.join(
-                            "STACKS", "%02i" % filterid, "%03i_DAYS" %
-                            mov_stack, components, ref_name,
-                            str(day) + extension)
-                        if os.path.isfile(df):
-                            try:
-                                cur = read(df)[0].data
-                            except:
-                                logging.debug("Error reading %s, skipping." %
-                                              df)
-                                continue
-                            logger.debug(
-                                'Processing MWCS for: %s.%s.%02i - %s - %02i days' %
-                                (ref_name, components, filterid, day, mov_stack))
-                            output = mwcs(
-                                cur, ref, f.mwcs_low, f.mwcs_high, goal_sampling_rate, -maxlag, f.mwcs_wlen, f.mwcs_step)
-                            outfolder = os.path.join(
-                                'MWCS', "%02i" % filterid, "%03i_DAYS" % mov_stack, components, ref_name)
-                            if outfolder not in outfolders:
-                                if not os.path.isdir(outfolder):
-                                    os.makedirs(outfolder)
-                                outfolders.append(outfolder)
-                            np.savetxt(os.path.join(outfolder, "%s.txt" % str(day)), output)
-                            clean_scipy_cache()
-                            del output, cur
+                for mov_stack in mov_stacks:
+                    n, data = get_results(db, station1.replace(".", "_"),
+                                          station2.replace(".", "_"), filterid,
+                                          components, days, mov_stack,
+                                          format="matrix", params=params)
+
+                    for i, cur in enumerate(data):
+                        if np.all(np.isnan(cur)):
+                            continue
+
+                        logger.debug(
+                            'Processing MWCS for: %s.%s.%02i - %s - %02i days' %
+                            (ref_name, components, filterid, days[i], mov_stack))
+                        output = mwcs(cur, ref, f.mwcs_low, f.mwcs_high, goal_sampling_rate, -maxlag, f.mwcs_wlen, f.mwcs_step)
+                        outfolder = os.path.join(
+                            'MWCS', "%02i" % filterid, "%03i_DAYS" % mov_stack, components, ref_name)
+                        if outfolder not in outfolders:
+                            if not os.path.isdir(outfolder):
+                                os.makedirs(outfolder)
+                            outfolders.append(outfolder)
+                        np.savetxt(os.path.join(outfolder, "%s.txt" % str(days[i])), output)
+                        clean_scipy_cache()
+                        del output
+                    del data
 
         # THIS SHOULD BE IN THE API
         massive_update_job(db, jobs, "D")

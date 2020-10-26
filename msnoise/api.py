@@ -1283,10 +1283,55 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
     return corr
 
 
-def get_results(session, station1, station2, filterid, components, dates,
-                mov_stack = 1, format="stack", params=None):
-    """
+def get_extension(export_format):
+    if export_format == "BOTH":
+        return ".MSEED"
+    elif export_format == "SAC":
+        return ".SAC"
+    elif export_format == "MSEED":
+        return ".MSEED"
 
+
+def get_ref(session, station1, station2, filterid, components, params=None):
+    """
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type station1: str
+    :param station1: The name of station 1 (formatted NET_STA)
+    :type station2: str
+    :param station2: The name of station 2 (formatted NET_STA)
+    :type filterid: int
+    :param filterid: The ID (ref) of the filter
+    :type components: str
+    :param components: The name of the components used (ZZ, ZR, ...)
+    :type params: dict
+    :param params: A dictionnary of MSNoise config parameters as returned by
+        :func:`get_params`.
+    :rtype: :class:`obspy.trace`
+    :return: A Trace object containing the ref
+    """
+    if not params:
+        export_format = get_config(session, 'export_format')
+        extension = get_extension(export_format)
+    else:
+        extension = get_extension(params.export_format)
+
+    ref_name = "%s_%s" % (station1, station2)
+    ref_name = ref_name.replace(".", "_")
+    rf = os.path.join("STACKS", "%02i" %
+                      filterid, "REF", components,
+                      ref_name + extension)
+    if not os.path.isfile(rf):
+        logging.debug("No REF file named %s, skipping." % rf)
+        return Stream()[0]
+
+    return read(rf)[0]
+
+
+def get_results(session, station1, station2, filterid, components, dates,
+                mov_stack=1, format="stack", params=None):
+    """
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
@@ -1315,21 +1360,16 @@ def get_results(session, station1, station2, filterid, components, dates,
     """
     if not params:
         export_format = get_config(session, 'export_format')
+        extension = get_extension(export_format)
     else:
         export_format = params.export_format
+        extension = get_extension(params.export_format)
 
     stack_data = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
     i = 0
     base = os.path.join("STACKS", "%02i" % filterid,
                         "%03i_DAYS" % mov_stack, components,
-                        "%s_%s" % (station1, station2), "%s")
-    if export_format == "BOTH":
-        base += ".MSEED"
-        export_format = "MSEED"
-    elif export_format == "SAC":
-        base += ".SAC"
-    elif export_format == "MSEED":
-        base += ".MSEED"
+                        "%s_%s" % (station1, station2), "%s") + extension
     logging.debug("Reading files...")
     for j, date in enumerate(dates):
         daystack = base % str(date)
