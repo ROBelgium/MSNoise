@@ -123,8 +123,16 @@ def main(stype, interval=1.0, loglevel="INFO"):
                         with_pid=True)
     logger.debug('Starting the %s stack' % stype)
     db = connect()
-    
-    export_format = get_config(db, 'export_format')
+    # Get Configuration
+    params = get_params(db)
+    stack_method = params.stack_method
+    pws_timegate = params.pws_timegate
+    pws_power = params.pws_power
+    goal_sampling_rate = params.cc_sampling_rate
+    cc_sampling_rate = params.cc_sampling_rate
+    maxlag = params.maxlag
+    plugins = params.plugins
+    export_format = params.export_format
 
     if export_format == "BOTH":
         mseed = True
@@ -135,17 +143,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
     elif export_format == "MSEED":
         mseed = True
         sac = False
-    
-    maxlag = float(get_config(db, "maxlag"))
-    cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
 
-    stack_method = get_config(db, 'stack_method')
-    pws_timegate = float(get_config(db, 'pws_timegate'))
-    pws_power = float(get_config(db, 'pws_power'))
-    goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-    # Get Configuration
-    params = get_params(db)
-    plugins = get_config(db, "plugins")
     extra_jobtypes = []
     if plugins:
         plugins = plugins.split(",")

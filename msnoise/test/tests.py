@@ -200,6 +200,10 @@ class MSNoiseTests(unittest.TestCase):
             traceback.print_exc()
             self.fail()
 
+    def test_013_X_check_results(self):
+        # TO DO CHECK CCF RESULTS ARRAYS!
+        pass
+
     def test_014_check_done_jobs(self):
         from ..api import connect, get_job_types
         db = connect()

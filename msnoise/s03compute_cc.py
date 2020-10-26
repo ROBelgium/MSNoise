@@ -33,11 +33,11 @@ Configuration Parameters
 
 Waveform Pre-processing
 ~~~~~~~~~~~~~~~~~~~~~~~
-Pairs are first split and a station list is created. The database is then
+Pairs are first split, and a station list is created. The database is then
 queried to get file paths. For each station, all files potentially containing
 data for the day are opened. The traces are then merged and split, to obtain
 the most continuous chunks possible. The different chunks are then demeaned,
-tapered and merged again to a 1-day long trace. If a chunk is not aligned
+tapered and merged again to a 1-day-long trace. If a chunk is not aligned
 on the sampling grid (that is, start at a integer times the sample spacing in s)
 , the chunk is phase-shifted in the frequency domain. This requires tapering and
 fft/ifft. If the gap between two chunks is small, compared to a configurable
@@ -98,7 +98,7 @@ in the STACKS/001_DAYS folder.
 If ``stack_method`` is 'linear', then a simple mean CCF of all windows is saved
 as the daily CCF. On the other hand, if ``stack_method`` is 'pws', then
 all the Phase Weighted Stack (PWS) is computed and saved as the daily CCF. The
-PWS is done in two steps: first the mean coherence between the instataneous
+PWS is done in two steps: first the mean coherence between the instantaneous
 phases of all windows is calculated, and eventually serves a weighting factor
 on the mean. The smoothness of this weighting array is defined using the
 ``pws_timegate`` parameter in the configuration. The weighting array is the

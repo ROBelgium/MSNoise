@@ -49,7 +49,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             gd = UTCDateTime(job.day).datetime
             files = get_data_availability(
                 db, net=net, sta=sta,
-                starttime=(UTCDateTime(job.day) - 1.5 * 3600).datetime,
+                starttime=(UTCDateTime(job.day) - 1.5 * ppsd_length).datetime,
                 endtime=gd)
             if len(files) == 0:
                 continue
@@ -66,9 +66,9 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                 for tmp in np.unique(toprocess):
                     logger.debug("Reading %s" % tmp)
                     try:
-                        st += read(tmp, starttime=UTCDateTime(gd) - 1.5 * 3600,
+                        st += read(tmp, starttime=UTCDateTime(gd) - 1.5 * ppsd_length,
                                    endtime=UTCDateTime(
-                                       gd + datetime.timedelta(days=1)) - 0.01)
+                                       gd + datetime.timedelta(days=1)) - 0.001)
                     except:
                         logger.debug("Problem loading %s" % tmp)
                 if not len(st):

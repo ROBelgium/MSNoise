@@ -87,7 +87,7 @@ def main(net, sta, comp, time_of_weekday=None, period_lim=None, show=False,
     print("Creating DataFrame...")
     data = pd.DataFrame(data, index=ind_times)
     # TODO : why resample here ?
-    data = data.resample("H").fillna(method="ffill")
+    # data = data.resample("H").fillna(method="ffill")
 
     if color_lim:
         vmin, vmax = color_lim
