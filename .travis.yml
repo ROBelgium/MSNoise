@@ -2,7 +2,7 @@
 # https://gist.github.com/dan-blanchard/7045057
 # and
 # https://github.com/Jorge-C/ordination/blob/master/.travis.yml
-language: c
+language: python
 
 services:
   - mysql
@@ -10,7 +10,7 @@ services:
 addons:
   mariadb: '10.5'
 
-matrix:
+jobs:
   include:
     # do one build run with our minimum dependencies
     # (or, well, at least the lowest version number that is available through
@@ -26,9 +26,11 @@ matrix:
 
     - os: osx
       env: PYTHON_VERSION=3.7
+      language: generic
 
     - os: osx
       env: PYTHON_VERSION=3.8
+      language: generic
 
 #    - os: osx
 #      env: PYTHON_VERSION=3.9
