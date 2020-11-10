@@ -4,9 +4,6 @@
 # https://github.com/Jorge-C/ordination/blob/master/.travis.yml
 language: c
 
-services:
-  - mysql
-
 addons:
   mariadb: '10.5'
 
@@ -22,19 +19,18 @@ env:
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       export OS="MacOSX";
-      brew update > /dev/null;
       brew install mariadb;
       brew services start mariadb;
     else
       export OS="Linux";
-      mysql -e "CREATE USER 'msnoise'@'localhost' IDENTIFIED BY 'msnoise';";
-      mysql -e "GRANT ALL PRIVILEGES ON * . * TO 'msnoise'@'localhost';";
-      mysql -e "FLUSH PRIVILEGES;";
-      mysql -e "CREATE DATABASE msnoise;";
     fi
 
   # Wait for mysql service to respond
   - which mysql && until mysql -u root -e "show status" &>/dev/null; do sleep 1; done
+  - mysql -e "CREATE USER 'msnoise'@'localhost' IDENTIFIED BY 'msnoise';";
+  - mysql -e "GRANT ALL PRIVILEGES ON * . * TO 'msnoise'@'localhost';";
+  - mysql -e "FLUSH PRIVILEGES;";
+  - mysql -e "CREATE DATABASE msnoise;";
   # MySQL database
   # Python and related stuff
   - wget https://repo.continuum.io/miniconda/Miniconda3-latest-${OS}-x86_64.sh -O miniconda.sh;
