@@ -4,9 +4,6 @@
 # https://github.com/Jorge-C/ordination/blob/master/.travis.yml
 language: c
 
-addons:
-  mariadb: '10.0'
-
 
 jobs:
   include:

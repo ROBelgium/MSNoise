@@ -3,8 +3,11 @@
 .. _workflow:
 
 ******************************
-Workflow
+Workflow: dv/v
 ******************************
+
+TODO REMAKE THIS FIGURE
+TODO ADD EXPLANATION THAT THE "init"+"CCF" workflows need to be done before this one!
 
 
 .. image:: ../.static/Figure01_workflow_summary_cmyk.png
@@ -18,4 +21,4 @@ first startup of MSNoise"), not the installation of the required software, which
    :glob:
    :maxdepth: 1
 
-   ../workflow/*
+   ../workflow_dvv/*

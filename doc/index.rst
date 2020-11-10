@@ -4,7 +4,7 @@ MSNoise - Documentation
 Originally, MSNoise was a "Python Package for Monitoring Seismic Velocity
 Changes using Ambient Seismic Noise". With the release of MSNoise 1.4, and
 because of the Plugin Support, we could call MSNoise: "Measuring with Seismic
-Noise". The current release version of MSNoise is **MSNoise 1.6**.
+Noise". The current release version of MSNoise is **MSNoise 2.0**.
 
 The standard MSNoise workflow is designed to go from seismic data archives to
 dv/v curves. The monitoring is achieved by computing the cross-correlation of
@@ -38,15 +38,42 @@ Installation
 
     installation
 
-Workflow
-========
+Workflows:
+==========
 
-.. image:: .static/Figure01_workflow_summary_cmyk.png
+Initializing and Configuring a Project
+--------------------------------------
 
 .. toctree::
     :maxdepth: 2
 
-    workflow/0000_intro.rst
+    workflow_000/0000_intro.rst
+
+
+Cross-Correlation Functions
+---------------------------
+
+.. toctree::
+    :maxdepth: 2
+
+    workflow_ccf/0000_intro.rst
+
+Computing Relative Velocity Variations
+--------------------------------------
+
+.. toctree::
+    :maxdepth: 2
+
+    workflow_dvv/0000_intro.rst
+
+Computing Power Spectral Densities (Quality Control)
+---------------------------------------------------
+
+.. toctree::
+    :maxdepth: 2
+
+    workflow_psd/0000_intro.rst
+
 
 Plotting
 ========
