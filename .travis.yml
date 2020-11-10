@@ -33,9 +33,6 @@ jobs:
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       export OS="MacOSX";
-#      brew update > /dev/null;
-#      brew install mariadb;
-#      brew services start mariadb;
     else
       export OS="Linux";
     fi
