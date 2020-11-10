@@ -4,8 +4,11 @@
 # https://github.com/Jorge-C/ordination/blob/master/.travis.yml
 language: c
 
+services:
+  - mysql
+
 addons:
-  mariadb: '10.0'
+  mariadb: '10.5'
 
 matrix:
   include:
@@ -48,7 +51,6 @@ before_install:
   # Wait for mysql service to respond
 #  - which mysql && until mysql -u root -e "show status" &>/dev/null; do sleep 1; done
   # MySQL database
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then mysql -u root -e "create database msnoise;"; fi
   # Python and related stuff
   - wget https://repo.continuum.io/miniconda/Miniconda3-latest-${OS}-x86_64.sh -O miniconda.sh;
   - bash miniconda.sh -b -p $HOME/miniconda
