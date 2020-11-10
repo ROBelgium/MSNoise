@@ -94,8 +94,14 @@ def get_engine(inifile=None):
     if dbini.tech == 1:
         engine = create_engine('sqlite:///%s' % dbini.hostname, echo=False,
                                connect_args={'check_same_thread': False})
-    else:
+    elif dbini.tech == 2:
         engine = create_engine('mysql+pymysql://%s:%s@%s/%s'
+                               % (dbini.username, dbini.password,
+                                  dbini.hostname, dbini.database),
+                               echo=False, poolclass=NullPool,
+                               connect_args={'connect_timeout': 15})
+    elif dbini.tech == 3:
+        engine = create_engine('postgresql+psycopg2://%s:%s@%s/%s'
                                % (dbini.username, dbini.password,
                                   dbini.hostname, dbini.database),
                                echo=False, poolclass=NullPool,
@@ -635,7 +641,6 @@ def update_data_availability(session, net, sta, loc, chan, path, file, starttime
     """
 
     data = session.query(DataAvailability).\
-        with_hint(DataAvailability, 'USE INDEX (da_index)'). \
         filter(DataAvailability.path == path). \
         filter(DataAvailability.file == file).\
         filter(DataAvailability.net == net).\
@@ -814,7 +819,6 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
         job = session.query(Job).filter(Job.ref == ref).first()
     else:
         job = session.query(Job)\
-            .with_hint(Job, 'USE INDEX (job_index)')\
             .filter(Job.day == day)\
             .filter(Job.pair == pair)\
             .filter(Job.jobtype == jobtype).first()
@@ -885,7 +889,7 @@ def is_next_job(session, flag='T', jobtype='CC'):
     :returns: True if at least one :class:`~msnoise.msnoise_table_def.declare_tables.Job`
         matches, False otherwise.
     """
-    job = session.query(Job).with_hint(Job, 'USE INDEX (job_index2)').\
+    job = session.query(Job).\
         filter(Job.jobtype == jobtype).\
         filter(Job.flag == flag).first()
     if job is None:
@@ -918,7 +922,6 @@ def get_next_job(session, flag='T', jobtype='CC', limit=99999):
         jobs = session.query(Job).filter(Job.jobtype == jobtype).\
             filter(Job.flag == flag).\
             filter(Job.day == session.query(Job).
-                   with_hint(Job, 'USE INDEX (job_index)').
                    filter(Job.jobtype == jobtype).
                    filter(Job.flag == flag).first().day).\
             limit(limit).with_for_update()
@@ -951,7 +954,7 @@ def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
     :rtype: bool
     :returns: True if at least one Job matches, False otherwise.
     """
-    q = session.query(Job.ref).with_hint(Job, 'USE INDEX (job_index2)').\
+    q = session.query(Job.ref).\
         filter(Job.flag == flag).\
         filter(Job.jobtype == jobtype)
     if ref:
@@ -985,15 +988,14 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
         Days of the next DTT jobs -
         Job IDs (for later being able to update their flag).
     """
-    if read_db_inifile().tech == 1:
-        rand = func.random
-    else:
+    if read_db_inifile().tech == 2:
         rand = func.rand
+    else:
+        rand = func.random
     try:
         jobs = session.query(Job.ref, Job.day, Job.pair, Job.flag).filter(Job.flag == flag).\
             filter(Job.jobtype == jobtype).filter(Job.day != 'REF').\
             filter(Job.pair == session.query(Job).
-                   with_hint(Job, 'USE INDEX (job_index)').
                    filter(Job.flag == flag).
                    filter(Job.jobtype == jobtype).
                    filter(Job.day != 'REF').
@@ -1682,15 +1684,18 @@ def updated_days_for_dates(session, date1, date2, pair, jobtype='CC',
     """
     lastmod = datetime.datetime.now() - interval
     if pair == '%':
-        days = session.query(Job).filter(Job.day >= date1).\
-            filter(Job.day <= date2).filter(Job.jobtype == jobtype).\
+        days = session.query(Job).\
+            filter(Job.day >= date1.strftime("%Y-%m-%d")).\
+            filter(Job.day <= date2.strftime("%Y-%m-%d")).\
+            filter(Job.jobtype == jobtype).\
             filter(Job.lastmod >= lastmod).group_by(Job.day).\
-            order_by(Job.day).all()
+            order_by(Job.day).with_entities("day").all()
     else:
         days = session.query(Job).filter(Job.pair == pair).\
-            filter(Job.day >= date1).filter(Job.day <= date2).\
+            filter(Job.day >= date1.strftime("%Y-%m-%d")). \
+            filter(Job.day <= date2.strftime("%Y-%m-%d")). \
             filter(Job.jobtype == jobtype).filter(Job.lastmod >= lastmod).\
-            group_by(Job.day).order_by(Job.day).all()
+            group_by(Job.day).order_by(Job.day).with_entities("day").all()
     logging.debug('Found %03i updated days' % len(days))
     if returndays and len(days) != 0:
         return [datetime.datetime.strptime(day.day,'%Y-%m-%d').date() for day

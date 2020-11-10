@@ -101,7 +101,7 @@ def main(init=False, nocc=False):
         for date in pd.date_range(start, end, freq="D"):
             updated_days.append(date.date())
             for jobtype in extra_jobtypes_new_files:
-                job = {"day": date.date(),
+                job = {"day": date.date().strftime("%Y-%m-%d"),
                                  "pair": "%s.%s.%s" % (nf.net, nf.sta, nf.loc),
                                  "jobtype": jobtype,
                                  "flag": "T", "lastmod": now}
@@ -139,11 +139,11 @@ def main(init=False, nocc=False):
                         pair = ':'.join(sorted([m, a]))
                         if pair not in jobs:
                             if not nocc:
-                                all_jobs.append({"day": day, "pair": pair,
+                                all_jobs.append({"day": day.strftime("%Y-%m-%d"), "pair": pair,
                                                  "jobtype": "CC", "flag": "T",
                                                  "lastmod": now})
                             for jobtype in extra_jobtypes_scan_archive:
-                                all_jobs.append({"day": day, "pair": pair,
+                                all_jobs.append({"day": day.strftime("%Y-%m-%d"), "pair": pair,
                                              "jobtype": jobtype, "flag": "T",
                                              "lastmod": now})
                             jobs.append(pair)

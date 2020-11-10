@@ -346,7 +346,7 @@ def upgrade():
 
     try:
         db.execute("CREATE UNIQUE INDEX da_index ON %sdata_availability (path, "
-                   "file, net, sta, comp)" %
+                   "file, net, sta, loc, chan)" %
                    prefix)
         db.commit()
     except:
@@ -416,11 +416,11 @@ def da_stations_update_loc_chan():
     stations = get_stations(session)
     for sta in stations:
         data = session.query(DataAvailability). \
-            with_hint(DataAvailability, 'USE INDEX (da_index)'). \
             filter(DataAvailability.net == sta.net). \
             filter(DataAvailability.sta == sta.sta). \
             group_by(DataAvailability.net, DataAvailability.sta,
-                     DataAvailability.loc, DataAvailability.chan).all()
+                     DataAvailability.loc, DataAvailability.chan). \
+            with_entities("net", "sta", "loc", "chan").all()
         locids = sorted([d.loc for d in data])
         chans = sorted([d.chan for d in data])
         print("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,

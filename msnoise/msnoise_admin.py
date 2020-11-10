@@ -767,9 +767,12 @@ def main(port=5000):
         prefix = ""
     if dbini.tech == 1:
         database = "SQLite: %s%s" % (dbini.hostname, prefix)
-    else:
+    elif dbini.tech == 2:
         database = "MySQL: %s@%s:%s%s" % (dbini.username, dbini.hostname,
                                           dbini.database, prefix)
+    elif dbini.tech == 3:
+        database = "PostgreSQL: %s@%s:%s%s" % (dbini.username, dbini.hostname,
+                                               dbini.database, prefix)
     admin.project_database = database
 
     jobtypes = ["CC", "STACK", "MWCS", "DTT"]

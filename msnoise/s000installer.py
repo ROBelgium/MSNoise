@@ -142,12 +142,13 @@ def main(tech=None, hostname=None, username=None, password=None,
                 print('Sorry, your choice is invalid. Please enter 1 or 2.')
             print(" [1] sqlite")
             print(" [2] mysql")
+            print(" [3] postgresql")
             try:
                 tech = int(raw_input('Choice: '))
             except ValueError:
                 tech = 0
             else:
-                if tech not in (1, 2):
+                if tech not in (1, 2, 3):
                     tech = 0
 
         def ask(prompt, default, input_func=raw_input):
@@ -162,6 +163,23 @@ def main(tech=None, hostname=None, username=None, password=None,
             database = None
             username = None
             password = None
+        elif tech == 2:
+            if hostname is None:
+                hostname = ask('Server: [{}]: ', DEFAULT_INPUTS['mysql_host'])
+            if database is None:
+                database = ask('Database: [{}]: ', DEFAULT_INPUTS['mysql_db'])
+            if username is None:
+                username = ask('Username: [{}]: ', DEFAULT_INPUTS['mysql_user'])
+            if password is None:
+                password = ''
+                while not password:
+                    password = ask('Password (not shown as you type): ',
+                                   '', getpass)
+                    if not password:
+                        print('Sorry, you must define a password.')
+            if prefix is None:
+                prefix = ask('Table prefix: [{}]: ',
+                             DEFAULT_INPUTS['table_prefix'])
         else:
             if hostname is None:
                 hostname = ask('Server: [{}]: ', DEFAULT_INPUTS['mysql_host'])
@@ -189,11 +207,14 @@ def main(tech=None, hostname=None, username=None, password=None,
         username = None
         password = None
         hostname = filename
-    else:
+    elif tech == 2:
         engine = create_engine('mysql+pymysql://%s:%s@%s/%s'
                                % (username, password, hostname, database),
                                echo=False)
-
+    elif tech == 3:
+        engine = create_engine('postgresql+psycopg2://%s:%s@%s/%s'
+                               % (username, password, hostname, database),
+                               echo=False)
     create_database_inifile(tech, hostname, database, username, password,
                             prefix)
 

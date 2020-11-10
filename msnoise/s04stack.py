@@ -268,7 +268,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                                                 sta1, sta2)
                                             if not jobadded and not params.hpc:
                                                 update_job(
-                                                    db, date, day_name.replace('_', '.'), 'MWCS', 'T')
+                                                    db, date.strftime("%Y-%m-%d"), day_name.replace('_', '.'), 'MWCS', 'T')
                                                 jobadded = True
                                         del corr
                         elif stype == "step":

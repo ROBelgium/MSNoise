@@ -141,7 +141,7 @@ def declare_tables(prefix=None):
 
         ref = Column(Integer, primary_key=True)
         day = Column(String(10))
-        pair = Column(String(20))
+        pair = Column(String(23))
         jobtype = Column(String(10))
         flag = Column(String(1))
         lastmod = Column(TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP'),
@@ -193,7 +193,7 @@ def declare_tables(prefix=None):
         X = Column(REAL())
         Y = Column(REAL())
         altitude = Column(Float())
-        coordinates = Column(Enum('DEG', 'UTM'))
+        coordinates = Column(Enum('DEG', 'UTM', name="coordinate_type"))
         used = Column(Boolean)
 
         def __init__(self, *args):

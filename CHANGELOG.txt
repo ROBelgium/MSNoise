@@ -5,12 +5,13 @@ Major:
 * added support for Location IDs: TODO + add documentation
 * this CHANGES the structure of the database !! TODO should we provide an "upgrade" tool?
 * changes to the schema: Station (and TODO Filter too)
-
+* supprort for PostgreSQL databases. TODO: check if removing index_hints really affect performances (should not)
 
 Changes:
  - msnoise
   * drop Continuous Integrations for Python 2.7. Only test on 3.7, 3.8 and 3.9
   * support for Location codes: TODO
+  * PostgreSQL support
 
  - msnoise.admin:
   * changed the visualisation of the config table, allows filtering names,
