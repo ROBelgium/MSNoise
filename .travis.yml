@@ -5,7 +5,7 @@
 language: c
 
 addons:
-  mariadb: '10.5'
+  mariadb: '10.0'
 
 
 jobs:
@@ -33,9 +33,9 @@ jobs:
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       export OS="MacOSX";
-      brew update > /dev/null;
-      brew install mariadb;
-      brew services start mariadb;
+#      brew update > /dev/null;
+#      brew install mariadb;
+#      brew services start mariadb;
     else
       export OS="Linux";
     fi
