@@ -10,33 +10,14 @@ services:
 addons:
   mariadb: '10.5'
 
-jobs:
-  include:
-    # do one build run with our minimum dependencies
-    # (or, well, at least the lowest version number that is available through
-    #  anaconda..)
-    - os: linux
-      env: PYTHON_VERSION=3.7
+os:
+  - linux
+  - osx
 
-    - os: linux
-      env: PYTHON_VERSION=3.8
+env:
+  - PYTHON_VERSION=3.7
+  - PYTHON_VERSION=3.8
 
-#    - os: linux
-#      env: PYTHON_VERSION=3.9
-
-    - os: osx
-      env: PYTHON_VERSION=3.7
-      language: generic
-
-    - os: osx
-      env: PYTHON_VERSION=3.8
-      language: generic
-
-#    - os: osx
-#      env: PYTHON_VERSION=3.9
-
-
-sudo: false
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
