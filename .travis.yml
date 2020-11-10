@@ -13,22 +13,22 @@ jobs:
     - name: "Python 3.7 on Xenial Linux"
       os: linux
       language: c
-      env: PYTHON_VERSION = 3.7
+      env: PYTHON_VERSION=3.7
 
     - name: "Python 3.8 on Xenial Linux"
       os: linux
       language: c
-      env: PYTHON_VERSION = 3.8
+      env: PYTHON_VERSION=3.8
 
     - name: "Python 3.7 on OSX"
       os: osx
       language: generic
-      env: PYTHON_VERSION = 3.7
+      env: PYTHON_VERSION=3.7
 
-    - name: "Python 3.7 on OSX"
+    - name: "Python 3.8 on OSX"
       os: osx
       language: generic
-      env: PYTHON_VERSION = 3.7
+      env: PYTHON_VERSION=3.8
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
