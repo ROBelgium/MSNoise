@@ -4,8 +4,8 @@
 # https://github.com/Jorge-C/ordination/blob/master/.travis.yml
 language: c
 
-services:
-  - mysql
+addons:
+  mariadb: '10.0'
 
 matrix:
   include:
