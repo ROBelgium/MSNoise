@@ -2,7 +2,7 @@
 # https://gist.github.com/dan-blanchard/7045057
 # and
 # https://github.com/Jorge-C/ordination/blob/master/.travis.yml
-language: python
+language: c
 
 services:
   - mysql
