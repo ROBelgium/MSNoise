@@ -147,6 +147,9 @@ class MSNoiseTests(unittest.TestCase):
             traceback.print_exc()
             self.fail()
 
+    def test_008b_add_loc_chan_to_stations(self):
+        result = self.runner.invoke(msnoise_script.da_stations_update_loc_chan)
+
     def test_009_control_data_availability(self):
         from ..api import connect, get_new_files, get_data_availability,\
             count_data_availability_flags, get_stations
@@ -159,9 +162,13 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(len(flags), 1)
 
         for station in get_stations(db):
-            da = get_data_availability(db, net=station.net, sta=station.sta,
-                                       comp='HHZ')
-            self.failUnlessEqual(len(da), 1)
+            for loc in station.locs():
+                for chan in station.chans():
+                    da = get_data_availability(db, net=station.net,
+                                               sta=station.sta,
+                                               loc=loc,
+                                               chan=chan)
+                    self.failUnlessEqual(len(da), 1)
 
     def test_010_new_jobs(self):
         from ..s02new_jobs import main
@@ -218,17 +225,20 @@ class MSNoiseTests(unittest.TestCase):
         for filter in get_filters(db):
             for components in get_components_to_compute(db):
                 for (sta1, sta2) in get_station_pairs(db):
-                    pair = "%s_%s_%s_%s" % (sta1.net, sta1.sta,
-                                            sta2.net, sta2.sta)
-                    tmp = os.path.join("STACKS",
-                                       "%02i" % filter.ref,
-                                       "001_DAYS",
-                                       components,
-                                       pair,
-                                       "2010-09-01.%s" % format)
-                    print("checking", tmp)
-                    if not os.path.isfile(tmp):
-                        self.fail()
+                    for loc1 in sta1.locs():
+                        for loc2 in sta2.locs():
+                            pair = "%s.%s.%s_%s.%s.%s" % (sta1.net, sta1.sta,
+                                                          loc1, sta2.net,
+                                                          sta2.sta, loc2)
+                            tmp = os.path.join("STACKS",
+                                               "%02i" % filter.ref,
+                                               "001_DAYS",
+                                               components,
+                                               pair,
+                                               "2010-09-01.%s" % format)
+                            print("checking", tmp)
+                            if not os.path.isfile(tmp):
+                                self.fail()
 
     def test_016_update_config(self):
         from ..api import connect, update_config
@@ -271,23 +281,26 @@ class MSNoiseTests(unittest.TestCase):
         for filter in get_filters(db):
             for components in get_components_to_compute(db):
                 for (sta1, sta2) in get_station_pairs(db):
-                    pair = "%s_%s_%s_%s" % (sta1.net, sta1.sta,
-                                            sta2.net, sta2.sta)
-                    tmp1 = os.path.join("STACKS",
-                                        "%02i" % filter.ref,
-                                        "001_DAYS",
-                                        components,
-                                        pair,
-                                        "2010-09-01.MSEED")
-                    tmp2 = os.path.join("STACKS",
-                                        "%02i" % filter.ref,
-                                        "001_DAYS",
-                                        components,
-                                        pair,
-                                        "2010-09-01.SAC")
-                    tmp1 = read(tmp1)
-                    tmp2 = read(tmp2)
-                    assert_allclose(tmp1[0].data, tmp2[0].data)
+                    for loc1 in sta1.locs():
+                        for loc2 in sta2.locs():
+                            sta1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
+                            sta2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
+                            pair = "%s_%s" % (sta1, sta2)
+                            tmp1 = os.path.join("STACKS",
+                                                "%02i" % filter.ref,
+                                                "001_DAYS",
+                                                components,
+                                                pair,
+                                                "2010-09-01.MSEED")
+                            tmp2 = os.path.join("STACKS",
+                                                "%02i" % filter.ref,
+                                                "001_DAYS",
+                                                components,
+                                                pair,
+                                                "2010-09-01.SAC")
+                            tmp1 = read(tmp1)
+                            tmp2 = read(tmp2)
+                            assert_allclose(tmp1[0].data, tmp2[0].data)
         db.close()
 
     def test_023_stack(self):
@@ -396,48 +409,52 @@ class MSNoiseTests(unittest.TestCase):
         from ..plots.ccftime import main
         db = connect()
         for sta1, sta2 in get_station_pairs(db):
-            sta1 = "%s.%s" % (sta1.net, sta1.sta)
-            sta2 = "%s.%s" % (sta2.net, sta2.sta)
-            for filter in get_filters(db):
-                main(sta1, sta2, filter.ref, "ZZ",  1, show=False,
-                     outfile="?.png")
-                fn = 'ccftime %s-%s-f%i-m%i.png' % \
-                     ("%s-%s" % (sta1.replace(".", "_"),
-                                 sta2.replace(".", "_")),
-                      "ZZ", filter.ref, 1)
-                self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
+            for loc1 in sta1.locs():
+                for loc2 in sta2.locs():
+                    sta1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
+                    sta2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
+                    for filter in get_filters(db):
+                        main(sta1, sta2, filter.ref, "ZZ",  1, show=False,
+                             outfile="?.png")
+                        fn = 'ccftime %s-%s-f%i-m%i.png' % \
+                             ("%s-%s" % (sta1, sta2), "ZZ", filter.ref, 1)
+                        self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
 
     def test_100_plot_interferogram(self):
         from ..api import connect, get_station_pairs, get_filters
         from ..plots.interferogram import main
         db = connect()
         for sta1, sta2 in get_station_pairs(db):
-            sta1 = "%s.%s" % (sta1.net, sta1.sta)
-            sta2 = "%s.%s" % (sta2.net, sta2.sta)
-            for filter in get_filters(db):
-                main(sta1, sta2, filter.ref, "ZZ",  1, show=False,
-                     outfile="?.png")
-                fn = 'interferogram %s-%s-f%i-m%i.png' % \
-                     ("%s-%s" % (sta1.replace(".", "_"),
-                                 sta2.replace(".", "_")),
-                      "ZZ", filter.ref, 1)
-                self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
+            for loc1 in sta1.locs():
+                for loc2 in sta2.locs():
+                    sta1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
+                    sta2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
+                    for filter in get_filters(db):
+                        main(sta1, sta2, filter.ref, "ZZ",  1, show=False,
+                             outfile="?.png")
+                        fn = 'interferogram %s-%s-f%i-m%i.png' % \
+                             ("%s-%s" % (sta1,
+                                         sta2),
+                              "ZZ", filter.ref, 1)
+                        self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
 
     def test_101_plot_spectime(self):
         from ..api import connect, get_station_pairs, get_filters
         from ..plots.spectime import main
         db = connect()
         for sta1, sta2 in get_station_pairs(db):
-            sta1 = "%s.%s" % (sta1.net, sta1.sta)
-            sta2 = "%s.%s" % (sta2.net, sta2.sta)
-            for filter in get_filters(db):
-                main(sta1, sta2, filter.ref, "ZZ", 1, show=False,
-                     outfile="?.png")
-                fn = 'ccftime %s-%s-f%i-m%i.png' % \
-                     ("%s-%s" % (sta1.replace(".", "_"),
-                                 sta2.replace(".", "_")),
-                      "ZZ", filter.ref, 1)
-                self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
+            for loc1 in sta1.locs():
+                for loc2 in sta2.locs():
+                    sta1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
+                    sta2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
+                    for filter in get_filters(db):
+                        main(sta1, sta2, filter.ref, "ZZ", 1, show=False,
+                             outfile="?.png")
+                        fn = 'spectime %s-%s-f%i-m%i.png' % \
+                             ("%s-%s" % (sta1,
+                                         sta2),
+                              "ZZ", filter.ref, 1)
+                        self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
 
     def test_102_plot_distance(self):
         from ..plots.distance import main

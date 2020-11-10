@@ -30,13 +30,13 @@ def main(show=False, outfile=None):
     start, end, datelist = build_movstack_datelist(db)
     dates = []
     stations = []
-    used_stations = ["%s.%s" % (s.net, s.sta) for s in get_stations(db)]
+    used_stations = get_stations(db, format="seed_id")
     for day in datelist:
         daystart = datetime.datetime.combine(day, datetime.time(0, 0, 0))
         dayend = datetime.datetime.combine(day, datetime.time(23, 59, 59))
         data = get_data_availability(db, starttime=daystart, endtime=dayend)
         for di in data:
-            _ = "%s.%s" % (di.net, di.sta)
+            _ = "%s.%s.%s.%s" % (di.net, di.sta, di.loc, di.chan)
             if _ in used_stations:
                 stations.append(_)
                 dates.append(di.starttime)

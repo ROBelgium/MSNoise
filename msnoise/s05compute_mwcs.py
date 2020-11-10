@@ -120,6 +120,7 @@ def main(loglevel="INFO"):
     filters = get_filters(db, all=False)
     time.sleep(np.random.random() * 5)
     while is_dtt_next_job(db, flag='T', jobtype='MWCS'):
+        #TODO would it be possible to make the next 8 lines in the API ?
         jobs = get_dtt_next_job(db, flag='T', jobtype='MWCS')
 
         if not len(jobs):
@@ -135,7 +136,7 @@ def main(loglevel="INFO"):
         for f in filters:
             filterid = int(f.ref)
             for components in params.all_components:
-                ref_name = pair.replace('.', '_').replace(':', '_')
+                ref_name = pair.replace(':', '_')
                 station1, station2 = pair.split(":")
                 ref = get_ref(db, station1, station2, filterid, components,
                               params)
@@ -146,8 +147,7 @@ def main(loglevel="INFO"):
                 ref = ref.data
 
                 for mov_stack in mov_stacks:
-                    n, data = get_results(db, station1.replace(".", "_"),
-                                          station2.replace(".", "_"), filterid,
+                    n, data = get_results(db, station1, station2, filterid,
                                           components, days, mov_stack,
                                           format="matrix", params=params)
 

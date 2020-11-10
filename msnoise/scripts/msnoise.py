@@ -369,24 +369,65 @@ def init(tech):
 
 @db.command()
 @click.argument('sql_command')
-def execute(sql_command):
+@click.option('-o', '--outfile', help='Output filename (?="request.csv")',
+              default=None, type=str)
+@click.option('-s', '--show', help='Show output (in case of SELECT statement)?',
+              default=True, type=bool)
+def execute(sql_command, outfile=None, show=True):
     """EXPERT MODE: Executes 'sql_command' on the database. Use this command
     at your own risk!!"""
     from msnoise.api import connect
 
     db = connect()
-    r = db.execute(sql_command)
-
-    if sql_command.count("select") or sql_command.count("SELECT"):
-        result = r.fetchall()
-        if not len(result):
-            print("The query returned no results, sorry.")
-        else:
-            import pandas as pd
-            df = pd.DataFrame(result)
-            print(df)
+    for cmd in sql_command.split(";"):
+        if not len(cmd):
+            continue
+        print("Executing '%s'" % cmd)
+        r = db.execute(cmd)
+        if cmd.count("select") or cmd.count("SELECT"):
+            result = r.fetchall()
+            if not len(result):
+                print("The query returned no results, sorry.")
+            else:
+                import pandas as pd
+                df = pd.DataFrame(result, columns=r.keys())
+                if show:
+                    pd.set_option('display.max_rows', None)
+                    pd.set_option('display.max_columns', None)
+                    pd.set_option('display.width', None)
+                    pd.set_option('display.max_colwidth', None)
+                    print(df)
+                if outfile:
+                    if outfile == "?":
+                        df.to_csv("request.csv")
+                    else:
+                        df.to_csv("%s" % outfile)
     db.commit()
     db.close()
+
+
+@db.command(name="update_loc_chan")
+def da_stations_update_loc_chan():
+    """EXPERT MODE: Populates the Location & Channel from the Data Availability
+    table. Warning: rewrites automatically, no confirmation."""
+    from msnoise.api import connect, get_stations
+
+    session = connect()
+    stations = get_stations(session)
+    for sta in stations:
+        data = session.query(DataAvailability). \
+            with_hint(DataAvailability, 'USE INDEX (da_index)'). \
+            filter(DataAvailability.net == sta.net). \
+            filter(DataAvailability.sta == sta.sta). \
+            group_by(DataAvailability.net, DataAvailability.sta,
+                     DataAvailability.loc, DataAvailability.chan).all()
+        locids = sorted([d.loc for d in data])
+        chans = sorted([d.chan for d in data])
+        print("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
+                                                    locids, chans))
+        sta.used_location_codes = ",".join(locids)
+        sta.used_channel_names = ",".join(chans)
+        session.commit()
 
 
 @cli.command()
@@ -1222,7 +1263,7 @@ def plot_psd(ctx, seed_id):
     """Plots the PSD and spectrogram based on NPZ files"""
     from ..plots.ppsd import main
     net,sta,loc,chan = seed_id.split(".")
-    main(net, sta, chan, time_of_weekday=None,
+    main(net, sta, loc, chan, time_of_weekday=None,
          period_lim=(0.02, 50.0), cmap="viridis",
          color_lim=(-160, -100), show=True)
 

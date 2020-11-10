@@ -187,11 +187,13 @@ def declare_tables(prefix=None):
         ref = Column(Integer, primary_key=True)
         net = Column(String(10))
         sta = Column(String(10))
+        used_location_codes = Column(String(20))
+        used_channel_names = Column(String(20))
+
         X = Column(REAL())
         Y = Column(REAL())
         altitude = Column(Float())
         coordinates = Column(Enum('DEG', 'UTM'))
-        instrument = Column(String(20))
         used = Column(Boolean)
 
         def __init__(self, *args):
@@ -203,8 +205,21 @@ def declare_tables(prefix=None):
                 self.Y = args[3]
                 self.altitude = args[4]
                 self.coordinates = args[5]
-                self.instrument = args[6]
                 self.used = args[7]
+
+        def locs(self):
+            if self.used_location_codes is None:
+                location_codes = []
+            else:
+                location_codes = sorted(self.used_location_codes.split(","))
+            return location_codes
+
+        def chans(self):
+            if self.used_channel_names is None:
+                channels = []
+            else:
+                channels = sorted(self.used_channel_names.split(","))
+            return channels
 
     ########################################################################
 
@@ -239,8 +254,8 @@ def declare_tables(prefix=None):
         :param net: The network code of the Station
         :type sta: str
         :param sta: The station code
-        :type comp: str
-        :param comp: The component (channel)
+        :type chan: str
+        :param chan: The component (channel)
         :type path: str
         :param path: The full path to the folder containing the file
         :type file: str
@@ -262,7 +277,8 @@ def declare_tables(prefix=None):
         ref = Column(Integer, primary_key=True, autoincrement=True)
         net = Column(String(10))
         sta = Column(String(10))
-        comp = Column(String(20))
+        loc = Column(String(10))
+        chan = Column(String(20))
         path = Column(String(255))
         file = Column(String(255))
         starttime = Column(DateTime)
@@ -277,14 +293,16 @@ def declare_tables(prefix=None):
                               "file",
                               "net",
                               "sta",
-                              "comp", unique=True),)
+                              "loc",
+                              "chan", unique=True),)
 
-        def __init__(self, net, sta, comp, path, file, starttime, endtime,
+        def __init__(self, net, sta, loc, chan, path, file, starttime, endtime,
                      data_duration, gaps_duration, samplerate, flag):
             """"""
             self.net = net
             self.sta = sta
-            self.comp = comp
+            self.loc = loc
+            self.chan = chan
             self.path = path
             self.file = file
             self.starttime = starttime

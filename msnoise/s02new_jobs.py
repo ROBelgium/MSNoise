@@ -73,14 +73,27 @@ def main(init=False, nocc=False):
         logger.debug("components_to_compute_single_station is populated, creating single-station CC jobs")
 
     logger.info('Scanning New/Modified files')
-    stations_to_analyse = ["%s.%s" % (sta.net, sta.sta) for sta in get_stations(db, all=False)]
+    stations_to_analyse = []
+    error = False
+    for sta in get_stations(db, all=False):
+
+        if not len(sta.locs()):
+            print("You haven't defined location codes to use for %s.%s, "
+                  "you should run 'msnoise db update_loc_chan'; exiting." %
+                  (sta.net, sta.sta))
+            error = True
+        for loc in sta.locs():
+            stations_to_analyse.append("%s.%s.%s" % (sta.net, sta.sta, loc))
+    if error:
+        return
+
     all_jobs = []
     crap_all_jobs_text = []
     updated_days = []
     nfs = get_new_files(db)
     now = datetime.datetime.utcnow()
     for nf in nfs:
-        tmp = "%s.%s" % (nf.net, nf.sta)
+        tmp = "%s.%s.%s" % (nf.net, nf.sta, nf.loc)
         if tmp not in stations_to_analyse:
             continue
 
@@ -89,7 +102,7 @@ def main(init=False, nocc=False):
             updated_days.append(date.date())
             for jobtype in extra_jobtypes_new_files:
                 job = {"day": date.date(),
-                                 "pair": "%s.%s" % (nf.net, nf.sta),
+                                 "pair": "%s.%s.%s" % (nf.net, nf.sta, nf.loc),
                                  "jobtype": jobtype,
                                  "flag": "T", "lastmod": now}
                 jobtxt = ''.join(str(x) for x in job.values())
@@ -111,13 +124,15 @@ def main(init=False, nocc=False):
             modified = []
             available = []
             for data in get_data_availability(db, starttime=day, endtime=day+datetime.timedelta(days=1)):
-                sta = "%s.%s" % (data.net, data.sta)
+                sta = "%s.%s.%s" % (data.net, data.sta, data.loc)
                 if sta in stations_to_analyse:
                     available.append(sta)
                     if data.flag in ["N", "M"]:
                         modified.append(sta)
             modified = np.unique(modified)
             available = np.unique(available)
+            print("modified:", modified)
+            print("available:", available)
             for m in modified:
                 for a in available:
                     if (m != a and crosscorr) or (m == a and autocorr):

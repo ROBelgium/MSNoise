@@ -45,18 +45,21 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             # get_next receives no jobs (heavily parallelised code)
             continue
         for job in jobs:
-            net, sta = job.pair.split('.')
+            net, sta, loc = job.pair.split('.')
+            print("Processing %s"% job.pair)
             gd = UTCDateTime(job.day).datetime
             files = get_data_availability(
-                db, net=net, sta=sta,
+                db, net=net, sta=sta, loc=loc,
                 starttime=(UTCDateTime(job.day) - 1.5 * ppsd_length).datetime,
                 endtime=gd)
             if len(files) == 0:
+                print("No files found for %s" % job.day)
                 continue
+
             for comp in ppsd_components:
                 toprocess = []
                 for file in files:
-                    if file.comp[-1] != comp:
+                    if file.chan[-1] != comp:
                         continue
                     tmp = os.path.join(file.path, file.file)
                     toprocess.append(tmp)
@@ -84,7 +87,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                 tr = st.select(component=comp)[0]
                 out = to_sds(tr.stats, gd.year, int(gd.strftime('%j')))
                 npzdout = os.path.join("PSD", "NPZ", out)
-                logger.debug("ppsd will be output to:", npzdout)
+                logger.debug("ppsd will be output to: %s" % npzdout)
                 ppsd = PPSD(tr.stats, metadata=responses,
                             ppsd_length=ppsd_length, overlap=ppsd_overlap,
                             period_smoothing_width_octaves=ppsd_period_smoothing_width_octaves,

@@ -203,8 +203,8 @@ def main(stype, interval=1.0, loglevel="INFO"):
             filterid = int(f.ref)
             for components in params.all_components:
                 pair = "%s:%s" % (sta1, sta2)
-                sta1 = sta1.replace('.', '_')
-                sta2 = sta2.replace('.', '_')
+                sta1 = sta1
+                sta2 = sta2
                 logger.debug('Processing %s-%s-%i' %
                                   (pair, components, filterid))
                 # updated_days = updated_days_for_dates(db, start, end, pair.replace('_', '.'), jobtype='CC', interval=datetime.timedelta(days=interval),returndays=True)

@@ -1,9 +1,23 @@
 master
 ======
 
+Major:
+* added support for Location IDs: TODO + add documentation
+* this CHANGES the structure of the database !! TODO should we provide an "upgrade" tool?
+* changes to the schema: Station (and TODO Filter too)
+
+
 Changes:
  - msnoise
-  * drop Continuous Integrations for Python 2.7. Only test on 3.7 and 3.8.
+  * drop Continuous Integrations for Python 2.7. Only test on 3.7, 3.8 and 3.9
+  * support for Location codes: TODO
+
+ - msnoise.admin:
+  * changed the visualisation of the config table, allows filtering names,
+    shows modified/new values, definition and enum values
+  * when a type or enum is defined, the field in the Edit Form view is set to a
+    select box/date picker to avoid wrong choices.
+
  - msnoise.api:
   * preload_instrument_response now reads anything
     obspy.inventory.read_inventory can read
@@ -12,29 +26,75 @@ Changes:
   * get_next_job() now allows setting a max number of returned job (useful
     when processing many stations/pairs for a limited number of days in
     parallel on multiple cores).
+  * get_results() TODO
   * get_results_all() now returns an empty DataFrame if there are no data
- - msnoise.qc:
-  * new group, commands (TODO temporary naming): compute_psd, plot_psd
-  * computes PPSD using obspy, saves daily NPZ and PNG files in SDS-like
-    structure
-  * new parameters in the database (PSD length, overlap, and smoothing
-    parameters, see obspy's doc for PPSD.__init__)
+  * check_stations_uniqueness(): helper function to determine if a station
+    that was provided is lacking the location code. If there is only one
+    possible case, returns it, otherwise #TODO fails.
+
+ - msnoise.commands
+  * execute: allows to export the result of a SELECT query to a CSV dataframe
+  * update_loc_chan: updates the `used_location_codes` and `used_channel_names`
+    from the SEED IDs available in the database, for each NET.STA (station
+    table)
+
+ - msnoise.compute_mwcs:
+  * the code now gets the ref and current data from the API and don't do I/O
+    directly. TODO this will allow replacing the storage format without changing
+    the code of the different steps.
+
  - msnoise.default:
   * now the default config bits are stored in a CSV file, with name, default
     value, definition, type, and enum values
   * the default.default dict is an AttribDict containing all information
   * deprecated bits: "autocorr", TODO: response_format?
- - msnoise.admin:
-  * changed the visualisation of the config table, allows filtering names,
-    shows modified/new values, definition and enum values
-  * when a type or enum is defined, the field in the Edit Form view is set to a
-    select box/date picker
- - msnoise.preprocessing:
-  * replaced "stream.simulate" by "stream.remove_response"
+
  - msnoise.doc:
   * added how-to for checking the instrument response
+  * TODO add documentation for the QC package
 
-1.6.1
+ - msnoise.new_jobs:
+  * added support for LOC IDs
+  * if a Station has multiple `used_location_codes` defined, those will be
+    treated like different stations. E.g. if we have 2 stations: BE.UCC and
+    BE.MEM BE.MEM has "00,10" configured, and data has been found for those LOC
+    by scan_archive, the new_jobs step will create three cross-station jobs:
+    BE.MEM.00:BE.MEM.10, BE.MEM.00:BE.UCC.--, BE.MEM.10:BE.UCC:--
+
+ - msnoise.plots:
+  * all plots have been adapted to fetch NET.STA.LOC(.CHAN)
+  * if the LOC code is not provided for a plot, the API checks if there is only
+    one solution and returns it, otherwise fails.
+  * data_availability: now shows the availability for each SEED id present in
+    the database
+  * distance: TODO: check interstation distances for different LOC
+
+ - msnoise.preprocessing:
+  * replaced "stream.simulate" by "stream.remove_response"
+  * added supoort for the LOC IDs
+
+ - msnoise.qc: #TODO ALL DOCUMENTATION PAGES
+  * new group, commands (TODO temporary naming): compute_psd, plot_psd
+  * computes PPSD using obspy, saves daily NPZ and PNG files in SDS-like
+    structure
+  * new parameters in the database (PSD length, overlap, and smoothing
+    parameters, see obspy's doc for PPSD.__init__)
+  * added documentation TODO
+
+- msnoise.scan_archive:
+  * added support for the LOC IDs. If it is "" (=empty), the record is added to
+    the data_availability table with the "--" loc value.
+  * the scan procedure will apply the global network and channel selectors (from
+    the config table), then apply the per-station selectors defined in
+    `used_location_codes` and `used_channel_names`. If empty, scan_archive will
+    scan all possible ("*") LOC IDs and add them to the database.
+
+ - msnoise.table_def:
+  * Station: get new fields: `used_location_codes` and `used_channel_names`
+  * Filter: TODO remove the rms_threshold parameter
+
+
+1.6.x
 =====
 
 Changes from all versions up to this one are described in the Release Notes

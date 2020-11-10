@@ -44,7 +44,7 @@ from matplotlib.widgets import Cursor
 from obspy.signal.filter import bandpass
 
 from msnoise.api import build_movstack_datelist, connect, get_config, \
-    get_filters, get_results
+    get_filters, get_results, check_stations_uniqueness
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
@@ -54,8 +54,6 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
     cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
     start, end, datelist = build_movstack_datelist(db)
     base = mdates.date2num(start)
-    sta1 = sta1.replace('.', '_')
-    sta2 = sta2.replace('.', '_')
 
     # TODO: Height adjustment of the plot for large number of stacks.
     # Preferably interactive
@@ -66,67 +64,73 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
         freqmin = float(freqmin)
         freqmax = float(freqmax)
 
-    if sta2 >= sta1:
-        pair = "%s:%s" % (sta1, sta2)
+    if sta2 < sta1:
+        print("Stations STA1 STA2 should be sorted alphabetically")
+        return
 
-        print("New Data for %s-%s-%i-%i" % (pair, components, filterid,
-                                            mov_stack))
-        nstack, stack_total = get_results(db, sta1, sta2, filterid, components,
-                                          datelist, mov_stack, format="matrix")
-        ax = fig.add_subplot(111)
-        for i, line in enumerate(stack_total):
-            if np.all(np.isnan(line)):
-                continue
+    sta1 = check_stations_uniqueness(db, sta1)
+    sta2 = check_stations_uniqueness(db, sta2)
 
-            if refilter:
-                line = bandpass(line, freqmin, freqmax, cc_sampling_rate,
-                                zerophase=True)
+    pair = "%s:%s" % (sta1, sta2)
 
-            freq, line = prepare_abs_postitive_fft(line, cc_sampling_rate)
-            line /= line.max()
+    print("New Data for %s-%s-%i-%i" % (pair, components, filterid,
+                                        mov_stack))
+    nstack, stack_total = get_results(db, sta1, sta2, filterid, components,
+                                      datelist, mov_stack, format="matrix")
+    ax = fig.add_subplot(111)
+    for i, line in enumerate(stack_total):
+        if np.all(np.isnan(line)):
+            continue
 
-            ax.plot(freq, line * ampli + i + base, c='k', lw=1)
-
-        for filterdb in get_filters(db, all=True):
-            if filterid == filterdb.ref:
-                low = float(filterdb.low)
-                high = float(filterdb.high)
-                break
-
-        ax.set_ylim(start-datetime.timedelta(days=ampli),
-                    end+datetime.timedelta(days=ampli))
-        ax.yaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-
-        if "xlim" in kwargs:
-            plt.xlim(kwargs["xlim"][0],kwargs["xlim"][1])
-
-        ax.set_xlabel("Frequency [Hz]")
-        ax.set_xscale('log')
-        ax.grid()
-
-        title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' %\
-                (sta1.replace('_', '.'), sta2.replace('_', '.'), components,
-                 filterid, low, high, mov_stack)
         if refilter:
-            title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
-        ax.set_title(title)
+            line = bandpass(line, freqmin, freqmax, cc_sampling_rate,
+                            zerophase=True)
 
-        cursor = Cursor(ax, useblit=True, color='red', linewidth=1.2)
-        print(outfile)
-        if outfile:
-            if outfile.startswith("?"):
-                pair = pair.replace(':', '-')
-                outfile = outfile.replace('?', '%s-%s-f%i-m%i' % (pair,
-                                                                  components,
-                                                                  filterid,
-                                                                  mov_stack))
-            outfile = "spectime" + outfile
-            print("output to:", outfile)
-            plt.savefig(outfile)
-        if show:
-            plt.show()
-        else:
-            plt.close(fig)
+        freq, line = prepare_abs_postitive_fft(line, cc_sampling_rate)
+        line /= line.max()
+
+        ax.plot(freq, line * ampli + i + base, c='k', lw=1)
+
+    for filterdb in get_filters(db, all=True):
+        if filterid == filterdb.ref:
+            low = float(filterdb.low)
+            high = float(filterdb.high)
+            break
+
+    ax.set_ylim(start-datetime.timedelta(days=ampli),
+                end+datetime.timedelta(days=ampli))
+    ax.yaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+
+    if "xlim" in kwargs:
+        plt.xlim(kwargs["xlim"][0],kwargs["xlim"][1])
+
+    ax.set_xlabel("Frequency [Hz]")
+    ax.set_xscale('log')
+    ax.grid()
+
+    title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' %\
+            (sta1.replace('_', '.'), sta2.replace('_', '.'), components,
+             filterid, low, high, mov_stack)
+    if refilter:
+        title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
+    ax.set_title(title)
+
+    cursor = Cursor(ax, useblit=True, color='red', linewidth=1.2)
+    print(outfile)
+    if outfile:
+        if outfile.startswith("?"):
+            pair = pair.replace(':', '-')
+            outfile = outfile.replace('?', '%s-%s-f%i-m%i' % (pair,
+                                                              components,
+                                                              filterid,
+                                                              mov_stack))
+        outfile = "spectime " + outfile
+        print("output to:", outfile)
+        plt.savefig(outfile)
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
 
 
 def prepare_abs_postitive_fft(line, sampling_rate):

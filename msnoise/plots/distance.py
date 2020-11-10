@@ -45,33 +45,35 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
     dists = []
     for pair in pairs:
         station1, station2 = pair
-
+        # TODO get distance for LOCids!!
         dist = get_interstation_distance(station1, station2,
                                          station1.coordinates)
         dists.append(dist)
+        for loc1 in station1.locs():
+            for loc2 in station2.locs():
+                sta1 = "%s.%s.%s" % (station1.net, station1.sta, loc1)
+                sta2 = "%s.%s.%s" % (station2.net, station2.sta, loc2)
 
-        sta1 = "%s.%s" % (station1.net, station1.sta)
-        sta2 = "%s.%s" % (station2.net, station2.sta)
+                if virtual_source is not None:
+                    if virtual_source not in [sta1, sta2]:
+                        continue
 
-        if virtual_source is not None:
-            if virtual_source not in [sta1, sta2]:
-                continue
-
-        pair = "%s:%s" % (sta1, sta2)
-        print(pair, dist)
-        ref_name = pair.replace('.', '_').replace(':', '_')
-        rf = os.path.join("STACKS", "%02i" %
-                          filterid, "REF", components, ref_name + extension)
-        if os.path.isfile(rf):
-            ref = read(rf)[0]
-            if refilter:
-                ref.detrend("simple")
-                ref.taper(0.02)
-                ref.filter("bandpass", freqmin=freqmin, freqmax=freqmax,
-                           zerophase=True)
-            ref.normalize()
-            ref = ref.data * ampli
-            plt.plot(t, ref+dist, c='k', lw=0.4)
+                pair = "%s:%s" % (sta1, sta2)
+                print(pair, dist)
+                ref_name = pair.replace(':', '_')
+                rf = os.path.join("STACKS", "%02i" %
+                                  filterid, "REF", components, ref_name + extension)
+                print(rf)
+                if os.path.isfile(rf):
+                    ref = read(rf)[0]
+                    if refilter:
+                        ref.detrend("simple")
+                        ref.taper(0.02)
+                        ref.filter("bandpass", freqmin=freqmin, freqmax=freqmax,
+                                   zerophase=True)
+                    ref.normalize()
+                    ref = ref.data * ampli
+                    plt.plot(t, ref+dist, c='k', lw=0.4)
         
     plt.ylabel("Interstation Distance in km")
     plt.xlabel("Lag Time")

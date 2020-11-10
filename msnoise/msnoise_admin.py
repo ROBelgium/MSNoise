@@ -255,7 +255,7 @@ class DataAvailabilityView(ModelView):
     can_edit = True
     page_size = 100
     can_set_page_size = True
-    column_filters = ('net', 'sta', 'comp', 'data_duration', 'gaps_duration',
+    column_filters = ('net', 'sta', 'loc', 'chan', 'data_duration', 'gaps_duration',
                       'samplerate', 'flag')
 
     def __init__(self, session, **kwargs):
@@ -618,7 +618,7 @@ def dataAvail():
     data = flask.request.get_json()
     db = connect()
     data = get_data_availability(db, net=data['net'], sta=data['sta'],
-                                 comp='HHZ')
+                                 chan='HHZ')
     o = {'dates': [o.starttime.strftime('%Y-%m-%d') for o in data]}
     db.close()
     o['result'] = 'ok'

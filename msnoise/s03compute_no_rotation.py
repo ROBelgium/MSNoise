@@ -351,7 +351,7 @@ def main(loglevel="INFO"):
                 psds = []
                 for i, name in enumerate(names):
                     n1, s1, l1, c1 = name
-                    netsta = "%s.%s" % (n1, s1)
+                    netsta = "%s.%s.%s" % (n1, s1, l1)
                     if netsta not in channel_index:
                         channel_index[netsta] = {}
                     channel_index[netsta][c1[-1]] = i
@@ -387,13 +387,13 @@ def main(loglevel="INFO"):
                 for sta1, sta2 in itertools.combinations(names, 2):
                     n1, s1, l1, c1 = sta1
                     n2, s2, l2, c2 = sta2
-                    pair = "%s.%s:%s.%s" % (n1, s1, n2, s2)
+                    pair = "%s.%s.%s:%s.%s.%s" % (n1, s1, l1, n2, s2, l2)
                     if pair not in pairs:
                         continue
                     comp = "%s%s" % (c1[-1], c2[-1])
                     if comp in params.components_to_compute:
                         cc_index.append(
-                            ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
+                            ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
                              names.index(sta1), names.index(sta2)])
 
             # Different iterator func for single station AC or SC:
@@ -406,28 +406,27 @@ def main(loglevel="INFO"):
                     n2, s2, l2, c2 = sta2
                     if n1 != n2 or s1 != s2:
                         continue
-                    pair = "%s.%s:%s.%s" % (n1, s1, n2, s2)
+                    pair = "%s.%s.%s:%s.%s.%s" % (n1, s1, l1, n2, s2, l2)
                     if pair not in pairs:
                         continue
                     comp = "%s%s" % (c1[-1], c2[-1])
                     if comp in params.components_to_compute_single_station:
                         if c1[-1] == c2[-1]:
                             single_station_pair_index_ac.append(
-                                ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
+                                ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
                                  names.index(sta1), names.index(sta2)])
                         else:
                         # If the components are different, we can just
                         # process them using the default CC code (should warn)
                             single_station_pair_index_sc.append(
-                                ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, comp),
+                                ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
                                  names.index(sta1), names.index(sta2)])
                     if comp[::-1] in params.components_to_compute_single_station:
                         if c1[-1] != c2[-1]:
                             # If the components are different, we can just
                             # process them using the default CC code (should warn)
                             single_station_pair_index_sc.append(
-                                ["%s.%s_%s.%s_%s" % (n1, s1, n2, s2, 
-                                                     comp[::-1]),
+                                ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp[::-1]),
                                  names.index(sta2), names.index(sta1)])
 
             for filterdb in filters:
@@ -567,7 +566,7 @@ def main(loglevel="INFO"):
 
         if params.keep_days:
             for ccfid in allcorr.keys():
-                # print("Exporting %s" % ccfid)
+                print("Exporting %s" % ccfid)
                 station1, station2, components, filterid, date = \
                     ccfid.split('_')
 
@@ -583,8 +582,7 @@ def main(loglevel="INFO"):
                 thisdate = goal_day
                 thistime = "0_0"
                 add_corr(
-                    db, station1.replace('.', '_'),
-                    station2.replace('.', '_'), int(filterid),
+                    db, station1, station2, int(filterid),
                     thisdate, thistime, params.min30 /
                                         params.goal_sampling_rate,
                     components, corr,

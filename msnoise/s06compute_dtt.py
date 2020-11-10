@@ -195,56 +195,55 @@ def main(interval=1, loglevel="INFO"):
                         stations.append(netsta1)
                         stations.append(netsta2)
                         current = job.day
-                        sta1 = netsta1.replace(".", "_")
-                        sta2 = netsta2.replace(".", "_")
-                        pair = "%s_%s" % (sta1, sta2)
-                        day = os.path.join('MWCS', "%02i" % filterid,
-                                           "%03i_DAYS" % mov_stack, components,
-                                           pair, '%s.txt' % current)
+                        sta1 = netsta1
+                        sta2 = netsta2
+                        pair = "%s_%s" % (netsta1, netsta2)
+                        df = get_mwcs(db, netsta1, netsta2, filterid, components, current, mov_stack)
+                        if not len(df):
+                            continue
                         # dist = get_interstation_distance(station1, station2,
                         #                                  station1.coordinates)
-                        dist = interstations[pair]
+                        n1, s1, l1 = sta1.split(".")
+                        n2, s2, l2 = sta2.split(".")
+                        dpair = "%s_%s_%s_%s" % (n1, s1, n2, s2)
+                        dist = interstations[dpair] if dpair in interstations else 0.0
                         if dist == 0. and params.dtt_lag == "dynamic":
                             logger.debug('%s: Distance is Zero?!' % pair)
-                        if os.path.isfile(day):
-                            df = pd.read_csv(
-                                day, delimiter=' ', header=None, index_col=0,
-                                names=['t', 'dt', 'err', 'coh'])
+                        tArray = df.index.values
+                        if params.dtt_lag == "static":
+                            lmlag = -params.dtt_minlag
+                            rmlag = params.dtt_minlag
+                        else:
+                            lmlag = -dist / params.dtt_v
+                            rmlag = dist / params.dtt_v
+                        lMlag = lmlag - params.dtt_width
+                        rMlag = rmlag + params.dtt_width
+
+                        if params.dtt_sides == "both":
+                            tindex = np.where(((tArray >= lMlag) & (tArray <= lmlag)) | ((tArray >= rmlag) & (tArray <= rMlag)))[0]
+                        elif params.dtt_sides == "left":
+                            tindex = np.where((tArray >= lMlag) & (tArray <= lmlag))[0]
+                        else:
+                            tindex = np.where((tArray >= rmlag) & (tArray <= rMlag))[0]
+
+                        tmp = np.setdiff1d(np.arange(len(tArray)),tindex)
+                        df.iloc[tmp, df.columns.get_indexer(['err', ])] = 1.0
+                        df.iloc[tmp, df.columns.get_indexer(['coh', ])] = 0.0
+
+                        if first:
                             tArray = df.index.values
-                            if params.dtt_lag == "static":
-                                lmlag = -params.dtt_minlag
-                                rmlag = params.dtt_minlag
-                            else:
-                                lmlag = -dist / params.dtt_v
-                                rmlag = dist / params.dtt_v
-                            lMlag = lmlag - params.dtt_width
-                            rMlag = rmlag + params.dtt_width
+                            dtArray = df['dt']
+                            errArray = df['err']
+                            cohArray = df['coh']
+                            pairArray = [pair, ]
+                            first = False
+                        else:
+                            dtArray = np.vstack((dtArray, df['dt']))
+                            errArray = np.vstack((errArray, df['err']))
+                            cohArray = np.vstack((cohArray, df['coh']))
+                            pairArray.append(pair)
+                        del df
 
-                            if params.dtt_sides == "both":
-                                tindex = np.where(((tArray >= lMlag) & (tArray <= lmlag)) | ((tArray >= rmlag) & (tArray <= rMlag)))[0]
-                            elif params.dtt_sides == "left":
-                                tindex = np.where((tArray >= lMlag) & (tArray <= lmlag))[0]
-                            else:
-                                tindex = np.where((tArray >= rmlag) & (tArray <= rMlag))[0]
-
-                            tmp = np.setdiff1d(np.arange(len(tArray)),tindex)
-                            df.iloc[tmp, df.columns.get_indexer(['err', ])] = 1.0
-                            df.iloc[tmp, df.columns.get_indexer(['coh', ])] = 0.0
-
-                            if first:
-                                tArray = df.index.values
-                                dtArray = df['dt']
-                                errArray = df['err']
-                                cohArray = df['coh']
-                                pairArray = [pair, ]
-                                first = False
-                            else:
-                                dtArray = np.vstack((dtArray, df['dt']))
-                                errArray = np.vstack((errArray, df['err']))
-                                cohArray = np.vstack((cohArray, df['coh']))
-                                pairArray.append(pair)
-                            del df
-                        del day
     
                     if not first:
                         #~ tindex = np.tindwhere(((tArray >= lMlag) & (tArray <= lmlag)) | (
@@ -390,7 +389,7 @@ def main(interval=1, loglevel="INFO"):
                             {'Pairs': Pairs, 'M': M, 'EM': EM, 'A': A, 'EA': EA,
                              'M0': M0, 'EM0': EM0},
                             index=Dates)
-                        # Needs to be changed !
+                        # TODO Needs to be changed to save via the API
                         output = os.path.join(
                             'DTT', "%02i" % filterid, "%03i_DAYS" % mov_stack,
                             components)

@@ -115,15 +115,17 @@ def update_availability(db, folder, basename, data):
         if trace.stats.endtime.datetime > stop:
             endtime = trace.stats.endtime
             stop = trace.stats.endtime.datetime
-
     net = trace.stats.network.upper()
+    loc = trace.stats.location
+    if loc == "":
+        loc = "--"
     sta = trace.stats.station.upper()
-    comp = trace.stats.channel.upper()
+    chan = trace.stats.channel.upper()
     path = folder.replace('\\', '/')
     starttime = starttime.datetime.replace(microsecond=0)
     endtime = endtime.datetime.replace(microsecond=0)
 
-    return api.update_data_availability(db, net, sta, comp, path, basename,
+    return api.update_data_availability(db, net, sta, loc, chan, path, basename,
                                         starttime, endtime, data_duration,
                                         gaps_duration,
                                         data[0].stats.sampling_rate)
@@ -159,7 +161,7 @@ def process_stream(db, folder, basename, stream, id_, startdate, enddate,
 
 
 def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
-                    archive_format, logger):
+                    archive_format, logger, stations):
     """
     Processes a list of files from a folder, and update the data availability
     table in the database whenever their data matches our dates and sampling
@@ -186,6 +188,29 @@ def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
             stream = obspy.core.read(pathname, headonly=True,
                                      format=archive_format or None)
             for id in set([t.id for t in stream]):
+                net, sta, loc, chan = id.split('.')
+                print("read file %s, id: %s" % (pathname, id))
+                tmp = None
+                for station in stations:
+                    if station.net == net and station.sta == sta:
+                        tmp = station
+                        break
+                if tmp is not None:
+                    if tmp.used_location_codes is None:
+                        location_codes = ["*"]
+                    elif tmp.used_location_codes.count(","):
+                        location_codes = tmp.used_location_codes.split(",")
+                    elif len(tmp.used_location_codes):
+                        location_codes = [tmp.used_location_codes]
+                    else:
+                        location_codes = ["*"]
+                    if "--" in location_codes:
+                        location_codes.append("")
+                    if location_codes != ["*"] and loc not in location_codes:
+                        print("%s not desired, from station configuration" % id)
+                        continue
+
+
                 update_rv = process_stream(db, folder, basename, stream, id,
                                            startdate, enddate,
                                            goal_sampling_rate)
@@ -244,7 +269,7 @@ def list_directory(folder, mintime):
 
 
 def scan_folders(folders, mintime, startdate, enddate, goal_sampling_rate,
-                 archive_format, loglevel=None):
+                 archive_format, stations, loglevel=None):
     """
     Reads files in a list of folders and updates their data availability in
     database, silently ignoring non-matching files and empty folders.
@@ -283,7 +308,8 @@ def scan_folders(folders, mintime, startdate, enddate, goal_sampling_rate,
         logger.debug(debug_msg)
         if files:
             scan_data_files(db, folder, files, startdate, enddate,
-                            goal_sampling_rate, archive_format, logger)
+                            goal_sampling_rate, archive_format, logger,
+                            stations)
         # else: no matching files found in this directory, nothing to do
     db.close()
 
@@ -305,19 +331,41 @@ def get_archives_folders(data_folder, data_structure,
     """
     folders = []
     for year in years:
-        for channel in channels:
-            stafolder = os.path.dirname(data_structure) \
-                        .replace('YEAR', '%04i' % year) \
-                        .replace('DAY', '*') \
-                        .replace('HOUR', '*') \
-                        .replace('CHAN', channel) \
-                        .replace('TYPE', 'D') \
-                        .replace('LOC', '*')
-            for sta in stations:
-                folders.append(os.path.join(
-                    data_folder,
-                    stafolder.replace('NET', sta.net)
-                             .replace('STA', sta.sta)))
+        stafolder = os.path.dirname(data_structure) \
+                    .replace('YEAR', '%04i' % year) \
+                    .replace('DAY', '*') \
+                    .replace('HOUR', '*') \
+                    .replace('TYPE', 'D')
+        for sta in stations:
+            # check if the station overrides the global config
+            if sta.used_channel_names is None:
+                channel_names = channels
+            elif sta.used_channel_names.count(","):
+                channel_names = sta.used_channel_names.split(",")
+            elif len(sta.used_channel_names):
+                channel_names = [sta.used_channel_names]
+            else:
+                channel_names = channels
+
+            # not useful to check LOC here for SDS, but could be for others
+            if sta.used_location_codes is None:
+                location_codes = ["*"]
+            elif sta.used_location_codes.count(","):
+                location_codes = sta.used_location_codes.split(",")
+            elif len(sta.used_location_codes):
+                location_codes = [sta.used_location_codes]
+            else:
+                location_codes = ["*"]
+
+            for channel in channel_names:
+                for loc in location_codes:
+                    folders.append(os.path.join(
+                        data_folder,
+                        stafolder.replace('NET', sta.net)
+                                 .replace('STA', sta.sta)
+                                 .replace('LOC', loc))
+                                 .replace('CHAN', channel))
+
     # returns a set to make sure we only get unique folder globs
     # (to be verified: could there really be duplicates?)
     return set(folders)
@@ -418,7 +466,7 @@ def await_children(pool, children):
 
 
 def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
-                 goal_sampling_rate, archive_format):
+                 goal_sampling_rate, archive_format, stations):
     """
     For each files in the archive folders, fork a process to read its data, and
     updates the availibility in the database. If mintime is not None, only
@@ -445,7 +493,7 @@ def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
     if nproc == 1:
         # In single process mode, we simply call scan_folder()
         scan_folders(dir_list, mintime, startdate, enddate, goal_sampling_rate,
-                     archive_format)
+                     archive_format, stations)
     else:
         # In multiprocessing mode, we split the folders into nproc lists of
         # similar size and have them processed by as many child processes.
@@ -558,12 +606,12 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
         # (See the official doc for datetime.timestamp())
         mintime = (datetime.datetime.utcnow() - modification_delta
                    - datetime.datetime(1970, 1, 1, 0, 0)).total_seconds()
-
+    stations = []
     if forced_path is None:
         data_folder = os.path.realpath(api.get_config(db, 'data_folder'))
         channels = api.get_config(db, 'channels').split(',')
         logger.debug('Will search for channels: %s' % channels)
-
+        stations = api.get_stations(db, all=False)
         rawpath = get_data_structure(api.get_config(db, 'data_structure'))
         if rawpath is None:
             raise FatalError("Cannot read configured data_structure '%s'"
@@ -579,7 +627,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
                 rawpath,
                 range(startdate.year,
                       min(datetime.datetime.utcnow().year, enddate.year) + 1),
-                api.get_stations(db, all=False),
+                stations,
                 channels)
         # logger.debug('Folders to glob: %s' % ','.join(folders_to_glob))
     elif forced_path_recursive:
@@ -595,7 +643,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
     # Run the main scan
     try:
         scan_archive(folders_to_glob, threads, mintime, startdate, enddate,
-                     goal_sampling_rate, archive_format)
+                     goal_sampling_rate, archive_format, stations)
     except Exception as e:
         logger.critical('Scan aborted because the following error occured '
                         'while scanning the archive:\n{}'.format(e))

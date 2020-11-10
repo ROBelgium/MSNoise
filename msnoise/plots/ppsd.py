@@ -24,7 +24,7 @@ from obspy.signal import PPSD
 from msnoise.api import *
 
 
-def main(net, sta, comp, time_of_weekday=None, period_lim=None, show=False,
+def main(net, sta, loc, chan, time_of_weekday=None, period_lim=None, show=False,
          outfile=None, cmap="viridis", color_lim=None):
 
     db = connect()
@@ -37,10 +37,10 @@ def main(net, sta, comp, time_of_weekday=None, period_lim=None, show=False,
     ppsd = None
     for day in datelist:
         jday = int(day.strftime("%j"))
-        toglob = os.path.join('PSD', 'NPZ', "%s" % day.year, net, sta, comp+".D", "%s.%s.*.%s.D.%s.%03i.npz"%(net, sta, comp, day.year, jday))
+        toglob = os.path.join('PSD', 'NPZ', "%s" % day.year, net, sta, chan+".D", "%s.%s.%s.%s.D.%s.%03i.npz"%(net, sta, loc, chan, day.year, jday))
         files = glob.glob(toglob)
         if not len(files):
-            print("No files found for %s.%s %s: %s" % (net,sta,comp, day))
+            print("No files found for %s.%s.%s.%s: %s" % (net,sta,loc,chan, day))
             continue
         file = files[0]
         if os.path.isfile(file):

@@ -404,7 +404,7 @@ def get_networks(session, all=False):
     return [net.net for net in networks]
 
 
-def get_stations(session, all=False, net=None):
+def get_stations(session, all=False, net=None, format="raw"):
     """Get Stations from the database.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -432,7 +432,30 @@ def get_stations(session, all=False, net=None):
         if net is not None:
             stations = stations.filter(Station.net == net).\
                 order_by(Station.net).order_by(Station.sta)
-    return stations
+    if format == "raw":
+        return stations
+    if format == "seed_id":
+        output = []
+        for sta in stations:
+            if sta.used_location_codes is None:
+                location_codes = []
+            else:
+                location_codes = sta.used_location_codes.split(",")
+            if sta.used_channel_names is None:
+                channels = []
+            else:
+                channels = []
+                for i, chan in enumerate(sta.used_channel_names.split(",")):
+                    if chan.count("?"):
+                        for comp in ["Z", "N", "E", "1", "2"]:
+                            channels.append(chan.replace("?", comp))
+                    else:
+                        channels.append(chan)
+
+            for loc in location_codes:
+                for chan in channels:
+                    output.append("%s.%s.%s.%s" % (sta.net, sta.sta, loc, chan))
+        return output
 
 
 def get_station(session, net, sta):
@@ -524,6 +547,32 @@ def get_station_pairs(session, used=None, net=None):
         return itertools.combinations(stations, 2)
 
 
+def check_stations_uniqueness(session, station):
+    """
+
+    :param session:
+    :param station:
+    :return:
+    """
+    # if the station is net.sta.loc, nothing to do
+    if station.count(".") == 2:
+        return station
+
+    print("It seems you're voluntarily missing the location code for"
+          " \"%s\". We'll handle this automatically, if there are no "
+          "conflicts." % station)
+    net, sta = station.split(".")
+    locs = get_station(session, net, sta).locs()
+    if len(locs) != 1:
+        print("There are more than 1 location codes for this station: "
+              "%s" % locs)
+        return station
+    station += ".%s" % locs[0]
+    print("Found %s to be the unique solution for this station" % station)
+    return station
+
+
+
 def get_interstation_distance(station1, station2, coordinates="DEG"):
     """Returns the distance in km between `station1` and `station2`.
 
@@ -543,7 +592,7 @@ def get_interstation_distance(station1, station2, coordinates="DEG"):
 
     if coordinates == "DEG":
         dist, azim, bazim = gps2dist_azimuth(station1.Y, station1.X,
-                                            station2.Y, station2.X)
+                                             station2.Y, station2.X)
         return dist / 1.e3
     else:
         dist = np.hypot(float(station1.X - station2.X),
@@ -554,7 +603,7 @@ def get_interstation_distance(station1, station2, coordinates="DEG"):
 # DATA AVAILABILITY
 
 
-def update_data_availability(session, net, sta, comp, path, file, starttime,
+def update_data_availability(session, net, sta, loc, chan, path, file, starttime,
                              endtime, data_duration, gaps_duration,
                              samplerate):
     """
@@ -567,8 +616,8 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
     :param net: The network code of the Station
     :type sta: str
     :param sta: The station code
-    :type comp: str
-    :param comp: The component (channel)
+    :type chan: str
+    :param chan: The component (channel)
     :type path: str
     :param path: The full path to the folder containing the file
     :type file: str
@@ -590,25 +639,27 @@ def update_data_availability(session, net, sta, comp, path, file, starttime,
         filter(DataAvailability.path == path). \
         filter(DataAvailability.file == file).\
         filter(DataAvailability.net == net).\
-        filter(DataAvailability.sta == sta).\
-        filter(DataAvailability.comp == comp).first()
+        filter(DataAvailability.sta == sta). \
+        filter(DataAvailability.loc == loc). \
+        filter(DataAvailability.chan == chan).first()
     if data is None:
         flag = "N"
-        data = DataAvailability(net, sta, comp, path, file, starttime, endtime,
+        data = DataAvailability(net, sta, loc, chan, path, file, starttime, endtime,
                                 data_duration, gaps_duration, samplerate, flag)
         session.add(data)
         toreturn = 1
     else:
         modified = False
-        for item in ['net', 'sta', 'comp', 'path', 'starttime', 'endtime',
-                     'data_duration', 'gaps_duration', 'samplerate']:
+        for item in ['net', 'sta', 'loc', 'chan', 'path', 'starttime',
+                     'endtime', 'data_duration', 'gaps_duration', 'samplerate']:
             if eval("data.%s != %s" % (item, item)):
                 modified = True
                 break
         if modified:
             data.net = net
             data.sta = sta
-            data.comp = comp
+            data.loc = loc
+            data.chan = chan
             data.path = path
             data.starttime = starttime
             data.endtime = endtime
@@ -641,7 +692,7 @@ def get_new_files(session):
     return files
 
 
-def get_data_availability(session, net=None, sta=None, comp=None,
+def get_data_availability(session, net=None, sta=None, loc=None, chan=None,
                           starttime=None, endtime=None):
     """
     Returns the :class:`~msnoise.msnoise_table_def.declare_tables.DataAvailability` objects
@@ -666,8 +717,9 @@ def get_data_availability(session, net=None, sta=None, comp=None,
     if not starttime:
         data = session.query(DataAvailability).\
             filter(DataAvailability.net == net).\
-            filter(DataAvailability.sta == sta).\
-            filter(DataAvailability.comp == comp).all()
+            filter(DataAvailability.sta == sta). \
+            filter(DataAvailability.loc == loc). \
+            filter(DataAvailability.chan == chan).all()
     elif not net:
         data = session.query(DataAvailability).\
             filter(DataAvailability.starttime <= endtime).\
@@ -675,7 +727,8 @@ def get_data_availability(session, net=None, sta=None, comp=None,
     else:
         data = session.query(DataAvailability).\
             filter(DataAvailability.net == net).\
-            filter(DataAvailability.sta == sta).\
+            filter(DataAvailability.sta == sta). \
+            filter(DataAvailability.loc == loc). \
             filter(func.DATE(DataAvailability.starttime) <= endtime.date()).\
             filter(func.DATE(DataAvailability.endtime) >= starttime.date()).all()
         if not len(data):
@@ -1300,9 +1353,9 @@ def get_ref(session, station1, station2, filterid, components, params=None):
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
     :type station1: str
-    :param station1: The name of station 1 (formatted NET_STA)
+    :param station1: The name of station 1 (formatted NET.STA)
     :type station2: str
-    :param station2: The name of station 2 (formatted NET_STA)
+    :param station2: The name of station 2 (formatted NET.STA)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type components: str
@@ -1320,7 +1373,7 @@ def get_ref(session, station1, station2, filterid, components, params=None):
         extension = get_extension(params.export_format)
 
     ref_name = "%s_%s" % (station1, station2)
-    ref_name = ref_name.replace(".", "_")
+    ref_name = ref_name
     rf = os.path.join("STACKS", "%02i" %
                       filterid, "REF", components,
                       ref_name + extension)
@@ -1338,9 +1391,9 @@ def get_results(session, station1, station2, filterid, components, dates,
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
     :type station1: str
-    :param station1: The name of station 1 (formatted NET_STA)
+    :param station1: The name of station 1 (formatted NET.STA)
     :type station2: str
-    :param station2: The name of station 2 (formatted NET_STA)
+    :param station2: The name of station 2 (formatted NET.STA)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type components: str
@@ -1374,7 +1427,7 @@ def get_results(session, station1, station2, filterid, components, dates,
     base = os.path.join("STACKS", "%02i" % filterid,
                         "%03i_DAYS" % mov_stack, components,
                         "%s_%s" % (station1, station2), "%s") + extension
-    logging.debug("Reading files...")
+    print("Reading files... in %s" % base)
     for j, date in enumerate(dates):
         daystack = base % str(date)
         try:
@@ -1396,6 +1449,22 @@ def get_results(session, station1, station2, filterid, components, dates,
             return i, corr
         else:
             return 0, None
+
+def get_mwcs(session, station1, station2, filterid, components, date,
+                mov_stack=1):
+    """
+    TODO
+    """
+    file = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" % mov_stack,
+                        components, "%s_%s" % (station1, station2),
+                        '%s.txt' % date)
+    if os.path.isfile(file):
+        df = pd.read_csv(
+            file, delimiter=' ', header=None, index_col=0,
+            names=['t', 'dt', 'err', 'coh'])
+        return df
+    else:
+        return pd.DataFrame()
 
 
 def get_results_all(session, station1, station2, filterid, components, dates):

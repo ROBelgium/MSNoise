@@ -439,8 +439,7 @@ def main(loglevel="INFO"):
                         thisdate = goal_day
                         thistime = "0_0"
                         add_corr(
-                                db, station1.replace('.', '_'),
-                                station2.replace('.', '_'), int(filterid),
+                                db, station1, station2, int(filterid),
                                 thisdate, thistime,  params.min30 /
                                 params.goal_sampling_rate,
                                 components, corr,
