@@ -22,17 +22,19 @@ env:
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       export OS="MacOSX";
+      brew update > /dev/null;
+      brew install mariadb;
+      brew services start mariadb;
     else
       export OS="Linux";
+      mysql -e "CREATE USER 'msnoise'@'localhost' IDENTIFIED BY 'msnoise';";
+      mysql -e "GRANT ALL PRIVILEGES ON * . * TO 'msnoise'@'localhost';";
+      mysql -e "FLUSH PRIVILEGES;";
+      mysql -e "CREATE DATABASE msnoise;";
     fi
-  - sudo mysql -e "CREATE USER 'msnoise'@'localhost' IDENTIFIED BY 'msnoise';"
-  - sudo mysql -e "GRANT ALL PRIVILEGES ON * . * TO 'msnoise'@'localhost';"
-  - sudo mysql -e "FLUSH PRIVILEGES;"
-  - sudo mysql -e "CREATE DATABASE msnoise;"
-#  - if [[ $TRAVIS_OS_NAME == "osx" ]]; then brew update > /dev/null && brew install mariadb && brew services start mariadb; fi
-#  - if [[ $TRAVIS_OS_NAME == "osx" ]]; then mkdir /usr/local/etc/my.cnf.d; fi
+
   # Wait for mysql service to respond
-#  - which mysql && until mysql -u root -e "show status" &>/dev/null; do sleep 1; done
+  - which mysql && until mysql -u root -e "show status" &>/dev/null; do sleep 1; done
   # MySQL database
   # Python and related stuff
   - wget https://repo.continuum.io/miniconda/Miniconda3-latest-${OS}-x86_64.sh -O miniconda.sh;
