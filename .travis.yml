@@ -38,11 +38,11 @@ before_install:
     fi
 
   # Wait for mysql service to respond
-  - sleep 5;
-  - mysql -e "CREATE USER 'msnoise'@'localhost' IDENTIFIED BY 'msnoise';";
-  - mysql -e "GRANT ALL PRIVILEGES ON * . * TO 'msnoise'@'localhost';";
-  - mysql -e "FLUSH PRIVILEGES;";
-  - mysql -e "CREATE DATABASE msnoise;";
+#  - sleep 5;
+#  - mysql -e "CREATE USER 'msnoise'@'localhost' IDENTIFIED BY 'msnoise';";
+#  - mysql -e "GRANT ALL PRIVILEGES ON * . * TO 'msnoise'@'localhost';";
+#  - mysql -e "FLUSH PRIVILEGES;";
+#  - mysql -e "CREATE DATABASE msnoise;";
   # MySQL database
   # Python and related stuff
   - wget https://repo.continuum.io/miniconda/Miniconda3-latest-${OS}-x86_64.sh -O miniconda.sh;
