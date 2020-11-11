@@ -1892,7 +1892,7 @@ def make_same_length(st):
 def clean_scipy_cache():
     """This functions wraps all destroy scipy cache at once. It is a workaround
     to the memory leak induced by the "caching" functions in scipy fft."""
-    if scipy.__version__ >= "1.4.0":
+    if sp.__version__ >= "1.4.0":
         return
     sff.destroy_zfft_cache()
     sff.destroy_zfftnd_cache()
