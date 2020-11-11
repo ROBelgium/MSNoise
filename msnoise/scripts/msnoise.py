@@ -6,7 +6,7 @@ import sqlalchemy
 import time
 
 import click
-import pkg_resources
+
 
 from .. import MSNoiseError, DBConfigNotFoundError
 from ..api import connect, get_config, update_station, get_logger, get_job_types
@@ -200,6 +200,7 @@ def info_plugins(db):
     if not plugins:
         return
     plugins = plugins.split(",")
+    import pkg_resources
     for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
         module_name = ep.module_name.split(".")[0]
         if module_name in plugins:

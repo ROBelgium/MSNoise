@@ -11,7 +11,7 @@ try:
 except:
     import pickle as cPickle
 import math
-import pkg_resources
+
 import sys
 
 from logbook import Logger, StreamHandler
@@ -24,7 +24,7 @@ from sqlalchemy.sql.expression import func
 import numpy as np
 import pandas as pd
 import scipy as sp
-import scipy.signal as ss
+
 if sp.__version__ < "1.4.0":
     import scipy.fftpack as sf
     from scipy.fftpack.helper import next_fast_len
@@ -34,7 +34,7 @@ else:
     from scipy.fft import next_fast_len
 
 
-import scipy.optimize
+# import scipy.optimize
 
 from obspy.core import Stream, Trace, read, AttribDict, UTCDateTime
 from obspy.core.inventory import Inventory
@@ -212,6 +212,7 @@ def get_config(session, name=None, isbool=False, plugin=None):
     :returns: the value for `name` or a dict of all config values
     """
     if plugin:
+        import pkg_resources
         for ep in pkg_resources.iter_entry_points(
                 group='msnoise.plugins.table_def'):
             if ep.name.replace("Config", "") == plugin:
@@ -259,6 +260,7 @@ def update_config(session, name, value, plugin=None):
 
     """
     if plugin:
+        import pkg_resources
         for ep in pkg_resources.iter_entry_points(
                 group='msnoise.plugins.table_def'):
             if ep.name.replace("Config", "") == plugin:
@@ -1316,6 +1318,7 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
         corr = data.mean(axis=0)
 
     elif stack_method == "pws":
+        import scipy.signal as ss
         # logging.debug("Doing a PWS stack")
         corr = np.zeros(data.shape[1], dtype='f8')
         phasestack = np.zeros(data.shape[1], dtype='c8')
