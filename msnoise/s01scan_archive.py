@@ -161,7 +161,7 @@ def process_stream(db, folder, basename, stream, id_, startdate, enddate,
 
 
 def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
-                    archive_format, logger, stations):
+                    archive_format, logger):
     """
     Processes a list of files from a folder, and update the data availability
     table in the database whenever their data matches our dates and sampling
@@ -180,6 +180,7 @@ def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
     added = 0
     modified = 0
     unchanged = 0
+    stations = api.get_stations(db)
     for basename in files:
         pathname = os.path.join(folder, basename)
         # logger.debug('reading file %s' % pathname)
@@ -232,6 +233,7 @@ def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
             # Re-raise the exception to end the scan
             # raise
         except Exception as e:
+            traceback.print_exc()
             logger.error("Error while processing file '%s': %s" %
                          (pathname, str(e)))
     logger.info('%s: Added %i | Modified %i | Unchanged %i' %
@@ -269,7 +271,7 @@ def list_directory(folder, mintime):
 
 
 def scan_folders(folders, mintime, startdate, enddate, goal_sampling_rate,
-                 archive_format, stations, loglevel=None):
+                 archive_format, loglevel=None):
     """
     Reads files in a list of folders and updates their data availability in
     database, silently ignoring non-matching files and empty folders.
@@ -309,7 +311,7 @@ def scan_folders(folders, mintime, startdate, enddate, goal_sampling_rate,
         if files:
             scan_data_files(db, folder, files, startdate, enddate,
                             goal_sampling_rate, archive_format, logger,
-                            stations)
+                            )
         # else: no matching files found in this directory, nothing to do
     db.close()
 
@@ -466,7 +468,7 @@ def await_children(pool, children):
 
 
 def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
-                 goal_sampling_rate, archive_format, stations):
+                 goal_sampling_rate, archive_format):
     """
     For each files in the archive folders, fork a process to read its data, and
     updates the availibility in the database. If mintime is not None, only
@@ -493,7 +495,7 @@ def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
     if nproc == 1:
         # In single process mode, we simply call scan_folder()
         scan_folders(dir_list, mintime, startdate, enddate, goal_sampling_rate,
-                     archive_format, stations)
+                     archive_format)
     else:
         # In multiprocessing mode, we split the folders into nproc lists of
         # similar size and have them processed by as many child processes.
@@ -513,7 +515,7 @@ def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
         children = spawn_processes(pool, nproc, dir_list, scan_folders,
                                    (mintime, startdate, enddate,
                                     goal_sampling_rate, archive_format,
-                                    logger.level))
+                                                          logger.level))
         # Wait for children to finish, or terminate them if one crashes
         await_children(pool, children)
 
@@ -643,7 +645,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
     # Run the main scan
     try:
         scan_archive(folders_to_glob, threads, mintime, startdate, enddate,
-                     goal_sampling_rate, archive_format, stations)
+                     goal_sampling_rate, archive_format)
     except Exception as e:
         logger.critical('Scan aborted because the following error occured '
                         'while scanning the archive:\n{}'.format(e))
