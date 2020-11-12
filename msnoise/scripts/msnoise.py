@@ -960,6 +960,29 @@ def compute_dtt(ctx, interval):
             p.join()
 
 
+@cli.command(name='compute_dtt2')
+@click.pass_context
+@click.option('-i', '--interval', default=1.0, help='Number of days before now to\
+ search for modified Jobs')
+def compute_dtt2(ctx, interval):
+    """Computes the dt/t jobs based on the new MWCS data"""
+    from ..s06compute_dtt2 import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    if threads == 1:
+        main(loglevel=loglevel)
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main, kwargs={"loglevel": loglevel})
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
 
 # @cli.command(name='compute_dvv')
 # @click.option('-f', '--filterid', default=1, help='Filter ID')
