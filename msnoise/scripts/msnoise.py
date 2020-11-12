@@ -258,11 +258,15 @@ def p():
 
 @cli.command()
 @click.option('-p', '--prefix', default="", help='Prefix for tables')
-def test(prefix):
+@click.option('-c', '--content', default=False, is_flag=True)
+def test(prefix, content):
     """Runs the test suite, should be executed in an empty folder!"""
     import matplotlib.pyplot as plt
     plt.switch_backend("agg")
-    from ..test.tests import main
+    if not content:
+        from ..test.tests import main
+    else:
+        from ..test.content_tests import main
     main(prefix=prefix)
 
 
@@ -808,11 +812,91 @@ def stack(ctx, ref, mov, step):
             p.join()
 
 
+@cli.command()
+@click.pass_context
+@click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
+@click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
+@click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
+def stack2(ctx, ref, mov, step):
+    """Stacks the [REF] or [MOV] windows.
+    Computes the STACK jobs.
+    """
+    click.secho('Lets STACK !', fg='green')
+    from ..s04_stack2 import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+
+    if ref and mov:
+        click.secho("With MSNoise 1.6, you can't run REF & MOV stacks"
+                    "simultaneously, please run them one after the other.")
+        sys.exit()
+
+    if threads == 1:
+        if ref:
+            main('ref', loglevel=loglevel)
+        if mov:
+            main('mov', loglevel=loglevel)
+        if step:
+            main('step', loglevel=loglevel)
+    else:
+        from multiprocessing import Process
+        processes = []
+        if ref:
+            for i in range(threads):
+                p = Process(target=main, args=["ref",],
+                            kwargs={"loglevel": loglevel})
+                p.start()
+                processes.append(p)
+                time.sleep(delay)
+        for p in processes:
+            p.join()
+        if mov:
+            for i in range(threads):
+                p = Process(target=main, args=["mov",],
+                            kwargs={"loglevel": loglevel})
+                p.start()
+                processes.append(p)
+                time.sleep(delay)
+        for p in processes:
+            p.join()
+        if step:
+            for i in range(threads):
+                p = Process(target=main, args=["step",],
+                            kwargs={"loglevel": loglevel})
+                p.start()
+                processes.append(p)
+                time.sleep(delay)
+        for p in processes:
+            p.join()
+
+
 @cli.command(name='compute_mwcs')
 @click.pass_context
 def compute_mwcs(ctx):
     """Computes the MWCS jobs"""
     from ..s05compute_mwcs import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    if threads == 1:
+        main(loglevel=loglevel)
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main, kwargs={"loglevel": loglevel})
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
+@cli.command(name='compute_mwcs2')
+@click.pass_context
+def compute_mwcs2(ctx):
+    """Computes the MWCS jobs"""
+    from ..s05compute_mwcs2 import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']

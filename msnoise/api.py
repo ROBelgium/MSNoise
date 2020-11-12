@@ -1433,16 +1433,25 @@ def get_results(session, station1, station2, filterid, components, dates,
                         "%03i_DAYS" % mov_stack, components,
                         "%s_%s" % (station1, station2), "%s") + extension
     print("Reading files... in %s" % base)
+    lastday = dates[0]
     for j, date in enumerate(dates):
         daystack = base % str(date)
+
         try:
             stack_data[j, :] = read(daystack, format=export_format)[0].data[:]
+            lastday = str(date)
             i += 1
         except:
+            # traceback.print_exc()
             pass
 
     if format == "matrix":
         return i, stack_data
+
+    if format == "dataframe":
+        taxis = get_t_axis(session)
+        return pd.DataFrame(stack_data, index=pd.DatetimeIndex(dates),
+                            columns=taxis).loc[:lastday]
 
     elif format == "stack":
         logging.debug("Stacking...")

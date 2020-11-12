@@ -1,3 +1,50 @@
+"""
+This code is responsible for the computation of the Power Spectral Densities.
+
+This script will search for QC *jobs* marked "T"odo in the database
+by day and process them. As soon as one day is selected, the
+corresponding jobs are marked "I"n Progress in the database. This allows
+running several instances of this script in parallel.
+
+The PSD are calculated using the implementation in ObsPy.
+Parameters can be defined in the Config to control the windowing and the
+smoothness of the PSD results.
+
+Configuration Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+* TODO
+
+Instrument Response
+~~~~~~~~~~~~~~~~~~~
+
+To be able to compute the PSD, the instrument responses need to be provided.
+TODO: add link to "how to check if my responses are OK"
+
+
+To run this script:
+
+.. code-block:: sh
+
+    $ msnoise qc compute_psd
+
+
+This step also supports parallel processing/threading:
+
+.. code-block:: sh
+
+    $ msnoise -t 4 qc compute_psd
+
+will start 4 instances of the code (after 1 second delay to avoid database
+conflicts). This works both with SQLite and MySQL but be aware problems
+could occur with SQLite.
+
+
+.. versionadded:: 2.0
+    New in 2.0
+
+
+"""
 # TODO add documentation :-)
 
 import os
