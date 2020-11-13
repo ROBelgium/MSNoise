@@ -1,16 +1,14 @@
 """
-Plots the data availability, as contained in the database. Every day which
-has a least some data will be coloured in red. Days with no data remain blank.
+Plots the PPSD and PSD-spectrograms
 
-
-.. include:: clickhelp/msnoise-plot-data_availability.rst
+.. include:: ../clickhelp/msnoise-qc-plot_psd.rst
 
 
 Example:
 
-``msnoise plot data_availability`` :
+``msnoise qc plot_psd YA.UV01.00.HHZ`` :
 
-.. image:: .static/data_availability.png
+.. image:: ../.static/undervolc_spectrogram.png
 
 """
 

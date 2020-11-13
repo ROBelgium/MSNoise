@@ -602,25 +602,25 @@ class MSNoiseTests(unittest.TestCase):
         parsed_crondays = s01scan_archive.parse_crondays('3w4d12h')
         self.assertEqual(parsed_crondays, datetime.timedelta(days=3*7+4, seconds=12*3600))
 
-    def test_999_S01installer(self):
-        if "TRAVIS_OS_NAME" not in os.environ:
-            print("Seems to be running on local machine, skipping MySQL test")
-            return
-
-        if os.environ["TRAVIS_OS_NAME"] != "linux":
-            print("Seems not to be running on a Linux machine, "
-                  "skipping MySQL test")
-            return
-        import shutil
-        shutil.move('db.ini', 'db.bak')
-        from ..s000installer import main
-        try:
-            ret = main(tech=2, username="root", password="",
-                       hostname="localhost", database="msnoise", prefix="")
-            self.failUnlessEqual(ret, 0)
-        except:
-            traceback.print_exc()
-            self.fail()
+    # def test_999_S01installer(self):
+    #     if "TRAVIS_OS_NAME" not in os.environ:
+    #         print("Seems to be running on local machine, skipping MySQL test")
+    #         return
+    #
+    #     if os.environ["TRAVIS_OS_NAME"] != "linux":
+    #         print("Seems not to be running on a Linux machine, "
+    #               "skipping MySQL test")
+    #         return
+    #     import shutil
+    #     shutil.move('db.ini', 'db.bak')
+    #     from ..s000installer import main
+    #     try:
+    #         ret = main(tech=2, username="root", password="",
+    #                    hostname="localhost", database="msnoise", prefix="")
+    #         self.failUnlessEqual(ret, 0)
+    #     except:
+    #         traceback.print_exc()
+    #         self.fail()
 
 
 def main(prefix=""):

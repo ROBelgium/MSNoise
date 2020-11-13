@@ -8,12 +8,27 @@ running several instances of this script in parallel.
 
 The PSD are calculated using the implementation in ObsPy.
 Parameters can be defined in the Config to control the windowing and the
-smoothness of the PSD results.
+smoothness of the PSD results (see below).
+
+The PSD computation produces two SDS-like structures that contain the results,
+both under the ``PSD/`` folder:
+
+* ``PSD/NPZ/``: contains the NPZ, or "compressed numpy arrays", with all the
+  individual psd spectra
+* ``PSD/PNG/``: contains the images representing the daily PPSD (probabilistic
+  power spectral densities), which are useful for a routine, or rapid check.
 
 Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-* TODO
+* |qc_components|
+* |qc_ppsd_length|
+* |qc_ppsd_overlap|
+* |qc_ppsd_period_smoothing_width_octaves|
+* |qc_ppsd_period_step_octaves|
+* |qc_ppsd_period_limits|
+* |qc_ppsd_db_bins|
+
 
 Instrument Response
 ~~~~~~~~~~~~~~~~~~~

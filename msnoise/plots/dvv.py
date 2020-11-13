@@ -2,14 +2,14 @@
 This plot shows the final output of MSNoise.
 
 
-.. include:: clickhelp/msnoise-plot-dvv.rst
+.. include:: ../clickhelp/msnoise-plot-dvv.rst
 
 
 Example:
 
 ``msnoise plot dvv`` will plot all defaults:
 
-.. image:: .static/dvv.png
+.. image:: ../.static/dvv.png
 
 """
 
@@ -98,7 +98,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
         print(mov_stack, alldf.head())
         if 'alldf' in locals():
             errname = "E" + dttname
-
+            alldf.to_csv("tt.csv")
             alldf[dttname] *= -100
             alldf[errname] *= -100
 

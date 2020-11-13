@@ -109,6 +109,8 @@ def main(interval=1, loglevel="INFO"):
                     MCOH[MCOH < params.dtt_mincoh] = 0.0
                     EM[EM > params.dtt_maxerr] *= 1.0
 
+                    # TODO missing check on max_dt !!
+
 
                     values = []
                     for i in range(len(M.index)):

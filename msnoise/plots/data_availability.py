@@ -3,14 +3,14 @@ Plots the data availability, as contained in the database. Every day which
 has a least some data will be coloured in red. Days with no data remain blank.
 
 
-.. include:: clickhelp/msnoise-plot-data_availability.rst
+.. include:: ../clickhelp/msnoise-plot-data_availability.rst
 
 
 Example:
 
 ``msnoise plot data_availability`` :
 
-.. image:: .static/data_availability.png
+.. image:: ../.static/data_availability.png
 
 """
 

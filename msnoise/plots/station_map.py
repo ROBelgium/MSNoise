@@ -3,14 +3,14 @@ This plots a very raw station map (needs improvement). This plot requires
 cartopy !
 
 
-.. include:: clickhelp/msnoise-plot-station_map.rst
+.. include:: ../clickhelp/msnoise-plot-station_map.rst
 
 
 Example:
 
 ``msnoise plot station_map`` :
 
-.. image:: .static/station_map.png
+.. image:: ../.static/station_map.png
 
 
 It will also generate a HTML file showing the stations on the Leaflet Mapping
@@ -18,7 +18,7 @@ Service:
 
 .. raw:: html
 
-    <iframe src="_static/station_map.html" width=800 height=400></iframe>
+    <iframe src="../_static/station_map.html" width=800 height=400></iframe>
 
 
 .. versionadded:: 1.4 | Thanks to A. Mordret!
@@ -27,14 +27,16 @@ Service:
 
 import traceback
 
-import folium
+
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
+
 
 from ..api import *
 
 
 def main(show=True, outfile=None):
+    from mpl_toolkits.basemap import Basemap
+    import folium
     db = connect()
     stations = get_stations(db, all=False)
     coords = [(sta.Y, sta.X) for sta in stations]

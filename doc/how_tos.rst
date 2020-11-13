@@ -1,7 +1,31 @@
 .. _how_tos:
 
-How To's
-========
+How To's - Recipes
+==================
+
+Run MSNoise only to have Power Spectral Densities and Spectrograms:
+-------------------------------------------------------------------
+
+This recipe is a kind of "let's check noise content rapidly":
+
+.. code-block:: sh
+
+    msnoise db init --tech 1
+
+    msnoise config set startdate=2019-01-01
+    msnoise config set enddate=2019-02-01
+    msnoise config set response_path=/path/to/response_files
+
+    msnoise scan_archive --path /path/to/archive --recursively
+    msnoise populate --fromDA
+    msnoise db update_loc_chan
+    msnoise new_jobs --init --nocc
+
+    msnoise admin # check the qc_* parameters
+
+    msnoise qc compute_psd
+    msnoise qc plot_psd YA.UV05.00.HHZ
+
 
 Run the simplest MSNoise run ever
 ---------------------------------
@@ -19,6 +43,7 @@ This recipe is a kind of "let's check this data rapidly":
 
     msnoise scan_archive --path /path/to/archive --recursively
     msnoise populate --fromDA
+    msnoise db update_loc_chan
     msnoise new_jobs --init
 
     msnoise admin # add 1 filter in the Filter table
@@ -32,6 +57,7 @@ This recipe is a kind of "let's check this data rapidly":
     msnoise compute_mwcs
     msnoise compute_dtt
     msnoise plot dvv
+
 
 Run MSNoise using lots of cores on a HPC
 ----------------------------------------

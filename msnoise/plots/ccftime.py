@@ -6,27 +6,27 @@ of the CCFs. The ``--seismic`` shows the up-going wiggles with a black-filled
 background (very heavy !). Passing ``--refilter`` allows to bandpass filter
 CCFs before plotting (new in 1.5).
 
-.. include:: clickhelp/msnoise-plot-ccftime.rst
+.. include:: ../clickhelp/msnoise-plot-ccftime.rst
 
 
 Example:
 
 ``msnoise plot ccftime YA.UV06 YA.UV11`` will plot all defaults:
 
-.. image:: .static/ccftime.png
+.. image:: ../.static/ccftime.png
 
 For zooming in the CCFs:
 
 ``msnoise plot ccftime YA.UV05 YA.UV11 --xlim=-10,10 --ampli=15``:
 
-.. image:: .static/ccftime_zoom.png
+.. image:: ../.static/ccftime_zoom.png
 
 
 It is sometimes useful to refilter the CCFs on the fly:
 
 ``msnoise plot ccftime YA.UV05 YA.UV11 -r 0.5:1.0``:
 
-.. image:: .static/ccftime_refilter.png
+.. image:: ../.static/ccftime_refilter.png
 
 
 

@@ -67,7 +67,7 @@ Computing Relative Velocity Variations
     workflow_dvv/0000_intro.rst
 
 Computing Power Spectral Densities (Quality Control)
----------------------------------------------------
+----------------------------------------------------
 
 .. toctree::
     :maxdepth: 2
