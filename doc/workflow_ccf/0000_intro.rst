@@ -2,9 +2,9 @@
 
 .. _workflow:
 
-******************************
-Workflow: CCF
-******************************
+*************************************
+Workflow: Cross-Correlation Functions
+*************************************
 
 
 TODO REMAKE THIS FIGURE

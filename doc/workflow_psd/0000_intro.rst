@@ -2,9 +2,9 @@
 
 .. _workflow:
 
-******************************
-Workflow: PSD
-******************************
+**********************************
+Workflow: Power Spectral Densities
+**********************************
 
 TODO REMAKE THIS FIGURE
 TODO ADD EXPLANATION THAT THE "init" workflow needs to be done before this one!

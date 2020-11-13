@@ -2,9 +2,9 @@
 
 .. _workflow:
 
-******************************
-Workflow: dv/v
-******************************
+**************************************
+Workflow: Relative Velocity Variations
+**************************************
 
 TODO REMAKE THIS FIGURE
 TODO ADD EXPLANATION THAT THE "init"+"CCF" workflows need to be done before this one!
