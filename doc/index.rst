@@ -75,14 +75,6 @@ Computing Power Spectral Densities (Quality Control)
     workflow_psd/0000_intro.rst
 
 
-Plotting
-========
-
-.. toctree::
-    :maxdepth: 2
-
-    plotting
-
 Interacting with MSNoise
 ========================
 
