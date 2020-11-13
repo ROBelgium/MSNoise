@@ -49,10 +49,13 @@ could occur with SQLite.
 
 import os
 import traceback
+import matplotlib
+matplotlib.use("Agg")
 import numpy as np
 import datetime
 from obspy.core import UTCDateTime, read, Stream
 from obspy.signal import PPSD
+
 
 
 from .api import to_sds, get_logger, preload_instrument_responses
