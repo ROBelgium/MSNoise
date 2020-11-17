@@ -213,6 +213,10 @@ import logbook
 
 
 def winsorizing(data, params, input="timeseries", nfft=0):
+    input1D = False
+    if len(data.shape) == 1:
+        data = data.reshape(-1, data.shape[0])
+        input1D = True
     if input == "fft":
         # data = np.real(sf.ifft(data, n=nfft, axis=1))
         data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(np.float64)
@@ -228,6 +232,8 @@ def winsorizing(data, params, input="timeseries", nfft=0):
             np.clip(data[i], -rms, rms, data[i])  # inplace
     if input == "fft":
         data = sf.fftn(data, [nfft, ], axes=[1, ])
+    if input1D:
+        data = data[0]
     return data
 
 
@@ -491,7 +497,6 @@ def main(loglevel="INFO"):
                                               corners=8)
                             if params.clip_after_whiten:
                                 logger.debug("Winsorizing (clipping) data after bandpass (AC)")
-                                # TODO not sure it'll work with 1D time series!
                                 tmp[i] = winsorizing(tmp[i], params, input="timeseries")
 
 
