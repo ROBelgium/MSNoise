@@ -181,6 +181,7 @@ def main(loglevel="INFO"):
                     data = pd.read_hdf(fn)
                     valid = data.index.intersection(pd.to_datetime(days))
                     data = data.loc[valid]
+                    data = data.dropna()
 
                     # work on 2D mwcs:
                     window_length_samples = np.int(

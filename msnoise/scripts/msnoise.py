@@ -1388,6 +1388,7 @@ except sqlalchemy.exc.OperationalError as e:
     sys.exit(1)
 
 if plugins:
+    import pkg_resources
     plugins = plugins.split(",")
     for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.commands'):
         module_name = ep.module_name.split(".")[0]

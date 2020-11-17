@@ -205,9 +205,31 @@ from .move2obspy import pcc_xcorr
 from .preprocessing import preprocess
 
 from scipy.stats import scoreatpercentile
+import scipy.signal
 from obspy.signal.filter import bandpass
 
+
 import logbook
+
+
+def winsorizing(data, params, input="timeseries", nfft=0):
+    if input == "fft":
+        # data = np.real(sf.ifft(data, n=nfft, axis=1))
+        data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(np.float64)
+
+    for i in range(data.shape[0]):
+        if params.windsorizing == -1:
+            np.sign(data[i], data[i])  # inplace
+        elif params.windsorizing != 0:
+            imin, imax = scoreatpercentile(data[i], [1, 99])
+            not_outliers = np.where((data[i] >= imin) &
+                                    (data[i] <= imax))[0]
+            rms = data[i][not_outliers].std() * params.windsorizing
+            np.clip(data[i], -rms, rms, data[i])  # inplace
+    if input == "fft":
+        data = sf.fftn(data, [nfft, ], axes=[1, ])
+    return data
+
 
 def main(loglevel="INFO"):
     logger = logbook.Logger(__name__)
@@ -327,24 +349,24 @@ def main(loglevel="INFO"):
             nfft = next_fast_len(tmp[0].stats.npts)
             tmp.detrend("demean")
 
-            for tr in tmp:
-                if params.windsorizing == -1:
-                    np.sign(tr.data, tr.data)  # inplace
-                elif params.windsorizing != 0:
-                    imin, imax = scoreatpercentile(tr.data, [1, 99])
-                    not_outliers = np.where((tr.data >= imin) &
-                                            (tr.data <= imax))[0]
-                    rms = tr.data[not_outliers].std() * params.windsorizing
-                    np.clip(tr.data, -rms, rms, tr.data)  # inplace
-            # TODO should not hardcode 4 percent!
-            tmp.taper(0.04)
-
             # TODO should not hardcode 100 taper points in spectrum
             napod = 100
 
             data = np.asarray([tr.data for tr in tmp])
             names = [tr.id.split(".") for tr in tmp]
 
+            if not params.clip_after_whiten:
+                logger.debug("Winsorizing (clipping) data before whiten")
+                data = winsorizing(data, params) #inplace
+
+            # TODO should not hardcode 4 percent!
+            wlen = int(0.04 * data.shape[1])
+            taper_sides = scipy.signal.hann(2 * wlen + 1)
+            taper = np.hstack(
+                (taper_sides[:wlen], np.ones(data.shape[1] - 2 * wlen),
+                 taper_sides[len(taper_sides) - wlen:]))
+            for i in range(data.shape[0]):
+                data[i] *= taper
             # index net.sta comps for energy later
             channel_index = {}
             if params.whitening != "N" and params.whitening_type == "PSD":
@@ -467,6 +489,12 @@ def main(loglevel="INFO"):
                                               freqmax=filterhigh,
                                               df=params.goal_sampling_rate,
                                               corners=8)
+                            if params.clip_after_whiten:
+                                logger.debug("Winsorizing (clipping) data after bandpass (AC)")
+                                # TODO not sure it'll work with 1D time series!
+                                tmp[i] = winsorizing(tmp[i], params, input="timeseries")
+
+
                     if params.cc_type_single_station_AC == "CC":
                         ffts = sf.fftn(tmp, [nfft, ], axes=[1, ])
                         energy = np.real(np.sqrt(np.mean(
@@ -502,6 +530,11 @@ def main(loglevel="INFO"):
                         if params.whitening != "N":
                             whiten2(ffts, nfft, low, high, p1, p2, psds,
                                     params.whitening_type)  # inplace
+                        if params.clip_after_whiten:
+                            logger.debug(
+                                "Winsorizing (clipping) data after whiten")
+                            ffts = winsorizing(ffts, params, input="fft", nfft=nfft)
+
                         # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
                         energy = np.real(np.sqrt( np.mean(sf.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
         
@@ -532,6 +565,9 @@ def main(loglevel="INFO"):
                         if params.whitening != "N":
                             whiten2(ffts, nfft, low, high, p1, p2, psds,
                                     params.whitening_type)  # inplace
+                        if params.clip_after_whiten:
+                            ffts = winsorizing(ffts, params, input="fft",
+                                               nfft=nfft)
                         # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
                         energy = np.real(np.sqrt(np.mean(
                             sf.ifft(ffts, n=nfft, axis=1) ** 2,

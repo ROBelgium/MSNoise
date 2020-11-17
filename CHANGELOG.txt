@@ -39,6 +39,11 @@ Changes:
     from the SEED IDs available in the database, for each NET.STA (station
     table)
 
+ - msnoise.compute_cc
+  * added possibility to echange the clipping (winsorizing) and spectral
+    whitening steps using the new `clip_after_whiten`. Note: requires an extra
+    pair of ifft/fft on the whitened data if set to Y.
+
  - msnoise.compute_mwcs:
   * the code now gets the ref and current data from the API and don't do I/O
     directly. TODO this will allow replacing the storage format without changing
