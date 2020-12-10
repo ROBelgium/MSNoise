@@ -110,7 +110,7 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None,
         elif normalized == "MAX":
             corr /= np.max(corr)
         elif normalized == "ABSMAX":
-            print("Normalising with AbsMax")
+            # print("Normalising with AbsMax")
             corr /= np.max(np.abs(corr))
 
         if maxlag != Nt:
