@@ -43,6 +43,9 @@ Changes:
   * added possibility to echange the clipping (winsorizing) and spectral
     whitening steps using the new `clip_after_whiten`. Note: requires an extra
     pair of ifft/fft on the whitened data if set to Y.
+  * added the possibility to normalise individual CCFs (individual windows, of
+    `corr_duration` duration, either by the power of the input traces, by the
+    maximum of the CCF or by its absmax.
 
  - msnoise.compute_mwcs:
   * the code now gets the ref and current data from the API and don't do I/O

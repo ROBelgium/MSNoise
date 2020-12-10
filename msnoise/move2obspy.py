@@ -77,7 +77,7 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     return corr
 
 
-def myCorr2(data, maxlag, energy, index, plot=False, nfft=None, 
+def myCorr2(data, maxlag, energy, index, plot=False, nfft=None,
             normalized=False):
     """This function takes ndimensional *data* array, computes the
     cross-correlation in the frequency domain and returns the cross-correlation
@@ -105,30 +105,35 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None,
         corr = np.real(sf.ifft(corr, nfft)) / Nt
         corr = np.concatenate((corr[-Nt + 1:], corr[:Nt + 1]))
 
-        if normalized:
+        if normalized == "POW":
             corr /= (energy[sta1] * energy[sta2])
+        elif normalized == "MAX":
+            corr /= np.max(corr)
+        elif normalized == "ABSMAX":
+            print("Normalising with AbsMax")
+            corr /= np.max(np.abs(corr))
 
         if maxlag != Nt:
             corr = corr[dN]
-        if len(corr) < (2*maxlag)+1:
+        if len(corr) < (2 * maxlag) + 1:
             continue
         corrs[id] = corr
 
     return corrs
 
 
-def pcc_xcorr(data, maxlag, energy, index, plot=False, nfft=None, 
-            normalized=False):
+def pcc_xcorr(data, maxlag, energy, index, plot=False, nfft=None,
+              normalized=False):
     """
-    
-    :param data: 
-    :param maxlag: 
-    :param energy: 
-    :param index: 
-    :param plot: 
-    :param nfft: 
-    :param normalized: 
-    :return: 
+
+    :param data:
+    :param maxlag:
+    :param energy:
+    :param index:
+    :param plot:
+    :param nfft:
+    :param normalized:
+    :return:
     """
     from phasecorr.phasecorr import xcorr
     corr = {}
@@ -139,7 +144,8 @@ def pcc_xcorr(data, maxlag, energy, index, plot=False, nfft=None,
                          parallel=True)
     return corr
 
-def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
+
+def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, returntime=False):
     """This function takes 1-dimensional *data* timeseries array,
     goes to frequency domain using fft, whitens the amplitude of the spectrum
     in frequency domain between *freqmin* and *freqmax*
@@ -161,6 +167,7 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     :rtype: :class:`numpy.ndarray`
     :returns: The FFT of the input trace, whitened between the frequency bounds
     """
+
     # TODO: docsting
     if plot:
         import matplotlib.pyplot as plt
@@ -172,7 +179,6 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
     Napod = 100
     Nfft = int(Nfft)
     freqVec = sf.fftfreq(Nfft, d=delta)[:Nfft // 2]
-
     J = np.where((freqVec >= freqmin) & (freqVec <= freqmax))[0]
     low = J[0] - Napod
     if low <= 0:
@@ -230,7 +236,8 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False):
         plt.plot(np.arange(len(wdata)) * delta, wdata)
         plt.xlim(0, len(wdata) * delta)
         plt.show()
-
+    if returntime:
+        return np.real(sf.ifft(FFTRawSign, Nfft))[:len(data)]
     return FFTRawSign
 
 
@@ -257,38 +264,51 @@ def whiten2(fft, Nfft, low, high, porte1, porte2, psds, whiten_type):
     :returns: The FFT of the input trace, whitened between the frequency bounds
     """
     # TODO: docsting
-    taper = np.ones(Nfft//2+1)
+    taper = np.ones(Nfft // 2 + 1)
     taper[0:low] *= 0
-    taper[low:porte1] *= np.cos(np.linspace(np.pi / 2., 0, porte1 - low))**2
-    taper[porte2:high] *= np.cos(np.linspace(0., np.pi / 2., high - porte2))**2
+    taper[low:porte1] *= np.cos(np.linspace(np.pi / 2., 0, porte1 - low)) ** 2
+    taper[porte2:high] *= np.cos(
+        np.linspace(0., np.pi / 2., high - porte2)) ** 2
     taper[high:] *= 0
     taper *= taper
+
+    hann = scipy.signal.hann(porte2 - porte1 + 1)  # / float(porte2-porte1)
+
     for i in range(fft.shape[0]):
         if whiten_type == "PSD":
-            fft[i][:Nfft//2+1] /= psds[i]
-            fft[i][:Nfft//2+1] *= taper
+            fft[i][:Nfft // 2 + 1] /= psds[i]
+            fft[i][:Nfft // 2 + 1] *= taper
             tmp = fft[i, porte1:porte2]
             imin = scoreatpercentile(tmp, 5)
             imax = scoreatpercentile(tmp, 95)
             not_outliers = np.where((tmp >= imin) & (tmp <= imax))[0]
             rms = tmp[not_outliers].std() * 1.0
-            np.clip(fft[i, porte1:porte2], -rms, rms, fft[i, porte1:porte2])  # inplace
+            np.clip(fft[i, porte1:porte2], -rms, rms,
+                    fft[i, porte1:porte2])  # inplace
             fft[i, 0:low] *= 0
             fft[i, high:] *= 0
+        elif whiten_type == "HANN":
+            fft[i] /= np.abs(fft[i])
+            fft[i][:porte1] *= 0.0
+            fft[i][porte1:porte2 + 1] *= hann
+            fft[i][porte2 + 1:] *= 0.0
         else:
             # print("Doing the classic Brutal Whiten")
             # Left tapering:
-            fft[i,0:low] *= 0
-            fft[i,low:porte1] = np.cos(np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2 * np.exp(1j * np.angle(fft[i,low:porte1]))
+            fft[i, 0:low] *= 0
+            fft[i, low:porte1] = np.cos(
+                np.linspace(np.pi / 2., np.pi, porte1 - low)) ** 2 * np.exp(
+                1j * np.angle(fft[i, low:porte1]))
             # Pass band:
-            fft[i,porte1:porte2] = np.exp(1j * np.angle(fft[i,porte1:porte2]))
+            fft[i, porte1:porte2] = np.exp(1j * np.angle(fft[i, porte1:porte2]))
             # Right tapering:
-            fft[i,porte2:high] = np.cos(np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(1j * np.angle(fft[i,porte2:high]))
-            fft[i,high:] *= 0
+            fft[i, porte2:high] = np.cos(
+                np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(
+                1j * np.angle(fft[i, porte2:high]))
+            fft[i, high:] *= 0
 
         # Hermitian symmetry (because the input is real)
-        fft[i,-(Nfft // 2) + 1:] = np.conjugate(fft[i,1:(Nfft // 2)])[::-1]
-
+        fft[i, -(Nfft // 2) + 1:] = np.conjugate(fft[i, 1:(Nfft // 2)])[::-1]
 
 
 def smooth(x, window='boxcar', half_win=3):
@@ -419,8 +439,8 @@ segment.
         cri = scipy.signal.detrend(cri, type='linear')
         cri *= tp
 
-        minind += int(step*df)
-        maxind += int(step*df)
+        minind += int(step * df)
+        maxind += int(step * df)
 
         fcur = sf.fft(cci, n=padd)[:padd // 2]
         fref = sf.fft(cri, n=padd)[:padd // 2]
@@ -482,7 +502,7 @@ segment.
 
         delta_err.append(e)
         delta_mcoh.append(np.real(mcoh))
-        time_axis.append(tmin+window_length/2.+count*step)
+        time_axis.append(tmin + window_length / 2. + count * step)
         count += 1
 
         del fcur, fref
@@ -491,7 +511,7 @@ segment.
         del index_range
         del w, v, e, s2x2, sx2, m, em
 
-    if maxind > len(current) + step*df:
+    if maxind > len(current) + step * df:
         logging.warning("The last window was too small, but was computed")
 
     return np.array([time_axis, delta_t, delta_err, delta_mcoh]).T

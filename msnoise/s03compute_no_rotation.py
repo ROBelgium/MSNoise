@@ -225,10 +225,12 @@ def winsorizing(data, params, input="timeseries", nfft=0):
         if params.windsorizing == -1:
             np.sign(data[i], data[i])  # inplace
         elif params.windsorizing != 0:
-            imin, imax = scoreatpercentile(data[i], [1, 99])
-            not_outliers = np.where((data[i] >= imin) &
-                                    (data[i] <= imax))[0]
-            rms = data[i][not_outliers].std() * params.windsorizing
+
+            # imin, imax = scoreatpercentile(data[i], [0.1, 99.9])
+            # not_outliers = np.where((data[i] >= imin) &
+            #                         (data[i] <= imax))[0]
+            # rms = data[i][not_outliers].std() * params.windsorizing
+            rms = data[i].std() * params.windsorizing
             np.clip(data[i], -rms, rms, data[i])  # inplace
     if input == "fft":
         data = sf.fftn(data, [nfft, ], axes=[1, ])
@@ -512,7 +514,8 @@ def main(loglevel="INFO"):
                                        energy,
                                        single_station_pair_index_ac,
                                        plot=False,
-                                       nfft=nfft)
+                                       nfft=nfft,
+                                       normalized=params.cc_normalisation)
 
                     elif params.cc_type_single_station_AC == "PCC":
                         corr = pcc_xcorr(tmp, np.ceil(params.maxlag / dt),
@@ -550,7 +553,8 @@ def main(loglevel="INFO"):
                                        energy,
                                        cc_index,
                                        plot=False,
-                                       nfft=nfft)
+                                       nfft=nfft,
+                                       normalized=params.cc_normalisation)
                         
                         for key in corr:
                             ccfid = key + "_%02i" % filterid + "_" + thisdate
@@ -585,7 +589,8 @@ def main(loglevel="INFO"):
                                        energy,
                                        single_station_pair_index_sc,
                                        plot=False,
-                                       nfft=nfft)
+                                       nfft=nfft,
+                                       normalized=params.cc_normalisation)
 
                         for key in corr:
                             ccfid = key + "_%02i" % filterid + "_" + thisdate
