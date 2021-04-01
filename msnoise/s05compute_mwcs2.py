@@ -83,6 +83,15 @@ from scipy.stats import scoreatpercentile
 from obspy.signal.invsim import cosine_taper
 from obspy.signal.regression import linear_regression
 
+import scipy
+if scipy.__version__ < "1.4.0":
+    import scipy.fftpack as sf
+    from scipy.fftpack.helper import next_fast_len
+    import scipy.fftpack._fftpack as sff
+else:
+    import scipy.fft as sf
+    from scipy.fft import next_fast_len
+
 def get_window(window="boxcar", half_win=3):
     window_len = 2 * half_win + 1
     if window == "boxcar":
@@ -164,6 +173,14 @@ def main(loglevel="INFO"):
             filterid = int(f.ref)
             freqmin = f.mwcs_low
             freqmax = f.mwcs_high
+            low = f.low
+            high = f.high
+
+            def ww(a):
+                from .move2obspy import whiten
+                n = next_fast_len(len(a))
+                return whiten(a, n, 1./params.cc_sampling_rate,
+                              low, high, returntime=True)
             for components in params.all_components:
                 ref_name = pair.replace(':', '_')
                 station1, station2 = pair.split(":")
@@ -172,16 +189,20 @@ def main(loglevel="INFO"):
                 if not len(ref):
                     continue
                 ref = ref.data
+                print("Whitening ref")
+                ref = ww(ref)
 
                 for mov_stack in mov_stacks:
                     output = []
-                    fn = r"STACKS2\%02i\%03i_DAYS\%s\%s_%s.h5" % (
+                    fn = r"STACKS2/%02i/%03i_DAYS/%s/%s_%s.h5" % (
                     filterid, mov_stack, components, station1, station2)
                     print("Reading %s" % fn)
                     data = pd.read_hdf(fn)
                     valid = data.index.intersection(pd.to_datetime(days))
                     data = data.loc[valid]
                     data = data.dropna()
+                    print("Whitening %s" % fn)
+                    data = data.apply(ww, axis=1, result_type="broadcast")
 
                     # work on 2D mwcs:
                     window_length_samples = np.int(
@@ -308,7 +329,7 @@ def main(loglevel="INFO"):
                         del X
                         del M, E, MCOH
                     output = pd.concat(output, axis=1)
-                    fn = r"MWCS2\%02i\%03i_DAYS\%s\%s_%s.h5" % (
+                    fn = r"MWCS2/%02i/%03i_DAYS/%s/%s_%s.h5" % (
                     filterid, mov_stack, components, station1, station2)
                     if not os.path.isdir(os.path.split(fn)[0]):
                         os.makedirs(os.path.split(fn)[0])

@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import sqlalchemy
+from sqlalchemy import text
 import time
 
 import click
@@ -421,11 +422,11 @@ def da_stations_update_loc_chan():
     stations = get_stations(session)
     for sta in stations:
         data = session.query(DataAvailability). \
-            filter(DataAvailability.net == sta.net). \
-            filter(DataAvailability.sta == sta.sta). \
+            filter(text("net=:net")). \
+            filter(text("sta=:sta")). \
             group_by(DataAvailability.net, DataAvailability.sta,
                      DataAvailability.loc, DataAvailability.chan). \
-            with_entities("net", "sta", "loc", "chan").all()
+            params(net=sta.net, sta=sta.sta).all()
         locids = sorted([d.loc for d in data])
         chans = sorted([d.chan for d in data])
         print("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
@@ -1051,18 +1052,19 @@ def plot():
 
 
 @plot.command(name='data_availability')
+@click.option('-c', '--comp', default="Z", help='Components (Z, E, N, 1, 2,...)')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
 @click.pass_context
-def data_availability(ctx, show, outfile):
+def data_availability(ctx, comp, show, outfile):
     """Plots the Data Availability vs time"""
     if ctx.obj['MSNOISE_custom']:
         from data_availability import main
     else:
         from ..plots.data_availability import main
-    main(show, outfile)
+    main(comp, show, outfile)
 
 
 @plot.command()
@@ -1373,7 +1375,7 @@ def plot_psd(ctx, seed_id):
     net,sta,loc,chan = seed_id.split(".")
     main(net, sta, loc, chan, time_of_weekday=None,
          period_lim=(0.02, 50.0), cmap="viridis",
-         color_lim=(-160, -100), show=True)
+         color_lim=None, show=True)
 
 
 # Main script

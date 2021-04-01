@@ -72,7 +72,7 @@ def main(interval=1, loglevel="INFO"):
             for components in params.all_components:
                 for mov_stack in mov_stacks:
                     output = []
-                    fn = r"MWCS2\%02i\%03i_DAYS\%s\%s_%s.h5" % (
+                    fn = r"MWCS2/%02i/%03i_DAYS/%s/%s_%s.h5" % (
                             filterid, mov_stack, components, netsta1, netsta2)
                     print("Reading %s" % fn)
                     mwcs = pd.read_hdf(fn)

@@ -480,7 +480,7 @@ class MSNoiseTests(unittest.TestCase):
     def test_104_plot_data_availability(self):
         import glob
         from ..plots.data_availability import main
-        main(show=False, outfile="?.png")
+        main(chan="HHZ", show=False, outfile="?.png")
         fn = glob.glob("data availability on*.png")
         self.assertEqual(len(fn), 1)
 

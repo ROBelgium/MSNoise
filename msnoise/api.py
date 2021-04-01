@@ -17,7 +17,7 @@ import sys
 from logbook import Logger, StreamHandler
 import sys
 
-from sqlalchemy import create_engine, func
+from sqlalchemy import create_engine, func, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlalchemy.sql.expression import func
@@ -33,14 +33,6 @@ else:
     import scipy.fft as sf
     from scipy.fft import next_fast_len
 
-
-# import scipy.optimize
-
-from obspy.core import Stream, Trace, read, AttribDict, UTCDateTime
-from obspy.core.inventory import Inventory
-from obspy import read_inventory
-from obspy.io.xseed import Parser
-from obspy.geodetics import gps2dist_azimuth
 
 from . import DBConfigNotFoundError
 from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
@@ -597,7 +589,7 @@ def get_interstation_distance(station1, station2, coordinates="DEG"):
     :rtype: float
     :returns: The interstation distance in km
     """
-
+    from obspy.geodetics import gps2dist_azimuth
     if coordinates == "DEG":
         dist, azim, bazim = gps2dist_azimuth(station1.Y, station1.X,
                                              station2.Y, station2.X)
@@ -818,12 +810,13 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
     :returns: If returnjob is True, returns the modified/inserted Job.
     """
     if ref:
-        job = session.query(Job).filter(Job.ref == ref).first()
+        job = session.query(Job).filter(text("ref=:ref")).params(ref=ref).first()
     else:
         job = session.query(Job)\
-            .filter(Job.day == day)\
-            .filter(Job.pair == pair)\
-            .filter(Job.jobtype == jobtype).first()
+            .filter(text("day=:day"))\
+            .filter(text("pair=:pair"))\
+            .filter(text("jobtype=:jobtype"))\
+            .params(day=day, pair=pair, jobtype=jobtype).first()
     if job is None:
         job = Job(day, pair, jobtype, 'T')
         session.add(job)
@@ -1172,7 +1165,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
     :param params: A dictionnary of MSNoise config parameters as returned by
         :func:`get_params`.
     """
-
+    from obspy import Stream, Trace
     output_folder = params.output_folder
     export_format = params.export_format
     sac, mseed = False, False
@@ -1217,6 +1210,8 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
 def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
                sac_format=None, maxlag=None, cc_sampling_rate=None,
                params=None):
+    from obspy.core.util.attribdict import AttribDict
+    from obspy import Stream, Trace
     maxlag = params.maxlag
     cc_sampling_rate = params.goal_sampling_rate
     sac_format = params.sac_format
@@ -1251,6 +1246,7 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
 
 def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
                  maxlag=None, cc_sampling_rate=None, params=None):
+    from obspy import Trace, Stream
     try:
         os.makedirs(os.path.split(filename)[0])
     except:
@@ -1371,6 +1367,7 @@ def get_ref(session, station1, station2, filterid, components, params=None):
     :rtype: :class:`obspy.trace`
     :return: A Trace object containing the ref
     """
+    from obspy import Trace, read
     if not params:
         export_format = get_config(session, 'export_format')
         extension = get_extension(export_format)
@@ -1418,6 +1415,7 @@ def get_results(session, station1, station2, filterid, components, dates,
     :return: Either a 1D CCF (if format is ``stack`` or a 2D array (if format=
         ``matrix``).
     """
+    from obspy import read
     if not params:
         export_format = get_config(session, 'export_format')
         extension = get_extension(export_format)
@@ -1697,11 +1695,12 @@ def updated_days_for_dates(session, date1, date2, pair, jobtype='CC',
     lastmod = datetime.datetime.now() - interval
     if pair == '%':
         days = session.query(Job).\
-            filter(Job.day >= date1.strftime("%Y-%m-%d")).\
-            filter(Job.day <= date2.strftime("%Y-%m-%d")).\
+            filter(text("day>=:date1")).\
+            filter(text("day<=:date2")).\
             filter(Job.jobtype == jobtype).\
             filter(Job.lastmod >= lastmod).group_by(Job.day).\
-            order_by(Job.day).with_entities("day").all()
+            order_by(Job.day).params(date1=date1.strftime("%Y-%m-%d"),
+                                     date2=date2.strftime("%Y-%m-%d")).all()
     else:
         days = session.query(Job).filter(Job.pair == pair).\
             filter(Job.day >= date1.strftime("%Y-%m-%d")). \
@@ -1738,6 +1737,7 @@ def azimuth(coordinates, x0, y0, x1, y1):
     :rtype: float
     :returns: The azimuth in degrees
     """
+    from obspy.geodetics import gps2dist_azimuth
     if coordinates == "DEG":
         dist, azim, bazim = gps2dist_azimuth(y0, x0, y1, x1)
         return azim
@@ -1769,6 +1769,9 @@ def nextpow2(x):
 
 def check_and_phase_shift(trace, taper_length=20.0):
     # TODO replace this hard coded taper length
+
+    import scipy.fft as sf
+    from scipy.fft import next_fast_len
     if trace.stats.npts < 4 * taper_length*trace.stats.sampling_rate:
         trace.data = np.zeros(trace.stats.npts)
         return trace
@@ -1857,7 +1860,7 @@ def make_same_length(st):
     This function takes a stream of equal sampling rate and makes sure that all
     channels have the same length and the same gaps.
     """
-
+    from obspy import Stream
     # Merge traces
     st.merge()
 
@@ -1897,29 +1900,29 @@ def make_same_length(st):
     st = st.split()
     return st
 
-
-def clean_scipy_cache():
-    """This functions wraps all destroy scipy cache at once. It is a workaround
-    to the memory leak induced by the "caching" functions in scipy fft."""
-    if sp.__version__ >= "1.4.0":
-        return
-    sff.destroy_zfft_cache()
-    sff.destroy_zfftnd_cache()
-    sff.destroy_drfft_cache()
-    sff.destroy_cfft_cache()
-    sff.destroy_cfftnd_cache()
-    sff.destroy_rfft_cache()
-    sff.destroy_ddct2_cache()
-    sff.destroy_ddct1_cache()
-    # sff.destroy_ddct4_cache()
-    sff.destroy_dct2_cache()
-    sff.destroy_dct1_cache()
-    # sff.destroy_dct4_cache()
-    sff.destroy_ddst2_cache()
-    sff.destroy_ddst1_cache()
-    sff.destroy_dst2_cache()
-    sff.destroy_dst1_cache()
-    sf.convolve.destroy_convolve_cache()
+#
+# def clean_scipy_cache():
+#     """This functions wraps all destroy scipy cache at once. It is a workaround
+#     to the memory leak induced by the "caching" functions in scipy fft."""
+#     if sp.__version__ >= "1.4.0":
+#         return
+#     sff.destroy_zfft_cache()
+#     sff.destroy_zfftnd_cache()
+#     sff.destroy_drfft_cache()
+#     sff.destroy_cfft_cache()
+#     sff.destroy_cfftnd_cache()
+#     sff.destroy_rfft_cache()
+#     sff.destroy_ddct2_cache()
+#     sff.destroy_ddct1_cache()
+#     # sff.destroy_ddct4_cache()
+#     sff.destroy_dct2_cache()
+#     sff.destroy_dct1_cache()
+#     # sff.destroy_dct4_cache()
+#     sff.destroy_ddst2_cache()
+#     sff.destroy_ddst1_cache()
+#     sff.destroy_dst2_cache()
+#     sff.destroy_dst1_cache()
+#     sf.convolve.destroy_convolve_cache()
 
 
 def preload_instrument_responses(session, return_format="dataframe"):
@@ -1941,6 +1944,8 @@ def preload_instrument_responses(session, return_format="dataframe"):
         poles and zeros.
     
     """
+    from obspy.core.inventory import Inventory
+    from obspy import read_inventory, UTCDateTime
     logging.debug('Preloading instrument response')
     response_format = get_config(session, 'response_format')
     files = glob.glob(os.path.join(get_config(session, 'response_path'), "*"))

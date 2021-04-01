@@ -603,8 +603,6 @@ def main(loglevel="INFO"):
                               "exiting")
                         exit(1)
             del psds
-        # Needed to clean the FFT memory caching of SciPy
-        clean_scipy_cache()
 
         if params.keep_all:
             for ccfid in allcorr.keys():

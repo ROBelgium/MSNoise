@@ -101,6 +101,7 @@ import argparse
 import scipy.signal
 
 from .api import *
+from obspy import UTCDateTime
 
 
 import logbook

@@ -294,6 +294,6 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                 output += stream
                 del stream
             del files
-    clean_scipy_cache()
+
     del MULTIPLEX_files
     return output

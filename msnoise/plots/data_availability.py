@@ -25,7 +25,7 @@ register_matplotlib_converters()
 from ..api import *
 
 
-def main(show=False, outfile=None):
+def main(chan, show=False, outfile=None):
     db = connect()
     start, end, datelist = build_movstack_datelist(db)
     dates = []
@@ -36,6 +36,8 @@ def main(show=False, outfile=None):
         dayend = datetime.datetime.combine(day, datetime.time(23, 59, 59))
         data = get_data_availability(db, starttime=daystart, endtime=dayend)
         for di in data:
+            if di.chan != chan:
+                continue
             _ = "%s.%s.%s.%s" % (di.net, di.sta, di.loc, di.chan)
             if _ in used_stations:
                 stations.append(_)

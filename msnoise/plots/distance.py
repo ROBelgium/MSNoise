@@ -16,7 +16,7 @@ Example:
 """
 
 import matplotlib.pyplot as plt
-
+from obspy import read
 from ..api import *
 
 

@@ -166,7 +166,6 @@ def main(loglevel="INFO"):
                                 os.makedirs(outfolder)
                             outfolders.append(outfolder)
                         np.savetxt(os.path.join(outfolder, "%s.txt" % str(days[i])), output)
-                        clean_scipy_cache()
                         del output
                     del data
 
