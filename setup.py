@@ -1,6 +1,21 @@
 from setuptools import setup, find_packages
+import os
+import sys
+import inspect
 
-setup(version="1.6.2",
+
+SETUP_DIRECTORY = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+
+UTIL_PATH = os.path.join(SETUP_DIRECTORY, "msnoise")
+sys.path.insert(0, UTIL_PATH)
+
+if UTIL_PATH:   # To avoid PEP8 E402
+    from _version import get_git_version  # @UnresolvedImport
+
+sys.path.pop(0)
+
+
+setup(version=get_git_version(),
       name='msnoise',
       packages=find_packages(),
       include_package_data=True,
