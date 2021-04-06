@@ -45,10 +45,8 @@ __all__ = ("get_git_version")
 
 script_dir = os.path.abspath(os.path.dirname(inspect.getfile(
                                              inspect.currentframe())))
-MSNOISE_ROOT = os.path.abspath(os.path.join(script_dir, os.pardir,
-                                          os.pardir, os.pardir))
+MSNOISE_ROOT = os.path.abspath(os.path.join(script_dir, os.pardir))
 VERSION_FILE = os.path.join(MSNOISE_ROOT, "msnoise", "RELEASE-VERSION")
-
 
 def call_git_describe(abbrev=10, dirty=True,
                       append_remote_tracking_branch=True):
