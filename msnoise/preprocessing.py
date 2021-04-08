@@ -167,8 +167,6 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         tr.stats.network = tr.stats.network.upper()
                         tr.stats.station = tr.stats.station.upper()
                         tr.stats.channel = tr.stats.channel.upper()
-                        if tr.stats.location == "":
-                            tr.stats.location = "--"
 
                         traces.append(tr)
                     del st
@@ -291,6 +289,8 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
 
                 for tr in stream:
                     tr.data = tr.data.astype(np.float32)
+                    if tr.stats.location == "":
+                        tr.stats.location = "--"
                 output += stream
                 del stream
             del files
