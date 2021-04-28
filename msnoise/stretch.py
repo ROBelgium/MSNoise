@@ -128,9 +128,7 @@ def main():
                         rf = os.path.join("STACKS", "%02i" %
                                           filterid, "REF", components, ref_name + extension)
                         if os.path.isfile(rf):
-                            ref = get_ref(db, station1, station2, filterid, components, params)
-                            ref = ref.data
-                            print(ref.data)
+                            ref = get_ref(db, station1, station2, filterid, components, params).data
                             mid = int(goal_sampling_rate*maxlag)
                             ref[mid-int(minlag*goal_sampling_rate):mid+int(minlag*goal_sampling_rate)] *= 0.
                             ref[:mid-int(maxlag2*goal_sampling_rate)] *= 0.
