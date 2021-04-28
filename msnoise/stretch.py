@@ -102,7 +102,7 @@ def main():
         logging.info(
             "There are STR (MWCS) jobs for some days to recompute for %s" % pair)
         
-        ref_name = pair.replace('.', '_').replace(':', '_')
+        ref_name = pair.replace(':', '_')
         sta1, sta2 = pair.split(':')
         station1 = sta1.split(".")
         station2 = sta2.split(".")
