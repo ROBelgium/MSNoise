@@ -103,12 +103,8 @@ def main():
             "There are STR (MWCS) jobs for some days to recompute for %s" % pair)
         
         ref_name = pair.replace(':', '_')
-        sta1, sta2 = pair.split(':')
-        station1 = sta1.split(".")
-        station2 = sta2.split(".")
+        station1, station2 = pair.split(":")
 
-        station1 = get_station(db, station1[0], station1[1])
-        station2 = get_station(db, station2[0], station2[1])
 
         dtt_lag = get_config(db, "dtt_lag")
         dtt_v = float(get_config(db, "dtt_v"))
@@ -132,7 +128,9 @@ def main():
                         rf = os.path.join("STACKS", "%02i" %
                                           filterid, "REF", components, ref_name + extension)
                         if os.path.isfile(rf):
-                            ref = read(rf)[0].data
+                            ref = get_ref(db, station1, station2, filterid, components, params)
+                            ref = ref.data
+                            print(ref.data)
                             mid = int(goal_sampling_rate*maxlag)
                             ref[mid-int(minlag*goal_sampling_rate):mid+int(minlag*goal_sampling_rate)] *= 0.
                             ref[:mid-int(maxlag2*goal_sampling_rate)] *= 0.
@@ -155,7 +153,7 @@ def main():
                                 mov_stack, components, ref_name, str(day) + extension)
 
                             if os.path.isfile(df):
-                                cur = read(df)[0].data   ### read the current mseed file ###
+                                cur = get_ref(db, station1, station2, filterid, components, params).data   ### read the current mseed file ###
                                 cur[mid-int(minlag*goal_sampling_rate):mid+int(minlag*goal_sampling_rate)] *= 0.
                                 cur[:mid-int(maxlag2*goal_sampling_rate)] *= 0.
                                 cur[mid+int(maxlag2*goal_sampling_rate):] *= 0.  ### replace with zeroes at all
