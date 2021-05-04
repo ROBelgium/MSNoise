@@ -278,14 +278,6 @@ def admin(port):
     from ..msnoise_admin import main
     main(port)
 
-
-@cli.command(name='upgrade-db')
-def upgrade_db():
-    """DEPRECATED: since MSNoise 1.6, please use "msnoise db upgrade" instead"""
-    click.echo(upgrade_db.__doc__)
-    pass
-
-
 @cli.group()
 def db():
     """Top level command to interact with the database"""
@@ -458,13 +450,6 @@ def info(jobs):
     db.close()
 
 
-@cli.command()
-def install():
-    """DEPRECATED: since MSNoise 1.6, please use "msnoise db init" instead"""
-    click.echo(install.__doc__)
-    pass
-
-
 @cli.group()
 def config():
     """
@@ -478,17 +463,6 @@ def config():
     'msnoise admin'.
     """
     pass
-
-
-@config.command(name='gui')
-def config_gui():
-    """
-    Run the deprecated configuration GUI tool.  Please use the configuration
-    web interface using 'msnoise admin' instead.
-    """
-    from ..s001configurator import main
-    click.echo("Let's Configure MSNoise !")
-    main()
 
 
 @config.command(name='sync')
