@@ -1801,7 +1801,7 @@ def check_and_phase_shift(trace, taper_length=20.0):
         trace.data = np.real(FFTdata[:len(trace.data)]).astype(np.float)
         trace.stats.starttime += dt
         del FFTdata, fftfreq
-        clean_scipy_cache()
+        # clean_scipy_cache()
         return trace
     else:
         return trace
