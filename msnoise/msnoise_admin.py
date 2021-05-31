@@ -778,6 +778,7 @@ def main(port=5000):
     jobtypes = ["CC", "STACK", "MWCS", "DTT"]
     template_folders = []
     if plugins:
+        import pkg_resources
         for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
             module_name = ep.module_name.split(".")[0]
             if module_name in plugins:
