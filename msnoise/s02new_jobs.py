@@ -51,6 +51,7 @@ def main(init=False, nocc=False):
     extra_jobtypes_scan_archive = []
     extra_jobtypes_new_files = ["QC"]
     if plugins:
+        import pkg_resources
         plugins = plugins.split(",")
         for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
             module_name = ep.module_name.split(".")[0]
