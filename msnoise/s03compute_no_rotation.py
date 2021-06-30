@@ -210,32 +210,88 @@ from obspy.signal.filter import bandpass
 
 
 import logbook
-
+logger = logbook.Logger(__name__)
 
 def winsorizing(data, params, input="timeseries", nfft=0):
+    #### Version ERHM wrote to allow for running absolute mean normalisation (RAMN)
+    ## new params file values:
+    ## "windsorizing" = -2 for RAMN
+    ## "RAMN_window" integer number of samples on either side of the sample to consider (the number of samples in the window = 2N+1). Also coded: number of seconds either side of sample.
+    ## "RAMN_EQfilt" range of frequencies to select for earthquakes in the format [min_freqency,max_freqency]. Unless in this format, no filtering will happen (default) - choose e.g. [0.01,10]
     input1D = False
     if len(data.shape) == 1:
         data = data.reshape(-1, data.shape[0])
         input1D = True
     if input == "fft":
-        # data = np.real(sf.ifft(data, n=nfft, axis=1))
-        data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(np.float64)
-
+       # data = np.real(sf.ifft(data, n=nfft, axis=1))
+       data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(np.float64)
+    _data = data.copy() ## set up weighted data output
+    #_data = np.require(_data, dtype=np.float64) ## making sure the data is in float format (may not be required - perhaps the if statement above does this already?)
+    tmp = data.copy()
+    count = 1
     for i in range(data.shape[0]):
         if params.windsorizing == -1:
+            if count == 1:
+                logger.debug("ERHM windsorizing: 1-bit normalisation")
             np.sign(data[i], data[i])  # inplace
-        elif params.windsorizing != 0:
 
+        elif params.windsorizing == -2:
+            ## make working data set. The dataset can be filtered to select earthquake frequencies as suggested in Bensen et al. 2007.
+            ## perhaps we need to produce an error message if RAMN_EQfilt isn't it the correct format
+            ## do we want the capability to lowpass or highpass filter as well?
+            tmp = data.copy()
+            if params.RAMN_EQfilt.count(',') == 1 and params.RAMN_EQfilt.split(',')[0] < params.RAMN_EQfilt.split(',')[1]:
+                minfreq = float(params.RAMN_EQfilt.split(',')[0])
+                maxfreq = float(params.RAMN_EQfilt.split(',')[1])
+                if count ==1:
+                    logger.debug("ERHM windsorizing: Waveforms for RAMN weighting filtered between %d and %d" % (minfreq, maxfreq))
+                tmp = bandpass(data, freqmin=minfreq,freqmax=maxfreq, df=params.cc_sampling_rate) ## assumes data already converted to cc_sampling_rate. 
+                #Can get an obspy error: Selected high corner frequency (maxfreq) of bandpass is at or above Nyquist (params.cc_sampling_rate*0.5). Applying a high-pass instead.
+                
+            else:
+                if count == 1:
+                    logger.debug("ERHM windsorizing: Waveforms for RAMN weighting unfiltered")
+                tmp = tmp
+
+
+            window_size = params.RAMN_window # for RAMN_window entered in number of samples
+            #window_size = params.RAMN_window * params.cc_sampling_rate # for RAMN_window entered in seconds
+
+            for j in range(len(data[i])):
+                if j < window_size: ## loop over working data and pull out those between 0 and n+N
+                    window = tmp[i][0:j+window_size+1]
+                elif j >= tmp[i].shape[0] - window_size: ## loop over working data and pull out those between n-N and max(n)
+                    window = tmp[i][j-window_size:tmp[i].shape[0]]
+                else: ## loop over working data and pull out those between n-N and n+N
+                    window = tmp[i][j-window_size:j+window_size+1]
+
+                ## we need to deal with the edge cases in a sensible way: do we divide by 2N+1 for all windows, or by len(window)
+                ## Dividing by len(window) (taking the mean), results in larger weight_j, and more downweighted edges
+                weight_j = np.mean(np.abs(window)) ## dividing by len(window)
+                #weight_j = np.sum(np.abs(window))/(2*window_size+1) ##  dividing by 2N+1
+                _data[i][j] = tmp[i][j]/weight_j
+
+        elif params.windsorizing != 0:
+            if count == 1:
+                logger.debug("ERHM windsorizing: RMS normalisation")
             # imin, imax = scoreatpercentile(data[i], [0.1, 99.9])
             # not_outliers = np.where((data[i] >= imin) &
             #                         (data[i] <= imax))[0]
             # rms = data[i][not_outliers].std() * params.windsorizing
             rms = data[i].std() * params.windsorizing
             np.clip(data[i], -rms, rms, data[i])  # inplace
+
+		
+        count += 1
+        
+
+    if params.windsorizing == -2:
+        data = _data
     if input == "fft":
         data = sf.fftn(data, [nfft, ], axes=[1, ])
     if input1D:
         data = data[0]
+
     return data
 
 
