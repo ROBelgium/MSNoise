@@ -217,8 +217,7 @@ def winsorizing(data, params, input="timeseries", nfft=0):
     ## new params file values:
     ## "windsorizing" = -2 for RAMN
     ## "RAMN_window" integer number of samples on either side of the sample to consider (the number of samples in the window = 2N+1). Also coded: number of seconds either side of sample.
-    ## "RAMN_EQfilt" range of frequencies to select for earthquakes in the format [min_freqency,max_freqency]. Unless in this format, no filtering will happen (default) - choose e.g. [0.01,10]
-    input1D = False
+    ## "RAMN_EQfilt" range of frequencies to select for earthquakes in the format "min_freqency,max_freqency". Unless in this format, no filtering will happen (default) - choose e.g. "0.01,10"    input1D = False
     if len(data.shape) == 1:
         data = data.reshape(-1, data.shape[0])
         input1D = True
