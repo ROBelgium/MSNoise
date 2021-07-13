@@ -770,6 +770,8 @@ def PSD_PNG():
         from obspy import UTCDateTime
         d = UTCDateTime(data['date'])
         file = ".".join([data["net"], data["sta"], data["loc"], data["chan"],"D","%04i"%d.year, "%03i"%d.julday,"*"])
+        # needed to remove the empty loc ids:
+        file = file.replace("--", "")
         year = "%04i"%d.year
     fn = os.path.join(os.getcwd(), "PSD", "PNG", year, data["net"], data["sta"],
                       "%s.D" % data["chan"], file)
