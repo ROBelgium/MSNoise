@@ -796,6 +796,44 @@ def PSD_PNG():
 
 
 
+@app.route('/admin/PSD-spectrogram.png',methods=['GET','POST'])
+def PSD_spectrogram():
+    import matplotlib.pyplot as plt
+    data = flask.request.get_json()
+    if not data:
+        data = flask.request.args
+    format = "png"
+    if 'format' in data:
+        format = data["format"]
+
+    db = connect()
+    start, end, datelist = build_movstack_datelist(db)
+    db.close()
+    ppsd = psd_read_results(data["net"], data["sta"], data["loc"], data["chan"], datelist)
+    data = psd_ppsd_to_dataframe(ppsd)
+
+    plt.pcolormesh(data.index, ppsd.period_bin_centers, data.T, cmap='viridis',
+                   rasterized=True)
+    from io import BytesIO
+    f = BytesIO()
+    plt.savefig(f, format='png')
+    f.seek(0)  # rewind to beginning of file
+
+    image_binary = f.read()
+    if format == "base64":
+        output = {}
+        output["image"] = base64.b64encode(image_binary).decode("utf-8")
+        o = json.dumps(output)
+        return flask.Response(o, mimetype='application/json')
+
+    else:
+        response = make_response(image_binary)
+        response.headers.set('Content-Type', 'image/png')
+        return response
+
+
+
+
 @app.route('/admin/data_availability_flags.json')
 def DA_flags():
     db = connect()

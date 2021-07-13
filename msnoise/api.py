@@ -65,7 +65,7 @@ def get_logger(name, loglevel=None, with_pid=False):
     else:
         log_fmt="{record.time} msnoise [{record.level_name}]: {record.message}"
 
-    StreamHandler(sys.stdout, format_string=log_fmt, 
+    StreamHandler(sys.stdout, format_string=log_fmt,
                   level=loglevel).push_application()
     logger = Logger(name)
 
@@ -297,7 +297,7 @@ def get_params(session):
     params.components_to_compute_single_station = get_components_to_compute_single_station(s)
     params.all_components = np.unique(params.components_to_compute_single_station + \
                             params.components_to_compute)
-    
+
     return params
 
 # FILTERS PART
@@ -460,7 +460,7 @@ def get_stations(session, all=False, net=None, format="raw"):
 
 def get_station(session, net, sta):
     """Get one Station from the database.
-    
+
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
@@ -483,7 +483,7 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
     """Updates or Insert a new Station in the database.
 
     .. seealso :: :class:`msnoise.msnoise_table_def.declare_tables.Station`
-    
+
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
@@ -1135,7 +1135,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
              components, CF, sampling_rate, day=False, ncorr=0, params=None):
     """
     Adds a CCF to the data archive on disk.
-    
+
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
@@ -1887,7 +1887,7 @@ def make_same_length(st):
 
     if len(st) < 2:
         return st
-    
+
     masks=[]
     for tr in st:
         masks.append(tr.data.mask)
@@ -1930,19 +1930,19 @@ def preload_instrument_responses(session, return_format="dataframe"):
     This function preloads all instrument responses from ``response_format``
     and stores the seed ids, start and end dates, and paz for every channel
     in a DataFrame.
-    
+
     .. warning::
         This function only works for ``response_format`` being "inventory"
         or "dataless".
-    
+
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect` 
-    
+        obtained by :func:`connect`
+
     :rtype: pandas.DataFrame
     :returns: A table containing all channels with the time of operation and
         poles and zeros.
-    
+
     """
     from obspy.core.inventory import Inventory
     from obspy import read_inventory, UTCDateTime
@@ -2010,3 +2010,48 @@ def to_sds(stats,year, jday):
     file=file.replace('JDAY', "%03i"%jday)
     file=file.replace('TYPE', "D")
     return file
+
+## PSD part (not sure it'll end up here but easier to handle for now)
+
+def psd_read_results(net, sta, loc, chan, datelist, format='PPSD'):
+    from obspy.signal import PPSD
+    first = True
+    ppsd = None
+    if chan == "--":
+        chan = ""
+    for day in datelist:
+        jday = int(day.strftime("%j"))
+        toglob = os.path.join('PSD', 'NPZ', "%s" % day.year, net, sta,
+                              chan + ".D", "%s.%s.%s.%s.D.%s.%03i.npz" % (
+                              net, sta, loc, chan, day.year, jday))
+        files = glob.glob(toglob)
+        if not len(files):
+            print("No files found for %s.%s.%s.%s: %s" % (
+            net, sta, loc, chan, day))
+            continue
+        file = files[0]
+        if os.path.isfile(file):
+            if first:
+                ppsd = PPSD.load_npz(file)
+                first = False
+            else:
+                try:
+                    ppsd.add_npz(file)
+                except:
+                    pass
+    if not ppsd:
+        return None
+    return ppsd
+
+def psd_ppsd_to_dataframe(ppsd):
+    from obspy import UTCDateTime
+    ind_times = np.array(
+        [UTCDateTime(t).datetime for t in ppsd.current_times_used])
+    data = np.asarray(ppsd._binned_psds)
+    return pd.DataFrame(data, index=ind_times)
+
+
+def psd_plot_spectrogram(ppsd, color_lim=(None,None)):
+    plt.pcolormesh(data.index, ppsd.period_bin_centers, data.T, cmap=cmap,
+                       vmin=color_lim[0], vmax=color_lim[1], rasterized=True)
+    plt.show()
