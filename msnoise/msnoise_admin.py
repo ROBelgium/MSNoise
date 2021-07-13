@@ -871,6 +871,7 @@ def PSD_spectrogram():
         plt.ylabel("Period [s]")
 
     plt.yscale(yaxis_scale)
+    plt.title(ppsd._get_plot_title())
 
     fig.autofmt_xdate()
     plt.tight_layout()
