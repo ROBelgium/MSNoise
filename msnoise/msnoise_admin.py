@@ -802,9 +802,26 @@ def PSD_spectrogram():
     data = flask.request.get_json()
     if not data:
         data = flask.request.args
-    format = "png"
-    if 'format' in data:
-        format = data["format"]
+
+    format = data.get("format", "png")
+    vmin = data.get("vmin", None, float)
+    vmax = data.get("vmax", None, float)
+    cmap = data.get("cmap", "viridis")
+    fmin = data.get("fmin", None, float)
+    fmax = data.get("fmax", None, float)
+
+    pmin = data.get("pmin", None, float)
+    pmax = data.get("pmax", None, float)
+
+    resample = data.get("resample", None, str)
+    resample_method = data.get("resample_method", "mean", str)
+
+
+    if fmin is not None and pmax is None:
+        pmax = 1.0 / fmin
+
+    if fmax is not None and pmin is None:
+        pmin = 1.0 / fmax
 
     db = connect()
     start, end, datelist = build_movstack_datelist(db)
@@ -812,11 +829,33 @@ def PSD_spectrogram():
     ppsd = psd_read_results(data["net"], data["sta"], data["loc"], data["chan"], datelist)
     data = psd_ppsd_to_dataframe(ppsd)
 
-    plt.pcolormesh(data.index, ppsd.period_bin_centers, data.T, cmap='viridis',
-                   rasterized=True)
+    if pmin is not None:
+        data = data.loc[:,pmin:]
+    if pmax is not None:
+        data = data.loc[:, :pmax]
+
+    if resample is not None:
+        rs = data.resample(resample)
+        if resample_method == "mean":
+            data = rs.mean()
+        elif resample_method == "median":
+            data = rs.median()
+        elif resample_method == "max":
+            data = rs.max()
+        elif resample_method == "min":
+            data = rs.min()
+
+    fig = plt.figure()
+    plt.pcolormesh(data.index, data.columns, data.T, cmap=cmap,
+                   rasterized=True, vmin=vmin, vmax=vmax)
+    plt.colorbar(shrink=0.7).set_label("Amplitude [dB]")
+    plt.ylabel("Period [s]")
+    fig.autofmt_xdate()
+
     from io import BytesIO
     f = BytesIO()
     plt.savefig(f, format='png')
+    plt.close("all")
     f.seek(0)  # rewind to beginning of file
 
     image_binary = f.read()

@@ -2012,35 +2012,49 @@ def to_sds(stats,year, jday):
     return file
 
 ## PSD part (not sure it'll end up here but easier to handle for now)
+from functools import lru_cache
 
-def psd_read_results(net, sta, loc, chan, datelist, format='PPSD'):
+
+def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=True):
     from obspy.signal import PPSD
-    first = True
-    ppsd = None
-    if chan == "--":
-        chan = ""
-    for day in datelist:
-        jday = int(day.strftime("%j"))
-        toglob = os.path.join('PSD', 'NPZ', "%s" % day.year, net, sta,
-                              chan + ".D", "%s.%s.%s.%s.D.%s.%03i.npz" % (
-                              net, sta, loc, chan, day.year, jday))
-        files = glob.glob(toglob)
-        if not len(files):
-            print("No files found for %s.%s.%s.%s: %s" % (
-            net, sta, loc, chan, day))
-            continue
-        file = files[0]
-        if os.path.isfile(file):
-            if first:
-                ppsd = PPSD.load_npz(file)
-                first = False
-            else:
-                try:
-                    ppsd.add_npz(file)
-                except:
-                    pass
+    fn = "%s.%s.%s.%s-%s_%s.npz" % (net, sta, loc, chan, datelist[0], datelist[-1])
+    import tempfile
+    fn = os.path.join(tempfile.gettempdir(), "MSNOISE-PSD", fn)
+    print(fn)
+    if use_cache and os.path.isfile(fn):
+        print("I found this cool file: %s" % fn)
+        ppsd = PPSD.load_npz(fn)
+    else:
+        first = True
+        ppsd = None
+        if chan == "--":
+            chan = ""
+        for day in datelist:
+            jday = int(day.strftime("%j"))
+            toglob = os.path.join('PSD', 'NPZ', "%s" % day.year, net, sta,
+                                  chan + ".D", "%s.%s.%s.%s.D.%s.%03i.npz" % (
+                                  net, sta, loc, chan, day.year, jday))
+            files = glob.glob(toglob)
+            if not len(files):
+                print("No files found for %s.%s.%s.%s: %s" % (
+                net, sta, loc, chan, day))
+                continue
+            file = files[0]
+            if os.path.isfile(file):
+                if first:
+                    ppsd = PPSD.load_npz(file)
+                    first = False
+                else:
+                    try:
+                        ppsd.add_npz(file)
+                    except:
+                        pass
     if not ppsd:
         return None
+    if use_cache:
+        if not os.path.isdir(os.path.split(fn)[0]):
+            os.makedirs(os.path.split(fn)[0])
+        ppsd.save_npz(fn[:-4])
     return ppsd
 
 def psd_ppsd_to_dataframe(ppsd):
@@ -2048,10 +2062,10 @@ def psd_ppsd_to_dataframe(ppsd):
     ind_times = np.array(
         [UTCDateTime(t).datetime for t in ppsd.current_times_used])
     data = np.asarray(ppsd._binned_psds)
-    return pd.DataFrame(data, index=ind_times)
+    return pd.DataFrame(data, index=ind_times, columns=ppsd.period_bin_centers)
 
 
 def psd_plot_spectrogram(ppsd, color_lim=(None,None)):
-    plt.pcolormesh(data.index, ppsd.period_bin_centers, data.T, cmap=cmap,
+    plt.pcolormesh(data.index, data.columns, data.T, cmap=cmap,
                        vmin=color_lim[0], vmax=color_lim[1], rasterized=True)
     plt.show()
