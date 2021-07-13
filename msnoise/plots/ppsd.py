@@ -92,12 +92,8 @@ def main(net, sta, loc, chan, time_of_weekday=None, period_lim=None, show=False,
         plt.pcolormesh(data.index, ppsd.period_bin_centers, data.T, cmap=cmap,
                        vmin=vmin, vmax=vmax, rasterized=True)
     else:
-        plt.imshow(data.T, cmap=cmap, aspect='auto', origin='lower',
-                   extent=(date2num(new_times[0].to_pydatetime()),
-                           date2num(new_times[-1].to_pydatetime()),
-                           ppsd.period_bin_centers[0],
-                           ppsd.period_bin_centers[-1]),
-                   )
+        plt.pcolormesh(data.index, ppsd.period_bin_centers, data.T, cmap=cmap,
+                       rasterized=True)
 
     cb = plt.colorbar(cax=plt.subplot(gs[3]), use_gridspec=True)
     plt.sca(ax2)

@@ -147,6 +147,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
 
     extra_jobtypes = []
     if plugins:
+        import pkg_resources
         plugins = plugins.split(",")
         for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
             module_name = ep.module_name.split(".")[0]
@@ -155,7 +156,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                 for jobtype in jobtypes:
                     if jobtype["after"] == "refstack":
                         extra_jobtypes.append(jobtype["name"])
-    
+
     if stype == "mov" or stype == "step":
         start, end, datelist = build_movstack_datelist(db)
         format = "matrix"
