@@ -2017,8 +2017,8 @@ from functools import lru_cache
 
 def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=True):
     from obspy.signal import PPSD
-    if chan == "--":
-        chan = ""
+    if loc == "--":
+        loc = ""
     fn = "%s.%s.%s.%s-%s_%s.npz" % (net, sta, loc, chan, datelist[0], datelist[-1])
     import tempfile
     fn = os.path.join(tempfile.gettempdir(), "MSNOISE-PSD", fn)
