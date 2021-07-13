@@ -128,6 +128,7 @@ modules are properly installed and available for MSNoise.
 """
 
 import json
+import os
 from io import BytesIO
 
 import flask
@@ -539,6 +540,14 @@ class DataAvailabilityPlot(BaseView):
     def index(self):
         return self.render('admin/data_availability.html')
 
+class PSDPlot(BaseView):
+    name = "MSNoise"
+    view_title = "Power Spectral Density"
+
+    @expose('/')
+    def index(self):
+        return self.render('admin/psd.html')
+
 
 class BugReport(BaseView):
     name = "MSNoise"
@@ -559,7 +568,12 @@ def networksJSON():
     networks = get_networks(db)
     for network in networks:
         stations = get_stations(db, net=network)
-        data[network] = [s.sta for s in stations]
+        data[network] = {}
+        for sta in stations:
+            data[network][sta.sta] = {}
+            data[network][sta.sta]["locs"] = sta.locs()
+            data[network][sta.sta]["chans"] = sta.chans()
+        #data[network] = [s.sta for s in stations]
     o = json.dumps(data)
     db.close()
     return flask.Response(o, mimetype='application/json')
@@ -618,7 +632,8 @@ def dataAvail():
     data = flask.request.get_json()
     db = connect()
     data = get_data_availability(db, net=data['net'], sta=data['sta'],
-                                 chan='HHZ')
+                                 loc=data['loc'], chan='HHZ')
+    print(data)
     o = {'dates': [o.starttime.strftime('%Y-%m-%d') for o in data]}
     db.close()
     o['result'] = 'ok'
@@ -710,6 +725,47 @@ def DA_PNG():
     main(show=False, outfile=output)
     output.seek(0)
     return flask.Response(output.read(), mimetype='image/png')
+
+from flask import send_file, make_response
+import base64
+
+
+@app.route('/admin/PSD.json',methods=['GET','POST'])
+def PSDAvail():
+    data = flask.request.get_json()
+    if not data:
+        data = flask.request.args
+    print(data)
+    fn = os.path.join(os.getcwd(), "PSD", "PNG", "*", data["net"], data["sta"], "%s.D"%data["chan"], "*")
+    files = sorted(glob.glob(fn))
+
+    o = {'files': [os.path.split(f)[1] for f in files]}
+    o['result'] = 'ok'
+    o = json.dumps(o)
+    return flask.Response(o, mimetype='application/json')
+
+
+@app.route('/admin/PSD.png',methods=['GET','POST'])
+def PSD_PNG():
+    data = flask.request.get_json()
+    if not data:
+        data = flask.request.args
+    print(data)
+    fn = os.path.join(os.getcwd(), "PSD", "PNG", "*", data["net"], data["sta"], "%s.D"%data["chan"], data['file'])
+    files = glob.glob(fn)
+    with open(files[0], "rb") as f:
+        image_binary = f.read()
+        if data["format"] == "base64":
+            output = {}
+            output["image"] = base64.b64encode(image_binary).decode("utf-8")
+            o = json.dumps(output)
+            return flask.Response(o, mimetype='application/json')
+
+        else:
+            response = make_response(image_binary)
+            response.headers.set('Content-Type', 'image/png')
+            return response
+
 
 
 @app.route('/admin/data_availability_flags.json')
@@ -810,6 +866,7 @@ def main(port=5000):
 
     admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',
                                         category='Results'))
+    admin.add_view(PSDPlot(endpoint='psd_plot',category='Results'))
     admin.add_view(ResultPlotter(endpoint='results',category='Results'))
     admin.add_view(InterferogramPlotter(endpoint='interferogram',
                                         category='Results'))
@@ -830,5 +887,5 @@ def main(port=5000):
     print("MSNoise admin will run on all interfaces by default")
     print("access it via the machine's IP address or")
     print("via http://127.0.0.1:%i when running locally."%port)
-    app.run(host='0.0.0.0', port=port, debug=False, reloader_interval=1,
+    app.run(host='0.0.0.0', port=port, debug=True, reloader_interval=1,
             threaded=True)

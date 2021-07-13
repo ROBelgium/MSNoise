@@ -59,39 +59,78 @@ function populate_locations(data) {
     $('#channel').change();
 }
 
-function update(){
+function update_filelist(){
     $('#dates').text("Updating...");
     var net = $('#network option:selected').text();
         var sta = $('#station option:selected').text();
         var loc = $('#location option:selected').text();
         var chan = $('#channel option:selected').text();
         $.ajax({
-            url: "/admin/data_availability.json",
+            url: "/admin/PSD.json",
             data: JSON.stringify({'net':net,'sta':sta,'loc':loc,'chan':chan}), //returns all cells' data
             dataType: 'json',
             contentType: 'application/json',
             type: 'POST',
-            success: function (res) {
-              {#console.debug('%o', res);#}
-              if (res.result === 'ok') {
-                $('#dates').text(res.dates);
-            }},
+            success: function (result) {
+                for(k=0;k<result.files.length;k++) {
+                    $('#file').append($('<option>').text(result.files[k]).attr('value',result.files[k]));
+                    }
+                update_image();
+            },
             error: function () {
               console.debug('Something bad happened...');
+              var err = new Error();
+              console.log(err.stack);
             }
           });
+
 }
 
+function update_image(){
+
+        var checkExist = setInterval(function() {
+           if ($('#file option:selected').text().length) {
+              clearInterval(checkExist);
+           }
+        }, 300); // check every 100ms
+
+        var net = $('#network option:selected').text();
+        var sta = $('#station option:selected').text();
+        var loc = $('#location option:selected').text();
+        var chan = $('#channel option:selected').text();
+        var file = $('#file option:selected').text();
+        $.ajax({
+            url: "/admin/PSD.png",
+            data: JSON.stringify({'net':net,'sta':sta,'loc':loc,'chan':chan,'file':file, 'format':"base64"}), //returns all cells' data
+            dataType: 'json',
+            contentType: 'application/json',
+            type: 'POST',
+            success: function (result) {
+                {#$('#image').src = 'data:image/png;base64,' + result.image;#}
+                $('#image').attr('src', 'data:image/png;base64,' + result.image);
+            },
+            error: function () {
+              console.debug('Something bad happened...');
+              var err = new Error();
+              console.log(err.stack);
+            }
+          });
+    var image = new Image();
+        image.src = $('#image').attr("src");
+
+        $('#image').attr('width',image.naturalWidth);
+        $('#image').attr('height',image.naturalHeight);
+}
 
 $(document).ready(function() {
     get_network_station(populate_network);
-    
+
     $('#network').change(function() {
         $('#station')
         .find('option')
         .remove()
         .end();
-        
+
         get_network_station(populate_stations);
 
     });
@@ -106,16 +145,35 @@ $(document).ready(function() {
         .remove()
         .end();
 
+                $('#file')
+        .find('option')
+        .remove()
+        .end();
+
         get_network_station(populate_locations);
 
     });
 
     $('#location').change(function() {
-        update();
+        $('#file')
+        .find('option')
+        .remove()
+        .end();
+
+        update_filelist();
     });
 
     $('#channel').change(function() {
-        update();
+        $('#file')
+        .find('option')
+        .remove()
+        .end();
+
+        update_filelist();
+    });
+
+    $('#file').change(function() {
+        update_image();
     });
 
 });
@@ -130,8 +188,11 @@ $(document).ready(function() {
   Location: <select id="location" name="location" ></select>
   <br>
   Channel: <select id="channel" name="channel" ></select>
+  <br>
+  File: <select id="file" name="file" ></select>
   </p>
-  Available data:<div id='dates'>
-  </div>
+
+    <img src="#" id="image" name="image" width="100" height="100">
+
 
 {% endblock body %}
