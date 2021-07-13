@@ -74,7 +74,7 @@ function update_images(){
             success: function (result) {
                 $('#timeline').empty();
                 for(k=0;k<result.files.length;k++) {
-                    var url = '<img id="theImg" src="http://localhost:5001/admin/PSD.png?net='+net+'&sta='+sta+'&loc='+loc+'&chan='+chan+'&date='+result.dates[k]+'"/>';
+                    var url = '<img id="theImg" src="../PSD.png?net='+net+'&sta='+sta+'&loc='+loc+'&chan='+chan+'&date='+result.dates[k]+'"/>';
                     console.log(url);
                     $('#timeline').prepend(url);
                     }
