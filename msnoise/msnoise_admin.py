@@ -542,7 +542,7 @@ class DataAvailabilityPlot(BaseView):
 
 class PSDPlot(BaseView):
     name = "MSNoise"
-    view_title = "Power Spectral Density"
+    view_title = "Probabilistic Power Spectral Density"
 
     @expose('/')
     def index(self):
@@ -870,10 +870,11 @@ def main(port=5000):
 
     admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',
                                         category='Results'))
-    admin.add_view(PSDPlot(endpoint='psd_plot',category='Results'))
     admin.add_view(ResultPlotter(endpoint='results',category='Results'))
     admin.add_view(InterferogramPlotter(endpoint='interferogram',
                                         category='Results'))
+    admin.add_view(
+        PSDPlot(name="Individual PPSD", endpoint='psd_plot', category='QC'))
 
     if plugins:
         plugins = plugins.split(',')
