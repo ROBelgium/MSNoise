@@ -556,6 +556,15 @@ class PSDTimeline(BaseView):
     def index(self):
         return self.render('admin/ppsd-multi.html')
 
+class PSDSpectrogram(BaseView):
+    name = "MSNoise"
+    view_title = "Power Spectral Density Spectrogram"
+
+    @expose('/')
+    def index(self):
+        return self.render('admin/psd-spectrogram.html')
+
+
 
 class BugReport(BaseView):
     name = "MSNoise"
@@ -979,6 +988,10 @@ def main(port=5000):
 
     admin.add_view(
         PSDTimeline(name="Timeline PPSD", endpoint='psd_timeline', category='QC'))
+
+    admin.add_view(
+        PSDSpectrogram(name="PSD Spectrogram", endpoint='psd_spectrogram', category='QC'))
+
 
     if plugins:
         plugins = plugins.split(',')

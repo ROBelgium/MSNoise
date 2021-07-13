@@ -1,0 +1,175 @@
+{% extends 'admin/master.html' %}
+{% block body %}
+{{ super() }}
+<script type='text/javascript' src='//code.jquery.com/jquery-2.0.2.js'></script>
+
+
+<script>
+function get_network_station(callback) {
+    $.ajax({
+        url:'/admin/networks.json',
+        type:'GET',
+        dataType: 'json',
+        success: callback
+        });
+}
+function populate_network(data) {
+    $.each(data, function(i, value) {
+        $('#network').append($('<option>').text(i).attr('value', i));
+    });
+    $('#network').change();
+}
+
+
+function populate_stations(data) {
+    var net = $('#network option:selected').text();
+    $.each(data, function(i, value) {
+    if(i == net) {
+        net = data[i];
+        $.each(net, function(j, value) {
+            $('#station').append($('<option>').text(j).attr('value',value));
+            });
+        }
+    });
+    $('#station').change();
+}
+
+function populate_locations(data) {
+    var net = $('#network option:selected').text();
+    var sta = $('#station option:selected').text();
+    $.each(data, function(i, value) {
+    if(i == net) {
+        net = data[i];
+        $.each(net, function(j, value) {
+            if(j == sta) {
+                sta = data[i][j];
+                locs = sta["locs"];
+                chans = sta["chans"];
+                for(k=0;k<locs.length;k++) {
+                    $('#location').append($('<option>').text(locs[k]).attr('value',locs[k]));
+                    }
+                for(k=0;k<chans.length;k++) {
+                    $('#channel').append($('<option>').text(chans[k]).attr('value',chans[k]));
+                    }
+            }
+        });
+        }
+    });
+    {#$('#location').change();#}
+    $('#channel').change();
+}
+
+function update_images(){
+        var net = $('#network option:selected').text();
+        var sta = $('#station option:selected').text();
+        var loc = $('#location option:selected').text();
+        var chan = $('#channel option:selected').text();
+        $('#timeline').empty()
+        var url = '../PSD-spectrogram.png?net='+net+'&sta='+sta+'&loc='+loc+'&chan='+chan;
+
+        var vmin = $('#vmin').val();
+        var vmax = $('#vmax').val();
+        var fmin = $('#fmin').val();
+        var fmax = $('#fmax').val();
+        var pmin = $('#pmin').val();
+        var pmax = $('#pmax').val();
+        var resample = $('#resample').val();
+        var resample_method = $('#resample_method').val();
+
+        if(vmin.length) url += '&vmin='+vmin;
+        if(vmax.length) url += '&vmax='+vmax;
+        if(fmin.length) url += '&fmin='+fmin;
+        if(fmax.length) url += '&fmax='+fmax;
+        if(pmin.length) url += '&pmin='+pmin;
+        if(pmax.length) url += '&pmax='+pmax;
+
+        if(resample.length) url += '&resample='+resample;
+        if(resample_method.length) url += '&resample_method='+resample_method;
+
+        var url = '<img id="theImg" src="'+url+'"/>';
+        console.log(url);
+        $('#timeline').prepend(url);
+
+}
+
+$(document).ready(function() {
+    get_network_station(populate_network);
+
+    $('#network').change(function() {
+        $('#station')
+        .find('option')
+        .remove()
+        .end();
+
+        get_network_station(populate_stations);
+
+    });
+
+    $('#station').change(function() {
+                $('#location')
+        .find('option')
+        .remove()
+        .end();
+                $('#channel')
+        .find('option')
+        .remove()
+        .end();
+
+                $('#file')
+        .find('option')
+        .remove()
+        .end();
+
+                $('#date')
+        .find('option')
+        .remove()
+        .end();
+
+        get_network_station(populate_locations);
+
+    });
+
+    $('#location').change(function() {
+update_images();
+    });
+
+    $('#channel').change(function() {
+
+update_images();
+    });
+
+        $('#refresh').click(function() {
+
+update_images();
+    });
+
+});
+</script>
+
+<h1 class="page-header">{{ admin_view.view_title }}</h1>
+{#    <img src="../data_availability.png">#}
+  <p>
+  Network: <select id="network" name="network" ></select>
+  Station: <select id="station" name="station" ></select>
+  <br>
+  Location: <select id="location" name="location" ></select>
+  Channel: <select id="channel" name="channel" ></select>
+  <br>
+  vmin: <input type="text" id="vmin" name="vmin" >
+  vmax: <input type="text" id="vmax" name="vmax" >
+  <br>
+  fmin: <input type="text" id="fmin" name="fmin" >
+  fmax: <input type="text" id="fmax" name="fmax" >
+  <br>
+  pmin: <input type="text" id="pmin" name="pmin" >
+  pmax: <input type="text" id="pmax" name="pmax" >
+        <br>
+  resample: <input type="text" id="resample" name="resample" >
+  resample_method: <input type="text" id="resample_method" name="resample_method" >
+
+  <input type="button" class="danger" value="Refresh" id="refresh">
+  </p>
+    <div id="timeline" name="timeline" width="100%" height="100%"></div>
+
+
+{% endblock body %}
