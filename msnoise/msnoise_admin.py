@@ -548,6 +548,14 @@ class PSDPlot(BaseView):
     def index(self):
         return self.render('admin/psd.html')
 
+class PSDTimeline(BaseView):
+    name = "MSNoise"
+    view_title = "Probabilistic Power Spectral Density (Timeline)"
+
+    @expose('/')
+    def index(self):
+        return self.render('admin/ppsd-multi.html')
+
 
 class BugReport(BaseView):
     name = "MSNoise"
@@ -754,12 +762,26 @@ def PSD_PNG():
     data = flask.request.get_json()
     if not data:
         data = flask.request.args
-    print(data)
-    fn = os.path.join(os.getcwd(), "PSD", "PNG", "*", data["net"], data["sta"], "%s.D"%data["chan"], data['file'])
+    file = "*"
+    year = "*"
+    if 'file' in data:
+        file = data["file"]
+    elif 'date' in data:
+        from obspy import UTCDateTime
+        d = UTCDateTime(data['date'])
+        file = ".".join([data["net"], data["sta"], data["loc"], data["chan"],"D","%04i"%d.year, "%03i"%d.julday,"*"])
+        year = "%04i"%d.year
+    fn = os.path.join(os.getcwd(), "PSD", "PNG", year, data["net"], data["sta"],
+                      "%s.D" % data["chan"], file)
+    print(fn)
+    format = "png"
+    if 'format' in data:
+        format = data["format"]
+
     files = glob.glob(fn)
     with open(files[0], "rb") as f:
         image_binary = f.read()
-        if data["format"] == "base64":
+        if format == "base64":
             output = {}
             output["image"] = base64.b64encode(image_binary).decode("utf-8")
             o = json.dumps(output)
@@ -875,6 +897,9 @@ def main(port=5000):
                                         category='Results'))
     admin.add_view(
         PSDPlot(name="Individual PPSD", endpoint='psd_plot', category='QC'))
+
+    admin.add_view(
+        PSDTimeline(name="Timeline PPSD", endpoint='psd_timeline', category='QC'))
 
     if plugins:
         plugins = plugins.split(',')

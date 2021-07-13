@@ -59,12 +59,12 @@ function populate_locations(data) {
     $('#channel').change();
 }
 
-function update_filelist(){
-    $('#dates').text("Updating...");
-    var net = $('#network option:selected').text();
+function update_images(){
+        var net = $('#network option:selected').text();
         var sta = $('#station option:selected').text();
         var loc = $('#location option:selected').text();
         var chan = $('#channel option:selected').text();
+
         $.ajax({
             url: "/admin/PSD.json",
             data: JSON.stringify({'net':net,'sta':sta,'loc':loc,'chan':chan}), //returns all cells' data
@@ -72,11 +72,12 @@ function update_filelist(){
             contentType: 'application/json',
             type: 'POST',
             success: function (result) {
+                $('#timeline').empty();
                 for(k=0;k<result.files.length;k++) {
-                    $('#file').append($('<option>').text(result.files[k]).attr('value',result.files[k]));
-                    $('#date').append($('<option>').text(result.dates[k]).attr('value',result.dates[k]));
+                    var url = '<img id="theImg" src="http://localhost:5001/admin/PSD.png?net='+net+'&sta='+sta+'&loc='+loc+'&chan='+chan+'&date='+result.dates[k]+'"/>';
+                    console.log(url);
+                    $('#timeline').prepend(url);
                     }
-                update_image();
             },
             error: function () {
               console.debug('Something bad happened...');
@@ -85,41 +86,6 @@ function update_filelist(){
             }
           });
 
-}
-
-function update_image(){
-
-        var checkExist = setInterval(function() {
-           if ($('#file option:selected').text().length) {
-              clearInterval(checkExist);
-           }
-        }, 300); // check every 100ms
-
-        var net = $('#network option:selected').text();
-        var sta = $('#station option:selected').text();
-        var loc = $('#location option:selected').text();
-        var chan = $('#channel option:selected').text();
-        var file = $('#file option:selected').text();
-        $.ajax({
-            url: "/admin/PSD.png",
-            data: JSON.stringify({'net':net,'sta':sta,'loc':loc,'chan':chan,'file':file, 'format':"base64"}), //returns all cells' data
-            dataType: 'json',
-            contentType: 'application/json',
-            type: 'POST',
-            success: function (result) {
-                {#$('#image').src = 'data:image/png;base64,' + result.image;#}
-                $('#image').attr('src', 'data:image/png;base64,' + result.image);
-            },
-            error: function () {
-              console.debug('Something bad happened...');
-              var err = new Error();
-              console.log(err.stack);
-            }
-          });
-    var image = new Image();
-    image.src = $('#image').attr("src");
-    $('#image').attr('width',image.naturalWidth);
-    $('#image').attr('height',image.naturalHeight);
 }
 
 $(document).ready(function() {
@@ -160,41 +126,12 @@ $(document).ready(function() {
     });
 
     $('#location').change(function() {
-        $('#file')
-        .find('option')
-        .remove()
-        .end();
-
-        $('#date')
-        .find('option')
-        .remove()
-        .end();
-
-        update_filelist();
+update_images();
     });
 
     $('#channel').change(function() {
-        $('#file')
-        .find('option')
-        .remove()
-        .end();
 
-        $('#date')
-        .find('option')
-        .remove()
-        .end();
-
-        update_filelist();
-    });
-
-    $('#file').change(function() {
-        $('#date option').eq($("#file")[0].selectedIndex).prop('selected', true);
-        update_image();
-    });
-
-    $('#date').change(function() {
-        $('#file option').eq($("#date")[0].selectedIndex).prop('selected', true);
-        update_image();
+update_images();
     });
 
 });
@@ -208,11 +145,8 @@ $(document).ready(function() {
   <br>
   Location: <select id="location" name="location" ></select>
   Channel: <select id="channel" name="channel" ></select>
-  <br>
-  File: <select id="file" name="file" ></select> or Date: <select id="date" name="date" ></select>
   </p>
-
-    <img src="#" id="image" name="image" width="100" height="100">
+    <div id="timeline" name="timeline" width="100%" height="100%"></div>
 
 
 {% endblock body %}
