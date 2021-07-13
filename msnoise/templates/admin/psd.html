@@ -74,6 +74,7 @@ function update_filelist(){
             success: function (result) {
                 for(k=0;k<result.files.length;k++) {
                     $('#file').append($('<option>').text(result.files[k]).attr('value',result.files[k]));
+                    $('#date').append($('<option>').text(result.dates[k]).attr('value',result.dates[k]));
                     }
                 update_image();
             },
@@ -116,10 +117,9 @@ function update_image(){
             }
           });
     var image = new Image();
-        image.src = $('#image').attr("src");
-
-        $('#image').attr('width',image.naturalWidth);
-        $('#image').attr('height',image.naturalHeight);
+    image.src = $('#image').attr("src");
+    $('#image').attr('width',image.naturalWidth);
+    $('#image').attr('height',image.naturalHeight);
 }
 
 $(document).ready(function() {
@@ -150,12 +150,22 @@ $(document).ready(function() {
         .remove()
         .end();
 
+                $('#date')
+        .find('option')
+        .remove()
+        .end();
+
         get_network_station(populate_locations);
 
     });
 
     $('#location').change(function() {
         $('#file')
+        .find('option')
+        .remove()
+        .end();
+
+        $('#date')
         .find('option')
         .remove()
         .end();
@@ -169,10 +179,21 @@ $(document).ready(function() {
         .remove()
         .end();
 
+        $('#date')
+        .find('option')
+        .remove()
+        .end();
+
         update_filelist();
     });
 
     $('#file').change(function() {
+        $('#date option').eq($("#file")[0].selectedIndex).prop('selected', true);
+        update_image();
+    });
+
+    $('#date').change(function() {
+        $('#file option').eq($("#date")[0].selectedIndex).prop('selected', true);
         update_image();
     });
 
@@ -189,7 +210,7 @@ $(document).ready(function() {
   <br>
   Channel: <select id="channel" name="channel" ></select>
   <br>
-  File: <select id="file" name="file" ></select>
+  File: <select id="file" name="file" ></select> or Date: <select id="date" name="date" ></select>
   </p>
 
     <img src="#" id="image" name="image" width="100" height="100">

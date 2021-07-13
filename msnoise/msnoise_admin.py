@@ -738,8 +738,12 @@ def PSDAvail():
     print(data)
     fn = os.path.join(os.getcwd(), "PSD", "PNG", "*", data["net"], data["sta"], "%s.D"%data["chan"], "*")
     files = sorted(glob.glob(fn))
-
-    o = {'files': [os.path.split(f)[1] for f in files]}
+    o = {}
+    o['files']= [os.path.split(f)[1] for f in files]
+    dates = [datetime.date(int(os.path.split(f)[1].split('.')[5]), 1,
+                   1) + datetime.timedelta(
+        int(os.path.split(f)[1].split('.')[6]) - 1) for f in files]
+    o['dates']= [d.strftime("%Y-%m-%d") for d in dates]
     o['result'] = 'ok'
     o = json.dumps(o)
     return flask.Response(o, mimetype='application/json')
