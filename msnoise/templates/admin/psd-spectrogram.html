@@ -76,6 +76,9 @@ function update_images(){
         var resample = $('#resample').val();
         var resample_method = $('#resample_method').val();
 
+        var yaxis = $('#yaxis').val();
+        var yaxis_scale = $('#yaxis_scale').val();
+
         if(vmin.length) url += '&vmin='+vmin;
         if(vmax.length) url += '&vmax='+vmax;
         if(fmin.length) url += '&fmin='+fmin;
@@ -85,6 +88,9 @@ function update_images(){
 
         if(resample.length) url += '&resample='+resample;
         if(resample_method.length) url += '&resample_method='+resample_method;
+
+        if(yaxis.length) url += '&yaxis='+yaxis;
+        if(yaxis_scale.length) url += '&yaxis_scale='+yaxis_scale;
 
         var url = '<img id="theImg" src="'+url+'"/>';
         console.log(url);
@@ -151,22 +157,21 @@ update_images();
   <p>
   Network: <select id="network" name="network" ></select>
   Station: <select id="station" name="station" ></select>
-  <br>
   Location: <select id="location" name="location" ></select>
   Channel: <select id="channel" name="channel" ></select>
+      <br>
+  fmin: <input type="text" id="fmin" name="fmin" >
+  fmax: <input type="text" id="fmax" name="fmax" >
+  pmin: <input type="text" id="pmin" name="pmin" >
+  pmax: <input type="text" id="pmax" name="pmax" >
   <br>
   vmin: <input type="text" id="vmin" name="vmin" >
   vmax: <input type="text" id="vmax" name="vmax" >
-  <br>
-  fmin: <input type="text" id="fmin" name="fmin" >
-  fmax: <input type="text" id="fmax" name="fmax" >
-  <br>
-  pmin: <input type="text" id="pmin" name="pmin" >
-  pmax: <input type="text" id="pmax" name="pmax" >
-        <br>
   resample: <input type="text" id="resample" name="resample" >
   resample_method: <input type="text" id="resample_method" name="resample_method" >
-
+<br>
+  yaxis: <input type="text" id="yaxis" name="yaxis" >
+  yaxis_scale: <input type="text" id="yaxis_scale" name="yaxis_scale" >
   <input type="button" class="danger" value="Refresh" id="refresh">
   </p>
     <div id="timeline" name="timeline" width="100%" height="100%"></div>

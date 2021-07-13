@@ -825,6 +825,8 @@ def PSD_spectrogram():
     resample = data.get("resample", None, str)
     resample_method = data.get("resample_method", "mean", str)
 
+    yaxis = data.get("yaxis", "period", str)
+    yaxis_scale = data.get("yaxis_scale", "linear", str)
 
     if fmin is not None and pmax is None:
         pmax = 1.0 / fmin
@@ -843,6 +845,11 @@ def PSD_spectrogram():
     if pmax is not None:
         data = data.loc[:, :pmax]
 
+    if yaxis == "frequency":
+        data.columns = 1. / data.columns
+        data = data.sort_index(axis="columns")
+
+
     if resample is not None:
         rs = data.resample(resample)
         if resample_method == "mean":
@@ -854,13 +861,19 @@ def PSD_spectrogram():
         elif resample_method == "min":
             data = rs.min()
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=(14,7))
     plt.pcolormesh(data.index, data.columns, data.T, cmap=cmap,
                    rasterized=True, vmin=vmin, vmax=vmax)
     plt.colorbar(shrink=0.7).set_label("Amplitude [dB]")
-    plt.ylabel("Period [s]")
-    fig.autofmt_xdate()
+    if yaxis == "frequency":
+        plt.ylabel("Frequency [Hz]")
+    else:
+        plt.ylabel("Period [s]")
 
+    plt.yscale(yaxis_scale)
+
+    fig.autofmt_xdate()
+    plt.tight_layout()
     from io import BytesIO
     f = BytesIO()
     plt.savefig(f, format='png')
