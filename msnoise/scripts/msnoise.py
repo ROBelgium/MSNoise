@@ -1026,19 +1026,19 @@ def plot():
 
 
 @plot.command(name='data_availability')
-@click.option('-c', '--comp', default="Z", help='Components (Z, E, N, 1, 2,...)')
+@click.option('-c', '--chan', default="?HZ", help="Channel, you can use the ? wildcard, e.g. '?HZ' (default) or 'HH?', etc.")
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
 @click.pass_context
-def data_availability(ctx, comp, show, outfile):
+def data_availability(ctx, chan, show, outfile):
     """Plots the Data Availability vs time"""
     if ctx.obj['MSNOISE_custom']:
         from data_availability import main
     else:
         from ..plots.data_availability import main
-    main(comp, show, outfile)
+    main(chan, show, outfile)
 
 
 @plot.command()
