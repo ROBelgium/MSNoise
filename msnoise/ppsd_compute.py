@@ -142,7 +142,13 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                 if not len(st):
                     continue
 
-                st.merge()
+                try:
+                    st.merge()
+                except:
+                    logger.info("Failed merging streams:")
+                    traceback.print_exc()
+                    continue
+
                 st = st.split()
                 for tr in st:
                     tr.stats.network = tr.stats.network.upper()

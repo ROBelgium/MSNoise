@@ -485,6 +485,9 @@ def config_sync():
     for station in get_stations(db):
         id = "%s.%s" % (station.net, station.sta)
         coords = responses[responses["netsta"] == id]
+        if not len(coords):
+            print("No coords for %s, skipping,..." % id)
+            continue
         lon = float(coords["longitude"].values[0])
         lat = float(coords["latitude"].values[0])
         update_station(db, station.net, station.sta, lon, lat, 0, "DEG", )
