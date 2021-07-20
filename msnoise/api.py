@@ -2068,7 +2068,7 @@ def hdf_open_store(seed_id):
     pd.set_option('io.hdf.default_format', 'table')
     if not os.path.isdir(os.path.join("PSD", "HDF")):
         os.makedirs(os.path.join("PSD","HDF"))
-    fn = os.path.join("PSD","HDF", seed_id + ".h5")
+    fn = os.path.join("PSD", "HDF", seed_id + ".h5")
     store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz")
     return store
 
@@ -2079,9 +2079,9 @@ def hdf_insert_or_update(store, key, new):
         if len(filter):
             coordinates = store.select_as_coordinates(key, "index=filter")
             store.remove(key, where=coordinates)
-        store.append(key, new, format='t', data_columns=True, append=True)
+            store.append(key, new, format='t', data_columns=True, append=True)
     else:
-        store.append(key, new)
+        store.append(key, new, data_columns=True,)
 
 
 def hdf_close_store(store):

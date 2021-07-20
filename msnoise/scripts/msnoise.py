@@ -1369,6 +1369,20 @@ def psd_to_hdf(ctx, njobs_per_worker):
         for p in processes:
             p.join()
 
+
+@qc.command(name='optimize')
+@click.option('-n', '--njobs_per_worker', default=9999,
+              help='Reduce this number when processing a small number of days '
+                   'but a large number of stations')
+@click.pass_context
+def psd_optimize(ctx, njobs_per_worker):
+    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    import os, glob
+    for file in glob.glob("PSD/HDF/*"):
+        os.system("ptrepack --chunkshape=auto --propindexes --complevel=9 --complib=blosc %s %s" % (file, file.replace(".h5", '_r.h5')))
+        os.system("mv %s %s " % ( file.replace(".h5", '_r.h5'), file,) )
+
+
 @qc.command(name='plot_psd')
 @click.argument('seed_id')
 @click.pass_context

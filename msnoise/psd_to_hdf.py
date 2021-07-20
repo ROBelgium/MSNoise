@@ -9,6 +9,8 @@ import datetime
 from obspy.core import UTCDateTime, read, Stream
 from obspy.signal import PPSD
 
+import warnings
+warnings.filterwarnings("ignore")
 
 
 from .api import *
