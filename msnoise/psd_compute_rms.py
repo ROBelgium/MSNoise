@@ -68,9 +68,8 @@ def main(loglevel="INFO", njobs_per_worker=9999):
 
     params = get_params(db)
     ppsd_components = params.qc_components
-    for out in ["DISP", "VEL", "ACC"]:
-        if not os.path.isdir(os.path.join("PSD", "RMS", out)):
-            os.makedirs(os.path.join("PSD", "RMS", out))
+    if not os.path.isdir(os.path.join("PSD", "RMS", params.qc_rms_type)):
+        os.makedirs(os.path.join("PSD", "RMS", params.qc_rms_type))
 
     while is_dtt_next_job(db, jobtype='HDF2RMS'):
         logger.info("Getting the next job")
@@ -98,9 +97,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             seed_id = "%s.%s.%s.%s" % (net, sta, loc, chan)
             print("Will open HDFstore: %s" % seed_id)
             store = hdf_open_store(seed_id)
-            print(store.PSD.head())
 
-            freqs = [(1.0, 20.0), (4.0, 14.0), (4.0, 40.0), (4.0, 9.0)]
             s = datelists[chan][0].strftime("%Y-%m-%d %H:%M:%S")
             e = (datelists[chan][-1] + datetime.timedelta(days=1)).strftime(
                 "%Y-%m-%d %H:%M:%S")
@@ -110,13 +107,13 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             # only need to compute RMS for new/updated PSD data
             data = data.sort_index(axis=1)
 
-
-
-            for output in ["DISP", "VEL", "ACC"]:
-                RMS = df_rms(data, freqs, output=output)
-                RMSstore = hdf_open_store(seed_id, location=os.path.join("PSD", "RMS", output))
-                hdf_insert_or_update(RMSstore, "PSD", RMS)
-                hdf_close_store(RMSstore)
-                del RMS, RMSstore
+            RMS = df_rms(data, freqs=params.qc_rms_frequency_ranges,
+                         output=params.qc_rms_type)
+            RMSstore = hdf_open_store(seed_id,
+                                      location=os.path.join("PSD", "RMS",
+                                                            params.qc_rms_type))
+            hdf_insert_or_update(RMSstore, "PSD", RMS)
+            hdf_close_store(RMSstore)
+            del RMS, RMSstore
             del data
         massive_update_job(db, jobs, "D")

@@ -30,12 +30,6 @@ def main(loglevel="INFO", njobs_per_worker=9999):
 
     params = get_params(db)
     ppsd_components = params.qc_components
-    ppsd_length = params.qc_ppsd_length
-    ppsd_overlap = params.qc_ppsd_overlap
-    ppsd_period_smoothing_width_octaves = params.qc_ppsd_period_smoothing_width_octaves
-    ppsd_period_step_octaves = params.qc_ppsd_period_step_octaves
-    ppsd_period_limits = params.qc_ppsd_period_limits
-    ppsd_db_bins = params.qc_ppsd_db_bins
 
     while is_dtt_next_job(db, jobtype='PSD2HDF'):
         logger.info("Getting the next job")
