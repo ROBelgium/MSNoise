@@ -837,9 +837,12 @@ def PSD_spectrogram():
     db = connect()
     start, end, datelist = build_movstack_datelist(db)
     db.close()
-    ppsd = psd_read_results(data["net"], data["sta"], data["loc"], data["chan"], datelist)
-    data = psd_ppsd_to_dataframe(ppsd)
 
+    # ppsd = psd_read_results(data["net"], data["sta"], data["loc"], data["chan"], datelist)
+    # data = psd_ppsd_to_dataframe(ppsd)
+    seed_id = "%s.%s.%s.%s" % (data["net"], data["sta"], data["loc"], data["chan"])
+    data = hdf_open_store(seed_id, location=os.path.join("PSD", "HDF")).PSD
+    data = data.sort_index()
     if pmin is not None:
         data = data.loc[:,pmin:]
     if pmax is not None:
@@ -871,7 +874,7 @@ def PSD_spectrogram():
         plt.ylabel("Period [s]")
 
     plt.yscale(yaxis_scale)
-    plt.title(ppsd._get_plot_title())
+    plt.title("%s: %s - %s" % (seed_id, data.index[0], data.index[-1]))
 
     fig.autofmt_xdate()
     plt.tight_layout()
