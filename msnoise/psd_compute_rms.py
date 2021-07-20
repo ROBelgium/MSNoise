@@ -112,7 +112,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             RMSstore = hdf_open_store(seed_id,
                                       location=os.path.join("PSD", "RMS",
                                                             params.qc_rms_type))
-            hdf_insert_or_update(RMSstore, "PSD", RMS)
+            hdf_insert_or_update(RMSstore, "RMS", RMS)
             hdf_close_store(RMSstore)
             del RMS, RMSstore
             del data

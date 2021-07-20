@@ -2,11 +2,6 @@
 
 {% block head %}
 
-<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
-
 <script>window.jQuery || document.write('<script src="{{
   url_for('static', filename='jquery.min.js') }}">\x3C/script>')</script>
 <script type='text/javascript'>
@@ -79,11 +74,11 @@ function update_all() {
     get_num_jobs('PSD', generic_update_jobs);
     get_num_jobs('PSD2HDF', generic_update_jobs);
     get_num_jobs('HDF2RMS', generic_update_jobs);
-   get_num_jobs('CC', generic_update_jobs);
-   get_num_jobs('STACK', generic_update_jobs);
-   get_num_jobs('MWCS', generic_update_jobs);
-   get_num_jobs('DTT', generic_update_jobs);
-   data_availability_flags(generic_update_jobs);
+    get_num_jobs('CC', generic_update_jobs);
+    get_num_jobs('STACK', generic_update_jobs);
+    get_num_jobs('MWCS', generic_update_jobs);
+    get_num_jobs('DTT', generic_update_jobs);
+    data_availability_flags(generic_update_jobs);
    
    }
 
@@ -158,12 +153,12 @@ function update_all() {
     get_num_jobs('PSD', generic_update_jobs);
     get_num_jobs('PSD2HDF', generic_update_jobs);
     get_num_jobs('HDF2RMS', generic_update_jobs);
-   get_num_jobs('CC', generic_update_jobs);
-   get_num_jobs('STACK', generic_update_jobs);
-   get_num_jobs('MWCS', generic_update_jobs);
-   get_num_jobs('DTT', generic_update_jobs);
-   data_availability_flags(generic_update_jobs);
-   
+    get_num_jobs('CC', generic_update_jobs);
+    get_num_jobs('STACK', generic_update_jobs);
+    get_num_jobs('MWCS', generic_update_jobs);
+    get_num_jobs('DTT', generic_update_jobs);
+    data_availability_flags(generic_update_jobs);
+
 
 
     });

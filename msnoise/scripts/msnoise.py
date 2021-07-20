@@ -1424,6 +1424,32 @@ def compute_rms(ctx):
         for p in processes:
             p.join()
 
+
+@qc.command(name='export_rms')
+@click.pass_context
+def export_rms(ctx):
+    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    from ..psd_export_rms import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    print(loglevel)
+    if threads == 1:
+        main(loglevel=loglevel)
+    else:
+        from multiprocessing import Process
+        processes = []
+        kwargs = {"loglevel": loglevel}
+        for i in range(threads):
+            p = Process(target=main, kwargs=kwargs)
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
+
 # Main script
 try:
     db = connect()

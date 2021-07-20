@@ -25,3 +25,7 @@
           padding-right: 20px;
         }
       }
+
+.container {
+    width:100%;
+}

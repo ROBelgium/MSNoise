@@ -2064,6 +2064,10 @@ def psd_ppsd_to_dataframe(ppsd):
     return pd.DataFrame(data, index=ind_times, columns=ppsd.period_bin_centers)
 
 
+def hdf_open_store_from_fn(fn, mode="a"):
+    store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
+    return store
+
 def hdf_open_store(seed_id, location=os.path.join("PSD", "HDF"), mode="a"):
     pd.set_option('io.hdf.default_format', 'table')
     if not os.path.isdir(location):
