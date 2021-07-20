@@ -841,7 +841,8 @@ def PSD_spectrogram():
     # ppsd = psd_read_results(data["net"], data["sta"], data["loc"], data["chan"], datelist)
     # data = psd_ppsd_to_dataframe(ppsd)
     seed_id = "%s.%s.%s.%s" % (data["net"], data["sta"], data["loc"], data["chan"])
-    data = hdf_open_store(seed_id, location=os.path.join("PSD", "HDF")).PSD
+    store = hdf_open_store(seed_id, location=os.path.join("PSD", "HDF"), mode="r")
+    data = store.PSD
     data = data.sort_index()
     if pmin is not None:
         data = data.loc[:,pmin:]

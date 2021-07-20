@@ -2064,12 +2064,12 @@ def psd_ppsd_to_dataframe(ppsd):
     return pd.DataFrame(data, index=ind_times, columns=ppsd.period_bin_centers)
 
 
-def hdf_open_store(seed_id, location=os.path.join("PSD", "HDF")):
+def hdf_open_store(seed_id, location=os.path.join("PSD", "HDF"), mode="a"):
     pd.set_option('io.hdf.default_format', 'table')
     if not os.path.isdir(location):
         os.makedirs(location)
     fn = os.path.join(location, seed_id + ".h5")
-    store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz")
+    store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
     return store
 
 

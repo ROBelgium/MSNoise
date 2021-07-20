@@ -96,7 +96,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                 continue
             seed_id = "%s.%s.%s.%s" % (net, sta, loc, chan)
             print("Will open HDFstore: %s" % seed_id)
-            store = hdf_open_store(seed_id)
+            store = hdf_open_store(seed_id, mode="r")
 
             s = datelists[chan][0].strftime("%Y-%m-%d %H:%M:%S")
             e = (datelists[chan][-1] + datetime.timedelta(days=1)).strftime(
