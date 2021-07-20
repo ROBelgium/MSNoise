@@ -101,9 +101,9 @@ def main(loglevel="INFO", njobs_per_worker=9999):
     ppsd_period_limits = params.qc_ppsd_period_limits
     ppsd_db_bins = params.qc_ppsd_db_bins
 
-    while is_next_job(db, jobtype='QC'):
+    while is_next_job(db, jobtype='PSD'):
         logger.info("Getting the next job")
-        jobs = get_next_job(db, jobtype='QC', limit=njobs_per_worker)
+        jobs = get_next_job(db, jobtype='PSD', limit=njobs_per_worker)
         logger.debug("I will process %i jobs" % len(jobs))
         if len(jobs) == 0:
             # edge case, should only occur when is_next returns true, but
@@ -176,7 +176,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                     os.makedirs(os.path.split(pngout)[0])
 
                 ppsd.save_npz(npzdout + ".npz")
-                update_job(db, job.day, job.pair, 'QC', 'D', ref=job.ref)
+                update_job(db, job.day, job.pair, 'PSD', 'D', ref=job.ref)
                 if not params.hpc:
                     for job in jobs:
                         update_job(db, job.day, job.pair, 'PSD2HDF', 'T')

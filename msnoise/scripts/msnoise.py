@@ -182,14 +182,21 @@ def info_jobs(db):
     Show information about jobs registered in database.
     """
     from ..api import get_job_types
+
+    jobtypes = {}
+    jobtypes["QC"] = ["PSD", "PSD2HDF", "HDF2RMS"]
+    jobtypes["CC"] = ["CC", "STACK", "MWCS", "DTT", "DVV"]
+
     click.echo("\nJobs:")
-    for jobtype in ["QC", "CC", "STACK", "MWCS", "DTT"]:
-        click.echo(' %s:' % jobtype)
-        n = None
-        for (n, jobtype) in get_job_types(db, jobtype):
-            click.echo("  %s : %i" % (jobtype, n))
-        if n is None:
-            click.echo('  none defined')
+    for category in ["QC", "CC"]:
+        click.echo(' %s:' % category)
+        for jobtype in jobtypes[category]:
+            click.echo('  %s:' % jobtype)
+            n = None
+            for (n, jobtype) in get_job_types(db, jobtype):
+                click.echo("   %s : %i" % (jobtype, n))
+            if n is None:
+                click.echo('   none defined')
 
 
 def info_plugins(db):

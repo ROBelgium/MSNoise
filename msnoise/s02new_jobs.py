@@ -49,7 +49,7 @@ def main(init=False, nocc=False):
     logger.debug("Checking plugins' entry points")
     plugins = get_config(db, "plugins")
     extra_jobtypes_scan_archive = []
-    extra_jobtypes_new_files = ["QC"]
+    extra_jobtypes_new_files = ["PSD"]
     if plugins:
         import pkg_resources
         plugins = plugins.split(",")
