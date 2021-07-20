@@ -51,7 +51,8 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                 print("Processing %s" % (job.pair))
                 station = get_station(db, net, sta)
             for chan in station.chans():
-                datelists[chan] = []
+                if chan not in datelists:
+                    datelists[chan] = []
                 if chan[-1] in ppsd_components:
                     datelists[chan].append(datetime.datetime.strptime(job.day, "%Y-%m-%d"))
         for chan in datelists:
