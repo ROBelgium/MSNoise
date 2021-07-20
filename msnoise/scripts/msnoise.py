@@ -1340,6 +1340,32 @@ def compute_psd(ctx, njobs_per_worker):
             p.join()
 
 
+@qc.command(name='psd_to_hdf')
+@click.option('-n', '--njobs_per_worker', default=9999,
+              help='Reduce this number when processing a small number of days '
+                   'but a large number of stations')
+@click.pass_context
+def psd_to_hdf(ctx, njobs_per_worker):
+    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    from ..psd_to_hdf import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    print(loglevel)
+    if threads == 1:
+        main(loglevel=loglevel, njobs_per_worker=njobs_per_worker)
+    else:
+        from multiprocessing import Process
+        processes = []
+        kwargs = {"loglevel": loglevel, "njobs_per_worker": njobs_per_worker}
+        for i in range(threads):
+            p = Process(target=main, kwargs=kwargs)
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
 @qc.command(name='plot_psd')
 @click.argument('seed_id')
 @click.pass_context

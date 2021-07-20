@@ -2065,7 +2065,26 @@ def psd_ppsd_to_dataframe(ppsd):
     return pd.DataFrame(data, index=ind_times, columns=ppsd.period_bin_centers)
 
 
-def psd_plot_spectrogram(ppsd, color_lim=(None,None)):
-    plt.pcolormesh(data.index, data.columns, data.T, cmap=cmap,
-                       vmin=color_lim[0], vmax=color_lim[1], rasterized=True)
-    plt.show()
+def hdf_open_store(seed_id):
+    pd.set_option('io.hdf.default_format', 'table')
+    if not os.path.isdir(os.path.join("PSD", "HDF")):
+        os.makedirs(os.path.join("PSD","HDF"))
+    fn = os.path.join("PSD","HDF", seed_id + ".h5")
+    store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz")
+    return store
+
+
+def hdf_insert_or_update(store, key, new):
+    if key in store:
+        filter = store[key].index.intersection(new.index)
+        if len(filter):
+            coordinates = store.select_as_coordinates(key, "index=filter")
+            store.remove(key, where=coordinates)
+        store.append(key, new, format='t', data_columns=True, append=True)
+    else:
+        store.append(key, new)
+
+
+def hdf_close_store(store):
+    store.close()
+    del store
