@@ -2022,7 +2022,6 @@ def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=Tru
     fn = "%s.%s.%s.%s-%s_%s.npz" % (net, sta, loc, chan, datelist[0], datelist[-1])
     import tempfile
     fn = os.path.join(tempfile.gettempdir(), "MSNOISE-PSD", fn)
-    print(fn)
     if use_cache and os.path.isfile(fn):
         print("I found this cool file: %s" % fn)
         ppsd = PPSD.load_npz(fn)

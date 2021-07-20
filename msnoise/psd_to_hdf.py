@@ -47,8 +47,8 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         station = None
         for job in jobs:
             net, sta, loc = job.pair.split('.')
-            print("Processing %s: %s" % (job.pair, job.day))
             if station is None:
+                print("Processing %s" % (job.pair))
                 station = get_station(db, net, sta)
             for chan in station.chans():
                 datelists[chan] = []
@@ -58,6 +58,8 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             if not len(datelists[chan]):
                 continue
             ppsd = psd_read_results(net, sta, loc, chan, datelists[chan], use_cache=False)
+            if ppsd is None or not len(ppsd.times_processed):
+                continue
             new = psd_ppsd_to_dataframe(ppsd)
             store = hdf_open_store("%s.%s.%s.%s" % (net, sta, loc, chan))
             hdf_insert_or_update(store, "PSD", new)
