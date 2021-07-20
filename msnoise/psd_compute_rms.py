@@ -65,16 +65,9 @@ def main(loglevel="INFO", njobs_per_worker=9999):
     logger.info('*** Starting: HDF to RMS ***')
     db = connect()
     logger.debug('Preloading all instrument response')
-    responses = preload_instrument_responses(db, return_format="inventory")
 
     params = get_params(db)
     ppsd_components = params.qc_components
-    ppsd_length = params.qc_ppsd_length
-    ppsd_overlap = params.qc_ppsd_overlap
-    ppsd_period_smoothing_width_octaves = params.qc_ppsd_period_smoothing_width_octaves
-    ppsd_period_step_octaves = params.qc_ppsd_period_step_octaves
-    ppsd_period_limits = params.qc_ppsd_period_limits
-    ppsd_db_bins = params.qc_ppsd_db_bins
     for out in ["DISP", "VEL", "ACC"]:
         if not os.path.isdir(os.path.join("PSD", "RMS", out)):
             os.makedirs(os.path.join("PSD", "RMS", out))
@@ -108,20 +101,22 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             print(store.PSD.head())
 
             freqs = [(1.0, 20.0), (4.0, 14.0), (4.0, 40.0), (4.0, 9.0)]
-
+            s = datelists[chan][0].strftime("%Y-%m-%d %H:%M:%S")
+            e = (datelists[chan][-1] + datetime.timedelta(days=1)).strftime(
+                "%Y-%m-%d %H:%M:%S")
+            print("Selecting data between %s and %s" % (s, e))
+            data = store.select("PSD", "(index >= '%s') & (index <= '%s')" % (s, e))
             data = store.PSD
+            # only need to compute RMS for new/updated PSD data
             data = data.sort_index(axis=1)
 
-            displacement_spectrum = df_rms(data, freqs, output="DISP")
-            displacement_spectrum.to_csv(os.path.join("PSD","RMS","DISP","%s.csv" % seed_id))
 
-            #     velocity_spectrum = df_rms(data, freqs, output="VEL")
-            #     velocity_spectrum.reset_index().to_feather("VEL_%s.feather" % netsta)
 
-            # acc_spectrum = df_rms(data, freqs, output="ACC")
-            # acc_spectrum.reset_index().to_feather(
-            #     "PSD/RMS/ACC/%s.feather" % seed_id)
-
-            hdf_close_store(store)
-            del store, data, displacement_spectrum
+            for output in ["DISP", "VEL", "ACC"]:
+                RMS = df_rms(data, freqs, output=output)
+                RMSstore = hdf_open_store(seed_id, location=os.path.join("PSD", "RMS", output))
+                hdf_insert_or_update(RMSstore, "PSD", RMS)
+                hdf_close_store(RMSstore)
+                del RMS, RMSstore
+            del data
         massive_update_job(db, jobs, "D")
