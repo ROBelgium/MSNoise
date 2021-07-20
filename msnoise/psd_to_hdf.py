@@ -63,3 +63,4 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             hdf_insert_or_update(store, "PSD", new)
             hdf_close_store(store)
             del ppsd, new, store
+        massive_update_job(db, jobs, "D")
