@@ -13,6 +13,11 @@ from .. import MSNoiseError, DBConfigNotFoundError
 from ..api import connect, get_config, update_station, get_logger, get_job_types
 from ..msnoise_table_def import DataAvailability
 
+class OrderedGroup(click.Group):
+    def list_commands(self, ctx):
+        return self.commands.keys()
+
+
 def parse_extra_args(ctx, param, extra_args):
     # extra_args = extra_args.split(" ")
     kwargs = {}
@@ -220,7 +225,7 @@ def info_plugins(db):
                     click.echo("  %s : %i" % (jobtype, n))
 
 
-@click.group()
+@click.group(context_settings=dict(max_content_width=120))
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
 (only affects modules that are designed to do parallel processing)')
 @click.option('-d', '--delay', default=1,  help='In the case of multi-threading'
@@ -1311,16 +1316,10 @@ def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
     main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile)
 
 
-@cli.group()
+@cli.group(cls=OrderedGroup)
 def qc():
-    """Top level command to interact with the database"""
+    """Top level command group for computing PSD, RMS, etc..."""
     pass
-
-
-@qc.command(name='info')
-def qc_info():
-    """Prints whatever info on the QC jobs"""
-    print("You know what...")
 
 
 @qc.command(name='compute_psd')
@@ -1329,7 +1328,8 @@ def qc_info():
                    'but a large number of stations')
 @click.pass_context
 def compute_psd(ctx, njobs_per_worker):
-    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    """Computes the PSD jobs, based on New or Modified files identified by
+       the new_jobs step"""
     from ..ppsd_compute import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
@@ -1356,7 +1356,7 @@ def compute_psd(ctx, njobs_per_worker):
                    'but a large number of stations')
 @click.pass_context
 def psd_to_hdf(ctx, njobs_per_worker):
-    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    """Groups the PSD calculated as NPZ to HDF"""
     from ..psd_to_hdf import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
@@ -1377,17 +1377,6 @@ def psd_to_hdf(ctx, njobs_per_worker):
             p.join()
 
 
-@qc.command(name='optimize')
-@click.pass_context
-def psd_optimize(ctx):
-    """Computes the CC jobs (based on the "New Jobs" identified)"""
-    import os, glob
-    for file in sorted(glob.glob("PSD/HDF/*")):
-        print("Optimizing %s" % file)
-        os.system("ptrepack --chunkshape=auto --propindexes --complevel=9 --complib=blosc %s %s" % (file, file.replace(".h5", '_r.h5')))
-        os.system("mv %s %s " % ( file.replace(".h5", '_r.h5'), file,) )
-
-
 @qc.command(name='plot_psd')
 @click.argument('seed_id')
 @click.pass_context
@@ -1403,8 +1392,7 @@ def plot_psd(ctx, seed_id):
 @qc.command(name='hdf_to_rms')
 @click.pass_context
 def compute_rms(ctx):
-    """Computes the CC jobs (based on the "New Jobs" identified)"""
-    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    """Computes the RMS based on HDFs"""
     from ..psd_compute_rms import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
@@ -1428,8 +1416,7 @@ def compute_rms(ctx):
 @qc.command(name='export_rms')
 @click.pass_context
 def export_rms(ctx):
-    """Computes the CC jobs (based on the "New Jobs" identified)"""
-    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    """Exports the RMS dataframes as CSV files"""
     from ..psd_export_rms import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
@@ -1449,6 +1436,16 @@ def export_rms(ctx):
         for p in processes:
             p.join()
 
+
+@qc.command(name='optimize')
+@click.pass_context
+def psd_optimize(ctx):
+    """Optimizes the HDFs using ptrepack (should be used periodically)"""
+    import os, glob
+    for file in sorted(glob.glob("PSD/HDF/*")):
+        print("Optimizing %s" % file)
+        os.system("ptrepack --chunkshape=auto --propindexes --complevel=9 --complib=blosc %s %s" % (file, file.replace(".h5", '_r.h5')))
+        os.system("mv %s %s " % ( file.replace(".h5", '_r.h5'), file,) )
 
 # Main script
 try:
