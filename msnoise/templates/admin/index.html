@@ -1,7 +1,10 @@
 {% extends 'admin/master.html' %}
 
 {% block head %}
-<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+
+
 <script>window.jQuery || document.write('<script src="{{
   url_for('static', filename='jquery.min.js') }}">\x3C/script>')</script>
 <script type='text/javascript'>
@@ -11,7 +14,9 @@ function data_availability_flags(callback, error) {
         url:'/admin/data_availability_flags.json',
         type:'GET',
         dataType: 'json',
-        success: callback,
+        success: function (data, status, xhr) {// success callback function
+           callback(data, 'DA', "#DA");
+    },
     });
 }
 function get_num_jobs(type, callback, error) {
@@ -20,58 +25,32 @@ function get_num_jobs(type, callback, error) {
         type:'GET',
         dataType: 'json',
         data: {'type':type},
-        success: callback,
+        success: function (data, status, xhr) {// success callback function
+           callback(data, type, "#"+type);
+           console.log(type + ": "+ data['T']);
+    },
     });
 }
-function update_CC_jobs(res) {
-    total = res['T'] + res['I'] + res['D'];
-    text = total + " CC jobs in the database: " + res['T'] + " todo, ";
-    text = text + res['I'] + " in progress and " + res['D'] + " done";
-    $("#jobs_CC").text(text);
-    var x = Math.floor(100*res['D']/total);
-  $('#CC').css('width', x+'%').attr('aria-valuenow', x);
-    $('#CC').text(x+'%');
-}
 
-function update_STACK_jobs(res) {
+function generic_update_jobs(res, jobtype, location){
     total = res['T'] + res['I'] + res['D'];
-    text = total + " STACK jobs in the database: " + res['T'] + " todo, ";
-    text = text + res['I'] + " in progress and " + res['D'] + " done";
-    $("#jobs_STACK").text(text);
-    var x = Math.floor(100*res['D']/total);
-  $('#STACK').css('width', x+'%').attr('aria-valuenow', x);
-    $('#STACK').text(x+'%');
-}
-function update_MWCS_jobs(res) {
-    total = res['T'] + res['I'] + res['D'];
-    text = total + " MWCS jobs in the database: " + res['T'] + " todo, ";
-    text = text + res['I'] + " in progress and " + res['D'] + " done";
-    $("#jobs_MWCS").text(text);
-    var x = Math.floor(100*res['D']/total);
-  $('#MWCS').css('width', x+'%').attr('aria-valuenow', x);
-    $('#MWCS').text(x+'%');
-}
-
-function update_DTT_jobs(res) {
-    total = res['T'] + res['I'] + res['D'];
-    text = total + " DTT jobs in the database: " + res['T'] + " todo, ";
-    text = text + res['I'] + " in progress and " + res['D'] + " done";
-    $("#jobs_DTT").text(text);
-    var x = Math.floor(100.0*res['D']/parseFloat(total));
-   $('#DTT').css('width', x+'%').attr('aria-valuenow', x);
-    $('#DTT').text(x+'%');
+    if(jobtype == "DA") {
+        total = res['N'] + res['M'] + res['A'];
+        text = total + " files identified in the archive: " + res['N'] + " new, ";
+        text = text + res['M'] + " modified and " + res['A'] + " archived";
+        var x = Math.floor(100*res['A']/total);
+    }
+    else {
+        text = total + " "+ jobtype +" jobs in the database: " + res['T'] + " todo, ";
+        text = text + res['I'] + " in progress and " + res['D'] + " done";
+        var x = Math.floor(100*res['D']/total);
+    }
+    $("#jobs_"+jobtype).text(text);
+    $(location).css('width', x+'%').attr('aria-valuenow', x);
+    $(location).text(x+'%');
 
 }
-function update_DA(res) {
-    total = res['N'] + res['M'] + res['A'];
-    text = total + " files identified in the archive: " + res['N'] + " new, ";
-    text = text + res['M'] + " modified and " + res['A'] + " archived";
-    $("#jobs_DA").text(text);
-    var x = Math.floor(100*res['A']/total);
-    $('#DA').css('width', x+'%').attr('aria-valuenow', x);
-    $('#DA').text(x+'%');
-  console.debug(x);
-}
+
 
 function resetjobs(jobtype, all, consolename) {
     $(consolename).text("Processing...");
@@ -95,11 +74,14 @@ function resetjobs(jobtype, all, consolename) {
 
 function update_all() {
 
-   get_num_jobs('CC', update_CC_jobs);
-   get_num_jobs('STACK', update_STACK_jobs);
-   get_num_jobs('MWCS', update_MWCS_jobs);
-   get_num_jobs('DTT', update_DTT_jobs); 
-   data_availability_flags(update_DA); 
+    get_num_jobs('PSD', generic_update_jobs);
+    get_num_jobs('PSD2HDF', generic_update_jobs);
+    get_num_jobs('HDF2RMS', generic_update_jobs);
+   get_num_jobs('CC', generic_update_jobs);
+   get_num_jobs('STACK', generic_update_jobs);
+   get_num_jobs('MWCS', generic_update_jobs);
+   get_num_jobs('DTT', generic_update_jobs);
+   data_availability_flags(generic_update_jobs);
    
    }
 
@@ -142,8 +124,7 @@ function update_all() {
     $('#reset_MWCS_all').click(function() {
         resetjobs("MWCS", 1, "#reset_MWCS_console")
     });
-    
-    
+
     $('#reset_DTT').click(function() {
         resetjobs("DTT", 0, "#reset_DTT_console")
     });
@@ -171,12 +152,15 @@ function update_all() {
     $('#login-error').on("click", '.close', function(e) {
         $(this).parent().hide();
     });
-    
-   get_num_jobs('CC', update_CC_jobs);
-   get_num_jobs('STACK', update_STACK_jobs);
-   get_num_jobs('MWCS', update_MWCS_jobs);
-   get_num_jobs('DTT', update_DTT_jobs); 
-   data_availability_flags(update_DA); 
+
+    get_num_jobs('PSD', generic_update_jobs);
+    get_num_jobs('PSD2HDF', generic_update_jobs);
+    get_num_jobs('HDF2RMS', generic_update_jobs);
+   get_num_jobs('CC', generic_update_jobs);
+   get_num_jobs('STACK', generic_update_jobs);
+   get_num_jobs('MWCS', generic_update_jobs);
+   get_num_jobs('DTT', generic_update_jobs);
+   data_availability_flags(generic_update_jobs);
    
 
 
@@ -193,19 +177,83 @@ function update_all() {
   Project Database: {{  admin_view.admin.project_database }}
   </p>
 
-  <p>
-  <h2>Status</h2>
+<ul class="nav nav-tabs" id="myTab" role="tablist">
+  <li class="nav-item">
+    <a class="nav-link active" id="data-tab" data-toggle="tab" href="#data" role="tab" aria-controls="data" aria-selected="true">Data</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" id="panelQC-tab" data-toggle="tab" href="#panelQC" role="tab" aria-controls="QC" aria-selected="false">QC Jobs</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" id="contact-tab" data-toggle="tab" href="#panelCC" role="tab" aria-controls="CC" aria-selected="false">CC Jobs</a>
+  </li>
+</ul>
+
+<div class="tab-content" id="myTabContent">
+  <div class="tab-pane fade show active" id="data" role="tabpanel" aria-labelledby="data-tab">
+
+        <h2>Data - Archive</h2>
 
 <h3>Data Availability Scan</h3>
 <span id='jobs_DA'></span>
 <div class="progress">
   <div id='DA' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
 </div>
+  </div>
 
+  <div class="tab-pane fade" id="panelQC" role="tabpanel" aria-labelledby="panelQC-tab">
+
+      <h2>QC Workflow</h2>
+<h3>Power Spectral Density Jobs</h3>
+     <button id='reset_PSD' value='Reset PSD: ALL' class="btn btn-success">Reset PSD jobs "in progress"</button>
+     <button id='reset_PSD_all' value='Reset PSD' class="btn btn-warning">Reset <b>all</b> PSD jobs</button>
+     <button id='delete_PSD_all' value='Reset STACK' class="btn btn-danger">Delete <b>all</b> PSD jobs</button>
+      <div class="alert fade in" id="reset_PSD_console_div" style="display:none;width:300px;">
+        <button type="button" class="close">x</button>
+        <div id='reset_PSD_console'></div>
+      </div>
+        <br>
+    <span id='jobs_PSD'></span>
+     <div class="progress">
+      <div id='PSD' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+    </div>
+<h3>PSD to HDF</h3>
+     <button id='reset_PSD2HDF' value='Reset PSD2HDF: ALL' class="btn btn-success">Reset PSD2HDF jobs "in progress"</button>
+     <button id='reset_PSD2HDF_all' value='Reset PSD2HDF' class="btn btn-warning">Reset <b>all</b> PSD2HDF jobs</button>
+     <button id='delete_PSD2HDF_all' value='Reset STACK' class="btn btn-danger">Delete <b>all</b> PSD2HDF jobs</button>
+      <div class="alert fade in" id="reset_PSD2HDF_console_div" style="display:none;width:300px;">
+        <button type="button" class="close">x</button>
+        <div id='reset_PSD2HDF_console'></div>
+      </div>
+        <br>
+    <span id='jobs_PSD2HDF'></span>
+     <div class="progress">
+      <div id='PSD2HDF' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+    </div>
+
+<h3>HDF to RMS</h3>
+     <button id='reset_HDF2RMS' value='Reset HDF2RMS: ALL' class="btn btn-success">Reset HDF2RMS jobs "in progress"</button>
+     <button id='reset_HDF2RMS_all' value='Reset HDF2RMS' class="btn btn-warning">Reset <b>all</b> HDF2RMS jobs</button>
+     <button id='delete_HDF2RMS_all' value='Reset STACK' class="btn btn-danger">Delete <b>all</b> HDF2RMS jobs</button>
+      <div class="alert fade in" id="reset_HDF2RMS_console_div" style="display:none;width:300px;">
+        <button type="button" class="close">x</button>
+        <div id='reset_HDF2RMS_console'></div>
+      </div>
+        <br>
+    <span id='jobs_HDF2RMS'></span>
+     <div class="progress">
+      <div id='HDF2RMS' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+    </div>
+  </div>
+
+
+  <div class="tab-pane fade" id="panelCC" role="tabpanel" aria-labelledby="panelCC-tab">
+
+
+      <h2>Cross-Correlation Workflow</h2>
 <h3>Cross-Correlation Jobs</h3>
      <button id='reset_CC' value='Reset CC: ALL' class="btn
   btn-success">Reset CC jobs "in progress"</button>
-
      <button id='reset_CC_all' value='Reset CC' class="btn
   btn-warning">Reset <b>all</b> CC jobs</button>
 <button id='delete_CC_all' value='Reset STACK' class="btn
@@ -276,6 +324,14 @@ function update_all() {
 <div class="progress">
   <div id='DTT' class="progress bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
 </div>
+  </div>
+</div>
+
+  <p>
+
+
+
+
 
   <p>
   <h2>Actions ?</h2>
