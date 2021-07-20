@@ -3,7 +3,9 @@
 {% block head %}
 
 <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
 
 <script>window.jQuery || document.write('<script src="{{
   url_for('static', filename='jquery.min.js') }}">\x3C/script>')</script>
@@ -205,9 +207,9 @@ function update_all() {
 
       <h2>QC Workflow</h2>
 <h3>Power Spectral Density Jobs</h3>
-     <button id='reset_PSD' value='Reset PSD: ALL' class="btn btn-success">Reset PSD jobs "in progress"</button>
-     <button id='reset_PSD_all' value='Reset PSD' class="btn btn-warning">Reset <b>all</b> PSD jobs</button>
-     <button id='delete_PSD_all' value='Reset STACK' class="btn btn-danger">Delete <b>all</b> PSD jobs</button>
+     <button id='reset_PSD' value='Reset PSD: ALL' class="btn btn-success btn-xs">Reset PSD jobs "in progress"</button>
+     <button id='reset_PSD_all' value='Reset PSD' class="btn btn-warning btn-xs">Reset <b>all</b> PSD jobs</button>
+     <button id='delete_PSD_all' value='Reset STACK' class="btn btn-danger btn-xs">Delete <b>all</b> PSD jobs</button>
       <div class="alert fade in" id="reset_PSD_console_div" style="display:none;width:300px;">
         <button type="button" class="close">x</button>
         <div id='reset_PSD_console'></div>
@@ -218,9 +220,9 @@ function update_all() {
       <div id='PSD' class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
     </div>
 <h3>PSD to HDF</h3>
-     <button id='reset_PSD2HDF' value='Reset PSD2HDF: ALL' class="btn btn-success">Reset PSD2HDF jobs "in progress"</button>
-     <button id='reset_PSD2HDF_all' value='Reset PSD2HDF' class="btn btn-warning">Reset <b>all</b> PSD2HDF jobs</button>
-     <button id='delete_PSD2HDF_all' value='Reset STACK' class="btn btn-danger">Delete <b>all</b> PSD2HDF jobs</button>
+     <button id='reset_PSD2HDF' value='Reset PSD2HDF: ALL' class="btn btn-success btn-xs">Reset PSD2HDF jobs "in progress"</button>
+     <button id='reset_PSD2HDF_all' value='Reset PSD2HDF' class="btn btn-warning btn-xs">Reset <b>all</b> PSD2HDF jobs</button>
+     <button id='delete_PSD2HDF_all' value='Reset STACK' class="btn btn-danger btn-xs">Delete <b>all</b> PSD2HDF jobs</button>
       <div class="alert fade in" id="reset_PSD2HDF_console_div" style="display:none;width:300px;">
         <button type="button" class="close">x</button>
         <div id='reset_PSD2HDF_console'></div>
@@ -232,9 +234,9 @@ function update_all() {
     </div>
 
 <h3>HDF to RMS</h3>
-     <button id='reset_HDF2RMS' value='Reset HDF2RMS: ALL' class="btn btn-success">Reset HDF2RMS jobs "in progress"</button>
-     <button id='reset_HDF2RMS_all' value='Reset HDF2RMS' class="btn btn-warning">Reset <b>all</b> HDF2RMS jobs</button>
-     <button id='delete_HDF2RMS_all' value='Reset STACK' class="btn btn-danger">Delete <b>all</b> HDF2RMS jobs</button>
+     <button id='reset_HDF2RMS' value='Reset HDF2RMS: ALL' class="btn btn-success btn-xs btn-xs">Reset HDF2RMS jobs "in progress"</button>
+     <button id='reset_HDF2RMS_all' value='Reset HDF2RMS' class="btn btn-warning btn-xs">Reset <b>all</b> HDF2RMS jobs</button>
+     <button id='delete_HDF2RMS_all' value='Reset STACK' class="btn btn-danger btn-xs">Delete <b>all</b> HDF2RMS jobs</button>
       <div class="alert fade in" id="reset_HDF2RMS_console_div" style="display:none;width:300px;">
         <button type="button" class="close">x</button>
         <div id='reset_HDF2RMS_console'></div>
@@ -253,11 +255,11 @@ function update_all() {
       <h2>Cross-Correlation Workflow</h2>
 <h3>Cross-Correlation Jobs</h3>
      <button id='reset_CC' value='Reset CC: ALL' class="btn
-  btn-success">Reset CC jobs "in progress"</button>
+  btn-success btn-xs">Reset CC jobs "in progress"</button>
      <button id='reset_CC_all' value='Reset CC' class="btn
-  btn-warning">Reset <b>all</b> CC jobs</button>
+  btn-warning btn-xs">Reset <b>all</b> CC jobs</button>
 <button id='delete_CC_all' value='Reset STACK' class="btn
-  btn-danger">Delete <b>all</b> CC jobs</button>
+  btn-danger btn-xs">Delete <b>all</b> CC jobs</button>
   <div class="alert fade in" id="reset_CC_console_div" style="display:none;width:300px;">
     <button type="button" class="close">x</button>
     <div id='reset_CC_console'></div>
@@ -270,12 +272,12 @@ function update_all() {
 
 <h3>Stack Jobs</h3>
          <button id='reset_STACK' value='STACK' class="btn
-  btn-success">Reset STACK jobs "in progress"</button>
+  btn-success btn-xs">Reset STACK jobs "in progress"</button>
 
      <button id='reset_STACK_all' value='Reset STACK' class="btn
-  btn-warning">Reset <b>all</b> STACK jobs</button>
+  btn-warning btn-xs">Reset <b>all</b> STACK jobs</button>
         <button id='delete_STACK_all' value='Reset STACK' class="btn
-  btn-danger">Delete <b>all</b> STACK jobs</button>
+  btn-danger btn-xs">Delete <b>all</b> STACK jobs</button>
   <div class="alert fade in" id="reset_STACK_console_div" style="display:none;width:300px;">
     <button type="button" class="close">x</button>
     <div id='reset_STACK_console'></div>
@@ -289,12 +291,12 @@ function update_all() {
 
 <h3>MWCS Jobs</h3>
              <button id='reset_MWCS' value='MWCS' class="btn
-  btn-success">Reset MWCS jobs "in progress"</button>
+  btn-success btn-xs">Reset MWCS jobs "in progress"</button>
 
      <button id='reset_MWCS_all' value='Reset CC' class="btn
-  btn-warning">Reset <b>all</b> MWCS jobs</button>
+  btn-warning btn-xs">Reset <b>all</b> MWCS jobs</button>
 <button id='delete_MWCS_all' value='Reset STACK' class="btn
-  btn-danger">Delete <b>all</b> MWCS jobs</button>
+  btn-danger btn-xs">Delete <b>all</b> MWCS jobs</button>
   <div class="alert fade in" id="reset_MWCS_console_div" style="display:none;width:300px;">
     <button type="button" class="close">x</button>
     <div id='reset_MWCS_console'></div>
@@ -309,12 +311,12 @@ function update_all() {
 
 <h3>Relative Travel Time Jobs</h3>
              <button id='reset_DTT' value='DTT' class="btn
-  btn-success">Reset DTT jobs "in progress"</button>
+  btn-success btn-xs">Reset DTT jobs "in progress"</button>
 
      <button id='reset_DTT_all' value='Reset CC' class="btn
-  btn-warning">Reset <b>all</b> DTT jobs</button>
+  btn-warning btn-xs">Reset <b>all</b> DTT jobs</button>
 <button id='delete_DTT_all' value='Reset STACK' class="btn
-  btn-danger">Delete <b>all</b> DTT jobs</button>
+  btn-danger btn-xs">Delete <b>all</b> DTT jobs</button>
   <div class="alert fade in" id="reset_DTT_console_div" style="display:none;width:300px;">
     <button type="button" class="close">x</button>
     <div id='reset_DTT_console'></div>
