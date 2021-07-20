@@ -69,3 +69,6 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             hdf_close_store(store)
             del ppsd, new, store
         massive_update_job(db, jobs, "D")
+        if not params.hpc:
+            for job in jobs:
+                update_job(db, job.day, job.pair, 'HDF2RMS', 'T')

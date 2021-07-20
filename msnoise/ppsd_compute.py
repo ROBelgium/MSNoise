@@ -177,6 +177,9 @@ def main(loglevel="INFO", njobs_per_worker=9999):
 
                 ppsd.save_npz(npzdout + ".npz")
                 update_job(db, job.day, job.pair, 'QC', 'D', ref=job.ref)
+                if not params.hpc:
+                    for job in jobs:
+                        update_job(db, job.day, job.pair, 'PSD2HDF', 'T')
                 try:
                     ppsd.plot(pngout + ".png")
                 except:

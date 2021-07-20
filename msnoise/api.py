@@ -2081,7 +2081,7 @@ def hdf_insert_or_update(store, key, new):
             store.remove(key, where=coordinates)
             store.append(key, new, format='t', data_columns=True, append=True)
     else:
-        store.append(key, new, data_columns=True,)
+        store.append(key, new)
 
 
 def hdf_close_store(store):

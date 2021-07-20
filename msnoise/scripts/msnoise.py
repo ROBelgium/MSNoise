@@ -1371,14 +1371,12 @@ def psd_to_hdf(ctx, njobs_per_worker):
 
 
 @qc.command(name='optimize')
-@click.option('-n', '--njobs_per_worker', default=9999,
-              help='Reduce this number when processing a small number of days '
-                   'but a large number of stations')
 @click.pass_context
-def psd_optimize(ctx, njobs_per_worker):
+def psd_optimize(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
     import os, glob
-    for file in glob.glob("PSD/HDF/*"):
+    for file in sorted(glob.glob("PSD/HDF/*")):
+        print("Optimizing %s" % file)
         os.system("ptrepack --chunkshape=auto --propindexes --complevel=9 --complib=blosc %s %s" % (file, file.replace(".h5", '_r.h5')))
         os.system("mv %s %s " % ( file.replace(".h5", '_r.h5'), file,) )
 
@@ -1394,6 +1392,30 @@ def plot_psd(ctx, seed_id):
          period_lim=(0.02, 50.0), cmap="viridis",
          color_lim=None, show=True)
 
+
+@qc.command(name='hdf_to_rms')
+@click.pass_context
+def compute_rms(ctx):
+    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    from ..psd_compute_rms import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    print(loglevel)
+    if threads == 1:
+        main(loglevel=loglevel)
+    else:
+        from multiprocessing import Process
+        processes = []
+        kwargs = {"loglevel": loglevel}
+        for i in range(threads):
+            p = Process(target=main, kwargs=kwargs)
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
 
 # Main script
 try:
