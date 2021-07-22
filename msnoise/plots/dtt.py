@@ -9,7 +9,7 @@ The time lags used to calculate the regression are shown in blue.
 
 Example
 
-``msnoise plot dtt Z7.HRIM Z7.LIND 2014-08-10 -f 14 -m 20`` will plot:
+``msnoise cc dvv plot dtt Z7.HRIM Z7.LIND 2014-08-10 -f 14 -m 20`` will plot:
 
 .. image:: .static/dtt.png
 

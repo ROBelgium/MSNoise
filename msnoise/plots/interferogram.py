@@ -9,7 +9,7 @@ CCFs before plotting (new in 1.5).
 
 Example:
 
-``msnoise plot interferogram YA.UV06 YA.UV11 -m5`` will plot the ZZ component
+``msnoise cc plot interferogram YA.UV06 YA.UV11 -m5`` will plot the ZZ component
 (default), filter 1 (default) and mov_stack 5:
 
 .. image:: ../.static/interferogram.png

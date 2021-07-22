@@ -67,7 +67,7 @@ script:
   - mkdir empty
   - cd empty
   - msnoise --help
-  - msnoise bugreport -s -m -e
+  - msnoise utils bugreport -s -m -e
   - cd ..
   - mkdir MSNoiseTest
   - cd MSNoiseTest

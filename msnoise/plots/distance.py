@@ -9,7 +9,7 @@ followed by the desired ``NET.STA`` (new in 1.5).
 
 Example:
 
-``msnoise plot distance`` will plot all defaults:
+``msnoise cc plot distance`` will plot all defaults:
 
 .. image:: ../.static/distance.png
 

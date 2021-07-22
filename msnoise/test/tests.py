@@ -148,7 +148,7 @@ class MSNoiseTests(unittest.TestCase):
             self.fail()
 
     def test_008b_add_loc_chan_to_stations(self):
-        result = self.runner.invoke(msnoise_script.da_stations_update_loc_chan)
+        result = self.runner.invoke(msnoise_script.db_da_stations_update_loc_chan)
 
     def test_009_control_data_availability(self):
         from ..api import connect, get_new_files, get_data_availability,\

@@ -12,21 +12,21 @@ plotted. By default the plot uses dates determined in database.
 
 Example:
 
-``msnoise plot spectime YA.UV05 YA.UV11`` will plot all defaults:
+``msnoise cc plot spectime YA.UV05 YA.UV11`` will plot all defaults:
 
 .. image:: ../.static/spectime.png
 
 
 Zooming in the X-axis and playing with the amplitude:
 
-``msnoise plot spectime YA.UV05 YA.UV11 --xlim=0.08,1.1 --ampli=10``:
+``msnoise cc plot spectime YA.UV05 YA.UV11 --xlim=0.08,1.1 --ampli=10``:
 
 .. image:: ../.static/spectime_zoom.png
 
 
 And refiltering to enhance high frequency content:
 
-``msnoise plot spectime YA.UV05 YA.UV11 --xlim=0.5,1.1 --ampli=10 -r0.7:1.0``:
+``msnoise cc plot spectime YA.UV05 YA.UV11 --xlim=0.5,1.1 --ampli=10 -r0.7:1.0``:
 
 .. image:: ../.static/spectime_refilter.png
 

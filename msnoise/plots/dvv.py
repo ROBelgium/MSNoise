@@ -7,7 +7,7 @@ This plot shows the final output of MSNoise.
 
 Example:
 
-``msnoise plot dvv`` will plot all defaults:
+``msnoise cc dvv plot dvv`` will plot all defaults:
 
 .. image:: ../.static/dvv.png
 

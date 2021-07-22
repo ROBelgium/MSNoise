@@ -12,7 +12,7 @@ The ``filterid``, ``comp`` and ``mov_stack`` allow filtering the data used.
 
 Example:
 
-``msnoise plot mwcs ID.KWUI ID.POSI -m 3`` will plot all defaults with the
+``msnoise cc dvv plot mwcs ID.KWUI ID.POSI -m 3`` will plot all defaults with the
 mov_stack = 3:
 
 .. image:: .static/mwcs.png

@@ -1,6 +1,6 @@
 .. include:: ../configs.hrst
 
-.. _workflow:
+.. _workflow_ccf:
 
 *************************************
 Workflow: Cross-Correlation Functions

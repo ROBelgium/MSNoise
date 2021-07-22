@@ -2,9 +2,9 @@
 
 .. _workflow:
 
-********************************
-Workflow: Project Initialization
-********************************
+**********************
+Project Initialization
+**********************
 
 TODO REMAKE THIS FIGURE
 

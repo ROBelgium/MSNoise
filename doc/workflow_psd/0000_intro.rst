@@ -1,6 +1,6 @@
 .. include:: ../configs.hrst
 
-.. _workflow:
+.. _workflow_qc:
 
 **********************************
 Workflow: Power Spectral Densities
