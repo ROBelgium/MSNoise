@@ -229,11 +229,9 @@ def info_plugins(db):
 
 from pkg_resources import iter_entry_points
 
-import click
-from click_plugins import with_plugins
-
-
-@with_plugins(iter_entry_points('click_command_tree'))
+# import click
+# from click_plugins import with_plugins
+# @with_plugins(iter_entry_points('click_command_tree'))
 @click.group(context_settings=dict(max_content_width=120), cls=OrderedGroup)
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
 (only affects modules that are designed to do parallel processing)')
