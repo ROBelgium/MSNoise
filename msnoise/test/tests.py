@@ -602,6 +602,38 @@ class MSNoiseTests(unittest.TestCase):
         parsed_crondays = s01scan_archive.parse_crondays('3w4d12h')
         self.assertEqual(parsed_crondays, datetime.timedelta(days=3*7+4, seconds=12*3600))
 
+    def test_301_compute_psd(self):
+        from ..ppsd_compute import main
+        try:
+            main()
+        except:
+            traceback.print_exc()
+            self.fail()
+
+    def test_302_psd2hdf(self):
+        from ..psd_to_hdf import main
+        try:
+            main()
+        except:
+            traceback.print_exc()
+            self.fail()
+
+    def test_303_hdf2rms(self):
+        from ..psd_compute_rms import main
+        try:
+            main()
+        except:
+            traceback.print_exc()
+            self.fail()
+
+    def test_304_export_rms(self):
+        from ..psd_export_rms import main
+        try:
+            main()
+        except:
+            traceback.print_exc()
+            self.fail()
+
     # def test_999_S01installer(self):
     #     if "TRAVIS_OS_NAME" not in os.environ:
     #         print("Seems to be running on local machine, skipping MySQL test")
