@@ -5,8 +5,7 @@ from obspy.core.util import AttribDict
 
 def get_defaults():
     df = pd.read_csv(os.path.join(os.path.dirname(os.path.realpath(__file__)), "default.csv"),
-                     delimiter=",", error_bad_lines=False, warn_bad_lines=True,
-                     encoding="latin-1", index_col=0)
+                     delimiter=",", encoding="latin-1", index_col=0)
     df["type"] = [pydoc.locate(t) for t in df["type"].values]
     df = df.fillna("")
 
