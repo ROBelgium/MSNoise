@@ -187,8 +187,8 @@ def declare_tables(prefix=None):
         ref = Column(Integer, primary_key=True)
         net = Column(String(10))
         sta = Column(String(10))
-        used_location_codes = Column(String(20))
-        used_channel_names = Column(String(20))
+        used_location_codes = Column(String(200))
+        used_channel_names = Column(String(200))
 
         X = Column(REAL())
         Y = Column(REAL())
