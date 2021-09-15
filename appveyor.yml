@@ -37,7 +37,7 @@ install:
   - activate test-environment
   # Install default dependencies
   - "%CMD_IN_ENV% conda install --yes -q pip"
-  - "%CMD_IN_ENV% conda install --yes -q scipy matplotlib pandas sqlalchemy pytables"
+  - "%CMD_IN_ENV% conda install --yes -q scipy matplotlib pandas sqlalchemy pytables xarray"
   - "%CMD_IN_ENV% conda install --yes -q sphinx jinja2 flask pymysql click"
   - "%CMD_IN_ENV% conda install --yes -q lxml"
   - "%CMD_IN_ENV% conda install --yes -c conda-forge obspy"

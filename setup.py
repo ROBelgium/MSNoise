@@ -37,7 +37,8 @@ setup(version=get_git_version(),
           'wtforms',
           'jinja2',
           'scandir',  # useful for python < 3.5
-          'logbook'
+          'logbook',
+          'xarray'  # new in 2.0
       ],
       extras_require={
           'doc': [
