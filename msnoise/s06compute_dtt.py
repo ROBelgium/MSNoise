@@ -228,9 +228,8 @@ def main(interval=1, loglevel="INFO"):
                                 tindex = np.where((tArray >= rmlag) & (tArray <= rMlag))[0]
                             
                             tmp = np.setdiff1d(np.arange(len(tArray)),tindex)
-                            df['err'][tmp] = 1.0
-                            df['coh'][tmp] = 0.0
-                            
+                            df.loc[:, 'err'].iloc[tmp] = 1.0
+                            df.loc[:, 'coh'].iloc[tmp] = 0.0
                             if first:
                                 tArray = df.index.values
                                 dtArray = df['dt']
