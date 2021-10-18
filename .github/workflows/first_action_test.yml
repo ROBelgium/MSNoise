@@ -22,14 +22,17 @@ jobs:
         environment-file: .github/environment.yml
 
     - name: print package info
+      shell: bash -l {0}
       run: |
         conda info -a
         conda list
 
     - name: Install MSNoise
+      shell: bash -l {0}
       run: |
         pip install -e .
 
     - name: Test suite
+      shell: bash -l {0}
       run: |
         msnoise test
