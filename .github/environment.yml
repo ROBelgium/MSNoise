@@ -1,4 +1,4 @@
-name: test
+name: base
 channels:
   - conda-forge
   - defaults
