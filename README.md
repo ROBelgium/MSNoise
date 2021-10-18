@@ -2,8 +2,7 @@ MSNoise
 =======
 A Python Package for Monitoring Seismic Velocity Changes using Ambient Seismic Noise.
 
-CI Builds: [![Github Action Status](https://github.com/ROBelgium/MSNoise/actions/workflows/first_action_test.yml/badge.svg)](https://github.com/ROBelgium/MSNoise/actions) [![Build Status](https://travis-ci.org/ROBelgium/MSNoise.png)](https://travis-ci.org/ROBelgium/MSNoise)
-[![Build status](https://ci.appveyor.com/api/projects/status/82k4dw58jhadfung?svg=true)](https://ci.appveyor.com/project/ThomasLecocq/msnoise)
+CI Builds: [![Github Action Status](https://github.com/ROBelgium/MSNoise/actions/workflows/first_action_test.yml/badge.svg)](https://github.com/ROBelgium/MSNoise/actions)
 [![codecov](https://codecov.io/gh/ROBelgium/MSNoise/branch/master/graph/badge.svg)](https://codecov.io/gh/ROBelgium/MSNoise)
 
 PyPI: [![PyPI version](https://badge.fury.io/py/msnoise.svg)](https://pypi.org/project/msnoise/) [![PyPI downloads](https://img.shields.io/pypi/dm/msnoise.svg)](https://pypi.org/project/msnoise/)
