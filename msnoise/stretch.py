@@ -196,7 +196,17 @@ def main():
                         output = os.path.join('STR', "%02i" % filterid, "%03i_DAYS" % mov_stack, components)
                         if not os.path.isdir(output):
                             os.makedirs(output)
-                        df.to_csv(os.path.join(output, "%s.csv" % ref_name), index_label="Date")
+                        fn = os.path.join(output, "%s.csv" % ref_name)
+                        if not os.path.isfile(fn):
+                            df.to_csv(fn, index_label="Date")
+                        else:
+                            dest = pd.read_csv(fn, index_col=0,
+                                               parse_dates=True)
+                            final = pd.concat([dest, df])
+                            final = final[~final.index.duplicated(keep='last')]
+                            final = final.sort_index()
+                            final.to_csv(fn, index_label="Date")
+                            # df.to_csv(os.path.join(output, "%s.csv" % ref_name), index_label="Date")
 
         # THIS SHOULD BE IN THE API
         updated = False
