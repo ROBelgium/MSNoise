@@ -13,6 +13,4 @@ dependencies:
   - click
   - pandas
   - folium
-  - pip:
-      - pyimgur
-      - -e..
+  - pip
