@@ -1,4 +1,4 @@
-name: base
+name: test
 channels:
   - conda-forge
   - defaults
@@ -14,3 +14,5 @@ dependencies:
   - pandas
   - folium
   - pip
+  - pymysql
+  
