@@ -18,3 +18,4 @@ dependencies:
   - folium
   - pip
   - pymysql
+  - xarray

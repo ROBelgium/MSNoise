@@ -123,8 +123,6 @@ def main(stype, interval=1.0, loglevel="INFO"):
     logger.debug('Starting the %s stack' % stype)
     db = connect()
 
-    start, end, datelist = build_movstack_datelist(db)
-
     params = get_params(db)
     taxis = get_t_axis(db)
     mov_stack = params.mov_stack
@@ -158,8 +156,8 @@ def main(stype, interval=1.0, loglevel="INFO"):
                 sta2 = sta2
                 print('Processing %s-%s-%i' %
                       (pair, components, filterid))
-                #TODO should only load data for jobs !
-                c = get_results(db, sta1, sta2, filterid, components, datelist,
+
+                c = get_results(db, sta1, sta2, filterid, components, days,
                                 mov_stack=1, format="xarray")
                 path = os.path.join("STACKS2", "%02i" % filterid,
                                     "001_DAYS", "%s" % components)
