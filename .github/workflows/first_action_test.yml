@@ -18,7 +18,7 @@ jobs:
       with:
         miniconda-version: 'latest'
         python-version: ${{ matrix.python-version }}
-        activate-environment: base
+        activate-environment: test
         environment-file: .github/environment.yml
 
     - name: print package info
