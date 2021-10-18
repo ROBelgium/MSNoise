@@ -1,4 +1,4 @@
-name: Test suite on github actions
+name: Full test suite
 
 on: [push]
 
