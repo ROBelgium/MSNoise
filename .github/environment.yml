@@ -7,6 +7,8 @@ dependencies:
   - sqlalchemy
   - flask
   - flask-admin
+  - flask-wtf
+  - markdown
   - scandir
   - logbook
   - pytables
@@ -15,4 +17,3 @@ dependencies:
   - folium
   - pip
   - pymysql
-  
