@@ -5,12 +5,11 @@ on: [push]
 jobs:
   run_tests:
     runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, '+DOCS')
+    if: "contains(github.event.head_commit.message, '+DOCS')"
 
     steps:
     - uses: actions/checkout@v2
     
     - name: Say Hello Docs
-      shell: bash -l {0}
       run: |
-        echo "Hello, I will build the docs!"
+        echo "Hello doc builder"
