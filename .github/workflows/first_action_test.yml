@@ -1,4 +1,4 @@
-name: Python Package using Conda
+name: Test suite on github actions
 
 on: [push]
 
