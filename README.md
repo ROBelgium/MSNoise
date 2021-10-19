@@ -43,6 +43,11 @@ Remember, always consider the current GitHub *master* as not stable!
 
 Getting Help
 ------------
+
+✨ We are trying to move the MSNoise help to https://github.com/ROBelgium/MSNoise/discussions the GitHub Discussions, so everything will be grouped here. For now, the mailing list (below) will still work, as well as the Gitter Chat, but try to use either the Discussions and the Gitter for questions !✨
+
+--
+
 The best way to get help is to subscribe to the Mailing List and ask your question directly there. It is available on 
 http://mailman-as.oma.be/mailman/listinfo/msnoise and the archive is http://mailman-as.oma.be/pipermail/msnoise/ or https://www.mail-archive.com/msnoise@mailman-as.oma.be/.
 
