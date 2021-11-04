@@ -28,8 +28,9 @@ def df_rms(d, freqs, output="VEL"):
     d = d.dropna(axis=1, how='all')
     RMS = {}
     for fmin, fmax in freqs:
-
-        ix = np.where((d.columns >= fmin) & (d.columns <= fmax))[0]
+        pmin = 1. / fmax
+        pmax = 1. / fmin
+        ix = np.where((d.columns >= pmin) & (d.columns <= pmax))[0]
         spec = d.iloc[:, ix]
         f = d.columns[ix]
 
