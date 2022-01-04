@@ -123,7 +123,7 @@ def create_indices(session, prefix):
 
 
 def main(tech=None, hostname=None, username=None, password=None,
-         database="msnoise", filename="msnoise.sqlite", prefix=None):
+         database="msnoise", filename=None, prefix=None):
     """
     Create the db.ini file and create database.
 
