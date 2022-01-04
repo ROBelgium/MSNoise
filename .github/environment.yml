@@ -1,0 +1,19 @@
+name: test
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - obspy
+  - sqlalchemy
+  - flask
+  - flask-admin
+  - flask-wtf
+  - markdown
+  - scandir
+  - logbook
+  - pytables
+  - click
+  - pandas
+  - folium
+  - pip
+  - pymysql

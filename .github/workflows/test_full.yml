@@ -1,0 +1,41 @@
+name: Full test suite
+
+on: [push]
+
+jobs:
+  run_tests:
+    runs-on: ${{ matrix.os }}
+    if: |
+      !contains(github.event.head_commit.message, '+ONLYDOCS') &&
+      !contains(github.event.head_commit.message, '+NOFULLTEST')
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.8', '3.9', '3.10']
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Setup conda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        miniconda-version: 'latest'
+        python-version: ${{ matrix.python-version }}
+        activate-environment: test
+        environment-file: .github/environment.yml
+
+    - name: print package info
+      shell: bash -l {0}
+      run: |
+        conda info -a
+        conda list
+
+    - name: Install MSNoise
+      shell: bash -l {0}
+      run: |
+        pip install -e .
+
+    - name: Test suite
+      shell: bash -l {0}
+      run: |
+        msnoise test
