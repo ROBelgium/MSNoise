@@ -26,14 +26,15 @@ jobs:
             prefix: C:\Miniconda3\envs\anaconda-client-env
 
     steps:
-      - name: Setup Mambaforge
-          uses: conda-incubator/setup-miniconda@v2.1.1
-          with:
-            miniforge-variant: Mambaforge
-            miniforge-version: latest
-            activate-environment: test
-            use-mamba: true
-            python-version: ${{ matrix.python-version }}
+      - uses: actions/checkout@v2
+
+      - uses: conda-incubator/setup-miniconda@v2.1.1
+        with:
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          activate-environment: test
+          use-mamba: true
+          python-version: ${{ matrix.python-version }}
 
       - name: Set cache date
           run: echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
