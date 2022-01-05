@@ -2,7 +2,7 @@
 # Author: Douglas Creager <dcreager@dcreager.net>
 # adapted for msnoise from obspy
 # This file is placed into the public domain.
-
+# -----
 # Calculates the current version number.  If possible, this is the
 # output of “git describe”, modified to conform to the versioning
 # scheme that setuptools uses.  If “git describe” returns an error
