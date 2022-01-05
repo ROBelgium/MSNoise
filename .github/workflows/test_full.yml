@@ -26,8 +26,6 @@ jobs:
             prefix: C:\Miniconda3\envs\anaconda-client-env
 
     steps:
-      - uses: actions/checkout@v2
-
       - name: Setup Mambaforge
           uses: conda-incubator/setup-miniconda@v2.1.1
           with:
