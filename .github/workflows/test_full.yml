@@ -49,7 +49,7 @@ jobs:
         id: cache
 
       - name: Update environment
-        run: mamba env update -n anaconda-client-env -f .github/environment.yml
+        run: mamba env update -n test -f .github/environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: print package info
