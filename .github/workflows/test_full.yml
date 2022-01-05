@@ -37,16 +37,16 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set cache date
-          run: set DATE=$(date +'%Y%m%d')
+          run: echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
 
-            - uses: actions/cache@v2
-              with:
-                path: ${{ matrix.prefix }}
-                key: ${{ matrix.label }}-conda-py${{ matrix.python-version }}-${{ hashFiles('.github/environment.yml') }}-${{ env.DATE }}-${{ env.CACHE_NUMBER }}
-              env:
-                # Increase this value to reset cache if etc/example-environment.yml has not changed
-                CACHE_NUMBER: 0
-              id: cache
+      - uses: actions/cache@v2
+        with:
+          path: ${{ matrix.prefix }}
+          key: ${{ matrix.label }}-conda-py${{ matrix.python-version }}-${{ hashFiles('.github/environment.yml') }}-${{ env.DATE }}-${{ env.CACHE_NUMBER }}
+        env:
+          # Increase this value to reset cache if etc/example-environment.yml has not changed
+          CACHE_NUMBER: 0
+        id: cache
 
       - name: Update environment
         run: mamba env update -n anaconda-client-env -f .github/environment.yml
