@@ -12,26 +12,11 @@ except:
     import pickle as cPickle
 import math
 
-import sys
-
 from logbook import Logger, StreamHandler
 import sys
 
-from sqlalchemy import create_engine, func, text
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import NullPool
-from sqlalchemy.sql.expression import func
 import numpy as np
 import pandas as pd
-import scipy as sp
-
-if sp.__version__ < "1.4.0":
-    import scipy.fftpack as sf
-    from scipy.fftpack.helper import next_fast_len
-    import scipy.fftpack._fftpack as sff
-else:
-    import scipy.fft as sf
-    from scipy.fft import next_fast_len
 
 
 from . import DBConfigNotFoundError
@@ -82,6 +67,8 @@ def get_engine(inifile=None):
     :rtype: :class:`sqlalchemy.engine.Engine`
     :returns: An :class:`~sqlalchemy.engine.Engine` Object
     """
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import NullPool
     dbini = read_db_inifile(inifile)
     if dbini.tech == 1:
         engine = create_engine('sqlite:///%s' % dbini.hostname, echo=False,
@@ -112,6 +99,7 @@ def connect(inifile=None):
     :returns: A :class:`~sqlalchemy.orm.session.Session` object, needed for
         many of the other API methods.
     """
+    from sqlalchemy.orm import sessionmaker
     if not inifile:
         inifile = os.path.join(os.getcwd(), 'db.ini')
 
@@ -712,7 +700,7 @@ def get_data_availability(session, net=None, sta=None, loc=None, chan=None,
     :rtype: list
     :returns: list of :class:`~msnoise.msnoise_table_def.declare_tables.DataAvailability`
     """
-
+    from sqlalchemy.sql.expression import func
     if not starttime:
         data = session.query(DataAvailability).\
             filter(DataAvailability.net == net).\
@@ -776,7 +764,7 @@ def count_data_availability_flags(session):
     :rtype: list
     :returns: list of [count, flag] pairs
     """
-
+    from sqlalchemy.sql.expression import func
     return session.query(func.count(DataAvailability.flag),
                          DataAvailability.flag).\
         group_by(DataAvailability.flag).all()
@@ -809,6 +797,7 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
     :rtype: :class:`~msnoise.msnoise_table_def.declare_tables.Job` or None
     :returns: If returnjob is True, returns the modified/inserted Job.
     """
+    from sqlalchemy import text
     if ref:
         job = session.query(Job).filter(text("ref=:ref")).params(ref=ref).first()
     else:
@@ -983,6 +972,7 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
         Days of the next DTT jobs -
         Job IDs (for later being able to update their flag).
     """
+    from sqlalchemy.sql.expression import func
     if read_db_inifile().tech == 2:
         rand = func.rand
     else:
@@ -1072,7 +1062,7 @@ def get_job_types(session, jobtype='CC'):
     :rtype: list
     :returns: list of [count, flag] pairs
     """
-
+    from sqlalchemy.sql.expression import func
     return session.query(func.count(Job.flag), Job.flag).\
         filter(Job.jobtype == jobtype).group_by(Job.flag).all()
 
@@ -1692,6 +1682,7 @@ def updated_days_for_dates(session, date1, date2, pair, jobtype='CC',
     :returns: List of days if returndays is True, only "True" if not.
         (not clear!)
     """
+    from sqlalchemy import text
     lastmod = datetime.datetime.now() - interval
     if pair == '%':
         days = session.query(Job).\
@@ -1899,31 +1890,6 @@ def make_same_length(st):
 
     st = st.split()
     return st
-
-#
-# def clean_scipy_cache():
-#     """This functions wraps all destroy scipy cache at once. It is a workaround
-#     to the memory leak induced by the "caching" functions in scipy fft."""
-#     if sp.__version__ >= "1.4.0":
-#         return
-#     sff.destroy_zfft_cache()
-#     sff.destroy_zfftnd_cache()
-#     sff.destroy_drfft_cache()
-#     sff.destroy_cfft_cache()
-#     sff.destroy_cfftnd_cache()
-#     sff.destroy_rfft_cache()
-#     sff.destroy_ddct2_cache()
-#     sff.destroy_ddct1_cache()
-#     # sff.destroy_ddct4_cache()
-#     sff.destroy_dct2_cache()
-#     sff.destroy_dct1_cache()
-#     # sff.destroy_dct4_cache()
-#     sff.destroy_ddst2_cache()
-#     sff.destroy_ddst1_cache()
-#     sff.destroy_dst2_cache()
-#     sff.destroy_dst1_cache()
-#     sf.convolve.destroy_convolve_cache()
-
 
 def preload_instrument_responses(session, return_format="dataframe"):
     """

@@ -205,7 +205,10 @@ from .move2obspy import pcc_xcorr
 from .preprocessing import preprocess
 
 from scipy.stats import scoreatpercentile
+
 import scipy.signal
+import scipy.fftpack as sf
+from scipy.fftpack import next_fast_len
 from obspy.signal.filter import bandpass
 
 
@@ -297,10 +300,8 @@ def main(loglevel="INFO"):
 
         comps = []
         for comp in params.all_components:
-            if comp[0] in ["Z", "E", "N", "1", "2"]:
-                comps.append(comp[0])
-            if comp[1] in ["Z", "E", "N", "1", "2"]:
-                comps.append(comp[1])
+            comps.append(comp[0])
+            comps.append(comp[1])
 
         comps = np.unique(comps)
         stream = preprocess(db, stations, comps, goal_day, params, responses)
