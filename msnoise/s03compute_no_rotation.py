@@ -485,7 +485,7 @@ def main(loglevel="INFO"):
                         _data[i] = bandpass(_, freqmin=filterlow,
                                             freqmax=filterhigh,
                                             df=params.goal_sampling_rate,
-                                            corners=8)                        
+                                            corners=8)
 
                 # First let's compute the AC and SC
                 if len(single_station_pair_index_ac):
