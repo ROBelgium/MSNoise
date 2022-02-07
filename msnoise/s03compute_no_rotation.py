@@ -487,7 +487,6 @@ def main(loglevel="INFO"):
                                             df=params.goal_sampling_rate,
                                             corners=8)                        
 
-
                 # First let's compute the AC and SC
                 if len(single_station_pair_index_ac):
                     tmp = _data.copy()
