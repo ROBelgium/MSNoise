@@ -486,6 +486,11 @@ def main(loglevel="INFO"):
                                             freqmax=filterhigh,
                                             df=params.goal_sampling_rate,
                                             corners=8)
+                        if params.clip_after_whiten:
+                            logger.debug("Winsorizing (clipping) data after bandpass (AC)")
+                            _data[i] = winsorizing(_data[i], params, input="timeseries")
+
+
 
                 # First let's compute the AC and SC
                 if len(single_station_pair_index_ac):
