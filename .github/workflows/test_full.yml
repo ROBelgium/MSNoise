@@ -63,7 +63,7 @@ jobs:
         run: |
           pip install -e .
 
-    - name: Test suite
-      shell: bash -l {0}
-      run: |
-        msnoise utils test
+      - name: Test suite
+        shell: bash -l {0}
+        run: |
+          msnoise utils test
