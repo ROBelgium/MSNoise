@@ -121,7 +121,7 @@ def main(interval=1, loglevel="INFO"):
                     MCOH.iloc[:, tmp] *= 0.0
 
                     MCOH[MCOH < params.dtt_mincoh] = 0.0
-                    EM[EM > params.dtt_maxerr] *= 1.0
+                    EM[EM > params.dtt_maxerr] = 1.0
 
                     # TODO missing check on max_dt !!
 
@@ -161,3 +161,5 @@ def main(interval=1, loglevel="INFO"):
                     rr = d.to_xarray().to_dataset(name="DTT")
                     rr = xr_insert_or_update(dr, rr)
                     xr_save_and_close(rr, out)
+        massive_update_job(db, jobs, "D")
+    logger.info('*** Finished: Compute DTT ***')

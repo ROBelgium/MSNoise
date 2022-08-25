@@ -171,13 +171,14 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         traces.append(tr)
                     del st
                 stream = Stream(traces=traces)
+                del traces
                 if not(len(stream)):
                     continue
                 f = io.BytesIO()
                 stream.write(f, format='MSEED')
                 f.seek(0)
                 stream = read(f, format="MSEED")
-
+                del f
                 stream.sort()
                 # try:
                 #     # HACK not super clean... should find a way to prevent the
@@ -235,6 +236,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
 
                 if not len(stream):
                     logger.debug(" has only too small traces, skipping...")
+                    del stream
                     continue
 
                 for trace in stream:
