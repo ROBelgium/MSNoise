@@ -299,9 +299,9 @@ def smooth(x, window='boxcar', half_win=3):
     # to apply the window at the borders
     s = np.r_[x[window_len - 1:0:-1], x, x[-1:-window_len:-1]]
     if window == "boxcar":
-        w = scipy.signal.boxcar(window_len).astype('complex')
+        w = scipy.signal.windows.boxcar(window_len).astype('complex')
     else:
-        w = scipy.signal.hanning(window_len).astype('complex')
+        w = scipy.signal.windows.hann(window_len).astype('complex')
     y = np.convolve(w / w.sum(), s, mode='valid')
     return y[half_win:len(y) - half_win]
 
