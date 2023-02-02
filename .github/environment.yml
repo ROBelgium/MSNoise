@@ -13,6 +13,7 @@ dependencies:
   - markdown
   - scandir
   - logbook
+  - pytables
   - click
   - pandas
   - folium
