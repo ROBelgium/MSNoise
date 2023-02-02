@@ -7,7 +7,7 @@ CI Builds: [![Github Action Status](https://github.com/ROBelgium/MSNoise/actions
 
 PyPI: [![PyPI version](https://badge.fury.io/py/msnoise.svg)](https://pypi.org/project/msnoise/) [![PyPI downloads](https://img.shields.io/pypi/dm/msnoise.svg)](https://pypi.org/project/msnoise/)
 
-Conda: [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/msnoise.svg)](https://anaconda.org/conda-forge/msnoise) [![Conda Version](https://img.shields.io/conda/vn/conda-forge/msnoise.svg)](https://anaconda.org/conda-forge/msnoise) [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/msnoise.svg)](https://anaconda.org/conda-forge/msnoise)
+Conda: [![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/msnoise.svg)](https://anaconda.org/conda-forge/msnoise) [![Conda Version](https://anaconda.org/conda-forge/msnoise/badges/version.svg)](https://anaconda.org/conda-forge/msnoise) [![Conda Platforms](https://img.shields.io/conda/pn/conda-forge/msnoise.svg)](https://anaconda.org/conda-forge/msnoise)
 
 MSNoise is the first complete software package for computing and monitoring relative velocity variations using ambient seismic noise. 
 MSNoise is a fully-integrated solution that automatically scans data archives and determines which jobs need to be done whenever the scheduled task is executed. 
