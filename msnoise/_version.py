@@ -2,7 +2,7 @@
 # Author: Douglas Creager <dcreager@dcreager.net>
 # adapted for msnoise from obspy
 # This file is placed into the public domain.
-# -----
+
 # Calculates the current version number.  If possible, this is the
 # output of “git describe”, modified to conform to the versioning
 # scheme that setuptools uses.  If “git describe” returns an error
@@ -18,6 +18,8 @@
 # setup(
 #     version=get_git_version(),
 #     .
+#     .
+#     .
 # )
 #
 # This will automatically update the RELEASE-VERSION file, if
@@ -32,15 +34,15 @@
 
 # NO IMPORTS FROM msnoise OR FUTURE IN THIS FILE! (file gets used at
 # installation time)
-
 import inspect
 import io
 import os
 import re
 from subprocess import STDOUT, CalledProcessError, check_output
+import warnings
 
 
-__all__ = ("get_git_version")
+__all__ = ["get_git_version"]
 
 script_dir = os.path.abspath(os.path.dirname(inspect.getfile(
                                              inspect.currentframe())))
@@ -104,12 +106,13 @@ def call_git_describe(abbrev=10, dirty=True,
     # (this line prevents official releases)
     # should work again now, see #482 and obspy/obspy@b437f31
     if "-" not in line and "." not in line:
-        version = "0.0.0+dev+.g%s" % line
+        version = "0.0.0.dev+0.g%s" % line
     else:
         parts = line.split('-', 1)
         version = parts[0]
         try:
-            version += '+post+' + parts[1]
+            modifier = '+' if '.post' in version else '.post+'
+            version += modifier + parts[1]
             if remote_tracking_branch is not None:
                 version += '.' + remote_tracking_branch
         # IndexError means we are at a release version tag cleanly,
@@ -141,7 +144,6 @@ def get_git_version(abbrev=10, dirty=True, append_remote_tracking_branch=True):
     version = call_git_describe(
         abbrev, dirty=dirty,
         append_remote_tracking_branch=append_remote_tracking_branch)
-
     # If that doesn't work, fall back on the value that's in
     # RELEASE-VERSION.
     if version is None:
@@ -149,6 +151,11 @@ def get_git_version(abbrev=10, dirty=True, append_remote_tracking_branch=True):
 
     # If we still don't have anything, that's an error.
     if version is None:
+        warnings.warn("ObsPy could not determine its version number. Make "
+                      "sure it is properly installed. This for example "
+                      "happens when installing from a zip archive "
+                      "of the ObsPy repository which is not a supported way "
+                      "of installing ObsPy.")
         return '0.0.0+archive'
 
     # pip uses its normalized version number (strict PEP440) instead of our
@@ -169,29 +176,29 @@ def _normalize_version(version):
     """
     Normalize version number string to adhere with PEP440 strictly.
     """
-    # we have a clean release version:
-    if re.match(r'^[0-9]+?\.[0-9]+?\.[0-9]+?$', version):
-        return version
-    # we have a release candidate version:
-    elif re.match(r'^[0-9]+?\.[0-9]+?\.[0-9]+?rc[0-9]+?$', version):
-        return version
-    # we have a dev tag version:
-    elif re.match(r'^[0-9]+?\.[0-9]+?\.[0-9]+?\.dev+?$', version):
+    pattern = (
+        r'^[0-9]+?\.[0-9]+?\.[0-9]+?'
+        r'((a|b|rc)[0-9]+?)?'
+        r'(\.post[0-9]+?)?'
+        r'(\.dev[0-9]+?)?$'
+    )
+    # we have a clean release version or another clean version
+    # according to PEP 440
+    if re.match(pattern, version):
         return version
     # we have an old-style version (i.e. a git describe string), prepare it for
     # the rest of clean up, i.e. put the '.post+' as separator for the local
     # version number part
+    elif '.post' in version:
+        version = re.sub(r'-', '+', version, count=1)
     elif re.match(r'^[0-9]+?\.[0-9]+?\.[0-9]+?-[0-9]+?-g[0-9a-z]+?$', version):
         version = re.sub(r'-', '.post+', version, count=1)
     # only adapt local version part right
     version = re.match(r'(.*?\+)(.*)', version)
     # no upper case letters
-    try:
-        local_version = version.group(2).lower()
-        # only alphanumeric and "." in local part
-        local_version = re.sub(r'[^A-Za-z0-9.]', r'.', local_version)
-    except:
-        local_version = ""
+    local_version = version.group(2).lower()
+    # only alphanumeric and "." in local part
+    local_version = re.sub(r'[^A-Za-z0-9.]', r'.', local_version)
     version = version.group(1) + local_version
     # make sure there's a "0" after ".post"
     version = re.sub(r'\.post\+', r'.post0+', version)
@@ -199,4 +206,4 @@ def _normalize_version(version):
 
 
 if __name__ == "__main__":
-    print(get_git_version(dirty=True))
+    print(get_git_version())
