@@ -149,6 +149,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                             # print("done in", time.time()-t)
                         except:
                             logger.debug("ERROR reading file %s" % file)
+                            traceback.print_exc()
                             # TODO add traceback (optional?)
                             continue
                     for tr in st:
