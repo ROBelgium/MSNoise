@@ -4,7 +4,7 @@ channels:
   - defaults
 dependencies:
   - numpy
-  - scipy<1.9
+  - scipy
   - obspy
   - sqlalchemy
   - flask
