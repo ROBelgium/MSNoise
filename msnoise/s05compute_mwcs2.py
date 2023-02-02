@@ -84,13 +84,9 @@ from obspy.signal.invsim import cosine_taper
 from obspy.signal.regression import linear_regression
 
 import scipy
-if scipy.__version__ < "1.4.0":
-    import scipy.fftpack as sf
-    from scipy.fftpack.helper import next_fast_len
-    import scipy.fftpack._fftpack as sff
-else:
-    import scipy.fft as sf
-    from scipy.fft import next_fast_len
+
+import scipy.fft as sf
+from scipy.fft import next_fast_len
 
 def get_window(window="boxcar", half_win=3):
     window_len = 2 * half_win + 1

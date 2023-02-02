@@ -3,13 +3,8 @@ import logging
 
 import numpy as np
 import scipy
-if scipy.__version__ < "1.4.0":
-    import scipy.fftpack as sf
-    from scipy.fftpack.helper import next_fast_len
-    import scipy.fftpack._fftpack as sff
-else:
-    import scipy.fft as sf
-    from scipy.fft import next_fast_len
+import scipy.fft as sf
+from scipy.fft import next_fast_len
 
 import scipy.optimize
 import scipy.signal

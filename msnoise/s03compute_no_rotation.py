@@ -207,8 +207,8 @@ from .preprocessing import preprocess
 from scipy.stats import scoreatpercentile
 
 import scipy.signal
-import scipy.fftpack as sf
-from scipy.fftpack import next_fast_len
+import scipy.fft as sf
+from scipy.fft import next_fast_len
 from obspy.signal.filter import bandpass
 
 
