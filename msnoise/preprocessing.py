@@ -141,7 +141,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         try:
                             # print("Reading %s" % file)
                             # t=  time.time()
-                            st = read(file, dytpe=np.float,
+                            st = read(file, dytpe=float,
                                       starttime=UTCDateTime(gd),
                                       endtime=UTCDateTime(gd)+86400,
                                       station=sta,
