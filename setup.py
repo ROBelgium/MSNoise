@@ -38,7 +38,7 @@ setup(version=get_git_version(),
           'jinja2',
           'scandir',  # useful for python < 3.5
           'logbook',
-          'pytables', # not sure it's still required as I'm using xarray now
+          'pytables',
           'xarray'  # new in 2.0
       ],
       extras_require={

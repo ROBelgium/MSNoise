@@ -19,4 +19,4 @@ dependencies:
   - pip
   - pymysql
   - xarray
-  - pytables
+
