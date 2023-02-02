@@ -222,7 +222,7 @@ def winsorizing(data, params, input="timeseries", nfft=0):
         input1D = True
     if input == "fft":
         # data = np.real(sf.ifft(data, n=nfft, axis=1))
-        data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(np.float64)
+        data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(float64)
 
     for i in range(data.shape[0]):
         if params.windsorizing == -1:

@@ -164,7 +164,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     else:
                         st = tmp
                     for tr in st:
-                        tr.data = tr.data.astype(np.float)
+                        tr.data = tr.data.astype(float)
                         tr.stats.network = tr.stats.network.upper()
                         tr.stats.station = tr.stats.station.upper()
                         tr.stats.channel = tr.stats.channel.upper()
@@ -291,7 +291,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         continue
 
                 for tr in stream:
-                    tr.data = tr.data.astype(np.float32)
+                    tr.data = tr.data.astype(float)
                     if tr.stats.location == "":
                         tr.stats.location = "--"
                 output += stream

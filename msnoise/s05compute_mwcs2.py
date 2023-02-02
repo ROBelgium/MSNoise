@@ -210,7 +210,7 @@ def main(loglevel="INFO"):
                     # data = data.apply(ww, axis=1, result_type="broadcast")
 
                     # work on 2D mwcs:
-                    window_length_samples = np.int(
+                    window_length_samples = int(
                         f.mwcs_wlen * goal_sampling_rate)
 
                     padd = int(2 ** (nextpow2(window_length_samples) + 2))
@@ -247,9 +247,9 @@ def main(loglevel="INFO"):
                         fref = sf.fft(cri, n=padd)[:padd // 2]
 
                         fcur2 = np.real(fcur) ** 2 + np.imag(fcur) ** 2
-                        fcur2 = fcur2.astype(np.float64)
+                        fcur2 = fcur2.astype(float)
                         fref2 = np.real(fref) ** 2 + np.imag(fref) ** 2
-                        fref2 = fref2.astype(np.float64)
+                        fref2 = fref2.astype(float)
 
                         X = fref * fcur.conj()
                         if smoothing_half_win != 0:
@@ -257,12 +257,12 @@ def main(loglevel="INFO"):
                                 fcur2[i] = np.sqrt(
                                     scipy.signal.convolve(fcur2[i],
                                                           hanningwindow.astype(
-                                                              np.float64),
+                                                              float),
                                                           "same"))
 
                             fref2 = np.sqrt(scipy.signal.convolve(fref2,
                                                                   hanningwindow.astype(
-                                                                      np.float64),
+                                                                      float),
                                                                   "same"))
 
                             for i in range(X.shape[0]):
@@ -299,7 +299,7 @@ def main(loglevel="INFO"):
                         # Phase:
 
                         phi = np.angle(X)
-                        phi = phi.astype(np.float64)
+                        phi = phi.astype(float)
                         phi[:, 0] = 0.0
                         phi = np.unwrap(phi, axis=1)
                         phi = phi[:, index_range]
