@@ -143,8 +143,7 @@ from flask_admin.babel import ngettext, lazy_gettext
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.model import typefmt
 from wtforms.validators import ValidationError
-from wtforms.fields import SelectField, StringField, BooleanField
-from wtforms.fields.html5 import DateField
+from wtforms.fields import SelectField, StringField, BooleanField, DateField
 from wtforms.utils import unset_value
 from flask_wtf import Form
 from flask_admin.form import widgets
