@@ -42,9 +42,10 @@ setup(version=get_git_version(),
       ],
       extras_require={
           'doc': [
-              'sphinx>=1.6.1',
-              'sphinx_bootstrap_theme>=0.5.0',
+              'sphinx',
+              'sphinx_bootstrap_theme',
               'numpydoc',
+              'sphinx_gallery'
               ],
           },
       entry_points='''

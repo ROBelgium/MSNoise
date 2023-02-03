@@ -89,7 +89,7 @@ To run this script:
 
 .. code-block:: bash
 
-    msnoise compute_dtt
+    msnoise cc dvv compute_dtt
 
 
 Grouping Station Pairs

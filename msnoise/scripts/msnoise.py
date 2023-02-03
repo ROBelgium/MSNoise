@@ -278,7 +278,7 @@ def db():
 
 
 @db.command(name="init")
-@click.option('--tech', help='Database technology: 1=SQLite 2=MySQL',
+@click.option('--tech', help='Database technology: 1=SQLite 2=MySQL 3=PostgreSQL',
               default=None)
 def db_init(tech):
     """This command initializes the current folder to be a MSNoise Project

@@ -62,7 +62,7 @@ Once done, each job is marked "D"one in the database and, unless ``hpc`` is
 Usage:
 ~~~~~~
 
-.. include:: ../clickhelp/msnoise-stack.rst
+.. include:: ../clickhelp/msnoise-cc-stack.rst
 
 
 For most users, the REF stack will need to be computed only once for specific
@@ -75,17 +75,17 @@ dates and then, on routine basis, only compute the MOV stacks:
 
 .. code-block:: sh
 
-    $ msnoise stack -r
+    $ msnoise cc stack -r
     $ msnoise reset STACK
-    $ msnoise stack -m
+    $ msnoise cc stack -m
 
 as for all other steps, this procedure can be run in parallel:
 
 .. code-block:: sh
 
-    $ msnoise -t 4 stack -r
+    $ msnoise -t 4 cc stack -r
     $ msnoise reset STACK
-    $ msnoise -t 4 stack -m
+    $ msnoise -t 4 cc stack -m
 
 
 .. versionadded:: 1.4

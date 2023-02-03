@@ -5,7 +5,7 @@ The errors in the regression lines are also plotted as fainter lines.
 The time lags used to calculate the regression are shown in blue.
 
 
-.. include:: clickhelp/msnoise-plot-dtt.rst
+.. include:: ../clickhelp/msnoise-cc-dvv-plot-dtt.rst
 
 Example
 

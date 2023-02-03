@@ -2,7 +2,7 @@
 This plot shows the final output of MSNoise.
 
 
-.. include:: clickhelp/msnoise-plot-dvv.rst
+.. include:: ../clickhelp/msnoise-cc-dvv-plot-dvv.rst
 
 
 Example:

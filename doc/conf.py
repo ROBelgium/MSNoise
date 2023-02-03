@@ -145,6 +145,7 @@ sphinx_gallery_conf = {
      'show_memory': False,
      'thumbnail_size': (250, 250),
 }
+intersphinx_cache_limit = 5
 
 math_number_all = False
 todo_include_todos = True
@@ -377,12 +378,12 @@ man_pages = [
 
 intersphinx_mapping = {
 'python': ('https://docs.python.org/2.7/', None),
-'numpy': ('http://docs.scipy.org/doc/numpy/', None),
-'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
-'matplotlib': ('http://matplotlib.org/', None),
-'sqlalchemy': ('http://docs.sqlalchemy.org/en/latest/', None),
-'click': ('http://click.pocoo.org/5/', None,),
-'obspy': ('http://docs.obspy.org', None),
+'numpy': ('https://numpy.org/doc/stable/', None),
+'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+'matplotlib': ('https://matplotlib.org/stable/', None),
+'sqlalchemy': ('https://docs.sqlalchemy.org/en/20/', None),
+'click': ('https://click.palletsprojects.com/en/5.x/', None,),
+'obspy': ('https://docs.obspy.org/', None),
 'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None)
 }
 

@@ -121,14 +121,14 @@ To run this script:
 
 .. code-block:: sh
 
-    $ msnoise compute_cc
+    $ msnoise cc compute_cc
 
 
 This step also supports parallel processing/threading:
 
 .. code-block:: sh
 
-    $ msnoise -t 4 compute_cc
+    $ msnoise -t 4 cc compute_cc
 
 will start 4 instances of the code (after 1 second delay to avoid database
 conflicts). This works both with SQLite and MySQL but be aware problems

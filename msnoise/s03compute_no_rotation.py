@@ -76,8 +76,8 @@ this step:
 Computing the Cross-Correlations
 --------------------------------
 
-Processing using ``msnoise compute_cc``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Processing using ``msnoise cc compute_cc``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. todo:: We still need to describe the workflow in plain text, but the
     following graph should help you understand how the code is structured
@@ -93,8 +93,8 @@ Processing using ``msnoise compute_cc``
 
 
 
-Processing using ``msnoise compute_cc_rot``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Processing using ``msnoise cc compute_cc_rot``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Once all traces are preprocessed, station pairs are processed sequentially.
 If a component different from *ZZ* is to be computed, the traces are first
@@ -156,14 +156,14 @@ To run this script:
 
 .. code-block:: sh
 
-    $ msnoise compute_cc
+    $ msnoise cc compute_cc
 
 
 This step also supports parallel processing/threading:
 
 .. code-block:: sh
 
-    $ msnoise -t 4 compute_cc
+    $ msnoise -t 4 cc compute_cc
 
 will start 4 instances of the code (after 1 second delay to avoid database
 conflicts). This works both with SQLite and MySQL but be aware problems

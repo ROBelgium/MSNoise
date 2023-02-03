@@ -5,7 +5,7 @@ The parameters allow to plot the daily or the mov-stacked CCF. Filters and
 components are selectable too. Passing ``--refilter`` allows to bandpass filter
 CCFs before plotting (new in 1.5).
 
-.. include:: ../clickhelp/msnoise-plot-interferogram.rst
+.. include:: ../clickhelp/msnoise-cc-plot-interferogram.rst
 
 Example:
 

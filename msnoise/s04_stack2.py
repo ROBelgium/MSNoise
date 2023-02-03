@@ -62,7 +62,7 @@ Once done, each job is marked "D"one in the database and, unless ``hpc`` is
 Usage:
 ~~~~~~
 
-.. include:: ../clickhelp/msnoise-stack.rst
+.. include:: ../clickhelp/msnoise-cc-stack.rst
 
 
 For most users, the REF stack will need to be computed only once for specific

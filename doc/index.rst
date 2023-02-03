@@ -4,7 +4,8 @@ MSNoise - Documentation
 Originally, MSNoise was a "Python Package for Monitoring Seismic Velocity
 Changes using Ambient Seismic Noise". With the release of MSNoise 1.4, and
 because of the Plugin Support, we could call MSNoise: "Measuring with Seismic
-Noise". The current release version of MSNoise is **MSNoise 2.0**.
+Noise". The current release version of MSNoise is **MSNoise 2.0** and is a
+Python 3 version only.
 
 The standard MSNoise workflow is designed to go from seismic data archives to
 dv/v curves. The monitoring is achieved by computing the cross-correlation of
