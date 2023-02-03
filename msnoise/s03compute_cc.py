@@ -377,12 +377,11 @@ def main(loglevel="INFO"):
                         filterid = filterdb.ref
                         low = float(filterdb.low)
                         high = float(filterdb.high)
-                        rms_threshold = filterdb.rms_threshold
 
                         trames2hWb = np.zeros((2, int(nfft)), dtype=np.complex)
                         skip = False
                         for i, station in enumerate(pair):
-                            if tmp[i].data.std() > rms_threshold:
+                            if tmp[i].data.std() > 0:
                                 if whitening:
                                     #logger.debug("Whitening %s" % components)
                                     trames2hWb[i] = whiten(tmp[i].data, nfft,
@@ -397,7 +396,7 @@ def main(loglevel="INFO"):
                             else:
                                 skip = True
                                 logger.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'
-                                              % (tmp[i].data.std(), rms_threshold))
+                                              % (tmp[i].data.std(), 0))
                         if not skip:
                             corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False, nfft=nfft)
                             if not np.all(np.isfinite(corr)):
@@ -419,7 +418,7 @@ def main(loglevel="INFO"):
                                 allcorr[ccfid][thistime] = corr
 
                             del corr, thistime, trames2hWb, tmptime
-                        del low, high, rms_threshold
+                        del low, high
                     del tmp, tmp1, tmp2
 
                 if params.keep_all:

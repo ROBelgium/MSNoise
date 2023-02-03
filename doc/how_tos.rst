@@ -48,7 +48,7 @@ This recipe is a kind of "let's check this data rapidly":
 
     msnoise admin # add 1 filter in the Filter table
     # or
-    msnoise db execute "insert into filters (ref, low, mwcs_low, high, mwcs_high, rms_threshold, mwcs_wlen, mwcs_step, used) values (1, 0.1, 0.1, 1.0, 1.0, 0.0, 12.0, 4.0, 1)"
+    msnoise db execute "insert into filters (ref, low, mwcs_low, high, mwcs_high, mwcs_wlen, mwcs_step, used) values (1, 0.1, 0.1, 1.0, 1.0, 12.0, 4.0, 1)"
 
     msnoise cc compute_cc
     msnoise cc stack -r
@@ -134,7 +134,7 @@ do it either:
 
 * in the Admin 
 * using MySQL workbench connected to your MySQL server
-* using such commands ``msnoise db execute "insert into filters (ref, low, mwcs_low, high, mwcs_high, rms_threshold, mwcs_wlen, mwcs_step, used) values (1, 0.1, 0.1, 1.0, 1.0, 0.0, 12.0, 4.0, 1)"``
+* using such commands ``msnoise db execute "insert into filters (ref, low, mwcs_low, high, mwcs_high, mwcs_wlen, mwcs_step, used) values (1, 0.1, 0.1, 1.0, 1.0, 12.0, 4.0, 1)"``
 * using ``msnoise db dump``, edit the filter table in CSV format, then ``msnoise db import filters --force``
 
 Once done, the project is set up and should run. Again, test if all goes OK in

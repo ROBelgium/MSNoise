@@ -326,7 +326,7 @@ def get_filters(session, all=False):
 
 
 def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
-                  rms_threshold, mwcs_wlen, mwcs_step, used):
+                  mwcs_wlen, mwcs_step, used):
     """Updates or Insert a new Filter in the database.
 
     .. seealso:: :class:`msnoise.msnoise_table_def.declare_tables.Filter`
@@ -347,8 +347,6 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
     :type mwcs_high: float
     :type mwcs_high: The upper frequency bound of the linear regression done in
         WCS (in Hz)
-    :type rms_threshold: float
-    :param rms_threshold: Not used anymore
     :type mwcs_wlen: float
     :param mwcs_wlen: Window length (in seconds) to perform MWCS
     :type mwcs_step: float
@@ -363,7 +361,6 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
         filter.high = high
         filter.mwcs_low = mwcs_low
         filter.mwcs_high = mwcs_high
-        filter.rms_threshold = rms_threshold
         filter.mwcs_wlen = mwcs_wlen
         filter.mwcs_step = mwcs_step
         filter.used = used
@@ -373,7 +370,6 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
         filter.high = high
         filter.mwcs_low = mwcs_low
         filter.mwcs_high = mwcs_high
-        filter.rms_threshold = rms_threshold
         filter.mwcs_wlen = mwcs_wlen
         filter.mwcs_step = mwcs_step
         filter.used = used
