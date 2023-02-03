@@ -293,6 +293,11 @@ def get_params(session):
     params.all_components = np.unique(params.components_to_compute_single_station + \
                             params.components_to_compute)
 
+    if params.mov_stack.count(',') == 0:
+        params.mov_stack = [int(params.mov_stack), ]
+    else:
+        params.mov_stack = [int(mi) for mi in params.mov_stack.split(',')]
+
     return params
 
 # FILTERS PART

@@ -634,6 +634,13 @@ class MSNoiseTests(unittest.TestCase):
             traceback.print_exc()
             self.fail()
 
+    def test_999_run_manually(self):
+        os.system("msnoise reset STACK --all")
+        os.system("msnoise cc stack2 -m")
+        os.system("msnoise cc dvv compute_mwcs2")
+        os.system("msnoise cc dvv compute_dtt2")
+
+
     # def test_999_S01installer(self):
     #     if "TRAVIS_OS_NAME" not in os.environ:
     #         print("Seems to be running on local machine, skipping MySQL test")

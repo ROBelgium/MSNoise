@@ -117,21 +117,16 @@ def main(loglevel="INFO"):
     logger.info('*** Starting: Compute MWCS ***')
 
     db = connect()
-
-    export_format = get_config(db, 'export_format')
+    params = get_params(db)
+    export_format = params.export_format
     if export_format == "BOTH":
         extension = ".MSEED"
     else:
         extension = "." + export_format
-    mov_stack = get_config(db, "mov_stack")
-    if mov_stack.count(',') == 0:
-        mov_stacks = [int(mov_stack), ]
-    else:
-        mov_stacks = [int(mi) for mi in mov_stack.split(',')]
+    mov_stacks = params.mov_stack
 
-    goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-    maxlag = float(get_config(db, "maxlag"))
-    params = get_params(db)
+    goal_sampling_rate = params.cc_sampling_rate
+    maxlag = params.maxlag
 
     # First we reset all DTT jobs to "T"odo if the REF is new for a given pair
     # for station1, station2 in get_station_pairs(db, used=True):

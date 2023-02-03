@@ -81,17 +81,13 @@ from statsmodels.tsa.filters.hp_filter import hpfilter
 def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
          pairs=[], showALL=False, show=False, outfile=None):
     db = connect()
-
+    params = get_params(db)
     start, end, datelist = build_movstack_datelist(db)
 
     if mov_stack != 0:
         mov_stacks = [mov_stack, ]
     else:
-        mov_stack = get_config(db, "mov_stack")
-        if mov_stack.count(',') == 0:
-            mov_stacks = [int(mov_stack), ]
-        else:
-            mov_stacks = [int(mi) for mi in mov_stack.split(',')]
+        mov_stacks = params.mov_stack
 
     if components.count(","):
         components = components.split(",")

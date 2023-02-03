@@ -125,13 +125,9 @@ def main(stype, interval=1.0, loglevel="INFO"):
 
     params = get_params(db)
     taxis = get_t_axis(db)
-    mov_stack = params.mov_stack
-    if mov_stack.count(',') == 0:
-        mov_stacks = [int(mov_stack), ]
-    else:
-        mov_stacks = [int(mi) for mi in mov_stack.split(',')]
+    mov_stacks = params.mov_stack
     if 1 in mov_stacks:
-        mov_stacks.remove(1)  # remove 1 day stack, it should exist already
+        mov_stacks.remove(1)  # remove 1 day stack, it will be done automatically
 
     filters = get_filters(db, all=False)
     while is_dtt_next_job(db, flag='T', jobtype='STACK'):
