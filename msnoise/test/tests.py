@@ -311,6 +311,7 @@ class MSNoiseTests(unittest.TestCase):
         update_config(db, 'ref_end', '2011-01-01')
         update_config(db, 'startdate', '2009-01-01')
         update_config(db, 'enddate', '2011-01-01')
+        update_config(db, 'mov_stack', '1,2,5')
 
         interval = 1.
         main('ref', interval)
