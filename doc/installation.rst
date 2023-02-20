@@ -164,6 +164,9 @@ same interface/tool !
 
 MySQL/MariaDB configuration
 ---------------------------
+
+.. warning:: THIS SHOULD NOT BE necessary with current MASTER version (msnoise2)
+
 You can also set up a database server using MariaDB_, there are plenty tutorials
 of how to set it up as well. The new default character set for MySQL or 
 MariaDB is not simple utf8, so make sure that the configuration file

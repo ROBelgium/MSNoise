@@ -15,5 +15,5 @@ In a nutshell, all examples start with the following Python code:
     db = connect()
 
 This, if run in an MSNoise project folder (= a folder where you have already
-run ``msnoise db init``), will provide a ``Session`` object, connected to the
-database. 
+run ``msnoise db init`` (as explained in :ref:`workflow`)), will provide a
+``Session`` object, connected to the database. 

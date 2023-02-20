@@ -10,7 +10,7 @@ Plot a Reference CCF
 
 import os
 if "SPHINX_DOC_BUILD" in os.environ:
-    os.chdir(r"C:\tmp\msnoise_doc_project")
+    os.chdir(r"X:\msnoise2")
 
 import matplotlib
 matplotlib.use("agg")
@@ -39,7 +39,7 @@ params = get_params(db)
 taxis = get_t_axis(db)
 
 # Get the results for two station, filter id=1, ZZ component, mov_stack=1 and stack the results:
-n, ccf = get_results(db, "YA_UV05", "YA_UV12", 1, "ZZ", datelist, 1, format="stack", params=params)
+n, ccf = get_results(db, "YA.FLR.00", "YA.FOR.00", 1, "ZZ", datelist, 1, format="stack", params=params)
 
 plt.figure()
 plt.plot(taxis, ccf)
