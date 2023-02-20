@@ -89,7 +89,7 @@ To run this script:
 
 .. code-block:: bash
 
-    msnoise compute_dtt
+    msnoise cc dvv compute_dtt
 
 
 Grouping Station Pairs
@@ -153,11 +153,7 @@ def main(interval=1, loglevel="INFO"):
 
     start, end, datelist = build_movstack_datelist(db)
 
-    mov_stack = get_config(db, "mov_stack")
-    if mov_stack.count(',') == 0:
-        mov_stacks = [int(mov_stack), ]
-    else:
-        mov_stacks = [int(mi) for mi in mov_stack.split(',')]
+    mov_stacks = params.mov_stack
 
     components_to_compute = get_components_to_compute(db)
     updated_dtt = updated_days_for_dates(

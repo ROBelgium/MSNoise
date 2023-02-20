@@ -141,7 +141,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         try:
                             # print("Reading %s" % file)
                             # t=  time.time()
-                            st = read(file, dytpe=np.float,
+                            st = read(file, dytpe=float,
                                       starttime=UTCDateTime(gd),
                                       endtime=UTCDateTime(gd)+86400,
                                       station=sta,
@@ -149,6 +149,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                             # print("done in", time.time()-t)
                         except:
                             logger.debug("ERROR reading file %s" % file)
+                            traceback.print_exc()
                             # TODO add traceback (optional?)
                             continue
                     for tr in st:
@@ -163,7 +164,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     else:
                         st = tmp
                     for tr in st:
-                        tr.data = tr.data.astype(np.float)
+                        tr.data = tr.data.astype(float)
                         tr.stats.network = tr.stats.network.upper()
                         tr.stats.station = tr.stats.station.upper()
                         tr.stats.channel = tr.stats.channel.upper()
@@ -171,13 +172,14 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         traces.append(tr)
                     del st
                 stream = Stream(traces=traces)
+                del traces
                 if not(len(stream)):
                     continue
                 f = io.BytesIO()
                 stream.write(f, format='MSEED')
                 f.seek(0)
                 stream = read(f, format="MSEED")
-
+                del f
                 stream.sort()
                 # try:
                 #     # HACK not super clean... should find a way to prevent the
@@ -235,6 +237,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
 
                 if not len(stream):
                     logger.debug(" has only too small traces, skipping...")
+                    del stream
                     continue
 
                 for trace in stream:
@@ -288,7 +291,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         continue
 
                 for tr in stream:
-                    tr.data = tr.data.astype(np.float32)
+                    tr.data = tr.data.astype(float)
                     if tr.stats.location == "":
                         tr.stats.location = "--"
                 output += stream

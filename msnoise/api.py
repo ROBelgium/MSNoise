@@ -12,11 +12,18 @@ except:
     import pickle as cPickle
 import math
 
+import sys
+
 from logbook import Logger, StreamHandler
 import sys
 
+from sqlalchemy import create_engine, func, text
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
+from sqlalchemy.sql.expression import func
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 
 from . import DBConfigNotFoundError
@@ -286,6 +293,11 @@ def get_params(session):
     params.all_components = np.unique(params.components_to_compute_single_station + \
                             params.components_to_compute)
 
+    if params.mov_stack.count(',') == 0:
+        params.mov_stack = [int(params.mov_stack), ]
+    else:
+        params.mov_stack = [int(mi) for mi in params.mov_stack.split(',')]
+
     return params
 
 # FILTERS PART
@@ -314,7 +326,7 @@ def get_filters(session, all=False):
 
 
 def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
-                  rms_threshold, mwcs_wlen, mwcs_step, used):
+                  mwcs_wlen, mwcs_step, used):
     """Updates or Insert a new Filter in the database.
 
     .. seealso:: :class:`msnoise.msnoise_table_def.declare_tables.Filter`
@@ -335,8 +347,6 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
     :type mwcs_high: float
     :type mwcs_high: The upper frequency bound of the linear regression done in
         WCS (in Hz)
-    :type rms_threshold: float
-    :param rms_threshold: Not used anymore
     :type mwcs_wlen: float
     :param mwcs_wlen: Window length (in seconds) to perform MWCS
     :type mwcs_step: float
@@ -351,7 +361,6 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
         filter.high = high
         filter.mwcs_low = mwcs_low
         filter.mwcs_high = mwcs_high
-        filter.rms_threshold = rms_threshold
         filter.mwcs_wlen = mwcs_wlen
         filter.mwcs_step = mwcs_step
         filter.used = used
@@ -361,7 +370,6 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
         filter.high = high
         filter.mwcs_low = mwcs_low
         filter.mwcs_high = mwcs_high
-        filter.rms_threshold = rms_threshold
         filter.mwcs_wlen = mwcs_wlen
         filter.mwcs_step = mwcs_step
         filter.used = used
@@ -1440,6 +1448,13 @@ def get_results(session, station1, station2, filterid, components, dates,
         taxis = get_t_axis(session)
         return pd.DataFrame(stack_data, index=pd.DatetimeIndex(dates),
                             columns=taxis).loc[:lastday]
+    elif format == "xarray":
+        taxis = get_t_axis(session)
+        times = pd.DatetimeIndex(dates)
+        dr = xr.DataArray(stack_data, coords=[times, taxis],
+                          dims=["times", "taxis"]).dropna("times", how="all")
+        dr.name = "CCF"
+        return dr.to_dataset()
 
     elif format == "stack":
         logging.debug("Stacking...")
@@ -1789,7 +1804,7 @@ def check_and_phase_shift(trace, taper_length=20.0):
         FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
         FFTdata = FFTdata.astype(np.complex64)
         sf.ifft(FFTdata, n=n, overwrite_x=True)
-        trace.data = np.real(FFTdata[:len(trace.data)]).astype(np.float)
+        trace.data = np.real(FFTdata[:len(trace.data)]).astype(float)
         trace.stats.starttime += dt
         del FFTdata, fftfreq
         # clean_scipy_cache()
@@ -2022,6 +2037,7 @@ def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=Tru
         ppsd.save_npz(fn[:-4])
     return ppsd
 
+
 def psd_ppsd_to_dataframe(ppsd):
     from obspy import UTCDateTime
     ind_times = np.array(
@@ -2034,11 +2050,15 @@ def hdf_open_store_from_fn(fn, mode="a"):
     store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
     return store
 
-def hdf_open_store(seed_id, location=os.path.join("PSD", "HDF"), mode="a"):
-    pd.set_option('io.hdf.default_format', 'table')
+
+def hdf_open_store(filename, location=os.path.join("PSD", "HDF"), mode="a",
+                   format='table'):
+    if ".h5" in filename:
+        filename = filename.replace(".h5", "")
+    pd.set_option('io.hdf.default_format', format)
     if not os.path.isdir(location):
         os.makedirs(location)
-    fn = os.path.join(location, seed_id + ".h5")
+    fn = os.path.join(location, filename + ".h5")
     store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
     return store
 
@@ -2057,3 +2077,47 @@ def hdf_insert_or_update(store, key, new):
 def hdf_close_store(store):
     store.close()
     del store
+
+
+def xr_create_or_open(fn, taxis=[], name="CCF"):
+    if os.path.isfile(fn):
+        # load_dataset works (it loads content in mem and closes, open_dataset
+        # failed, the file handle was still open and it failed later.
+        ds = xr.load_dataset(fn)
+        return ds
+    if name == "CCF":
+        times = pd.date_range("2000-01-01", freq="H", periods=0)
+        data = np.random.random((len(times), len(taxis)))
+        dr = xr.DataArray(data, coords=[times, taxis], dims=["times", "taxis"])
+        dr.name = name
+    elif name == "MWCS":
+        times = pd.date_range("2000-01-01", freq="H", periods=0)
+        keys = ["M", "EM", "MCOH"]
+        data = np.random.random((len(times), len(taxis), len(keys)))
+        dr = xr.DataArray(data, coords=[times, taxis, keys],
+                          dims=["times", "taxis", "keys"])
+        dr.name = name
+    elif name == "DTT":
+        times = pd.date_range("2000-01-01", freq="H", periods=0)
+        keys = ["m", "em", "a", "ea", "m0", "em0"]
+        data = np.random.random((len(times), len(keys)))
+        dr = xr.DataArray(data, coords=[times, keys],
+                          dims=["times", "keys"])
+        dr.name = name
+    else:
+        print("Not implemented, name=%s invalid." % name)
+        sys.exit(1)
+    return dr.to_dataset()
+
+
+def xr_insert_or_update(dataset, new):
+    tt = new.merge(dataset, compat='override', combine_attrs="drop_conflicts")
+    return tt.combine_first(dataset)
+
+
+def xr_save_and_close(dataset, fn):
+    if not os.path.isdir(os.path.split(fn)[0]):
+        os.makedirs(os.path.split(fn)[0])
+    dataset.to_netcdf(fn, mode="w")
+    dataset.close()
+    del dataset

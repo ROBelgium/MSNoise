@@ -8,14 +8,14 @@ horizontal lines, and the minimum coherence or the maximum dt are in red.
 
 The ``filterid``, ``comp`` and ``mov_stack`` allow filtering the data used.
 
-.. include:: clickhelp/msnoise-plot-mwcs.rst
+.. include:: ../clickhelp/msnoise-cc-dvv-plot-mwcs.rst
 
 Example:
 
-``msnoise plot mwcs ID.KWUI ID.POSI -m 3`` will plot all defaults with the
+``msnoise cc dvv plot mwcs ID.KWUI ID.POSI -m 3`` will plot all defaults with the
 mov_stack = 3:
 
-.. image:: .static/mwcs.png
+.. image:: ../.static/mwcs.png
 
 """
 

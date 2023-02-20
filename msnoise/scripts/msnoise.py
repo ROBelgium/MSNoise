@@ -9,6 +9,9 @@ import time
 import click
 
 
+from .._version import get_git_version
+__version__ = get_git_version(dirty=True)
+
 from .. import MSNoiseError, DBConfigNotFoundError
 from ..api import connect, get_config, update_station, get_logger, get_job_types
 from ..msnoise_table_def import DataAvailability
@@ -69,7 +72,7 @@ def info_db_ini():
     """
     from ..api import read_db_inifile
     dbini = read_db_inifile()
-    click.echo('\nDatabase information stored in the db.ini file:')
+    click.echo('Database information stored in the db.ini file:')
     if dbini.tech == 1:
         click.echo(' - database type: SQLite')
         click.echo(' - filename: {}'.format(dbini.hostname))
@@ -140,8 +143,8 @@ def info_parameters(db):
     from ..api import get_filters
     from ..default import default
     click.echo('')
-    click.echo('Configuration values:\n'
-            '   | Normal colour indicates that the default value is used\n'
+    click.echo('Configuration values:'
+            '   | Normal colour indicates that the default value is used'
             '   | Green indicates "M"odified values')
     # TODO: add plugins params
     show_config_values(db, default.keys())
@@ -192,7 +195,7 @@ def info_jobs(db):
     jobtypes["QC"] = ["PSD", "PSD2HDF", "HDF2RMS"]
     jobtypes["CC"] = ["CC", "STACK", "MWCS", "DTT", "DVV"]
 
-    click.echo("\nJobs:")
+    click.echo("Jobs:")
     for category in ["QC", "CC"]:
         click.echo(' %s:' % category)
         for jobtype in jobtypes[category]:
@@ -224,8 +227,12 @@ def info_plugins(db):
                 for (n, jobtype) in get_job_types(db, row["name"]):
                     click.echo("  %s : %i" % (jobtype, n))
 
+from pkg_resources import iter_entry_points
 
-@click.group(context_settings=dict(max_content_width=120))
+# import click
+# from click_plugins import with_plugins
+# @with_plugins(iter_entry_points('click_command_tree'))
+@click.group(context_settings=dict(max_content_width=120), cls=OrderedGroup)
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
 (only affects modules that are designed to do parallel processing)')
 @click.option('-d', '--delay', default=1,  help='In the case of multi-threading'
@@ -236,6 +243,7 @@ def info_plugins(db):
 @click.option('-v', '--verbose', is_flag=True, callback=validate_verbosity)
 @click.option('-q', '--quiet', is_flag=True, default=False,
               callback=validate_verbosity)
+@click.version_option(__version__)
 @click.pass_context
 def cli(ctx, threads, delay, custom, verbose, quiet):
     ctx.obj['MSNOISE_threads'] = threads
@@ -255,33 +263,6 @@ def cli(ctx, threads, delay, custom, verbose, quiet):
     # sys.path.append(os.getcwd())
 
 
-# @with_plugins(iter_entry_points('msnoise.plugins'))
-@cli.group()
-def plugin():
-    """Runs a command in a named plugin"""
-    pass
-
-
-# @with_plugins(iter_entry_points('msnoise.plugins'))
-@cli.group()
-def p():
-    """Short cut for plugins"""
-    pass
-
-
-@cli.command()
-@click.option('-p', '--prefix', default="", help='Prefix for tables')
-@click.option('-c', '--content', default=False, is_flag=True)
-def test(prefix, content):
-    """Runs the test suite, should be executed in an empty folder!"""
-    import matplotlib.pyplot as plt
-    plt.switch_backend("agg")
-    if not content:
-        from ..test.tests import main
-    else:
-        from ..test.content_tests import main
-    main(prefix=prefix)
-
 
 @cli.command()
 @click.option('-p', '--port', default=5000, help='Port to open')
@@ -290,37 +271,89 @@ def admin(port):
     from ..msnoise_admin import main
     main(port)
 
-@cli.group()
+@cli.group(cls=OrderedGroup)
 def db():
-    """Top level command to interact with the database"""
+    """Commands to interact with the database"""
     pass
 
 
-@db.command(name='clean_duplicates')
-def clean_duplicates():
-    """Checks the Jobs table and deletes duplicate entries"""
-    from msnoise.api import connect, read_db_inifile
+@db.command(name="init")
+@click.option('--tech', help='Database technology: 1=SQLite 2=MySQL 3=PostgreSQL',
+              default=None)
+def db_init(tech):
+    """This command initializes the current folder to be a MSNoise Project
+    by creating a database and a db.ini file."""
+    click.echo('Launching the init')
+    from ..s000installer import main
+    main(tech)
 
-    dbini = read_db_inifile()
-    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
+
+@db.command(name="update_loc_chan")
+def db_da_stations_update_loc_chan():
+    """Populates the Location & Channel from the Data Availability
+    table. Warning: rewrites automatically, no confirmation."""
+    from msnoise.api import connect, get_stations
+
+    session = connect()
+    stations = get_stations(session)
+    for sta in stations:
+        data = session.query(DataAvailability). \
+            filter(text("net=:net")). \
+            filter(text("sta=:sta")). \
+            group_by(DataAvailability.net, DataAvailability.sta,
+                     DataAvailability.loc, DataAvailability.chan). \
+            params(net=sta.net, sta=sta.sta).all()
+        locids = list(set(sorted([d.loc for d in data])))
+        chans = list(set(sorted([d.chan for d in data])))
+        print("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
+                                                    locids, chans))
+        sta.used_location_codes = ",".join(locids)
+        sta.used_channel_names = ",".join(chans)
+        session.commit()
+
+@db.command(name="execute")
+@click.argument('sql_command')
+@click.option('-o', '--outfile', help='Output filename (?="request.csv")',
+              default=None, type=str)
+@click.option('-s', '--show', help='Show output (in case of SELECT statement)?',
+              default=True, type=bool)
+def db_execute(sql_command, outfile=None, show=True):
+    """EXPERT MODE: Executes 'sql_command' on the database. Use this command
+    at your own risk!!"""
+    from msnoise.api import connect
+
     db = connect()
-    if dbini.tech == 1:
-        query = 'DELETE FROM {0}jobs WHERE rowid NOT IN '\
-                '(SELECT MIN(rowid) FROM {0}jobs GROUP BY day,pair,jobtype)'\
-                .format(prefix)
-    else:
-        query = 'DELETE from {0}jobs USING {0}jobs as j1, {0}jobs as j2 '\
-                'WHERE (j1.ref > j2.ref) AND (j1.day=j2.day) '\
-                'AND (j1.pair=j2.pair) AND (j1.jobtype=j2.jobtype)'\
-                .format(prefix)
-    db.execute(query)
+    for cmd in sql_command.split(";"):
+        if not len(cmd):
+            continue
+        print("Executing '%s'" % cmd)
+        r = db.execute(cmd)
+        if cmd.count("select") or cmd.count("SELECT"):
+            result = r.fetchall()
+            if not len(result):
+                print("The query returned no results, sorry.")
+            else:
+                import pandas as pd
+                df = pd.DataFrame(result, columns=r.keys())
+                if show:
+                    pd.set_option('display.max_rows', None)
+                    pd.set_option('display.max_columns', None)
+                    pd.set_option('display.width', None)
+                    pd.set_option('display.max_colwidth', None)
+                    print(df)
+                if outfile:
+                    if outfile == "?":
+                        df.to_csv("request.csv")
+                    else:
+                        df.to_csv("%s" % outfile)
     db.commit()
     db.close()
 
 
-@db.command()
-def upgrade():
-    """Upgrade the database from previous to a new version.\n
+
+@db.command(name="upgrade")
+def db_upgrade():
+    """Upgrade the database from previous to a new version.
     This procedure adds new parameters with their default value
     in the config database.
     """
@@ -366,78 +399,82 @@ def upgrade():
     db.close()
 
 
-@db.command()
-@click.option('--tech', help='Database technology: 1=SQLite 2=MySQL',
-              default=None)
-def init(tech):
-    """This command initializes the current folder to be a MSNoise Project
-    by creating a database and a db.ini file."""
-    click.echo('Launching the init')
-    from ..s000installer import main
-    main(tech)
+@db.command(name='clean_duplicates')
+def db_clean_duplicates():
+    """Checks the Jobs table and deletes duplicate entries"""
+    from msnoise.api import connect, read_db_inifile
 
-
-@db.command()
-@click.argument('sql_command')
-@click.option('-o', '--outfile', help='Output filename (?="request.csv")',
-              default=None, type=str)
-@click.option('-s', '--show', help='Show output (in case of SELECT statement)?',
-              default=True, type=bool)
-def execute(sql_command, outfile=None, show=True):
-    """EXPERT MODE: Executes 'sql_command' on the database. Use this command
-    at your own risk!!"""
-    from msnoise.api import connect
-
+    dbini = read_db_inifile()
+    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
     db = connect()
-    for cmd in sql_command.split(";"):
-        if not len(cmd):
-            continue
-        print("Executing '%s'" % cmd)
-        r = db.execute(cmd)
-        if cmd.count("select") or cmd.count("SELECT"):
-            result = r.fetchall()
-            if not len(result):
-                print("The query returned no results, sorry.")
-            else:
-                import pandas as pd
-                df = pd.DataFrame(result, columns=r.keys())
-                if show:
-                    pd.set_option('display.max_rows', None)
-                    pd.set_option('display.max_columns', None)
-                    pd.set_option('display.width', None)
-                    pd.set_option('display.max_colwidth', None)
-                    print(df)
-                if outfile:
-                    if outfile == "?":
-                        df.to_csv("request.csv")
-                    else:
-                        df.to_csv("%s" % outfile)
+    if dbini.tech == 1:
+        query = 'DELETE FROM {0}jobs WHERE rowid NOT IN '\
+                '(SELECT MIN(rowid) FROM {0}jobs GROUP BY day,pair,jobtype)'\
+                .format(prefix)
+    else:
+        query = 'DELETE from {0}jobs USING {0}jobs as j1, {0}jobs as j2 '\
+                'WHERE (j1.ref > j2.ref) AND (j1.day=j2.day) '\
+                'AND (j1.pair=j2.pair) AND (j1.jobtype=j2.jobtype)'\
+                .format(prefix)
+    db.execute(query)
     db.commit()
     db.close()
 
 
-@db.command(name="update_loc_chan")
-def da_stations_update_loc_chan():
-    """EXPERT MODE: Populates the Location & Channel from the Data Availability
-    table. Warning: rewrites automatically, no confirmation."""
-    from msnoise.api import connect, get_stations
+@db.command(name="dump")
+@click.option("--format", default="csv")
+def db_dump(format):
+    """Dumps the complete database in formatted files, defaults to CSV.
+    """
+    from ..api import connect, get_engine
+    from sqlalchemy import MetaData
+    import pandas as pd
 
-    session = connect()
-    stations = get_stations(session)
-    for sta in stations:
-        data = session.query(DataAvailability). \
-            filter(text("net=:net")). \
-            filter(text("sta=:sta")). \
-            group_by(DataAvailability.net, DataAvailability.sta,
-                     DataAvailability.loc, DataAvailability.chan). \
-            params(net=sta.net, sta=sta.sta).all()
-        locids = sorted([d.loc for d in data])
-        chans = sorted([d.chan for d in data])
-        print("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
-                                                    locids, chans))
-        sta.used_location_codes = ",".join(locids)
-        sta.used_channel_names = ",".join(chans)
-        session.commit()
+    if format == "csv":
+        engine = get_engine(inifile=os.path.join(os.getcwd(), 'db.ini'))
+
+        meta = MetaData()
+        meta.reflect(bind=engine)
+
+        for table in meta.sorted_tables:
+            r = [dict(row) for row in engine.execute(table.select())]
+            df = pd.DataFrame(r)
+            print("Dumping table %s to %s.csv" % (table.name, table.name))
+            df.to_csv("%s.csv" % table.name, index=False)
+    else:
+        print("Currently only the csv format is supported, sorry.")
+
+
+@db.command(name="import")
+@click.argument("table")
+@click.option("--format", default="csv")
+@click.option("--force", is_flag=True, default=False)
+def db_import(table, format, force):
+    """
+    Imports msnoise tables from formatted files (CSV).
+    """
+    from ..api import connect, get_engine
+    from sqlalchemy import MetaData
+    import pandas as pd
+
+    if format == "csv":
+        engine = get_engine(inifile=os.path.join(os.getcwd(), 'db.ini'))
+        print("Loading table %s from %s.csv" % (table, table))
+        df = pd.read_csv("%s.csv" % table)
+        if force:
+            df.to_sql(table, engine, if_exists="replace")
+        else:
+            try:
+                df.to_sql(table, engine)
+            except ValueError:
+                traceback.print_exc()
+                print("!"*80)
+                print("You're probably getting the error above because the "
+                      "table already exists, if you want to replace the table "
+                      "with the imported data, then pass the --force option")
+    else:
+        print("Currently only the csv format is supported, sorry.")
+
 
 
 @cli.command()
@@ -468,11 +505,6 @@ def config():
     This command allows to set a parameter value in the database, show
     parameter values, or synchronise station metadata, depending on the
     invoked subcommands.
-
-    Called without argument, it used to launch the Configurator (now
-    accessible using 'msnoise config gui') but the recommended way to
-    configure MSNoise is now to use the web interface through the command
-    'msnoise admin'.
     """
     pass
 
@@ -543,74 +575,30 @@ def config_get(names):
     db.close()
 
 
-@db.command(name="dump")
-@click.option("--format", default="csv")
-def db_dump(format):
-    """
-    Dumps the complete database in a formatted structure.
-    """
-    from ..api import connect, get_engine
-    from sqlalchemy import MetaData
-    import pandas as pd
-
-    if format == "csv":
-        engine = get_engine(inifile=os.path.join(os.getcwd(), 'db.ini'))
-
-        meta = MetaData()
-        meta.reflect(bind=engine)
-
-        for table in meta.sorted_tables:
-            r = [dict(row) for row in engine.execute(table.select())]
-            df = pd.DataFrame(r)
-            print("Dumping table %s to %s.csv" % (table.name, table.name))
-            df.to_csv("%s.csv" % table.name, index=False)
-    else:
-        print("Currently only the csv format is supported, sorry.")
-
-
-@db.command(name="import")
-@click.argument("table")
-@click.option("--format", default="csv")
-@click.option("--force", is_flag=True, default=False)
-def db_import(table, format, force):
-    """
-    Imports msnoise tables from formatted files (csv).
-    """
-    from ..api import connect, get_engine
-    from sqlalchemy import MetaData
-    import pandas as pd
-
-    if format == "csv":
-        engine = get_engine(inifile=os.path.join(os.getcwd(), 'db.ini'))
-        print("Loading table %s from %s.csv" % (table, table))
-        df = pd.read_csv("%s.csv" % table)
-        if force:
-            df.to_sql(table, engine, if_exists="replace")
-        else:
-            try:
-                df.to_sql(table, engine)
-            except ValueError:
-                traceback.print_exc()
-                print("!"*80)
-                print("You're probably getting the error above because the "
-                      "table already exists, if you want to replace the table "
-                      "with the imported data, then pass the --force option")
-    else:
-        print("Currently only the csv format is supported, sorry.")
-
 
 @cli.command()
-@click.option('-s', '--sys', is_flag=True, help='System Info')
-@click.option('-m', '--modules', is_flag=True, help='Modules Info')
-@click.option('-e', '--env', is_flag=True, help='Environment Info')
-@click.option('-a', '--all', is_flag=True, help='All Info')
-@click.pass_context
-def bugreport(ctx, sys, modules, env, all):
-    """This command launches the Bug Report script."""
-    click.echo('Let\'s Bug Report MSNoise !')
-    # click.echo('Working on %i threads' % ctx.obj['MSNOISE_threads'])
-    from ..bugreport import main
-    main(sys, modules, env, all)
+@click.argument('jobtype')
+@click.option('-a', '--all', is_flag=True, help='Reset all jobs')
+@click.option('-r', '--rule', help='Reset job that match this SQL rule')
+def reset(jobtype, all, rule):
+    """Resets the jobs to "T"odo. JOBTYPE is the acronym of the job type.
+    By default only resets jobs "I"n progress. --all resets all jobs, whatever
+    the flag value. Standard Job Types are CC, STACK, MWCS and DTT, but
+    plugins can define their own."""
+    from ..api import connect, reset_jobs, read_db_inifile
+    dbini = read_db_inifile()
+    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
+    session = connect()
+    if jobtype == "DA":
+        session.execute("UPDATE {0}data_availability SET flag='M'"
+                        .format(prefix))
+    elif jobtype != jobtype.upper():
+        logging.info("The jobtype %s is not uppercase (usually jobtypes"
+                     " are uppercase...)"%jobtype)
+    reset_jobs(session, jobtype, all, rule)
+    session.close()
+
+
 
 
 @cli.command()
@@ -621,7 +609,9 @@ def bugreport(ctx, sys, modules, env, all):
                                 ' workflow step.',
               is_flag=True)
 def populate(fromda):
-    """Rapidly scan the archive filenames and find Network/Stations"""
+    """Rapidly scan the archive filenames and find Network/Stations, only works
+    with known archive structures, or with a custom code provided by the user.
+    """
     if fromda:
         logging.info("Overriding workflow...")
         db = connect()
@@ -670,6 +660,45 @@ def scan_archive(ctx, init, crondays, path, recursively):
         s01scan_archive.main(init, nthreads, crondays)
 
 
+@cli.group(name="plot")
+def plot():
+    """Commands to trigger plots (data availability, station map)"""
+    pass
+
+
+
+@plot.command(name='data_availability')
+@click.option('-c', '--chan', default="?HZ", help="Channel, you can use the ? wildcard, e.g. '?HZ' (default) or 'HH?', etc.")
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.pass_context
+def plot_data_availability(ctx, chan, show, outfile):
+    """Plots the Data Availability vs time"""
+    if ctx.obj['MSNOISE_custom']:
+        from data_availability import main
+    else:
+        from ..plots.data_availability import main
+    main(chan, show, outfile)
+
+
+
+@plot.command(name='station_map')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.pass_context
+def plot_station_map(ctx, show, outfile):
+    """Plots the station map (very very basic)"""
+    if ctx.obj['MSNOISE_custom']:
+        from station_map import main
+    else:
+        from ..plots.station_map import main
+    main(show, outfile)
+
+
 @cli.command(name='new_jobs')
 @click.option('-i', '--init', is_flag=True, help='First run ? This disables '
                                                  'the check for existing jobs.')
@@ -681,7 +710,7 @@ def scan_archive(ctx, init, crondays, path, recursively):
                             '"msnoise new_jobs --hpc CC:STACK" will create '
                             'STACK jobs based on CC jobs marked "D"one.')
 def new_jobs(init, nocc, hpc=""):
-    """Determines if new CC jobs are to be defined"""
+    """Determines if new CC/QC jobs are to be defined"""
     if not hpc:
         from ..s02new_jobs import main
         main(init, nocc)
@@ -699,9 +728,16 @@ def new_jobs(init, nocc, hpc=""):
         db.close()
 
 
-@cli.command(name='compute_cc')
+
+@cli.group(cls=OrderedGroup)
+def cc():
+    """Commands for the "Cross-Correlations" Workflow"""
+    pass
+
+
+@cc.command(name='compute_cc')
 @click.pass_context
-def compute_cc(ctx):
+def cc_compute_cc(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
     from ..s03compute_no_rotation import main
     threads = ctx.obj['MSNOISE_threads']
@@ -721,9 +757,9 @@ def compute_cc(ctx):
             p.join()
 
 
-@cli.command(name='compute_cc_rot')
+@cc.command(name='compute_cc_rot')
 @click.pass_context
-def compute_cc_rot(ctx):
+def cc_compute_cc_rot(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
     from ..s03compute_cc import main
     threads = ctx.obj['MSNOISE_threads']
@@ -743,12 +779,12 @@ def compute_cc_rot(ctx):
             p.join()
 
 
-@cli.command()
+@cc.command(name="stack")
 @click.pass_context
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-def stack(ctx, ref, mov, step):
+def cc_stack(ctx, ref, mov, step):
     """Stacks the [REF] or [MOV] windows.
     Computes the STACK jobs.
     """
@@ -802,12 +838,12 @@ def stack(ctx, ref, mov, step):
             p.join()
 
 
-@cli.command()
+@cc.command(name="stack2")
 @click.pass_context
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-def stack2(ctx, ref, mov, step):
+def cc_stack2(ctx, ref, mov, step):
     """Stacks the [REF] or [MOV] windows.
     Computes the STACK jobs.
     """
@@ -861,9 +897,161 @@ def stack2(ctx, ref, mov, step):
             p.join()
 
 
-@cli.command(name='compute_mwcs')
+@cc.group(name="plot")
+def cc_plot():
+    """Commands to trigger different plots"""
+    pass
+
+
+@cc_plot.command(name="distance",
+                 context_settings=dict(ignore_unknown_options=True, ))
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-a', '--ampli', default=1.0, help='Amplification')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.option('--virtual-source', default=None,
+              help='Use only pairs including this station. Format must be '
+                   'NET.STA')
+@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED,
+                callback=parse_extra_args)
 @click.pass_context
-def compute_mwcs(ctx):
+def cc_plot_distance(ctx, filterid, comp, ampli, show, outfile, refilter,
+                     virtual_source, extra_args):
+    """Plots the REFs of all pairs vs distance"""
+
+    if ctx.obj['MSNOISE_custom']:
+        from distance import main
+    else:
+        from ..plots.distance import main
+    main(filterid, comp, ampli, show, outfile, refilter, virtual_source,
+         **extra_args)
+
+
+@cc_plot.command(name="interferogram",
+                 context_settings=dict(ignore_unknown_options=True, ))
+@click.argument('sta1')
+@click.argument('sta2')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1,
+              help='Mov Stack to read from disk')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED,
+                callback=parse_extra_args)
+@click.pass_context
+def cc_plot_interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show,
+                          outfile,
+                          refilter, extra_args):
+    """Plots the interferogram between sta1 and sta2 (parses the CCFs)
+    STA1 and STA2 must be provided with this format: NET.STA !"""
+
+    if sta1 > sta2:
+        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+        return
+    if ctx.obj['MSNOISE_custom']:
+        from interferogram import main
+    else:
+        from ..plots.interferogram import main
+    main(sta1, sta2, filterid, comp, mov_stack, show, outfile, refilter,
+         **extra_args)
+
+
+@cc_plot.command(name="ccftime",
+                 context_settings=dict(ignore_unknown_options=True, ))
+@click.argument('sta1')
+@click.argument('sta2')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1,
+              help='Mov Stack to read from disk')
+@click.option('-a', '--ampli', default=5.0, help='Amplification')
+@click.option('-S', '--seismic', is_flag=True, help='Seismic style')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.option('-e', '--envelope', is_flag=True, help='Plot envelope instead of '
+                                                     'time series')
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.option("--normalize", default="individual")
+@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED,
+                callback=parse_extra_args)
+@click.pass_context
+def cc_plot_ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
+                    ampli, seismic, show, outfile, envelope, refilter,
+                    normalize, extra_args):
+    """Plots the ccf vs time between sta1 and sta2
+    STA1 and STA2 must be provided with this format: NET.STA !"""
+
+    if sta1 > sta2:
+        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+        return
+    if ctx.obj['MSNOISE_custom']:
+        from ccftime import main
+    else:
+        from ..plots.ccftime import main
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
+         envelope, refilter, normalize, **extra_args)
+
+
+@cc_plot.command(name="spectime",
+                 context_settings=dict(ignore_unknown_options=True, ))
+@click.argument('sta1')
+@click.argument('sta2')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1,
+              help='Mov Stack to read from disk')
+@click.option('-a', '--ampli', default=5.0, help='Amplification')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.option('-r', '--refilter', default=None,
+              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
+                   'between 4.0 and 8.0 Hz. This will update the plot title.')
+@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED,
+                callback=parse_extra_args)
+@click.pass_context
+def cc_plot_spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
+                     ampli, show, outfile, refilter, extra_args):
+    """Plots the ccf's spectrum vs time between sta1 and sta2
+    STA1 and STA2 must be provided with this format: NET.STA !"""
+
+    if sta1 > sta2:
+        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+        return
+    if ctx.obj['MSNOISE_custom']:
+        from spectime import main
+    else:
+        from ..plots.spectime import main
+    main(sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
+         refilter, **extra_args)
+
+
+@cc.group(cls=OrderedGroup)
+def dvv():
+    """Commands for the "Relative Velocity Variations" Workflow"""
+    pass
+
+
+@dvv.command(name='compute_mwcs')
+@click.pass_context
+def dvv_compute_mwcs(ctx):
     """Computes the MWCS jobs"""
     from ..s05compute_mwcs import main
     threads = ctx.obj['MSNOISE_threads']
@@ -882,9 +1070,9 @@ def compute_mwcs(ctx):
         for p in processes:
             p.join()
 
-@cli.command(name='compute_mwcs2')
+@dvv.command(name='compute_mwcs2')
 @click.pass_context
-def compute_mwcs2(ctx):
+def dvv_compute_mwcs2(ctx):
     """Computes the MWCS jobs"""
     from ..s05compute_mwcs2 import main
     threads = ctx.obj['MSNOISE_threads']
@@ -904,9 +1092,9 @@ def compute_mwcs2(ctx):
             p.join()
 
 
-@cli.command(name='compute_stretching')
+@dvv.command(name='compute_stretching')
 @click.pass_context
-def compute_stretching(ctx):
+def dvv_compute_stretching(ctx):
     """[experimental] Computes the stretching based on the new stacked data"""
     from ..stretch import main
     threads = ctx.obj['MSNOISE_threads']
@@ -926,11 +1114,11 @@ def compute_stretching(ctx):
             p.join()
 
 
-@cli.command(name='compute_dtt')
+@dvv.command(name='compute_dtt')
 @click.pass_context
 @click.option('-i', '--interval', default=1.0, help='Number of days before now to\
  search for modified Jobs')
-def compute_dtt(ctx, interval):
+def dvv_compute_dtt(ctx, interval):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt import main
     threads = ctx.obj['MSNOISE_threads']
@@ -950,11 +1138,11 @@ def compute_dtt(ctx, interval):
             p.join()
 
 
-@cli.command(name='compute_dtt2')
+@dvv.command(name='compute_dtt2')
 @click.pass_context
 @click.option('-i', '--interval', default=1.0, help='Number of days before now to\
  search for modified Jobs')
-def compute_dtt2(ctx, interval):
+def dvv_compute_dtt2(ctx, interval):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt2 import main
     threads = ctx.obj['MSNOISE_threads']
@@ -973,6 +1161,120 @@ def compute_dtt2(ctx, interval):
         for p in processes:
             p.join()
 
+@dvv.group(name="plot")
+def dvv_plot():
+    """Commands to trigger different plots"""
+    pass
+
+
+@dvv_plot.command(name='mwcs')
+@click.argument('sta1')
+@click.argument('sta2')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1,
+              help='Mov Stack to read from disk')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.pass_context
+def dvv_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
+    """Plots the mwcs results between sta1 and sta2 (parses the CCFs)
+    STA1 and STA2 must be provided with this format: NET.STA !"""
+    if sta1 > sta2:
+        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+        return
+    if ctx.obj['MSNOISE_custom']:
+        from mwcs import main
+    else:
+        from ..plots.mwcs import main
+    main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
+
+
+@dvv_plot.command(name="dvv")
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
+@click.option('-p', '--pair', default=None, help='Plot a specific pair',
+              multiple=True)
+@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
+@click.option('-M', '--dttname', default="M", help='Plot M or M0?')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.pass_context
+def dvv_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
+    """Plots the dv/v (parses the dt/t results)
+    Individual pairs can be plotted extra using the -p flag one or more times.
+    Example: msnoise plot dvv -p ID_KWUI_ID_POSI
+    Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
+    Remember to order stations alphabetically !
+    """
+    if ctx.obj['MSNOISE_custom']:
+        from dvv import main
+    else:
+        from ..plots.dvv import main
+    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
+
+
+
+
+@dvv_plot.command(name="dtt")
+@click.argument('sta1')
+@click.argument('sta2')
+@click.argument('day')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=1,
+              help='Mov Stack to read from disk')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.pass_context
+def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
+    """Plots a graph of dt against t
+    STA1 and STA2 must be provided with this format: NET.STA !
+    DAY must be provided in the ISO format: YYYY-MM-DD"""
+    if sta1 > sta2:
+        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+        return
+    if ctx.obj['MSNOISE_custom']:
+        from dtt import main
+    else:
+        from ..plots.dtt import main
+    main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile)
+
+
+
+@dvv_plot.command(name="timing")
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
+@click.option('-p', '--pair', default=None, help='Plot a specific pair',
+              multiple=True)
+@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
+@click.option('-M', '--dttname', default="A", help='Plot M or M0?')
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.pass_context
+def dvv_plot_timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
+    """Plots the timing (parses the dt/t results)
+    Individual pairs can be plotted extra using the -p flag one or more times.
+    Example: msnoise plot timing -p ID_KWUI_ID_POSI
+    Example: msnoise plot timing -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
+    Remember to order stations alphabetically !
+    """
+    if ctx.obj['MSNOISE_custom']:
+        from timing import main
+    else:
+        from ..plots.timing import main
+    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
+
 
 # @cli.command(name='compute_dvv')
 # @click.option('-f', '--filterid', default=1, help='Filter ID')
@@ -988,10 +1290,10 @@ def compute_dtt2(ctx, interval):
 #               default=None, type=str)
 # @click.pass_context
 # def compute_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
-#     """Plots the dv/v (parses the dt/t results)\n
-#     Individual pairs can be plotted extra using the -p flag one or more times.\n
-#     Example: msnoise plot dvv -p ID_KWUI_ID_POSI\n
-#     Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
+#     """Plots the dv/v (parses the dt/t results)
+#     Individual pairs can be plotted extra using the -p flag one or more times.
+#     Example: msnoise plot dvv -p ID_KWUI_ID_POSI
+#     Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
 #     Remember to order stations alphabetically !
 #     """
 #     if ctx.obj['MSNOISE_custom']:
@@ -1001,324 +1303,15 @@ def compute_dtt2(ctx, interval):
 #     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
 
 
-@cli.command()
-@click.argument('jobtype')
-@click.option('-a', '--all', is_flag=True, help='Reset all jobs')
-@click.option('-r', '--rule', help='Reset job that match this SQL rule')
-def reset(jobtype, all, rule):
-    """Resets the job to "T"odo. JOBTYPE is the acronym of the job type.
-    By default only resets jobs "I"n progress. --all resets all jobs, whatever
-    the flag value. Standard Job Types are CC, STACK, MWCS and DTT, but
-    plugins can define their own."""
-    from ..api import connect, reset_jobs, read_db_inifile
-    dbini = read_db_inifile()
-    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
-    session = connect()
-    if jobtype == "DA":
-        session.execute("UPDATE {0}data_availability SET flag='M'"
-                        .format(prefix))
-    elif jobtype != jobtype.upper():
-        logging.info("The jobtype %s is not uppercase (usually jobtypes"
-                     " are uppercase...)"%jobtype)
-    reset_jobs(session, jobtype, all, rule)
-    session.close()
-
-
-@cli.command()
-def jupyter():
-    """Launches an jupyter notebook in the current folder"""
-    os.system("jupyter notebook --ip 0.0.0.0 --no-browser")
-
 
 #
 # PLOT GROUP
 #
 
-@cli.group()
-def plot():
-    """Top level command to trigger different plots"""
-    pass
-
-
-@plot.command(name='data_availability')
-@click.option('-c', '--chan', default="?HZ", help="Channel, you can use the ? wildcard, e.g. '?HZ' (default) or 'HH?', etc.")
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
-              default=None, type=str)
-@click.pass_context
-def data_availability(ctx, chan, show, outfile):
-    """Plots the Data Availability vs time"""
-    if ctx.obj['MSNOISE_custom']:
-        from data_availability import main
-    else:
-        from ..plots.data_availability import main
-    main(chan, show, outfile)
-
-
-@plot.command()
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
-@click.option('-p', '--pair', default=None, help='Plot a specific pair',
-              multiple=True)
-@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
-@click.option('-M', '--dttname', default="M", help='Plot M or M0?')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
-              default=None, type=str)
-@click.pass_context
-def dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
-    """Plots the dv/v (parses the dt/t results)\n
-    Individual pairs can be plotted extra using the -p flag one or more times.\n
-    Example: msnoise plot dvv -p ID_KWUI_ID_POSI\n
-    Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
-    Remember to order stations alphabetically !
-    """
-    if ctx.obj['MSNOISE_custom']:
-        from dvv import main
-    else:
-        from ..plots.dvv import main
-    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
-
-
-@plot.command()
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
-@click.option('-p', '--pair', default=None, help='Plot a specific pair',
-              multiple=True)
-@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
-@click.option('-M', '--dttname', default="A", help='Plot M or M0?')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
-              default=None, type=str)
-@click.pass_context
-def timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
-    """Plots the timing (parses the dt/t results)\n
-    Individual pairs can be plotted extra using the -p flag one or more times.\n
-    Example: msnoise plot timing -p ID_KWUI_ID_POSI\n
-    Example: msnoise plot timing -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
-    Remember to order stations alphabetically !
-    """
-    if ctx.obj['MSNOISE_custom']:
-        from timing import main
-    else:
-        from ..plots.timing import main
-    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
-
-
-@plot.command(context_settings=dict(ignore_unknown_options=True,))
-@click.argument('sta1')
-@click.argument('sta2')
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
-              default=None, type=str)
-@click.option('-r', '--refilter', default=None,
-              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
-                   'between 4.0 and 8.0 Hz. This will update the plot title.')
-@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED, callback=parse_extra_args)
-@click.pass_context
-def interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile,
-                  refilter, extra_args):
-    """Plots the interferogram between sta1 and sta2 (parses the CCFs)\n
-    STA1 and STA2 must be provided with this format: NET.STA !"""
-    
-        
-
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
-    if ctx.obj['MSNOISE_custom']:
-        from interferogram import main
-    else:
-        from ..plots.interferogram import main
-    main(sta1, sta2, filterid, comp, mov_stack, show, outfile, refilter,
-         **extra_args)
-
-
-
-@plot.command(context_settings=dict(ignore_unknown_options=True,))
-@click.argument('sta1')
-@click.argument('sta2')
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk')
-@click.option('-a', '--ampli', default=5.0, help='Amplification')
-@click.option('-S', '--seismic', is_flag=True, help='Seismic style')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
-              default=None, type=str)
-@click.option('-e', '--envelope', is_flag=True, help='Plot envelope instead of '
-                                                     'time series')
-@click.option('-r', '--refilter', default=None,
-              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
-                   'between 4.0 and 8.0 Hz. This will update the plot title.')
-@click.option("--normalize", default="individual")
-@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED, callback=parse_extra_args)
-@click.pass_context
-def ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
-            ampli, seismic, show, outfile, envelope, refilter, normalize, extra_args):
-    """Plots the ccf vs time between sta1 and sta2\n
-    STA1 and STA2 must be provided with this format: NET.STA !"""
-    
-    
-
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
-    if ctx.obj['MSNOISE_custom']:
-        from ccftime import main
-    else:
-        from ..plots.ccftime import main
-    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
-         envelope, refilter, normalize, **extra_args)
-
-
-@plot.command(context_settings=dict(ignore_unknown_options=True,))
-@click.argument('sta1')
-@click.argument('sta2')
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk')
-@click.option('-a', '--ampli', default=5.0, help='Amplification')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
-              default=None, type=str)
-@click.option('-r', '--refilter', default=None,
-              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
-                   'between 4.0 and 8.0 Hz. This will update the plot title.')
-@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED, callback=parse_extra_args)
-@click.pass_context
-def spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
-            ampli, show, outfile, refilter, extra_args):
-    """Plots the ccf's spectrum vs time between sta1 and sta2\n
-    STA1 and STA2 must be provided with this format: NET.STA !"""
-    
-        
-
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
-    if ctx.obj['MSNOISE_custom']:
-        from spectime import main
-    else:
-        from ..plots.spectime import main
-    main(sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
-         refilter, **extra_args)
-
-
-@plot.command()
-@click.argument('sta1')
-@click.argument('sta2')
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
-              default=None, type=str)
-@click.pass_context
-def mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
-    """Plots the mwcs results between sta1 and sta2 (parses the CCFs)\n
-    STA1 and STA2 must be provided with this format: NET.STA !"""
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
-    if ctx.obj['MSNOISE_custom']:
-        from mwcs import main
-    else:
-        from ..plots.mwcs import main
-    main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
-
-
-@plot.command(context_settings=dict(ignore_unknown_options=True,))
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-a', '--ampli', default=1.0, help='Amplification')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
-              default=None, type=str)
-@click.option('-r', '--refilter', default=None,
-              help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
-                   'between 4.0 and 8.0 Hz. This will update the plot title.')
-@click.option('--virtual-source', default=None,
-              help='Use only pairs including this station. Format must be '
-                   'NET.STA')
-@click.argument('extra_args', nargs=-1, type=click.UNPROCESSED, callback=parse_extra_args)
-@click.pass_context
-def distance(ctx, filterid, comp, ampli, show, outfile, refilter,
-             virtual_source, extra_args):
-    """Plots the REFs of all pairs vs distance"""
-    
-        
-        
-    if ctx.obj['MSNOISE_custom']:
-        from distance import main
-    else:
-        from ..plots.distance import main
-    main(filterid, comp, ampli, show, outfile, refilter, virtual_source,
-         **extra_args)
-
-
-@plot.command(name='station_map')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
-              default=None, type=str)
-@click.pass_context
-def station_map(ctx, show, outfile):
-    """Plots the station map (very very basic)"""
-    if ctx.obj['MSNOISE_custom']:
-        from station_map import main
-    else:
-        from ..plots.station_map import main
-    main(show, outfile)
-
-
-@plot.command()
-@click.argument('sta1')
-@click.argument('sta2')
-@click.argument('day')
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
-              default=None, type=str)
-@click.pass_context
-def dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
-    """Plots a graph of dt against t\n
-    STA1 and STA2 must be provided with this format: NET.STA !\n
-    DAY must be provided in the ISO format: YYYY-MM-DD"""
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
-    if ctx.obj['MSNOISE_custom']:
-        from dtt import main
-    else:
-        from ..plots.dtt import main
-    main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile)
-
 
 @cli.group(cls=OrderedGroup)
 def qc():
-    """Top level command group for computing PSD, RMS, etc..."""
+    """Commands for computing PSD, RMS, etc..."""
     pass
 
 
@@ -1327,7 +1320,7 @@ def qc():
               help='Reduce this number when processing a small number of days '
                    'but a large number of stations')
 @click.pass_context
-def compute_psd(ctx, njobs_per_worker):
+def qc_compute_psd(ctx, njobs_per_worker):
     """Computes the PSD jobs, based on New or Modified files identified by
        the new_jobs step"""
     from ..ppsd_compute import main
@@ -1355,7 +1348,7 @@ def compute_psd(ctx, njobs_per_worker):
               help='Reduce this number when processing a small number of days '
                    'but a large number of stations')
 @click.pass_context
-def psd_to_hdf(ctx, njobs_per_worker):
+def qc_psd_to_hdf(ctx, njobs_per_worker):
     """Groups the PSD calculated as NPZ to HDF"""
     from ..psd_to_hdf import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1380,7 +1373,7 @@ def psd_to_hdf(ctx, njobs_per_worker):
 @qc.command(name='plot_psd')
 @click.argument('seed_id')
 @click.pass_context
-def plot_psd(ctx, seed_id):
+def qc_plot_psd(ctx, seed_id):
     """Plots the PSD and spectrogram based on NPZ files"""
     from ..plots.ppsd import main
     net,sta,loc,chan = seed_id.split(".")
@@ -1391,7 +1384,7 @@ def plot_psd(ctx, seed_id):
 
 @qc.command(name='hdf_to_rms')
 @click.pass_context
-def compute_rms(ctx):
+def qc_compute_rms(ctx):
     """Computes the RMS based on HDFs"""
     from ..psd_compute_rms import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1415,7 +1408,7 @@ def compute_rms(ctx):
 
 @qc.command(name='export_rms')
 @click.pass_context
-def export_rms(ctx):
+def qc_export_rms(ctx):
     """Exports the RMS dataframes as CSV files"""
     from ..psd_export_rms import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1439,7 +1432,7 @@ def export_rms(ctx):
 
 @qc.command(name='optimize')
 @click.pass_context
-def psd_optimize(ctx):
+def qc_psd_optimize(ctx):
     """Optimizes the HDFs using ptrepack (should be used periodically)"""
     import os, glob
     for file in sorted(glob.glob("PSD/HDF/*")):
@@ -1447,7 +1440,13 @@ def psd_optimize(ctx):
         os.system("ptrepack --chunkshape=auto --propindexes --complevel=9 --complib=blosc %s %s" % (file, file.replace(".h5", '_r.h5')))
         os.system("mv %s %s " % ( file.replace(".h5", '_r.h5'), file,) )
 
-# Main script
+
+# @with_plugins(iter_entry_points('msnoise.plugins'))
+@cli.group()
+def plugin():
+    """Runs a command in a named plugin"""
+    pass
+
 try:
     db = connect()
     plugins = get_config(db, "plugins")
@@ -1455,7 +1454,7 @@ try:
 except DBConfigNotFoundError:
     plugins = None
 except sqlalchemy.exc.OperationalError as e:
-    logging.critical('Unable to read project configuration: error connecting to the database:\n{}'.format(str(e)))
+    logging.critical('Unable to read project configuration: error connecting to the database:{}'.format(str(e)))
     sys.exit(1)
 
 if plugins:
@@ -1465,7 +1464,46 @@ if plugins:
         module_name = ep.module_name.split(".")[0]
         if module_name in plugins:
             plugin.add_command(ep.load())
-            p.add_command(ep.load())
+
+
+@cli.group(cls=OrderedGroup)
+def utils():
+    """Command group for smaller tools"""
+    pass
+
+@utils.command(name="bugreport")
+@click.option('-s', '--sys', is_flag=True, help='System Info')
+@click.option('-m', '--modules', is_flag=True, help='Modules Info')
+@click.option('-e', '--env', is_flag=True, help='Environment Info')
+@click.option('-a', '--all', is_flag=True, help='All Info')
+@click.pass_context
+def utils_bugreport(ctx, sys, modules, env, all):
+    """This command launches the Bug Report script."""
+    click.echo('Let\'s Bug Report MSNoise !')
+    # click.echo('Working on %i threads' % ctx.obj['MSNOISE_threads'])
+    from ..bugreport import main
+    main(sys, modules, env, all)
+
+
+@utils.command(name="test")
+@click.option('-p', '--prefix', default="", help='Prefix for tables')
+@click.option('-c', '--content', default=False, is_flag=True)
+def utils_test(prefix, content):
+    """Runs the test suite, should be executed in an empty folder!"""
+    import matplotlib.pyplot as plt
+    plt.switch_backend("agg")
+    if not content:
+        from ..test.tests import main
+    else:
+        from ..test.content_tests import main
+    main(prefix=prefix)
+
+
+@utils.command(name="jupyter")
+def utils_jupyter():
+    """Launches an jupyter notebook in the current folder"""
+    os.system("jupyter notebook --ip 0.0.0.0 --no-browser")
+
 
 
 def run():

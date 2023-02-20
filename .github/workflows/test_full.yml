@@ -10,7 +10,7 @@ jobs:
       !contains(github.event.head_commit.message, '+NOFULLTEST')
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10']
+        python-version: ['3.9', '3.10', '3.11']
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - os: ubuntu-latest
@@ -66,4 +66,4 @@ jobs:
       - name: Test suite
         shell: bash -l {0}
         run: |
-          msnoise test
+          msnoise utils test

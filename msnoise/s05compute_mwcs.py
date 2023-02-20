@@ -56,13 +56,13 @@ To run this step:
 
 .. code-block:: sh
 
-    $ msnoise compute_mwcs
+    $ msnoise cc dvv compute_mwcs
 
 This step also supports parallel processing/threading:
 
 .. code-block:: sh
 
-    $ msnoise -t 4 compute_mwcs
+    $ msnoise -t 4 cc dvv compute_mwcs
 
 will start 4 instances of the code (after 1 second delay to avoid database
 conflicts). This works both with SQLite and MySQL but be aware problems
@@ -87,17 +87,13 @@ def main(loglevel="INFO"):
     logger.info('*** Starting: Compute MWCS ***')
     
     db = connect()
-
+    params = get_params(db)
     export_format = get_config(db, 'export_format')
     if export_format == "BOTH":
         extension = ".MSEED"
     else:
         extension = "."+export_format
-    mov_stack = get_config(db, "mov_stack")
-    if mov_stack.count(',') == 0:
-        mov_stacks = [int(mov_stack), ]
-    else:
-        mov_stacks = [int(mi) for mi in mov_stack.split(',')]
+    mov_stacks = params.mov_stack
     
     goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
     maxlag = float(get_config(db, "maxlag"))

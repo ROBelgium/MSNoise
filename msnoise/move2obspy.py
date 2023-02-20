@@ -413,7 +413,7 @@ segment.
     delta_mcoh = []
     time_axis = []
 
-    window_length_samples = np.int(window_length * df)
+    window_length_samples = int(window_length * df)
     # try:
     #     from sf.helper import next_fast_len
     # except ImportError:

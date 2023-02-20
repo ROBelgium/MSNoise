@@ -7,26 +7,26 @@ CCFs before computing the FFT and plotting. Passing ``--startdate`` and
 ``--enddate`` parameters allows to specify which period of data should be
 plotted. By default the plot uses dates determined in database.
 
-.. include:: ../clickhelp/msnoise-plot-spectime.rst
+.. include:: ../clickhelp/msnoise-cc-plot-spectime.rst
 
 
 Example:
 
-``msnoise plot spectime YA.UV05 YA.UV11`` will plot all defaults:
+``msnoise cc plot spectime YA.UV05 YA.UV11`` will plot all defaults:
 
 .. image:: ../.static/spectime.png
 
 
 Zooming in the X-axis and playing with the amplitude:
 
-``msnoise plot spectime YA.UV05 YA.UV11 --xlim=0.08,1.1 --ampli=10``:
+``msnoise cc plot spectime YA.UV05 YA.UV11 --xlim=0.08,1.1 --ampli=10``:
 
 .. image:: ../.static/spectime_zoom.png
 
 
 And refiltering to enhance high frequency content:
 
-``msnoise plot spectime YA.UV05 YA.UV11 --xlim=0.5,1.1 --ampli=10 -r0.7:1.0``:
+``msnoise cc plot spectime YA.UV05 YA.UV11 --xlim=0.5,1.1 --ampli=10 -r0.7:1.0``:
 
 .. image:: ../.static/spectime_refilter.png
 

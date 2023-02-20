@@ -54,6 +54,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         for chan in datelists:
             if not len(datelists[chan]):
                 continue
+            # TODO ADD (optional) INTERPOLATION OF THE PERIOD BINS, TO AVOID CRASHES WHEN CHANGING THE SPS OF THE STATION -> HDF WILL NOT LIKE IT !
             ppsd = psd_read_results(net, sta, loc, chan, datelists[chan], use_cache=False)
             if ppsd is None or not len(ppsd.times_processed):
                 continue

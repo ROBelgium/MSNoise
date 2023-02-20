@@ -3,7 +3,8 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - numpy<1.22
+  - numpy
+  - scipy
   - obspy
   - sqlalchemy
   - flask
@@ -18,3 +19,5 @@ dependencies:
   - folium
   - pip
   - pymysql
+  - xarray
+

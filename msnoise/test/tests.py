@@ -76,7 +76,6 @@ class MSNoiseTests(unittest.TestCase):
         f.mwcs_low = 0.12
         f.high = 1.0
         f.mwcs_high = 0.98
-        f.rms_threshold = 0
         f.mwcs_wlen = 10
         f.mwcs_step = 5
         f.used = True
@@ -86,7 +85,6 @@ class MSNoiseTests(unittest.TestCase):
         f.mwcs_low = 0.12
         f.high = 1.0
         f.mwcs_high = 0.98
-        f.rms_threshold = 0
         f.mwcs_wlen = 10
         f.mwcs_step = 5
         f.used = True
@@ -94,12 +92,12 @@ class MSNoiseTests(unittest.TestCase):
 
         for f in filters:
             update_filter(db, f.ref, f.low, f.mwcs_low, f.high, f.mwcs_high,
-                          f.rms_threshold, f.mwcs_wlen, f.mwcs_step, f.used)
+                          f.mwcs_wlen, f.mwcs_step, f.used)
 
         dbfilters = get_filters(db)
         for i, filter in enumerate(dbfilters):
             for param in ['low', 'mwcs_low', 'high', 'mwcs_high',
-                          'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used']:
+                          'mwcs_wlen', 'mwcs_step', 'used']:
                 self.failUnlessEqual(eval("filter.%s" % param),
                                      eval("filters[i].%s" % param))
 
@@ -148,7 +146,7 @@ class MSNoiseTests(unittest.TestCase):
             self.fail()
 
     def test_008b_add_loc_chan_to_stations(self):
-        result = self.runner.invoke(msnoise_script.da_stations_update_loc_chan)
+        result = self.runner.invoke(msnoise_script.db_da_stations_update_loc_chan)
 
     def test_009_control_data_availability(self):
         from ..api import connect, get_new_files, get_data_availability,\
@@ -311,6 +309,7 @@ class MSNoiseTests(unittest.TestCase):
         update_config(db, 'ref_end', '2011-01-01')
         update_config(db, 'startdate', '2009-01-01')
         update_config(db, 'enddate', '2011-01-01')
+        update_config(db, 'mov_stack', '1,2,5')
 
         interval = 1.
         main('ref', interval)
@@ -520,9 +519,47 @@ class MSNoiseTests(unittest.TestCase):
         result = self.runner.invoke(msnoise_script.config_set,
                                     ['channels=*'])
 
-    ### Tests on the 'crondays' parameter format
 
-    def test_210_crondays_positive_float(self):
+
+    def test_301_compute_psd(self):
+        from ..ppsd_compute import main
+        try:
+            main()
+        except:
+            traceback.print_exc()
+            self.fail()
+
+    def test_302_psd2hdf(self):
+        from ..psd_to_hdf import main
+        try:
+            main()
+        except:
+            traceback.print_exc()
+            self.fail()
+
+    def test_303_hdf2rms(self):
+        from ..psd_compute_rms import main
+        try:
+            main()
+        except:
+            traceback.print_exc()
+            self.fail()
+
+    def test_304_export_rms(self):
+        from ..psd_export_rms import main
+        try:
+            main()
+        except:
+            traceback.print_exc()
+            self.fail()
+
+    def test_400_run_manually(self):
+        os.system("msnoise reset STACK --all")
+        os.system("msnoise cc stack2 -m")
+        os.system("msnoise cc dvv compute_mwcs2")
+        os.system("msnoise cc dvv compute_dtt2")
+
+    def test_99210_crondays_positive_float(self):
         """
         The crondays parameter can be a positive float that represents a
         number of days.
@@ -530,7 +567,7 @@ class MSNoiseTests(unittest.TestCase):
         parsed_crondays = s01scan_archive.parse_crondays('2.5')
         self.assertEqual(parsed_crondays, datetime.timedelta(days=2.5))
 
-    def test_211_crondays_negative_float(self):
+    def test_99211_crondays_negative_float(self):
         """
         A negative crondays parameter representing a number of days should be
         accepted for backward compatibility with MSNoise < 1.6.
@@ -538,7 +575,7 @@ class MSNoiseTests(unittest.TestCase):
         parsed_crondays = s01scan_archive.parse_crondays('-3')
         self.assertEqual(parsed_crondays, datetime.timedelta(days=3))
 
-    def test_212_crondays_weeks(self):
+    def test_99212_crondays_weeks(self):
         """
         The crondays parameter can designate a number of weeks (7 days) using a
         string in the format 'Xw'.
@@ -546,7 +583,7 @@ class MSNoiseTests(unittest.TestCase):
         parsed_crondays = s01scan_archive.parse_crondays('2w')
         self.assertEqual(parsed_crondays, datetime.timedelta(days=7*2))
 
-    def test_213_crondays_days(self):
+    def test_99213_crondays_days(self):
         """
         The crondays parameter can designate a number of days using a string in
         the format 'Xd'.
@@ -554,7 +591,7 @@ class MSNoiseTests(unittest.TestCase):
         parsed_crondays = s01scan_archive.parse_crondays('5d')
         self.assertEqual(parsed_crondays, datetime.timedelta(days=5))
 
-    def test_214_crondays_hours(self):
+    def test_99214_crondays_hours(self):
         """
         The crondays parameter can designate a number of hours using a string
         in the format 'Xh'.
@@ -562,7 +599,7 @@ class MSNoiseTests(unittest.TestCase):
         parsed_crondays = s01scan_archive.parse_crondays('12h')
         self.assertEqual(parsed_crondays, datetime.timedelta(seconds=12*3600))
 
-    def test_215_crondays_weeks_days_hours(self):
+    def test_99215_crondays_weeks_days_hours(self):
         """
         The crondays parameter can designate a number of weeks, days, and hours
         in the same string.
@@ -570,7 +607,7 @@ class MSNoiseTests(unittest.TestCase):
         parsed_crondays = s01scan_archive.parse_crondays('2w 3d 12h')
         self.assertEqual(parsed_crondays, datetime.timedelta(days=2*7+3, seconds=12*3600))
 
-    def test_216_crondays_weeks_hours(self):
+    def test_99216_crondays_weeks_hours(self):
         """
         The crondays parameter does not have to designate the three units
         weeks, days and hours in the string.
@@ -578,7 +615,7 @@ class MSNoiseTests(unittest.TestCase):
         parsed_crondays = s01scan_archive.parse_crondays('1w 6h')
         self.assertEqual(parsed_crondays, datetime.timedelta(days=1*7, seconds=6*3600))
 
-    def test_217_crondays_weeks_days_hours_order_matters(self):
+    def test_99217_crondays_weeks_days_hours_order_matters(self):
         """
         If the crondays parameter designates any weeks, days or hours in the
         string, they must be in the right order.
@@ -586,7 +623,7 @@ class MSNoiseTests(unittest.TestCase):
         with self.assertRaises(FatalError):
             s01scan_archive.parse_crondays('16h 3d')
 
-    def test_218_crondays_weeks_days_hours_alone(self):
+    def test_99218_crondays_weeks_days_hours_alone(self):
         """
         The crondays parameter can designate any weeks, days and hours, but the
         format must be [Xw][Xd][Xh] only.
@@ -594,33 +631,13 @@ class MSNoiseTests(unittest.TestCase):
         with self.assertRaises(FatalError):
             s01scan_archive.parse_crondays('about 16h')
 
-    def test_219_crondays_weeks_days_hours_optional_blank(self):
+    def test_99219_crondays_weeks_days_hours_optional_blank(self):
         """
         If the crondays parameter designates any weeks, days and hours in
         the string, the separation blank is optional.
         """
         parsed_crondays = s01scan_archive.parse_crondays('3w4d12h')
         self.assertEqual(parsed_crondays, datetime.timedelta(days=3*7+4, seconds=12*3600))
-
-    # def test_999_S01installer(self):
-    #     if "TRAVIS_OS_NAME" not in os.environ:
-    #         print("Seems to be running on local machine, skipping MySQL test")
-    #         return
-    #
-    #     if os.environ["TRAVIS_OS_NAME"] != "linux":
-    #         print("Seems not to be running on a Linux machine, "
-    #               "skipping MySQL test")
-    #         return
-    #     import shutil
-    #     shutil.move('db.ini', 'db.bak')
-    #     from ..s000installer import main
-    #     try:
-    #         ret = main(tech=2, username="root", password="",
-    #                    hostname="localhost", database="msnoise", prefix="")
-    #         self.failUnlessEqual(ret, 0)
-    #     except:
-    #         traceback.print_exc()
-    #         self.fail()
 
 
 def main(prefix=""):

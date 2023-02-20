@@ -204,7 +204,7 @@ All the available plots are listed using the ``--help`` argument:
 Same as above, sub-commands have their own ``--help``:
 
 
-.. include:: ../clickhelp/msnoise-plot-interferogram.rst
+.. include:: ../clickhelp/msnoise-cc-plot-interferogram.rst
 
 
 .. image:: ../.static/13newplots.png

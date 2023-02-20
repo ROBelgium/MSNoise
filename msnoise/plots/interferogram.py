@@ -5,11 +5,11 @@ The parameters allow to plot the daily or the mov-stacked CCF. Filters and
 components are selectable too. Passing ``--refilter`` allows to bandpass filter
 CCFs before plotting (new in 1.5).
 
-.. include:: ../clickhelp/msnoise-plot-interferogram.rst
+.. include:: ../clickhelp/msnoise-cc-plot-interferogram.rst
 
 Example:
 
-``msnoise plot interferogram YA.UV06 YA.UV11 -m5`` will plot the ZZ component
+``msnoise cc plot interferogram YA.UV06 YA.UV11 -m5`` will plot the ZZ component
 (default), filter 1 (default) and mov_stack 5:
 
 .. image:: ../.static/interferogram.png

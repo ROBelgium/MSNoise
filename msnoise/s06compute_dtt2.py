@@ -25,11 +25,7 @@ def main(interval=1, loglevel="INFO"):
 
     start, end, datelist = build_movstack_datelist(db)
 
-    mov_stack = get_config(db, "mov_stack")
-    if mov_stack.count(',') == 0:
-        mov_stacks = [int(mov_stack), ]
-    else:
-        mov_stacks = [int(mi) for mi in mov_stack.split(',')]
+    mov_stacks = params.mov_stack
 
     components_to_compute = get_components_to_compute(db)
     updated_dtt = updated_days_for_dates(
@@ -59,8 +55,10 @@ def main(interval=1, loglevel="INFO"):
         pair = jobs[0].pair
         refs, days = zip(*[[job.ref, job.day] for job in jobs])
         netsta1, netsta2 = pair.split(':')
+        station1, station2 = pair.split(":")
         n1, s1, l1 = netsta1.split(".")
         n2, s2, l2 = netsta2.split(".")
+        # todo, include location code for computing distances?
         dpair = "%s_%s_%s_%s" % (n1, s1, n2, s2)
         dist = interstations[dpair] if dpair in interstations else 0.0
         logger.info(
@@ -72,14 +70,26 @@ def main(interval=1, loglevel="INFO"):
             for components in params.all_components:
                 for mov_stack in mov_stacks:
                     output = []
-                    fn = r"MWCS2/%02i/%03i_DAYS/%s/%s_%s.h5" % (
-                            filterid, mov_stack, components, netsta1, netsta2)
+                    fn = os.path.join("MWCS2", "%02i" % filterid,
+                                        "%03i_DAYS" % mov_stack,
+                                        "%s" % components,
+                                        "%s_%s.nc" % (station1, station2))
                     print("Reading %s" % fn)
-                    mwcs = pd.read_hdf(fn)
-                    print(mwcs.head())
-                    M = mwcs.xs("M", level=1, axis=1).copy()
-                    EM = mwcs.xs("EM", level=1, axis=1).copy()
-                    MCOH = mwcs.xs("MCOH", level=1, axis=1).copy()
+                    if not os.path.isfile(fn):
+                        print("FILE DOES NOT EXIST: %s, skipping" % fn)
+                        continue
+
+                    data = xr_create_or_open(fn)
+                    print(data)
+                    data = data.MWCS.to_dataframe().reorder_levels(['times','taxis','keys']).unstack().droplevel(0, axis=1).unstack()
+                    valid = data.index.intersection(pd.to_datetime(days))
+                    data = data.loc[valid]
+                    data = data.dropna()
+                    mwcs = data
+
+                    M = mwcs.xs("M", level=0, axis=1).copy()
+                    EM = mwcs.xs("EM", level=0, axis=1).copy()
+                    MCOH = mwcs.xs("MCOH", level=0, axis=1).copy()
                     tArray = M.columns.values
 
                     if params.dtt_lag == "static":
@@ -107,7 +117,7 @@ def main(interval=1, loglevel="INFO"):
                     MCOH.iloc[:, tmp] *= 0.0
 
                     MCOH[MCOH < params.dtt_mincoh] = 0.0
-                    EM[EM > params.dtt_maxerr] *= 1.0
+                    EM[EM > params.dtt_maxerr] = 1.0
 
                     # TODO missing check on max_dt !!
 
@@ -134,9 +144,18 @@ def main(interval=1, loglevel="INFO"):
                                 VecXfilt, VecYfilt, w,
                                 intercept_origin=True)
                             values.append([m, em, a, ea, m0, em0])
-                    values = pd.DataFrame(values, index=M.index,
+                    output = pd.DataFrame(values, index=M.index,
                                           columns=["m", "em", "a", "ea", "m0", "em0"])
+
                     out = fn.replace("MWCS", "DTT")
-                    if not os.path.isdir(os.path.split(out)[0]):
-                        os.makedirs(os.path.split(out)[0])
-                    values.to_hdf(out, "DTT")
+                    d = output.stack()
+                    print("OUTPUT:")
+                    print(d.head())
+                    d.index = d.index.set_names(["times", "keys"])
+                    d.columns = ["DTT"]
+                    dr = xr_create_or_open(out, taxis=[], name="DTT")
+                    rr = d.to_xarray().to_dataset(name="DTT")
+                    rr = xr_insert_or_update(dr, rr)
+                    xr_save_and_close(rr, out)
+        massive_update_job(db, jobs, "D")
+    logger.info('*** Finished: Compute DTT ***')

@@ -51,7 +51,7 @@ before_install:
   - conda update -q --yes conda
   # Installs required packages
   - conda install --yes -q pip python=$PYTHON_VERSION
-  - conda install --yes -q numpy scipy matplotlib pandas sqlalchemy
+  - conda install --yes -q numpy scipy matplotlib pandas sqlalchemy pytables xarray
   - conda install --yes -q sphinx jinja2 flask pymysql click
   - conda install --yes -q lxml pyqt
   - conda install --yes -q -c conda-forge obspy
@@ -67,7 +67,7 @@ script:
   - mkdir empty
   - cd empty
   - msnoise --help
-  - msnoise bugreport -s -m -e
+  - msnoise utils bugreport -s -m -e
   - cd ..
   - mkdir MSNoiseTest
   - cd MSNoiseTest

@@ -37,13 +37,15 @@ setup(version=get_git_version(),
           'wtforms',
           'jinja2',
           'scandir',  # useful for python < 3.5
-          'logbook'
+          'logbook',
+          'xarray'  # new in 2.0
       ],
       extras_require={
           'doc': [
-              'sphinx>=1.6.1',
-              'sphinx_bootstrap_theme>=0.5.0',
+              'sphinx',
+              'sphinx_bootstrap_theme',
               'numpydoc',
+              'sphinx_gallery'
               ],
           },
       entry_points='''
@@ -67,10 +69,11 @@ setup(version=get_git_version(),
         'Intended Audience :: Developers',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Physics'],
       )

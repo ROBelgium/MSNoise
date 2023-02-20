@@ -121,14 +121,14 @@ To run this script:
 
 .. code-block:: sh
 
-    $ msnoise compute_cc
+    $ msnoise cc compute_cc
 
 
 This step also supports parallel processing/threading:
 
 .. code-block:: sh
 
-    $ msnoise -t 4 compute_cc
+    $ msnoise -t 4 cc compute_cc
 
 will start 4 instances of the code (after 1 second delay to avoid database
 conflicts). This works both with SQLite and MySQL but be aware problems
@@ -157,8 +157,8 @@ could occur with SQLite.
 """
 import sys
 import time
-import scipy.fftpack as sf
-from scipy.fftpack import next_fast_len
+import scipy.fft as sf
+from scipy.fft import next_fast_len
 from .api import *
 from .move2obspy import myCorr
 from .move2obspy import whiten
@@ -377,12 +377,11 @@ def main(loglevel="INFO"):
                         filterid = filterdb.ref
                         low = float(filterdb.low)
                         high = float(filterdb.high)
-                        rms_threshold = filterdb.rms_threshold
 
                         trames2hWb = np.zeros((2, int(nfft)), dtype=np.complex)
                         skip = False
                         for i, station in enumerate(pair):
-                            if tmp[i].data.std() > rms_threshold:
+                            if tmp[i].data.std() > 0:
                                 if whitening:
                                     #logger.debug("Whitening %s" % components)
                                     trames2hWb[i] = whiten(tmp[i].data, nfft,
@@ -397,7 +396,7 @@ def main(loglevel="INFO"):
                             else:
                                 skip = True
                                 logger.debug('Slice RMS is smaller (%e) than rms_threshold (%e)!'
-                                              % (tmp[i].data.std(), rms_threshold))
+                                              % (tmp[i].data.std(), 0))
                         if not skip:
                             corr = myCorr(trames2hWb, np.ceil(params.maxlag / dt), plot=False, nfft=nfft)
                             if not np.all(np.isfinite(corr)):
@@ -419,7 +418,7 @@ def main(loglevel="INFO"):
                                 allcorr[ccfid][thistime] = corr
 
                             del corr, thistime, trames2hWb, tmptime
-                        del low, high, rms_threshold
+                        del low, high
                     del tmp, tmp1, tmp2
 
                 if params.keep_all:

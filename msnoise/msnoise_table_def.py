@@ -87,8 +87,6 @@ def declare_tables(prefix=None):
         :type mwcs_high: float
         :param mwcs_high: The upper frequency bound of the linear regression done in
             MWCS (in Hz)
-        :type rms_threshold: float
-        :param rms_threshold: Not used anymore
         :type mwcs_wlen: float
         :param mwcs_wlen: Window length (in seconds) to perform MWCS
         :type mwcs_step: float
@@ -104,7 +102,6 @@ def declare_tables(prefix=None):
         mwcs_low = Column(Float())
         high = Column(Float())
         mwcs_high = Column(Float())
-        rms_threshold = Column(Float())
         mwcs_wlen = Column(Float())
         mwcs_step = Column(Float())
         used = Column(Boolean(True))
@@ -115,7 +112,6 @@ def declare_tables(prefix=None):
             # self.mwcs_low = mwcs_low
             # self.high = high
             # self.mwcs_high = mwcs_high
-            # self.rms_threshold = rms_threshold
             # self.mwcs_wlen = mwcs_wlen
             # self.mwcs_step = mwcs_step
             # self.used = used

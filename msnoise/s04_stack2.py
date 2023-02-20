@@ -62,7 +62,7 @@ Once done, each job is marked "D"one in the database and, unless ``hpc`` is
 Usage:
 ~~~~~~
 
-.. include:: ../clickhelp/msnoise-stack.rst
+.. include:: ../clickhelp/msnoise-cc-stack.rst
 
 
 For most users, the REF stack will need to be computed only once for specific
@@ -123,16 +123,11 @@ def main(stype, interval=1.0, loglevel="INFO"):
     logger.debug('Starting the %s stack' % stype)
     db = connect()
 
-    start, end, datelist = build_movstack_datelist(db)
-
     params = get_params(db)
-    mov_stack = params.mov_stack
-    if mov_stack.count(',') == 0:
-        mov_stacks = [int(mov_stack), ]
-    else:
-        mov_stacks = [int(mi) for mi in mov_stack.split(',')]
+    taxis = get_t_axis(db)
+    mov_stacks = params.mov_stack
     if 1 in mov_stacks:
-        mov_stacks.remove(1)  # remove 1 day stack, it should exist already
+        mov_stacks.remove(1)  # remove 1 day stack, it will be done automatically
 
     filters = get_filters(db, all=False)
     while is_dtt_next_job(db, flag='T', jobtype='STACK'):
@@ -157,18 +152,34 @@ def main(stype, interval=1.0, loglevel="INFO"):
                 sta2 = sta2
                 print('Processing %s-%s-%i' %
                       (pair, components, filterid))
-                c = get_results(db, sta1, sta2, filterid, components, datelist,
-                                mov_stack=1, format="dataframe")
-                fn = r"STACKS2\%02i\001_DAYS\%s\%s_%s.h5" % (
-                    filterid, components, sta1, sta2)
-                if not os.path.isdir(os.path.split(fn)[0]):
-                    os.makedirs(os.path.split(fn)[0])
-                c.to_hdf(fn, key="CCF")
-                for mov_stack in mov_stacks:
-                    tmp = c.rolling("%iD" % mov_stack).mean()
-                    fn = r"STACKS2\%02i\%03i_DAYS\%s\%s_%s.h5" % (
-                        filterid, mov_stack, components, sta1, sta2)
-                    if not os.path.isdir(os.path.split(fn)[0]):
-                        os.makedirs(os.path.split(fn)[0])
-                    tmp.to_hdf(fn, key="CCF")
 
+                c = get_results(db, sta1, sta2, filterid, components, days,
+                                mov_stack=1, format="xarray")
+                path = os.path.join("STACKS2", "%02i" % filterid,
+                                    "001_DAYS", "%s" % components)
+                fn = "%s_%s.nc" % (sta1, sta2)
+                fullpath = os.path.join(path, fn)
+                dr = xr_create_or_open(fullpath, taxis)
+                dr = xr_insert_or_update(dr, c)
+                xr_save_and_close(dr, fullpath)
+
+                for mov_stack in mov_stacks:
+                    if mov_stack > len(dr.times):
+                        print("not enough data for mov_stack=%i" % mov_stack)
+                        continue
+
+                    xx = dr.resample(times='1D').mean().rolling(
+                        times=mov_stack, min_periods=1).mean().dropna("times", how="all")
+
+                    path = os.path.join("STACKS2", "%02i" % filterid,
+                                       "%03i_DAYS" % mov_stack,
+                                       "%s" % components)
+                    fn = "%s_%s.nc" % (sta1, sta2)
+                    fullpath = os.path.join(path, fn)
+                    xr_save_and_close(xx, fullpath)
+                    del xx
+        if stype != "ref":
+            massive_update_job(db, jobs, "D")
+            if stype != "step" and not params.hpc:
+                for job in jobs:
+                    update_job(db, job.day, job.pair, 'MWCS', 'T')

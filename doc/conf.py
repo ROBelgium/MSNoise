@@ -67,15 +67,13 @@ from msnoise.scripts import msnoise as M
 if not os.path.isdir("clickhelp"):
     os.makedirs("clickhelp")
 
-def write_click_help(group='', command='', data=''):
+def write_click_help(fullcommand='', command='', data=''):
     out = ".. code-block:: sh\n"
     out += "\n"
-    if group:
-        f = open('clickhelp/msnoise-%s-%s.rst'% (group, command), 'w')
-        out += space+"msnoise %s %s --help" % (group, command)
-    else:
-        f = open('clickhelp/msnoise-%s.rst'% (command), 'w')
-        out += space+"msnoise %s --help" % command
+    # fullcommand = fullcommand.replace("msnoise ", "").replace(" %s"%command, "")
+    fn = "-".join(fullcommand.split(" "))
+    f = open(os.path.join('clickhelp', fn+".rst"), "w")
+    out += space + "%s --help" % fullcommand
     out += "\n"
     out += "\n"
     for line in data.split('\n'):
@@ -85,62 +83,45 @@ def write_click_help(group='', command='', data=''):
     f.close()
     return out
 
+def process_command_or_group(out, commands, chain=[]):
+    for command_name, command in commands.items():
+        try:
+            group = command.group
+        except AttributeError:
+            group = ''
+        if group:
+            chain.append(command_name)
+            chain = process_command_or_group(out, command.commands, chain=chain)
+        else:
+            fullcommand = "msnoise %s %s" % (" ".join(chain), command_name)
+            fullcommand = fullcommand.replace("  ", " ")
+            out.write('%s\n' % fullcommand)
+            out.write('-' * len(fullcommand) + '\n')
+            help_text = click.Context(command=command).get_help()
+            out.write(write_click_help(fullcommand, command_name, help_text))
+            out.write("\n\n")
+    if len(chain):
+        chain.pop()
+    return chain
+
+
 out = open('clickhelp/msnoise.rst', 'w')
 out.write('Help on the msnoise commands\n')
 out.write('============================\n\n')
-out.write('This page shows all the command line interface commands\n\n')
-for command_name, command in sorted(M.cli.commands.items()):
-    try:
-        group = command.group
-    except AttributeError:
-        group = ''
-
-    if group:
-        group = command_name
-        out.write("\n")
-        out.write("\n")
-        out.write("------------")
-        out.write("\n")
-        out.write("\n")
-        fullgroup = "msnoise %s" % group
-        out.write('%s\n'%fullgroup)
-        out.write('-'*len(fullgroup)+'\n')
-        out.write("\n")
-        if command_name in ["plugin", "p"]:
-            out.write(
-                "Will be automatically populated with the commands declared "
-                "by the plugins (`p` is an alias for `plugin`)\n\n")
-            continue
-        for subcommand_name, subcommand in sorted(command.commands.items()):
-            fullcommand = "msnoise %s %s" % (group, subcommand_name)
-            out.write('%s\n' % fullcommand)
-            out.write('~' * len(fullcommand) + '\n')
-            help_text = click.Context(command=subcommand).get_help()
-            out.write(write_click_help(group, subcommand_name, help_text))
-            # out.write('.. include:: msnoise-%s-%s.rst\n\n' % (group, subcommand_name))
-            out.write("\n\n")
-        out.write("\n")
-        out.write("\n")
-
-    else:
-        fullcommand = "msnoise %s" % command_name
-        out.write('%s\n' % fullcommand)
-        out.write('-' * len(fullcommand) + '\n')
-        help_text = click.Context(command=command).get_help()
-        out.write(write_click_help(group, command_name, help_text))
-        # out.write('.. include:: msnoise-%s.rst\n\n' % command_name)
-        out.write("\n\n")
+out.write('This page shows all the commands accessible from the command '
+          'line\n\n')
+process_command_or_group(out, M.cli.commands)
 out.close()
 
 out = open('contributors.rst', 'w')
 out.write('Contributors\n')
 out.write('============\n\n')
-out.write('The following poeple have contributed to MSNoise (sorted '
+out.write('The following people have contributed to MSNoise (sorted '
           'alphabetically):\n\n')
 
-cont = open("../CONTRIBUTORS.txt",'r')
+cont = open("../CONTRIBUTORS.txt", 'r')
 for line in cont.readlines():
-    out.write("* "+ line)
+    out.write("* " + line)
 out.close()
 # -- General configuration -----------------------------------------------------
 
@@ -164,6 +145,7 @@ sphinx_gallery_conf = {
      'show_memory': False,
      'thumbnail_size': (250, 250),
 }
+intersphinx_cache_limit = 5
 
 math_number_all = False
 todo_include_todos = True
@@ -396,12 +378,12 @@ man_pages = [
 
 intersphinx_mapping = {
 'python': ('https://docs.python.org/2.7/', None),
-'numpy': ('http://docs.scipy.org/doc/numpy/', None),
-'scipy': ('http://docs.scipy.org/doc/scipy/reference/', None),
-'matplotlib': ('http://matplotlib.org/', None),
-'sqlalchemy': ('http://docs.sqlalchemy.org/en/latest/', None),
-'click': ('http://click.pocoo.org/5/', None,),
-'obspy': ('http://docs.obspy.org', None),
+'numpy': ('https://numpy.org/doc/stable/', None),
+'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+'matplotlib': ('https://matplotlib.org/stable/', None),
+'sqlalchemy': ('https://docs.sqlalchemy.org/en/20/', None),
+'click': ('https://click.palletsprojects.com/en/5.x/', None,),
+'obspy': ('https://docs.obspy.org/', None),
 'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None)
 }
 
@@ -430,8 +412,8 @@ texinfo_documents = [
 # How to display URL addresses: 'footnote', 'no', or 'inline'.
 #texinfo_show_urls = 'footnote'
 
-
-# Add our customized style sheet
-# See https://github.com/ryan-roemer/sphinx-bootstrap-theme
-def setup(app):
-    app.add_stylesheet('my-styles.css')
+#
+# # Add our customized style sheet
+# # See https://github.com/ryan-roemer/sphinx-bootstrap-theme
+# def setup(app):
+#     app.add_stylesheet('my-styles.css')

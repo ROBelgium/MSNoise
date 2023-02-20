@@ -2,12 +2,12 @@
 This plot shows the final output of MSNoise.
 
 
-.. include:: ../clickhelp/msnoise-plot-dvv.rst
+.. include:: ../clickhelp/msnoise-cc-dvv-plot-dvv.rst
 
 
 Example:
 
-``msnoise plot dvv`` will plot all defaults:
+``msnoise cc dvv plot dvv`` will plot all defaults:
 
 .. image:: ../.static/dvv.png
 
@@ -49,17 +49,13 @@ def get_wavgwstd(data, dttname, errname):
 def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
          pairs=[], showALL=False, show=False, outfile=None):
     db = connect()
-
+    params = get_params(db)
     start, end, datelist = build_movstack_datelist(db)
 
     if mov_stack != 0:
         mov_stacks = [mov_stack, ]
     else:
-        mov_stack = get_config(db, "mov_stack")
-        if mov_stack.count(',') == 0:
-            mov_stacks = [int(mov_stack), ]
-        else:
-            mov_stacks = [int(mi) for mi in mov_stack.split(',')]
+        mov_stacks = params.mov_stack
 
     if components.count(","):
         components = components.split(",")

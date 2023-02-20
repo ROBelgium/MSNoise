@@ -143,8 +143,7 @@ from flask_admin.babel import ngettext, lazy_gettext
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.model import typefmt
 from wtforms.validators import ValidationError
-from wtforms.fields import SelectField, StringField, BooleanField
-from wtforms.fields.html5 import DateField
+from wtforms.fields import SelectField, StringField, BooleanField, DateField
 from wtforms.utils import unset_value
 from flask_wtf import Form
 from flask_admin.form import widgets
@@ -196,9 +195,9 @@ class FilterView(ModelView):
     )
     
     column_list = ('ref', 'low', 'mwcs_low', 'mwcs_high', 'high',
-                   'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used')
+                   'mwcs_wlen', 'mwcs_step', 'used')
     form_columns = ('low', 'mwcs_low', 'mwcs_high', 'high',
-                    'rms_threshold', 'mwcs_wlen', 'mwcs_step', 'used')
+                    'mwcs_wlen', 'mwcs_step', 'used')
     
     def __init__(self, session, **kwargs):
         # You can pass name and other parameters if you want to

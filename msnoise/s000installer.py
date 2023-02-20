@@ -69,9 +69,9 @@ def create_database_inifile(tech, hostname, database, username, password,
     """Creates the db.ini file based on supplied parameters.
 
     :type tech: int
-    :param tech: The database technology used: 1=sqlite 2=mysql
+    :param tech: The database technology used: 1=sqlite 2=mysql 3=postgresql
     :type hostname: string
-    :param hostname: The hostname of the server (if tech=2) or the name of the
+    :param hostname: The hostname of the server (if tech>=2) or the name of the
         sqlite file if tech=1)
     :type database: string
     :param database: The database name
@@ -123,7 +123,7 @@ def create_indices(session, prefix):
 
 
 def main(tech=None, hostname=None, username=None, password=None,
-         database="msnoise", filename="msnoise.sqlite", prefix=None):
+         database="msnoise", filename=None, prefix=None):
     """
     Create the db.ini file and create database.
 

@@ -48,15 +48,15 @@ This recipe is a kind of "let's check this data rapidly":
 
     msnoise admin # add 1 filter in the Filter table
     # or
-    msnoise db execute "insert into filters (ref, low, mwcs_low, high, mwcs_high, rms_threshold, mwcs_wlen, mwcs_step, used) values (1, 0.1, 0.1, 1.0, 1.0, 0.0, 12.0, 4.0, 1)"
+    msnoise db execute "insert into filters (ref, low, mwcs_low, high, mwcs_high, mwcs_wlen, mwcs_step, used) values (1, 0.1, 0.1, 1.0, 1.0, 12.0, 4.0, 1)"
 
-    msnoise compute_cc
-    msnoise stack -r
+    msnoise cc compute_cc
+    msnoise cc stack -r
     msnoise reset STACK
-    msnoise stack -m
-    msnoise compute_mwcs
-    msnoise compute_dtt
-    msnoise plot dvv
+    msnoise cc stack -m
+    msnoise cc dvv compute_mwcs
+    msnoise cc dvv compute_dtt
+    msnoise cc dvv plot dvv
 
 
 Run MSNoise using lots of cores on a HPC
@@ -81,17 +81,17 @@ SELECT/UPDATE/INSERT).
 Commands and actions with ``hpc`` = N :
 
 * ``msnoise new_jobs``: creates the CC jobs
-* ``msnoise compute_cc``: processes the CC jobs and creates the STACK jobs
-* ``msnoise stack -m``: processes the STACK jobs and creates the MWCS jobs
+* ``msnoise cc compute_cc``: processes the CC jobs and creates the STACK jobs
+* ``msnoise cc stack -m``: processes the STACK jobs and creates the MWCS jobs
 * etc...
 
 Commands and actions with ``hpc`` = Y :
 
 * ``msnoise new_jobs``: creates the CC jobs
-* ``msnoise compute_cc``: processes the CC jobs
+* ``msnoise cc compute_cc``: processes the CC jobs
 * ``msnoise new_jobs --hpc CC:STACK``: creates the STACK jobs based on the CC 
   jobs marked "D"one
-* ``msnoise stack -m``: processes the STACK jobs
+* ``msnoise cc stack -m``: processes the STACK jobs
 * ``msnoise new_jobs --hpc STACK:MWCS``: creates the MWCS jobs based on the 
   STACK jobs marked "D"one
 * etc...
@@ -134,7 +134,7 @@ do it either:
 
 * in the Admin 
 * using MySQL workbench connected to your MySQL server
-* using such commands ``msnoise db execute "insert into filters (ref, low, mwcs_low, high, mwcs_high, rms_threshold, mwcs_wlen, mwcs_step, used) values (1, 0.1, 0.1, 1.0, 1.0, 0.0, 12.0, 4.0, 1)"``
+* using such commands ``msnoise db execute "insert into filters (ref, low, mwcs_low, high, mwcs_high, mwcs_wlen, mwcs_step, used) values (1, 0.1, 0.1, 1.0, 1.0, 12.0, 4.0, 1)"``
 * using ``msnoise db dump``, edit the filter table in CSV format, then ``msnoise db import filters --force``
 
 Once done, the project is set up and should run. Again, test if all goes OK in
@@ -157,7 +157,7 @@ The job file in my PBS case looks like this for computing the CC:
     #PBS -J 1-400
     cd /scratch-a/thomas/2019_PDF
     source /space/hpc-home/thomas/.profile
-    msnoise compute_cc2
+    msnoise cc compute_cc
 
 This requests 400 cores with 1GB of RAM. The content of my .profile file
 contains:
@@ -200,7 +200,7 @@ reprocess all CC jobs, but not for filters already existing. The recipe is:
 * Set all other filters 'used' value to 0
 * Redefine the flag of the CC jobs, from 'D'one to 'T'odo with the following:
 * Run ``msnoise reset CC --all``
-* Run ``msnoise compute_cc``
+* Run ``msnoise cc compute_cc``
 * Run next commands if needed (stack, mwcs, dtt)
 * Set back the other filters 'used' value to 1
 
@@ -219,7 +219,7 @@ re-computed:
 .. code-block:: sh
 
     msnoise reset STACK --all
-    msnoise stack -r
+    msnoise cc stack -r
 
 The REF will then be re-output, and you probably should reset the MWCS jobs to
 recompute daily correlations against this new ref:
@@ -227,7 +227,7 @@ recompute daily correlations against this new ref:
 .. code-block:: sh
 
     msnoise reset MWCS --all
-    msnoise compute_mwcs
+    msnoise cc dvv compute_mwcs
 
 
 When changing the MWCS parameters
@@ -239,7 +239,7 @@ reprocessed:
 .. code-block:: sh
 
     msnoise reset MWCS --all
-    msnoise compute_mwcs
+    msnoise cc dvv compute_mwcs
 
 shoud do the trick.
 
@@ -250,7 +250,7 @@ When changing the dt/t parameters
 .. code-block:: sh
 
     msnoise reset DTT --all
-    msnoise compute_dtt
+    msnoise cc dvv compute_dtt
 
 
 Recompute only the specific days

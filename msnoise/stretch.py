@@ -56,17 +56,11 @@ def main():
     logging.info('*** Starting: Compute STR ***')
 
     db = connect()
-    components_to_compute = get_components_to_compute(db)
-
-    mov_stack = get_config(db, "mov_stack")
-    if mov_stack.count(',') == 0:
-        mov_stacks = [int(mov_stack), ]
-    else:
-        mov_stacks = [int(mi) for mi in mov_stack.split(',')]
     params = get_params(db)
-    goal_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-    maxlag = float(get_config(db, "maxlag"))
-    export_format = get_config(db, 'export_format')
+    mov_stacks = params.mov_stack
+    goal_sampling_rate = params.cc_sampling_rate
+    maxlag = params.maxlag
+    export_format = params.export_format
     if export_format == "BOTH":
         extension = ".MSEED"
     else:

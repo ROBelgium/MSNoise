@@ -62,7 +62,7 @@ Once done, each job is marked "D"one in the database and, unless ``hpc`` is
 Usage:
 ~~~~~~
 
-.. include:: ../clickhelp/msnoise-stack.rst
+.. include:: ../clickhelp/msnoise-cc-stack.rst
 
 
 For most users, the REF stack will need to be computed only once for specific
@@ -75,17 +75,17 @@ dates and then, on routine basis, only compute the MOV stacks:
 
 .. code-block:: sh
 
-    $ msnoise stack -r
+    $ msnoise cc stack -r
     $ msnoise reset STACK
-    $ msnoise stack -m
+    $ msnoise cc stack -m
 
 as for all other steps, this procedure can be run in parallel:
 
 .. code-block:: sh
 
-    $ msnoise -t 4 stack -r
+    $ msnoise -t 4 cc stack -r
     $ msnoise reset STACK
-    $ msnoise -t 4 stack -m
+    $ msnoise -t 4 cc stack -m
 
 
 .. versionadded:: 1.4
@@ -160,11 +160,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
     if stype == "mov" or stype == "step":
         start, end, datelist = build_movstack_datelist(db)
         format = "matrix"
-        mov_stack = get_config(db, "mov_stack")
-        if mov_stack.count(',') == 0:
-            mov_stacks = [int(mov_stack), ]
-        else:
-            mov_stacks = [int(mi) for mi in mov_stack.split(',')]
+        mov_stacks = params.mov_stack
         if 1 in mov_stacks:
             mov_stacks.remove(1)  # remove 1 day stack, it should exist already
     
@@ -255,7 +251,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                                                 continue
 
                                             corr = scipy.signal.detrend(
-                                                corr).astype(np.float32)
+                                                corr).astype(float)
                                             stack_path = os.path.join(
                                                 "STACKS", "%02i" % filterid, "%03i_DAYS" % mov_stack, components, day_name)
                                             filename = os.path.join(
