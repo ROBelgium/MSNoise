@@ -646,7 +646,7 @@ def main(prefix=""):
 
     import os
     import sys
-    test_dir = tempfile.mkdtemp()
+    test_dir = tempfile.mkdtemp(prefix="msnoise_")
     os.chdir(test_dir)
     print("Tests will be executed in %s" % test_dir)
     # c = len(os.listdir(os.getcwd()))
