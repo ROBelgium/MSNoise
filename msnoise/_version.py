@@ -104,7 +104,6 @@ def call_git_describe(abbrev=10, dirty=True,
             pass
 
     # (this line prevents official releases)
-    # should work again now, see #482 and obspy/obspy@b437f31
     if "-" not in line and "." not in line:
         version = "0.0.0.dev+0.g%s" % line
     else:
@@ -151,11 +150,11 @@ def get_git_version(abbrev=10, dirty=True, append_remote_tracking_branch=True):
 
     # If we still don't have anything, that's an error.
     if version is None:
-        warnings.warn("ObsPy could not determine its version number. Make "
+        warnings.warn("msnoise could not determine its version number. Make "
                       "sure it is properly installed. This for example "
                       "happens when installing from a zip archive "
-                      "of the ObsPy repository which is not a supported way "
-                      "of installing ObsPy.")
+                      "of the msnoise repository which is not a supported way "
+                      "of installing msnoise.")
         return '0.0.0+archive'
 
     # pip uses its normalized version number (strict PEP440) instead of our
