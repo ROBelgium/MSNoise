@@ -70,18 +70,24 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
             break
 
     fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
+
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
     for i, mov_stack in enumerate(mov_stacks):
         current = start
-        plt.sca(axes[i])
+        try:
+            plt.sca(axes[i])
+        except:
+            plt.sca(axes)
         plt.title('%i Days Moving Window' % mov_stack)
         for comps in components:
             try:
                 dvv = xr_get_dvv(comps, filterid, mov_stack)
             except:
                 continue
-            plt.plot(dvv.index, dvv.loc[:,("m", "weighted_mean")] * -100, label=comps)
-            # plt.plot(dvv.index, dvv.loc[:, ("m", "50%")] * -100, label=comps)
+            for _ in ["mean", "50%", "trimmed_mean", "weighted_mean"]:
+                plt.plot(dvv.index, dvv.loc[:, ("m", _)] * -100, label="%s: %s" % (comps,_ ))
+            for _ in ["5%","95%"]:
+                plt.plot(dvv.index, dvv.loc[:, ("m", _)] * -100, label="%s: %s" % (comps,_ ))
 
         plt.ylabel('dv/v (%)')
         if i == 0:

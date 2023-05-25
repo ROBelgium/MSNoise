@@ -1230,6 +1230,8 @@ def dvv_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfi
     Remember to order stations alphabetically !
     """
     if ctx.obj['MSNOISE_custom']:
+        import sys, os
+        sys.path.append(os.getcwd())
         from dvv import main
     else:
         from ..plots.dvv import main
