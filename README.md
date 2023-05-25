@@ -45,14 +45,12 @@ Remember, always consider the current GitHub *master* as not stable!
 Getting Help
 ------------
 
-✨ We are trying to move the MSNoise help to https://github.com/ROBelgium/MSNoise/discussions the GitHub Discussions, so everything will be grouped here. For now, the mailing list (below) will still work, as well as the Gitter Chat, but try to use either the Discussions and the Gitter for questions !✨
+✨ Please make use of the https://github.com/ROBelgium/MSNoise/discussions the GitHub Discussions for questions !✨
 
 --
 
-The best way to get help is to subscribe to the Mailing List and ask your question directly there. It is available on 
-http://mailman-as.oma.be/mailman/listinfo/msnoise and the archive is http://mailman-as.oma.be/pipermail/msnoise/ or https://www.mail-archive.com/msnoise@mailman-as.oma.be/.
+You can also search the mailing list's archive on http://mailman-as.oma.be/pipermail/msnoise/ or https://www.mail-archive.com/msnoise@mailman-as.oma.be/.
 
-Join us on the Gitter Chat: [![Join the chat at https://gitter.im/ROBelgium/MSNoise](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/ROBelgium/MSNoise?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 Citing MSNoise
 --------------
@@ -76,6 +74,3 @@ Licence
 -------
 
 MSNoise is released under EUPL v1.1
-
-[![Analytics](https://ga-beacon.appspot.com/UA-55331253-1/MSNoise/readme)](https://github.com/ROBelgium/MSNoise)
-
