@@ -118,6 +118,7 @@ def main(loglevel="INFO"):
 
     db = connect()
     params = get_params(db)
+    taxis = get_t_axis(db)
     export_format = params.export_format
     if export_format == "BOTH":
         extension = ".MSEED"
@@ -175,26 +176,26 @@ def main(loglevel="INFO"):
             for components in params.all_components:
                 ref_name = pair.replace(':', '_')
                 station1, station2 = pair.split(":")
-                ref = get_ref(db, station1, station2, filterid, components,
-                              params)
+
+                try:
+                    ref = xr_get_ref(station1, station2, components, filterid, taxis)
+                    ref = ref.CCF.values
+                except FileNotFoundError:
+                    continue
                 if not len(ref):
                     continue
-                ref = ref.data
                 # print("Whitening ref")
                 # ref = ww(ref)
 
                 for mov_stack in mov_stacks:
                     output = []
-                    fn = r"STACKS2/%02i/%03i_DAYS/%s/%s_%s.nc" % (
-                    filterid, mov_stack, components, station1, station2)
-                    print("Reading %s" % fn)
-                    if not os.path.isfile(fn):
-                        print("FILE DOES NOT EXIST: %s, skipping" % fn)
+                    try:
+                        data = xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis)
+                    except FileNotFoundError:
                         continue
-                    data = xr_create_or_open(fn)
-                    data = data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
-                    valid = data.index.intersection(pd.to_datetime(days))
-                    data = data.loc[valid]
+
+                    todo = data.index.intersection(pd.to_datetime(days))
+                    data = data.loc[todo]
                     data = data.dropna()
                     # print("Whitening %s" % fn)
                     # data = pd.DataFrame(data)
@@ -247,13 +248,11 @@ def main(loglevel="INFO"):
                             for i in range(fcur2.shape[0]):
                                 fcur2[i] = np.sqrt(
                                     scipy.signal.convolve(fcur2[i],
-                                                          hanningwindow.astype(
-                                                              float),
+                                                          hanningwindow.real,
                                                           "same"))
 
                             fref2 = np.sqrt(scipy.signal.convolve(fref2,
-                                                                  hanningwindow.astype(
-                                                                      float),
+                                                                  hanningwindow.real,
                                                                   "same"))
 
                             for i in range(X.shape[0]):
@@ -325,24 +324,10 @@ def main(loglevel="INFO"):
                         del X
                         del M, E, MCOH
                     output = pd.concat(output, axis=1)
-                    fn = os.path.join("MWCS2", "%02i" % filterid,
-                                        "%03i_DAYS" % mov_stack,
-                                        "%s" % components,
-                                        "%s_%s.nc" % ( station1, station2))
+                    # output.to_csv(fn.replace('.nc','.csv'))
 
-                    if not os.path.isdir(os.path.split(fn)[0]):
-                        os.makedirs(os.path.split(fn)[0])
-                    output.to_csv(fn.replace('.nc','.csv'))
-                    d = output.stack().stack()
-                    d.index = d.index.set_names(["times", "keys", "taxis"])
-                    d = d.reorder_levels(["times", "taxis", "keys"])
-                    d.columns = ["MWCS"]
-                    taxis = np.unique(d.index.get_level_values('taxis'))
-                    dr = xr_create_or_open(fn, taxis=taxis, name="MWCS")
-                    rr = d.to_xarray().to_dataset(name="MWCS")
-                    rr = xr_insert_or_update(dr, rr)
-                    xr_save_and_close(rr, fn)
-                    del rr, dr, d
+                    xr_save_mwcs(station1, station2, components, filterid, mov_stack, taxis, output)
+
         massive_update_job(db, jobs, "D")
         if not params.hpc:
             for job in jobs:

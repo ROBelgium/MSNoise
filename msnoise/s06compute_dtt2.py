@@ -70,22 +70,14 @@ def main(interval=1, loglevel="INFO"):
             for components in params.all_components:
                 for mov_stack in mov_stacks:
                     output = []
-                    fn = os.path.join("MWCS2", "%02i" % filterid,
-                                        "%03i_DAYS" % mov_stack,
-                                        "%s" % components,
-                                        "%s_%s.nc" % (station1, station2))
-                    print("Reading %s" % fn)
-                    if not os.path.isfile(fn):
-                        print("FILE DOES NOT EXIST: %s, skipping" % fn)
+                    try:
+                        mwcs = xr_get_mwcs(station1, station2, components, filterid, mov_stack)
+                    except FileNotFoundError:
                         continue
 
-                    data = xr_create_or_open(fn)
-                    print(data)
-                    data = data.MWCS.to_dataframe().reorder_levels(['times','taxis','keys']).unstack().droplevel(0, axis=1).unstack()
-                    valid = data.index.intersection(pd.to_datetime(days))
-                    data = data.loc[valid]
-                    data = data.dropna()
-                    mwcs = data
+                    todo = mwcs.index.intersection(pd.to_datetime(days))
+                    mwcs = mwcs.loc[todo]
+                    mwcs = mwcs.dropna()
 
                     M = mwcs.xs("M", level=0, axis=1).copy()
                     EM = mwcs.xs("EM", level=0, axis=1).copy()
@@ -147,15 +139,8 @@ def main(interval=1, loglevel="INFO"):
                     output = pd.DataFrame(values, index=M.index,
                                           columns=["m", "em", "a", "ea", "m0", "em0"])
 
-                    out = fn.replace("MWCS", "DTT")
-                    d = output.stack()
-                    print("OUTPUT:")
-                    print(d.head())
-                    d.index = d.index.set_names(["times", "keys"])
-                    d.columns = ["DTT"]
-                    dr = xr_create_or_open(out, taxis=[], name="DTT")
-                    rr = d.to_xarray().to_dataset(name="DTT")
-                    rr = xr_insert_or_update(dr, rr)
-                    xr_save_and_close(rr, out)
+                    xr_save_dtt(station1, station2, components, filterid, mov_stack, output)
+
         massive_update_job(db, jobs, "D")
+
     logger.info('*** Finished: Compute DTT ***')

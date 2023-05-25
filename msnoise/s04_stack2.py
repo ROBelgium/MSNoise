@@ -125,6 +125,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
 
     params = get_params(db)
     taxis = get_t_axis(db)
+
     mov_stacks = params.mov_stack
     if 1 in mov_stacks:
         mov_stacks.remove(1)  # remove 1 day stack, it will be done automatically
@@ -161,7 +162,25 @@ def main(stype, interval=1.0, loglevel="INFO"):
                 fullpath = os.path.join(path, fn)
                 dr = xr_create_or_open(fullpath, taxis)
                 dr = xr_insert_or_update(dr, c)
+                dr = dr.sortby("times")
                 xr_save_and_close(dr, fullpath)
+
+                if stype == "ref":
+                    start, end, datelist = build_ref_datelist(db)
+                    start = np.array(start, dtype=np.datetime64)
+                    end = np.array(end, dtype=np.datetime64)
+                    _ = dr.where(dr.times >= start, drop=True)
+                    _ = _.where(_.times <= end, drop=True)
+                    # TODO add other stack methods here! using apply?
+                    _ = _.mean(dim="times")
+                    path = os.path.join("STACKS2", "%02i" % filterid,
+                                        "REF", "%s" % components)
+                    fn = "%s_%s.nc" % (sta1, sta2)
+                    fullpath = os.path.join(path, fn)
+                    _r = xr_create_or_open(fullpath, taxis, name="REF")
+                    _r = xr_insert_or_update(_r, _)
+                    xr_save_and_close(_r, fullpath)
+                    continue
 
                 for mov_stack in mov_stacks:
                     if mov_stack > len(dr.times):

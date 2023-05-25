@@ -58,6 +58,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
     sta1 = sta1 #.replace('.', '_')
     sta2 = sta2 #.replace('.', '_')
     t = np.arange(samples)/cc_sampling_rate - maxlag
+    taxis = get_t_axis(db)
 
     if refilter:
         freqmin, freqmax = refilter.split(':')
@@ -75,16 +76,19 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
 
     print("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
                                                  mov_stack))
-    nstack, stack_total = get_results(db, sta1, sta2, filterid, components,
-                                      datelist, mov_stack, format="matrix")
-    if nstack == 0:
+    stack_total = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
+
+    # convert index to mdates
+    stack_total.index = mdates.date2num(stack_total.index.to_pydatetime())
+
+    if len(stack_total) == 0:
         print("No CCF found for this request")
         return
 
     if normalize == "common":
         stack_total /= np.nanmax(stack_total)
     ax = plt.subplot(111)
-    for i, line in enumerate(stack_total):
+    for i, line in stack_total.iterrows():
         if np.all(np.isnan(line)):
             continue
         if refilter:
@@ -94,10 +98,10 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
             line = obspy_envelope(line)
         if normalize == "individual":
             line /= line.max()
-        plt.plot(t, line * ampli + i + base, c='k', lw=0.5)
+        plt.plot(t, line * ampli + i, c='k', lw=0.5)
         if seismic:
-            y1 = np.ones(len(line)) * i + base
-            y2 = line*ampli + i + base
+            y1 = np.ones(len(line)) * i
+            y2 = line*ampli + i
             plt.fill_between(t, y1, y2, where=y2 >= y1, facecolor='k',
                              interpolate=True)
     low = high = 0.0

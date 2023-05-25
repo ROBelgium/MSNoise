@@ -779,12 +779,12 @@ def cc_compute_cc_rot(ctx):
             p.join()
 
 
-@cc.command(name="stack")
+@cc.command(name="stack_old")
 @click.pass_context
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-def cc_stack(ctx, ref, mov, step):
+def cc_stack_old(ctx, ref, mov, step):
     """Stacks the [REF] or [MOV] windows.
     Computes the STACK jobs.
     """
@@ -838,12 +838,12 @@ def cc_stack(ctx, ref, mov, step):
             p.join()
 
 
-@cc.command(name="stack2")
+@cc.command(name="stack")
 @click.pass_context
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-def cc_stack2(ctx, ref, mov, step):
+def cc_stack(ctx, ref, mov, step):
     """Stacks the [REF] or [MOV] windows.
     Computes the STACK jobs.
     """
@@ -1049,9 +1049,9 @@ def dvv():
     pass
 
 
-@dvv.command(name='compute_mwcs')
+@dvv.command(name='compute_mwcs_old')
 @click.pass_context
-def dvv_compute_mwcs(ctx):
+def dvv_compute_mwcs_old(ctx):
     """Computes the MWCS jobs"""
     from ..s05compute_mwcs import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1070,9 +1070,9 @@ def dvv_compute_mwcs(ctx):
         for p in processes:
             p.join()
 
-@dvv.command(name='compute_mwcs2')
+@dvv.command(name='compute_mwcs')
 @click.pass_context
-def dvv_compute_mwcs2(ctx):
+def dvv_compute_mwcs(ctx):
     """Computes the MWCS jobs"""
     from ..s05compute_mwcs2 import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1114,11 +1114,9 @@ def dvv_compute_stretching(ctx):
             p.join()
 
 
-@dvv.command(name='compute_dtt')
+@dvv.command(name='compute_dtt_old')
 @click.pass_context
-@click.option('-i', '--interval', default=1.0, help='Number of days before now to\
- search for modified Jobs')
-def dvv_compute_dtt(ctx, interval):
+def dvv_compute_dtt_old(ctx):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1138,13 +1136,32 @@ def dvv_compute_dtt(ctx, interval):
             p.join()
 
 
-@dvv.command(name='compute_dtt2')
+@dvv.command(name='compute_dtt')
 @click.pass_context
-@click.option('-i', '--interval', default=1.0, help='Number of days before now to\
- search for modified Jobs')
-def dvv_compute_dtt2(ctx, interval):
+def dvv_compute_dtt(ctx):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt2 import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    if threads == 1:
+        main(loglevel=loglevel)
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main, kwargs={"loglevel": loglevel})
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
+@dvv.command(name='compute_dvv')
+@click.pass_context
+def dvv_compute_dvv(ctx):
+    """Computes the dt/t jobs based on the new MWCS data"""
+    from ..s07_compute_dvv import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']

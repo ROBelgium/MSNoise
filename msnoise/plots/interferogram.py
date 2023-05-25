@@ -31,6 +31,8 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     db = connect()
     maxlag = float(get_config(db, 'maxlag'))
     cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
+    taxis = get_t_axis(db)
+
     start, end, datelist = build_movstack_datelist(db)
     if refilter:
         freqmin, freqmax = refilter.split(':')
@@ -50,12 +52,11 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     print("New Data for %s-%s-%i-%i" % (pair, components, filterid,
                                         mov_stack))
 
-    nstack, stack_total = get_results(db, sta1, sta2, filterid, components,
-                                      datelist, mov_stack, format="matrix")
+    data = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
 
-    xextent = (date2num(start), date2num(end), -maxlag, maxlag)
+    xextent = (date2num(data.index[0]), date2num(data.index[-1]), -maxlag, maxlag)
     ax = plt.subplot(111)
-    data = stack_total
+    # data = stack_total
     if refilter:
         for i, d in enumerate(data):
             data[i] = bandpass(data[i], freqmin, freqmax, cc_sampling_rate,
