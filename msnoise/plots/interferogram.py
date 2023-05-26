@@ -75,11 +75,9 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     # ax.xaxis.set_minor_locator(DayLocator())
     # ax.xaxis.set_minor_formatter(DateFormatter('%Y-%m-%d %H:%M'))
 
-    for filterdb in get_filters(db, all=True):
-        if filterid == filterdb.ref:
-            low = float(filterdb.low)
-            high = float(filterdb.high)
-            break
+    filter = get_filters(db, ref=filterid)
+    low = float(filter.low)
+    high = float(filter.high)
 
     if "ylim" in kwargs:
         plt.ylim(kwargs["ylim"][0],kwargs["ylim"][1])

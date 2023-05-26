@@ -44,7 +44,8 @@ from matplotlib.widgets import Cursor
 from obspy.signal.filter import bandpass
 
 from msnoise.api import build_movstack_datelist, connect, get_config, \
-    get_filters, get_results, check_stations_uniqueness
+    get_filters, get_results, check_stations_uniqueness, xr_get_ccf,\
+    get_t_axis
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
@@ -54,7 +55,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
     cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
     start, end, datelist = build_movstack_datelist(db)
     base = mdates.date2num(start)
-
+    taxis = get_t_axis(db)
     # TODO: Height adjustment of the plot for large number of stacks.
     # Preferably interactive
     fig = plt.figure(figsize=(12, 9))
@@ -75,10 +76,16 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
 
     print("New Data for %s-%s-%i-%i" % (pair, components, filterid,
                                         mov_stack))
-    nstack, stack_total = get_results(db, sta1, sta2, filterid, components,
-                                      datelist, mov_stack, format="matrix")
-    ax = fig.add_subplot(111)
-    for i, line in enumerate(stack_total):
+    stack_total = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
+
+    # convert index to mdates
+    stack_total.index = mdates.date2num(stack_total.index.to_pydatetime())
+
+    if len(stack_total) == 0:
+        print("No CCF found for this request")
+        return
+    ax = plt.subplot(111)
+    for i, line in stack_total.iterrows():
         if np.all(np.isnan(line)):
             continue
 
@@ -89,13 +96,12 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
         freq, line = prepare_abs_postitive_fft(line, cc_sampling_rate)
         line /= line.max()
 
-        ax.plot(freq, line * ampli + i + base, c='k', lw=1)
+        ax.plot(freq, line * ampli + i, c='k', lw=1)
 
-    for filterdb in get_filters(db, all=True):
-        if filterid == filterdb.ref:
-            low = float(filterdb.low)
-            high = float(filterdb.high)
-            break
+    filter = get_filters(db, ref=filterid)
+    low = float(filter.low)
+    high = float(filter.high)
+
 
     ax.set_ylim(start-datetime.timedelta(days=ampli),
                 end+datetime.timedelta(days=ampli))

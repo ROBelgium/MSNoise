@@ -173,7 +173,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     if mov_stack > len(dr.times):
                         print("not enough data for mov_stack=%i" % mov_stack)
                         continue
-
+                    # TODO avoid the 1D resampler here
                     xx = dr.resample(times='1D').mean().rolling(
                         times=mov_stack, min_periods=1).mean().dropna("times", how="all")
                     xr_save_ccf(sta1, sta2, components, filterid, mov_stack, taxis, xx, overwrite=True)

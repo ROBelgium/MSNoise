@@ -129,17 +129,6 @@ def main(loglevel="INFO"):
     goal_sampling_rate = params.cc_sampling_rate
     maxlag = params.maxlag
 
-    # First we reset all DTT jobs to "T"odo if the REF is new for a given pair
-    # for station1, station2 in get_station_pairs(db, used=True):
-    #     sta1 = "%s.%s" % (station1.net, station1.sta)
-    #     sta2 = "%s.%s" % (station2.net, station2.sta)
-    #     pair = "%s:%s" % (sta1, sta2)
-    #     if is_dtt_next_job(db, jobtype='DTT', ref=pair):
-    #         logger.info(
-    #             "We will recompute all MWCS based on the new REF for %s" % pair)
-    #         reset_dtt_jobs(db, pair)
-    #         update_job(db, "REF", pair, jobtype='DTT', flag='D')
-    # 
     logger.debug('Ready to compute')
     # Then we compute the jobs
     outfolders = []

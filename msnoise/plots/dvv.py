@@ -13,37 +13,10 @@ Example:
 
 """
 
-import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
-
 from matplotlib.dates import DateFormatter
 
 from ..api import *
-
-
-def wavg(group, dttname, errname):
-    d = group[dttname]
-    group[errname][group[errname] == 0] = 1e-6
-    w = 1. / group[errname]
-    wavg = (d * w).sum() / w.sum()
-    return wavg
-
-
-def wstd(group, dttname, errname):
-    d = group[dttname]
-    group[errname][group[errname] == 0] = 1e-6
-    w = 1. / group[errname]
-    wavg = (d * w).sum() / w.sum()
-    N = len(np.nonzero(w)[0])
-    wstd = np.sqrt(np.sum(w * (d - wavg) ** 2) / ((N - 1) * np.sum(w) / N))
-    return wstd
-
-
-def get_wavgwstd(data, dttname, errname):
-    grouped = data.groupby(level=0)
-    g = grouped.apply(wavg, dttname=dttname, errname=errname)
-    h = grouped.apply(wstd, dttname=dttname, errname=errname)
-    return g, h
 
 
 def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
@@ -63,11 +36,9 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
         components = [components, ]
 
     low = high = 0.0
-    for filterdb in get_filters(db, all=True):
-        if filterid == filterdb.ref:
-            low = float(filterdb.low)
-            high = float(filterdb.high)
-            break
+    filter = get_filters(db, ref=filterid)
+    low = float(filter.low)
+    high = float(filter.high)
 
     fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
 

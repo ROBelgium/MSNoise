@@ -76,12 +76,9 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
         
     plt.ylabel("Interstation Distance in km")
     plt.xlabel("Lag Time")
-    low = high = 0.0
-    for filterdb in get_filters(db, all=True):
-        if filterid == filterdb.ref:
-            low = float(filterdb.low)
-            high = float(filterdb.high)
-            break
+    filter = get_filters(db, ref=filterid)
+    low = float(filter.low)
+    high = float(filter.high)
     title = '%s, Filter %d (%.2f - %.2f Hz)' % \
             (components, filterid, low, high,)
     if refilter:

@@ -104,12 +104,10 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
             y2 = line*ampli + i
             plt.fill_between(t, y1, y2, where=y2 >= y1, facecolor='k',
                              interpolate=True)
-    low = high = 0.0
-    for filterdb in get_filters(db, all=True):
-        if filterid == filterdb.ref:
-            low = float(filterdb.low)
-            high = float(filterdb.high)
-            break
+
+    filter = get_filters(db, ref=filterid)
+    low = float(filter.low)
+    high = float(filter.high)
 
     plt.xlabel("Lag Time (s)")
     plt.axhline(0, lw=0.5, c='k')

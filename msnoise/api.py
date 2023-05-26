@@ -303,7 +303,7 @@ def get_params(session):
 # FILTERS PART
 
 
-def get_filters(session, all=False):
+def get_filters(session, all=False, ref=None):
     """Get Filters from the database.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -317,7 +317,9 @@ def get_filters(session, all=False):
     :rtype: list of :class:`~msnoise.msnoise_table_def.declare_tables.Filter`
     :returns: a list of Filter
     """
-
+    if ref:
+        filter = session.query(Filter).filter(Filter.ref == ref).first()
+        return filter
     if all:
         filters = session.query(Filter).all()
     else:
