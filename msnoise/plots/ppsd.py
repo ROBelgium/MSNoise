@@ -23,8 +23,9 @@ from msnoise.api import *
 
 
 def main(net, sta, loc, chan, time_of_weekday=None, period_lim=None, show=False,
-         outfile=None, cmap="viridis", color_lim=None):
-
+         outfile=None, cmap="viridis", color_lim=None, loglevel="INFO"):
+    logger = get_logger('msnoise.qc_compute_psd', loglevel,
+                        with_pid=True)
     db = connect()
     logging.debug('Preloading all instrument response')
     response_format = get_config(db, 'response_format')
@@ -39,16 +40,15 @@ def main(net, sta, loc, chan, time_of_weekday=None, period_lim=None, show=False,
         # outfile.write(f)
         return
 
-    print("Calculate histogram...")
+    logger.debug("Calculate histogram...")
     ppsd.calculate_histogram( time_of_weekday=time_of_weekday)
     if len(ppsd._times_processed) < 2:
-        print("Not enough data for %s.%s - %s"%(net, sta, comp))
+        logger.warning("Not enough data for %s.%s - %s"%(net, sta, comp))
         return
-    print("Plotting PPSD...")
+    logger.info("Plotting PPSD...")
     fig = ppsd.plot(show_mean=True, show=False, period_lim=period_lim,show_coverage=False)
-    print(fig)
 
-    print("Plotting spectrogram...")
+    logger.info("Plotting spectrogram...")
     gs = GridSpec(2, 2, width_ratios=[10,1], hspace=0.3, left=0.2, right=0.85, top=0.80, bottom=0.2)
     fig.set_size_inches(8.2, 11.6, forward=True)
     fig.axes[0].set_subplotspec(gs[0])
@@ -90,7 +90,7 @@ def main(net, sta, loc, chan, time_of_weekday=None, period_lim=None, show=False,
     adf.scaled[365.] = '%Y'  # set the > 1y scale to Y
 
     if outfile:
-        print("output to: %s" % outfile)
+        logger.info("output to: %s" % outfile)
         plt.savefig(outfile)
 
     if show:

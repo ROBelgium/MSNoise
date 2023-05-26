@@ -677,11 +677,12 @@ def plot():
 @click.pass_context
 def plot_data_availability(ctx, chan, show, outfile):
     """Plots the Data Availability vs time"""
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
         from data_availability import main
     else:
         from ..plots.data_availability import main
-    main(chan, show, outfile)
+    main(chan, show, outfile, loglevel=loglevel)
 
 
 
@@ -925,13 +926,13 @@ def cc_plot():
 def cc_plot_distance(ctx, filterid, comp, ampli, show, outfile, refilter,
                      virtual_source, extra_args):
     """Plots the REFs of all pairs vs distance"""
-
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
         from distance import main
     else:
         from ..plots.distance import main
     main(filterid, comp, ampli, show, outfile, refilter, virtual_source,
-         **extra_args)
+         loglevel=loglevel, **extra_args)
 
 
 @cc_plot.command(name="interferogram",
@@ -957,16 +958,13 @@ def cc_plot_interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show,
                           refilter, extra_args):
     """Plots the interferogram between sta1 and sta2 (parses the CCFs)
     STA1 and STA2 must be provided with this format: NET.STA !"""
-
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
         from interferogram import main
     else:
         from ..plots.interferogram import main
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile, refilter,
-         **extra_args)
+         loglevel=loglevel, **extra_args)
 
 
 @cc_plot.command(name="ccftime",
@@ -1197,14 +1195,12 @@ def dvv_plot():
 def dvv_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
     """Plots the mwcs results between sta1 and sta2 (parses the CCFs)
     STA1 and STA2 must be provided with this format: NET.STA !"""
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
         from mwcs import main
     else:
         from ..plots.mwcs import main
-    main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
+    main(sta1, sta2, filterid, comp, mov_stack, show, outfile, loglevel=loglevel)
 
 
 @dvv_plot.command(name="dvv")
@@ -1227,15 +1223,14 @@ def dvv_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfi
     Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
     Remember to order stations alphabetically !
     """
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
         import sys, os
         sys.path.append(os.getcwd())
         from dvv import main
     else:
         from ..plots.dvv import main
-    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
-
-
+    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile, loglevel=loglevel)
 
 
 @dvv_plot.command(name="dtt")
@@ -1255,14 +1250,12 @@ def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
     """Plots a graph of dt against t
     STA1 and STA2 must be provided with this format: NET.STA !
     DAY must be provided in the ISO format: YYYY-MM-DD"""
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
         from dtt import main
     else:
         from ..plots.dtt import main
-    main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile)
+    main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile, loglevel=loglevel)
 
 
 
@@ -1286,38 +1279,12 @@ def dvv_plot_timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, ou
     Example: msnoise plot timing -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
     Remember to order stations alphabetically !
     """
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
         from timing import main
     else:
         from ..plots.timing import main
-    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
-
-
-# @cli.command(name='compute_dvv')
-# @click.option('-f', '--filterid', default=1, help='Filter ID')
-# @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-# @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
-# @click.option('-p', '--pair', default=None, help='Plot a specific pair',
-#               multiple=True)
-# @click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
-# @click.option('-M', '--dttname', default="M", help='Plot M or M0?')
-# @click.option('-s', '--show', help='Show interactively?',
-#               default=True, type=bool)
-# @click.option('-o', '--outfile', help='Output filename (?=auto)',
-#               default=None, type=str)
-# @click.pass_context
-# def compute_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
-#     """Plots the dv/v (parses the dt/t results)
-#     Individual pairs can be plotted extra using the -p flag one or more times.
-#     Example: msnoise plot dvv -p ID_KWUI_ID_POSI
-#     Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
-#     Remember to order stations alphabetically !
-#     """
-#     if ctx.obj['MSNOISE_custom']:
-#         from s07_compute_dvv import main
-#     else:com
-#         from ..s07_compute_dvv import main
-#     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
+    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile, loglevel=loglevel)
 
 
 

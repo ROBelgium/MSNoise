@@ -28,7 +28,9 @@ from ..api import *
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
-         outfile=None):
+         outfile=None, loglevel='INFO'):
+    logger = get_logger('msnoise.cc_dvv_plot_mwcs', loglevel,
+                        with_pid=True)
     db = connect()
     maxlag = float(get_config(db, 'maxlag'))
     start, end, datelist = build_movstack_datelist(db)
@@ -49,7 +51,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
         plt.axhline(-maxlag, c='g')
 
     if sta2 < sta1:
-        print("Stations STA1 STA2 should be sorted alphabetically")
+        logger.error("Stations STA1 STA2 should be sorted alphabetically")
         return
 
     sta1 = check_stations_uniqueness(db, sta1)
@@ -67,12 +69,12 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     else:
         minlag = get_interstation_distance(station1, station2,
                                            station1.coordinates) / dtt_v
-        print(minlag)
+
 
     maxlag2 = minlag + dtt_width
 
-    print("New Data for %s-%s-%i-%i" % (pair, components, filterid,
-                                        mov_stack))
+    logger.info("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
+                                                       mov_stack))
 
     id = []
     alldt = []
@@ -87,7 +89,6 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
             allcoh.append(df["coh"])
             id.append(day)
             del df
-    print(len(alldt[0]))
 
     alldt = pd.DataFrame(alldt, index=pd.DatetimeIndex(id))
     allcoh = pd.DataFrame(allcoh, index=pd.DatetimeIndex(id))
@@ -113,8 +114,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     plt.title('%s : %s : dt' % (sta1, sta2))
     plot_lags(minlag, maxlag2)
     plt.setp(ax1.get_xticklabels(), visible=False)
-    print(type(alldt))
-    print(alldt)
+
     plt.subplot(gs[1], sharey=ax1)
     plt.plot(alldt.mean(axis=0), alldt.columns, c='k')
     plt.grid()
@@ -166,7 +166,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
                                                               filterid,
                                                               mov_stack))
         outfile = "mwcs " + outfile
-        print("output to: %s" % outfile)
+        logger.info("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

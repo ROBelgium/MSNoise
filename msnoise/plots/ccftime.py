@@ -78,7 +78,11 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
 
     logger.info("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
                                                  mov_stack))
-    stack_total = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
+    try:
+        stack_total = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
+    except FileNotFoundError as fullpath:
+        logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
+        sys.exit(1)
 
     # convert index to mdates
     stack_total.index = mdates.date2num(stack_total.index.to_pydatetime())

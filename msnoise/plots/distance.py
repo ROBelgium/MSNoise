@@ -21,8 +21,8 @@ from ..api import *
 
 
 def main(filterid, components, ampli=1, show=True, outfile=None,
-         refilter=None, virtual_source=None, **kwargs):
-    logger = get_logger('msnoise.plotdistance_child', "DEBUG",
+         refilter=None, virtual_source=None, loglevel="INFO", **kwargs):
+    logger = get_logger('msnoise.plotdistance_child', loglevel,
                         with_pid=True)
     db = connect()
 
@@ -49,6 +49,8 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
         # TODO get distance for LOCids!!
         dist = get_interstation_distance(station1, station2,
                                          station1.coordinates)
+        if dist == 0 and station1 != station2:
+            logger.warning("Distance is 0.0 km for %s.%s:%s.%s" % (station1.net, station1.sta, station2.net, station2.sta))
         dists.append(dist)
         for loc1 in station1.locs():
             for loc2 in station2.locs():
@@ -106,7 +108,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
             newname = 'distance %s-f%i' % (components,
                                            filterid)
             outfile = outfile.replace('?', newname)
-        print("output to: %s" % outfile)
+        logger.info("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()
