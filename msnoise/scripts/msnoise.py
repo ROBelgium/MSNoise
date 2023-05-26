@@ -318,7 +318,7 @@ def db_da_stations_update_loc_chan(ctx):
 @click.option('-s', '--show', help='Show output (in case of SELECT statement)?',
               default=True, type=bool)
 @click.pass_context
-def db_execute(sql_command, outfile=None, show=True):
+def db_execute(ctx, sql_command, outfile=None, show=True):
     """EXPERT MODE: Executes 'sql_command' on the database. Use this command
     at your own risk!!"""
     from msnoise.api import connect
