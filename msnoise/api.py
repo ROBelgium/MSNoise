@@ -2105,42 +2105,34 @@ def xr_create_or_open(fn, taxis=[], name="CCF"):
         # failed, the file handle was still open and it failed later.
         ds = xr.load_dataset(fn)
         return ds
+    times = pd.date_range("2000-01-01", freq="H", periods=0)
     if name == "CCF":
-        times = pd.date_range("2000-01-01", freq="H", periods=0)
         data = np.random.random((len(times), len(taxis)))
         dr = xr.DataArray(data, coords=[times, taxis], dims=["times", "taxis"])
-        dr.name = name
     elif name == "REF":
-        times = pd.date_range("2000-01-01", freq="H", periods=0)
         data = np.random.random(len(taxis))
         dr = xr.DataArray(data, coords=[taxis], dims=["taxis"])
-        dr.name = name
     elif name == "MWCS":
-        times = pd.date_range("2000-01-01", freq="H", periods=0)
         keys = ["M", "EM", "MCOH"]
         data = np.random.random((len(times), len(taxis), len(keys)))
         dr = xr.DataArray(data, coords=[times, taxis, keys],
                           dims=["times", "taxis", "keys"])
-        dr.name = name
     elif name == "DTT":
-        times = pd.date_range("2000-01-01", freq="H", periods=0)
         keys = ["m", "em", "a", "ea", "m0", "em0"]
         data = np.random.random((len(times), len(keys)))
         dr = xr.DataArray(data, coords=[times, keys],
                           dims=["times", "keys"])
-        dr.name = name
     elif name == "DVV":
-        times = pd.date_range("2000-01-01", freq="H", periods=0)
         level0 = ["m", "em", "a", "ea", "m0", "em0"]
         level1 = ['10%', '25%', '5%', '50%', '75%', '90%', '95%', 'count', 'max', 'mean',
-       'min', 'std', 'trimmed_mean', 'trimmed_std', 'weighted_mean', 'weighted_std']
+                  'min', 'std', 'trimmed_mean', 'trimmed_std', 'weighted_mean', 'weighted_std']
         data = np.random.random((len(times), len(level0), len(level1)))
         dr = xr.DataArray(data, coords=[times, level0, level1],
                           dims=["times", "level0", "level1"])
-        dr.name = name
     else:
         print("Not implemented, name=%s invalid." % name)
         sys.exit(1)
+    dr.name = name
     return dr.to_dataset()
 
 
@@ -2159,6 +2151,20 @@ def xr_save_and_close(dataset, fn):
     del dataset
 
 
+def xr_save_ccf(station1, station2, components, filterid, mov_stack, taxis, new, overwrite=False):
+    path = os.path.join("STACKS2", "%02i" % filterid,
+                        "%03i_DAYS" % mov_stack, "%s" % components)
+    fn = "%s_%s.nc" % (station1, station2)
+    fullpath = os.path.join(path, fn)
+    if overwrite:
+        xr_save_and_close(new, fullpath)
+    else:
+        dr = xr_create_or_open(fullpath, taxis, name="CCF")
+        dr = xr_insert_or_update(dr, new)
+        dr = dr.sortby("times")
+        xr_save_and_close(dr, fullpath)
+        return dr
+
 def xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis):
     path = os.path.join("STACKS2", "%02i" % filterid,
                         "%03i_DAYS" % mov_stack, "%s" % components)
@@ -2168,8 +2174,22 @@ def xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis):
     if not os.path.isfile(fullpath):
         print("FILE DOES NOT EXIST: %s, skipping" % fullpath)
         raise FileNotFoundError
-    data = xr_create_or_open(fullpath, taxis)
+    data = xr_create_or_open(fullpath, taxis, name="CCF")
     return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
+
+
+def xr_save_ref(station1, station2, components, filterid, taxis, new, overwrite=False):
+    path = os.path.join("STACKS2", "%02i" % filterid,
+                        "%REF", "%s" % components)
+    fn = "%s_%s.nc" % (station1, station2)
+    fullpath = os.path.join(path, fn)
+    if overwrite:
+        xr_save_and_close(new, fullpath)
+    else:
+        dr = xr_create_or_open(fullpath, taxis, name="REF")
+        dr = xr_insert_or_update(dr, new)
+        xr_save_and_close(dr, fullpath)
+        return dr
 
 
 def xr_get_ref(station1, station2, components, filterid, taxis):
@@ -2212,7 +2232,7 @@ def xr_get_mwcs(station1, station2, components, filterid, mov_stack):
     if not os.path.isfile(fn):
         print("FILE DOES NOT EXIST: %s, skipping" % fn)
         raise FileNotFoundError
-    data = xr_create_or_open(fn)
+    data = xr_create_or_open(fn, name="MWCS")
     data = data.MWCS.to_dataframe().reorder_levels(['times', 'taxis', 'keys']).unstack().droplevel(0, axis=1).unstack()
     return data
 
@@ -2273,7 +2293,7 @@ def xr_get_dvv(components, filterid, mov_stack):
     if not os.path.isfile(fn):
         print("FILE DOES NOT EXIST: %s, skipping" % fn)
         raise FileNotFoundError
-    data = xr_create_or_open(fn)
+    data = xr_create_or_open(fn, name="DVV")
     data = data.DVV.to_dataframe().reorder_levels(['times', 'level1', 'level0']).unstack().droplevel(0, axis=1).unstack()
     return data
 
