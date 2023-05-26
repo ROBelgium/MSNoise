@@ -303,7 +303,7 @@ class MSNoiseTests(unittest.TestCase):
 
     def test_023_stack(self):
         from ..api import connect, update_config, reset_jobs
-        from ..s04stack import main
+        from ..s04_stack2 import main
         db = connect()
         update_config(db, 'ref_begin', '2009-01-01')
         update_config(db, 'ref_end', '2011-01-01')
@@ -320,14 +320,18 @@ class MSNoiseTests(unittest.TestCase):
         db.close()
 
     def test_024_mwcs(self):
-        from ..s05compute_mwcs import main
+        from ..s05compute_mwcs2 import main
         main()
 
     def test_025_dtt(self):
-        from ..s06compute_dtt import main
+        from ..s06compute_dtt2 import main
         main()
 
-    def test_026_build_ref_datelist(self):
+    def test_026_dvv(self):
+        from ..s07_compute_dvv import main
+        main()
+
+    def test_027_build_ref_datelist(self):
         from ..api import connect, build_ref_datelist
         db = connect()
         start, end, datelist = build_ref_datelist(db)
@@ -336,7 +340,7 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(len(datelist), 731)
         db.close()
 
-    def test_027_build_movstack_datelist(self):
+    def test_028_build_movstack_datelist(self):
         from ..api import connect, build_movstack_datelist
         db = connect()
         start, end, datelist = build_movstack_datelist(db)
@@ -345,7 +349,7 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(len(datelist), 731)
         db.close()
 
-    def test_028_stretching(self):
+    def test_029_stretching(self):
         from ..api import connect, update_config, reset_jobs
         db = connect()
         update_config(db, "export_format", "MSEED")
@@ -355,7 +359,7 @@ class MSNoiseTests(unittest.TestCase):
         from ..stretch import main
         main()
 
-    def test_029_create_fake_new_files(self):
+    def test_030_create_fake_new_files(self):
         for f in sorted(glob.glob(os.path.join(self.data_folder, "2010", "*",
                                                "HHZ.D", "*"))):
             st = read(f)
@@ -379,7 +383,7 @@ class MSNoiseTests(unittest.TestCase):
         self.failUnlessEqual(jobs[1][0], 3)
         self.failUnlessEqual(jobs[1][1], 'T')
 
-    def test_030_instrument_response(self):
+    def test_031_instrument_response(self):
         from ..api import connect, update_config
         path = os.path.abspath(os.path.dirname(__file__))
         resp_folder = os.path.join(path, 'extra')
@@ -468,6 +472,14 @@ class MSNoiseTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(fn),
                         msg="%s doesn't exist" % fn)
 
+    def test_103_plot_dvv(self):
+        from ..plots.dvv import main
+        main(filterid=1, components="ZZ", show=False, outfile="?.png")
+        fn = "dvv ['ZZ']-f1-MM.png"
+        self.assertTrue(os.path.isfile(fn),
+                        msg="%s doesn't exist" % fn)
+
+
     # def test_103_plot_mwcs(self):
     #     from ..plots.mwcs import main
     #     main("YA.UV05", "YA.UV06", filterid=1, components="ZZ",
@@ -555,9 +567,10 @@ class MSNoiseTests(unittest.TestCase):
 
     def test_400_run_manually(self):
         os.system("msnoise reset STACK --all")
-        os.system("msnoise cc stack2 -m")
-        os.system("msnoise cc dvv compute_mwcs2")
-        os.system("msnoise cc dvv compute_dtt2")
+        os.system("msnoise cc stack -m")
+        os.system("msnoise cc dvv compute_mwcs")
+        os.system("msnoise cc dvv compute_dtt")
+        os.system("msnoise cc dvv compute_dvv")
 
     def test_99210_crondays_positive_float(self):
         """

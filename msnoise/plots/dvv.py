@@ -12,6 +12,7 @@ Example:
 .. image:: ../.static/dvv.png
 
 """
+import traceback
 
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
@@ -25,7 +26,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
     params = get_params(db)
     start, end, datelist = build_movstack_datelist(db)
 
-    if mov_stack != 0:
+    if mov_stack and mov_stack != 0:
         mov_stacks = [mov_stack, ]
     else:
         mov_stacks = params.mov_stack
@@ -54,6 +55,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
             try:
                 dvv = xr_get_dvv(comps, filterid, mov_stack)
             except:
+                traceback.print_exc()
                 continue
             for _ in ["mean", "50%", "trimmed_mean", "weighted_mean"]:
                 plt.plot(dvv.index, dvv.loc[:, ("m", _)] * -100, label="%s: %s" % (comps,_ ))

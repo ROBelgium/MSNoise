@@ -265,6 +265,7 @@ def main(loglevel="INFO"):
                             mcoh = np.mean(coh)
                             MCOH.append(np.real(mcoh))
                             # Get Weights
+                            coh[coh==1] = 1.0-1e-9
                             w = 1.0 / (1.0 / (coh ** 2) - 1.0)
                             w[coh >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
                             w = np.sqrt(w * np.sqrt(dcs[i][index_range]))

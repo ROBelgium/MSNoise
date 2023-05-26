@@ -2182,7 +2182,7 @@ def xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis):
 
 def xr_save_ref(station1, station2, components, filterid, taxis, new, overwrite=False):
     path = os.path.join("STACKS2", "%02i" % filterid,
-                        "%REF", "%s" % components)
+                        "REF", "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
     fullpath = os.path.join(path, fn)
     if overwrite:

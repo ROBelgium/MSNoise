@@ -16,7 +16,7 @@ Example:
 """
 
 import matplotlib.pyplot as plt
-from obspy import read
+from obspy import read, Trace
 from ..api import *
 
 
@@ -34,7 +34,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
     maxlag = float(get_config(db, 'maxlag'))
     maxlagsamples = get_maxlag_samples(db)
     t = np.linspace(-maxlag, maxlag, maxlagsamples)
-
+    taxis = get_t_axis(db)
     if refilter:
         freqmin, freqmax = refilter.split(':')
         freqmin = float(freqmin)
@@ -57,22 +57,21 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
                     if virtual_source not in [sta1, sta2]:
                         continue
 
-                pair = "%s:%s" % (sta1, sta2)
-                print(pair, dist)
-                ref_name = pair.replace(':', '_')
-                rf = os.path.join("STACKS", "%02i" %
-                                  filterid, "REF", components, ref_name + extension)
-                print(rf)
-                if os.path.isfile(rf):
-                    ref = read(rf)[0]
-                    if refilter:
-                        ref.detrend("simple")
-                        ref.taper(0.02)
-                        ref.filter("bandpass", freqmin=freqmin, freqmax=freqmax,
-                                   zerophase=True)
-                    ref.normalize()
-                    ref = ref.data * ampli
-                    plt.plot(t, ref+dist, c='k', lw=0.4)
+                try:
+                    ref = xr_get_ref(sta1, sta2, components, filterid, taxis)
+                    ref = Trace(data=ref.CCF.values)
+                    ref.stats.sampling_rate = cc_sampling_rate
+                except FileNotFoundError:
+                    continue
+
+                if refilter:
+                    ref.detrend("simple")
+                    ref.taper(0.02)
+                    ref.filter("bandpass", freqmin=freqmin, freqmax=freqmax,
+                               zerophase=True)
+                ref.normalize()
+                ref = ref.data * ampli
+                plt.plot(t, ref+dist, c='k', lw=0.4)
         
     plt.ylabel("Interstation Distance in km")
     plt.xlabel("Lag Time")
