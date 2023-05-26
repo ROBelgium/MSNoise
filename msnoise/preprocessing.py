@@ -107,7 +107,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                 datafiles[station][file.chan[-1]].append(fullpath)
             else:
                 MULTIPLEX = True
-                print("Mutliplex mode, reading the files")
+                logger.debug("Mutliplex mode, reading the files")
                 fullpath = os.path.join(file.path, file.file)
                 multiplexed = sorted(glob.glob(fullpath))
                 for comp in comps:

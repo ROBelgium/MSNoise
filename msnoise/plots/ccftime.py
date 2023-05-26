@@ -47,7 +47,9 @@ from ..api import *
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
          show=False, outfile=None, envelope=False, refilter=None,
-         normalize=None, **kwargs):
+         normalize=None, loglevel="INFO", **kwargs):
+    logger = get_logger('msnoise.cc_plot_ccftime', loglevel,
+                        with_pid=True)
     db = connect()
     maxlag = float(get_config(db, 'maxlag'))
     samples = get_maxlag_samples(db)
@@ -66,7 +68,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
         freqmax = float(freqmax)
 
     if sta2 < sta1:
-        print("Stations STA1 STA2 should be sorted alphabetically")
+        logger.error("Stations STA1 STA2 should be sorted alphabetically")
         return
 
     sta1 = check_stations_uniqueness(db, sta1)
@@ -74,7 +76,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
 
     pair = "%s:%s" % (sta1, sta2)
 
-    print("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
+    logger.info("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
                                                  mov_stack))
     stack_total = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
 
@@ -82,7 +84,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
     stack_total.index = mdates.date2num(stack_total.index.to_pydatetime())
 
     if len(stack_total) == 0:
-        print("No CCF found for this request")
+        logger.error("No CCF found for this request")
         return
 
     if normalize == "common":
@@ -137,7 +139,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
                                                               filterid,
                                                               mov_stack))
         outfile = "ccftime " + outfile
-        print("output to:", outfile)
+        logger.info("output to:", outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

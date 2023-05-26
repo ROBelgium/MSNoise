@@ -110,8 +110,9 @@ def getCoherence(dcs, ds1, ds2):
     return coh
 
 def main(loglevel="INFO"):
-    logger = logbook.Logger(__name__)
+
     # Reconfigure logger to show the pid number in log records
+    global logger
     logger = get_logger('msnoise.compute_mwcs_child', loglevel,
                         with_pid=True)
     logger.info('*** Starting: Compute MWCS ***')
@@ -169,7 +170,8 @@ def main(loglevel="INFO"):
                 try:
                     ref = xr_get_ref(station1, station2, components, filterid, taxis)
                     ref = ref.CCF.values
-                except FileNotFoundError:
+                except FileNotFoundError as fullpath:
+                    logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
                 if not len(ref):
                     continue
@@ -180,7 +182,8 @@ def main(loglevel="INFO"):
                     output = []
                     try:
                         data = xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis)
-                    except FileNotFoundError:
+                    except FileNotFoundError as fullpath:
+                        logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                         continue
 
                     todo = data.index.intersection(pd.to_datetime(days))
@@ -264,7 +267,7 @@ def main(loglevel="INFO"):
                                                fcur2[i, index_range])
                             mcoh = np.mean(coh)
                             MCOH.append(np.real(mcoh))
-                            # Get Weights
+                            # Get Weights, avoid zero division here below:
                             coh[coh==1] = 1.0-1e-9
                             w = 1.0 / (1.0 / (coh ** 2) - 1.0)
                             w[coh >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)

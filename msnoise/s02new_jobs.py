@@ -79,8 +79,8 @@ def main(init=False, nocc=False):
     for sta in get_stations(db, all=False):
 
         if not len(sta.locs()):
-            print("You haven't defined location codes to use for %s.%s, "
-                  "you should run 'msnoise db update_loc_chan'; exiting." %
+            logger.error("You haven't defined location codes to use for %s.%s, "
+                         "you should run 'msnoise db update_loc_chan'; exiting." %
                   (sta.net, sta.sta))
             error = True
         for loc in sta.locs():
@@ -132,8 +132,7 @@ def main(init=False, nocc=False):
                         modified.append(sta)
             modified = np.unique(modified)
             available = np.unique(available)
-            print("modified:", modified)
-            print("available:", available)
+            logger.debug("%s: modified: %s | available: %s"% (day, modified,available))
             for m in modified:
                 for a in available:
                     if (m != a and crosscorr) or (m == a and autocorr):

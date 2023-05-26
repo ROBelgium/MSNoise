@@ -478,7 +478,6 @@ class ResultPlotter(BaseView):
         params = get_params(db)
         station1, station2 = pairs[pair]['text'].replace('.', '_').split(' - ')
         start, end, dates = build_movstack_datelist(db)
-        print(station1, station2, filter, component, dates, format)
         i, result = get_results(db,station1, station2, filter, component, dates,
                                 format=format, params=params)
 
@@ -649,7 +648,6 @@ def dataAvail():
     db = connect()
     data = get_data_availability(db, net=data['net'], sta=data['sta'],
                                  loc=data['loc'], chan='HHZ')
-    print(data)
     o = {'dates': [o.starttime.strftime('%Y-%m-%d') for o in data]}
     db.close()
     o['result'] = 'ok'
@@ -751,7 +749,6 @@ def PSDAvail():
     data = flask.request.get_json()
     if not data:
         data = flask.request.args
-    print(data)
     fn = os.path.join(os.getcwd(), "PSD", "PNG", "*", data["net"], data["sta"], "%s.D"%data["chan"], "*")
     files = sorted(glob.glob(fn))
     o = {}
@@ -783,7 +780,6 @@ def PSD_PNG():
         year = "%04i"%d.year
     fn = os.path.join(os.getcwd(), "PSD", "PNG", year, data["net"], data["sta"],
                       "%s.D" % data["chan"], file)
-    print(fn)
     format = "png"
     if 'format' in data:
         format = data["format"]

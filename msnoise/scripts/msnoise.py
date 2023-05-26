@@ -289,11 +289,11 @@ def db_init(tech):
 
 
 @db.command(name="update_loc_chan")
-def db_da_stations_update_loc_chan():
+@click.pass_context
+def db_da_stations_update_loc_chan(ctx):
     """Populates the Location & Channel from the Data Availability
     table. Warning: rewrites automatically, no confirmation."""
     from msnoise.api import connect, get_stations
-
     session = connect()
     stations = get_stations(session)
     for sta in stations:
@@ -305,8 +305,8 @@ def db_da_stations_update_loc_chan():
             params(net=sta.net, sta=sta.sta).all()
         locids = list(set(sorted([d.loc for d in data])))
         chans = list(set(sorted([d.chan for d in data])))
-        print("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
-                                                    locids, chans))
+        logger.info("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
+                                                          locids, chans))
         sta.used_location_codes = ",".join(locids)
         sta.used_channel_names = ",".join(chans)
         session.commit()
@@ -317,21 +317,21 @@ def db_da_stations_update_loc_chan():
               default=None, type=str)
 @click.option('-s', '--show', help='Show output (in case of SELECT statement)?',
               default=True, type=bool)
+@click.pass_context
 def db_execute(sql_command, outfile=None, show=True):
     """EXPERT MODE: Executes 'sql_command' on the database. Use this command
     at your own risk!!"""
     from msnoise.api import connect
-
     db = connect()
     for cmd in sql_command.split(";"):
         if not len(cmd):
             continue
-        print("Executing '%s'" % cmd)
+        logger.info("Executing '%s'" % cmd)
         r = db.execute(cmd)
         if cmd.count("select") or cmd.count("SELECT"):
             result = r.fetchall()
             if not len(result):
-                print("The query returned no results, sorry.")
+                logger.info("The query returned no results, sorry.")
             else:
                 import pandas as pd
                 df = pd.DataFrame(result, columns=r.keys())
@@ -439,10 +439,10 @@ def db_dump(format):
         for table in meta.sorted_tables:
             r = [dict(row) for row in engine.execute(table.select())]
             df = pd.DataFrame(r)
-            print("Dumping table %s to %s.csv" % (table.name, table.name))
+            logger.info("Dumping table %s to %s.csv" % (table.name, table.name))
             df.to_csv("%s.csv" % table.name, index=False)
     else:
-        print("Currently only the csv format is supported, sorry.")
+        logger.error("Currently only the csv format is supported, sorry.")
 
 
 @db.command(name="import")
@@ -459,7 +459,7 @@ def db_import(table, format, force):
 
     if format == "csv":
         engine = get_engine(inifile=os.path.join(os.getcwd(), 'db.ini'))
-        print("Loading table %s from %s.csv" % (table, table))
+        logger.info("Loading table %s from %s.csv" % (table, table))
         df = pd.read_csv("%s.csv" % table)
         if force:
             df.to_sql(table, engine, if_exists="replace")
@@ -468,13 +468,11 @@ def db_import(table, format, force):
                 df.to_sql(table, engine)
             except ValueError:
                 traceback.print_exc()
-                print("!"*80)
-                print("You're probably getting the error above because the "
+                logger.info("You're probably getting the error above because the "
                       "table already exists, if you want to replace the table "
                       "with the imported data, then pass the --force option")
     else:
-        print("Currently only the csv format is supported, sorry.")
-
+        logger.error("Currently only the csv format is supported, sorry.")
 
 
 @cli.command()
@@ -530,7 +528,7 @@ def config_sync():
         id = "%s.%s" % (station.net, station.sta)
         coords = responses[responses["netsta"] == id]
         if not len(coords):
-            print("No coords for %s, skipping,..." % id)
+            logger.error("No coords for %s, skipping,..." % id)
             continue
         lon = float(coords["longitude"].values[0])
         lat = float(coords["latitude"].values[0])
@@ -608,18 +606,21 @@ def reset(jobtype, all, rule):
                                 ' table, overrides the default'
                                 ' workflow step.',
               is_flag=True)
-def populate(fromda):
+@click.pass_context
+def populate(ctx, fromda):
     """Rapidly scan the archive filenames and find Network/Stations, only works
     with known archive structures, or with a custom code provided by the user.
     """
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if fromda:
-        logging.info("Overriding workflow...")
+        logger.info("Populating the Station table")
+        logger.info("Overriding workflow...")
         db = connect()
         stations = db.query(DataAvailability.net, DataAvailability.sta). \
             group_by(DataAvailability.net, DataAvailability.sta)
 
         for net, sta in stations:
-            print('Adding:', net, sta)
+            logger.info('Adding: %s.%s' % (net, sta))
             X = 0.0
             Y = 0.0
             altitude = 0.0
@@ -629,7 +630,7 @@ def populate(fromda):
                            coordinates=coordinates, instrument=instrument)
     else:
         from ..s002populate_station_table import main
-        main()
+        main(loglevel=loglevel)
 
 
 @cli.command(name='scan_archive')
@@ -996,16 +997,16 @@ def cc_plot_ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
                     normalize, extra_args):
     """Plots the ccf vs time between sta1 and sta2
     STA1 and STA2 must be provided with this format: NET.STA !"""
-
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    # if sta1 > sta2:
+    #     click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+    #     return
     if ctx.obj['MSNOISE_custom']:
         from ccftime import main
     else:
         from ..plots.ccftime import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
-         envelope, refilter, normalize, **extra_args)
+         envelope, refilter, normalize, loglevel=loglevel, **extra_args)
 
 
 @cc_plot.command(name="spectime",
@@ -1031,16 +1032,13 @@ def cc_plot_spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
                      ampli, show, outfile, refilter, extra_args):
     """Plots the ccf's spectrum vs time between sta1 and sta2
     STA1 and STA2 must be provided with this format: NET.STA !"""
-
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
         from spectime import main
     else:
         from ..plots.spectime import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
-         refilter, **extra_args)
+         refilter, loglevel=loglevel, **extra_args)
 
 
 @cc.group(cls=OrderedGroup)
@@ -1101,12 +1099,12 @@ def dvv_compute_stretching(ctx):
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
     if threads == 1:
-        main()
+        main(loglevel=loglevel)
     else:
         from multiprocessing import Process
         processes = []
         for i in range(threads):
-            p = Process(target=main)
+            p = Process(target=main, kwargs={"loglevel": loglevel})
             p.start()
             processes.append(p)
             time.sleep(delay)
@@ -1346,7 +1344,7 @@ def qc_compute_psd(ctx, njobs_per_worker):
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
-    print(loglevel)
+
     if threads == 1:
         main(loglevel=loglevel, njobs_per_worker=njobs_per_worker)
     else:
@@ -1373,7 +1371,7 @@ def qc_psd_to_hdf(ctx, njobs_per_worker):
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
-    print(loglevel)
+
     if threads == 1:
         main(loglevel=loglevel, njobs_per_worker=njobs_per_worker)
     else:
@@ -1409,7 +1407,7 @@ def qc_compute_rms(ctx):
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
-    print(loglevel)
+
     if threads == 1:
         main(loglevel=loglevel)
     else:
@@ -1433,7 +1431,7 @@ def qc_export_rms(ctx):
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
-    print(loglevel)
+
     if threads == 1:
         main(loglevel=loglevel)
     else:
@@ -1455,7 +1453,7 @@ def qc_psd_optimize(ctx):
     """Optimizes the HDFs using ptrepack (should be used periodically)"""
     import os, glob
     for file in sorted(glob.glob("PSD/HDF/*")):
-        print("Optimizing %s" % file)
+        logger.info("Optimizing %s" % file)
         os.system("ptrepack --chunkshape=auto --propindexes --complevel=9 --complib=blosc %s %s" % (file, file.replace(".h5", '_r.h5')))
         os.system("mv %s %s " % ( file.replace(".h5", '_r.h5'), file,) )
 

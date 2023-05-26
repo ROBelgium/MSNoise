@@ -85,7 +85,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         for job in jobs:
             net, sta, loc = job.pair.split('.')
             if station is None:
-                print("Processing %s" % (job.pair))
+                logger.debug("Processing %s" % (job.pair))
                 station = get_station(db, net, sta)
             for chan in station.chans():
                 if chan not in datelists:
@@ -96,13 +96,13 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             if not len(datelists[chan]):
                 continue
             seed_id = "%s.%s.%s.%s" % (net, sta, loc, chan)
-            print("Will open HDFstore: %s" % seed_id)
+            logger.debug("Will open HDFstore: %s" % seed_id)
             store = hdf_open_store(seed_id, mode="r")
 
             s = datelists[chan][0].strftime("%Y-%m-%d %H:%M:%S")
             e = (datelists[chan][-1] + datetime.timedelta(days=1)).strftime(
                 "%Y-%m-%d %H:%M:%S")
-            print("Selecting data between %s and %s" % (s, e))
+            logger.debug("Selecting data between %s and %s" % (s, e))
             data = store.select("PSD", "(index >= '%s') & (index <= '%s')" % (s, e))
             data = store.PSD
             # only need to compute RMS for new/updated PSD data

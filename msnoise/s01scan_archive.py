@@ -190,7 +190,7 @@ def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
                                      format=archive_format or None)
             for id in set([t.id for t in stream]):
                 net, sta, loc, chan = id.split('.')
-                print("read file %s, id: %s" % (pathname, id))
+                logger.debug("read file %s, id: %s" % (pathname, id))
                 tmp = None
                 for station in stations:
                     if station.net == net and station.sta == sta:
@@ -208,7 +208,7 @@ def scan_data_files(db, folder, files, startdate, enddate, goal_sampling_rate,
                     if "--" in location_codes:
                         location_codes.append("")
                     if location_codes != ["*"] and loc not in location_codes:
-                        print("%s not desired, from station configuration" % id)
+                        logger.debug("%s not desired, from station configuration" % id)
                         continue
 
 

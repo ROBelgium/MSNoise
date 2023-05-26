@@ -523,7 +523,7 @@ def main(loglevel="INFO"):
                         corr = pcc_xcorr(tmp, np.ceil(params.maxlag / dt),
                                          None, single_station_pair_index_ac)
                     else:
-                        print("cc_type_single_station_AC = %s not implemented, "
+                        logging.error("cc_type_single_station_AC = %s not implemented, "
                               "exiting")
                         exit(1)
 
@@ -565,7 +565,7 @@ def main(loglevel="INFO"):
                             allcorr[ccfid][thistime] = corr[key]
                         del corr, energy, ffts
                     else:
-                        print("cc_type = %s not implemented, "
+                        logging.error("cc_type = %s not implemented, "
                               "exiting")
                         exit(1)
 
@@ -601,7 +601,7 @@ def main(loglevel="INFO"):
                             allcorr[ccfid][thistime] = corr[key]
                         del corr, energy, ffts
                     else:
-                        print("cc_type_single_station_SC = %s not implemented, "
+                        logging.error("cc_type_single_station_SC = %s not implemented, "
                               "exiting")
                         exit(1)
             del psds
@@ -612,7 +612,7 @@ def main(loglevel="INFO"):
 
         if params.keep_days:
             for ccfid in allcorr.keys():
-                print("Exporting %s" % ccfid)
+                logging.debug("Exporting %s" % ccfid)
                 station1, station2, components, filterid, date = \
                     ccfid.split('_')
 

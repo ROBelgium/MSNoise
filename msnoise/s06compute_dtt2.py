@@ -72,7 +72,8 @@ def main(interval=1, loglevel="INFO"):
                     output = []
                     try:
                         mwcs = xr_get_mwcs(station1, station2, components, filterid, mov_stack)
-                    except FileNotFoundError:
+                    except FileNotFoundError as fullpath:
+                        logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                         continue
 
                     todo = mwcs.index.intersection(pd.to_datetime(days))

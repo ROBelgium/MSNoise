@@ -22,6 +22,8 @@ from ..api import *
 
 def main(filterid, components, ampli=1, show=True, outfile=None,
          refilter=None, virtual_source=None, **kwargs):
+    logger = get_logger('msnoise.plotdistance_child', "DEBUG",
+                        with_pid=True)
     db = connect()
 
     pairs = get_station_pairs(db, used=1)
@@ -61,7 +63,8 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
                     ref = xr_get_ref(sta1, sta2, components, filterid, taxis)
                     ref = Trace(data=ref.CCF.values)
                     ref.stats.sampling_rate = cc_sampling_rate
-                except FileNotFoundError:
+                except FileNotFoundError as fullpath:
+                    logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
 
                 if refilter:

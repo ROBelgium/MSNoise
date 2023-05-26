@@ -116,7 +116,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
         Number of days before now to search for modified CC jobs
 
     """
-    logger = logbook.Logger(__name__)
+    # logger = logbook.Logger(__name__)
     # Reconfigure logger to show the pid number in log records
     logger = get_logger('msnoise.stack_child', loglevel,
                         with_pid=True)
@@ -142,7 +142,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
         pair = jobs[0].pair
         refs, days = zip(*[[job.ref, job.day] for job in jobs])
 
-        print(
+        logger.info(
             "There are STACKS jobs for some days to recompute for %s" % pair)
         sta1, sta2 = pair.split(':')
         for f in filters:
@@ -151,7 +151,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                 pair = "%s:%s" % (sta1, sta2)
                 sta1 = sta1
                 sta2 = sta2
-                print('Processing %s-%s-%i' %
+                logger.info('Processing %s-%s-%i' %
                       (pair, components, filterid))
 
                 c = get_results(db, sta1, sta2, filterid, components, days,
@@ -171,7 +171,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
 
                 for mov_stack in mov_stacks:
                     if mov_stack > len(dr.times):
-                        print("not enough data for mov_stack=%i" % mov_stack)
+                        logger.error("not enough data for mov_stack=%i" % mov_stack)
                         continue
                     # TODO avoid the 1D resampler here
                     xx = dr.resample(times='1D').mean().rolling(

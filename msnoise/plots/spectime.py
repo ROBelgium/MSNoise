@@ -45,12 +45,14 @@ from obspy.signal.filter import bandpass
 
 from msnoise.api import build_movstack_datelist, connect, get_config, \
     get_filters, get_results, check_stations_uniqueness, xr_get_ccf,\
-    get_t_axis
+    get_t_axis, get_logger
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
-         outfile=False, refilter=None, startdate=None, enddate=None, **kwargs):
-
+         outfile=False, refilter=None, startdate=None, enddate=None,
+         loglevel="INFO", **kwargs):
+    logger = get_logger('msnoise.cc_plot_spectime', loglevel,
+                        with_pid=True)
     db = connect()
     cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
     start, end, datelist = build_movstack_datelist(db)
@@ -66,7 +68,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
         freqmax = float(freqmax)
 
     if sta2 < sta1:
-        print("Stations STA1 STA2 should be sorted alphabetically")
+        logger.error("Stations STA1 STA2 should be sorted alphabetically")
         return
 
     sta1 = check_stations_uniqueness(db, sta1)
@@ -74,7 +76,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
 
     pair = "%s:%s" % (sta1, sta2)
 
-    print("New Data for %s-%s-%i-%i" % (pair, components, filterid,
+    logger.info("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
                                         mov_stack))
     stack_total = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
 
@@ -82,7 +84,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
     stack_total.index = mdates.date2num(stack_total.index.to_pydatetime())
 
     if len(stack_total) == 0:
-        print("No CCF found for this request")
+        logger.error("No CCF found for this request")
         return
     ax = plt.subplot(111)
     for i, line in stack_total.iterrows():
@@ -122,7 +124,6 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
     ax.set_title(title)
 
     cursor = Cursor(ax, useblit=True, color='red', linewidth=1.2)
-    print(outfile)
     if outfile:
         if outfile.startswith("?"):
             pair = pair.replace(':', '-')
@@ -131,7 +132,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
                                                               filterid,
                                                               mov_stack))
         outfile = "spectime " + outfile
-        print("output to:", outfile)
+        logger.info("output to:", outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

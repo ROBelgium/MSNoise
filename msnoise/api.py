@@ -556,17 +556,17 @@ def check_stations_uniqueness(session, station):
     if station.count(".") == 2:
         return station
 
-    print("It seems you're voluntarily missing the location code for"
-          " \"%s\". We'll handle this automatically, if there are no "
-          "conflicts." % station)
+    logging.info("It seems you're voluntarily missing the location code for"
+                 " \"%s\". We'll handle this automatically, if there are no "
+                 "conflicts." % station)
     net, sta = station.split(".")
     locs = get_station(session, net, sta).locs()
     if len(locs) != 1:
-        print("There are more than 1 location codes for this station: "
-              "%s" % locs)
+        logging.info("There are more than 1 location codes for this station: "
+                     "%s" % locs)
         return station
     station += ".%s" % locs[0]
-    print("Found %s to be the unique solution for this station" % station)
+    logging.info("Found %s to be the unique solution for this station" % station)
     return station
 
 
@@ -920,7 +920,7 @@ def get_next_job(session, flag='T', jobtype='CC', limit=99999):
                    filter(Job.jobtype == jobtype).
                    filter(Job.flag == flag).first().day).\
             limit(limit).with_for_update()
-        # print(jobs.statement.compile(compile_kwargs={"literal_binds": True}))
+
         tmp = jobs.all()
         refs = [_.ref for _ in tmp]
         q = update(Job).values({"flag":"I"}).where(Job.ref.in_(refs))
@@ -937,7 +937,7 @@ def get_dvv_jobs(session, flag='T', jobtype='DVV', limit=99999):
         jobs = session.query(Job).filter(Job.jobtype == jobtype). \
             filter(Job.flag == flag). \
             limit(limit).with_for_update()
-        # print(jobs.statement.compile(compile_kwargs={"literal_binds": True}))
+
         tmp = jobs.all()
         refs = [_.ref for _ in tmp]
         q = update(Job).values({"flag": "I"}).where(Job.ref.in_(refs))
@@ -1448,7 +1448,7 @@ def get_results(session, station1, station2, filterid, components, dates,
     base = os.path.join("STACKS", "%02i" % filterid,
                         "%03i_DAYS" % mov_stack, components,
                         "%s_%s" % (station1, station2), "%s") + extension
-    print("Reading files... in %s" % base)
+    logging.debug("Reading files... in %s" % base)
     lastday = dates[0]
     for j, date in enumerate(dates):
         daystack = base % str(date)
@@ -2026,7 +2026,7 @@ def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=Tru
     import tempfile
     fn = os.path.join(tempfile.gettempdir(), "MSNOISE-PSD", fn)
     if use_cache and os.path.isfile(fn):
-        print("I found this cool file: %s" % fn)
+        logging.debug("I found this cool file: %s" % fn)
         ppsd = PPSD.load_npz(fn)
     else:
         first = True
@@ -2038,7 +2038,7 @@ def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=Tru
                                   net, sta, loc, chan, day.year, jday))
             files = glob.glob(toglob)
             if not len(files):
-                print("No files found for %s.%s.%s.%s: %s" % (
+                logging.error("No files found for %s.%s.%s.%s: %s" % (
                 net, sta, loc, chan, day))
                 continue
             file = files[0]
@@ -2132,15 +2132,13 @@ def xr_create_or_open(fn, taxis=[], name="CCF"):
         dr = xr.DataArray(data, coords=[times, level0, level1],
                           dims=["times", "level0", "level1"])
     else:
-        print("Not implemented, name=%s invalid." % name)
+        logging.error("Not implemented, name=%s invalid." % name)
         sys.exit(1)
     dr.name = name
     return dr.to_dataset()
 
 
 def xr_insert_or_update(dataset, new):
-    print("dataset", type(dataset))
-    print("new", type(new))
     tt = new.merge(dataset, compat='override', combine_attrs="drop_conflicts")
     return tt.combine_first(dataset)
 
@@ -2167,6 +2165,7 @@ def xr_save_ccf(station1, station2, components, filterid, mov_stack, taxis, new,
         xr_save_and_close(dr, fullpath)
         return dr
 
+
 def xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis):
     path = os.path.join("STACKS2", "%02i" % filterid,
                         "%03i_DAYS" % mov_stack, "%s" % components)
@@ -2174,8 +2173,8 @@ def xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis):
 
     fullpath = os.path.join(path, fn)
     if not os.path.isfile(fullpath):
-        print("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-        raise FileNotFoundError
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+        raise FileNotFoundError(fullpath)
     data = xr_create_or_open(fullpath, taxis, name="CCF")
     return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
 
@@ -2201,8 +2200,8 @@ def xr_get_ref(station1, station2, components, filterid, taxis):
 
     fullpath = os.path.join(path, fn)
     if not os.path.isfile(fullpath):
-        print("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-        raise FileNotFoundError
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+        raise FileNotFoundError(fullpath)
     data = xr_create_or_open(fullpath, taxis, name="REF")
     return data.CCF.to_dataframe()
 
@@ -2232,8 +2231,8 @@ def xr_get_mwcs(station1, station2, components, filterid, mov_stack):
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
     if not os.path.isfile(fn):
-        print("FILE DOES NOT EXIST: %s, skipping" % fn)
-        raise FileNotFoundError
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
+        raise FileNotFoundError(fn)
     data = xr_create_or_open(fn, name="MWCS")
     data = data.MWCS.to_dataframe().reorder_levels(['times', 'taxis', 'keys']).unstack().droplevel(0, axis=1).unstack()
     return data
@@ -2247,8 +2246,6 @@ def xr_save_dtt(station1, station2, components, filterid, mov_stack, dataframe):
     if not os.path.isdir(os.path.split(fn)[0]):
         os.makedirs(os.path.split(fn)[0])
     d = dataframe.stack()
-    print("OUTPUT:")
-    print(d.head())
     d.index = d.index.set_names(["times", "keys"])
     d.columns = ["DTT"]
     dr = xr_create_or_open(fn, taxis=[], name="DTT")
@@ -2263,8 +2260,8 @@ def xr_get_dtt(station1, station2, components, filterid, mov_stack):
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
     if not os.path.isfile(fn):
-        print("FILE DOES NOT EXIST: %s, skipping" % fn)
-        raise FileNotFoundError
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
+        raise FileNotFoundError(fn)
     dr = xr_create_or_open(fn, taxis=[], name="DTT")
     data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
     return data
@@ -2293,8 +2290,8 @@ def xr_get_dvv(components, filterid, mov_stack):
                       "%03i_DAYS" % mov_stack,
                       "%s.nc" % components)
     if not os.path.isfile(fn):
-        print("FILE DOES NOT EXIST: %s, skipping" % fn)
-        raise FileNotFoundError
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
+        raise FileNotFoundError(fn)
     data = xr_create_or_open(fn, name="DVV")
     data = data.DVV.to_dataframe().reorder_levels(['times', 'level1', 'level0']).unstack().droplevel(0, axis=1).unstack()
     return data
