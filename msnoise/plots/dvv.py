@@ -21,7 +21,9 @@ from ..api import *
 
 
 def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
-         pairs=[], showALL=False, show=False, outfile=None):
+         pairs=[], showALL=False, show=False, outfile=None, loglevel="INFO"):
+    logger = get_logger('msnoise.cc_dvv_plot_dvv', loglevel,
+                        with_pid=True)
     db = connect()
     params = get_params(db)
     start, end, datelist = build_movstack_datelist(db)
@@ -54,8 +56,8 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
         for comps in components:
             try:
                 dvv = xr_get_dvv(comps, filterid, mov_stack)
-            except:
-                traceback.print_exc()
+            except FileNotFoundError as fullpath:
+                logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                 continue
             for _ in ["mean", "50%", "trimmed_mean", "weighted_mean"]:
                 plt.plot(dvv.index, dvv.loc[:, ("m", _)] * -100, label="%s: %s" % (comps,_ ))
