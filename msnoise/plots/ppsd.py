@@ -90,7 +90,7 @@ def main(net, sta, loc, chan, time_of_weekday=None, period_lim=None, show=False,
     adf.scaled[365.] = '%Y'  # set the > 1y scale to Y
 
     if outfile:
-        print("output to:", outfile)
+        print("output to: %s" % outfile)
         plt.savefig(outfile)
 
     if show:

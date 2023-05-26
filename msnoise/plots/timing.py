@@ -105,7 +105,7 @@ def main(mov_stack=None, dttname="A", components='ZZ', filterid=1,
                                                                filterid,
                                                                dttname))
         outfile = "timing " + outfile
-        print("output to:", outfile)
+        print("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

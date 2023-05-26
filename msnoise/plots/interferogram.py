@@ -101,7 +101,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
                                                               filterid,
                                                               mov_stack))
         outfile = "interferogram " + outfile
-        print("output to:", outfile)
+        print("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

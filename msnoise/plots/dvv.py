@@ -91,7 +91,7 @@ def main(mov_stack=None, dttname="M", components='ZZ', filterid=1,
                                                                filterid,
                                                                dttname))
         outfile = "dvv " + outfile
-        print("output to:", outfile)
+        print("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

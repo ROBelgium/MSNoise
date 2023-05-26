@@ -132,7 +132,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
                                                               filterid,
                                                               mov_stack))
         outfile = "spectime " + outfile
-        logger.info("output to:", outfile)
+        logger.info("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

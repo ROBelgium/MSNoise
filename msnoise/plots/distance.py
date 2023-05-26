@@ -106,7 +106,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
             newname = 'distance %s-f%i' % (components,
                                            filterid)
             outfile = outfile.replace('?', newname)
-        print("output to:", outfile)
+        print("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

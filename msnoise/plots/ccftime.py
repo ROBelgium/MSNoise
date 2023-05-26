@@ -139,7 +139,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
                                                               filterid,
                                                               mov_stack))
         outfile = "ccftime " + outfile
-        logger.info("output to:", outfile)
+        logger.info("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

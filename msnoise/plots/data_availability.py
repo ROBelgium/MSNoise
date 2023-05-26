@@ -105,7 +105,7 @@ def main(chan, show=False, outfile=None):
             now = datetime.datetime.now()
             now = now.strftime('data availability on %Y-%m-%d %H.%M.%S')
             outfile = outfile.replace('?', now)
-        print("output to:", outfile)
+        print("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()
