@@ -222,7 +222,7 @@ def winsorizing(data, params, input="timeseries", nfft=0):
         input1D = True
     if input == "fft":
         # data = np.real(sf.ifft(data, n=nfft, axis=1))
-        data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(float64)
+        data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(float)
 
     for i in range(data.shape[0]):
         if params.windsorizing == -1:
@@ -350,7 +350,7 @@ def main(loglevel="INFO"):
             for tr in tmp:
                 if tr.stats.npts != base:
                     tmp.remove(tr)
-                    logger.debug("One trace is too short, removing it")
+                    logger.debug("%s trace is too short, removing it" % tr.id)
 
             if len(tmp) == 0:
                 logger.debug("No traces left in slice")
@@ -366,7 +366,7 @@ def main(loglevel="INFO"):
             names = [tr.id.split(".") for tr in tmp]
 
             if not params.clip_after_whiten:
-                logger.debug("Winsorizing (clipping) data before whiten")
+                # logger.debug("Winsorizing (clipping) data before whiten")
                 data = winsorizing(data, params) #inplace
 
             # TODO should not hardcode 4 percent!
@@ -500,7 +500,7 @@ def main(loglevel="INFO"):
                                               df=params.goal_sampling_rate,
                                               corners=8)
                             if params.clip_after_whiten:
-                                logger.debug("Winsorizing (clipping) data after bandpass (AC)")
+                                # logger.debug("Winsorizing (clipping) data after bandpass (AC)")
                                 tmp[i] = winsorizing(tmp[i], params, input="timeseries")
 
 
@@ -541,8 +541,8 @@ def main(loglevel="INFO"):
                             whiten2(ffts, nfft, low, high, p1, p2, psds,
                                     params.whitening_type)  # inplace
                         if params.clip_after_whiten:
-                            logger.debug(
-                                "Winsorizing (clipping) data after whiten")
+                            # logger.debug(
+                            #     "Winsorizing (clipping) data after whiten")
                             ffts = winsorizing(ffts, params, input="fft", nfft=nfft)
 
                         # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)

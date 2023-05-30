@@ -181,6 +181,8 @@ def info_stations(db):
                 '{:.1f}'.format(s.altitude) if s.altitude is not None else na_sign,
                 s.coordinates or na_sign,
                 'Y' if s.used else 'N'))
+        click.echo("  ├ Location code(s): %s" % s.used_location_codes)
+        click.echo("  └ Channel names(s): %s" % s.used_channel_names)
     if s is None:
         click.echo(' ')
 
@@ -260,7 +262,8 @@ def cli(ctx, threads, delay, custom, verbose, quiet):
     else:
         logger = get_logger('msnoise', ctx.obj['MSNOISE_verbosity'])
     # Is this really needed?
-    # sys.path.append(os.getcwd())
+    if custom:
+        sys.path.append(os.getcwd())
 
 
 
@@ -628,6 +631,8 @@ def populate(ctx, fromda):
             instrument = 'N/A'
             update_station(db, net, sta, X, Y, altitude,
                            coordinates=coordinates, instrument=instrument)
+        logger.info("Checking the available loc ids and chans...")
+        ctx.invoke(db_da_stations_update_loc_chan)
     else:
         from ..s002populate_station_table import main
         main(loglevel=loglevel)
@@ -679,7 +684,7 @@ def plot_data_availability(ctx, chan, show, outfile):
     """Plots the Data Availability vs time"""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from data_availability import main
+        from data_availability import main # NOQA
     else:
         from ..plots.data_availability import main
     main(chan, show, outfile, loglevel=loglevel)
@@ -695,7 +700,7 @@ def plot_data_availability(ctx, chan, show, outfile):
 def plot_station_map(ctx, show, outfile):
     """Plots the station map (very very basic)"""
     if ctx.obj['MSNOISE_custom']:
-        from station_map import main
+        from station_map import main # NOQA
     else:
         from ..plots.station_map import main
     main(show, outfile)
@@ -928,7 +933,7 @@ def cc_plot_distance(ctx, filterid, comp, ampli, show, outfile, refilter,
     """Plots the REFs of all pairs vs distance"""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from distance import main
+        from distance import main # NOQA
     else:
         from ..plots.distance import main
     main(filterid, comp, ampli, show, outfile, refilter, virtual_source,
@@ -960,7 +965,7 @@ def cc_plot_interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show,
     STA1 and STA2 must be provided with this format: NET.STA !"""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from interferogram import main
+        from interferogram import main # NOQA
     else:
         from ..plots.interferogram import main
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile, refilter,
@@ -1000,7 +1005,7 @@ def cc_plot_ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
     #     click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
     #     return
     if ctx.obj['MSNOISE_custom']:
-        from ccftime import main
+        from ccftime import main # NOQA
     else:
         from ..plots.ccftime import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
@@ -1032,7 +1037,7 @@ def cc_plot_spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
     STA1 and STA2 must be provided with this format: NET.STA !"""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from spectime import main
+        from spectime import main # NOQA
     else:
         from ..plots.spectime import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
@@ -1197,7 +1202,7 @@ def dvv_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
     STA1 and STA2 must be provided with this format: NET.STA !"""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from mwcs import main
+        from mwcs import main # NOQA
     else:
         from ..plots.mwcs import main
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile, loglevel=loglevel)
@@ -1225,9 +1230,7 @@ def dvv_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfi
     """
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        import sys, os
-        sys.path.append(os.getcwd())
-        from dvv import main
+        from dvv import main # NOQA
     else:
         from ..plots.dvv import main
     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile, loglevel=loglevel)
@@ -1252,7 +1255,7 @@ def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
     DAY must be provided in the ISO format: YYYY-MM-DD"""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from dtt import main
+        from dtt import main # NOQA
     else:
         from ..plots.dtt import main
     main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile, loglevel=loglevel)
@@ -1281,7 +1284,7 @@ def dvv_plot_timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, ou
     """
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from timing import main
+        from timing import main # NOQA
     else:
         from ..plots.timing import main
     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile, loglevel=loglevel)
