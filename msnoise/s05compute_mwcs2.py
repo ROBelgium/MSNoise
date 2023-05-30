@@ -185,7 +185,7 @@ def main(loglevel="INFO"):
                     except FileNotFoundError as fullpath:
                         logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                         continue
-
+                    logger.debug("Processing %s:%s f%i m%i %s" % (station1, station2, filterid, mov_stack, components))
                     todo = data.index.intersection(pd.to_datetime(days))
                     data = data.loc[todo]
                     data = data.dropna()

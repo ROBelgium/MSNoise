@@ -23,19 +23,20 @@ def main(interval=1, loglevel="INFO"):
 
         for mov_stack in mov_stacks:
             for components in params.all_components:
-                    try:
-                        dvv = compute_dvv(db, filterid, mov_stack, pairs=None,
-                                      components=components, params=params)
-                    except ValueError:
-                        logger.error("No data for f%i m%i: %s" % (filterid, mov_stack, components))
-                        continue
-                    xr_save_dvv(components, filterid, mov_stack, dvv)
-                    del dvv
+                logger.debug("Processing f%i m%i %s" % (filterid,   mov_stack, components))
+                try:
+                    dvv = compute_dvv(db, filterid, mov_stack, pairs=None,
+                                  components=components, params=params)
+                except ValueError:
+                    logger.error("No data for f%i m%i: %s" % (filterid, mov_stack, components))
+                    continue
+                xr_save_dvv(components, filterid, mov_stack, dvv)
+                del dvv
             try:
                 dvv = compute_dvv(db, filterid, mov_stack, pairs=None,
                               components=None, params=params)
             except ValueError:
-                logger.error("No data for %i %i" % (filterid, mov_stack))
+                logger.error("No data for any component: f%i m%i" % (filterid, mov_stack))
                 continue
             xr_save_dvv("ALL", filterid, mov_stack, dvv)
             del dvv
