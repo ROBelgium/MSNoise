@@ -205,11 +205,13 @@ from .move2obspy import pcc_xcorr
 from .preprocessing import preprocess
 
 from scipy.stats import scoreatpercentile
+import concurrent
 
 import scipy.signal
 import scipy.fft as sf
 from scipy.fft import next_fast_len
 from obspy.signal.filter import bandpass
+
 
 
 import logbook
@@ -243,6 +245,7 @@ def winsorizing(data, params, input="timeseries", nfft=0):
 
 
 def main(loglevel="INFO"):
+    global logger
     logger = logbook.Logger(__name__)
     # Reconfigure logger to show the pid number in log records
     logger = get_logger('msnoise.compute_cc_norot_child', loglevel,
@@ -305,7 +308,10 @@ def main(loglevel="INFO"):
             comps.append(comp[1])
 
         comps = np.unique(comps)
-        stream = preprocess(db, stations, comps, goal_day, params, responses)
+        with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+            stream = executor.submit(preprocess, stations, comps, goal_day, params, responses, loglevel).result()
+        logger.info("Received preprocessed traces")
+        # stream = preprocess(db, stations, comps, goal_day, params, responses)
         if not len(stream):
             logger.debug("Not enough data for this day !")
             logger.debug("Marking job Done and continuing with next !")

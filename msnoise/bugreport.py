@@ -49,15 +49,24 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n" + ispresent('wtforms')
         output += "\n" + ispresent('folium')
         output += "\n" + ispresent('jinja2')
+        output += "\n" + ispresent('tables') + " (pytables)"
+        output += "\n" + ispresent('xarray')
+        output += "\n" + ispresent('logbook')
 
         output += "\n"
         output += "\n" + "Only necessary if you plan to build the doc locally:"
         output += "\n" + ispresent('sphinx')
         output += "\n" + ispresent('sphinx_bootstrap_theme')
+        output += "\n" + ispresent('sphinx_rtd_theme')
+        output += "\n" + ispresent('sphinx_gallery')
+        output += "\n" + ispresent('numpydoc')
 
         output += "\n"
-        output += "\n" + "Graphical Backends: (at least one is required)"
+        output += "\n" + "Graphical Backends:"
         output += "\n" + ispresent('wx')
+        output += "\n" + ispresent('qt')
+        output += "\n" + ispresent('qt4')
+        output += "\n" + ispresent('qt5')
         output += "\n" + ispresent('pyqt')
         output += "\n" + ispresent('PyQt4')
         output += "\n" + ispresent('PyQt5')
