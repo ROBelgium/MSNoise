@@ -29,6 +29,7 @@ History
 * 2019: MSNoise 1.6: Optimisation of the workflow (one job type per step), HPC support, faster *compute_cc* step, PSD-whitening, DB optimisations ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.6.html))
 * 2023: MSNoise 2.0: _coming soon ..._!!
 
+
 Documentation
 -------------
 The full documentation can be found on: http://www.msnoise.org.
