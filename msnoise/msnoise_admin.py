@@ -135,7 +135,7 @@ import flask
 import jinja2
 import markdown
 from flask import Flask, redirect, request, render_template
-from flask import Markup
+from markupsafe import Markup
 from flask import flash
 from flask_admin import Admin, BaseView, expose
 from flask_admin.actions import action

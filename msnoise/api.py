@@ -842,7 +842,10 @@ def massive_insert_job(jobs):
         conn.execute(
             Job.__table__.insert(),
             jobs)
-        conn.commit()
+        try:
+            conn.commit()
+        except:
+            pass
 
 
 def massive_update_job(session, jobs, flag="D"):
