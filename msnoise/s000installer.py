@@ -202,6 +202,8 @@ def main(tech=None, hostname=None, username=None, password=None,
         prefix = ""
 
     if tech == 1:
+        if not filename:
+            filename = "db.sqlite"
         engine = create_engine('sqlite:///%s' % filename, echo=False)
         database = None
         username = None
