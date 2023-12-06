@@ -838,9 +838,11 @@ def massive_insert_job(jobs):
     :param jobs: a list of :class:`~msnoise.msnoise_table_def.declare_tables.Job` to insert.
     """
     engine = get_engine()
-    engine.execute(
-        Job.__table__.insert(),
-        jobs)
+    with engine.connect() as conn:
+        conn.execute(
+            Job.__table__.insert(),
+            jobs)
+        conn.commit()
 
 
 def massive_update_job(session, jobs, flag="D"):
@@ -2365,6 +2367,7 @@ def compute_dvv(session, filterid, mov_stack, pairs=None, components=None, param
                 dtt = xr_get_dtt(s1, s2, comp, filterid, mov_stack)
                 all.append(dtt)
             except FileNotFoundError:
+                traceback.print_exc()
                 continue
     if not len(all):
         raise ValueError

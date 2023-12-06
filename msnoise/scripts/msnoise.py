@@ -330,7 +330,7 @@ def db_execute(ctx, sql_command, outfile=None, show=True):
         if not len(cmd):
             continue
         logger.info("Executing '%s'" % cmd)
-        r = db.execute(cmd)
+        r = db.execute(text(cmd))
         if cmd.count("select") or cmd.count("SELECT"):
             result = r.fetchall()
             if not len(result):
@@ -374,26 +374,26 @@ def db_upgrade():
             # print("Passing %s: already in DB" % name)
             continue
     try:
-        db.execute("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
+        db.execute(text("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
                    "jobtype)" %
-                   prefix)
+                   prefix))
         db.commit()
     except:
         logging.info("It looks like the v1.5 'job_index' is already in the DB")
         db.rollback()
 
     try:
-        db.execute("CREATE INDEX job_index2 ON %sjobs (jobtype, flag)" %
-                   prefix)
+        db.execute(text("CREATE INDEX job_index2 ON %sjobs (jobtype, flag)" %
+                   prefix))
         db.commit()
     except:
         logging.info("It looks like the v1.6 'job_index2' is already in the DB")
         db.rollback()
 
     try:
-        db.execute("CREATE UNIQUE INDEX da_index ON %sdata_availability (path, "
+        db.execute(text("CREATE UNIQUE INDEX da_index ON %sdata_availability (path, "
                    "file, net, sta, loc, chan)" %
-                   prefix)
+                   prefix))
         db.commit()
     except:
         logging.info("It looks like the v1.5 'da_index' is already in the DB")
@@ -419,7 +419,7 @@ def db_clean_duplicates():
                 'WHERE (j1.ref > j2.ref) AND (j1.day=j2.day) '\
                 'AND (j1.pair=j2.pair) AND (j1.jobtype=j2.jobtype)'\
                 .format(prefix)
-    db.execute(query)
+    db.execute(text(query))
     db.commit()
     db.close()
 
@@ -440,8 +440,9 @@ def db_dump(format):
         meta.reflect(bind=engine)
 
         for table in meta.sorted_tables:
-            r = [dict(row) for row in engine.execute(table.select())]
-            df = pd.DataFrame(r)
+            with engine.connect() as conn:
+                rows = conn.execute(table.select()).all()
+            df = pd.DataFrame(rows)
             logger.info("Dumping table %s to %s.csv" % (table.name, table.name))
             df.to_csv("%s.csv" % table.name, index=False)
     else:
@@ -591,8 +592,8 @@ def reset(jobtype, all, rule):
     prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
     session = connect()
     if jobtype == "DA":
-        session.execute("UPDATE {0}data_availability SET flag='M'"
-                        .format(prefix))
+        session.execute(text("UPDATE {0}data_availability SET flag='M'"
+                        .format(prefix)))
     elif jobtype != jobtype.upper():
         logging.info("The jobtype %s is not uppercase (usually jobtypes"
                      " are uppercase...)"%jobtype)
@@ -727,10 +728,10 @@ def new_jobs(init, nocc, hpc=""):
         prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
         left, right = hpc.split(':')
         db = connect()
-        db.execute("INSERT INTO {prefix}jobs (pair, day, jobtype, flag) "
+        db.execute(text("INSERT INTO {prefix}jobs (pair, day, jobtype, flag) "
                    "SELECT pair, day, '{right_type}', 'T' FROM {prefix}jobs "
                    "WHERE jobtype='{left_type}' AND flag='D';"
-                   .format(prefix=prefix, right_type=right, left_type=left))
+                   .format(prefix=prefix, right_type=right, left_type=left)))
         db.commit()
         db.close()
 

@@ -1,3 +1,4 @@
+import traceback
 
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -28,6 +29,7 @@ def main(interval=1, loglevel="INFO"):
                     dvv = compute_dvv(db, filterid, mov_stack, pairs=None,
                                   components=components, params=params)
                 except ValueError:
+                    traceback.print_exc()
                     logger.error("No data for f%i m%i: %s" % (filterid, mov_stack, components))
                     continue
                 xr_save_dvv(components, filterid, mov_stack, dvv)
