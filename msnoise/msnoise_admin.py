@@ -390,7 +390,10 @@ class ConfigView(ModelView):
         if obj.name in default_datetime_fields:
             nf = DateField("value", widget=widgets.DatePickerWidget())
             nf = nf.bind(form, "value")
-            nf.data = datetime.datetime.strptime(obj.value, "%Y-%m-%d")
+            if obj.value == "1970-01-01":
+                nf.data = datetime.datetime.strptime("2023-01-01", "%Y-%m-%d")
+            else:
+                nf.data = datetime.datetime.strptime(obj.value, "%Y-%m-%d")
             form._fields["value"] = nf
 
         elif len(d.possible_values):
