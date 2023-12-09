@@ -78,6 +78,7 @@ function update_all() {
     get_num_jobs('STACK', generic_update_jobs);
     get_num_jobs('MWCS', generic_update_jobs);
     get_num_jobs('DTT', generic_update_jobs);
+    get_num_jobs('DVV', generic_update_jobs);
     data_availability_flags(generic_update_jobs);
    
    }
@@ -288,9 +289,9 @@ function update_all() {
              <button id='reset_MWCS' value='MWCS' class="btn
   btn-success btn-xs">Reset MWCS jobs "in progress"</button>
 
-     <button id='reset_MWCS_all' value='Reset CC' class="btn
+     <button id='reset_MWCS_all' value='Reset MWCS' class="btn
   btn-warning btn-xs">Reset <b>all</b> MWCS jobs</button>
-<button id='delete_MWCS_all' value='Reset STACK' class="btn
+<button id='delete_MWCS_all' value='Reset MWCS' class="btn
   btn-danger btn-xs">Delete <b>all</b> MWCS jobs</button>
   <div class="alert fade in" id="reset_MWCS_console_div" style="display:none;width:300px;">
     <button type="button" class="close">x</button>
@@ -308,9 +309,9 @@ function update_all() {
              <button id='reset_DTT' value='DTT' class="btn
   btn-success btn-xs">Reset DTT jobs "in progress"</button>
 
-     <button id='reset_DTT_all' value='Reset CC' class="btn
+     <button id='reset_DTT_all' value='Reset DTT' class="btn
   btn-warning btn-xs">Reset <b>all</b> DTT jobs</button>
-<button id='delete_DTT_all' value='Reset STACK' class="btn
+<button id='delete_DTT_all' value='Reset DTT' class="btn
   btn-danger btn-xs">Delete <b>all</b> DTT jobs</button>
   <div class="alert fade in" id="reset_DTT_console_div" style="display:none;width:300px;">
     <button type="button" class="close">x</button>
@@ -321,6 +322,27 @@ function update_all() {
 <div class="progress">
   <div id='DTT' class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
 </div>
+
+      <h3>DV/V jobs</h3>
+             <button id='reset_DVV' value='DVV' class="btn
+  btn-success btn-xs">Reset DVV jobs "in progress"</button>
+
+     <button id='reset_DVV_all' value='Reset DVV' class="btn
+  btn-warning btn-xs">Reset <b>all</b> DVV jobs</button>
+<button id='delete_DVV_all' value='Reset DVV' class="btn
+  btn-danger btn-xs">Delete <b>all</b> DVV jobs</button>
+  <div class="alert fade in" id="reset_DVV_console_div" style="display:none;width:300px;">
+    <button type="button" class="close">x</button>
+    <div id='reset_DVV_console'></div>
+  </div>
+    <br>
+<span id='jobs_DVV'></span>
+<div class="progress">
+  <div id='DVV' class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+</div>
+
+
+
   </div>
 </div>
 
@@ -353,4 +375,5 @@ function update_all() {
     });
 </script>
 {% endblock body %}
+
 

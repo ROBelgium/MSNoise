@@ -44,7 +44,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         for job in jobs:
             net, sta, loc = job.pair.split('.')
             if station is None:
-                print("Processing %s" % (job.pair))
+                logger.debug("Processing %s" % (job.pair))
                 station = get_station(db, net, sta)
             for chan in station.chans():
                 if chan not in datelists:

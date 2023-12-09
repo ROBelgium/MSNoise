@@ -111,14 +111,14 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             continue
         for job in jobs:
             net, sta, loc = job.pair.split('.')
-            print("Processing %s"% job.pair)
+            logger.debug("Processing %s"% job.pair)
             gd = UTCDateTime(job.day).datetime
             files = get_data_availability(
                 db, net=net, sta=sta, loc=loc,
                 starttime=(UTCDateTime(job.day) - 1.5 * ppsd_length).datetime,
                 endtime=gd)
             if len(files) == 0:
-                print("No files found for %s" % job.day)
+                logger.error("No files found for %s" % job.day)
                 continue
 
             for comp in ppsd_components:

@@ -83,11 +83,11 @@ import traceback
 from .api import *
 
 
-def main():
+def main(loglevel="INFO"):
+    logger = get_logger('msnoise.db_populate', loglevel,
+                        with_pid=True)
     db = connect()
-    print()
-    print(">> Populating the Station table")
-    print()
+    logger.info("Populating the Station table")
     data_folder = get_config(db, 'data_folder')
     data_structure = get_config(db, 'data_structure')
 
@@ -119,22 +119,21 @@ def main():
             stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
         del datalist
     else:
-        print("Can't parse the archive for format %s !" % data_structure)
-        print("trying to import local parser (should return a station dictionary)")
-        print("")
+        logger.warning("Can't parse the archive for format %s !" % data_structure)
+        logger.warning("trying to import local parser (should return a station dictionary)")
         try:
             sys.path.append(os.getcwd())
             from custom import populate
             stationdict = populate(data_folder)
         except:
             traceback.print_exc()
-            print("No file named custom.py in the %s folder" % os.getcwd())
+            logging.error("No file named custom.py in the %s folder" % os.getcwd())
             return
 
     db = connect()
     for s in stationdict.keys() :
         net,sta,lon,lat,alt,coordinates,instype=stationdict[s]
-        print('Adding:', net, sta)
+        logging.info('Adding:', net, sta)
         X = float(lon)
         Y = float(lat)
         altitude = float(alt)

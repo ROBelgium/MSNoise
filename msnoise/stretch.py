@@ -48,12 +48,10 @@ def stretch_mat_creation(refcc, str_range=0.01, nstr=1001):
     return strrefmat, strvec
 
 
-def main():
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s [%(levelname)s] %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
-
-    logging.info('*** Starting: Compute STR ***')
+def main(loglevel="INFO"):
+    logger = get_logger('msnoise.compute_psd_child', loglevel,
+                        with_pid=True)
+    logger.info('*** Starting:  Compute STR ***')
 
     db = connect()
     params = get_params(db)
@@ -112,7 +110,7 @@ def main():
             minlag = get_interstation_distance(station1, station2, station1.coordinates) / dtt_v
 
         maxlag2 = minlag + dtt_width
-        print("betweeen", minlag, "and", maxlag2)
+        logger.debug("betweeen", minlag, "and", maxlag2)
 
         for f in get_filters(db, all=False):
             filterid = int(f.ref)

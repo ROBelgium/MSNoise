@@ -48,7 +48,7 @@ import io
 import logbook
 logger = logbook.Logger(__name__)
 
-def preprocess(db, stations, comps, goal_day, params, responses=None):
+def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO"):
     """
     Fetches data for each ``stations`` and each ``comps`` using the
     data_availability table in the database.
@@ -63,7 +63,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
     >>> db = connect()
     >>> params = get_params(db)
     >>> responses = preload_instrument_responses(db)
-    >>> st = preprocess(db, ["YA.UV06","YA.UV10"], ["Z",], "2010-09-01", params, responses)
+    >>> st = preprocess(db, ["YA.UV06","YA.UV10"], ["Z",], "2010-09-01", params, responses, loglevel="INFO")
     >>> st
      2 Trace(s) in Stream:
     YA.UV06.00.HHZ | 2010-09-01T00:00:00.000000Z - 2010-09-01T23:59:59.950000Z | 20.0 Hz, 1728000 samples
@@ -87,10 +87,14 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
     :rtype: :class:`obspy.core.stream.Stream`
     :return: A Stream object containing all traces.
     """
+    logger = get_logger('msnoise.compute_cc_norot_child', loglevel,
+                        with_pid=True)
+    logger.debug('*** Starting: preprocessing ***')
     datafiles = {}
     output = Stream()
     MULTIPLEX = False
     MULTIPLEX_files = {}
+    db = connect()
     for station in stations:
         datafiles[station] = {}
         net, sta, loc = station.split('.')
@@ -107,7 +111,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                 datafiles[station][file.chan[-1]].append(fullpath)
             else:
                 MULTIPLEX = True
-                print("Mutliplex mode, reading the files")
+                logger.debug("Mutliplex mode, reading the files")
                 fullpath = os.path.join(file.path, file.file)
                 multiplexed = sorted(glob.glob(fullpath))
                 for comp in comps:
@@ -125,7 +129,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                             _ = Stream(traces=traces)
                             MULTIPLEX_files[fn] = _
                         datafiles[station][comp].append(_)
-
+    db.close()
     for istation, station in enumerate(stations):
         net, sta, loc = station.split(".")
         for comp in comps:
@@ -299,4 +303,5 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
             del files
 
     del MULTIPLEX_files
+    logger.info("Finished preprocessing")
     return output

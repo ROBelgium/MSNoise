@@ -283,7 +283,7 @@ def whiten2(fft, Nfft, low, high, porte1, porte2, psds, whiten_type):
             fft[i, 0:low] *= 0
             fft[i, high:] *= 0
         elif whiten_type == "HANN":
-            fft[i] /= np.abs(fft[i])
+            np.divide(fft[i], np.abs(fft[i]), out=fft[i], where=fft[i]!=0)
             fft[i][:porte1] *= 0.0
             fft[i][porte1:porte2 + 1] *= hann
             fft[i][porte2 + 1:] *= 0.0

@@ -27,10 +27,14 @@ from ..api import *
 
 
 def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
-         outfile=None, refilter=None, **kwargs):
+         outfile=None, refilter=None, loglevel="INFO", **kwargs):
+    logger = get_logger('msnoise.cc_plot_interferogram', loglevel,
+                        with_pid=True)
     db = connect()
     maxlag = float(get_config(db, 'maxlag'))
     cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
+    taxis = get_t_axis(db)
+
     start, end, datelist = build_movstack_datelist(db)
     if refilter:
         freqmin, freqmax = refilter.split(':')
@@ -39,7 +43,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     fig = plt.figure(figsize=(12, 9))
 
     if sta2 < sta1:
-        print("Stations STA1 STA2 should be sorted alphabetically")
+        logger.error("Stations STA1 STA2 should be sorted alphabetically")
         return
 
     sta1 = check_stations_uniqueness(db, sta1)
@@ -47,15 +51,17 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
 
     pair = "%s:%s" % (sta1, sta2)
 
-    print("New Data for %s-%s-%i-%i" % (pair, components, filterid,
+    logger.info("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
                                         mov_stack))
+    try:
+        data = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
+    except FileNotFoundError as fullpath:
+        logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
+        sys.exit(1)
 
-    nstack, stack_total = get_results(db, sta1, sta2, filterid, components,
-                                      datelist, mov_stack, format="matrix")
-
-    xextent = (date2num(start), date2num(end), -maxlag, maxlag)
+    xextent = (date2num(data.index[0]), date2num(data.index[-1]), -maxlag, maxlag)
     ax = plt.subplot(111)
-    data = stack_total
+    # data = stack_total
     if refilter:
         for i, d in enumerate(data):
             data[i] = bandpass(data[i], freqmin, freqmax, cc_sampling_rate,
@@ -74,11 +80,9 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     # ax.xaxis.set_minor_locator(DayLocator())
     # ax.xaxis.set_minor_formatter(DateFormatter('%Y-%m-%d %H:%M'))
 
-    for filterdb in get_filters(db, all=True):
-        if filterid == filterdb.ref:
-            low = float(filterdb.low)
-            high = float(filterdb.high)
-            break
+    filter = get_filters(db, ref=filterid)
+    low = float(filter.low)
+    high = float(filter.high)
 
     if "ylim" in kwargs:
         plt.ylim(kwargs["ylim"][0],kwargs["ylim"][1])
@@ -102,7 +106,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
                                                               filterid,
                                                               mov_stack))
         outfile = "interferogram " + outfile
-        print("output to:", outfile)
+        logger.info("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

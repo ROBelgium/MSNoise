@@ -47,7 +47,9 @@ from ..api import *
 
 def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
          show=False, outfile=None, envelope=False, refilter=None,
-         normalize=None, **kwargs):
+         normalize=None, loglevel="INFO", **kwargs):
+    logger = get_logger('msnoise.cc_plot_ccftime', loglevel,
+                        with_pid=True)
     db = connect()
     maxlag = float(get_config(db, 'maxlag'))
     samples = get_maxlag_samples(db)
@@ -58,6 +60,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
     sta1 = sta1 #.replace('.', '_')
     sta2 = sta2 #.replace('.', '_')
     t = np.arange(samples)/cc_sampling_rate - maxlag
+    taxis = get_t_axis(db)
 
     if refilter:
         freqmin, freqmax = refilter.split(':')
@@ -65,7 +68,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
         freqmax = float(freqmax)
 
     if sta2 < sta1:
-        print("Stations STA1 STA2 should be sorted alphabetically")
+        logger.error("Stations STA1 STA2 should be sorted alphabetically")
         return
 
     sta1 = check_stations_uniqueness(db, sta1)
@@ -73,18 +76,25 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
 
     pair = "%s:%s" % (sta1, sta2)
 
-    print("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
+    logger.info("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
                                                  mov_stack))
-    nstack, stack_total = get_results(db, sta1, sta2, filterid, components,
-                                      datelist, mov_stack, format="matrix")
-    if nstack == 0:
-        print("No CCF found for this request")
+    try:
+        stack_total = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
+    except FileNotFoundError as fullpath:
+        logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
+        sys.exit(1)
+
+    # convert index to mdates
+    stack_total.index = mdates.date2num(stack_total.index.to_pydatetime())
+
+    if len(stack_total) == 0:
+        logger.error("No CCF found for this request")
         return
 
     if normalize == "common":
         stack_total /= np.nanmax(stack_total)
     ax = plt.subplot(111)
-    for i, line in enumerate(stack_total):
+    for i, line in stack_total.iterrows():
         if np.all(np.isnan(line)):
             continue
         if refilter:
@@ -94,18 +104,16 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
             line = obspy_envelope(line)
         if normalize == "individual":
             line /= line.max()
-        plt.plot(t, line * ampli + i + base, c='k', lw=0.5)
+        plt.plot(t, line * ampli + i, c='k', lw=0.5)
         if seismic:
-            y1 = np.ones(len(line)) * i + base
-            y2 = line*ampli + i + base
+            y1 = np.ones(len(line)) * i
+            y2 = line*ampli + i
             plt.fill_between(t, y1, y2, where=y2 >= y1, facecolor='k',
                              interpolate=True)
-    low = high = 0.0
-    for filterdb in get_filters(db, all=True):
-        if filterid == filterdb.ref:
-            low = float(filterdb.low)
-            high = float(filterdb.high)
-            break
+
+    filter = get_filters(db, ref=filterid)
+    low = float(filter.low)
+    high = float(filter.high)
 
     plt.xlabel("Lag Time (s)")
     plt.axhline(0, lw=0.5, c='k')
@@ -135,7 +143,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
                                                               filterid,
                                                               mov_stack))
         outfile = "ccftime " + outfile
-        print("output to:", outfile)
+        logger.info("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

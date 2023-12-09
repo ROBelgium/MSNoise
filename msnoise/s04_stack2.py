@@ -116,7 +116,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
         Number of days before now to search for modified CC jobs
 
     """
-    logger = logbook.Logger(__name__)
+    # logger = logbook.Logger(__name__)
     # Reconfigure logger to show the pid number in log records
     logger = get_logger('msnoise.stack_child', loglevel,
                         with_pid=True)
@@ -125,6 +125,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
 
     params = get_params(db)
     taxis = get_t_axis(db)
+
     mov_stacks = params.mov_stack
     if 1 in mov_stacks:
         mov_stacks.remove(1)  # remove 1 day stack, it will be done automatically
@@ -141,7 +142,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
         pair = jobs[0].pair
         refs, days = zip(*[[job.ref, job.day] for job in jobs])
 
-        print(
+        logger.info(
             "There are STACKS jobs for some days to recompute for %s" % pair)
         sta1, sta2 = pair.split(':')
         for f in filters:
@@ -150,33 +151,32 @@ def main(stype, interval=1.0, loglevel="INFO"):
                 pair = "%s:%s" % (sta1, sta2)
                 sta1 = sta1
                 sta2 = sta2
-                print('Processing %s-%s-%i' %
+                logger.info('Processing %s-%s-%i' %
                       (pair, components, filterid))
 
                 c = get_results(db, sta1, sta2, filterid, components, days,
                                 mov_stack=1, format="xarray")
-                path = os.path.join("STACKS2", "%02i" % filterid,
-                                    "001_DAYS", "%s" % components)
-                fn = "%s_%s.nc" % (sta1, sta2)
-                fullpath = os.path.join(path, fn)
-                dr = xr_create_or_open(fullpath, taxis)
-                dr = xr_insert_or_update(dr, c)
-                xr_save_and_close(dr, fullpath)
+                dr = xr_save_ccf(sta1, sta2, components, filterid, 1, taxis, c)
+
+                if stype == "ref":
+                    start, end, datelist = build_ref_datelist(db)
+                    start = np.array(start, dtype=np.datetime64)
+                    end = np.array(end, dtype=np.datetime64)
+                    _ = dr.where(dr.times >= start, drop=True)
+                    _ = _.where(_.times <= end, drop=True)
+                    # TODO add other stack methods here! using apply?
+                    _ = _.mean(dim="times")
+                    xr_save_ref(sta1, sta2, components, filterid, taxis, _)
+                    continue
 
                 for mov_stack in mov_stacks:
                     if mov_stack > len(dr.times):
-                        print("not enough data for mov_stack=%i" % mov_stack)
+                        logger.error("not enough data for mov_stack=%i" % mov_stack)
                         continue
-
+                    # TODO avoid the 1D resampler here
                     xx = dr.resample(times='1D').mean().rolling(
                         times=mov_stack, min_periods=1).mean().dropna("times", how="all")
-
-                    path = os.path.join("STACKS2", "%02i" % filterid,
-                                       "%03i_DAYS" % mov_stack,
-                                       "%s" % components)
-                    fn = "%s_%s.nc" % (sta1, sta2)
-                    fullpath = os.path.join(path, fn)
-                    xr_save_and_close(xx, fullpath)
+                    xr_save_ccf(sta1, sta2, components, filterid, mov_stack, taxis, xx, overwrite=True)
                     del xx
         if stype != "ref":
             massive_update_job(db, jobs, "D")

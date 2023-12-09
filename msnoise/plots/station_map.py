@@ -62,7 +62,7 @@ def main(show=True, outfile=None):
             now = datetime.datetime.now()
             now = now.strftime('station map on %Y-%m-%d %H.%M.%S')
             tmp = outfile.replace('?', now)
-        logging.debug("output to:", tmp)
+        logging.debug("output to: %s" % tmp)
         sta_map.save('%s.html' % tmp)
 
     # plot topography/bathymetry as an image.
@@ -109,7 +109,7 @@ def main(show=True, outfile=None):
             now = datetime.datetime.now()
             now = now.strftime('station map on %Y-%m-%d %H.%M.%S')
             outfile = outfile.replace('?', now)
-        logging.info("output to:", outfile)
+        logging.info("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

@@ -30,7 +30,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
     params = get_params(db)
     files = glob.glob(os.path.join("PSD", "RMS", params.qc_rms_type, '*.h5'))
     for file in sorted(files):
-        print(file)
+        logger.debug(file)
         store = hdf_open_store_from_fn(file, "r")\
 
         store.RMS.to_csv(file.replace(".h5", ".csv"))

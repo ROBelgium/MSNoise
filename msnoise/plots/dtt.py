@@ -22,7 +22,9 @@ from ..api import *
 
 
 def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True,
-         outfile=None):
+         outfile=None, loglevel="INFO"):
+    logger = get_logger('msnoise.cc_dvv_plot_dtt', loglevel,
+                        with_pid=True)
     db = connect()
     dtt_lag = get_config(db, "dtt_lag")
     dtt_v = float(get_config(db, "dtt_v"))
@@ -30,7 +32,7 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True,
     dtt_width = float(get_config(db, "dtt_width"))
     dbmaxlag = int(float(get_config(db, "maxlag")))
     if sta2 < sta1:
-        print("Stations STA1 STA2 should be sorted alphabetically")
+        logger.error("Stations STA1 STA2 should be sorted alphabetically")
         return
 
     sta1 = check_stations_uniqueness(db, sta1)
@@ -52,7 +54,7 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True,
 
     fname = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" % mov_stack,
                          components, pair, '%s.txt' % day)
-    print(fname)
+
     t = []
     dt = []
     err = []
@@ -73,7 +75,7 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True,
     alldf.append(df)
     alldf = pd.concat(alldf)
     line = alldf[alldf['Pairs'] == pair].copy()
-    print(line)
+
     M = float(line["M"])
     M0 = float(line["M0"])
     A = float(line["A"])
@@ -123,7 +125,7 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True,
                                              mov_stack, day)
             outfile = outfile.replace('?', basename)
         outfile = "dtt_" + outfile
-        print("output to: %s" % outfile)
+        logger.info("output to: %s" % outfile)
         plt.savefig(outfile)
 
     if show:

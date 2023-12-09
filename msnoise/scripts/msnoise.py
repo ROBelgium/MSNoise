@@ -181,6 +181,8 @@ def info_stations(db):
                 '{:.1f}'.format(s.altitude) if s.altitude is not None else na_sign,
                 s.coordinates or na_sign,
                 'Y' if s.used else 'N'))
+        click.echo("  ├ Location code(s): %s" % s.used_location_codes)
+        click.echo("  └ Channel names(s): %s" % s.used_channel_names)
     if s is None:
         click.echo(' ')
 
@@ -260,7 +262,8 @@ def cli(ctx, threads, delay, custom, verbose, quiet):
     else:
         logger = get_logger('msnoise', ctx.obj['MSNOISE_verbosity'])
     # Is this really needed?
-    # sys.path.append(os.getcwd())
+    if custom:
+        sys.path.append(os.getcwd())
 
 
 
@@ -289,11 +292,11 @@ def db_init(tech):
 
 
 @db.command(name="update_loc_chan")
-def db_da_stations_update_loc_chan():
+@click.pass_context
+def db_da_stations_update_loc_chan(ctx):
     """Populates the Location & Channel from the Data Availability
     table. Warning: rewrites automatically, no confirmation."""
     from msnoise.api import connect, get_stations
-
     session = connect()
     stations = get_stations(session)
     for sta in stations:
@@ -305,8 +308,8 @@ def db_da_stations_update_loc_chan():
             params(net=sta.net, sta=sta.sta).all()
         locids = list(set(sorted([d.loc for d in data])))
         chans = list(set(sorted([d.chan for d in data])))
-        print("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
-                                                    locids, chans))
+        logger.info("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
+                                                          locids, chans))
         sta.used_location_codes = ",".join(locids)
         sta.used_channel_names = ",".join(chans)
         session.commit()
@@ -317,21 +320,21 @@ def db_da_stations_update_loc_chan():
               default=None, type=str)
 @click.option('-s', '--show', help='Show output (in case of SELECT statement)?',
               default=True, type=bool)
-def db_execute(sql_command, outfile=None, show=True):
+@click.pass_context
+def db_execute(ctx, sql_command, outfile=None, show=True):
     """EXPERT MODE: Executes 'sql_command' on the database. Use this command
     at your own risk!!"""
     from msnoise.api import connect
-
     db = connect()
     for cmd in sql_command.split(";"):
         if not len(cmd):
             continue
-        print("Executing '%s'" % cmd)
-        r = db.execute(cmd)
+        logger.info("Executing '%s'" % cmd)
+        r = db.execute(text(cmd))
         if cmd.count("select") or cmd.count("SELECT"):
             result = r.fetchall()
             if not len(result):
-                print("The query returned no results, sorry.")
+                logger.info("The query returned no results, sorry.")
             else:
                 import pandas as pd
                 df = pd.DataFrame(result, columns=r.keys())
@@ -371,26 +374,26 @@ def db_upgrade():
             # print("Passing %s: already in DB" % name)
             continue
     try:
-        db.execute("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
+        db.execute(text("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
                    "jobtype)" %
-                   prefix)
+                   prefix))
         db.commit()
     except:
         logging.info("It looks like the v1.5 'job_index' is already in the DB")
         db.rollback()
 
     try:
-        db.execute("CREATE INDEX job_index2 ON %sjobs (jobtype, flag)" %
-                   prefix)
+        db.execute(text("CREATE INDEX job_index2 ON %sjobs (jobtype, flag)" %
+                   prefix))
         db.commit()
     except:
         logging.info("It looks like the v1.6 'job_index2' is already in the DB")
         db.rollback()
 
     try:
-        db.execute("CREATE UNIQUE INDEX da_index ON %sdata_availability (path, "
+        db.execute(text("CREATE UNIQUE INDEX da_index ON %sdata_availability (path, "
                    "file, net, sta, loc, chan)" %
-                   prefix)
+                   prefix))
         db.commit()
     except:
         logging.info("It looks like the v1.5 'da_index' is already in the DB")
@@ -416,7 +419,7 @@ def db_clean_duplicates():
                 'WHERE (j1.ref > j2.ref) AND (j1.day=j2.day) '\
                 'AND (j1.pair=j2.pair) AND (j1.jobtype=j2.jobtype)'\
                 .format(prefix)
-    db.execute(query)
+    db.execute(text(query))
     db.commit()
     db.close()
 
@@ -437,12 +440,13 @@ def db_dump(format):
         meta.reflect(bind=engine)
 
         for table in meta.sorted_tables:
-            r = [dict(row) for row in engine.execute(table.select())]
-            df = pd.DataFrame(r)
-            print("Dumping table %s to %s.csv" % (table.name, table.name))
+            with engine.connect() as conn:
+                rows = conn.execute(table.select()).all()
+            df = pd.DataFrame(rows)
+            logger.info("Dumping table %s to %s.csv" % (table.name, table.name))
             df.to_csv("%s.csv" % table.name, index=False)
     else:
-        print("Currently only the csv format is supported, sorry.")
+        logger.error("Currently only the csv format is supported, sorry.")
 
 
 @db.command(name="import")
@@ -459,7 +463,7 @@ def db_import(table, format, force):
 
     if format == "csv":
         engine = get_engine(inifile=os.path.join(os.getcwd(), 'db.ini'))
-        print("Loading table %s from %s.csv" % (table, table))
+        logger.info("Loading table %s from %s.csv" % (table, table))
         df = pd.read_csv("%s.csv" % table)
         if force:
             df.to_sql(table, engine, if_exists="replace")
@@ -468,13 +472,11 @@ def db_import(table, format, force):
                 df.to_sql(table, engine)
             except ValueError:
                 traceback.print_exc()
-                print("!"*80)
-                print("You're probably getting the error above because the "
+                logger.info("You're probably getting the error above because the "
                       "table already exists, if you want to replace the table "
                       "with the imported data, then pass the --force option")
     else:
-        print("Currently only the csv format is supported, sorry.")
-
+        logger.error("Currently only the csv format is supported, sorry.")
 
 
 @cli.command()
@@ -530,7 +532,7 @@ def config_sync():
         id = "%s.%s" % (station.net, station.sta)
         coords = responses[responses["netsta"] == id]
         if not len(coords):
-            print("No coords for %s, skipping,..." % id)
+            logger.error("No coords for %s, skipping,..." % id)
             continue
         lon = float(coords["longitude"].values[0])
         lat = float(coords["latitude"].values[0])
@@ -590,8 +592,8 @@ def reset(jobtype, all, rule):
     prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
     session = connect()
     if jobtype == "DA":
-        session.execute("UPDATE {0}data_availability SET flag='M'"
-                        .format(prefix))
+        session.execute(text("UPDATE {0}data_availability SET flag='M'"
+                        .format(prefix)))
     elif jobtype != jobtype.upper():
         logging.info("The jobtype %s is not uppercase (usually jobtypes"
                      " are uppercase...)"%jobtype)
@@ -608,18 +610,21 @@ def reset(jobtype, all, rule):
                                 ' table, overrides the default'
                                 ' workflow step.',
               is_flag=True)
-def populate(fromda):
+@click.pass_context
+def populate(ctx, fromda):
     """Rapidly scan the archive filenames and find Network/Stations, only works
     with known archive structures, or with a custom code provided by the user.
     """
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if fromda:
-        logging.info("Overriding workflow...")
+        logger.info("Populating the Station table")
+        logger.info("Overriding workflow...")
         db = connect()
         stations = db.query(DataAvailability.net, DataAvailability.sta). \
             group_by(DataAvailability.net, DataAvailability.sta)
 
         for net, sta in stations:
-            print('Adding:', net, sta)
+            logger.info('Adding: %s.%s' % (net, sta))
             X = 0.0
             Y = 0.0
             altitude = 0.0
@@ -627,9 +632,11 @@ def populate(fromda):
             instrument = 'N/A'
             update_station(db, net, sta, X, Y, altitude,
                            coordinates=coordinates, instrument=instrument)
+        logger.info("Checking the available loc ids and chans...")
+        ctx.invoke(db_da_stations_update_loc_chan)
     else:
         from ..s002populate_station_table import main
-        main()
+        main(loglevel=loglevel)
 
 
 @cli.command(name='scan_archive')
@@ -676,11 +683,12 @@ def plot():
 @click.pass_context
 def plot_data_availability(ctx, chan, show, outfile):
     """Plots the Data Availability vs time"""
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from data_availability import main
+        from data_availability import main # NOQA
     else:
         from ..plots.data_availability import main
-    main(chan, show, outfile)
+    main(chan, show, outfile, loglevel=loglevel)
 
 
 
@@ -693,7 +701,7 @@ def plot_data_availability(ctx, chan, show, outfile):
 def plot_station_map(ctx, show, outfile):
     """Plots the station map (very very basic)"""
     if ctx.obj['MSNOISE_custom']:
-        from station_map import main
+        from station_map import main # NOQA
     else:
         from ..plots.station_map import main
     main(show, outfile)
@@ -720,10 +728,10 @@ def new_jobs(init, nocc, hpc=""):
         prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
         left, right = hpc.split(':')
         db = connect()
-        db.execute("INSERT INTO {prefix}jobs (pair, day, jobtype, flag) "
+        db.execute(text("INSERT INTO {prefix}jobs (pair, day, jobtype, flag) "
                    "SELECT pair, day, '{right_type}', 'T' FROM {prefix}jobs "
                    "WHERE jobtype='{left_type}' AND flag='D';"
-                   .format(prefix=prefix, right_type=right, left_type=left))
+                   .format(prefix=prefix, right_type=right, left_type=left)))
         db.commit()
         db.close()
 
@@ -779,12 +787,12 @@ def cc_compute_cc_rot(ctx):
             p.join()
 
 
-@cc.command(name="stack")
+@cc.command(name="stack_old")
 @click.pass_context
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-def cc_stack(ctx, ref, mov, step):
+def cc_stack_old(ctx, ref, mov, step):
     """Stacks the [REF] or [MOV] windows.
     Computes the STACK jobs.
     """
@@ -838,12 +846,12 @@ def cc_stack(ctx, ref, mov, step):
             p.join()
 
 
-@cc.command(name="stack2")
+@cc.command(name="stack")
 @click.pass_context
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
 @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
 @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-def cc_stack2(ctx, ref, mov, step):
+def cc_stack(ctx, ref, mov, step):
     """Stacks the [REF] or [MOV] windows.
     Computes the STACK jobs.
     """
@@ -924,13 +932,13 @@ def cc_plot():
 def cc_plot_distance(ctx, filterid, comp, ampli, show, outfile, refilter,
                      virtual_source, extra_args):
     """Plots the REFs of all pairs vs distance"""
-
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from distance import main
+        from distance import main # NOQA
     else:
         from ..plots.distance import main
     main(filterid, comp, ampli, show, outfile, refilter, virtual_source,
-         **extra_args)
+         loglevel=loglevel, **extra_args)
 
 
 @cc_plot.command(name="interferogram",
@@ -956,16 +964,13 @@ def cc_plot_interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show,
                           refilter, extra_args):
     """Plots the interferogram between sta1 and sta2 (parses the CCFs)
     STA1 and STA2 must be provided with this format: NET.STA !"""
-
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from interferogram import main
+        from interferogram import main # NOQA
     else:
         from ..plots.interferogram import main
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile, refilter,
-         **extra_args)
+         loglevel=loglevel, **extra_args)
 
 
 @cc_plot.command(name="ccftime",
@@ -996,16 +1001,16 @@ def cc_plot_ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
                     normalize, extra_args):
     """Plots the ccf vs time between sta1 and sta2
     STA1 and STA2 must be provided with this format: NET.STA !"""
-
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    # if sta1 > sta2:
+    #     click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
+    #     return
     if ctx.obj['MSNOISE_custom']:
-        from ccftime import main
+        from ccftime import main # NOQA
     else:
         from ..plots.ccftime import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
-         envelope, refilter, normalize, **extra_args)
+         envelope, refilter, normalize, loglevel=loglevel, **extra_args)
 
 
 @cc_plot.command(name="spectime",
@@ -1031,16 +1036,13 @@ def cc_plot_spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
                      ampli, show, outfile, refilter, extra_args):
     """Plots the ccf's spectrum vs time between sta1 and sta2
     STA1 and STA2 must be provided with this format: NET.STA !"""
-
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from spectime import main
+        from spectime import main # NOQA
     else:
         from ..plots.spectime import main
     main(sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
-         refilter, **extra_args)
+         refilter, loglevel=loglevel, **extra_args)
 
 
 @cc.group(cls=OrderedGroup)
@@ -1049,9 +1051,9 @@ def dvv():
     pass
 
 
-@dvv.command(name='compute_mwcs')
+@dvv.command(name='compute_mwcs_old')
 @click.pass_context
-def dvv_compute_mwcs(ctx):
+def dvv_compute_mwcs_old(ctx):
     """Computes the MWCS jobs"""
     from ..s05compute_mwcs import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1070,9 +1072,9 @@ def dvv_compute_mwcs(ctx):
         for p in processes:
             p.join()
 
-@dvv.command(name='compute_mwcs2')
+@dvv.command(name='compute_mwcs')
 @click.pass_context
-def dvv_compute_mwcs2(ctx):
+def dvv_compute_mwcs(ctx):
     """Computes the MWCS jobs"""
     from ..s05compute_mwcs2 import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1101,12 +1103,12 @@ def dvv_compute_stretching(ctx):
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
     if threads == 1:
-        main()
+        main(loglevel=loglevel)
     else:
         from multiprocessing import Process
         processes = []
         for i in range(threads):
-            p = Process(target=main)
+            p = Process(target=main, kwargs={"loglevel": loglevel})
             p.start()
             processes.append(p)
             time.sleep(delay)
@@ -1134,11 +1136,9 @@ def dvv_compute_stretching2(ctx):
         for p in processes:
             p.join()
 
-@dvv.command(name='compute_dtt')
+@dvv.command(name='compute_dtt_old')
 @click.pass_context
-@click.option('-i', '--interval', default=1.0, help='Number of days before now to\
- search for modified Jobs')
-def dvv_compute_dtt(ctx, interval):
+def dvv_compute_dtt_old(ctx):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1158,13 +1158,32 @@ def dvv_compute_dtt(ctx, interval):
             p.join()
 
 
-@dvv.command(name='compute_dtt2')
+@dvv.command(name='compute_dtt')
 @click.pass_context
-@click.option('-i', '--interval', default=1.0, help='Number of days before now to\
- search for modified Jobs')
-def dvv_compute_dtt2(ctx, interval):
+def dvv_compute_dtt(ctx):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt2 import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    if threads == 1:
+        main(loglevel=loglevel)
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main, kwargs={"loglevel": loglevel})
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
+@dvv.command(name='compute_dvv')
+@click.pass_context
+def dvv_compute_dvv(ctx):
+    """Computes the dt/t jobs based on the new MWCS data"""
+    from ..s07_compute_dvv import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1202,14 +1221,12 @@ def dvv_plot():
 def dvv_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
     """Plots the mwcs results between sta1 and sta2 (parses the CCFs)
     STA1 and STA2 must be provided with this format: NET.STA !"""
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from mwcs import main
+        from mwcs import main # NOQA
     else:
         from ..plots.mwcs import main
-    main(sta1, sta2, filterid, comp, mov_stack, show, outfile)
+    main(sta1, sta2, filterid, comp, mov_stack, show, outfile, loglevel=loglevel)
 
 
 @dvv_plot.command(name="dvv")
@@ -1232,13 +1249,12 @@ def dvv_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfi
     Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
     Remember to order stations alphabetically !
     """
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from dvv import main
+        from dvv import main # NOQA
     else:
         from ..plots.dvv import main
-    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
-
-
+    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile, loglevel=loglevel)
 
 
 @dvv_plot.command(name="dtt")
@@ -1258,14 +1274,12 @@ def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
     """Plots a graph of dt against t
     STA1 and STA2 must be provided with this format: NET.STA !
     DAY must be provided in the ISO format: YYYY-MM-DD"""
-    if sta1 > sta2:
-        click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
-        return
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from dtt import main
+        from dtt import main # NOQA
     else:
         from ..plots.dtt import main
-    main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile)
+    main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile, loglevel=loglevel)
 
 
 
@@ -1289,38 +1303,12 @@ def dvv_plot_timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, ou
     Example: msnoise plot timing -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
     Remember to order stations alphabetically !
     """
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from timing import main
+        from timing import main # NOQA
     else:
         from ..plots.timing import main
-    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
-
-
-# @cli.command(name='compute_dvv')
-# @click.option('-f', '--filterid', default=1, help='Filter ID')
-# @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-# @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
-# @click.option('-p', '--pair', default=None, help='Plot a specific pair',
-#               multiple=True)
-# @click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
-# @click.option('-M', '--dttname', default="M", help='Plot M or M0?')
-# @click.option('-s', '--show', help='Show interactively?',
-#               default=True, type=bool)
-# @click.option('-o', '--outfile', help='Output filename (?=auto)',
-#               default=None, type=str)
-# @click.pass_context
-# def compute_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
-#     """Plots the dv/v (parses the dt/t results)
-#     Individual pairs can be plotted extra using the -p flag one or more times.
-#     Example: msnoise plot dvv -p ID_KWUI_ID_POSI
-#     Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
-#     Remember to order stations alphabetically !
-#     """
-#     if ctx.obj['MSNOISE_custom']:
-#         from s07_compute_dvv import main
-#     else:com
-#         from ..s07_compute_dvv import main
-#     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile)
+    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile, loglevel=loglevel)
 
 
 
@@ -1347,7 +1335,7 @@ def qc_compute_psd(ctx, njobs_per_worker):
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
-    print(loglevel)
+
     if threads == 1:
         main(loglevel=loglevel, njobs_per_worker=njobs_per_worker)
     else:
@@ -1374,7 +1362,7 @@ def qc_psd_to_hdf(ctx, njobs_per_worker):
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
-    print(loglevel)
+
     if threads == 1:
         main(loglevel=loglevel, njobs_per_worker=njobs_per_worker)
     else:
@@ -1410,7 +1398,7 @@ def qc_compute_rms(ctx):
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
-    print(loglevel)
+
     if threads == 1:
         main(loglevel=loglevel)
     else:
@@ -1434,7 +1422,7 @@ def qc_export_rms(ctx):
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
-    print(loglevel)
+
     if threads == 1:
         main(loglevel=loglevel)
     else:
@@ -1456,7 +1444,7 @@ def qc_psd_optimize(ctx):
     """Optimizes the HDFs using ptrepack (should be used periodically)"""
     import os, glob
     for file in sorted(glob.glob("PSD/HDF/*")):
-        print("Optimizing %s" % file)
+        logger.info("Optimizing %s" % file)
         os.system("ptrepack --chunkshape=auto --propindexes --complevel=9 --complib=blosc %s %s" % (file, file.replace(".h5", '_r.h5')))
         os.system("mv %s %s " % ( file.replace(".h5", '_r.h5'), file,) )
 

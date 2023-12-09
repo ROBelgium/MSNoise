@@ -27,7 +27,9 @@ import re
 from ..api import *
 
 
-def main(chan, show=False, outfile=None):
+def main(chan, show=False, outfile=None, loglevel="INFO"):
+    logger = get_logger('msnoise.plot_da', loglevel,
+                        with_pid=True)
     db = connect()
     start, end, datelist = build_movstack_datelist(db)
     dates = []
@@ -68,11 +70,10 @@ def main(chan, show=False, outfile=None):
         new = True
         for di in data.groups[group]:
             if new:
-                print(group, di)
+                logger.info("Loading: %s : %s" % (group, di))
                 new = False
             dt = (di-start).days
             matrix[i, dt] = 1
-        print(di)
 
     gs = gridspec.GridSpec(2, 1, height_ratios=[4, 1])
 
@@ -105,7 +106,7 @@ def main(chan, show=False, outfile=None):
             now = datetime.datetime.now()
             now = now.strftime('data availability on %Y-%m-%d %H.%M.%S')
             outfile = outfile.replace('?', now)
-        print("output to:", outfile)
+        logger.info("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

@@ -16,12 +16,14 @@ Example:
 """
 
 import matplotlib.pyplot as plt
-from obspy import read
+from obspy import read, Trace
 from ..api import *
 
 
 def main(filterid, components, ampli=1, show=True, outfile=None,
-         refilter=None, virtual_source=None, **kwargs):
+         refilter=None, virtual_source=None, loglevel="INFO", **kwargs):
+    logger = get_logger('msnoise.plotdistance_child', loglevel,
+                        with_pid=True)
     db = connect()
 
     pairs = get_station_pairs(db, used=1)
@@ -34,7 +36,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
     maxlag = float(get_config(db, 'maxlag'))
     maxlagsamples = get_maxlag_samples(db)
     t = np.linspace(-maxlag, maxlag, maxlagsamples)
-
+    taxis = get_t_axis(db)
     if refilter:
         freqmin, freqmax = refilter.split(':')
         freqmin = float(freqmin)
@@ -47,6 +49,8 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
         # TODO get distance for LOCids!!
         dist = get_interstation_distance(station1, station2,
                                          station1.coordinates)
+        if dist == 0 and station1 != station2:
+            logger.warning("Distance is 0.0 km for %s.%s:%s.%s" % (station1.net, station1.sta, station2.net, station2.sta))
         dists.append(dist)
         for loc1 in station1.locs():
             for loc2 in station2.locs():
@@ -57,31 +61,28 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
                     if virtual_source not in [sta1, sta2]:
                         continue
 
-                pair = "%s:%s" % (sta1, sta2)
-                print(pair, dist)
-                ref_name = pair.replace(':', '_')
-                rf = os.path.join("STACKS", "%02i" %
-                                  filterid, "REF", components, ref_name + extension)
-                print(rf)
-                if os.path.isfile(rf):
-                    ref = read(rf)[0]
-                    if refilter:
-                        ref.detrend("simple")
-                        ref.taper(0.02)
-                        ref.filter("bandpass", freqmin=freqmin, freqmax=freqmax,
-                                   zerophase=True)
-                    ref.normalize()
-                    ref = ref.data * ampli
-                    plt.plot(t, ref+dist, c='k', lw=0.4)
+                try:
+                    ref = xr_get_ref(sta1, sta2, components, filterid, taxis)
+                    ref = Trace(data=ref.CCF.values)
+                    ref.stats.sampling_rate = cc_sampling_rate
+                except FileNotFoundError as fullpath:
+                    logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+                    continue
+
+                if refilter:
+                    ref.detrend("simple")
+                    ref.taper(0.02)
+                    ref.filter("bandpass", freqmin=freqmin, freqmax=freqmax,
+                               zerophase=True)
+                ref.normalize()
+                ref = ref.data * ampli
+                plt.plot(t, ref+dist, c='k', lw=0.4)
         
     plt.ylabel("Interstation Distance in km")
     plt.xlabel("Lag Time")
-    low = high = 0.0
-    for filterdb in get_filters(db, all=True):
-        if filterid == filterdb.ref:
-            low = float(filterdb.low)
-            high = float(filterdb.high)
-            break
+    filter = get_filters(db, ref=filterid)
+    low = float(filter.low)
+    high = float(filter.high)
     title = '%s, Filter %d (%.2f - %.2f Hz)' % \
             (components, filterid, low, high,)
     if refilter:
@@ -107,7 +108,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
             newname = 'distance %s-f%i' % (components,
                                            filterid)
             outfile = outfile.replace('?', newname)
-        print("output to:", outfile)
+        logger.info("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

@@ -56,6 +56,7 @@ This recipe is a kind of "let's check this data rapidly":
     msnoise cc stack -m
     msnoise cc dvv compute_mwcs
     msnoise cc dvv compute_dtt
+    msnoise cc dvv compute_dvv
     msnoise cc dvv plot dvv
 
 

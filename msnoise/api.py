@@ -303,7 +303,7 @@ def get_params(session):
 # FILTERS PART
 
 
-def get_filters(session, all=False):
+def get_filters(session, all=False, ref=None):
     """Get Filters from the database.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -317,7 +317,9 @@ def get_filters(session, all=False):
     :rtype: list of :class:`~msnoise.msnoise_table_def.declare_tables.Filter`
     :returns: a list of Filter
     """
-
+    if ref:
+        filter = session.query(Filter).filter(Filter.ref == ref).first()
+        return filter
     if all:
         filters = session.query(Filter).all()
     else:
@@ -554,17 +556,17 @@ def check_stations_uniqueness(session, station):
     if station.count(".") == 2:
         return station
 
-    print("It seems you're voluntarily missing the location code for"
-          " \"%s\". We'll handle this automatically, if there are no "
-          "conflicts." % station)
+    logging.info("It seems you're voluntarily missing the location code for"
+                 " \"%s\". We'll handle this automatically, if there are no "
+                 "conflicts." % station)
     net, sta = station.split(".")
     locs = get_station(session, net, sta).locs()
     if len(locs) != 1:
-        print("There are more than 1 location codes for this station: "
-              "%s" % locs)
+        logging.info("There are more than 1 location codes for this station: "
+                     "%s" % locs)
         return station
     station += ".%s" % locs[0]
-    print("Found %s to be the unique solution for this station" % station)
+    logging.info("Found %s to be the unique solution for this station" % station)
     return station
 
 
@@ -836,9 +838,14 @@ def massive_insert_job(jobs):
     :param jobs: a list of :class:`~msnoise.msnoise_table_def.declare_tables.Job` to insert.
     """
     engine = get_engine()
-    engine.execute(
-        Job.__table__.insert(),
-        jobs)
+    with engine.connect() as conn:
+        conn.execute(
+            Job.__table__.insert(),
+            jobs)
+        try:
+            conn.commit()
+        except:
+            pass
 
 
 def massive_update_job(session, jobs, flag="D"):
@@ -846,8 +853,9 @@ def massive_update_job(session, jobs, flag="D"):
     Routine to use a low level function to update much faster a list of
     :class:`~msnoise.msnoise_table_def.declare_tables.Job`. This method uses the Job.ref
     which is unique.
-
-    :type jobs: list
+    :type session: Session
+    :param session: the database connection object
+    :type jobs: list or tuple
     :param jobs: a list of :class:`~msnoise.msnoise_table_def.declare_tables.Job` to update.
     :type flag: str
     :param flag: The destination flag.
@@ -917,10 +925,27 @@ def get_next_job(session, flag='T', jobtype='CC', limit=99999):
                    filter(Job.jobtype == jobtype).
                    filter(Job.flag == flag).first().day).\
             limit(limit).with_for_update()
-        # print(jobs.statement.compile(compile_kwargs={"literal_binds": True}))
+
         tmp = jobs.all()
         refs = [_.ref for _ in tmp]
         q = update(Job).values({"flag":"I"}).where(Job.ref.in_(refs))
+        session.execute(q)
+        # jobs.update({Job.flag: 'I'})
+        session.commit()
+    return tmp
+
+
+def get_dvv_jobs(session, flag='T', jobtype='DVV', limit=99999):
+    from sqlalchemy import update
+    tmp = []
+    while not len(tmp):
+        jobs = session.query(Job).filter(Job.jobtype == jobtype). \
+            filter(Job.flag == flag). \
+            limit(limit).with_for_update()
+
+        tmp = jobs.all()
+        refs = [_.ref for _ in tmp]
+        q = update(Job).values({"flag": "I"}).where(Job.ref.in_(refs))
         session.execute(q)
         # jobs.update({Job.flag: 'I'})
         session.commit()
@@ -1428,7 +1453,7 @@ def get_results(session, station1, station2, filterid, components, dates,
     base = os.path.join("STACKS", "%02i" % filterid,
                         "%03i_DAYS" % mov_stack, components,
                         "%s_%s" % (station1, station2), "%s") + extension
-    print("Reading files... in %s" % base)
+    logging.debug("Reading files... in %s" % base)
     lastday = dates[0]
     for j, date in enumerate(dates):
         daystack = base % str(date)
@@ -1444,7 +1469,7 @@ def get_results(session, station1, station2, filterid, components, dates,
     if format == "matrix":
         return i, stack_data
 
-    if format == "dataframe":
+    elif format == "dataframe":
         taxis = get_t_axis(session)
         return pd.DataFrame(stack_data, index=pd.DatetimeIndex(dates),
                             columns=taxis).loc[:lastday]
@@ -1466,6 +1491,8 @@ def get_results(session, station1, station2, filterid, components, dates,
             return i, corr
         else:
             return 0, None
+
+
 
 def get_mwcs(session, station1, station2, filterid, components, date,
                 mov_stack=1):
@@ -2004,7 +2031,7 @@ def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=Tru
     import tempfile
     fn = os.path.join(tempfile.gettempdir(), "MSNOISE-PSD", fn)
     if use_cache and os.path.isfile(fn):
-        print("I found this cool file: %s" % fn)
+        logging.debug("I found this cool file: %s" % fn)
         ppsd = PPSD.load_npz(fn)
     else:
         first = True
@@ -2016,7 +2043,7 @@ def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=Tru
                                   net, sta, loc, chan, day.year, jday))
             files = glob.glob(toglob)
             if not len(files):
-                print("No files found for %s.%s.%s.%s: %s" % (
+                logging.error("No files found for %s.%s.%s.%s: %s" % (
                 net, sta, loc, chan, day))
                 continue
             file = files[0]
@@ -2085,28 +2112,34 @@ def xr_create_or_open(fn, taxis=[], name="CCF"):
         # failed, the file handle was still open and it failed later.
         ds = xr.load_dataset(fn)
         return ds
+    times = pd.date_range("2000-01-01", freq="H", periods=0)
     if name == "CCF":
-        times = pd.date_range("2000-01-01", freq="H", periods=0)
         data = np.random.random((len(times), len(taxis)))
         dr = xr.DataArray(data, coords=[times, taxis], dims=["times", "taxis"])
-        dr.name = name
+    elif name == "REF":
+        data = np.random.random(len(taxis))
+        dr = xr.DataArray(data, coords=[taxis], dims=["taxis"])
     elif name == "MWCS":
-        times = pd.date_range("2000-01-01", freq="H", periods=0)
         keys = ["M", "EM", "MCOH"]
         data = np.random.random((len(times), len(taxis), len(keys)))
         dr = xr.DataArray(data, coords=[times, taxis, keys],
                           dims=["times", "taxis", "keys"])
-        dr.name = name
     elif name == "DTT":
-        times = pd.date_range("2000-01-01", freq="H", periods=0)
         keys = ["m", "em", "a", "ea", "m0", "em0"]
         data = np.random.random((len(times), len(keys)))
         dr = xr.DataArray(data, coords=[times, keys],
                           dims=["times", "keys"])
-        dr.name = name
+    elif name == "DVV":
+        level0 = ["m", "em", "a", "ea", "m0", "em0"]
+        level1 = ['10%', '25%', '5%', '50%', '75%', '90%', '95%', 'count', 'max', 'mean',
+                  'min', 'std', 'trimmed_mean', 'trimmed_std', 'weighted_mean', 'weighted_std']
+        data = np.random.random((len(times), len(level0), len(level1)))
+        dr = xr.DataArray(data, coords=[times, level0, level1],
+                          dims=["times", "level0", "level1"])
     else:
-        print("Not implemented, name=%s invalid." % name)
+        logging.error("Not implemented, name=%s invalid." % name)
         sys.exit(1)
+    dr.name = name
     return dr.to_dataset()
 
 
@@ -2170,3 +2203,232 @@ def get_dvv(session, filterid, components, dates,
         else:
             print('Choose median or mean')
     return tmp3, etmp3
+
+def xr_save_ccf(station1, station2, components, filterid, mov_stack, taxis, new, overwrite=False):
+    path = os.path.join("STACKS2", "%02i" % filterid,
+                        "%03i_DAYS" % mov_stack, "%s" % components)
+    fn = "%s_%s.nc" % (station1, station2)
+    fullpath = os.path.join(path, fn)
+    if overwrite:
+        xr_save_and_close(new, fullpath)
+    else:
+        dr = xr_create_or_open(fullpath, taxis, name="CCF")
+        dr = xr_insert_or_update(dr, new)
+        dr = dr.sortby("times")
+        xr_save_and_close(dr, fullpath)
+        return dr
+
+
+def xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis):
+    path = os.path.join("STACKS2", "%02i" % filterid,
+                        "%03i_DAYS" % mov_stack, "%s" % components)
+    fn = "%s_%s.nc" % (station1, station2)
+
+    fullpath = os.path.join(path, fn)
+    if not os.path.isfile(fullpath):
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+        raise FileNotFoundError(fullpath)
+    data = xr_create_or_open(fullpath, taxis, name="CCF")
+    return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
+
+
+def xr_save_ref(station1, station2, components, filterid, taxis, new, overwrite=False):
+    path = os.path.join("STACKS2", "%02i" % filterid,
+                        "REF", "%s" % components)
+    fn = "%s_%s.nc" % (station1, station2)
+    fullpath = os.path.join(path, fn)
+    if overwrite:
+        xr_save_and_close(new, fullpath)
+    else:
+        dr = xr_create_or_open(fullpath, taxis, name="REF")
+        dr = xr_insert_or_update(dr, new)
+        xr_save_and_close(dr, fullpath)
+        return dr
+
+
+def xr_get_ref(station1, station2, components, filterid, taxis):
+    path = os.path.join("STACKS2", "%02i" % filterid,
+                        "REF", "%s" % components)
+    fn = "%s_%s.nc" % (station1, station2)
+
+    fullpath = os.path.join(path, fn)
+    if not os.path.isfile(fullpath):
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+        raise FileNotFoundError(fullpath)
+    data = xr_create_or_open(fullpath, taxis, name="REF")
+    return data.CCF.to_dataframe()
+
+
+def xr_save_mwcs(station1, station2, components, filterid, mov_stack, taxis, dataframe):
+    fn = os.path.join("MWCS2", "%02i" % filterid,
+                      "%03i_DAYS" % mov_stack,
+                      "%s" % components,
+                      "%s_%s.nc" % (station1, station2))
+    if not os.path.isdir(os.path.split(fn)[0]):
+        os.makedirs(os.path.split(fn)[0])
+    d = dataframe.stack().stack()
+    d.index = d.index.set_names(["times", "keys", "taxis"])
+    d = d.reorder_levels(["times", "taxis", "keys"])
+    d.columns = ["MWCS"]
+    taxis = np.unique(d.index.get_level_values('taxis'))
+    dr = xr_create_or_open(fn, taxis=taxis, name="MWCS")
+    rr = d.to_xarray().to_dataset(name="MWCS")
+    rr = xr_insert_or_update(dr, rr)
+    xr_save_and_close(rr, fn)
+    del dr, rr, d
+
+
+def xr_get_mwcs(station1, station2, components, filterid, mov_stack):
+    fn = os.path.join("MWCS2", "%02i" % filterid,
+                      "%03i_DAYS" % mov_stack,
+                      "%s" % components,
+                      "%s_%s.nc" % (station1, station2))
+    if not os.path.isfile(fn):
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
+        raise FileNotFoundError(fn)
+    data = xr_create_or_open(fn, name="MWCS")
+    data = data.MWCS.to_dataframe().reorder_levels(['times', 'taxis', 'keys']).unstack().droplevel(0, axis=1).unstack()
+    return data
+
+
+def xr_save_dtt(station1, station2, components, filterid, mov_stack, dataframe):
+    fn = os.path.join("DTT2", "%02i" % filterid,
+                      "%03i_DAYS" % mov_stack,
+                      "%s" % components,
+                      "%s_%s.nc" % (station1, station2))
+    if not os.path.isdir(os.path.split(fn)[0]):
+        os.makedirs(os.path.split(fn)[0])
+    d = dataframe.stack()
+    d.index = d.index.set_names(["times", "keys"])
+    d.columns = ["DTT"]
+    dr = xr_create_or_open(fn, taxis=[], name="DTT")
+    rr = d.to_xarray().to_dataset(name="DTT")
+    rr = xr_insert_or_update(dr, rr)
+    xr_save_and_close(rr, fn)
+
+
+def xr_get_dtt(station1, station2, components, filterid, mov_stack):
+    fn = os.path.join("DTT2", "%02i" % filterid,
+                      "%03i_DAYS" % mov_stack,
+                      "%s" % components,
+                      "%s_%s.nc" % (station1, station2))
+    if not os.path.isfile(fn):
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
+        raise FileNotFoundError(fn)
+    dr = xr_create_or_open(fn, taxis=[], name="DTT")
+    data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
+    return data
+
+
+def xr_save_dvv(components, filterid, mov_stack, dataframe):
+    fn = os.path.join("DVV2", "%02i" % filterid,
+                      "%03i_DAYS" % mov_stack,
+                      "%s.nc" % components)
+    if not os.path.isdir(os.path.split(fn)[0]):
+        os.makedirs(os.path.split(fn)[0])
+    d = dataframe.stack().stack()
+    d.index = d.index.set_names(["times", "level1", "level0"])
+    d = d.reorder_levels(["times", "level0", "level1"])
+    d.columns = ["DVV"]
+    # taxis = np.unique(d.index.get_level_values('taxis'))
+    dr = xr_create_or_open(fn, taxis=[], name="DVV")
+    rr = d.to_xarray().to_dataset(name="DVV")
+    rr = xr_insert_or_update(dr, rr)
+    xr_save_and_close(rr, fn)
+    del dr, rr, d
+
+
+def xr_get_dvv(components, filterid, mov_stack):
+    fn = os.path.join("DVV2", "%02i" % filterid,
+                      "%03i_DAYS" % mov_stack,
+                      "%s.nc" % components)
+    if not os.path.isfile(fn):
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
+        raise FileNotFoundError(fn)
+    data = xr_create_or_open(fn, name="DVV")
+    data = data.DVV.to_dataframe().reorder_levels(['times', 'level1', 'level0']).unstack().droplevel(0, axis=1).unstack()
+    return data
+
+
+def wavg(group, dttname, errname):
+    d = group[dttname]
+    group[errname][group[errname] == 0] = 1e-6
+    w = 1. / group[errname]
+    try:
+        wavg = (d * w).sum() / w.sum()
+    except:
+        wavg = d.mean()
+    return wavg
+
+
+def wstd(group, dttname, errname):
+    d = group[dttname]
+    group[errname][group[errname] == 0] = 1e-6
+    w = 1. / group[errname]
+    wavg = (d * w).sum() / w.sum()
+    N = len(np.nonzero(w)[0])
+    wstd = np.sqrt(np.sum(w * (d - wavg) ** 2) / ((N - 1) * np.sum(w) / N))
+    return wstd
+
+
+def get_wavgwstd(data, dttname, errname):
+    grouped = data.groupby(level=0)
+    g = grouped.apply(wavg, dttname=dttname, errname=errname)
+    h = grouped.apply(wstd, dttname=dttname, errname=errname)
+    return g, h
+
+
+def trim(data, dttname, errname, limits=0.1):
+    from scipy.stats.mstats import trimmed_mean, trimmed_std
+    grouped = data[dttname].groupby(level=0)
+    if limits == 0:
+        g = grouped.mean()
+        h = grouped.std()
+    else:
+        g = grouped.apply(trimmed_mean, limits=limits)
+        h = grouped.apply(trimmed_std, limits=limits)
+    return g, h
+
+
+def compute_dvv(session, filterid, mov_stack, pairs=None, components=None, params=None, method=None, **kwargs):
+    if pairs == None:
+        pairs = []
+        for sta1, sta2 in get_station_pairs(session):
+            for loc1 in sta1.locs():
+                s1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
+                for loc2 in sta2.locs():
+                    s2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
+                    pairs.append((s1, s2))
+    all = []
+    for (s1, s2) in pairs:
+        if components == None:
+            if s1 == s2:
+                # if not provided, we'll load all:
+                comps = params.components_to_compute_single_station
+            else:
+                comps = params.components_to_compute
+        else:
+            if components.count(',') == 0:
+                comps = [components, ]
+            else:
+                comps = components.split(',')
+
+        for comp in comps:
+            try:
+                dtt = xr_get_dtt(s1, s2, comp, filterid, mov_stack)
+                all.append(dtt)
+            except FileNotFoundError:
+                traceback.print_exc()
+                continue
+    if not len(all):
+        raise ValueError
+    if len(all) == 1:
+        return all[0]
+    all = pd.concat(all)
+    percentiles = kwargs.get("percentiles", [.05, .10, .25, .5, .75, .90, .95])
+    stats = all.groupby(level=0).describe(percentiles=percentiles)
+    for c in ["m", "m0", "a"]:
+        stats[(c, "weighted_mean")], stats[(c, "weighted_std")] = get_wavgwstd(all, c, 'e'+c)
+        stats[(c, "trimmed_mean")], stats[(c, "trimmed_std")] = trim(all, c, 'e'+c, kwargs.get("limits", None))
+
+    return stats.sort_index(axis=1)
