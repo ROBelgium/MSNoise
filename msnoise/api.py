@@ -2121,3 +2121,52 @@ def xr_save_and_close(dataset, fn):
     dataset.to_netcdf(fn, mode="w")
     dataset.close()
     del dataset
+
+
+def get_dvv(session, filterid, components, dates,
+            mov_stack=1, aggregation="median", dttname="M"):
+    pairs = []
+
+    current = dates[0]
+    end = dates[-1]
+
+    alldf = []
+    while current <= end:
+        for comp in components:
+            day = os.path.join('DTT', "%02i" % filterid, "%03i_DAYS" %
+                               mov_stack, components, '%s.txt' % current)
+            if os.path.isfile(day):
+                df = pd.read_csv(day, header=0, index_col=0,
+                                 parse_dates=True)
+                alldf.append(df)
+        current += datetime.timedelta(days=1)
+    if len(alldf) == 0:
+        print("No Data for %s m%i f%i" % (components, mov_stack, filterid))
+
+    alldf = pd.concat(alldf)
+    print(mov_stack, alldf.head())
+    if 'alldf' in locals():
+        errname = "E" + dttname
+        alldf.to_csv("tt.csv")
+        alldf[dttname] *= -100
+        alldf[errname] *= -100
+
+        allbut = alldf[alldf['Pairs'] != 'ALL'].copy()
+
+        for pair in pairs:
+            print(pair)
+            pair1 = alldf[alldf['Pairs'] == pair].copy()
+            print(pair1.head())
+
+            pair1.to_csv('%s-m%i-f%i.csv' % (pair, mov_stack, filterid))
+
+        if aggregation == "median":
+            tmp3 = allbut[dttname].resample('D').median()
+            etmp3 = allbut[errname].resample('D').median()
+
+        elif aggregation == "mean":
+            tmp3 = allbut[dttname].resample('D').mean()
+            etmp3 = allbut[errname].resample('D').mean()
+        else:
+            print('Choose median or mean')
+    return tmp3, etmp3

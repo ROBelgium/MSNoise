@@ -1092,7 +1092,7 @@ def dvv_compute_mwcs2(ctx):
             p.join()
 
 
-@dvv.command(name='compute_stretching')
+@dvv.command(name='compute_stretching_old')
 @click.pass_context
 def dvv_compute_stretching(ctx):
     """[experimental] Computes the stretching based on the new stacked data"""
@@ -1113,6 +1113,26 @@ def dvv_compute_stretching(ctx):
         for p in processes:
             p.join()
 
+@dvv.command(name='compute_stretching')
+@click.pass_context
+def dvv_compute_stretching2(ctx):
+    """[experimental] Computes the stretching based on the new stacked data"""
+    from ..stretch2 import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    if threads == 1:
+        main()
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main)
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
 
 @dvv.command(name='compute_dtt')
 @click.pass_context
