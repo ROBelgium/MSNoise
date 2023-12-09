@@ -248,7 +248,7 @@ def main(loglevel="INFO"):
 
                     data.iloc[:,mid - int(minlag * params.goal_sampling_rate):mid + int(
                         minlag * params.goal_sampling_rate)] *= 0.
-                    data.iloc[:,mid - int(maxlag2 * params.goal_samplin g_rate)] *= 0.
+                    data.iloc[:,mid - int(maxlag2 * params.goal_sampling_rate)] *= 0.
                     data.iloc[:,mid + int(maxlag2 * params.goal_sampling_rate):] *= 0.
 
                     for day, row in data.iterrows():
