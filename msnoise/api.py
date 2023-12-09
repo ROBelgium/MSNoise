@@ -2366,7 +2366,7 @@ def wstd(group, dttname, errname):
     group[errname][group[errname] == 0] = 1e-6
     w = 1. / group[errname]
     wavg = (d * w).sum() / w.sum()
-    N = len(np.nonzero(w)[0])
+    N = len(np.nonzero(w.values)[0])
     wstd = np.sqrt(np.sum(w * (d - wavg) ** 2) / ((N - 1) * np.sum(w) / N))
     return wstd
 
