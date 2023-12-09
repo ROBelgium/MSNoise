@@ -79,19 +79,27 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     id = []
     alldt = []
     allcoh = []
-    for day in datelist:
-        fname = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" %
-                             mov_stack, components, pair, '%s.txt' % day)
-        if os.path.isfile(fname):
-            df = pd.read_csv(fname, delimiter=' ', header=None, index_col=0,
-                             names=['t', 'dt', 'err', 'coh'])
-            alldt.append(df["dt"])
-            allcoh.append(df["coh"])
-            id.append(day)
-            del df
+    # for day in datelist:
+    #     fname = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" %
+    #                          mov_stack, components, pair, '%s.txt' % day)
+    #     if os.path.isfile(fname):
+    #         df = pd.read_csv(fname, delimiter=' ', header=None, index_col=0,
+    #                          names=['t', 'dt', 'err', 'coh'])
+    #         alldt.append(df["dt"])
+    #         allcoh.append(df["coh"])
+    #         id.append(day)
+    #         del df
 
-    alldt = pd.DataFrame(alldt, index=pd.DatetimeIndex(id))
-    allcoh = pd.DataFrame(allcoh, index=pd.DatetimeIndex(id))
+    try:
+        mwcs = xr_get_mwcs(sta1, sta2, components, filterid, mov_stack)
+    except FileNotFoundError as fullpath:
+        logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+        return
+
+    alldt = mwcs.M
+    allcoh = mwcs.MCOH
+    id = mwcs.index
+    print(mwcs.M)
 
     alldt = alldt.resample('D').mean()
     allcoh = allcoh.resample('D').mean()
