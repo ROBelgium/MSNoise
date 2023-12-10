@@ -116,6 +116,7 @@ def main(interval=1, loglevel="INFO"):
 
 
                     values = []
+                    dates = []
                     for i in range(len(M.index)):
                         errArray = EM.iloc[i]
                         dtArray = M.iloc[i]
@@ -137,7 +138,8 @@ def main(interval=1, loglevel="INFO"):
                                 VecXfilt, VecYfilt, w,
                                 intercept_origin=True)
                             values.append([m, em, a, ea, m0, em0])
-                    output = pd.DataFrame(values, index=M.index,
+                            dates.append(M.index[i])
+                    output = pd.DataFrame(values, index=dates,
                                           columns=["m", "em", "a", "ea", "m0", "em0"])
 
                     xr_save_dtt(station1, station2, components, filterid, mov_stack, output)
