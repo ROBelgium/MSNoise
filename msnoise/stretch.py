@@ -97,6 +97,8 @@ def main(loglevel="INFO"):
         ref_name = pair.replace(':', '_')
         station1, station2 = pair.split(":")
 
+        s1 = get_station(db, station1.split('.')[0], station1.split('.')[1])
+        s2 = get_station(db, station2.split('.')[0], station2.split('.')[1])
 
         dtt_lag = get_config(db, "dtt_lag")
         dtt_v = float(get_config(db, "dtt_v"))
@@ -107,7 +109,7 @@ def main(loglevel="INFO"):
         if dtt_lag == "static":
             minlag = dtt_minlag
         else:
-            minlag = get_interstation_distance(station1, station2, station1.coordinates) / dtt_v
+            minlag = get_interstation_distance(s1, s2, s1.coordinates) / dtt_v
 
         maxlag2 = minlag + dtt_width
         logger.debug("betweeen", minlag, "and", maxlag2)
