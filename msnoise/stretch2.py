@@ -167,6 +167,7 @@ def main(loglevel="INFO"):
     outfolders = []
     filters = get_filters(db, all=False)
     time.sleep(np.random.random() * 5)
+    taxis = get_t_axis(db)
     smoothing_half_win= 5
     # hanningwindow = get_window("hanning", smoothing_half_win)
     while is_dtt_next_job(db, flag='T', jobtype='MWCS'):
@@ -198,11 +199,13 @@ def main(loglevel="INFO"):
             for components in params.all_components:
                 ref_name = pair.replace(':', '_')
                 station1, station2 = pair.split(":")
-                ref = get_ref(db, station1, station2, filterid, components,
-                              params)
-                if not len(ref):
+                try:
+                    ref = xr_get_ref(station1, station2, components, filterid,
+                                     taxis)
+                    ref = ref.CCF.values
+                except FileNotFoundError as fullpath:
+                    logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
-                ref = ref.data
                 # print("Whitening ref")
                 # ref = ww(ref)
 
@@ -210,8 +213,13 @@ def main(loglevel="INFO"):
                 if params.dtt_lag == "static":
                     minlag = params.dtt_minlag
                 else:
-                    minlag = get_interstation_distance(station1, station2,
-                                                       station1.coordinates) / params.dtt_v
+                    SS1 = station1.split(".")
+                    SS2 = station2.split(".")
+
+                    SS1 = get_station(db, SS1[0], SS1[1])
+                    SS2 = get_station(db, SS2[0], SS2[1])
+                    minlag = get_interstation_distance(SS1, SS2,
+                                                       SS1.coordinates) / params.dtt_v
                 maxlag2 = minlag + params.dtt_width
                 mid = int(params.goal_sampling_rate * params.maxlag)
                 print("betweeen", minlag, "and", maxlag2    )
@@ -252,6 +260,7 @@ def main(loglevel="INFO"):
                     data.iloc[:,mid + int(maxlag2 * params.goal_sampling_rate):] *= 0.
 
                     for day, row in data.iterrows():
+                        print(day)
                         cur = row.values
                         coeffs = []
                         for j in range(ref_stretched.shape[0]):
