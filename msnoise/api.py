@@ -2326,9 +2326,18 @@ def xr_save_dvv(components, filterid, mov_stack, dataframe):
                       "%s.nc" % components)
     if not os.path.isdir(os.path.split(fn)[0]):
         os.makedirs(os.path.split(fn)[0])
-    d = dataframe.stack().stack()
-    d.index = d.index.set_names(["times", "level1", "level0"])
-    d = d.reorder_levels(["times", "level0", "level1"])
+
+    if dataframe.columns.nlevels > 1:
+        d = dataframe.stack().stack()
+    else:
+        d = dataframe.stack()
+    
+    level_names = ["times", "level1", "level0"]
+    d.index = d.index.set_names(level_names[:d.index.nlevels])
+
+    if d.index.nlevels == 3:
+        d = d.reorder_levels(["times", "level0", "level1"])
+
     d.columns = ["DVV"]
     # taxis = np.unique(d.index.get_level_values('taxis'))
     dr = xr_create_or_open(fn, taxis=[], name="DVV")
@@ -2414,6 +2423,12 @@ def compute_dvv(session, filterid, mov_stack, pairs=None, components=None, param
                 comps = components.split(',')
 
         for comp in comps:
+
+            if (s1 == s2) and (comp not in params.components_to_compute_single_station):
+                continue
+            if (s1 != s2) and (comp not in params.components_to_compute):
+                continue
+
             try:
                 dtt = xr_get_dtt(s1, s2, comp, filterid, mov_stack)
                 all.append(dtt)

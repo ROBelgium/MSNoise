@@ -147,10 +147,13 @@ def main(stype, interval=1.0, loglevel="INFO"):
         sta1, sta2 = pair.split(':')
         for f in filters:
             filterid = int(f.ref)
-            for components in params.all_components:
-                pair = "%s:%s" % (sta1, sta2)
-                sta1 = sta1
-                sta2 = sta2
+
+            if sta1 == sta2:
+                components_to_compute = params.components_to_compute_single_station
+            else:
+                components_to_compute = params.components_to_compute
+
+            for components in components_to_compute:
                 logger.info('Processing %s-%s-%i' %
                       (pair, components, filterid))
 

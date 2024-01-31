@@ -163,10 +163,16 @@ def main(loglevel="INFO"):
                 n = next_fast_len(len(a))
                 return whiten(a, n, 1./params.cc_sampling_rate,
                               low, high, returntime=True)
-            for components in params.all_components:
-                ref_name = pair.replace(':', '_')
-                station1, station2 = pair.split(":")
+            ref_name = pair.replace(':', '_')
+            station1, station2 = pair.split(":")
+            
+            if station1 == station2:
+                components_to_compute = params.components_to_compute_single_station
+            else:
+                components_to_compute = params.components_to_compute
 
+
+            for components in components_to_compute:
                 try:
                     ref = xr_get_ref(station1, station2, components, filterid, taxis)
                     ref = ref.CCF.values

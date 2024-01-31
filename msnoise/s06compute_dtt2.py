@@ -67,7 +67,12 @@ def main(interval=1, loglevel="INFO"):
             filterid = int(f.ref)
             freqmin = f.mwcs_low
             freqmax = f.mwcs_high
-            for components in params.all_components:
+            if station1 == station2:
+                components_to_compute = params.components_to_compute_single_station
+            else:
+                components_to_compute = params.components_to_compute
+
+            for components in components_to_compute:
                 for mov_stack in mov_stacks:
                     output = []
                     try:
