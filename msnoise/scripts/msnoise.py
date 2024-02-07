@@ -16,6 +16,11 @@ from .. import MSNoiseError, DBConfigNotFoundError
 from ..api import connect, get_config, update_station, get_logger, get_job_types
 from ..msnoise_table_def import DataAvailability
 
+old = False
+if os.path.isfile(".old"):
+    print("OK, showing old commands too")
+    old = True
+
 class OrderedGroup(click.Group):
     def list_commands(self, ctx):
         return self.commands.keys()
@@ -787,63 +792,64 @@ def cc_compute_cc_rot(ctx):
             p.join()
 
 
-@cc.command(name="stack_old")
-@click.pass_context
-@click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
-@click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
-@click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-def cc_stack_old(ctx, ref, mov, step):
-    """Stacks the [REF] or [MOV] windows.
-    Computes the STACK jobs.
-    """
-    click.secho('Lets STACK !', fg='green')
-    from ..s04stack import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
+if old:
+    @cc.command(name="stack_old")
+    @click.pass_context
+    @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
+    @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
+    @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
+    def cc_stack_old(ctx, ref, mov, step):
+        """Stacks the [REF] or [MOV] windows.
+        Computes the STACK jobs.
+        """
+        click.secho('Lets STACK !', fg='green')
+        from ..s04stack import main
+        threads = ctx.obj['MSNOISE_threads']
+        delay = ctx.obj['MSNOISE_threadsdelay']
+        loglevel = ctx.obj['MSNOISE_verbosity']
 
-    if ref and mov:
-        click.secho("With MSNoise 1.6, you can't run REF & MOV stacks"
-                    "simultaneously, please run them one after the other.")
-        sys.exit()
+        if ref and mov:
+            click.secho("With MSNoise 1.6, you can't run REF & MOV stacks"
+                        "simultaneously, please run them one after the other.")
+            sys.exit()
 
-    if threads == 1:
-        if ref:
-            main('ref', loglevel=loglevel)
-        if mov:
-            main('mov', loglevel=loglevel)
-        if step:
-            main('step', loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        if ref:
-            for i in range(threads):
-                p = Process(target=main, args=["ref",],
-                            kwargs={"loglevel": loglevel})
-                p.start()
-                processes.append(p)
-                time.sleep(delay)
-        for p in processes:
-            p.join()
-        if mov:
-            for i in range(threads):
-                p = Process(target=main, args=["mov",],
-                            kwargs={"loglevel": loglevel})
-                p.start()
-                processes.append(p)
-                time.sleep(delay)
-        for p in processes:
-            p.join()
-        if step:
-            for i in range(threads):
-                p = Process(target=main, args=["step",],
-                            kwargs={"loglevel": loglevel})
-                p.start()
-                processes.append(p)
-                time.sleep(delay)
-        for p in processes:
-            p.join()
+        if threads == 1:
+            if ref:
+                main('ref', loglevel=loglevel)
+            if mov:
+                main('mov', loglevel=loglevel)
+            if step:
+                main('step', loglevel=loglevel)
+        else:
+            from multiprocessing import Process
+            processes = []
+            if ref:
+                for i in range(threads):
+                    p = Process(target=main, args=["ref",],
+                                kwargs={"loglevel": loglevel})
+                    p.start()
+                    processes.append(p)
+                    time.sleep(delay)
+            for p in processes:
+                p.join()
+            if mov:
+                for i in range(threads):
+                    p = Process(target=main, args=["mov",],
+                                kwargs={"loglevel": loglevel})
+                    p.start()
+                    processes.append(p)
+                    time.sleep(delay)
+            for p in processes:
+                p.join()
+            if step:
+                for i in range(threads):
+                    p = Process(target=main, args=["step",],
+                                kwargs={"loglevel": loglevel})
+                    p.start()
+                    processes.append(p)
+                    time.sleep(delay)
+            for p in processes:
+                p.join()
 
 
 @cc.command(name="stack")
@@ -1051,26 +1057,27 @@ def dvv():
     pass
 
 
-@dvv.command(name='compute_mwcs_old')
-@click.pass_context
-def dvv_compute_mwcs_old(ctx):
-    """Computes the MWCS jobs"""
-    from ..s05compute_mwcs import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel})
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+if old:
+    @dvv.command(name='compute_mwcs_old')
+    @click.pass_context
+    def dvv_compute_mwcs_old(ctx):
+        """Computes the MWCS jobs"""
+        from ..s05compute_mwcs import main
+        threads = ctx.obj['MSNOISE_threads']
+        delay = ctx.obj['MSNOISE_threadsdelay']
+        loglevel = ctx.obj['MSNOISE_verbosity']
+        if threads == 1:
+            main(loglevel=loglevel)
+        else:
+            from multiprocessing import Process
+            processes = []
+            for i in range(threads):
+                p = Process(target=main, kwargs={"loglevel": loglevel})
+                p.start()
+                processes.append(p)
+                time.sleep(delay)
+            for p in processes:
+                p.join()
 
 @dvv.command(name='compute_mwcs')
 @click.pass_context
@@ -1094,26 +1101,27 @@ def dvv_compute_mwcs(ctx):
             p.join()
 
 
-@dvv.command(name='compute_stretching_old')
-@click.pass_context
-def dvv_compute_stretching(ctx):
-    """[experimental] Computes the stretching based on the new stacked data"""
-    from ..stretch import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel})
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+if old:
+    @dvv.command(name='compute_stretching_old')
+    @click.pass_context
+    def dvv_compute_stretching(ctx):
+        """[experimental] Computes the stretching based on the new stacked data"""
+        from ..stretch import main
+        threads = ctx.obj['MSNOISE_threads']
+        delay = ctx.obj['MSNOISE_threadsdelay']
+        loglevel = ctx.obj['MSNOISE_verbosity']
+        if threads == 1:
+            main(loglevel=loglevel)
+        else:
+            from multiprocessing import Process
+            processes = []
+            for i in range(threads):
+                p = Process(target=main, kwargs={"loglevel": loglevel})
+                p.start()
+                processes.append(p)
+                time.sleep(delay)
+            for p in processes:
+                p.join()
 
 @dvv.command(name='compute_stretching')
 @click.pass_context
@@ -1136,26 +1144,27 @@ def dvv_compute_stretching2(ctx):
         for p in processes:
             p.join()
 
-@dvv.command(name='compute_dtt_old')
-@click.pass_context
-def dvv_compute_dtt_old(ctx):
-    """Computes the dt/t jobs based on the new MWCS data"""
-    from ..s06compute_dtt import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel})
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+if old:
+    @dvv.command(name='compute_dtt_old')
+    @click.pass_context
+    def dvv_compute_dtt_old(ctx):
+        """Computes the dt/t jobs based on the new MWCS data"""
+        from ..s06compute_dtt import main
+        threads = ctx.obj['MSNOISE_threads']
+        delay = ctx.obj['MSNOISE_threadsdelay']
+        loglevel = ctx.obj['MSNOISE_verbosity']
+        if threads == 1:
+            main(loglevel=loglevel)
+        else:
+            from multiprocessing import Process
+            processes = []
+            for i in range(threads):
+                p = Process(target=main, kwargs={"loglevel": loglevel})
+                p.start()
+                processes.append(p)
+                time.sleep(delay)
+            for p in processes:
+                p.join()
 
 
 @dvv.command(name='compute_dtt')
