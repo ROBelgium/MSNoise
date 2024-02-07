@@ -14,7 +14,7 @@ To run MSNoise, you need:
 
 * A recent version of Python (3.x recommended). We suggest using Miniconda_
   and creating a fresh environment for running msnoise.
-  MSNoise is tested "continuously" by automatic
+  MSNoise is tested "continuously" on GitHub for the last 3 most recent python version, and the three OS.
 
 
 * Database: MariaDB or Postgresql: if you want to use a database,
@@ -135,8 +135,5 @@ communicate about bugs and not the mailing list, preferably used for Releases.
 
 
 .. _obspy: http://www.obspy.org
-.. _Anaconda: http://www.continuum.io/downloads
+.. _Miniconda: https://docs.anaconda.com/free/miniconda/#latest-miniconda-installer-links
 .. _MariaDBs: https://mariadb.org/download/?t=mariadb&p=mariadb&r=10.11.6&os=windows&cpu=x86_64&pkg=zip&m=serverion
-.. _MariaDBw: https://dev.mysql.com/downloads/workbench
-.. _MariaDB: https://mariadb.org
-.. _Issue72: https://github.com/ROBelgium/MSNoise/issues/72
