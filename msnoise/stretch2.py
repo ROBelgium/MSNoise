@@ -87,7 +87,7 @@ import scipy
 
 import scipy.fft as sf
 from scipy.fft import next_fast_len
-from scipy import asarray as ar
+from numpy import asarray as ar
 from scipy.optimize import curve_fit
 from scipy.ndimage import map_coordinates
 
