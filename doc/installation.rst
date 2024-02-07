@@ -31,6 +31,7 @@ Full Installation
 1. Download and install Miniconda_ for your machine, make sure Miniconda's Python
    is the default python for your user
 
+
 2. Execute the following command to install the missing packages:
    
    .. code-block:: sh
@@ -38,6 +39,7 @@ Full Installation
         conda install -c conda-forge flask-admin flask-wtf markdown folium pymysql logbook pandas pytables pip xarray
         conda install -c conda-forge obspy
         conda install -c conda-forge msnoise
+
 
 3. Prepare a portable database server:
 
@@ -50,6 +52,7 @@ Full Installation
    * test the server by running the ``bin/mysqld --console``  command, you should see the server starting.
    * Keep the server running for now (later you'll use CTRL-C to kill the server)
 
+
 4. Create a database:
 
    * In a new (!!) console (so keep the server running in the other console)
@@ -61,12 +64,15 @@ Full Installation
    * From here, we can continue using the root user, or create a msnoise user, but this is not essential (see https://phoenixnap.com/kb/how-to-create-mariadb-user-grant-privileges) for instructions.
    * Close the connection by executing the ``quit;`` command.
 
+
 5. Check which required packages you are still missing by executing the
    ``msnoise utils bugreport`` command. (See :ref:`testing`)
+
 
 6. To be sure all is running OK, one could start the ``msnoise utils test`` command.
    This will start the standard MSNoise test suite, which should end with a
    "Ran xx tests in yy seconds : OK".
+
 
 7. Proceed to the :ref:`Workflow` description to start MSNoise!
 
@@ -88,6 +94,7 @@ To build this documentation, some modules are required:
 
     conda install -c conda-forge "sphinx<6" sphinx_bootstrap_theme numpydoc sphinx-gallery
     pip install "sphinx_rtd_theme>1"
+    pip install pillow==9.0.0
 
 
 Then, this should simply work:

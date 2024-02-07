@@ -109,7 +109,9 @@ out = open('clickhelp/msnoise.rst', 'w')
 out.write('Help on the msnoise commands\n')
 out.write('============================\n\n')
 out.write('This page shows all the commands accessible from the command '
-          'line\n\n')
+          'line.\n\n')
+out.write('Commands with an _old suffix are only visible in the console if a .old file is present in the folder. '
+          '\n\n')
 process_command_or_group(out, M.cli.commands)
 out.close()
 
