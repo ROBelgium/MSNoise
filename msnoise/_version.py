@@ -150,8 +150,8 @@ def get_git_version(abbrev=10, dirty=True, append_remote_tracking_branch=True):
 
     if version is None:
         try:
-            from importlib.metadata import version
-            version = version('msnoise')
+            from importlib.metadata import version as V
+            version = V('msnoise')
         except:
             pass
 
