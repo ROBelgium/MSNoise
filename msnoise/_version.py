@@ -162,7 +162,9 @@ def get_git_version(abbrev=10, dirty=True, append_remote_tracking_branch=True):
                       "happens when installing from a zip archive "
                       "of the msnoise repository which is not a supported way "
                       "of installing msnoise.")
-        return '0.0.0+archive'
+        import datetime
+        day = datetime.datetime.strftime("%Y%m%d+%H%M")
+        return '0.0.0+%s+archive'%day
 
     # pip uses its normalized version number (strict PEP440) instead of our
     # original version number, so we bow to pip and use the normalized version
