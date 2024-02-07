@@ -20,5 +20,6 @@ dependencies:
   - pip
   - pymysql
   - xarray
-  - sqlalchemy_utils
+  - pip:
+      - sqlalchemy_utils
 
