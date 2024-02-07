@@ -286,7 +286,7 @@ def db():
 
 
 @db.command(name="init")
-@click.option('--tech', help='Database technology: 1=SQLite 2=MySQL 3=PostgreSQL',
+@click.option('--tech', help='Database technology: 1=SQLite 2=MySQL/MariaDB 3=PostgreSQL',
               default=None)
 def db_init(tech):
     """This command initializes the current folder to be a MSNoise Project
@@ -683,7 +683,7 @@ def plot():
 @click.option('-c', '--chan', default="?HZ", help="Channel, you can use the ? wildcard, e.g. '?HZ' (default) or 'HH?', etc.")
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def plot_data_availability(ctx, chan, show, outfile):
@@ -700,7 +700,7 @@ def plot_data_availability(ctx, chan, show, outfile):
 @plot.command(name='station_map')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def plot_station_map(ctx, show, outfile):
@@ -773,7 +773,7 @@ def cc_compute_cc(ctx):
 @cc.command(name='compute_cc_rot')
 @click.pass_context
 def cc_compute_cc_rot(ctx):
-    """Computes the CC jobs (based on the "New Jobs" identified)"""
+    """Computes the CC jobs too (allows for R or T components)"""
     from ..s03compute_cc import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
@@ -920,11 +920,11 @@ def cc_plot():
 @cc_plot.command(name="distance",
                  context_settings=dict(ignore_unknown_options=True, ))
 @click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-a', '--ampli', default=1.0, help='Amplification')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
+@click.option('-a', '--ampli', default=1.0, help='Amplification of the individual lines on the vertical axis (default=1)')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
@@ -952,12 +952,12 @@ def cc_plot_distance(ctx, filterid, comp, ampli, show, outfile, refilter,
 @click.argument('sta1')
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk')
+              help='Mov Stack to read from disk. Defaults to 1.')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
@@ -984,14 +984,14 @@ def cc_plot_interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show,
 @click.argument('sta1')
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk')
-@click.option('-a', '--ampli', default=5.0, help='Amplification')
-@click.option('-S', '--seismic', is_flag=True, help='Seismic style')
+              help='Mov Stack to read from disk. Defaults to 1.')
+@click.option('-a', '--ampli', default=5.0, help='Amplification of the individual lines on the vertical axis (default=1)')
+@click.option('-S', '--seismic', is_flag=True, help='Seismic style: fill the space between the zero and the positive wiggles')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.option('-e', '--envelope', is_flag=True, help='Plot envelope instead of '
                                                      'time series')
@@ -1024,13 +1024,13 @@ def cc_plot_ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
 @click.argument('sta1')
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk')
-@click.option('-a', '--ampli', default=5.0, help='Amplification')
+              help='Mov Stack to read from disk. Defaults to 1.')
+@click.option('-a', '--ampli', default=5.0, help='Amplification of the individual lines on the vertical axis (default=1)')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
@@ -1219,12 +1219,12 @@ def dvv_plot():
 @click.argument('sta1')
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk')
+              help='Mov Stack to read from disk. Defaults to 1.')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def dvv_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
@@ -1240,7 +1240,7 @@ def dvv_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
 
 @dvv_plot.command(name="dvv")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
 @click.option('-p', '--pair', default=None, help='Plot a specific pair',
               multiple=True)
@@ -1248,7 +1248,7 @@ def dvv_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
 @click.option('-M', '--dttname', default="M", help='Plot M or M0?')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def dvv_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
@@ -1271,12 +1271,12 @@ def dvv_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfi
 @click.argument('sta2')
 @click.argument('day')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk')
+              help='Mov Stack to read from disk. Defaults to 1.')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
@@ -1294,7 +1294,7 @@ def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
 
 @dvv_plot.command(name="timing")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
 @click.option('-p', '--pair', default=None, help='Plot a specific pair',
               multiple=True)
@@ -1302,7 +1302,7 @@ def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
 @click.option('-M', '--dttname', default="A", help='Plot M or M0?')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def dvv_plot_timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
