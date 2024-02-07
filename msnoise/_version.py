@@ -148,6 +148,10 @@ def get_git_version(abbrev=10, dirty=True, append_remote_tracking_branch=True):
     if version is None:
         version = release_version
 
+    if version is None:
+        import pkg_resources
+        version = pkg_resources.get_distribution("msnoise").version
+
     # If we still don't have anything, that's an error.
     if version is None:
         warnings.warn("msnoise could not determine its version number. Make "
