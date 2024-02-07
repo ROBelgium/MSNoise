@@ -414,6 +414,7 @@ segment.
     time_axis = []
 
     window_length_samples = int(window_length * df)
+    step_samples = int(step * df)
     # try:
     #     from sf.helper import next_fast_len
     # except ImportError:
@@ -434,8 +435,8 @@ segment.
         cri = scipy.signal.detrend(cri, type='linear')
         cri *= tp
 
-        minind += int(step * df)
-        maxind += int(step * df)
+        minind += step_samples
+        maxind += step_samples
 
         fcur = sf.fft(cci, n=padd)[:padd // 2]
         fref = sf.fft(cri, n=padd)[:padd // 2]
@@ -497,7 +498,7 @@ segment.
 
         delta_err.append(e)
         delta_mcoh.append(np.real(mcoh))
-        time_axis.append(tmin + window_length / 2. + count * step)
+        time_axis.append(tmin + window_length / 2. + count * (step_samples/df))
         count += 1
 
         del fcur, fref

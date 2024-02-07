@@ -42,6 +42,8 @@ def main(interval=1, loglevel="INFO"):
                 continue
             xr_save_dvv("ALL", filterid, mov_stack, dvv)
             del dvv
+    
+    logger.info('*** Finished: Compute DV/V ***')
 
 
 if __name__ == "__main__":
