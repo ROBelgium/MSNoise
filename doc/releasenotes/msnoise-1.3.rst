@@ -254,7 +254,7 @@ Some improvements to the maths have been done for MSNoise 1.3:
 * ``whiten``: the symmetric hermitian was not properly defined and could lead to
   a 1 sample shift in the negative frequencies.
 * ``compute_cc``: it is now possible to define an overlap of the windows
-* ``compute_cc``: setting ``windsorizing`` to ``-1`` now computes the 1-bit
+* ``compute_cc``: setting ``winsorizing`` to ``-1`` now computes the 1-bit
   normalization of the trace. Reminder: ``0``: no normalization, ``N``: N*rms
   clipping.
 * ``mwcs``: the tapering of the windowed CCF has been improved in order to

@@ -12,7 +12,7 @@ Note that MSNoise is always tested against the latest release versions of the ma
 
 To run MSNoise, you need:
 
-* A recent version of Python (3.x recommended). We suggest using Miniconda_
+* A recent version of Python (3.11 recommended). We suggest using Miniconda_
   and creating a fresh environment for running msnoise.
   MSNoise is tested "continuously" on GitHub for the last 3 most recent python version, and the three OS.
 

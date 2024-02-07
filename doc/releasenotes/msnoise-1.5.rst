@@ -319,7 +319,7 @@ Improvements in terms of performances have also been done for MSNoise 1.5:
 * Added fftpack optimized nfft (scipy's next_fast_len). This could lead to some
   small differences in the final result of the MWCS procedure, because of the
   number of points used for smoothing the (cross-)spectra.
-* Replaced binarization (sign) and windsorizing (clip) by standard numpy
+* Replaced binarization (sign) and winsorizing (clip) by standard numpy
   functions operating directly inplace on the arrays, avoiding unecessary
   copies.
 * The preprocessing only reads files that should contain the right component.

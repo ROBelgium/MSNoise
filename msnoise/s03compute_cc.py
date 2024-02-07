@@ -14,7 +14,7 @@ Configuration Parameters
 * |overlap|
 * |maxlag|
 * |corr_duration|
-* |windsorizing|
+* |winsorizing|
 * |resampling_method|
 * |remove_response|
 * |response_format|
@@ -71,7 +71,7 @@ rotated. This supposes the user has provided the station coordinates in the
 *station* table. The rotation is computed for Radial and Transverse components.
 
 Then, for each ``corr_duration`` window in the signal, and for each filter
-configured in the database, the traces are clipped to ``windsorizing`` times
+configured in the database, the traces are clipped to ``winsorizing`` times
 the RMS (or 1-bit converted) and then whitened in the frequency domain
 (see :ref:`whiten`) between the frequency bounds. The whitening procedure can be
 skipped by setting the ``whitening`` configuration to `None`. The two other
@@ -340,10 +340,10 @@ def main(loglevel="INFO"):
                     tmp.detrend("demean")
 
                     for tr in tmp:
-                        if params.windsorizing == -1:
+                        if params.winsorizing == -1:
                             np.sign(tr.data, tr.data)  # inplace
-                        elif params.windsorizing != 0:
-                            rms = tr.data.std() * params.windsorizing
+                        elif params.winsorizing != 0:
+                            rms = tr.data.std() * params.winsorizing
                             np.clip(tr.data, -rms, rms, tr.data)  # inplace
 
                     # TODO should not hardcode 4 percent!

@@ -51,7 +51,7 @@ this step:
 * |overlap|
 * |maxlag|
 * |corr_duration|
-* |windsorizing|
+* |winsorizing|
 * |resampling_method|
 * |remove_response|
 * |response_format|
@@ -102,7 +102,7 @@ rotated. This supposes the user has provided the station coordinates in the
 *station* table. The rotation is computed for Radial and Transverse components.
 
 Then, for each ``corr_duration`` window in the signal, and for each filter
-configured in the database, the traces are clipped to ``windsorizing`` times
+configured in the database, the traces are clipped to ``winsorizing`` times
 the RMS (or 1-bit converted) and then whitened in the frequency domain
 (see :ref:`whiten`) between the frequency bounds. The whitening procedure can be
 skipped by setting the ``whitening`` configuration to `None`. The two other
@@ -227,15 +227,15 @@ def winsorizing(data, params, input="timeseries", nfft=0):
         data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(float)
 
     for i in range(data.shape[0]):
-        if params.windsorizing == -1:
+        if params.winsorizing == -1:
             np.sign(data[i], data[i])  # inplace
-        elif params.windsorizing != 0:
+        elif params.winsorizing != 0:
 
             # imin, imax = scoreatpercentile(data[i], [0.1, 99.9])
             # not_outliers = np.where((data[i] >= imin) &
             #                         (data[i] <= imax))[0]
-            # rms = data[i][not_outliers].std() * params.windsorizing
-            rms = data[i].std() * params.windsorizing
+            # rms = data[i][not_outliers].std() * params.winsorizing
+            rms = data[i].std() * params.winsorizing
             np.clip(data[i], -rms, rms, data[i])  # inplace
     if input == "fft":
         data = sf.fftn(data, [nfft, ], axes=[1, ])
