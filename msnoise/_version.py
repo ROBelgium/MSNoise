@@ -149,8 +149,11 @@ def get_git_version(abbrev=10, dirty=True, append_remote_tracking_branch=True):
         version = release_version
 
     if version is None:
-        import pkg_resources
-        version = pkg_resources.get_distribution("msnoise").version
+        try:
+            import pkg_resources
+            version = pkg_resources.get_distribution("msnoise").version
+        except:
+            pass
 
     # If we still don't have anything, that's an error.
     if version is None:
