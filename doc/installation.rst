@@ -48,7 +48,7 @@ Full Installation
    * Extract the zip/tarball in a folder and open a console into the folder:
 
    * Navigate to the bin/ directory (Windows) or scripts/ directory (Linux)
-   * execute the ``mariadb-install-db.exe`` (Windows) or ``mariadb-install-db``
+   * execute the ``mariadb-install-db.exe`` (Windows) or ``mariadb-install-db`` (Linux)
    * test the server by running the ``bin/mysqld --console``  command, you should see the server starting.
    * Keep the server running for now (later you'll use CTRL-C to kill the server)
 

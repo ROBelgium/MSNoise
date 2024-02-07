@@ -8,10 +8,12 @@ Questions are:
 
   * sqlite: this will create a file in the current folder and use it as DB
 
-  * mysql: this will connect to a local or remote mysql server, additional
+  * mysql/mariadb/postgresql: this will connect to a local or remote mysql server, additional
     information is then required:
 
-    - hostname: of the mysql server, defaults to 127.0.0.1
+    - hostname: of the mysql server, defaults to 127.0.0.1 - in case your server doesn't run on the default port,
+      you can pass that information here as, for example for port 13995: ``127.0.0.1:13995``, i.e. a ``hostname:port``
+      format.
     - database: must already exist on `hostname`
     - username: as registered in the privileged users of the mysql server
     - password: his password
