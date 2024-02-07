@@ -12,183 +12,65 @@ Note that MSNoise is always tested against the latest release versions of the ma
 
 To run MSNoise, you need:
 
-* A recent version of Python (3.x recommended). We suggest using Anaconda_
-  with a few extra modules. MSNoise is tested "continuously" by automatic
-  build systems (GitHub Actions) **Python 3.9+** only,
-  on **Windows, Linux and MacOSX** 64 bits systems!
-
-  * Those modules are already distributed with Anaconda_:
-
-    * setuptools
-    * numpy
-    * scipy
-    * pandas
-    * matplotlib
-    * statsmodels
-    * sqlalchemy
-    * click
-    * flask
-    * pymysql
-    * wtforms
-
-  * Not shipped with Anaconda_:
-
-    * obspy
-    * flask-admin
-    * markdown
-    * folium
-    * flask-wtf
+* A recent version of Python (3.x recommended). We suggest using Miniconda_
+  and creating a fresh environment for running msnoise.
+  MSNoise is tested "continuously" by automatic
 
 
-* MySQL: if you want to use MySQL, you need to install and configure a
-  MySQL Server beforehand. This is not needed for sqlite.
-  Read :ref:`aboutdbandperformances` for more information.
-  We recommend using MySQL.
+* Database: MariaDB or Postgresql: if you want to use a database,
+  you need to install and configure a dabatase Server beforehand.
+  This is not needed for sqlite. Read :ref:`aboutdbandperformances` for
+  more information. We recommend using a database server when the number of
+  stations/jobs is large, as parallelism of the workflow will allow you to
+  process more data at once, compared with using sqlite.
 
 
 Full Installation
 -----------------
 
-1. Download and install Anaconda_ for your machine, make sure Anaconda's Python
+1. Download and install Miniconda_ for your machine, make sure Miniconda's Python
    is the default python for your user
 
 2. Execute the following command to install the missing packages:
    
    .. code-block:: sh
 
-        conda install -c conda-forge flask-admin flask-wtf markdown folium pymysql logbook
+        conda install -c conda-forge flask-admin flask-wtf markdown folium pymysql logbook pandas pytables pip xarray
         conda install -c conda-forge obspy
+        conda install -c conda-forge msnoise
 
-3. Install a MySQL server and MySQL Workbench:
+3. Prepare a portable database server:
 
-   Download and install MySQL Community Server (MySQLs_ ) and MySQL Workbench
-   (MySQLw_ ) ; On Windows one can also use the MySQL installer (MySQLi_ ).
+   * The following instructions are for MariaDB similar to https://www.mariadb.education/install-portable, but can be replicated easily for postgresql.
+   * Download the zip/tarball version of MariaDB portable (MariaDBs_)
+   * Extract the zip/tarball in a folder and open a console into the folder:
 
-   On Linux, the MySQL server can also be installed using the following command:
+   * Navigate to the bin/ directory (Windows) or scripts/ directory (Linux)
+   * execute the ``mariadb-install-db.exe`` (Windows) or ``mariadb-install-db``
+   * test the server by running the ``bin/mysqld --console``  command, you should see the server starting.
+   * Keep the server running for now (later you'll use CTRL-C to kill the server)
 
-   .. code-block:: sh
+4. Create a database:
 
-       sudo apt-get install mysql-server
+   * In a new (!!) console (so keep the server running in the other console)
+   * Go to the ``bin/`` directory and execute ``mysqladmin -u root  flush-privileges password "SECRET"`` where SECRET is a password (not very important to make it secure here)
+   * test the connection with ``mysql -u root -p`` where you should be prompted for the password
+   * the prompt should look like ``MariaDB [(none)]>`` now.
+   * execute the command ``CREATE DATABASE msnoise;`` (the ; semicolumn is important)
+   * List the databases with ``SHOW DATABASES;`` which should show the native MariaDB dbs, and our msnoise db.
+   * From here, we can continue using the root user, or create a msnoise user, but this is not essential (see https://phoenixnap.com/kb/how-to-create-mariadb-user-grant-privileges) for instructions.
+   * Close the connection by executing the ``quit;`` command.
 
-4. Create a privileged user and a database:
+5. Check which required packages you are still missing by executing the
+   ``msnoise utils bugreport`` command. (See :ref:`testing`)
 
-   * Start MySQL Workbench and connect to the local database
-   * Click on "Privileges" and create a new user, with all privileges (Select
-     all). Ideally, create user "msnoise" with password "msnoise".
-
-5. Install the latest release version of MSNoise:
-
-   .. code-block:: sh
-
-        pip install msnoise
-
-   Power user could install the development version too, but it is not
-   recommended.
-
-6. Check which required packages you are still missing by executing the
-   ``msnoise bugreport`` command. (See :ref:`testing`)
-
-7. To be sure all is running OK, one could start the ``msnoise test`` command.
+6. To be sure all is running OK, one could start the ``msnoise utils test`` command.
    This will start the standard MSNoise test suite, which should end with a
    "Ran xx tests in yy seconds : OK".
 
-8. Proceed to the :ref:`Workflow` description to start MSNoise!
+7. Proceed to the :ref:`Workflow` description to start MSNoise!
 
 Done !
-
-MySQL Server and Workbench
---------------------------
-
-Using the MySQL Server and Workbench is fairly easy and lots of tutorials are
-available online as text or videos.
-
-Once both are installed, start Workbench and you should see the local MySQL
-server automatically identified:
-
-.. image:: .static/workbench_1.png
-
-And by clicking on "Local Instance ..." another tab should open, connected to
-the local database.
-
-Create a msnoise user
-~~~~~~~~~~~~~~~~~~~~~
-
-Select "Users and Privileges" in the left sidebar, then "Add Account". Define
-the username and the password (msnoise:msnoise could do, although "weak"):
-
-.. image:: .static/workbench_2.png
-
-Then, under "Administrative Roles", grant this user the *DBA* mode (user can
-perform all tasks on the database server) and click "Apply".
-
-.. image:: .static/workbench_3.png
-
-
-.. _emptydb:
-
-Create an empty database
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Ideally, each "project" needs a database. For example, if one has two different
-volcanoes and wants to run MSNoise using the these distinct datasets, one needs
-to create two empty databases. For users who have access to only 1 database,
-the ```msnoise db init`` allows to provide a ``prefix```, which works like the
-Wordpress prefixes: for example if a prefix is "vA", the ```config`` 
-table that will be created is ``vA_config`` in the database.
-
-Click on the "Create new schema" button in the taskbar:
-
-.. image:: .static/workbench_4.png
-
-and provide a name for the database (for example msnoise; or msnoise_project1,
-or project1, or anything else) ; and click "Apply":
-
-.. image:: .static/workbench_5.png
-
-and click "Apply" again and it should state all is OK:
-
-.. image:: .static/workbench_6.png
-
-.. image:: .static/workbench_7.png
-
-When done, the database we can be seen in the left sidebar:
-
-.. image:: .static/workbench_8.png
-
-And you're ready to start your first project: :ref:`Workflow`.
-
-
-When moving your project to a larger server, HPC or else, just add the
-connection to this server in Workbench and you're good to go with the very
-same interface/tool !
-
-MySQL/MariaDB configuration
----------------------------
-
-.. warning:: THIS SHOULD NOT BE necessary with current MASTER version (msnoise2)
-
-You can also set up a database server using MariaDB_, there are plenty tutorials
-of how to set it up as well. The new default character set for MySQL or 
-MariaDB is not simple utf8, so make sure that the configuration file
-(/etc/mysql/my.cnf under Linux) contains the following lines. There are 
-issues with the latest MySQL versions which prevent a "traditional group by"
-statement.
-
-.. code-block:: sh
-
-    [mysqld]
-    character-set-server=utf8
-    collation-server=utf8_unicode_ci
-    sql_mode="TRADITIONAL,NO_AUTO_CREATE_USER"
-
-
-For Mac, this seemed to work for users (see Issue72_):
-
-.. code-block:: sh
-
-    [mysqld]
-     sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
-
 
 
 Database Structure - Tables
@@ -234,7 +116,7 @@ This is not recommended, but users willing to test the latest development
 Please note this version most probably uses the very latest version of every
 package: Release versions of `numpy`, `scipy`, etc obtained from conda-forge
 and "master" version of `obspy`. The development version (master) of obspy can
-be installed from github:
+be installed from github: (warning regular Windows users, you might not be able to build the obspy package)
 
 .. code-block:: sh
 
@@ -247,8 +129,7 @@ communicate about bugs and not the mailing list, preferably used for Releases.
 
 .. _obspy: http://www.obspy.org
 .. _Anaconda: http://www.continuum.io/downloads
-.. _MySQLi: https://dev.mysql.com/downloads/installer
-.. _MySQLs: https://dev.mysql.com/downloads/mysql
-.. _MySQLw: https://dev.mysql.com/downloads/workbench
+.. _MariaDBs: https://mariadb.org/download/?t=mariadb&p=mariadb&r=10.11.6&os=windows&cpu=x86_64&pkg=zip&m=serverion
+.. _MariaDBw: https://dev.mysql.com/downloads/workbench
 .. _MariaDB: https://mariadb.org
 .. _Issue72: https://github.com/ROBelgium/MSNoise/issues/72
