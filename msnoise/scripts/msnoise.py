@@ -1504,8 +1504,9 @@ def utils_bugreport(ctx, sys, modules, env, all):
 
 @utils.command(name="test")
 @click.option('-p', '--prefix', default="", help='Prefix for tables')
+@click.option('--tech', default=1, help='Test using (1) SQLite or (2) MariaDB (you need to start that server before!)')
 @click.option('-c', '--content', default=False, is_flag=True)
-def utils_test(prefix, content):
+def utils_test(prefix, tech, content):
     """Runs the test suite, should be executed in an empty folder!"""
     import matplotlib.pyplot as plt
     plt.switch_backend("agg")
@@ -1513,7 +1514,7 @@ def utils_test(prefix, content):
         from ..test.tests import main
     else:
         from ..test.content_tests import main
-    main(prefix=prefix)
+    main(prefix=prefix, tech=tech)
 
 
 @utils.command(name="jupyter")

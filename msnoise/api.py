@@ -2112,7 +2112,7 @@ def xr_create_or_open(fn, taxis=[], name="CCF"):
         # failed, the file handle was still open and it failed later.
         ds = xr.load_dataset(fn)
         return ds
-    times = pd.date_range("2000-01-01", freq="H", periods=0)
+    times = pd.date_range("2000-01-01", freq="h", periods=0)
     if name == "CCF":
         data = np.random.random((len(times), len(taxis)))
         dr = xr.DataArray(data, coords=[times, taxis], dims=["times", "taxis"])

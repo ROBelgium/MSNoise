@@ -36,8 +36,19 @@ class MSNoiseTests(unittest.TestCase):
         if "PREFIX" in os.environ:
             self.prefix=os.environ["PREFIX"]
         try:
-            ret = main(tech=1, prefix=self.prefix,
-                       filename='testmsnoise.sqlite')
+            if os.environ["TECH"] == "1":
+                ret = main(tech=1, prefix=self.prefix,
+                           hostname="localhost",
+                           username="root",
+                           password="SECRET",
+                           database=os.environ["hash"])
+            elif os.environ["TECH"] == "2":
+                ret = main(tech=2, prefix=self.prefix,
+                           hostname=os.environ["MARIADB_HOSTNAME"],
+                           username=os.environ["MARIADB_USERNAME"],
+                           password=os.environ["MARIADB_PASSWORD"],
+                           database=os.environ["hash"])
+
             self.failUnlessEqual(ret, 0)
         except:
             traceback.print_exc()
@@ -653,7 +664,7 @@ class MSNoiseTests(unittest.TestCase):
         self.assertEqual(parsed_crondays, datetime.timedelta(days=3*7+4, seconds=12*3600))
 
 
-def main(prefix=""):
+def main(prefix="", tech=1):
     import matplotlib.pyplot as plt
     plt.switch_backend("agg")
 
@@ -661,16 +672,25 @@ def main(prefix=""):
     import sys
     test_dir = tempfile.mkdtemp(prefix="msnoise_")
     os.chdir(test_dir)
-    print("Tests will be executed in %s" % test_dir)
+
     # c = len(os.listdir(os.getcwd()))
     # if c > 0:
     #     print("Directory is not empty, can't run tests here!")
     #     sys.exit()
     os.environ["PREFIX"] = prefix
+    os.environ["hash"] = "h" + test_dir[-10:]
+    os.environ["TECH"] = str(tech)
+    print("Tests will be executed in %s" % test_dir)
+    if tech == 2:
+        print("The database localhost/%s was NOT deleted after this test!" % os.environ["HASH"])
+
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(MSNoiseTests)
     runner = unittest.TextTestRunner(verbosity=4)
     result = runner.run(suite)
+
     print("Tests executed in %s" % test_dir)
+    if tech == 2:
+        print("The database localhost/%s was NOT deleted after this test!" % os.environ["HASH"])
     if not result.wasSuccessful():
         sys.exit(1)
 

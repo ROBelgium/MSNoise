@@ -43,6 +43,7 @@ from getpass import getpass
 from sqlalchemy import create_engine
 from sqlalchemy.exc import *
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy_utils import database_exists, create_database
 try:
     import cPickle
 except ImportError:
@@ -219,6 +220,13 @@ def main(tech=None, hostname=None, username=None, password=None,
         engine = create_engine('postgresql+psycopg2://%s:%s@%s/%s'
                                % (username, password, hostname, database),
                                echo=False)
+
+
+
+    if not database_exists(engine.url):
+        logging.info("Database does not exist. Creating it right away!")
+        create_database(engine.url)
+
     create_database_inifile(tech, hostname, database, username, password,
                             prefix)
 
