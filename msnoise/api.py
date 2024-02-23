@@ -2529,6 +2529,6 @@ def compute_dvv(session, filterid, mov_stack, pairs=None, components=None, param
     stats = all.groupby(level=0).describe(percentiles=percentiles)
     for c in ["m", "m0", "a"]:
         stats[(c, "weighted_mean")], stats[(c, "weighted_std")] = get_wavgwstd(all, c, 'e'+c)
-        stats[(c, "trimmed_mean")], stats[(c, "trimmed_std")] = trim(all, c, 'e'+c, kwargs.get("limits", None))
+        stats[(c, "trimmed_mean")], stats[(c, "trimmed_std")] = trim(all, c, kwargs.get("limits", None))
 
     return stats.sort_index(axis=1)
