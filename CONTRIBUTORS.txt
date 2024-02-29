@@ -1,4 +1,5 @@
 Xavier Béguin
+Laure Brenot
 Corentin Caudron
 Clare Donaldson
 Raphaël De Plaen
@@ -9,3 +10,4 @@ Aurélien Mordret
 Lukas E. Preiswerk
 Carmelo Sammarco
 Arnaud Watlet
+Alec Yates

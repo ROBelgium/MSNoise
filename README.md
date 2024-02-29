@@ -27,12 +27,13 @@ History
 * 2016: MSNoise 1.4: new web admin interface, plugin support, instrument response removal and phase weighted stacking ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.4.html)).
 * 2017: MSNoise 1.5: Autocorrelation / Single Station correlation support, rewritten preprocessing, new_jobs and scan_archive for more performance, better instrument response preloading ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.5.html)).
 * 2019: MSNoise 1.6: Optimisation of the workflow (one job type per step), HPC support, faster *compute_cc* step, PSD-whitening, DB optimisations ([Release Notes](http://msnoise.org/doc/releasenotes/msnoise-1.6.html))
-* 2023: MSNoise 2.0: _coming soon ..._!!
+* 2024: MSNoise 2.0: Massive optimisation of all steps (xarray-based), sub-daily dv/v computation, PSD QC calculation, ... Already available if you install the "dev" version (could unstable!)... 
 
 
 Documentation
 -------------
-The full documentation can be found on: http://www.msnoise.org.
+The full documentation can be found on: http://www.msnoise.org/doc.
+The documentation of the _master_ branch (active development): http://www.msnoise.org/doc/master
 
 
 Installation
