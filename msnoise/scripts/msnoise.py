@@ -186,8 +186,8 @@ def info_stations(db):
                 '{:.1f}'.format(s.altitude) if s.altitude is not None else na_sign,
                 s.coordinates or na_sign,
                 'Y' if s.used else 'N'))
-        click.echo("  ├ Location code(s): %s" % s.used_location_codes)
-        click.echo("  └ Channel names(s): %s" % s.used_channel_names)
+        click.echo("  | Location code(s): %s" % s.used_location_codes)
+        click.echo("  | Channel names(s): %s" % s.used_channel_names)
     if s is None:
         click.echo(' ')
 
