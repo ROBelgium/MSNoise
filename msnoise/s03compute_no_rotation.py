@@ -415,8 +415,11 @@ def main(loglevel="INFO"):
                     # psds[iZ] = mm
 
             # define pairwise CCs
+            # TODO document that MASSIVE change !!
+
             tmptime = tmp[0].stats.starttime.datetime
             thisdate = tmptime.strftime("%Y-%m-%d")
+            tmptime = tmp[0].stats.endtime.datetime
             thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
 
             # Standard operator for CC

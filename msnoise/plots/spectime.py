@@ -45,10 +45,10 @@ from obspy.signal.filter import bandpass
 
 from msnoise.api import build_movstack_datelist, connect, get_config, \
     get_filters, get_results, check_stations_uniqueness, xr_get_ccf,\
-    get_t_axis, get_logger
+    get_t_axis, get_logger, get_params
 
 
-def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
+def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
          outfile=False, refilter=None, startdate=None, enddate=None,
          loglevel="INFO", **kwargs):
     logger = get_logger('msnoise.cc_plot_spectime', loglevel,
@@ -75,8 +75,9 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
     sta2 = check_stations_uniqueness(db, sta2)
 
     pair = "%s:%s" % (sta1, sta2)
-
-    logger.info("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
+    params = get_params(db)
+    mov_stack = params.mov_stack[mov_stackid-1]
+    logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filterid,
                                         mov_stack))
     stack_total = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
 
@@ -116,9 +117,9 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
     ax.set_xscale('log')
     ax.grid()
 
-    title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' %\
-            (sta1.replace('_', '.'), sta2.replace('_', '.'), components,
-             filterid, low, high, mov_stack)
+    title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %i (%s_%s)' % \
+            (sta1, sta2, components,
+             filterid, low, high, mov_stackid, mov_stack[0], mov_stack[1])
     if refilter:
         title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
     ax.set_title(title)
@@ -127,10 +128,11 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, show=False,
     if outfile:
         if outfile.startswith("?"):
             pair = pair.replace(':', '-')
-            outfile = outfile.replace('?', '%s-%s-f%i-m%i' % (pair,
+            outfile = outfile.replace('?', '%s-%s-f%i-m%s_%s' % (pair,
                                                               components,
                                                               filterid,
-                                                              mov_stack))
+                                                              mov_stack[0],
+                                                              mov_stack[1]))
         outfile = "spectime " + outfile
         logger.info("output to: %s" % outfile)
         plt.savefig(outfile)

@@ -103,7 +103,7 @@ import scipy.signal
 from .api import *
 
 import logbook
-
+import matplotlib.pyplot as plt
 
 def main(stype, interval=1.0, loglevel="INFO"):
     """Computes the REF/MOV stacks.
@@ -127,8 +127,8 @@ def main(stype, interval=1.0, loglevel="INFO"):
     taxis = get_t_axis(db)
 
     mov_stacks = params.mov_stack
-    if 1 in mov_stacks:
-        mov_stacks.remove(1)  # remove 1 day stack, it will be done automatically
+    # if 1 in mov_stacks:
+    #     mov_stacks.remove(1)  # remove 1 day stack, it will be done automatically
 
     filters = get_filters(db, all=False)
     while is_dtt_next_job(db, flag='T', jobtype='STACK'):
@@ -156,11 +156,10 @@ def main(stype, interval=1.0, loglevel="INFO"):
             for components in components_to_compute:
                 logger.info('Processing %s-%s-%i' %
                       (pair, components, filterid))
-
-                c = get_results(db, sta1, sta2, filterid, components, days,
-                                mov_stack=1, format="xarray")
-                dr = xr_save_ccf(sta1, sta2, components, filterid, 1, taxis, c)
-
+                c = get_results_all(db, sta1, sta2, filterid, components, days, format="xarray")
+                # print(c)
+                # dr = xr_save_ccf(sta1, sta2, components, filterid, 1, taxis, c)
+                dr = c
                 if stype == "ref":
                     start, end, datelist = build_ref_datelist(db)
                     start = np.array(start, dtype=np.datetime64)
@@ -171,14 +170,30 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     _ = _.mean(dim="times")
                     xr_save_ref(sta1, sta2, components, filterid, taxis, _)
                     continue
-
+                dr = dr.resample(times="%is" % params.corr_duration).mean()
                 for mov_stack in mov_stacks:
-                    if mov_stack > len(dr.times):
-                        logger.error("not enough data for mov_stack=%i" % mov_stack)
-                        continue
-                    # TODO avoid the 1D resampler here
-                    xx = dr.resample(times='1D').mean().rolling(
-                        times=mov_stack, min_periods=1).mean().dropna("times", how="all")
+                    # if mov_stack > len(dr.times):
+                    #     logger.error("not enough data for mov_stack=%i" % mov_stack)
+                    #     continue
+                    mov_rolling, mov_sample = mov_stack
+                    # print(mov_rolling, mov_sample)
+
+                    if mov_rolling == mov_sample:
+                        # just resample & mean
+                        xx = dr.resample(times=mov_sample, label="right", skipna=True).mean().dropna("times",
+                                                                                                       how="all")
+                    else:
+                        mov_rolling = pd.to_timedelta(mov_rolling).total_seconds()
+                        # print("Will roll over %i seconds" % mov_rolling)
+                        duration_to_windows = mov_rolling / params.corr_duration
+                        if not duration_to_windows.is_integer():
+                            print("Warning, rounding down the number of windows to roll over")
+                        duration_to_windows = int(max(1, math.floor(duration_to_windows)))
+                        # print("Which is %i windows of %i seconds duration" % (duration_to_windows, params.corr_duration))
+
+                        xx = dr.rolling(times=duration_to_windows, min_periods=1).mean()
+                        xx = xx.resample(times=mov_sample, label="right", skipna=True).asfreq().dropna("times", how="all")
+
                     xr_save_ccf(sta1, sta2, components, filterid, mov_stack, taxis, xx, overwrite=True)
                     del xx
         if stype != "ref":

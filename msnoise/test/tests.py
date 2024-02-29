@@ -320,7 +320,7 @@ class MSNoiseTests(unittest.TestCase):
         update_config(db, 'ref_end', '2011-01-01')
         update_config(db, 'startdate', '2009-01-01')
         update_config(db, 'enddate', '2011-01-01')
-        update_config(db, 'mov_stack', '1,2,5')
+        update_config(db, 'mov_stack', "(('1d','1d'),('2d','1d'),('5d','1d'))")
 
         interval = 1.
         main('ref', interval)
@@ -430,8 +430,8 @@ class MSNoiseTests(unittest.TestCase):
                     for filter in get_filters(db):
                         main(sta1, sta2, filter.ref, "ZZ",  1, show=False,
                              outfile="?.png")
-                        fn = 'ccftime %s-%s-f%i-m%i.png' % \
-                             ("%s-%s" % (sta1, sta2), "ZZ", filter.ref, 1)
+                        fn = 'ccftime %s-%s-f%i-m%s_%s.png' % \
+                             ("%s-%s" % (sta1, sta2), "ZZ", filter.ref, "1d", "1d")
                         self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
 
     def test_100_plot_interferogram(self):
@@ -446,10 +446,10 @@ class MSNoiseTests(unittest.TestCase):
                     for filter in get_filters(db):
                         main(sta1, sta2, filter.ref, "ZZ",  1, show=False,
                              outfile="?.png")
-                        fn = 'interferogram %s-%s-f%i-m%i.png' % \
+                        fn = 'interferogram %s-%s-f%i-m%s_%s.png' % \
                              ("%s-%s" % (sta1,
                                          sta2),
-                              "ZZ", filter.ref, 1)
+                              "ZZ", filter.ref, "1d", "1d")
                         self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
 
     def test_101_plot_spectime(self):
@@ -464,10 +464,10 @@ class MSNoiseTests(unittest.TestCase):
                     for filter in get_filters(db):
                         main(sta1, sta2, filter.ref, "ZZ", 1, show=False,
                              outfile="?.png")
-                        fn = 'spectime %s-%s-f%i-m%i.png' % \
+                        fn = 'spectime %s-%s-f%i-m%s_%s.png' % \
                              ("%s-%s" % (sta1,
                                          sta2),
-                              "ZZ", filter.ref, 1)
+                              "ZZ", filter.ref, "1d", "1d")
                         self.assertTrue(os.path.isfile(fn), msg="%s doesn't exist" % fn)
 
     def test_102_plot_distance(self):

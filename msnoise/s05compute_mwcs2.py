@@ -71,6 +71,7 @@ could occur with SQLite.
 .. versionadded:: 1.4
     Parallel Processing
 """
+import pandas as pd
 
 from .api import *
 from .move2obspy import mwcs
@@ -191,10 +192,16 @@ def main(loglevel="INFO"):
                     except FileNotFoundError as fullpath:
                         logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                         continue
-                    logger.debug("Processing %s:%s f%i m%i %s" % (station1, station2, filterid, mov_stack, components))
-                    todo = data.index.intersection(pd.to_datetime(days))
-                    data = data.loc[todo]
+                    logger.debug("Processing %s:%s f%i m%s %s" % (station1, station2, filterid, mov_stack, components))
+                    # todo = data.index.intersection()
+                    # data = data.loc[todo]
+
+                    to_search = pd.to_datetime(days)
+                    to_search = to_search.append(pd.DatetimeIndex([to_search[-1]+pd.Timedelta("1d"),]))
+                    # data = data[(data.index.floor('d').isin(to_search) or data.index.ceil('d').isin(to_search))]
+                    data = data[data.index.floor('d').isin(to_search)]
                     data = data.dropna()
+
                     # print("Whitening %s" % fn)
                     # data = pd.DataFrame(data)
                     # data = data.apply(ww, axis=1, result_type="broadcast")
@@ -323,7 +330,6 @@ def main(loglevel="INFO"):
                         del X
                         del M, E, MCOH
                     output = pd.concat(output, axis=1)
-                    # output.to_csv(fn.replace('.nc','.csv'))
 
                     xr_save_mwcs(station1, station2, components, filterid, mov_stack, taxis, output)
 

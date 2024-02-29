@@ -293,11 +293,10 @@ def get_params(session):
     params.all_components = np.unique(params.components_to_compute_single_station + \
                             params.components_to_compute)
 
-    if params.mov_stack.count(',') == 0:
-        params.mov_stack = [int(params.mov_stack), ]
+    if params.mov_stack.count(',') == 1:
+        params.mov_stack = [params.mov_stack, ]
     else:
-        params.mov_stack = [int(mi) for mi in params.mov_stack.split(',')]
-
+        params.mov_stack = params.mov_stack
     return params
 
 # FILTERS PART
@@ -1133,7 +1132,7 @@ def export_allcorr(session, ccfid, data):
 
     df = pd.DataFrame().from_dict(data).T
     df.columns = get_t_axis(session)
-    df.to_hdf(os.path.join(path, date+'.h5'), 'data')
+    df.to_hdf(os.path.join(path, date+'.h5'), key='data')
     del df
     return
 
@@ -1149,7 +1148,7 @@ def export_allcorr2(session, ccfid, data):
 
     df = pd.DataFrame().from_dict(data).T
     df.columns = get_t_axis(session)
-    df.to_hdf(os.path.join(path, date+'.h5'), 'data')
+    df.to_hdf(os.path.join(path, date+'.h5'), key='data')
     del df
     return
 
@@ -1499,7 +1498,7 @@ def get_mwcs(session, station1, station2, filterid, components, date,
     """
     TODO
     """
-    file = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" % mov_stack,
+    file = os.path.join('MWCS', "%02i" % filterid, "%s_%s" % (mov_stack[0], mov_stack[1]),
                         components, "%s_%s" % (station1, station2),
                         '%s.txt' % date)
     if os.path.isfile(file):
@@ -1537,7 +1536,10 @@ def get_results_all(session, station1, station2, filterid, components, dates,
                         station1, station2, components)
     results = []
     for date in dates:
-        fname = os.path.join(path, date.strftime('%Y-%m-%d.h5'))
+        if isinstance(date, str):
+            fname = os.path.join(path, date+".h5")
+        else:
+            fname = os.path.join(path, date.strftime('%Y-%m-%d.h5'))
         if os.path.isfile(fname):
             df = pd.read_hdf(fname, 'data', parse_dates=True)
             df.index = pd.to_datetime(df.index)
@@ -1553,6 +1555,7 @@ def get_results_all(session, station1, station2, filterid, components, dates,
             dr = xr.DataArray(result, coords=[times, taxis],
                               dims=["times", "taxis"]).dropna("times", how="all")
             dr.name = "CCF"
+            dr = dr.sortby('times')
             return dr.to_dataset()
     else:
         return pd.DataFrame()
@@ -1695,9 +1698,13 @@ def build_movstack_datelist(session):
     elif begin == "1970-01-01": # TODO this fails when the DA is empty
         start = session.query(DataAvailability).order_by(
             DataAvailability.starttime).first().starttime.date()
-        end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
     else:
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
+
+    if end == "2100-01-01":
+        end = session.query(DataAvailability).order_by(
+            DataAvailability.endtime.desc()).first().endtime.date()
+    else:
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
     end = min(end, datetime.date.today())
     datelist = pd.date_range(start, end).map(lambda x: x.date())
@@ -2186,7 +2193,7 @@ def get_dvv(session, filterid, components, dates,
         print("No Data for %s m%i f%i" % (components, mov_stack, filterid))
 
     alldf = pd.concat(alldf)
-    print(mov_stack, alldf.head())
+    # print(mov_stack, alldf.head())
     if 'alldf' in locals():
         errname = "E" + dttname
         alldf.to_csv("tt.csv")
@@ -2215,7 +2222,7 @@ def get_dvv(session, filterid, components, dates,
 
 def xr_save_ccf(station1, station2, components, filterid, mov_stack, taxis, new, overwrite=False):
     path = os.path.join("STACKS2", "%02i" % filterid,
-                        "%03i_DAYS" % mov_stack, "%s" % components)
+                        "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
     fullpath = os.path.join(path, fn)
     if overwrite:
@@ -2230,7 +2237,7 @@ def xr_save_ccf(station1, station2, components, filterid, mov_stack, taxis, new,
 
 def xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis):
     path = os.path.join("STACKS2", "%02i" % filterid,
-                        "%03i_DAYS" % mov_stack, "%s" % components)
+                        "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
 
     fullpath = os.path.join(path, fn)
@@ -2270,12 +2277,12 @@ def xr_get_ref(station1, station2, components, filterid, taxis):
 
 def xr_save_mwcs(station1, station2, components, filterid, mov_stack, taxis, dataframe):
     fn = os.path.join("MWCS2", "%02i" % filterid,
-                      "%03i_DAYS" % mov_stack,
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
     if not os.path.isdir(os.path.split(fn)[0]):
         os.makedirs(os.path.split(fn)[0])
-    d = dataframe.stack().stack()
+    d = dataframe.stack(future_stack=True).stack(future_stack=True)
     d.index = d.index.set_names(["times", "keys", "taxis"])
     d = d.reorder_levels(["times", "taxis", "keys"])
     d.columns = ["MWCS"]
@@ -2289,7 +2296,7 @@ def xr_save_mwcs(station1, station2, components, filterid, mov_stack, taxis, dat
 
 def xr_get_mwcs(station1, station2, components, filterid, mov_stack):
     fn = os.path.join("MWCS2", "%02i" % filterid,
-                      "%03i_DAYS" % mov_stack,
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
     if not os.path.isfile(fn):
@@ -2315,12 +2322,12 @@ def xr_save_dtt(station1, station2, components, filterid, mov_stack, dataframe):
     * opened using the given file path, and the stacked data is inserted or updated in the file. The resulting dataset is then saved and the file is closed.
     """
     fn = os.path.join("DTT2", "%02i" % filterid,
-                      "%03i_DAYS" % mov_stack,
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
     if not os.path.isdir(os.path.split(fn)[0]):
         os.makedirs(os.path.split(fn)[0])
-    d = dataframe.stack()
+    d = dataframe.stack(future_stack=True)
     d.index = d.index.set_names(["times", "keys"])
     d.columns = ["DTT"]
     dr = xr_create_or_open(fn, taxis=[], name="DTT")
@@ -2343,7 +2350,7 @@ def xr_get_dtt(station1, station2, components, filterid, mov_stack):
     * result.
     """
     fn = os.path.join("DTT2", "%02i" % filterid,
-                      "%03i_DAYS" % mov_stack,
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
     if not os.path.isfile(fn):
@@ -2356,15 +2363,15 @@ def xr_get_dtt(station1, station2, components, filterid, mov_stack):
 
 def xr_save_dvv(components, filterid, mov_stack, dataframe):
     fn = os.path.join("DVV2", "%02i" % filterid,
-                      "%03i_DAYS" % mov_stack,
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s.nc" % components)
     if not os.path.isdir(os.path.split(fn)[0]):
         os.makedirs(os.path.split(fn)[0])
 
     if dataframe.columns.nlevels > 1:
-        d = dataframe.stack().stack()
+        d = dataframe.stack(future_stack=True).stack(future_stack=True)
     else:
-        d = dataframe.stack()
+        d = dataframe.stack(future_stack=True)
     
     level_names = ["times", "level1", "level0"]
     d.index = d.index.set_names(level_names[:d.index.nlevels])
@@ -2383,7 +2390,7 @@ def xr_save_dvv(components, filterid, mov_stack, dataframe):
 
 def xr_get_dvv(components, filterid, mov_stack):
     fn = os.path.join("DVV2", "%02i" % filterid,
-                      "%03i_DAYS" % mov_stack,
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s.nc" % components)
     if not os.path.isfile(fn):
         # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
@@ -2404,7 +2411,7 @@ def wavg(group, dttname, errname):
 
     """
     d = group[dttname]
-    group[errname][group[errname] == 0] = 1e-6
+    group.loc[group[errname] == 0,errname] = 1e-6
     w = 1. / group[errname]
     try:
         wavg = (d * w).sum() / w.sum()
@@ -2434,7 +2441,7 @@ def wstd(group, dttname, errname):
     Note: This method uses the `np` module from NumPy.
     """
     d = group[dttname]
-    group[errname][group[errname] == 0] = 1e-6
+    group.loc[group[errname] == 0,errname] = 1e-6
     w = 1. / group[errname]
     wavg = (d * w).sum() / w.sum()
     N = len(np.nonzero(w.values)[0])

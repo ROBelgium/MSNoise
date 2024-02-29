@@ -26,7 +26,7 @@ from obspy.signal.filter import bandpass
 from ..api import *
 
 
-def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
+def main(sta1, sta2, filterid, components, mov_stackid=1, show=True,
          outfile=None, refilter=None, loglevel="INFO", **kwargs):
     logger = get_logger('msnoise.cc_plot_interferogram', loglevel,
                         with_pid=True)
@@ -51,8 +51,14 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
 
     pair = "%s:%s" % (sta1, sta2)
 
-    logger.info("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
+    params = get_params(db)
+    mov_stack = params.mov_stack[mov_stackid - 1]
+    # print(mov_stack)
+
+    logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filterid,
                                         mov_stack))
+
+
     try:
         data = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
     except FileNotFoundError as fullpath:
@@ -89,9 +95,9 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     else:
         plt.ylim(-maxlag, maxlag)
 
-    title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' % \
-            (sta1.replace('_', '.'), sta2.replace('_', '.'), components,
-             filterid, low, high, mov_stack)
+    title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %i (%s_%s)' % \
+            (sta1, sta2, components,
+             filterid, low, high, mov_stackid, mov_stack[0], mov_stack[1])
     if refilter:
         title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
     plt.title(title)
@@ -101,10 +107,11 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     if outfile:
         if outfile.startswith("?"):
             pair = pair.replace(':', '-')
-            outfile = outfile.replace('?', '%s-%s-f%i-m%i' % (pair,
+            outfile = outfile.replace('?', '%s-%s-f%i-m%s_%s' % (pair,
                                                               components,
                                                               filterid,
-                                                              mov_stack))
+                                                              mov_stack[0],
+                                                              mov_stack[1]))
         outfile = "interferogram " + outfile
         logger.info("output to: %s" % outfile)
         plt.savefig(outfile)

@@ -2,10 +2,11 @@ master
 ======
 
 Major:
+* MSNoise can now work with subdaily CCFs natively, from CC to dv/v!
 * added support for Location IDs: TODO + add documentation
 * this CHANGES the structure of the database !! TODO should we provide an "upgrade" tool?
 * changes to the schema: Station (and TODO Filter too)
-* supprort for PostgreSQL databases. TODO: check if removing index_hints really affect performances (should not)
+* support for PostgreSQL databases. TODO: check if removing index_hints really affect performances (should not)
 
 Changes:
  - msnoise

@@ -45,12 +45,14 @@ from obspy.signal.filter import bandpass
 from ..api import *
 
 
-def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
+def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, seismic=False,
          show=False, outfile=None, envelope=False, refilter=None,
          normalize=None, loglevel="INFO", **kwargs):
     logger = get_logger('msnoise.cc_plot_ccftime', loglevel,
                         with_pid=True)
     db = connect()
+    params = get_params(db)
+    mov_stack = params.mov_stack[mov_stackid-1]
     maxlag = float(get_config(db, 'maxlag'))
     samples = get_maxlag_samples(db)
     cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
@@ -76,8 +78,8 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
 
     pair = "%s:%s" % (sta1, sta2)
 
-    logger.info("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
-                                                 mov_stack))
+    logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filterid,
+                                                 str(mov_stack)))
     try:
         stack_total = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
     except FileNotFoundError as fullpath:
@@ -118,9 +120,9 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
     plt.xlabel("Lag Time (s)")
     plt.axhline(0, lw=0.5, c='k')
     plt.grid()
-    title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %d' %\
+    title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %i (%s_%s)' %\
             (sta1, sta2, components,
-             filterid, low, high, mov_stack)
+             filterid, low, high, mov_stackid, mov_stack[0], mov_stack[1])
     if refilter:
         title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
     plt.title(title)
@@ -138,10 +140,11 @@ def main(sta1, sta2, filterid, components, mov_stack=1, ampli=5, seismic=False,
     if outfile:
         if outfile.startswith("?"):
             pair = pair.replace(':', '-')
-            outfile = outfile.replace('?', '%s-%s-f%i-m%i' % (pair,
+            outfile = outfile.replace('?', '%s-%s-f%i-m%s_%s' % (pair,
                                                               components,
                                                               filterid,
-                                                              mov_stack))
+                                                              mov_stack[0],
+                                                              mov_stack[1]))
         outfile = "ccftime " + outfile
         logger.info("output to: %s" % outfile)
         plt.savefig(outfile)

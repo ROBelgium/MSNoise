@@ -100,7 +100,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
         net, sta, loc = station.split('.')
         gd = datetime.datetime.strptime(goal_day, '%Y-%m-%d')
         files = get_data_availability(
-            db, net=net, sta=sta, loc=loc, starttime=gd, endtime=gd)
+            db, net=net, sta=sta, loc=loc, starttime=gd, endtime=gd + datetime.timedelta(seconds=86401))
         for comp in comps:
             datafiles[station][comp] = []
         for file in files:

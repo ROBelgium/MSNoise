@@ -72,8 +72,9 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
 
 
     maxlag2 = minlag + dtt_width
-
-    logger.info("Fetching CCF data for %s-%s-%i-%i" % (pair, components, filterid,
+    params = get_params(db)
+    mov_stack = params.mov_stack[mov_stack-1]
+    logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filterid,
                                                        mov_stack))
 
     id = []
@@ -99,7 +100,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     alldt = mwcs.M
     allcoh = mwcs.MCOH
     id = mwcs.index
-    print(mwcs.M)
+    # print(mwcs.M)
 
     alldt = alldt.resample('D').mean()
     allcoh = allcoh.resample('D').mean()
@@ -161,7 +162,7 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     plt.xlabel('Coherence')
     plt.ylabel("Lag Time (s)")
 
-    name = '%s-%s f%i m%i' % (sta1, sta2, filterid, mov_stack)
+    name = '%s-%s f%i m%s' % (sta1, sta2, filterid, mov_stack)
     name = name.replace('_', '.')
 
     plt.suptitle(name)
@@ -169,10 +170,11 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     if outfile:
         if outfile.startswith("?"):
             pair = pair.replace(':', '-')
-            outfile = outfile.replace('?', '%s-%s-f%i-m%i' % (pair,
+            outfile = outfile.replace('?', '%s-%s-f%i-m%s_%s' % (pair,
                                                               components,
                                                               filterid,
-                                                              mov_stack))
+                                                              mov_stack[0],
+                                                              mov_stack[1]))
         outfile = "mwcs " + outfile
         logger.info("output to: %s" % outfile)
         plt.savefig(outfile)

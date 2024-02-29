@@ -183,7 +183,7 @@ def main(loglevel="INFO"):
         refs, days = zip(*[[job.ref, job.day] for job in jobs])
 
         logger.info(
-            "There are MWCS jobs for some days to recompute for %s" % pair)
+            "There are MWCS (stretching) jobs for some days to recompute for %s" % pair)
         for f in filters:
             filterid = int(f.ref)
             freqmin = f.mwcs_low
@@ -239,17 +239,18 @@ def main(loglevel="INFO"):
                     allcoefs = []
                     allerrs = []
 
-                    fn = r"STACKS2/%02i/%03i_DAYS/%s/%s_%s.nc" % (
-                    filterid, mov_stack, components, station1, station2)
+                    fn = r"STACKS2/%02i/%s_%s/%s/%s_%s.nc" % (
+                    filterid, mov_stack[0], mov_stack[1], components, station1, station2)
                     print("Reading %s" % fn)
                     if not os.path.isfile(fn):
                         print("FILE DOES NOT EXIST: %s, skipping" % fn)
                         continue
                     data = xr_create_or_open(fn)
                     data = data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
-                    valid = data.index.intersection(pd.to_datetime(days))
-                    data = data.loc[valid]
+                    to_search = pd.to_datetime(days)
+                    data = data[data.index.floor('d').isin(to_search)]
                     data = data.dropna()
+
                     # print("Whitening %s" % fn)
                     # data = pd.DataFrame(data)
                     # data = data.apply(ww, axis=1, result_type="broadcast")
@@ -300,8 +301,8 @@ def main(loglevel="INFO"):
                         np.array([alldeltas, allcoefs, allerrs]).T,
                         index=alldays, columns=["Delta", "Coeff", "Error"], )
                     output = os.path.join('STR2', "%02i" % filterid,
-                                          "%03i_DAYS" % mov_stack, components)
-                    print(df.head())
+                                          "%s_%s" % (mov_stack[0],mov_stack[1]), components)
+                    # print(df.head())
                     if not os.path.isdir(output):
                         os.makedirs(output)
                     fn = os.path.join(output, "%s.csv" % ref_name)
