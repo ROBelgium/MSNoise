@@ -293,7 +293,7 @@ def get_params(session):
     params.all_components = np.unique(params.components_to_compute_single_station + \
                             params.components_to_compute)
 
-    if params.mov_stack.count(',') == 1:
+    if not isinstance(params.mov_stack[0], tuple):
         params.mov_stack = [params.mov_stack, ]
     else:
         params.mov_stack = params.mov_stack
