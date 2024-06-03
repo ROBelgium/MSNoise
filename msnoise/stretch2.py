@@ -321,4 +321,4 @@ def main(loglevel="INFO"):
         if not params.hpc:
             for job in jobs:
                 update_job(db, job.day, job.pair, 'DTT', 'T')
-    logger.info('*** Finished: Compute MWCS ***')
+    logger.info('*** Finished: Compute Stretching ***')
