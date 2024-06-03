@@ -234,10 +234,10 @@ def main(loglevel="INFO"):
 
                 for mov_stack in mov_stacks:
                     output = []
-                    alldays = []
-                    alldeltas = []
-                    allcoefs = []
-                    allerrs = []
+                    #alldays = []
+                    #alldeltas = []
+                    #allcoefs = []
+                    #allerrs = []
 
                     fn = r"STACKS2/%02i/%s_%s/%s/%s_%s.nc" % (
                     filterid, mov_stack[0], mov_stack[1], components, station1, station2)
@@ -260,24 +260,35 @@ def main(loglevel="INFO"):
                     data.iloc[:,mid - int(maxlag2 * params.goal_sampling_rate)] *= 0.
                     data.iloc[:,mid + int(maxlag2 * params.goal_sampling_rate):] *= 0.
 
-                    for day, row in data.iterrows():
-                        print(day)
-                        cur = row.values
-                        coeffs = []
-                        for j in range(ref_stretched.shape[0]):
-                            ci = np.corrcoef(cur, ref_stretched[j])[0, 1]
-                            coeffs.append(ci)
-                        # tday = day.strptime(day, "%Y-%m-%d")
-                        alldays.append(day)
-                        alldeltas.append(deltas[np.argmax(coeffs)])
-                        allcoefs.append(np.max(coeffs))
+                    data_values = data.values
+                    num_days = data_values.shape[0]
+                    num_stretch = ref_stretched.shape[0]
+
+                    # Normalizing the data for correlation
+                    data_norm = (data_values - data_values.mean(axis=1, keepdims=True)) / data_values.std(axis=1, keepdims=True)
+                    ref_stretched_norm = (ref_stretched - ref_stretched.mean(axis=1, keepdims=True)) / ref_stretched.std(axis=1, keepdims=True)
+
+                    # Compute the correlation coefficients
+                    corr_coeffs = np.dot(ref_stretched_norm, data_norm.T) / ref_stretched.shape[1]
+
+                    max_corr_indices = np.argmax(corr_coeffs, axis=0)
+                    max_corr_values = corr_coeffs[max_corr_indices, np.arange(num_days)]
+
+                    alldays = data.index
+                    alldeltas = deltas[max_corr_indices]
+                    allcoefs = max_corr_values
+
+                    allerrs = []
+
+                    for day_idx in range(data_values.shape[0]):
 
                         ###### gaussian fit ######
                         def gauss_function(x, a, x0, sigma):
                             return a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
+                        coeffs = corr_coeffs[:, day_idx]
                         x = ar(range(len(coeffs)))
-                        ymax_index = coeffs.index(np.max(coeffs))
+                        ymax_index = np.argmax(coeffs)
                         ymin = np.min(coeffs)
                         coeffs_shift = []
                         for j in coeffs:
