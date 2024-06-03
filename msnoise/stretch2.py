@@ -137,7 +137,7 @@ def main(loglevel="INFO"):
     # Reconfigure logger to show the pid number in log records
     logger = get_logger('msnoise.compute_mwcs_child', loglevel,
                         with_pid=True)
-    logger.info('*** Starting: Compute MWCS ***')
+    logger.info('*** Starting: Compute Stretching ***')
 
     db = connect()
     params = get_params(db)
