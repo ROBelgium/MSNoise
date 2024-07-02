@@ -267,7 +267,7 @@ def whiten2(fft, Nfft, low, high, porte1, porte2, psds, whiten_type):
     taper[high:] *= 0
     taper *= taper
 
-    hann = scipy.signal.hanning(porte2 - porte1 + 1)  # / float(porte2-porte1)
+    hann = scipy.signal.windows.hanning(porte2 - porte1 + 1)  # / float(porte2-porte1)
 
     for i in range(fft.shape[0]):
         if whiten_type == "PSD":
