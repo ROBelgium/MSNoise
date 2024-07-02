@@ -49,7 +49,7 @@ class MSNoiseTests(unittest.TestCase):
                            password=os.environ["MARIADB_PASSWORD"],
                            database=os.environ["hash"])
 
-            self.failUnlessEqual(ret, 0)
+            self.assertEqual(ret, 0)
         except:
             traceback.print_exc()
             self.fail()
@@ -74,7 +74,7 @@ class MSNoiseTests(unittest.TestCase):
         for test in totests:
             update_config(db, test[0], test[1])
             d = get_config(db, test[0])
-            self.failUnlessEqual(test[1], d)
+            self.assertEqual(test[1], d)
 
         db.close()
 
@@ -109,14 +109,14 @@ class MSNoiseTests(unittest.TestCase):
         for i, filter in enumerate(dbfilters):
             for param in ['low', 'mwcs_low', 'high', 'mwcs_high',
                           'mwcs_wlen', 'mwcs_step', 'used']:
-                self.failUnlessEqual(eval("filter.%s" % param),
+                self.assertEqual(eval("filter.%s" % param),
                                      eval("filters[i].%s" % param))
 
     def test_005_populate_station_table(self):
         from ..s002populate_station_table import main
         try:
             ret = main()
-            self.failUnlessEqual(ret, True)
+            self.assertEqual(ret, True)
         except:
             self.fail()
 
@@ -124,7 +124,7 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, get_stations
         db = connect()
         stations = get_stations(db).all()
-        self.failUnlessEqual(len(stations), 3)
+        self.assertEqual(len(stations), 3)
         db.close()
 
     def test_007_update_stations(self):
@@ -165,10 +165,10 @@ class MSNoiseTests(unittest.TestCase):
 
         db = connect()
         files = get_new_files(db)
-        self.failUnlessEqual(len(files), 3)
+        self.assertEqual(len(files), 3)
 
         flags = count_data_availability_flags(db)
-        self.failUnlessEqual(len(flags), 1)
+        self.assertEqual(len(flags), 1)
 
         for station in get_stations(db):
             for loc in station.locs():
@@ -177,7 +177,7 @@ class MSNoiseTests(unittest.TestCase):
                                                sta=station.sta,
                                                loc=loc,
                                                chan=chan)
-                    self.failUnlessEqual(len(da), 1)
+                    self.assertEqual(len(da), 1)
 
     def test_010_new_jobs(self):
         from ..s02new_jobs import main
@@ -192,9 +192,9 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, is_next_job, get_next_job, Job
         db = connect()
 
-        self.failUnlessEqual(is_next_job(db), True)
+        self.assertEqual(is_next_job(db), True)
         jobs = get_next_job(db)
-        self.failUnlessEqual(isinstance(jobs[0], Job), True)
+        self.assertEqual(isinstance(jobs[0], Job), True)
 
     def test_012_reset_jobs(self):
         from ..api import connect, reset_jobs
@@ -224,8 +224,8 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, get_job_types
         db = connect()
         jobs = get_job_types(db, 'CC')
-        self.failUnlessEqual(jobs[0][0], 3)
-        self.failUnlessEqual(jobs[0][1], 'D')
+        self.assertEqual(jobs[0][0], 3)
+        self.assertEqual(jobs[0][1], 'D')
 
     def test_015_check_cc_files(self, format="MSEED"):
         from ..api import connect, get_filters, get_station_pairs, \
@@ -346,18 +346,18 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, build_ref_datelist
         db = connect()
         start, end, datelist = build_ref_datelist(db)
-        self.failUnlessEqual(start, datetime.date(2009, 1, 1))
-        self.failUnlessEqual(end, datetime.date(2011, 1, 1))
-        self.failUnlessEqual(len(datelist), 731)
+        self.assertEqual(start, datetime.date(2009, 1, 1))
+        self.assertEqual(end, datetime.date(2011, 1, 1))
+        self.assertEqual(len(datelist), 731)
         db.close()
 
     def test_028_build_movstack_datelist(self):
         from ..api import connect, build_movstack_datelist
         db = connect()
         start, end, datelist = build_movstack_datelist(db)
-        self.failUnlessEqual(start, datetime.date(2009, 1, 1))
-        self.failUnlessEqual(end, datetime.date(2011, 1, 1))
-        self.failUnlessEqual(len(datelist), 731)
+        self.assertEqual(start, datetime.date(2009, 1, 1))
+        self.assertEqual(end, datetime.date(2011, 1, 1))
+        self.assertEqual(len(datelist), 731)
         db.close()
 
     def test_029_stretching(self):
@@ -389,10 +389,10 @@ class MSNoiseTests(unittest.TestCase):
         db = connect()
         jobs = get_job_types(db, 'CC')
         print(jobs)
-        self.failUnlessEqual(jobs[0][0], 3)
-        self.failUnlessEqual(jobs[0][1], 'D')
-        self.failUnlessEqual(jobs[1][0], 3)
-        self.failUnlessEqual(jobs[1][1], 'T')
+        self.assertEqual(jobs[0][0], 3)
+        self.assertEqual(jobs[0][1], 'D')
+        self.assertEqual(jobs[1][0], 3)
+        self.assertEqual(jobs[1][1], 'T')
 
     def test_031_instrument_response(self):
         from ..api import connect, update_config
