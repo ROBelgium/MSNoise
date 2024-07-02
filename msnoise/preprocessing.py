@@ -237,7 +237,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                         trace.detrend(type="demean")
                         trace.detrend(type="linear")
                         trace.taper(max_percentage=None,
-                                    max_length=taper_length)
+                                    max_length=taper_length,)
 
                 if not len(stream):
                     logger.debug(" has only too small traces, skipping...")

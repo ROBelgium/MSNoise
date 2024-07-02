@@ -523,13 +523,13 @@ class MSNoiseTests(unittest.TestCase):
         result = self.runner.invoke(msnoise_script.config_get,
                                     ['inexistant_param'])
         self.assertEqual(result.exit_code, 0)
-        self.assertTrue('unknown parameter' in result.output)
+        self.assertIn('unknown parameter', result.output)
 
     def test_202_config_set_unknown_param(self):
         result = self.runner.invoke(msnoise_script.config_set,
                                     ['inexistant_param=value'])
         self.assertEqual(result.exit_code, 0)
-        self.assertTrue('unknown parameter' in result.output)
+        self.assertIn('unknown parameter', result.output)
 
     def test_203_config_set_param(self):
         result = self.runner.invoke(msnoise_script.config_set,
@@ -538,7 +538,7 @@ class MSNoiseTests(unittest.TestCase):
         result = self.runner.invoke(msnoise_script.config_get,
                                     ['channels'])
         self.assertEqual(result.exit_code, 0)
-        self.assertTrue('XXX' in result.output)
+        self.assertIn('XXX', result.output)
         result = self.runner.invoke(msnoise_script.config_set,
                                     ['channels=*'])
 
