@@ -1,0 +1,7 @@
+sphinx>=4.2.0
+sphinx_rtd_theme
+matplotlib
+numpy # required by cartopy
+cython # required by cartopy
+obspy
+sphinx_gallery
