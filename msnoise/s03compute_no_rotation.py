@@ -377,7 +377,7 @@ def main(loglevel="INFO"):
 
             # TODO should not hardcode 4 percent!
             wlen = int(0.04 * data.shape[1])
-            taper_sides = scipy.signal.hann(2 * wlen + 1)
+            taper_sides = scipy.signal.hanning(2 * wlen + 1)
             taper = np.hstack(
                 (taper_sides[:wlen], np.ones(data.shape[1] - 2 * wlen),
                  taper_sides[len(taper_sides) - wlen:]))
