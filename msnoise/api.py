@@ -1979,35 +1979,52 @@ def preload_instrument_responses(session, return_format="dataframe"):
         logging.debug("Processing %s" % file)
         try:
             inv = read_inventory(file)
-            all_inv += inv
+
             if return_format == "inventory":
+                all_inv += inv
                 continue
+
             for net in inv.networks:
                 for sta in net.stations:
                     for cha in sta.channels:
                         seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
                                                    cha.location_code,
                                                    cha.code)
+                        pzdict = {}
                         try:
-                            resp = inv.get_response(seed_id,
-                                                    cha.start_date + 10)
+                            resp = inv.get_response(seed_id, cha.start_date + 10)
                             polezerostage = resp.get_paz()
+                        except Exception as e:
+                            logging.warning(
+                                'Failed to get PAZ for SEED ID "%s", this '
+                                'SEED ID will have an empty dictionary '
+                                'for Poles and Zeros '
+                                'information (Error message: %s).' % (
+                                    seed_id, str(e)))
+                        else:
                             totalsensitivity = resp.instrument_sensitivity
-                            pz = {'poles': polezerostage.poles,
-                                  'zeros': polezerostage.zeros,
-                                  'gain': polezerostage.normalization_factor,
-                                  'sensitivity': totalsensitivity.value}
-                            channels.append([seed_id, cha.start_date,
-                                             cha.end_date or UTCDateTime(),
-                                             pz, cha.latitude, cha.longitude])
-                        except:
-                            logging.debug("There was an error loading PAZ for"
-                                          " %s" % seed_id)
-                            traceback.print_exc()
-        except:
-            logging.debug("Can't read this file using obspy's read_inventory():"
-                          " %s" % file)
-            continue
+                            pzdict['poles'] = polezerostage.poles
+                            pzdict['zeros'] = polezerostage.zeros
+                            pzdict['gain'] = polezerostage.normalization_factor
+                            pzdict['sensitivity'] = totalsensitivity.value
+                        lat = cha.latitude
+                        lon = cha.longitude
+                        elevation = cha.elevation
+                        if lat is None or lon is None or elevation is None:
+                            lat = sta.latitude
+                            lon = sta.longitude
+                            elevation = sta.elevation
+                        if lat is None or lon is None or elevation is None:
+                            logging.error(
+                                'Failed to look up coordinates for SEED '
+                                'ID: %s' % seed_id)
+                        channels.append([seed_id, cha.start_date,
+                                         cha.end_date or UTCDateTime(),
+                                         pzdict, lat, lon, elevation])
+
+        except Exception as e:
+            logging.error('Failed to process file %s: %s' % (file, str(e)))
+
 
     logging.debug('Finished Loading instrument responses')
     if return_format == "inventory":
@@ -2016,7 +2033,7 @@ def preload_instrument_responses(session, return_format="dataframe"):
     if return_format == "dataframe":
         channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
                                                    "end_date", "paz",
-                                                   "latitude", "longitude"],)
+                                                   "latitude", "longitude", "elevation"],)
         return channels
 
 

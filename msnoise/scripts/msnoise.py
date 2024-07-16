@@ -539,11 +539,18 @@ def config_sync():
         if not len(coords):
             logger.error("No coords for %s, skipping,..." % id)
             continue
-        lon = float(coords["longitude"].values[0])
-        lat = float(coords["latitude"].values[0])
-        update_station(db, station.net, station.sta, lon, lat, 0, "DEG", )
-        logging.info("Added coordinates (%.5f %.5f) for station %s.%s" %
-                    (lon, lat, station.net, station.sta))
+        try:
+            lon = float(coords["longitude"].values[0])
+            lat = float(coords["latitude"].values[0])
+            elevation = float(coords["elevation"].values[0])
+        except:
+            logging.warning(
+                'Problem getting coordinates for '
+                '"%s": %s' % (id, str(coords)))
+            continue
+        update_station(db, station.net, station.sta, lat, lon, elevation, "DEG", )
+        logging.info("Added coordinates (%.5f %.5f %.1f) for station %s.%s" %
+                     (lon, lat, elevation, station.net, station.sta))
     db.close()
 
 
