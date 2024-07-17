@@ -216,6 +216,11 @@ def main(loglevel="INFO"):
                     tp = cosine_taper(window_length_samples, 0.85)
                     minind = 0
                     maxind = window_length_samples
+                    step_samples = int(f.mwcs_step * goal_sampling_rate)
+                    if step_samples != (f.mwcs_step * goal_sampling_rate):
+                        logger.warning('mwcs_step of %g s incompatible with %i Hz sampling rate. Step size of %g s used instead' % 
+                                        (f.mwcs_step, goal_sampling_rate, step_samples/goal_sampling_rate))
+
                     freq_vec = sf.fftfreq(padd, 1. / goal_sampling_rate)[
                                :padd // 2]
                     # Find the values the frequency range of interest
@@ -237,8 +242,8 @@ def main(loglevel="INFO"):
                                              overwrite_data=True)
                         cri *= tp
 
-                        minind += int(f.mwcs_step * goal_sampling_rate)
-                        maxind += int(f.mwcs_step * goal_sampling_rate)
+                        minind += step_samples
+                        maxind += step_samples
 
                         fcur = sf.fft(cci, axis=1, n=padd)[:, :padd // 2]
                         fref = sf.fft(cri, n=padd)[:padd // 2]
@@ -317,7 +322,7 @@ def main(loglevel="INFO"):
                         sx2 = np.sum(W * v ** 2, axis=1)
                         E = np.sqrt(e * s2x2 / sx2 ** 2)
 
-                        ti = -params.maxlag + f.mwcs_wlen / 2. + count * f.mwcs_step
+                        ti = -params.maxlag + f.mwcs_wlen / 2. + count * (step_samples/goal_sampling_rate)
                         # print("Finished processing t_center=", ti, "s")
                         S = pd.DataFrame(np.array([M, E, MCOH]).T,
                                          index=data.index,
