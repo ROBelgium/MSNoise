@@ -21,4 +21,5 @@ dependencies:
   - pymysql
   - xarray
   - sqlalchemy-utils
+  - pooch
 

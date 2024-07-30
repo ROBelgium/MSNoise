@@ -39,7 +39,8 @@ setup(version=get_git_version(),
           'jinja2',
           'scandir',  # useful for python < 3.5
           'logbook',
-          'xarray'  # new in 2.0
+          'xarray',  # new in 2.0
+          'pooch', #new in 2.0
       ],
       extras_require={
           'doc': [

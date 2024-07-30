@@ -7,6 +7,8 @@ import shutil
 import traceback
 import unittest
 
+import pooch
+
 logger = logging.getLogger('matplotlib')
 # set WARNING for Matplotlib
 logger.setLevel(logging.CRITICAL)
@@ -21,9 +23,31 @@ class MSNoiseTests(unittest.TestCase):
     prefix = ""
 
     def setUp(self):
+
+        test_files = {
+            "2010/UV05/HHZ.D/YA.UV05.00.HHZ.D.2010.244": "17034091285d485f7c2d4797f435228c408d6940db943be63f1769ec09854f4f",
+            "2010/UV06/HHZ.D/YA.UV06.00.HHZ.D.2010.244": "51bfd1e735696e83ee6dba136c9e740c59120fac9f74b386eac75062eb9ca382",
+            "2010/UV10/HHZ.D/YA.UV10.00.HHZ.D.2010.244": "530cc7f4a57fe69a8a5cedeb18e64773055c146e4ae4676012f6618dd0c92e82",
+        }
+
+        BRIAN = pooch.create(
+            # This is still the default
+            path=pooch.os_cache("msnoise"),
+            base_url="https://github.com/ROBelgium/MSNoise/raw/{version}/msnoise/test/data/",
+            version="1.6",
+            version_dev="main",
+            registry=test_files,
+            # The name of an environment variable that can overwrite the path
+            env="MSNOISE_DATA_DIR",
+        )
+        for fn in test_files:
+            path = BRIAN.fetch(fn)
         # Copy test/data directory to ./data
-        path = os.path.abspath(os.path.dirname(__file__))
-        data_folder = os.path.join(path, 'data')
+        # path = os.path.abspath(os.path.dirname(__file__))
+        # data_folder = os.path.join(path, 'data')
+
+        data_folder = os.path.join(os.environ["MSNOISE_DATA_DIR"], "1.6")
+
         if not os.path.isdir("data"):
             shutil.copytree(data_folder, "data/")
         self.data_folder = "data"
