@@ -465,7 +465,7 @@ def db_import(table, format, force):
     from ..api import connect, get_engine, read_db_inifile
     from sqlalchemy import MetaData
     import pandas as pd
-    dbini = read_db_inifile()
+    dbini = read_db_inifile(inifile=os.path.join(os.getcwd(), 'db.ini'))
 
     if format == "csv":
         engine = get_engine(inifile=os.path.join(os.getcwd(), 'db.ini'))
@@ -594,6 +594,23 @@ def config_get(names):
     show_config_values(db, names)
     db.close()
 
+
+@config.command(name='reset')
+@click.argument('names', nargs=-1)
+def config_reset(names):
+    """
+    Reset the value of the given configuration variable(s) to their default.
+    """
+    from ..default import default
+    from ..api import connect, update_config
+    for key in names:
+        default_value = default[key].default
+        print(default_value)
+        db = connect()
+        update_config(db, key, default_value)
+        # db.commit()
+        db.close()
+        click.echo("Successfully reset parameter %s = %s" % (key, default_value))
 
 
 @cli.command()
