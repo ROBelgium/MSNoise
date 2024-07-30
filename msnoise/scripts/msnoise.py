@@ -462,24 +462,30 @@ def db_import(table, format, force):
     """
     Imports msnoise tables from formatted files (CSV).
     """
-    from ..api import connect, get_engine
+    from ..api import connect, get_engine, read_db_inifile
     from sqlalchemy import MetaData
     import pandas as pd
+    dbini = read_db_inifile()
 
     if format == "csv":
         engine = get_engine(inifile=os.path.join(os.getcwd(), 'db.ini'))
         logger.info("Loading table %s from %s.csv" % (table, table))
         df = pd.read_csv("%s.csv" % table)
         if force:
-            df.to_sql(table, engine, if_exists="replace")
+            if_exists = "replace"
         else:
-            try:
-                df.to_sql(table, engine)
-            except ValueError:
-                traceback.print_exc()
-                logger.info("You're probably getting the error above because the "
-                      "table already exists, if you want to replace the table "
-                      "with the imported data, then pass the --force option")
+            if_exists = "fail"
+        try:
+            if dbini.tech == 1:
+                with engine.connect() as conn:
+                    df.to_sql(table, conn.connection, if_exists=if_exists)
+            else:
+                df.to_sql(table, engine, if_exists=if_exists)
+        except ValueError:
+            traceback.print_exc()
+            logger.info("You're probably getting the error above because the "
+                  "table already exists, if you want to replace the table "
+                  "with the imported data, then pass the --force option")
     else:
         logger.error("Currently only the csv format is supported, sorry.")
 
