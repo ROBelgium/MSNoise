@@ -46,7 +46,7 @@ class MSNoiseTests(unittest.TestCase):
         # path = os.path.abspath(os.path.dirname(__file__))
         # data_folder = os.path.join(path, 'data')
 
-        data_folder = os.path.join(os.environ.get("MSNOISE_DATA_DIR",""), "1.6")
+        data_folder = os.path.join(os.environ.get("MSNOISE_DATA_DIR",pooch.os_cache("msnoise")), "1.6")
 
         if not os.path.isdir("data"):
             shutil.copytree(data_folder, "data/")
