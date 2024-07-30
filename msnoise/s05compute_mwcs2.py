@@ -92,7 +92,7 @@ from scipy.fft import next_fast_len
 def get_window(window="boxcar", half_win=3):
     window_len = 2 * half_win + 1
     if window == "boxcar":
-        w = scipy.signal.boxcar(window_len).astype('complex')
+        w = scipy.signal.windows.boxcar(window_len).astype('complex')
     else:
         w = scipy.signal.windows.hann(window_len).astype('complex')
     return w / window_len

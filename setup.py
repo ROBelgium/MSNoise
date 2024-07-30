@@ -26,6 +26,7 @@ setup(version=get_git_version(),
           'pandas',
           'matplotlib',
           'sqlalchemy<2', # TEMP needed as it breaks flask-admin
+          'sqlalchemy-utils',
           'obspy',
           'click',
           'pymysql',

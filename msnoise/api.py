@@ -1349,7 +1349,7 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
         coh = 1. / data.shape[0] * np.abs(phasestack)
 
         timegate_samples = int(pws_timegate * goal_sampling_rate)
-        coh = np.convolve(ss.boxcar(timegate_samples) /
+        coh = np.convolve(ss.windows.boxcar(timegate_samples) /
                           timegate_samples, coh, 'same')
         coh = np.power(coh, pws_power)
         for c in data:
