@@ -416,14 +416,14 @@ def db_clean_duplicates():
     prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
     db = connect()
     if dbini.tech == 1:
-        query = 'DELETE FROM {0}jobs WHERE rowid NOT IN '\
-                '(SELECT MIN(rowid) FROM {0}jobs GROUP BY day,pair,jobtype)'\
-                .format(prefix)
+        # SQlite case
+        query = "WITH cte AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY day, pair, jobtype ORDER BY ref) AS rn FROM {0}jobs) DELETE FROM {0}jobs WHERE ref IN (SELECT ref FROM cte WHERE rn > 1);".format(prefix)
+    elif dbini.tech == 2:
+        # Mysql/mariadb
+        query = "DELETE j1 FROM {0}jobs j1 INNER JOIN {0}jobs j2 ON j1.ref > j2.ref AND j1.day = j2.day AND j1.pair = j2.pair AND j1.jobtype = j2.jobtype;".format(prefix)
     else:
-        query = 'DELETE from {0}jobs USING {0}jobs as j1, {0}jobs as j2 '\
-                'WHERE (j1.ref > j2.ref) AND (j1.day=j2.day) '\
-                'AND (j1.pair=j2.pair) AND (j1.jobtype=j2.jobtype)'\
-                .format(prefix)
+        # postgresql
+        query = "DELETE FROM {0}jobs WHERE ref NOT IN (SELECT MIN(ref) FROM {0}jobs GROUP BY day, pair, jobtype);".format(prefix)
     db.execute(text(query))
     db.commit()
     db.close()
