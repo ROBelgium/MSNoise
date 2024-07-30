@@ -25,15 +25,19 @@ class MSNoiseTests(unittest.TestCase):
     def setUp(self):
 
         test_files = {
-            "2010/UV05/HHZ.D/YA.UV05.00.HHZ.D.2010.244": "17034091285d485f7c2d4797f435228c408d6940db943be63f1769ec09854f4f",
-            "2010/UV06/HHZ.D/YA.UV06.00.HHZ.D.2010.244": "51bfd1e735696e83ee6dba136c9e740c59120fac9f74b386eac75062eb9ca382",
-            "2010/UV10/HHZ.D/YA.UV10.00.HHZ.D.2010.244": "530cc7f4a57fe69a8a5cedeb18e64773055c146e4ae4676012f6618dd0c92e82",
+            "data/2010/UV05/HHZ.D/YA.UV05.00.HHZ.D.2010.244": "17034091285d485f7c2d4797f435228c408d6940db943be63f1769ec09854f4f",
+            "data/2010/UV06/HHZ.D/YA.UV06.00.HHZ.D.2010.244": "51bfd1e735696e83ee6dba136c9e740c59120fac9f74b386eac75062eb9ca382",
+            "data/2010/UV10/HHZ.D/YA.UV10.00.HHZ.D.2010.244": "530cc7f4a57fe69a8a5cedeb18e64773055c146e4ae4676012f6618dd0c92e82",
+            "extra/DATA.RESIF_Jun_10,14_21_05_20264.RESIF": "95a6d007132fc41b6107d258aeee1170614d234cdd3eb4a6d5652e4661a6adcd",
+            # "extra/RESP.GD.PUT..SHZ.L4C.5500.8905.1.171": "bubu",
+            "extra/stations.csv": "057152c2823c5457bce879146d78984af422973ab313e1d1cd8baaa7f7a1d6b3",
+            "extra/test_inventory.xml": "48bf3261a9c23f1782e452583306b73643a4d7f205df4338e5525df3c06eccb9",
         }
 
         BRIAN = pooch.create(
             # This is still the default
             path=pooch.os_cache("msnoise"),
-            base_url="https://github.com/ROBelgium/MSNoise/raw/{version}/msnoise/test/data/",
+            base_url="https://github.com/ROBelgium/MSNoise/raw/{version}/msnoise/test",
             version="1.6",
             version_dev="main",
             registry=test_files,
@@ -46,8 +50,8 @@ class MSNoiseTests(unittest.TestCase):
         # path = os.path.abspath(os.path.dirname(__file__))
         # data_folder = os.path.join(path, 'data')
 
-        data_folder = os.path.join(os.environ.get("MSNOISE_DATA_DIR",pooch.os_cache("msnoise")), "1.6")
-
+        data_folder = os.path.join(os.environ.get("MSNOISE_DATA_DIR",pooch.os_cache("msnoise")), "1.6", "data")
+        self.response_folder = os.path.join(os.environ.get("MSNOISE_DATA_DIR",pooch.os_cache("msnoise")), "1.6", "extra")
         if not os.path.isdir("data"):
             shutil.copytree(data_folder, "data/")
         self.data_folder = "data"
@@ -155,8 +159,7 @@ class MSNoiseTests(unittest.TestCase):
         from ..api import connect, get_stations, update_station
         import pandas as pd
         db = connect()
-        path = os.path.split(os.path.abspath(os.path.dirname(__file__)))[0]
-        stations = pd.read_csv(os.path.join(path, 'test', 'extra',
+        stations = pd.read_csv(os.path.join(self.response_folder,
                                             'stations.csv'),
                                header=None, index_col=0,
                                names=['X', 'Y', 'altitude'])
@@ -420,10 +423,8 @@ class MSNoiseTests(unittest.TestCase):
 
     def test_031_instrument_response(self):
         from ..api import connect, update_config
-        path = os.path.abspath(os.path.dirname(__file__))
-        resp_folder = os.path.join(path, 'extra')
         db = connect()
-        update_config(db, 'response_path', resp_folder)
+        update_config(db, 'response_path', self.response_folder)
         update_config(db, 'response_format', "dataless")
         update_config(db, 'remove_response', "Y")
         db.close()

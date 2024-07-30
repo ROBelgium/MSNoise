@@ -40,6 +40,7 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n" + ispresent('pandas')
         output += "\n" + ispresent('matplotlib')
         output += "\n" + ispresent('sqlalchemy')
+        output += "\n" + ispresent('sqlalchemy_utils')
         output += "\n" + ispresent('obspy')
         output += "\n" + ispresent('click')
         output += "\n" + ispresent('pymysql')

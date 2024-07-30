@@ -605,7 +605,6 @@ def config_reset(names):
     from ..api import connect, update_config
     for key in names:
         default_value = default[key].default
-        print(default_value)
         db = connect()
         update_config(db, key, default_value)
         # db.commit()

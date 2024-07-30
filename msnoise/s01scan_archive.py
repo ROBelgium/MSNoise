@@ -474,7 +474,6 @@ def scan_archive(folder_globs, nproc, mintime, startdate, enddate,
         # Add a sentinel value for each worker
         for _ in range(nproc):
             queue.put(None)
-        print(dir_list)
 
         children = spawn_processes(queue, nproc, scan_func, scan_args)
         await_children(children)
