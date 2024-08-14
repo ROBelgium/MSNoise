@@ -1,11 +1,22 @@
 """
-WCT
+Wavelet Coherence Transform (WCT) Computation
+
+This script performs the computation of the Wavelet Coherence Transform (WCT), a tool used to analyze the correlation between two time series in the time-frequency domain. The script supports parallel processing and interacts with a database to manage job statuses.
+
 
 
 Filter Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
+* |dtt_minlag| : Minimum lag time for DTT (Differential Time Travel) analysis.
+* |dtt_maxdt| : Maximum allowable time difference for coherence calculation.
+* |dtt_mincoh| : Minimum coherence required for DTT job inclusion.
+* |dtt_codacycles| : Number of coda cycles to consider in the computation.
+* |wct_ns| : Smoothing parameter for wavelet coherence transform.
+* |wct_nt| : Smoothing parameter for wavelet coherence transform.
+* |wct_vpo| : Spacing parameter between discrete scales in the wavelet transform.
+* |wct_nptsfreq| : Number of frequency points between `freqmin` and `freqmax`.
+* |dtt_min_nonzero| : Minimum percentage of non-zero weights required for the DTT computation.
+* |wct_norm| : Flag indicating whether to normalize waveforms before processing.
 * |hpc| | 
 
 This process is job-based, so it is possible to run several instances in
@@ -51,7 +62,31 @@ import scipy
 import scipy.fft as sf
 
 def get_avgcoh(freqs, tvec, wcoh, freqmin, freqmax, lag_min=5, coda_cycles=20):
+    """
+    Calculate the average coherence over specified frequency range and time lags.
 
+    Parameters
+    ----------
+    freqs : numpy.ndarray
+        Array of frequency values.
+    tvec : numpy.ndarray
+        Time vector.
+    wcoh : numpy.ndarray
+        Wavelet coherence array.
+    freqmin : float
+        Minimum frequency for coherence calculation.
+    freqmax : float
+        Maximum frequency for coherence calculation.
+    lag_min : int, optional
+        Minimum lag in seconds for coherence calculation. Default is 5.
+    coda_cycles : int, optional
+        Number of coda cycles to consider. Default is 20.
+
+    Returns
+    -------
+    numpy.ndarray
+        Average coherence values over the specified frequency range.
+    """
     inx = np.where((freqs>=freqmin) & (freqs<=freqmax)) 
     coh = np.zeros(inx[0].shape) # Create empty vector for coherence
 
@@ -67,17 +102,35 @@ def get_avgcoh(freqs, tvec, wcoh, freqmin, freqmax, lag_min=5, coda_cycles=20):
             coh[ii] = c
 
         else:
-            print('not enough points to compute average coherence') #not sure why it would ever get here, but just in case.
+            logger.debug('not enough points to compute average coherence') #not sure why it would ever get here, but just in case.
             coh[ii] = np.nan
 
     return coh
 
 def smoothCFS(cfs, scales, dt, ns, nt):
     """
-    Smoothing function
+    Smooth the continuous wavelet transform coefficients using a Fourier domain approach.
+
+    Parameters
+    ----------
+    cfs : numpy.ndarray
+        Continuous wavelet transform coefficients.
+    scales : numpy.ndarray
+        Scales used in the wavelet transform.
+    dt : float
+        Sampling interval.
+    ns : int
+        Smoothing parameter for the moving average filter.
+    nt : float
+        Smoothing parameter for the Gaussian filter.
+
+    Returns
+    -------
+    numpy.ndarray
+        Smoothed continuous wavelet transform coefficients.
     """
     N = cfs.shape[1]
-    npad = int(2 ** nextpow2(N))
+    npad = sf.next_fast_len(N, real=True)
     omega = np.arange(1, np.fix(npad / 2) + 1, 1).tolist()
     omega = np.array(omega) * ((2 * np.pi) / npad)
     omega_save = -omega[int(np.fix((npad - 1) / 2)) - 1:0:-1]
@@ -98,22 +151,50 @@ def smoothCFS(cfs, scales, dt, ns, nt):
     cfs = conv2(cfs, H)
     return cfs
 
-
-## nextpow2 function
-# Returns the exponents p for the smallest powers of two that satisfy the relation  : 2**p >= abs(x)
-def nextpow2(x):
-    res = np.ceil(np.log2(x))
-    return res.astype('int')
-
-## conv2 function
-# Returns the two-dimensional convolution of matrices x and y
 def conv2(x, y, mode='same'):
+    """
+    Perform 2D convolution of matrices x and y
+    """
     return np.rot90(convolve2d(np.rot90(x, 2), np.rot90(y, 2), mode=mode), 2)
 
 
-def get_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20, mincoh=0.5, maxdt=0.2, 
+def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20, mincoh=0.5, maxdt=0.2, 
             min_nonzero=0.25, freqmin=0.1, freqmax=2.0):
-   
+    """
+    Compute the dv/v values and associated errors from the wavelet transform results.
+
+    Parameters
+    ----------
+    freqs : numpy.ndarray
+        Frequency values corresponding to the wavelet transform.
+    tvec : numpy.ndarray
+        Time vector.
+    WXamp : numpy.ndarray
+        Amplitude of the cross-wavelet transform.
+    Wcoh : numpy.ndarray
+        Wavelet coherence.
+    delta_t : numpy.ndarray
+        Time delays between signals.
+    lag_min : int, optional
+        Minimum lag in seconds. Default is 5.
+    coda_cycles : int, optional
+        Number of coda cycles to consider. Default is 20.
+    mincoh : float, optional
+        Minimum coherence value for weighting. Default is 0.5.
+    maxdt : float, optional
+        Maximum time delay for weighting. Default is 0.2.
+    min_nonzero : float, optional
+        Minimum percentage of non-zero weights required for valid estimation. Default is 0.25.
+    freqmin : float, optional
+        Minimum frequency for calculation. Default is 0.1 Hz.
+    freqmax : float, optional
+        Maximum frequency for calculation. Default is 2.0 Hz.
+
+    Returns
+    -------
+    tuple
+        dvv values (percentage), errors (percentage), and weighting function used.
+    """   
     inx = np.where((freqs >= freqmin) & (freqs <= freqmax))  # Filter frequencies within the specified range
     dvv, err = np.zeros(len(inx[0])), np.zeros(len(inx[0])) # Initialize dvv and err arrays
 
@@ -148,13 +229,13 @@ def get_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20, mincoh
             else:
                 dvv[ii], err[ii] = np.nan, np.nan
         else:
-            print('Not enough points to estimate dv/v for WCT')
+            logger.debug('Not enough points to estimate dv/v for WCT')
 
     return dvv * 100, err * 100, wf
 
 def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqmax=8.0, nptsfreq=100):
     """
-    Wavelet coherence transform (WCT).
+    Wavelet coherence transform (WCT) on two time series..
 
     The WCT finds regions in time frequency space where the two time
     series co-vary, but do not necessarily have high power.
@@ -187,9 +268,25 @@ def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqma
         Default value is 100 points
        
     Returns
+    ----------
+    WXamp : numpy.ndarray
+        Amplitude of the cross-wavelet transform.
+    WXspec : numpy.ndarray
+        Complex cross-wavelet transform, representing both magnitude and phase information.
+    WXangle : numpy.ndarray
+        Phase angles of the cross-wavelet transform, indicating the phase relationship between the input signals.
+    Wcoh : numpy.ndarray
+        Wavelet coherence, representing the degree of correlation between the two signals in time-frequency space.
+    WXdt : numpy.ndarray
+        Time delay between the signals, estimated from the phase angles.
+    freqs : numpy.ndarray
+        Frequencies corresponding to the scales of the wavelet transform.
+    coi : numpy.ndarray
+        Cone of influence, representing the region of the wavelet spectrum where edge effects become significant.
+    
     """
     # Choosing a Morlet wavelet with a central frequency w0 = 6
-    mother = wavelet.Morlet(6.)
+    mother = wavelet.Morlet(6.) # TO DO mother wavelet class: Morlet, Paul, DOG, MexicanHat param 
     # nx represent the number of element in the trace_current array
     nx = np.size(trace_current)
     x_reference = np.transpose(trace_ref)
@@ -286,7 +383,7 @@ def xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_
     # Save the dataset to a NetCDF file
     ds.to_netcdf(fn)
     
-    print(f"Saved WCT data to {fn}")
+    logger.debug(f"Saved WCT data to {fn}")
 
     # Clean up
     del dvv_da, err_da, coh_da, ds
@@ -395,7 +492,7 @@ def main(loglevel="INFO"):
 
                     for date, row in new_waveform.iterrows():
                         WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi = xwt(ori_waveform, row.values, goal_sampling_rate, int(ns), int(nt), int(vpo), freqmin, freqmax, int(nptsfreq))
-                        dvv, err, wf = get_dvv(freqs, taxis, WXamp, Wcoh, WXdt, lag_min=int(lag_min), coda_cycles=coda_cycles, mincoh=mincoh, maxdt=maxdt, min_nonzero=min_nonzero, freqmin=freqmin, freqmax=freqmax)
+                        dvv, err, wf = compute_wct_dvv(freqs, taxis, WXamp, Wcoh, WXdt, lag_min=int(lag_min), coda_cycles=coda_cycles, mincoh=mincoh, maxdt=maxdt, min_nonzero=min_nonzero, freqmin=freqmin, freqmax=freqmax)
                         coh = get_avgcoh(freqs, taxis, Wcoh, freqmin, freqmax, lag_min=int(lag_min), coda_cycles=coda_cycles)
 
                         dvv_list.append(dvv)
