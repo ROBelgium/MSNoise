@@ -156,7 +156,10 @@ def main(stype, interval=1.0, loglevel="INFO"):
             for components in components_to_compute:
                 logger.info('Processing %s-%s-%i' %
                       (pair, components, filterid))
-                c = get_results_all(db, sta1, sta2, filterid, components, days, format="xarray")
+                if params.keep_all:
+                    c = get_results_all(db, sta1, sta2, filterid, components, days, format="xarray")
+                else:
+                    c = get_results(db, sta1, sta2, filterid, components, days,  mov_stack=1, format="xarray", params=params)
                 # print(c)
                 # dr = xr_save_ccf(sta1, sta2, components, filterid, 1, taxis, c)
                 dr = c
@@ -170,6 +173,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     _ = _.mean(dim="times")
                     xr_save_ref(sta1, sta2, components, filterid, taxis, _)
                     continue
+                dr = dr.sortby('times')
                 dr = dr.resample(times="%is" % params.corr_duration).mean()
                 for mov_stack in mov_stacks:
                     # if mov_stack > len(dr.times):
