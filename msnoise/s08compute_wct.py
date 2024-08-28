@@ -140,6 +140,34 @@ def conv2(x, y, mode='same'):
     """
     return np.rot90(convolve2d(np.rot90(x, 2), np.rot90(y, 2), mode=mode), 2)
 
+def get_wavelet_type(wavelet_type):
+    # Default parameters for each wavelet type
+    default_params = {
+        'Morlet': 6,
+        'Paul': 4,
+        'DOG': 2,
+        'MexicanHat': 2  # MexicanHat inherits from DOG with m=2
+    }
+
+    wavelet_name = wavelet_type[0]
+
+    # If a second argument is provided, use it; otherwise, use the default value
+    if len(wavelet_type) == 2:
+        param = float(wavelet_type[1])
+    else:
+        param = default_params[wavelet_name]
+
+    # Get the corresponding wavelet object
+    if wavelet_name == 'Morlet':
+        return wavelet.Morlet(param)
+    elif wavelet_name == 'Paul':
+        return wavelet.Paul(param)
+    elif wavelet_name == 'DOG':
+        return wavelet.DOG(param)
+    elif wavelet_name == 'MexicanHat':
+        return wavelet.MexicanHat()  # Uses m=2, so no need for param
+    else:
+        raise logger.error(f"Unknown wavelet type: {wavelet_name}")
 
 def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20, mincoh=0.5, maxdt=0.2, 
             min_nonzero=0.25, freqmin=0.1, freqmax=2.0):
@@ -214,7 +242,7 @@ def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20
 
     return dvv * 100, err * 100, wf
 
-def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqmax=8.0, nptsfreq=100):
+def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqmax=8.0, nptsfreq=100, wavelet_type):
     """
     Wavelet coherence transform (WCT) on two time series..
     The WCT finds regions in time frequency space where the two time
@@ -245,6 +273,9 @@ def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqma
     nptsfreq : int,
         Number of frequency points between freqmin and freqmax.
         Default value is 100 points
+    wavelet_type: list,
+        Wavelet type and associated parameter.
+        Default Morlet wavelet with a central frequency w0 = 6
        
     Returns
         ----------
@@ -264,8 +295,8 @@ def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqma
         Cone of influence, representing the region of the wavelet spectrum where edge effects become significant.
     
     """
-    # Choosing a Morlet wavelet with a central frequency w0 = 6
-    mother = wavelet.Morlet(6.) # TO DO mother wavelet class: Morlet, Paul, DOG, MexicanHat param 
+    
+    mother = get_wavelet_type(wavelet_type) # mother wavelet class: Morlet, Paul, DOG, MexicanHat param 
     # nx represent the number of element in the trace_current array
     nx = np.size(trace_current)
     x_reference = np.transpose(trace_ref)
@@ -389,7 +420,8 @@ def main(loglevel="INFO"):
     coda_cycles = params.dtt_codacycles 
     min_nonzero = params.dvv_min_nonzero
     wct_norm = params.wct_norm
-
+    wavelet_type = params.wavelet_type
+    
     mov_stacks = params.mov_stack
     goal_sampling_rate = params.cc_sampling_rate
     lag_min = params.dtt_minlag
@@ -470,7 +502,7 @@ def main(loglevel="INFO"):
                         new_waveform = cur
 
                     for date, row in new_waveform.iterrows():
-                        WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi = xwt(ori_waveform, row.values, goal_sampling_rate, int(ns), int(nt), int(vpo), freqmin, freqmax, int(nptsfreq))
+                        WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi = xwt(ori_waveform, row.values, goal_sampling_rate, int(ns), int(nt), int(vpo), freqmin, freqmax, int(nptsfreq), wavelet_type)
                         dvv, err, wf = compute_wct_dvv(freqs, taxis, WXamp, Wcoh, WXdt, lag_min=int(lag_min), coda_cycles=coda_cycles, mincoh=mincoh, maxdt=maxdt, min_nonzero=min_nonzero, freqmin=freqmin, freqmax=freqmax)
                         coh = get_avgcoh(freqs, taxis, Wcoh, freqmin, freqmax, lag_min=int(lag_min), coda_cycles=coda_cycles)
 
