@@ -156,7 +156,11 @@ def main(stype, interval=1.0, loglevel="INFO"):
             for components in components_to_compute:
                 logger.info('Processing %s-%s-%i' %
                       (pair, components, filterid))
-                c = get_results_all(db, sta1, sta2, filterid, components, days, format="xarray")
+                if params.keep_all:
+                    c = get_results_all(db, sta1, sta2, filterid, components, days, format="xarray")
+                else:
+                    logger.warning("keep_all=N used by default mov_stack=("1D","1D")") 
+                    c = get_results(db, sta1, sta2, filterid, components, days,  mov_stack=1, format="xarray", params=params)
                 # print(c)
                 # dr = xr_save_ccf(sta1, sta2, components, filterid, 1, taxis, c)
                 dr = c
@@ -170,6 +174,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     _ = _.mean(dim="times")
                     xr_save_ref(sta1, sta2, components, filterid, taxis, _)
                     continue
+                dr = dr.sortby('times')
                 dr = dr.resample(times="%is" % params.corr_duration).mean()
                 for mov_stack in mov_stacks:
                     # if mov_stack > len(dr.times):
@@ -187,7 +192,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                         # print("Will roll over %i seconds" % mov_rolling)
                         duration_to_windows = mov_rolling / params.corr_duration
                         if not duration_to_windows.is_integer():
-                            print("Warning, rounding down the number of windows to roll over")
+                            logger.warning("Warning, rounding down the number of windows to roll over")
                         duration_to_windows = int(max(1, math.floor(duration_to_windows)))
                         # print("Which is %i windows of %i seconds duration" % (duration_to_windows, params.corr_duration))
 
