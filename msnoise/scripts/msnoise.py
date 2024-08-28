@@ -200,7 +200,7 @@ def info_jobs(db):
 
     jobtypes = {}
     jobtypes["QC"] = ["PSD", "PSD2HDF", "HDF2RMS"]
-    jobtypes["CC"] = ["CC", "STACK", "MWCS", "DTT", "DVV"]
+    jobtypes["CC"] = ["CC", "STACK", "MWCS", "DTT", "DVV", "WCT]
 
     click.echo("Jobs:")
     for category in ["QC", "CC"]:
@@ -1222,6 +1222,27 @@ def dvv_compute_dtt(ctx):
 def dvv_compute_dvv(ctx):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s07_compute_dvv import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    if threads == 1:
+        main(loglevel=loglevel)
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main, kwargs={"loglevel": loglevel})
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
+@dvv.command(name='compute_wct')
+@click.pass_context
+def dvv_compute_wct(ctx):
+    """Computes the wavelet dv/v jobs based on the new STACK data"""
+    from ..s08compute_wct import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
