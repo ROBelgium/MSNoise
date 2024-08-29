@@ -159,7 +159,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                 if params.keep_all:
                     c = get_results_all(db, sta1, sta2, filterid, components, days, format="xarray")
                 else:
-                    logger.warning("keep_all=N used by default mov_stack=("1D","1D")") 
+                    logger.warning("keep_all=N used by default mov_stack=('1D','1D')") 
                     c = get_results(db, sta1, sta2, filterid, components, days,  mov_stack=1, format="xarray", params=params)
                 # print(c)
                 # dr = xr_save_ccf(sta1, sta2, components, filterid, 1, taxis, c)
