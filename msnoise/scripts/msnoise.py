@@ -200,7 +200,7 @@ def info_jobs(db):
 
     jobtypes = {}
     jobtypes["QC"] = ["PSD", "PSD2HDF", "HDF2RMS"]
-    jobtypes["CC"] = ["CC", "STACK", "MWCS", "DTT", "DVV", "WCT]
+    jobtypes["CC"] = ["CC", "STACK", "MWCS", "DTT", "DVV", "WCT"]
 
     click.echo("Jobs:")
     for category in ["QC", "CC"]:
