@@ -1340,7 +1340,35 @@ def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
         from ..plots.dtt import main
     main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile, loglevel=loglevel)
 
-
+@dvv_plot.command(name="wct")
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
+@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
+@click.option('-p', '--pair', default=None, help='Plot a specific pair',
+              multiple=True)
+@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
+@click.option('-e', '--end', default="2100-01-01", help='Plot until which date? (default=2100-01-01 or enddate)')
+@click.option('-b', '--begin',default="1970-01-01",  help="Plot from which date, can be relative to the endate ('-100'days)?(default=1970-01-01 or startdate)")
+@click.option('-v', '--visualize',default="dvv",  help="Which plot : wavelet 'dvv' heat map, wavelet 'coh'erence heat map, dv/v 'curve' with coherence color?", type=str)
+@click.option('-r', '--ranges',default="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]",  help="With visualize = 'curve', which frequency ranges to use?", type=str)
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+              default=None, type=str)
+@click.pass_context
+def dvv_plot_dvv(ctx, mov_stack, comp, filterid, pair, all, begin, end, visualize,ranges, show,  outfile):
+    """Plots the dv/v (parses the dt/t results)
+    Individual pairs can be plotted extra using the -p flag one or more times.
+    Example: msnoise plot dvv -p ID_KWUI_ID_POSI
+    Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
+    Remember to order stations alphabetically !
+    """
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    if ctx.obj['MSNOISE_custom']:
+        from wct_dvv import main # NOQA
+    else:
+        from ..plots.wct_dvv import main
+    main(mov_stack, comp, filterid, pair, all, begin, end, visualize, ranges, show, outfile, loglevel=loglevel)
 
 @dvv_plot.command(name="timing")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
