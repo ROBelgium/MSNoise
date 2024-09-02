@@ -1356,7 +1356,7 @@ def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
 @click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
-def dvv_plot_dvv(ctx, mov_stack, comp, filterid, pair, all, begin, end, visualize,ranges, show,  outfile):
+def dvv_plot_wct(ctx, mov_stack, comp, filterid, pair, all, begin, end, visualize,ranges, show,  outfile):
     """Plots the dv/v (parses the dt/t results)
     Individual pairs can be plotted extra using the -p flag one or more times.
     Example: msnoise plot dvv -p ID_KWUI_ID_POSI
