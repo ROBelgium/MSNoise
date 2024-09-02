@@ -1,3 +1,12 @@
+"""
+This plot shows the final output of MSNoise using the wavelet.
+
+
+Example:
+
+``msnoise cc dvv plot wct``
+
+"""
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
@@ -28,7 +37,7 @@ def plot_dvv_heatmap(data_type, dvv_df, pair, rolling, start, end, low, high, lo
     if data_type == 'dvv':
         low_per = np.nanpercentile(dvv_freq, 1)
         high_per = np.nanpercentile(dvv_freq, 99)
-        print('low_per', low_per, 'high_per', high_per)
+        
         ax.pcolormesh(np.asarray(dvv_freq.index), np.asarray(dvv_freq.columns), dvv_freq.T,
             cmap=mpl.cm.seismic, edgecolors='none', vmin=low_per, vmax=high_per)
         save_name = f"{pair[0]}_{low}_{high}_Hz_m{rolling_window}_dvv_heatmap"
