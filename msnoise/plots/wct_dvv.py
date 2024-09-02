@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from matplotlib.lines import Line2D
 import matplotlib.dates as mdates
-from datetime import datetime, timedelta
 import pandas as pd
 from ..api import *
+from datetime import datetime, timedelta
 
 def plot_dvv_heatmap(data_type, dvv_df, pair, rolling, start, end, low, high, logger, mincoh=0.5):
     # Extracting relevant data from dvv_df
@@ -26,8 +26,8 @@ def plot_dvv_heatmap(data_type, dvv_df, pair, rolling, start, end, low, high, lo
     #norm1 = plt.Normalize(vmin=np.min(dvv_freq.T), vmax=np.max(dvv_freq.T))
 
     if data_type == 'dvv':
-        low_per = np.percentile(dvv_freq, 1)
-        high_per = np.percentile(dvv_freq, 99)
+        low_per = np.nanpercentile(dvv_freq, 1)
+        high_per = np.nanpercentile(dvv_freq, 99)
         print('low_per', low_per, 'high_per', high_per)
         ax.pcolormesh(np.asarray(dvv_freq.index), np.asarray(dvv_freq.columns), dvv_freq.T,
             cmap=mpl.cm.seismic, edgecolors='none', vmin=low_per, vmax=high_per)
@@ -131,7 +131,7 @@ def plot_dvv_scatter(dvv_df, pair, rolling, start, end, ranges, logger):
 
 def save_figure(fig, filename, logger, mov_stack, components,filterid, visualize, plot_all_period=False, start=None, end=None, outfile=None):
     fig_path = os.path.join('Figures' if plot_all_period else 'Figures/Zooms')
-    create_folder(fig_path)
+    create_folder(fig_path, logger)
     mov_stack= mov_stack[0]
     if start and end:
         filename = f'{filename}_{str(start)[:10]}_{str(end)[:10]}'
@@ -243,11 +243,11 @@ def main(mov_stackid=None, components='ZZ', filterid=1,
         for comps in components:
             # Get the data
             if not pairs:
-                dvv = xr_get_wct(comps, filterid, mov_stack)
+                dvv = xr_get_wct(comps, filterid, mov_stack, logger)
                 pairs = ["all stations",]
             else:
                 try:
-                    dvv = xr_get_wct_pair(pairs, comps, filterid, mov_stack)    
+                    dvv = xr_get_wct_pair(pairs, comps, filterid, mov_stack, logger)    
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
