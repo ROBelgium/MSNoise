@@ -138,6 +138,9 @@ def conv2(x, y, mode='same'):
     return np.rot90(convolve2d(np.rot90(x, 2), np.rot90(y, 2), mode=mode), 2)
 
 def get_wavelet_type(wavelet_type):
+    """
+    return a wavelet object based on the specified wavelet type and associated parameter
+    """
     # Default parameters for each wavelet type
     default_params = {
         'Morlet': 6,
@@ -165,70 +168,6 @@ def get_wavelet_type(wavelet_type):
         return wavelet.MexicanHat()  # Uses m=2, so no need for param
     else:
         raise logger.error(f"Unknown wavelet type: {wavelet_name}")
-
-
-def compute_wct_dvv1(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20, mincoh=0.5, maxdt=0.2,
-            min_nonzero=0.25, freqmin=0.1, freqmax=2.0):
-
-    """
-    Measure velocity variations (dv/v) from the Wavelet coherence transform (WCT).
-
-    Parameters
-    ----------
-    freqs :
-        frequencies used in CWT
-    tvec : numpy.ndarray
-        time vector of the CCFs
-    WXamp : numpy.ndarray
-        amplitude product of two CWT in time-frequency domain
-    Wcoh :  numpy.ndarray
-        wavelet coherence
-    delta_t : numpy.ndarray
-        time difference between the two inputs in the time-frequency domain.
-    lag_min : float
-        lower limit of the analyzed lag tim on the CCF
-    lag_max : float
-        higher limit of the analyzed lag tim on the CCF
-    freqmin :
-        lower limit of the analyzed frequency range
-    freqmax :
-        higher limit of the analyzed frequency range
-    RETURNS:
-    ------------------
-    dvv*100 : estimated dv/v in %
-    err*100 : error of dv/v estimation in %
-    wf : weighting function used for the linear regressions
-
-    """
-    inx = np.where((freqs>=freqmin) & (freqs<=freqmax)) #TODO don't hardcode frequency range
-    dvv, err = np.zeros(inx[0].shape), np.zeros(inx[0].shape) # Create empty vectors vor dvv and err
-    t=tvec
-
-    ## Better weight function
-    weight_func = np.log(np.abs(WXamp))/np.log(np.abs(WXamp)).max()
-    zero_idx = (np.where((Wcoh<=0.65) | (delta_t>0.1))) #TODO get values from db
-    wf = weight_func+abs(np.nanmin(weight_func))
-    wf = wf/wf.max()
-    wf[zero_idx] = 0
-
-    ## Coda selection
-    tindex = np.where(((t >= -lag_max) & (t <= -lag_min)) | ((t >= lag_min) & (t <= lag_max)))[0] # Index of the coda
-    # loop through freq for linear regression
-    for ii, ifreq in enumerate(inx[0]): # Loop through frequencies index
-        if len(tvec)>2: # check time vector size
-            if not np.any(delta_t[ifreq]): # check non-empty dt array
-                continue
-            delta_t[ifreq][tindex]=np.nan_to_num(delta_t[ifreq][tindex])
-            w = wf[ifreq] # weighting function for the specific frequency
-            w[~np.isfinite(w)] = 1.0
-            #m, a, em, ea = linear_regression(time_axis[indx], delta_t[indx], w, intercept_origin=False) # if note forcing through origin
-            m, em = linear_regression(tvec[tindex], delta_t[ifreq][tindex], w[tindex], intercept_origin=True) #Forcing through origin
-            dvv[ii], err[ii] = -m, em
-        else:
-            dvv[ii], err[ii]=np.nan, np.nan
-
-    return dvv*100, err*100, wf
-
 
 def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20, mincoh=0.5, maxdt=0.2, 
             min_nonzero=0.25, freqmin=0.1, freqmax=2.0):
