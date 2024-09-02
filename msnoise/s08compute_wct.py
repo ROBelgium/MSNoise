@@ -38,12 +38,9 @@ import xarray as xr
 import scipy.optimize
 import scipy.signal
 import pycwt as wavelet
-from scipy.fft import next_fast_len
 from scipy.signal import convolve2d
-from scipy.stats import scoreatpercentile
 from obspy.signal.regression import linear_regression
 from .api import *
-
 import logbook
 import scipy
 import scipy.fft as sf
@@ -169,6 +166,70 @@ def get_wavelet_type(wavelet_type):
     else:
         raise logger.error(f"Unknown wavelet type: {wavelet_name}")
 
+
+def compute_wct_dvv1(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20, mincoh=0.5, maxdt=0.2,
+            min_nonzero=0.25, freqmin=0.1, freqmax=2.0):
+
+    """
+    Measure velocity variations (dv/v) from the Wavelet coherence transform (WCT).
+
+    Parameters
+    ----------
+    freqs :
+        frequencies used in CWT
+    tvec : numpy.ndarray
+        time vector of the CCFs
+    WXamp : numpy.ndarray
+        amplitude product of two CWT in time-frequency domain
+    Wcoh :  numpy.ndarray
+        wavelet coherence
+    delta_t : numpy.ndarray
+        time difference between the two inputs in the time-frequency domain.
+    lag_min : float
+        lower limit of the analyzed lag tim on the CCF
+    lag_max : float
+        higher limit of the analyzed lag tim on the CCF
+    freqmin :
+        lower limit of the analyzed frequency range
+    freqmax :
+        higher limit of the analyzed frequency range
+    RETURNS:
+    ------------------
+    dvv*100 : estimated dv/v in %
+    err*100 : error of dv/v estimation in %
+    wf : weighting function used for the linear regressions
+
+    """
+    inx = np.where((freqs>=freqmin) & (freqs<=freqmax)) #TODO don't hardcode frequency range
+    dvv, err = np.zeros(inx[0].shape), np.zeros(inx[0].shape) # Create empty vectors vor dvv and err
+    t=tvec
+
+    ## Better weight function
+    weight_func = np.log(np.abs(WXamp))/np.log(np.abs(WXamp)).max()
+    zero_idx = (np.where((Wcoh<=0.65) | (delta_t>0.1))) #TODO get values from db
+    wf = weight_func+abs(np.nanmin(weight_func))
+    wf = wf/wf.max()
+    wf[zero_idx] = 0
+
+    ## Coda selection
+    tindex = np.where(((t >= -lag_max) & (t <= -lag_min)) | ((t >= lag_min) & (t <= lag_max)))[0] # Index of the coda
+    # loop through freq for linear regression
+    for ii, ifreq in enumerate(inx[0]): # Loop through frequencies index
+        if len(tvec)>2: # check time vector size
+            if not np.any(delta_t[ifreq]): # check non-empty dt array
+                continue
+            delta_t[ifreq][tindex]=np.nan_to_num(delta_t[ifreq][tindex])
+            w = wf[ifreq] # weighting function for the specific frequency
+            w[~np.isfinite(w)] = 1.0
+            #m, a, em, ea = linear_regression(time_axis[indx], delta_t[indx], w, intercept_origin=False) # if note forcing through origin
+            m, em = linear_regression(tvec[tindex], delta_t[ifreq][tindex], w[tindex], intercept_origin=True) #Forcing through origin
+            dvv[ii], err[ii] = -m, em
+        else:
+            dvv[ii], err[ii]=np.nan, np.nan
+
+    return dvv*100, err*100, wf
+
+
 def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20, mincoh=0.5, maxdt=0.2, 
             min_nonzero=0.25, freqmin=0.1, freqmax=2.0):
     """
@@ -231,7 +292,6 @@ def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20
 
             # Percentage of non-zero weights
             nzc_perc = np.count_nonzero(w[tindex]) / len(tindex)
-
             if nzc_perc >= min_nonzero:
                 m, em = linear_regression(tvec[tindex], delta_t[ifreq][tindex], w[tindex], intercept_origin=True)
                 dvv[ii], err[ii] = -m, em
@@ -239,10 +299,10 @@ def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20
                 dvv[ii], err[ii] = np.nan, np.nan
         else:
             logger.debug('Not enough points to estimate dv/v for WCT')
-
+    
     return dvv * 100, err * 100, wf
 
-def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqmax=8.0, nptsfreq=100, wavelet_type):
+def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqmax=8.0, nptsfreq=100, wavelet_type=('Morlet',6.)):
     """
     Wavelet coherence transform (WCT) on two time series..
     The WCT finds regions in time frequency space where the two time
@@ -327,7 +387,6 @@ def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqma
 
     cfs2 = smoothCFS(invscales * abs(cwt_current) ** 2, scales, dt, ns, nt)
     cfs1 = smoothCFS(invscales * abs(cwt_reference) ** 2, scales, dt, ns, nt)
-
     crossCFS = cwt_reference * np.conj(cwt_current)
     WXamp = abs(crossCFS)
     # cross-wavelet transform operation with smoothing
@@ -394,7 +453,6 @@ def xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_
     ds.to_netcdf(fn)
 
     logger.debug(f"Saved WCT data to {fn}")
-
     # Clean up
     del dvv_da, err_da, coh_da, ds
 
@@ -402,7 +460,6 @@ def xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_
 
 
 def main(loglevel="INFO"):
-
     # Reconfigure logger to show the pid number in log records
     global logger
     logger = get_logger('msnoise.compute_wct_child', loglevel,
@@ -452,20 +509,16 @@ def main(loglevel="INFO"):
             freqmin = f.low
             freqmax = f.high
 
-            ref_name = pair.replace(':', '_')
             station1, station2 = pair.split(":")
-
             if station1 == station2:
                 components_to_compute = params.components_to_compute_single_station
             else:
                 components_to_compute = params.components_to_compute
 
-
             for components in components_to_compute:
                 try:
                     ref = xr_get_ref(station1, station2, components, filterid, taxis)
                     ref = ref.CCF.values
-
                     if wct_norm:
                         ori_waveform = (ref/ref.max()) 
                     else:
@@ -475,7 +528,6 @@ def main(loglevel="INFO"):
                     continue
                 if not len(ref):
                     continue
-
 
                 for mov_stack in mov_stacks:
                     dvv_list = []
@@ -491,7 +543,6 @@ def main(loglevel="INFO"):
 
                     to_search = pd.to_datetime(days)
                     to_search = to_search.append(pd.DatetimeIndex([to_search[-1]+pd.Timedelta("1d"),]))
-                    # data = data[(data.index.floor('d').isin(to_search) or data.index.ceil('d').isin(to_search))]
                     data = data[data.index.floor('d').isin(to_search)]
                     data = data.dropna()
 
@@ -505,21 +556,19 @@ def main(loglevel="INFO"):
                         WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi = xwt(ori_waveform, row.values, goal_sampling_rate, int(ns), int(nt), int(vpo), freqmin, freqmax, int(nptsfreq), wavelet_type)
                         dvv, err, wf = compute_wct_dvv(freqs, taxis, WXamp, Wcoh, WXdt, lag_min=int(lag_min), coda_cycles=coda_cycles, mincoh=mincoh, maxdt=maxdt, min_nonzero=min_nonzero, freqmin=freqmin, freqmax=freqmax)
                         coh = get_avgcoh(freqs, taxis, Wcoh, freqmin, freqmax, lag_min=int(lag_min), coda_cycles=coda_cycles)
-
                         dvv_list.append(dvv)
                         err_list.append(err)
                         coh_list.append(coh)
                         data_dates.append(date)
 
-
-                    if len(dvv_list) > 1:
+                    if len(dvv_list) > 0:#1:
                         inx = np.where((freqs >= freqmin) & (freqs <= freqmax))
 
                         dvv_df = pd.DataFrame(dvv_list, columns=freqs[inx], index=data_dates)
                         err_df = pd.DataFrame(err_list, columns=freqs[inx], index=data_dates)
                         coh_df = pd.DataFrame(coh_list, columns=freqs[inx], index=data_dates)
 
-                        # Save using the xr_save_wct function
+                        # Saving
                         xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_df, err_df, coh_df)
 
                         del dvv_df, err_df, coh_df
@@ -528,3 +577,6 @@ def main(loglevel="INFO"):
         massive_update_job(db, jobs, "D")
 
     logger.info('*** Finished: Compute WCT ***')
+
+if __name__ == "__main__":
+    main()
