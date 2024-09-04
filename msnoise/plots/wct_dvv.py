@@ -227,14 +227,21 @@ def main(mov_stackid=None, components='ZZ', filterid=1,
         end = params.enddate
 
     # TODO clearer  mov_stackid to additionnal rolling
-    if mov_stackid and mov_stackid != "":
+    if mov_stackid and mov_stackid != "": #if mov_stackid given
         try:
             mov_stack = params.mov_stack[mov_stackid - 1]
-            mov_stacks = [mov_stack, ]
-            rolling = mov_stack
+            if mov_stack in params.mov_stack:  # Check if mov_stack is in params.mov_stack
+                mov_stacks = [mov_stack, ]
+                rolling = 1
+            else:
+                rolling = mov_stackid  # Assign  mov_stack to rolling
         except:
-            mov_stacks = [params.mov_stack[0], ]
-            rolling = mov_stackid
+            mov_stack = params.mov_stack[0]
+            if mov_stack in params.mov_stack:  # Check if mov_stack is in params.mov_stack new format
+                mov_stacks = [mov_stack, ]
+                rolling = 1  # Keeping the mov_stack result
+            else:
+                rolling = mov_stack  # Assign mov_stack to rolling
     else:
         mov_stacks = params.mov_stack
         rolling = int(params.mov_stack[0][0][0])
