@@ -340,64 +340,6 @@ def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqma
 
     return WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi
 
-def xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_df, err_df, coh_df):
-    """
-    Save the Wavelet Coherence Transform (WCT) results as a NetCDF file.
-    
-    Parameters
-    ----------
-    station1 : str
-        The first station in the pair.
-    station2 : str
-        The second station in the pair.
-    components : str
-        The components (e.g., Z, N, E) being analyzed.
-    filterid : int
-        Filter ID used in the analysis.
-    mov_stack : tuple
-        Tuple of (start, end) representing the moving stack window.
-    taxis : array-like
-        Time axis corresponding to the WCT data.
-    dvv_df : pandas.DataFrame
-        DataFrame containing dvv data (2D).
-    err_df : pandas.DataFrame
-        DataFrame containing err data (2D).
-    coh_df : pandas.DataFrame
-        DataFrame containing coh data (2D).
-    
-    Returns
-    -------
-    None
-    """
-    # Construct the file path
-    fn = os.path.join("WCT", f"{filterid:02d}", f"{mov_stack[0]}_{mov_stack[1]}",
-                      components, f"{station1}_{station2}.nc")
-
-    # Ensure the directory exists
-    os.makedirs(os.path.dirname(fn), exist_ok=True)
-
-    # Convert DataFrames to xarray.DataArrays
-    dvv_da = xr.DataArray(dvv_df.values, coords=[dvv_df.index, dvv_df.columns], dims=['times', 'frequency'])
-    err_da = xr.DataArray(err_df.values, coords=[err_df.index, err_df.columns], dims=['times', 'frequency'])
-    coh_da = xr.DataArray(coh_df.values, coords=[coh_df.index, coh_df.columns], dims=['times', 'frequency'])
-
-    # Combine into a single xarray.Dataset
-    ds = xr.Dataset({
-        'dvv': dvv_da,
-        'err': err_da,
-        'coh': coh_da
-    })
-
-    # Save the dataset to a NetCDF file
-    ds.to_netcdf(fn)
-
-    logger.debug(f"Saved WCT data to {fn}")
-    # Clean up
-    del dvv_da, err_da, coh_da, ds
-
-
-
-
 def main(loglevel="INFO"):
     # Reconfigure logger to show the pid number in log records
     global logger
