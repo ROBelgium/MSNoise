@@ -9,8 +9,9 @@ Plot a Reference CCF
 # Delete them and run the code in your project folder.
 
 import os
-if "SPHINX_DOC_BUILD" in os.environ:
-    os.chdir(r"X:\msnoise2")
+if "SPHINX_DOC_BUILD" in os.environ or 1:
+    os.chdir(r"C:\tmp\MSNOISE_DOC")
+
 
 import matplotlib
 matplotlib.use("agg")
@@ -24,7 +25,7 @@ register_matplotlib_converters()
 
 plt.style.use("ggplot")
 
-from msnoise.api import connect, get_results, build_movstack_datelist, get_params, get_t_axis
+from msnoise.api import connect, get_results, build_movstack_datelist, get_params, get_t_axis, xr_get_ref
 
 # connect to the database
 db = connect()
@@ -38,14 +39,11 @@ params = get_params(db)
 # Get the time axis for plotting the CCF:
 taxis = get_t_axis(db)
 
-# Get the results for two station, filter id=1, ZZ component, mov_stack=1 and stack the results:
-n, ccf = get_results(db, "YA.FLR.00", "YA.FOR.00", 1, "ZZ", datelist, 1, format="stack", params=params)
+# Get the results for two station, filter id=1, ZZ component, mov_stack=("1d","1d") and stack the results:
+ccf = xr_get_ref("PF.FJS.00", "PF.FOR.00", "ZZ", 1, taxis)
 
-plt.figure()
-plt.plot(taxis, ccf)
-plt.title("Reference Function")
-plt.xlabel("Lag Time (s)")
-plt.ylabel("Amplitude")
+
+ccf.plot(figsize=(8,8))
 
 
 #EOF

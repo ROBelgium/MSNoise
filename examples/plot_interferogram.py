@@ -6,8 +6,8 @@ Plot an interferogram
 """
 
 import os
-if "SPHINX_DOC_BUILD" in os.environ:
-    os.chdir(r"X:\msnoise2")
+if "SPHINX_DOC_BUILD" in os.environ or 1:
+    os.chdir(r"C:\tmp\MSNOISE_DOC")
 
 import matplotlib
 matplotlib.use("agg")
@@ -20,7 +20,7 @@ register_matplotlib_converters()
 
 plt.style.use("ggplot")
 
-from msnoise.api import connect, get_results, build_movstack_datelist, get_params, get_t_axis
+from msnoise.api import connect, get_results, build_movstack_datelist, get_params, get_t_axis, xr_get_ccf
 
 # connect to the database
 db = connect()
@@ -34,43 +34,43 @@ params = get_params(db)
 # Get the time axis for plotting the CCF:
 taxis = get_t_axis(db)
 
+# Get the first mov_stack configured:
+mov_stack = params.mov_stack[0]
+
 # Get the results for two station, filter id=1, ZZ component, mov_stack=1 and the results as a 2D array:
-n, ccfs = get_results(db, "YA.FLR.00", "YA.FOR.00", 1, "ZZ", datelist, 1, format="matrix", params=params)
+ccf = xr_get_ccf("PF.FJS.00", "PF.FOR.00", "ZZ", 1, mov_stack, taxis, format="xarray")
 
-# Convert to a pandas DataFrame object for convenience, and drop empty rows:
-df = pd.DataFrame(ccfs, index=pd.DatetimeIndex(datelist), columns=taxis)
-df = df.dropna()
-
-# Define the 99% percentile of the data, for visualisation purposes:
-clim = df.mean(axis="index").quantile(0.99)
-
-fig, ax = plt.subplots()
-plt.pcolormesh(df.columns, df.index.to_pydatetime(), df.values,
-               vmin=-clim, vmax=clim, rasterized=True)
-plt.colorbar()
-plt.title("Interferogram")
-plt.xlabel("Lag Time (s)")
-plt.ylim(df.index[0],df.index[-1])
-plt.xlim(df.columns[0], df.columns[-1])
-plt.subplots_adjust(left=0.15)
+# Plot the interferogram
+ccf.plot(robust=True, figsize=(10,8))
 
 
 ##############################################################################
 # Running a simple moving window average can be done with pandas's functions:
 
+smooth = ccf.rolling(times=5).mean()
 
-smooth = df.rolling(5).mean()
-
-fig, ax = plt.subplots()
-plt.pcolormesh(smooth.columns, smooth.index.to_pydatetime(), smooth.values,
-               vmin=-clim, vmax=clim, rasterized=True)
-plt.colorbar()
-plt.title("Interferogram (smoothed over 5 days)")
-plt.xlabel("Lag Time (s)")
-plt.ylim(smooth.index[0],smooth.index[-1])
-plt.xlim(smooth.columns[0], smooth.columns[-1])
-plt.subplots_adjust(left=0.15)
+smooth.plot(robust=True, figsize=(10,8))
 
 
-plt.show()  
+#############################################################
+# Plotting the sub-daily stacks and zooming on +- 20 seconds:
+
+if "SPHINX_DOC_BUILD" in os.environ or 1:
+    os.chdir(r"C:\tmp\MSNOISE_DOC")
+
+# Get the last mov_stack configured:
+mov_stack = params.mov_stack[-1]
+
+# Get the results for two station, filter id=1, ZZ component, mov_stack=1 and the results as a 2D array:
+ccf = xr_get_ccf("PF.FJS.00", "PF.FOR.00", "ZZ", 1, mov_stack, taxis, format="xarray")
+
+# Plot the interferogram and zoom in around +- 10 seconds lag
+ccf.loc[:,-20:20].plot(robust=True, figsize=(10,8))
+
+
+#############################################################
+# Finally, stacking to a Reference function
+
+ccf.mean(axis=0).plot(figsize=(10,8))
+
 #EOF

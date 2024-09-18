@@ -2252,7 +2252,7 @@ def xr_save_ccf(station1, station2, components, filterid, mov_stack, taxis, new,
         return dr
 
 
-def xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis):
+def xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis, format="dataframe"):
     path = os.path.join("STACKS2", "%02i" % filterid,
                         "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
@@ -2262,7 +2262,10 @@ def xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis):
         # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
         raise FileNotFoundError(fullpath)
     data = xr_create_or_open(fullpath, taxis, name="CCF")
-    return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
+    if format == "xarray":
+        return data.CCF
+    else:
+        return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
 
 
 def xr_save_ref(station1, station2, components, filterid, taxis, new, overwrite=False):

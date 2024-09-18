@@ -1220,7 +1220,7 @@ def dvv_compute_dtt(ctx):
 @dvv.command(name='compute_dvv')
 @click.pass_context
 def dvv_compute_dvv(ctx):
-    """Computes the dt/t jobs based on the new MWCS data"""
+    """Computes the dt/t jobs based on the new DTT data"""
     from ..s07_compute_dvv import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
