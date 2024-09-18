@@ -2608,6 +2608,6 @@ def xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_
     # Save the dataset to a NetCDF file
     ds.to_netcdf(fn)
 
-    logger.debug(f"Saved WCT data to {fn}")
+    logging.debug(f"Saved WCT data to {fn}")
     # Clean up
     del dvv_da, err_da, coh_da, ds
