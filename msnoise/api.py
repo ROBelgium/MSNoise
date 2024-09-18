@@ -2169,6 +2169,19 @@ def xr_create_or_open(fn, taxis=[], name="CCF"):
         data = np.random.random((len(times), len(level0), len(level1)))
         dr = xr.DataArray(data, coords=[times, level0, level1],
                           dims=["times", "level0", "level1"])
+    elif name == "WCT":
+        dvv_data = np.random.random((len(times), len(taxis)))
+        err_data = np.random.random((len(times), len(taxis)))
+        coh_data = np.random.random((len(times), len(taxis)))
+
+        dvv_da = xr.DataArray(dvv_data, coords=[times, taxis], dims=['times', 'frequency'])
+        err_da = xr.DataArray(err_data, coords=[times, taxis], dims=['times', 'frequency'])
+        coh_da = xr.DataArray(coh_data, coords=[times, taxis], dims=['times', 'frequency'])
+
+        # Combine into a Dataset
+        ds = xr.Dataset({'dvv': dvv_da,'err': err_da,'coh': coh_da})
+        return ds
+        
     else:
         logging.error("Not implemented, name=%s invalid." % name)
         sys.exit(1)
@@ -2608,8 +2621,10 @@ def xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_
         'coh': coh_da
     })
 
-    # Save the dataset to a NetCDF file
-    ds.to_netcdf(fn)
+    existing_ds = xr_create_or_open(fn, name="WCT")
+    updated_ds = xr_insert_or_update(existing_ds, ds)
+    xr_save_and_close(updated_ds, fn)
+
 
     logging.debug(f"Saved WCT data to {fn}")
     # Clean up
