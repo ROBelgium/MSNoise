@@ -190,8 +190,9 @@ def main(stype, interval=1.0, loglevel="INFO"):
                             print("Warning, rounding down the number of windows to roll over")
                         duration_to_windows = int(max(1, math.floor(duration_to_windows)))
                         # print("Which is %i windows of %i seconds duration" % (duration_to_windows, params.corr_duration))
-
-                        xx = dr.rolling(times=duration_to_windows, min_periods=1).mean()
+                        # That construct thing shouldn't be necessary, but without it, tests fail when bottleneck is installed
+                        # ref: https://github.com/pydata/xarray/issues/3165
+                        xx = dr.rolling(times=duration_to_windows, min_periods=1).construct("win").mean("win")
                         xx = xx.resample(times=mov_sample, label="right", skipna=True).asfreq().dropna("times", how="all")
 
                     xr_save_ccf(sta1, sta2, components, filterid, mov_stack, taxis, xx, overwrite=True)
