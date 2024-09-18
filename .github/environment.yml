@@ -22,5 +22,6 @@ dependencies:
   - xarray
   - sqlalchemy-utils
   - pooch
-  - pycwt
+  - pip:
+      - git+https://github.com/regeirk/pycwt
 

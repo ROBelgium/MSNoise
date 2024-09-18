@@ -41,7 +41,7 @@ setup(version=get_git_version(),
           'logbook',
           'xarray',  # new in 2.0
           'pooch', # new in 2.0
-          'pycwt', # new in 2.0
+          'pycwt>0.3.9', # new in 2.0
       ],
       extras_require={
           'doc': [
