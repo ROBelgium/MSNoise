@@ -19,9 +19,9 @@ from datetime import datetime, timedelta
 def plot_dvv_heatmap(data_type, dvv_df, pair, rolling, start, end, low, high, logger, mincoh=0.5):
     # Extracting relevant data from dvv_df
     dvv_df = dvv_df.loc[start:end]
-    if dvv_df.empty:
+    if dvv_df is None or dvv_df.empty:
         logger.error(f"No data available for {pair} between {start} and {end}. Exiting function.")
-        return
+        return None, None
     rolling_window = int(rolling)
     
     dvv_freq = dvv_df['dvv']
@@ -50,7 +50,7 @@ def plot_dvv_heatmap(data_type, dvv_df, pair, rolling, start, end, low, high, lo
         color_bar_label = 'Coherence value'
     else:
         logger.error("Unknown data type: %s, write 'dvv' or 'coh'? " % data_type)
-        return None, None, None
+        return None, None
 
     #if current_config.get('plot_event', False):
     #    plot_events(ax, current_config['event_list'], start, end)
@@ -77,9 +77,9 @@ def plot_dvv_heatmap(data_type, dvv_df, pair, rolling, start, end, low, high, lo
 def plot_dvv_scatter(dvv_df, pair, rolling, start, end, ranges, logger):
     # Extracting relevant data from dvv_df
     dvv_df = dvv_df.loc[start:end]
-    if dvv_df.empty:
+    if dvv_df is None or dvv_df.empty:
         logger.error(f"No data available for {pair} between {start} and {end}. Exiting function.")
-        return
+        return None, None
     rolling_window = int(rolling)
 
     color = ['Blues', 'Reds','Greens','Greys'] #'Purples'
@@ -178,6 +178,9 @@ def xr_get_wct_pair(pair, components, filterid, mov_stack, logger):
         logger.error("FILE DOES NOT EXIST: %s, skipping" % fn)
     
     data = xr_create_or_open(fn, name="WCT")
+    if data is None:
+        logger.error(f"Empty file for pair {pair}.")
+        return None
     data = data.to_dataframe().unstack(level='frequency')
     return data
 
@@ -268,6 +271,9 @@ def main(mov_stackid=None, components='ZZ', filterid=1,
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
             # Plotting
+            if dvv is None:
+                logger.error(f"No data available for {pairs}. Skipping plot.")
+                continue
             if visualize == 'dvv':
                 fig, savename = plot_dvv_heatmap('dvv', dvv, pairs, rolling, start, end, low, high, logger, mincoh)
             elif visualize == 'coh':
@@ -277,9 +283,12 @@ def main(mov_stackid=None, components='ZZ', filterid=1,
             else:
                 logger.error("PLOT TYPE DOES NOT EXIST: %s" % visualize)
             # Save and show the figure
-            save_figure(fig, savename, logger, mov_stacks, comps, filterid, visualize, plot_all_period=False, start=start, end=end, outfile=outfile)
-            if show:
-                plt.show()
+            if fig is not None :
+                save_figure(fig, savename, logger, mov_stacks, comps, filterid, visualize, plot_all_period=False, start=start, end=end, outfile=outfile)
+                if show:
+                    plt.show()
+            else:
+                logger.error("Figure was not created. Skipping save.")
 
 if __name__ == "__main__":
     main()
