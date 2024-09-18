@@ -22,4 +22,5 @@ dependencies:
   - xarray
   - sqlalchemy-utils
   - pooch
+  - pycwt
 

@@ -40,7 +40,8 @@ setup(version=get_git_version(),
           'scandir',  # useful for python < 3.5
           'logbook',
           'xarray',  # new in 2.0
-          'pooch', #new in 2.0
+          'pooch', # new in 2.0
+          'pycwt', # new in 2.0
       ],
       extras_require={
           'doc': [
