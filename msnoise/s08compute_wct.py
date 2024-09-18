@@ -1,33 +1,42 @@
 """
 Wavelet Coherence Transform (WCT) Computation
 This script performs the computation of the Wavelet Coherence Transform (WCT), a tool used to analyze the correlation between two time series in the time-frequency domain. The script supports parallel processing and interacts with a database to manage job statuses.
+
 Filter Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* |dtt_minlag| : Minimum lag time for DTT (Differential Time Travel) analysis.
-* |dtt_maxdt| : Maximum allowable time difference for coherence calculation.
-* |dtt_mincoh| : Minimum coherence required for DTT job inclusion.
-* |dtt_codacycles| : Number of coda cycles to consider in the computation.
-* |wct_ns| : Smoothing parameter for wavelet coherence transform.
-* |wct_nt| : Smoothing parameter for wavelet coherence transform.
-* |wct_vpo| : Spacing parameter between discrete scales in the wavelet transform.
-* |wct_nptsfreq| : Number of frequency points between `freqmin` and `freqmax`.
-* |dtt_min_nonzero| : Minimum percentage of non-zero weights required for the DTT computation.
-* |wct_norm| : Flag indicating whether to normalize waveforms before processing.
-* |hpc| | 
+
+* |dtt_minlag|
+* |dtt_maxdt|
+* |dtt_mincoh|
+* |dtt_codacycles|
+* |wct_ns|
+* |wct_nt|
+* |wct_vpo|
+* |wct_nptsfreq|
+* |dvv_min_nonzero|
+* |wct_norm|
+* |hpc|
+
 This process is job-based, so it is possible to run several instances in
 parallel.
-Once done, each job is marked "D"one in the database and, unless ``hpc`` is 
-``Y``, DTT jobs are inserted/updated in the database.
+
+
 To run this step:
+
 .. code-block:: sh
+
     $ msnoise cc dvv compute_wct
+
 This step also supports parallel processing/threading:
+
 .. code-block:: sh
+
     $ msnoise -t 4 cc dvv compute_wct
+
 will start 4 instances of the code (after 1 second delay to avoid database
 conflicts). This works both with SQLite and MySQL but be aware problems
 could occur with SQLite.
-    Parallel Processing
+
 """
 
 import os
