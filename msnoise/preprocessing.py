@@ -48,7 +48,7 @@ import io
 import logbook
 logger = logbook.Logger(__name__)
 
-def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO"):
+def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO", logger='msnoise.compute_cc_norot_child'):
     """
     Fetches data for each ``stations`` and each ``comps`` using the
     data_availability table in the database.
@@ -87,7 +87,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
     :rtype: :class:`obspy.core.stream.Stream`
     :return: A Stream object containing all traces.
     """
-    logger = get_logger('msnoise.compute_cc_norot_child', loglevel,
+    logger = get_logger(logger, loglevel or "INFO",
                         with_pid=True)
     logger.debug('*** Starting: preprocessing ***')
     datafiles = {}
@@ -202,6 +202,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
 
                 logger.debug("%s Checking Gaps" % stream[0].id)
                 if len(getGaps(stream)) > 0:
+                    logger.debug(" found %i gaps" % len(getGaps(stream)))
                     max_gap = params.preprocess_max_gap*stream[0].stats.sampling_rate
 
                     gaps = getGaps(stream)
@@ -226,8 +227,10 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                     del gaps
 
                 stream = stream.split()
+                logger.debug("%s Checking sampling rate" % stream[0].id)
                 for tr in stream:
                     if tr.stats.sampling_rate < (params.goal_sampling_rate-1):
+                        logger.warning("Trace has a lower sampling rate than the goal_sampling_rate, removing!")
                         stream.remove(tr)
                 taper_length = params.preprocess_taper_length  # seconds
                 for trace in stream:

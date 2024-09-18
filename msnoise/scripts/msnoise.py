@@ -223,9 +223,9 @@ def info_plugins(db):
     if not plugins:
         return
     plugins = plugins.split(",")
-    import pkg_resources
-    for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
-        module_name = ep.module_name.split(".")[0]
+    from importlib.metadata import entry_points
+    for ep in list(entry_points(group='msnoise.plugins.jobtypes')):
+        module_name = ep.value.split(".")[0]
         if module_name in plugins:
             click.echo('')
             click.echo('Plugin: %s' % module_name)
@@ -234,7 +234,7 @@ def info_plugins(db):
                 for (n, jobtype) in get_job_types(db, row["name"]):
                     click.echo("  %s : %i" % (jobtype, n))
 
-from pkg_resources import iter_entry_points
+# from pkg_resources import iter_entry_points
 
 # import click
 # from click_plugins import with_plugins
@@ -1553,10 +1553,10 @@ except sqlalchemy.exc.OperationalError as e:
     sys.exit(1)
 
 if plugins:
-    import pkg_resources
+    from importlib.metadata import entry_points
     plugins = plugins.split(",")
-    for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.commands'):
-        module_name = ep.module_name.split(".")[0]
+    for ep in list(entry_points(group='msnoise.plugins.commands')):
+        module_name = ep.value.split(".")[0]
         if module_name in plugins:
             plugin.add_command(ep.load())
 
