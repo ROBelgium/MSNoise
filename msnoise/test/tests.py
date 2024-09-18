@@ -441,6 +441,22 @@ class MSNoiseTests(unittest.TestCase):
     #     from ..s03compute_no_rotation import main
     #     main()
 
+    def test_032_wct(self):
+        from ..api import connect, read_db_inifile
+        from sqlalchemy import text
+        db = connect()
+        dbini = read_db_inifile()
+        prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
+        db.execute(text("INSERT INTO {prefix}jobs (pair, day, jobtype, flag) "
+                       "SELECT pair, day, '{right_type}', 'T' FROM {prefix}jobs "
+                       "WHERE jobtype='{left_type}' AND flag='D';"
+                       .format(prefix=prefix, right_type="WCT", left_type="STACK")))
+        db.commit()
+
+        from ..s08compute_wct import main
+        main()
+        db.close()
+    
     # PLOTS
 
     def test_100_plot_cctfime(self):
@@ -542,6 +558,13 @@ class MSNoiseTests(unittest.TestCase):
         self.assertTrue(os.path.isfile("jobs.csv"))
         self.assertTrue(os.path.isfile("data_availability.csv"))
 
+    def test_106_plot_wct(self):
+        from ..plots.wct_dvv import main
+        main(filterid=1, components="ZZ", show=False, outfile="?.png")
+        fn = "wct ZZ-f1-dvv.png"
+        self.assertTrue(os.path.isfile(fn),
+                        msg="%s doesn't exist" % fn)
+  
     ### A few click CLI interface tests
 
     def test_201_config_get_unknown_param(self):
