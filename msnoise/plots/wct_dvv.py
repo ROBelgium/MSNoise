@@ -275,7 +275,7 @@ def main(mov_stackid=None, components='ZZ', filterid=1,
             elif visualize == 'curve':
                 fig, savename = plot_dvv_scatter(dvv, pairs, rolling, start, end, ranges, logger)
             else:
-                looger.error("PLOT TYPE DOES NOT EXIST: %s" % visualize)
+                logger.error("PLOT TYPE DOES NOT EXIST: %s" % visualize)
             # Save and show the figure
             save_figure(fig, savename, logger, mov_stacks, comps, filterid, visualize, plot_all_period=False, start=start, end=end, outfile=outfile)
             if show:
