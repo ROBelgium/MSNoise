@@ -145,7 +145,7 @@ sphinx_gallery_conf = {
      'examples_dirs': '../examples',   # path to your example scripts
      'gallery_dirs': 'auto_examples',  # path where to save gallery generated examples
      'show_memory': False,
-     'thumbnail_size': (250, 250),
+     'thumbnail_size': (400, 400),
 }
 intersphinx_cache_limit = 5
 

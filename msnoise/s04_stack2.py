@@ -49,7 +49,7 @@ Configuration Parameters
 
 * |ref_begin|
 * |ref_end|
-* |mov_stack|
+* |mov_stack| | * changed in 2.0 !!
 * |stack_method| | *new in 1.4*
 * |pws_timegate| | *new in 1.4*
 * |pws_power| | *new in 1.4*
