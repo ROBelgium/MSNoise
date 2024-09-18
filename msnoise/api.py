@@ -2618,8 +2618,10 @@ def xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_
         'coh': coh_da
     })
 
-    # Save the dataset to a NetCDF file
-    ds.to_netcdf(fn)
+    existing_ds = xr_create_or_open(fn, name="WCT")
+    updated_ds = xr_insert_or_update(existing_ds, ds)
+    xr_save_and_close(updated_ds, fn)
+
 
     logging.debug(f"Saved WCT data to {fn}")
     # Clean up
