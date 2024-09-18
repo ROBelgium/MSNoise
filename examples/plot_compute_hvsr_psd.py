@@ -13,8 +13,9 @@ Compute the H/V spectral ratio from the ratios of PSDs
 
 import os
 
-if "SPHINX_DOC_BUILD" in os.environ or 1:
-    os.chdir(r"C:\tmp\MSNOISE_DOC")
+if "SPHINX_DOC_BUILD" in os.environ:
+    if "MSNOISE_DOC" in os.environ:
+        os.chdir(os.environ["MSNOISE_DOC"])
 
 import matplotlib
 # matplotlib.use("agg")

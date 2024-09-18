@@ -9,8 +9,9 @@ Compute the H/V spectral ratio from the imaginary part of the CCFs
 # Import & getting the data from the computed autocorrelations (ZZ, EE, NN)
 
 import os
-if "SPHINX_DOC_BUILD" in os.environ or 1:
-    os.chdir(r"C:\tmp\MSNOISE_DOC")
+if "SPHINX_DOC_BUILD" in os.environ:
+    if "MSNOISE_DOC" in os.environ:
+        os.chdir(os.environ["MSNOISE_DOC"])
 
 import matplotlib
 matplotlib.use("agg")

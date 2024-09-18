@@ -6,8 +6,9 @@ Plot an interferogram
 """
 
 import os
-if "SPHINX_DOC_BUILD" in os.environ or 1:
-    os.chdir(r"C:\tmp\MSNOISE_DOC")
+if "SPHINX_DOC_BUILD" in os.environ:
+    if "MSNOISE_DOC" in os.environ:
+        os.chdir(os.environ["MSNOISE_DOC"])
 
 import matplotlib
 matplotlib.use("agg")
@@ -55,8 +56,9 @@ smooth.plot(robust=True, figsize=(10,8))
 #############################################################
 # Plotting the sub-daily stacks and zooming on +- 20 seconds:
 
-if "SPHINX_DOC_BUILD" in os.environ or 1:
-    os.chdir(r"C:\tmp\MSNOISE_DOC")
+if "SPHINX_DOC_BUILD" in os.environ:
+    if "MSNOISE_DOC" in os.environ:
+        os.chdir(os.environ["MSNOISE_DOC"])
 
 # Get the last mov_stack configured:
 mov_stack = params.mov_stack[-1]

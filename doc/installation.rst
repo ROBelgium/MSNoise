@@ -96,6 +96,11 @@ To build this documentation, some modules are required:
     pip install "sphinx_rtd_theme>1"
     pip install pillow==9.0.0
 
+If you plan to build the interaction examples, you'll need to download this link:
+
+.. todo:: ADD LINK TO THE BIG DATA REPO
+
+and define an environment variable ``MSNOISE_DOC`` with the path to where that data has been extracted.
 
 Then, this should simply work:
 
@@ -103,7 +108,7 @@ Then, this should simply work:
 
     make html
     
-it will create a .build folder containing the documentation.
+it will create a .build/html folder containing the documentation.
 
 You can also build the doc to Latex and then use your favorite Latex-to-PDF
 tool.
