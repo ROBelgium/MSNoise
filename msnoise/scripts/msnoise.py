@@ -1374,7 +1374,7 @@ def dvv_plot_wct(ctx, mov_stack, comp, filterid, pair, all, begin, end, visualiz
         from ..plots.wct_dvv import main
     main(mov_stack, comp, filterid, pair, all, begin, end, visualize, ranges, show, outfile, loglevel=loglevel)
 
-@dvv_plot.command(name="timing")
+@dvv_plot.command(name="dvvs")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')

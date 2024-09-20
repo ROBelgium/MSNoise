@@ -17,21 +17,19 @@ from msnoise.api import *
 
 
 
-def main(mov_stack=None, components='ZZ', filterid=1, pairs=[],
+def main(mov_stackid=None, components='ZZ', filterid=1, pairs=[],
          show=False, outfile=None):
 
     db = connect()
-
+    params = get_params(db)
     start, end, datelist = build_movstack_datelist(db)
 
-    if mov_stack != 0:
+    if mov_stackid and mov_stackid != "":
+        mov_stack = params.mov_stack[mov_stackid - 1]
         mov_stacks = [mov_stack, ]
+        print(mov_stack)
     else:
-        mov_stack = get_config(db, "mov_stack")
-        if mov_stack.count(',') == 0:
-            mov_stacks = [int(mov_stack), ]
-        else:
-            mov_stacks = [int(mi) for mi in mov_stack.split(',')]
+        mov_stacks = params.mov_stack
 
     if components.count(","):
         components = components.split(",")
@@ -39,11 +37,10 @@ def main(mov_stack=None, components='ZZ', filterid=1, pairs=[],
         components = [components, ]
 
     low = high = 0.0
-    for filterdb in get_filters(db, all=True):
-        if filterid == filterdb.ref:
-            low = float(filterdb.low)
-            high = float(filterdb.high)
-            break
+    low = high = 0.0
+    filter = get_filters(db, ref=filterid)
+    low = float(filter.low)
+    high = float(filter.high)
 
     gs = gridspec.GridSpec(len(mov_stacks), 1)
     fig = plt.figure(figsize=(12, 9))
@@ -52,13 +49,13 @@ def main(mov_stack=None, components='ZZ', filterid=1, pairs=[],
     for i, mov_stack in enumerate(mov_stacks):
         alldf = []
         for comp in components:
-            filedir = os.path.join("STR","%02i" % filterid,
-                               "%03i_DAYS" % mov_stack, comp)
+            filedir = os.path.join("STR2","%02i" % filterid,
+                               "%s_%s" % (mov_stack[0], mov_stack[1]), comp)
 
             listfiles = os.listdir(path=filedir)
             for file in listfiles:
-                rf = os.path.join("STR","%02i" % filterid,
-                                  "%03i_DAYS" % mov_stack, comp, file)
+                rf = os.path.join("STR2","%02i" % filterid,
+                                  "%s_%s" % (mov_stack[0], mov_stack[1]), comp, file)
 
                 # Append all series and give them the pair names
                 s = pd.read_csv(rf, index_col=0, parse_dates=True).iloc[:,0]
@@ -67,7 +64,7 @@ def main(mov_stack=None, components='ZZ', filterid=1, pairs=[],
                 alldf.append(s)
 
         if len(alldf) == 0:
-            print("No Data for %s m%i f%i" % (components, mov_stack, filterid))
+            print("No Data for %s m%s f%i" % (components, mov_stack, filterid))
             continue
 
         alldf = pd.concat(alldf, axis=1)
@@ -100,11 +97,11 @@ def main(mov_stack=None, components='ZZ', filterid=1, pairs=[],
                 if mov_stack == 1:
                     plt.title('1 Day')
                 else:
-                    plt.title('%i Days Moving Window' % mov_stack)
+                    plt.title('%s Moving Window' % str(mov_stack))
                 first_plot = False
             else:
                 plt.xlim(left, right)
-                plt.title('%i Days Moving Window' % mov_stack)
+                plt.title('%s Moving Window' % str(mov_stack))
 
             plt.grid(True)
             plt.gca().xaxis.set_major_formatter(DateFormatter("%Y-%m-%d %H:%M"))
@@ -120,11 +117,11 @@ def main(mov_stack=None, components='ZZ', filterid=1, pairs=[],
                 outfile = outfile.replace('?', '%s-f%i-m%i-M%s' % (components,
                                                                    filterid,
                                                                    mov_stack,
-                                                                   dttname))
+                                                                   "STR"))
             else:
                 outfile = outfile.replace('?', '%s-f%i-M%s' % (components,
                                                                filterid,
-                                                               dttname))
+                                                               "STR"))
         outfile = "dvv_" + outfile
         print("output to:", outfile)
         plt.savefig(outfile)
