@@ -238,11 +238,13 @@ def info_plugins(db):
                 for (n, jobtype) in get_job_types(db, row["name"]):
                     click.echo("  %s : %i" % (jobtype, n))
 
-# from pkg_resources import iter_entry_points
 
-# import click
-# from click_plugins import with_plugins
-@with_plugins(importlib.metadata.entry_points().get('click_command_tree', []))
+if sys.version_info < (3, 11):
+    click_command_tree_entry_points = importlib.metadata.entry_points().get('click_command_tree', [])
+else:
+    click_command_tree_entry_points = importlib.metadata.entry_points.select(group='click_command_tree')
+
+@with_plugins(click_command_tree_entry_points)
 @click.group(context_settings=dict(max_content_width=120), cls=OrderedGroup)
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
 (only affects modules that are designed to do parallel processing)')
@@ -1393,7 +1395,7 @@ def dvvs(ctx, mov_stack, comp, filterid, pair, show, outfile):
     Remember to order stations alphabetically !
     """
     if ctx.obj['MSNOISE_custom']:
-        from dvvs import main
+        from dvvs import main # NOQA
     else:
         from ..plots.dvvs import main
     main(mov_stack, comp, filterid, pair, show, outfile)
