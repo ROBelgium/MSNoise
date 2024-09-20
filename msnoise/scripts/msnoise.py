@@ -2,11 +2,15 @@ import traceback
 import logging
 import os
 import sys
+
+import importlib_metadata
 import sqlalchemy
 from sqlalchemy import text
 import time
 
 import click
+from click_plugins import with_plugins
+import importlib.metadata
 
 
 from .._version import get_git_version
@@ -238,7 +242,7 @@ def info_plugins(db):
 
 # import click
 # from click_plugins import with_plugins
-# @with_plugins(iter_entry_points('click_command_tree'))
+@with_plugins(importlib.metadata.entry_points().get('click_command_tree', []))
 @click.group(context_settings=dict(max_content_width=120), cls=OrderedGroup)
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
 (only affects modules that are designed to do parallel processing)')
@@ -1134,7 +1138,7 @@ if old:
     @dvv.command(name='compute_stretching_old')
     @click.pass_context
     def dvv_compute_stretching(ctx):
-        """[experimental] Computes the stretching based on the new stacked data"""
+        """Computes the stretching based on the new stacked data"""
         from ..stretch import main
         threads = ctx.obj['MSNOISE_threads']
         delay = ctx.obj['MSNOISE_threadsdelay']
@@ -1155,7 +1159,7 @@ if old:
 @dvv.command(name='compute_stretching')
 @click.pass_context
 def dvv_compute_stretching2(ctx):
-    """[experimental] Computes the stretching based on the new stacked data"""
+    """Computes the stretching based on the new stacked data"""
     from ..stretch2 import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
@@ -1357,7 +1361,7 @@ def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
               default=None, type=str)
 @click.pass_context
 def dvv_plot_wct(ctx, mov_stack, comp, filterid, pair, all, begin, end, visualize,ranges, show,  outfile):
-    """Plots the dv/v (parses the dt/t results)
+    """Plots the dv/v (parses the wct results)
     Individual pairs can be plotted extra using the -p flag one or more times.
     Example: msnoise plot dvv -p ID_KWUI_ID_POSI
     Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
@@ -1585,7 +1589,7 @@ def utils_bugreport(ctx, sys, modules, env, all):
 @click.option('--tech', default=1, help='Test using (1) SQLite or (2) MariaDB (you need to start that server before!)')
 @click.option('-c', '--content', default=False, is_flag=True)
 def utils_test(prefix, tech, content):
-    """Runs the test suite, should be executed in an empty folder!"""
+    """Runs the test suite in a temporary folder"""
     import matplotlib.pyplot as plt
     plt.switch_backend("agg")
     if not content:
