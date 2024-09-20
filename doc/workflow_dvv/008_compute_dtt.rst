@@ -3,7 +3,7 @@
 
 .. _workflowcomputedtt:
 
-Compute dt/t
-------------
+Compute dt/t from MWCS measurements
+-----------------------------------
 
 .. automodule::  msnoise.s06compute_dtt
