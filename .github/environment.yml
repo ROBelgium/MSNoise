@@ -15,6 +15,7 @@ dependencies:
   - logbook
   - pytables
   - click
+  - click-plugins
   - pandas
   - folium
   - pip
@@ -24,4 +25,5 @@ dependencies:
   - pooch
   - pip:
       - git+https://github.com/regeirk/pycwt
+      - click-command-tree
 

@@ -29,6 +29,8 @@ setup(version=get_git_version(),
           'sqlalchemy-utils',
           'obspy',
           'click',
+          'click-plugins', # new in 2.0
+          'click-command-tree', # new in 2.0
           'pymysql',
           'flask',
           'flask-admin',
