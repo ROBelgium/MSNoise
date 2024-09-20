@@ -1376,6 +1376,31 @@ def dvv_plot_wct(ctx, mov_stack, comp, filterid, pair, all, begin, end, visualiz
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
 @click.option('-p', '--pair', default=None, help='Plot a specific pair',
               multiple=True)
+@click.option('-s', '--show', help='Show interactively?',
+              default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)',
+              default=None, type=str)
+@click.pass_context
+def dvvs(ctx, mov_stack, comp, filterid, pair, show, outfile):
+    """Plots the dv/v obtained by stretching\n
+    Individual pairs can be plotted extra using the -p flag one or more times.\n
+    Example: msnoise plot dvvs -p ID_KWUI_ID_POSI\n
+    Example: msnoise plot dvvs -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
+    Remember to order stations alphabetically !
+    """
+    if ctx.obj['MSNOISE_custom']:
+        from dvvs import main
+    else:
+        from ..plots.dvvs import main
+    main(mov_stack, comp, filterid, pair, show, outfile)
+
+
+@plot.command()
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
+@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
+@click.option('-p', '--pair', default=None, help='Plot a specific pair',
+              multiple=True)
 @click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
 @click.option('-M', '--dttname', default="A", help='Plot M or M0?')
 @click.option('-s', '--show', help='Show interactively?',
