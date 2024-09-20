@@ -9,8 +9,8 @@ from sqlalchemy import text
 import time
 
 import click
-from click_plugins import with_plugins
-import importlib.metadata
+# from click_plugins import with_plugins
+# import importlib.metadata
 
 
 from .._version import get_git_version
@@ -239,12 +239,12 @@ def info_plugins(db):
                     click.echo("  %s : %i" % (jobtype, n))
 
 
-if sys.version_info < (3, 11):
-    click_command_tree_entry_points = importlib.metadata.entry_points().get('click_command_tree', [])
-else:
-    click_command_tree_entry_points = importlib.metadata.entry_points.select(group='click_command_tree')
+# if sys.version_info < (3, 11):
+#     click_command_tree_entry_points = importlib.metadata.entry_points().get('click_command_tree', [])
+# else:
+#     click_command_tree_entry_points = importlib.metadata.entry_points.select(group='click_command_tree')
 
-@with_plugins(click_command_tree_entry_points)
+# @with_plugins(click_command_tree_entry_points)
 @click.group(context_settings=dict(max_content_width=120), cls=OrderedGroup)
 @click.option('-t', '--threads', default=1, help='Number of threads to use \
 (only affects modules that are designed to do parallel processing)')
