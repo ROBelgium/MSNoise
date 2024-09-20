@@ -56,27 +56,24 @@ import scipy.fft as sf
 
 def get_avgcoh(freqs, tvec, wcoh, freqmin, freqmax, lag_min=5, coda_cycles=20):
     """
-    Calculate the average coherence over specified frequency range and time lags.
-    Parameters
-    ----------
-    freqs : numpy.ndarray
-        Array of frequency values.
-    tvec : numpy.ndarray
-        Time vector.
-    wcoh : numpy.ndarray
-        Wavelet coherence array.
-    freqmin : float
-        Minimum frequency for coherence calculation.
-    freqmax : float
-        Maximum frequency for coherence calculation.
-    lag_min : int, optional
-        Minimum lag in seconds for coherence calculation. Default is 5.
-    coda_cycles : int, optional
-        Number of coda cycles to consider. Default is 20.
-    Returns
-    -------
-    numpy.ndarray
-        Average coherence values over the specified frequency range.
+    Calculate the average wavelet coherence over a specified frequency range and time lags.
+
+    :param freqs: A numpy array that represents frequency values.
+    :type freqs: numpy.ndarray
+    :param tvec: A time vector represented as a numpy array.
+    :type tvec: numpy.ndarray
+    :param wcoh: The wavelet coherence array, represented as a numpy array.
+    :type wcoh: numpy.ndarray
+    :param freqmin: The minimum frequency for coherence calculation, represented as a floating-point number.
+    :type freqmin: float
+    :param freqmax: The maximum frequency for coherence calculation, represented as a floating-point number.
+    :type freqmax: float
+    :param lag_min: The minimum lag in seconds for coherence calculation. This is optional and it defaults to 5.
+    :type lag_min: int, optional
+    :param coda_cycles: The number of coda cycles to consider. This is optional and it defaults to 20.
+    :type coda_cycles: int, optional
+    :returns: A numpy array of average coherence values computed over the specified frequency range and time lags.
+    :rtype: numpy.ndarray
     """
     inx = np.where((freqs>=freqmin) & (freqs<=freqmax)) 
     coh = np.zeros(inx[0].shape) # Create empty vector for coherence

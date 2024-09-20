@@ -2525,6 +2525,29 @@ def trim(data, dttname, limits=0.1):
 
 
 def compute_dvv(session, filterid, mov_stack, pairs=None, components=None, params=None, method=None, **kwargs):
+    """
+    Compute DVV statistics for a given seismic session, filter ID, and movement stack. The method calculates various
+    statistical measures for DVV values based on the provided parameters.
+
+    :param session: Seismic session object.
+    :type session: object
+    :param filterid: ID of the filter.
+    :type filterid: str
+    :param mov_stack: Movement stack object.
+    :type mov_stack: object
+    :param pairs: List of station pairs. Defaults to None.
+    :type pairs: list, optional
+    :param components: Component(s) to compute DVV for. Defaults to None.
+    :type components: str, optional
+    :param params: Parameters object containing configuration settings. Defaults to None.
+    :type params: object, optional
+    :param method: Method to use for computation. Defaults to None.
+    :type method: str, optional
+    :param **kwargs: Additional keyword arguments
+    :return: DataFrame containing the computed statistical measures for DVV values.
+    :rtype: DataFrame
+    :raises ValueError: If no DVV values are computed.
+    """
     if pairs == None:
         pairs = []
         for sta1, sta2 in get_station_pairs(session):
@@ -2576,32 +2599,28 @@ def compute_dvv(session, filterid, mov_stack, pairs=None, components=None, param
 def xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_df, err_df, coh_df):
     """
     Save the Wavelet Coherence Transform (WCT) results as a NetCDF file.
-    
-    Parameters
-    ----------
-    station1 : str
-        The first station in the pair.
-    station2 : str
-        The second station in the pair.
-    components : str
-        The components (e.g., Z, N, E) being analyzed.
-    filterid : int
-        Filter ID used in the analysis.
-    mov_stack : tuple
-        Tuple of (start, end) representing the moving stack window.
-    taxis : array-like
-        Time axis corresponding to the WCT data.
-    dvv_df : pandas.DataFrame
-        DataFrame containing dvv data (2D).
-    err_df : pandas.DataFrame
-        DataFrame containing err data (2D).
-    coh_df : pandas.DataFrame
-        DataFrame containing coh data (2D).
-    
-    Returns
-    -------
-    None
+
+    :param station1: The first station in the pair.
+    :type station1: str
+    :param station2: The second station in the pair.
+    :type station2: str
+    :param components: The components (e.g., Z, N, E) being analyzed.
+    :type components: str
+    :param filterid: Filter ID used in the analysis.
+    :type filterid: int
+    :param mov_stack: Tuple of (start, end) representing the moving stack window.
+    :type mov_stack: tuple
+    :param taxis: Time axis corresponding to the WCT data.
+    :type taxis: array-like
+    :param dvv_df: DataFrame containing dvv data (2D).
+    :type dvv_df: pandas.DataFrame
+    :param err_df: DataFrame containing err data (2D).
+    :type err_df: pandas.DataFrame
+    :param coh_df: DataFrame containing coh data (2D).
+    :type coh_df: pandas.DataFrame
+    :returns: None
     """
+
     # Construct the file path
     fn = os.path.join("WCT", f"{filterid:02d}", f"{mov_stack[0]}_{mov_stack[1]}",
                       components, f"{station1}_{station2}.nc")
