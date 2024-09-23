@@ -1,3 +1,16 @@
+'''
+method - MWCS or STRETCH
+mov_stack_idx (str or int)
+components = 'ZZ, ZE, ..'
+filterid (str or int)
+bystation : median, mean or None (None plot all the pairs)
+keep_nopair : True or False (remove the unused pairs)
+show : True or False
+outfile : Export the figure (somewhere)
+
+return : nothing
+'''
+    
 import matplotlib.pyplot as plt
 import matplotlib.colors as clr
 import numpy as np
@@ -10,18 +23,6 @@ import warnings
 from matplotlib.dates import DateFormatter
 
 def main(method='MWCS', mov_stack_idx=1, components='ZZ', filterid='01', bystation=None, keep_nopair=False, show=True, outfile=None, loglevel="INFO") :
-    '''
-    method - MWCS or STRETCH
-    mov_stack_idx (str or int)
-    components = 'ZZ, ZE, ..'
-    filterid (str or int)
-    bystation : median, mean or None (None plot all the pairs)
-    keep_nopair : True or False (remove the unused pairs)
-    show : True or False
-    outfile : Export the figure (somewhere)
-    
-    return : nothing
-    '''
     logger = get_logger('msnoise.cc_dvv_plot_aurelogram', loglevel,with_pid=True)
     db = connect()
     params = get_params(db)
@@ -29,6 +30,16 @@ def main(method='MWCS', mov_stack_idx=1, components='ZZ', filterid='01', bystati
     mov_stacks = params.mov_stack 
 
     stations = get_stations(db)
+    
+    ### verifying the inputs
+    if mov_stack_idx > len(mov_stacks) :
+        print('Index of mov. stack is too high! Change the value')
+        return
+    Testpath = os.path.join("STR2","%02i" % int(filterid),"%s_%s" %(mov_stacks[int(mov_stack_idx)-1][0], mov_stacks[int(mov_stack_idx)-1][1])
+                                , components)
+    if os.path.isdir(Testpath) == False :
+        print('The path : %s does not exist' %Testpath)
+        return
 
     list_sta1 = np.array([], dtype='str')
     for sta in stations :
