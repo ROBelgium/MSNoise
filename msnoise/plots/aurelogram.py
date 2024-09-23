@@ -6,9 +6,8 @@ filterid (str or int)
 bystation : median, mean or None (None plot all the pairs)
 keep_nopair : True or False (remove the unused pairs)
 show : True or False
-outfile : Export the figure (somewhere)
+outfile : Export the figure (somewhere) - Specify path
 
-return : nothing
 '''
     
 import matplotlib.pyplot as plt
