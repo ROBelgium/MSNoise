@@ -20,8 +20,9 @@ from msnoise._version import *
 import os
 import warnings
 from matplotlib.dates import DateFormatter
+from datetime import datetime
 
-def main(method='MWCS', mov_stack_idx=1, components='ZZ', filterid='01', bystation=None, keep_nopair=False, show=True, outfile=None, loglevel="INFO") :
+def main(method='MWCS', mov_stack_idx=1, components='ZZ', filterid='01', bystation=None, keep_nopair=False, wiggles=False, show=True, outfile=None, loglevel="INFO") :
     logger = get_logger('msnoise.cc_dvv_plot_aurelogram', loglevel,with_pid=True)
     db = connect()
     params = get_params(db)
@@ -114,19 +115,49 @@ def main(method='MWCS', mov_stack_idx=1, components='ZZ', filterid='01', bystati
     ### plotting ###
 
     fig, ax = plt.subplots(figsize=(10,10), dpi=300)
-    norm = clr.Normalize(vmin=-np.nanmax(np.abs(dvv_grid)), vmax=np.nanmax(np.abs(dvv_grid)))
-    TIMEPLT, PAIRIDX = np.meshgrid(datearray, np.arange(len(list_pair)))
-
-    pclr = ax.pcolormesh(TIMEPLT, PAIRIDX, dvv_grid, norm=norm, cmap='coolwarm')
-    ax.set_yticks(np.arange(len(list_pair)), labels=list_pair)
-    for g in np.arange(len(list_pair))+1 :
-        ax.axhline(y=g-.5, ls='--', c='grey', linewidth=.5)
-    clb = plt.colorbar(pclr, fraction=0.03)
-    clb.set_label('dv/v = -dt/t')
-    plt.gca().xaxis.set_major_formatter(DateFormatter("%Y-%m-%d\n%H:%M"))
-    #plt.text(1,-1, 'MSNoise - Lecocq et al', horizontalalignment='right',verticalalignment='bottom')
-    plt.gcf().text(0.95, 0.045, 'MSNoise - Lecocq et al. Aurelogram plot\n%s' %get_git_version(), fontsize=8, horizontalalignment='right', c='grey')
     
+    if wiggles == True :
+        axb = ax.twinx()
+        for z, dvvVal in enumerate(dvv_grid) :
+            color='indianred'
+            if (z//2 - z/2) == 0: 
+                color = 'cornflowerblue'
+                linewidth = .5
+            if len(list_pair) > 30 :
+                color = 'dimgrey'
+                linewidth = .3
+            ax.plot(datearray, z + (dvvVal), c=color, linewidth=linewidth)
+            axb.plot(datearray, z +(dvvVal), c='b', linewidth=.3, ls='--', visible = False)
+        
+        ds = 3
+        poslabel = np.arange(0,len(list_pair), ds)
+        if len(list_pair) <= 30 :
+            defticks = np.arange(0,len(list_pair), 3)
+            posticks = np.array([defticks-.5,defticks,defticks+.5]).T.ravel()
+            poslabel = [-.5,0,.5]*len(defticks)
+            axb.set_yticks(posticks, labels=poslabel)
+            axb.grid(ls='--')
+            axb.set_ylabel('dv/v = -dt/t (%)')
+        else :
+            axb.set_yticks([])
+        ax.set_ylim(-1, len(list_pair)+.5), axb.set_ylim(-1, len(list_pair)+.5)
+
+    else : 
+        norm = clr.Normalize(vmin=-np.nanmax(np.abs(dvv_grid)), vmax=np.nanmax(np.abs(dvv_grid)))
+        TIMEPLT, PAIRIDX = np.meshgrid(datearray, np.arange(len(list_pair)))
+        pclr = ax.pcolormesh(TIMEPLT, PAIRIDX, dvv_grid, norm=norm, cmap='coolwarm')
+
+        for g in np.arange(len(list_pair))+1 :
+            ax.axhline(y=g-.5, ls='--', c='grey', linewidth=.7)
+        clb = plt.colorbar(pclr, fraction=0.03)
+        clb.set_label('dv/v = -dt/t (%)')
+        
+    ax.set_yticks(np.arange(len(list_pair)), labels=list_pair)
+    plt.gca().xaxis.set_major_formatter(DateFormatter("%Y-%m-%d\n%H:%M"))
+    date_plot = datetime.now()
+    plt.gcf().text(0.95, 0.045, 'MSNoise - Lecocq et al. Aurelogram plot\nv%i.%i_%s' %(date_plot.year, date_plot.month, get_git_version())
+                   , fontsize=8, horizontalalignment='right', c='grey')
+    #ax.set_xlim(datearray[0],datearray[-1])
     if bystation in ('median', 'mean') :
         typeaur = 'by stations (%s)' %bystation
     else :
