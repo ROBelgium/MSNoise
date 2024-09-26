@@ -32,6 +32,10 @@ def main(method='MWCS', mov_stack_idx=1, components='ZZ', filterid='01', bystati
     stations = get_stations(db)
     
     ### verifying the inputs
+    if method in ['MWCS', 'STRETCH'] ==  False :
+        print("Method must 'MWCS' OR 'STRETCH' not %s" %method)
+        return
+        
     if mov_stack_idx > len(mov_stacks) :
         print('Index of mov. stack is too high! Change the value')
         return
@@ -62,7 +66,6 @@ def main(method='MWCS', mov_stack_idx=1, components='ZZ', filterid='01', bystati
     for i, pair in enumerate(list_pair):
 
         if method == 'STRETCH' :
-            #path = './STR2/%02i/%s_%s/%s/%s.csv' %(int(filterid),str(mov_stacks[int(mov_stack_idx)-1][0]),str(mov_stacks[int(mov_stack_idx)-1][1]), str(components), pair)
             path = os.path.join("STR2","%02i" % int(filterid),"%s_%s" %(mov_stacks[int(mov_stack_idx)-1][0], mov_stacks[int(mov_stack_idx)-1][1])
                                 , components, pair+'.csv')
             if os.path.isfile(path) == False : 
