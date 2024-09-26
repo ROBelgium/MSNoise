@@ -142,6 +142,29 @@ def main(stype, interval=1.0, loglevel="INFO"):
         pair = jobs[0].pair
         refs, days = zip(*[[job.ref, job.day] for job in jobs])
 
+        # Calculate the maximum mov_rolling value (in days)
+        max_mov_rolling = max(pd.to_timedelta(mov_stack[0]).total_seconds() for mov_stack in mov_stacks)
+        max_mov_rolling_days = max(1, max_mov_rolling / 86400)
+        
+        days.sort()
+        day_diffs = np.diff(days)
+        gaps = [i+1 for i, diff in enumerate(day_diffs) if diff.days > 1] #get index of days with gaps
+        gaps.insert(0,0) #zero index also 'gap' (need previous data for stacking)
+
+        all_days = set(days)
+        added_days = set() #keep track of days included for eventual removal pre-saving CCFs
+
+        for gap_idx in gaps:
+            start = days[gap_idx]
+            #Add preceding days
+            for j in range(1, max_mov_rolling_days):
+                preceding_day = start - timedelta(days=j)
+                if preceding_day not in all_days:
+                    all_days.add(preceding_day)
+                    added_days.add(preceding_day)
+
+        added_dates = pd.to_datetime(added_days).values
+
         logger.info(
             "There are STACKS jobs for some days to recompute for %s" % pair)
         sta1, sta2 = pair.split(':')
@@ -156,7 +179,8 @@ def main(stype, interval=1.0, loglevel="INFO"):
             for components in components_to_compute:
                 logger.info('Processing %s-%s-%i' %
                       (pair, components, filterid))
-                c = get_results_all(db, sta1, sta2, filterid, components, days, format="xarray")
+                c = get_results_all(db, sta1, sta2, filterid, components, all_days, format="xarray")
+                print(len(c), len(all_days)
                 # print(c)
                 # dr = xr_save_ccf(sta1, sta2, components, filterid, 1, taxis, c)
                 dr = c
@@ -195,8 +219,11 @@ def main(stype, interval=1.0, loglevel="INFO"):
                         xx = dr.rolling(times=duration_to_windows, min_periods=1).construct("win").mean("win")
                         xx = xx.resample(times=mov_sample, label="right", skipna=True).asfreq().dropna("times", how="all")
 
-                    xr_save_ccf(sta1, sta2, components, filterid, mov_stack, taxis, xx, overwrite=True)
-                    del xx
+                    mask = xx.times.dt.floor('D').isin(added_dates)
+                    xx_cleaned = xx.where(~mask, drop=True)
+
+                    xr_save_ccf(sta1, sta2, components, filterid, mov_stack, taxis, xx_cleaned, overwrite=False)
+                    del xx, xx_cleaned
         if stype != "ref":
             massive_update_job(db, jobs, "D")
             if stype != "step" and not params.hpc:
