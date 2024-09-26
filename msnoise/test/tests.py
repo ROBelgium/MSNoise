@@ -564,6 +564,13 @@ class MSNoiseTests(unittest.TestCase):
         fn = "wct ZZ-f1-dvv.png"
         self.assertTrue(os.path.isfile(fn),
                         msg="%s doesn't exist" % fn)
+                        
+    def test_107_plot_aurelogram(self):
+        from ..plots.aurelogram import main
+        main(filterid=1, components="ZZ", show=False, outfile="aurelogram.png")
+        fn = "aurelogram.png"
+        self.assertTrue(os.path.isfile(fn),
+                        msg="%s doesn't exist" % fn)
   
     ### A few click CLI interface tests
 
