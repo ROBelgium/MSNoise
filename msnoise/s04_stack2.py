@@ -142,31 +142,6 @@ def main(stype, interval=1.0, loglevel="INFO"):
         pair = jobs[0].pair
         refs, days = zip(*[[job.ref, job.day] for job in jobs])
 
-        # Calculate the maximum mov_rolling value (in days)
-        max_mov_rolling = max(pd.to_timedelta(mov_stack[0]).total_seconds() for mov_stack in mov_stacks)
-        max_mov_rolling_days = max(1, max_mov_rolling / 86400)
-        
-        days = list(days)
-        days.sort()
-        days = [datetime.datetime.strptime(day, '%Y-%m-%d') for day in days]
-        day_diffs = np.diff(days)
-        gaps = [i+1 for i, diff in enumerate(day_diffs) if diff.days > 1] #get index of days with gaps
-        gaps.insert(0,0) #zero index also 'gap' (need previous data for stacking)
-
-        all_days = list(days)
-        added_days = [] #keep track of days included for eventual removal pre-saving CCFs
-
-        for gap_idx in gaps:
-            start = days[gap_idx]
-            #Add preceding days
-            for j in range(1, max_mov_rolling_days+1):
-                preceding_day = start - datetime.timedelta(days=j)
-                if preceding_day not in all_days:
-                    all_days.append(preceding_day)
-                    added_days.append(preceding_day)
-
-        added_dates = pd.to_datetime(added_days).values
-
         logger.info(
             "There are STACKS jobs for some days to recompute for %s" % pair)
         sta1, sta2 = pair.split(':')
@@ -181,12 +156,11 @@ def main(stype, interval=1.0, loglevel="INFO"):
             for components in components_to_compute:
                 logger.info('Processing %s-%s-%i' %
                       (pair, components, filterid))
-                c = get_results_all(db, sta1, sta2, filterid, components, all_days, format="xarray")
-                # print(c)
-                # dr = xr_save_ccf(sta1, sta2, components, filterid, 1, taxis, c)
-                dr = c
                 if stype == "ref":
                     start, end, datelist = build_ref_datelist(db)
+                    c = get_results_all(db, sta1, sta2, filterid, components, datelist, format="xarray") #get ccfs corresponding to ref dates
+                    # dr = xr_save_ccf(sta1, sta2, components, filterid, 1, taxis, c)
+                    dr = c
                     start = np.array(start, dtype=np.datetime64)
                     end = np.array(end, dtype=np.datetime64)
                     _ = dr.where(dr.times >= start, drop=True)
@@ -195,7 +169,35 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     _ = _.mean(dim="times")
                     xr_save_ref(sta1, sta2, components, filterid, taxis, _)
                     continue
+
+                # Calculate the maximum mov_rolling value (in days)
+                max_mov_rolling = max(pd.to_timedelta(mov_stack[0]).total_seconds() for mov_stack in mov_stacks)
+                max_mov_rolling_days = max(1, max_mov_rolling / 86400)
+                
+                days = list(days)
+                days.sort()
+                days = [datetime.datetime.strptime(day, '%Y-%m-%d') for day in days]
+                day_diffs = np.diff(days)
+                gaps = [i+1 for i, diff in enumerate(day_diffs) if diff.days > 1] #get index of days with gaps
+                gaps.insert(0,0) #zero index also 'gap' (need previous data for stacking)
+
+                all_days = list(days)
+                added_days = [] #keep track of days included for eventual removal pre-saving CCFs
+
+                for gap_idx in gaps:
+                    start = days[gap_idx]
+                    #Add preceding days
+                    for j in range(1, max_mov_rolling_days+1):
+                        preceding_day = start - datetime.timedelta(days=j)
+                        if preceding_day not in all_days:
+                            all_days.append(preceding_day)
+                            added_days.append(preceding_day)
+
+                added_dates = pd.to_datetime(added_days).values
+                c = get_results_all(db, sta1, sta2, filterid, components, all_days, format="xarray") #get ccfs needed for -m stacking
+                dr = c
                 dr = dr.resample(times="%is" % params.corr_duration).mean()
+
                 for mov_stack in mov_stacks:
                     # if mov_stack > len(dr.times):
                     #     logger.error("not enough data for mov_stack=%i" % mov_stack)
@@ -221,7 +223,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                         xx = xx.resample(times=mov_sample, label="right", skipna=True).asfreq().dropna("times", how="all")
 
                     mask = xx.times.dt.floor('D').isin(added_dates)
-                    xx_cleaned = xx.where(~mask, drop=True)
+                    xx_cleaned = xx.where(~mask, drop=True) #remove days not associated with current jobs
 
                     xr_save_ccf(sta1, sta2, components, filterid, mov_stack, taxis, xx_cleaned, overwrite=False)
                     del xx, xx_cleaned
