@@ -176,7 +176,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                 
                 days = list(days)
                 days.sort()
-                days = [datetime.datetime.strptime(day, '%Y-%m-%d') for day in days]
+                days = [day if isinstance(day, datetime) else datetime.strptime(day, '%Y-%m-%d') for day in days]
                 day_diffs = np.diff(days)
                 gaps = [i+1 for i, diff in enumerate(day_diffs) if diff.days > 1] #get index of days with gaps
                 gaps.insert(0,0) #zero index also 'gap' (need previous data for stacking)
