@@ -172,7 +172,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
 
                 # Calculate the maximum mov_rolling value (in days)
                 max_mov_rolling = max(pd.to_timedelta(mov_stack[0]).total_seconds() for mov_stack in mov_stacks)
-                max_mov_rolling_days = max(1, max_mov_rolling / 86400)
+                max_mov_rolling_days = max(1, math.ceil(max_mov_rolling / 86400))
                 
                 days = list(days)
                 days.sort()
