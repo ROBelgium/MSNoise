@@ -131,36 +131,38 @@ def main(stype, interval=1.0, loglevel="INFO"):
     #     mov_stacks.remove(1)  # remove 1 day stack, it will be done automatically
 
     filters = get_filters(db, all=False)
-    while is_dtt_next_job(db, flag='T', jobtype='STACK'):
-        jobs = get_dtt_next_job(db, flag='T', jobtype='STACK')
 
-        if not len(jobs):
-            # edge case, should only occur when is_next returns true, but
-            # get_next receives no jobs (heavily parallelised calls).
-            time.sleep(np.random.random())
-            continue
-        pair = jobs[0].pair
-        refs, days = zip(*[[job.ref, job.day] for job in jobs])
+    if stype == "ref":
+        
+        pairs = []
+        for sta1, sta2 in get_station_pairs(db, used=False):
+            for loc1 in sta1.locs():
+                s1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
+                for loc2 in sta2.locs():
+                    s2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
+                    pairs.append((s1, s2))
+   
+        for sta1, sta2 in pairs:
+            for f in filters:
+                filterid = int(f.ref)
 
-        logger.info(
-            "There are STACKS jobs for some days to recompute for %s" % pair)
-        sta1, sta2 = pair.split(':')
-        for f in filters:
-            filterid = int(f.ref)
+                if sta1 == sta2:
+                    components_to_compute = params.components_to_compute_single_station
+                else:
+                    components_to_compute = params.components_to_compute
 
-            if sta1 == sta2:
-                components_to_compute = params.components_to_compute_single_station
-            else:
-                components_to_compute = params.components_to_compute
+                for components in components_to_compute:
+                    logger.info('Processing %s:%s-%s-%i REF stack' %
+                        (sta1, sta2, components, filterid))
 
-            for components in components_to_compute:
-                logger.info('Processing %s-%s-%i' %
-                      (pair, components, filterid))
-                if stype == "ref":
                     start, end, datelist = build_ref_datelist(db)
                     c = get_results_all(db, sta1, sta2, filterid, components, datelist, format="xarray") #get ccfs corresponding to ref dates
                     # dr = xr_save_ccf(sta1, sta2, components, filterid, 1, taxis, c)
                     dr = c
+                    if not c.data_vars:
+                        logger.debug('No data found for %s:%s-%s-%i' %
+                            (sta1, sta2, components, filterid))
+                        continue
                     start = np.array(start, dtype=np.datetime64)
                     end = np.array(end, dtype=np.datetime64)
                     _ = dr.where(dr.times >= start, drop=True)
@@ -168,67 +170,95 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     # TODO add other stack methods here! using apply?
                     _ = _.mean(dim="times")
                     xr_save_ref(sta1, sta2, components, filterid, taxis, _)
-                    continue
+    
+    else:   #stype== 'mov'
+        while is_dtt_next_job(db, flag='T', jobtype='STACK'):
+            jobs = get_dtt_next_job(db, flag='T', jobtype='STACK')
 
-                # Calculate the maximum mov_rolling value (in days)
-                max_mov_rolling = max(pd.to_timedelta(mov_stack[0]).total_seconds() for mov_stack in mov_stacks)
-                max_mov_rolling_days = max(1, math.ceil(max_mov_rolling / 86400))
-                
-                days = list(days)
-                days.sort()
-                days = [day if isinstance(day, datetime.datetime) else datetime.datetime.strptime(day, '%Y-%m-%d') for day in days]
-                day_diffs = np.diff(days)
-                gaps = [i+1 for i, diff in enumerate(day_diffs) if diff.days > 1] #get index of days with gaps
-                gaps.insert(0,0) #zero index also 'gap' (need previous data for stacking)
+            if not len(jobs):
+                # edge case, should only occur when is_next returns true, but
+                # get_next receives no jobs (heavily parallelised calls).
+                time.sleep(np.random.random())
+                continue
+            pair = jobs[0].pair
+            refs, days = zip(*[[job.ref, job.day] for job in jobs])
 
-                all_days = list(days)
-                added_days = [] #keep track of days included for eventual removal pre-saving CCFs
+            logger.info(
+                "There are STACKS jobs for some days to recompute for %s" % pair)
 
-                for gap_idx in gaps:
-                    start = days[gap_idx]
-                    #Add preceding days
-                    for j in range(1, max_mov_rolling_days+1):
-                        preceding_day = start - datetime.timedelta(days=j)
-                        if preceding_day not in all_days:
-                            all_days.append(preceding_day)
-                            added_days.append(preceding_day)
+            sta1, sta2 = pair.split(':')
+            for f in filters:
+                filterid = int(f.ref)
 
-                added_dates = pd.to_datetime(added_days).values
-                c = get_results_all(db, sta1, sta2, filterid, components, all_days, format="xarray") #get ccfs needed for -m stacking
-                dr = c
-                dr = dr.resample(times="%is" % params.corr_duration).mean()
+                if sta1 == sta2:
+                    components_to_compute = params.components_to_compute_single_station
+                else:
+                    components_to_compute = params.components_to_compute
 
-                for mov_stack in mov_stacks:
-                    # if mov_stack > len(dr.times):
-                    #     logger.error("not enough data for mov_stack=%i" % mov_stack)
-                    #     continue
-                    mov_rolling, mov_sample = mov_stack
-                    # print(mov_rolling, mov_sample)
+                for components in components_to_compute:
+                    logger.info('Processing %s-%s-%i MOV stack' %
+                        (pair, components, filterid))
 
-                    if mov_rolling == mov_sample:
-                        # just resample & mean
-                        xx = dr.resample(times=mov_sample, label="right", skipna=True).mean().dropna("times",
-                                                                                                       how="all")
-                    else:
-                        mov_rolling = pd.to_timedelta(mov_rolling).total_seconds()
-                        # print("Will roll over %i seconds" % mov_rolling)
-                        duration_to_windows = mov_rolling / params.corr_duration
-                        if not duration_to_windows.is_integer():
-                            print("Warning, rounding down the number of windows to roll over")
-                        duration_to_windows = int(max(1, math.floor(duration_to_windows)))
-                        # print("Which is %i windows of %i seconds duration" % (duration_to_windows, params.corr_duration))
-                        # That construct thing shouldn't be necessary, but without it, tests fail when bottleneck is installed
-                        # ref: https://github.com/pydata/xarray/issues/3165
-                        xx = dr.rolling(times=duration_to_windows, min_periods=1).construct("win").mean("win")
-                        xx = xx.resample(times=mov_sample, label="right", skipna=True).asfreq().dropna("times", how="all")
 
-                    mask = xx.times.dt.floor('D').isin(added_dates)
-                    xx_cleaned = xx.where(~mask, drop=True) #remove days not associated with current jobs
+                    # Calculate the maximum mov_rolling value (in days)
+                    max_mov_rolling = max(pd.to_timedelta(mov_stack[0]).total_seconds() for mov_stack in mov_stacks)
+                    max_mov_rolling_days = max(1, math.ceil(max_mov_rolling / 86400))
+                    
+                    days = list(days)
+                    days.sort()
+                    days = [day if isinstance(day, datetime.datetime) else datetime.datetime.strptime(day, '%Y-%m-%d') for day in days]
+                    day_diffs = np.diff(days)
+                    gaps = [i+1 for i, diff in enumerate(day_diffs) if diff.days > 1] #get index of days with gaps
+                    gaps.insert(0,0) #zero index also 'gap' (need previous data for stacking)
 
-                    xr_save_ccf(sta1, sta2, components, filterid, mov_stack, taxis, xx_cleaned, overwrite=False)
-                    del xx, xx_cleaned
-        if stype != "ref":
-            massive_update_job(db, jobs, "D")
-            if stype != "step" and not params.hpc:
-                for job in jobs:
-                    update_job(db, job.day, job.pair, 'MWCS', 'T')
+                    all_days = list(days)
+                    added_days = [] #keep track of days included for eventual removal pre-saving CCFs
+
+                    for gap_idx in gaps:
+                        start = days[gap_idx]
+                        #Add preceding days
+                        for j in range(1, max_mov_rolling_days+1):
+                            preceding_day = start - datetime.timedelta(days=j)
+                            if preceding_day not in all_days:
+                                all_days.append(preceding_day)
+                                added_days.append(preceding_day)
+
+                    added_dates = pd.to_datetime(added_days).values
+                    c = get_results_all(db, sta1, sta2, filterid, components, all_days, format="xarray") #get ccfs needed for -m stacking
+                    dr = c
+                    dr = dr.resample(times="%is" % params.corr_duration).mean()
+
+                    for mov_stack in mov_stacks:
+                        # if mov_stack > len(dr.times):
+                        #     logger.error("not enough data for mov_stack=%i" % mov_stack)
+                        #     continue
+                        mov_rolling, mov_sample = mov_stack
+                        # print(mov_rolling, mov_sample)
+
+                        if mov_rolling == mov_sample:
+                            # just resample & mean
+                            xx = dr.resample(times=mov_sample, label="right", skipna=True).mean().dropna("times",
+                                                                                                           how="all")
+                        else:
+                            mov_rolling = pd.to_timedelta(mov_rolling).total_seconds()
+                            # print("Will roll over %i seconds" % mov_rolling)
+                            duration_to_windows = mov_rolling / params.corr_duration
+                            if not duration_to_windows.is_integer():
+                                print("Warning, rounding down the number of windows to roll over")
+                            duration_to_windows = int(max(1, math.floor(duration_to_windows)))
+                            # print("Which is %i windows of %i seconds duration" % (duration_to_windows, params.corr_duration))
+                            # That construct thing shouldn't be necessary, but without it, tests fail when bottleneck is installed
+                            # ref: https://github.com/pydata/xarray/issues/3165
+                            xx = dr.rolling(times=duration_to_windows, min_periods=1).construct("win").mean("win")
+                            xx = xx.resample(times=mov_sample, label="right", skipna=True).asfreq().dropna("times", how="all")
+
+                        mask = xx.times.dt.floor('D').isin(added_dates)
+                        xx_cleaned = xx.where(~mask, drop=True) #remove days not associated with current jobs
+
+                        xr_save_ccf(sta1, sta2, components, filterid, mov_stack, taxis, xx_cleaned, overwrite=False)
+                        del xx, xx_cleaned
+
+                massive_update_job(db, jobs, "D")
+                if stype != "step" and not params.hpc:
+                    for job in jobs:
+                        update_job(db, job.day, job.pair, 'MWCS', 'T')

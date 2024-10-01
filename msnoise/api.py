@@ -1558,8 +1558,10 @@ def get_results_all(session, station1, station2, filterid, components, dates,
             dr = dr.sortby('times')
             return dr.to_dataset()
     else:
-        return pd.DataFrame()
-
+        if format == "xarray":
+            return xr.Dataset()
+        else:
+            return pd.DataFrame()
 
 # Some helper functions
 
