@@ -217,7 +217,9 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     if wienerfilt:
                         wiener_mlen_days = math.ceil(pd.to_timedelta(wiener_mlen).total_seconds() / 86400)
                         max_mov_rolling_days = max(1, math.ceil(max_mov_rolling / 86400), 2*wiener_mlen_days) #2*wiener to deal with edge effect
-                    
+                    else:
+                        max_mov_rolling_days = max(1, math.ceil(max_mov_rolling / 86400))
+
                     days = list(days)
                     days.sort()
                     days = [day if isinstance(day, datetime.datetime) else datetime.datetime.strptime(day, '%Y-%m-%d') for day in days]
