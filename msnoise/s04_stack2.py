@@ -258,7 +258,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                         xr_save_ccf(sta1, sta2, components, filterid, mov_stack, taxis, xx_cleaned, overwrite=False)
                         del xx, xx_cleaned
 
-                massive_update_job(db, jobs, "D")
-                if stype != "step" and not params.hpc:
-                    for job in jobs:
-                        update_job(db, job.day, job.pair, 'MWCS', 'T')
+            massive_update_job(db, jobs, "D")
+            if stype != "step" and not params.hpc:
+                for job in jobs:
+                    update_job(db, job.day, job.pair, 'MWCS', 'T')
