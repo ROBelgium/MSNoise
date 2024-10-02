@@ -101,6 +101,8 @@ import argparse
 import scipy.signal
 
 from .api import *
+from .wiener import *
+
 
 import logbook
 import matplotlib.pyplot as plt
@@ -131,6 +133,15 @@ def main(stype, interval=1.0, loglevel="INFO"):
     #     mov_stacks.remove(1)  # remove 1 day stack, it will be done automatically
 
     filters = get_filters(db, all=False)
+
+    wiener_Mlen = params.wiener_Mlen
+    wiener_Nlen = params.wiener_Nlen
+    wienerfilt = params.wienerfilt
+    wiener_M =  int(pd.to_timedelta(wiener_Mlen).total_seconds() / params.corr_duration)
+    wiener_N =  int(pd.to_timedelta(wiener_Nlen).total_seconds() * params.cc_sampling_rate)
+    
+    if wienerfilt:
+        logger.info('Wiener filter enabled, will apply to CCFs before stacking')
 
     if stype == "ref":
         
@@ -163,12 +174,12 @@ def main(stype, interval=1.0, loglevel="INFO"):
                         logger.debug('No data found for %s:%s-%s-%i' %
                             (sta1, sta2, components, filterid))
                         continue
-                    start = np.array(start, dtype=np.datetime64)
-                    end = np.array(end, dtype=np.datetime64)
-                    _ = dr.where(dr.times >= start, drop=True)
-                    _ = _.where(_.times <= end, drop=True)
+                    
+                    if wienerfilt:
+                        dr = wiener_filt(dr, wiener_M, wiener_N)
+
                     # TODO add other stack methods here! using apply?
-                    _ = _.mean(dim="times")
+                    _ = dr.mean(dim="times")                    
                     xr_save_ref(sta1, sta2, components, filterid, taxis, _)
     
     else:   #stype== 'mov'
@@ -227,6 +238,9 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     c = get_results_all(db, sta1, sta2, filterid, components, all_days, format="xarray") #get ccfs needed for -m stacking
                     dr = c
                     dr = dr.resample(times="%is" % params.corr_duration).mean()
+
+                    if wienerfilt:
+                        dr = wiener_filt(dr, wiener_M, wiener_N)
 
                     for mov_stack in mov_stacks:
                         # if mov_stack > len(dr.times):
