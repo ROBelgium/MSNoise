@@ -134,11 +134,11 @@ def main(stype, interval=1.0, loglevel="INFO"):
 
     filters = get_filters(db, all=False)
 
-    wiener_Mlen = params.wiener_Mlen
-    wiener_Nlen = params.wiener_Nlen
+    wiener_mlen = params.wiener_Mlen
+    wiener_nlen = params.wiener_Nlen
     wienerfilt = params.wienerfilt
-    wiener_M =  int(pd.to_timedelta(wiener_Mlen).total_seconds() / params.corr_duration)
-    wiener_N =  int(pd.to_timedelta(wiener_Nlen).total_seconds() * params.cc_sampling_rate)
+    wiener_M =  int(pd.to_timedelta(wiener_mlen).total_seconds() / params.corr_duration)
+    wiener_N =  int(pd.to_timedelta(wiener_nlen).total_seconds() * params.cc_sampling_rate)
     
     if wienerfilt:
         logger.info('Wiener filter enabled, will apply to CCFs before stacking')
@@ -213,7 +213,10 @@ def main(stype, interval=1.0, loglevel="INFO"):
 
                     # Calculate the maximum mov_rolling value (in days)
                     max_mov_rolling = max(pd.to_timedelta(mov_stack[0]).total_seconds() for mov_stack in mov_stacks)
-                    max_mov_rolling_days = max(1, math.ceil(max_mov_rolling / 86400))
+                    
+                    if wienerfilt:
+                        wiener_mlen_days = math.ceil(pd.to_timedelta(wiener_mlen).total_seconds() / 86400)
+                        max_mov_rolling_days = max(1, math.ceil(max_mov_rolling / 86400), 2*wiener_mlen_days) #2*wiener to deal with edge effect
                     
                     days = list(days)
                     days.sort()
@@ -265,7 +268,11 @@ def main(stype, interval=1.0, loglevel="INFO"):
                             # ref: https://github.com/pydata/xarray/issues/3165
                             xx = dr.rolling(times=duration_to_windows, min_periods=1).construct("win").mean("win")
                             xx = xx.resample(times=mov_sample, label="right", skipna=True).asfreq().dropna("times", how="all")
-
+                        
+                        if wienerfilt: #only remove days at edge of filter
+                            added_dates = np.sort(added_dates)
+                            added_dates = added_dates[:wiener_mlen_days] 
+                        
                         mask = xx.times.dt.floor('D').isin(added_dates)
                         xx_cleaned = xx.where(~mask, drop=True) #remove days not associated with current jobs
 
