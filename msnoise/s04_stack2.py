@@ -139,6 +139,8 @@ def main(stype, interval=1.0, loglevel="INFO"):
     wienerfilt = params.wienerfilt
     wiener_M =  int(pd.to_timedelta(wiener_mlen).total_seconds() / params.corr_duration)
     wiener_N =  int(pd.to_timedelta(wiener_nlen).total_seconds() * params.cc_sampling_rate)
+    # is there a better alternative for threshold?
+    wiener_gap_threshold = wiener_M #no. indices which will be considered adjacent by wiener
     
     if wienerfilt:
         logger.info('Wiener filter enabled, will apply to CCFs before stacking')
@@ -176,7 +178,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                         continue
                     
                     if wienerfilt:
-                        dr = wiener_filt(dr, wiener_M, wiener_N)
+                        dr = wiener_filt(dr, wiener_M, wiener_N, wiener_gap_threshold)
 
                     # TODO add other stack methods here! using apply?
                     _ = dr.mean(dim="times")                    
@@ -245,7 +247,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     dr = dr.resample(times="%is" % params.corr_duration).mean()
 
                     if wienerfilt:
-                        dr = wiener_filt(dr, wiener_M, wiener_N)
+                        dr = wiener_filt(dr, wiener_M, wiener_N, wiener_gap_threshold)
 
                     for mov_stack in mov_stacks:
                         # if mov_stack > len(dr.times):
