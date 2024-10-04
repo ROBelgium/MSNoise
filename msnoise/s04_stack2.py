@@ -44,6 +44,30 @@ value is 2.
     of weak, coherent signals through phase-weighted stacks". Geophysical Journal
     International 130, 2 (1997): 497-505.
 
+If ``wienerfilt`` set to 'Y', a Wiener filter is applied to CCFs prior to
+stacking. This applies smoothing to CCFs in both datetime axis (window length
+corresponding to ``wiener_mlen``) and lag time axis (window length corresponding 
+to ``wiener_nlen``). For applying the filter, CCFs are treated as continguous
+or separate segments depending on the temporal gap between them. For gaps
+shorter than ``wiener_mlen``, segments are treated as adjacent by the filter.
+For larger gaps, the segments are considered seperate and the filter is applied
+independently to each segment (thus avoiding smoothing over large temporal
+gaps). To reduce influence of edge effects, an additional window of 2 * ``wiener_mlen``
+(rounded up to nearest day) CCFs are included (if the CCFs exist) at both ends
+of a segment. After filtering, the first ``wiener_mlen`` portion (each side) is
+discarded to retain only well-smoothed data. The second ``wiener_mlen``
+portion, noting that 2 * ``wiener_mlen`` was included either side, will (after stacking) overwrite 
+previously stacked data. This allows data that was previously at the 'edge' to be updated
+with improved smoothing based on neighbouring CCFs (for example, if processing in 
+real-time when no future data was available).
+
+.. warning:: While padding "T"odo jobs with existing data (where possible) may 
+    reduce the influence of edge effects, caution should be exercised when processing
+    data in separate steps/segments (e.g. real-time processing of smaller data segments). 
+    Applying the wiener filter may, therefore, be better suited when possible to process 
+    all jobs at once (i.e. set all STACK jobs as "T"odo).
+ 
+
 Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -53,6 +77,9 @@ Configuration Parameters
 * |stack_method| | *new in 1.4*
 * |pws_timegate| | *new in 1.4*
 * |pws_power| | *new in 1.4*
+* |wienerfilt| | *new in 2.0*
+* |wiener_mlen| | *new in 2.0*
+* |wiener_nlen| | *new in 2.0*
 * |hpc| | *new in 1.6*
 
 
@@ -68,15 +95,15 @@ Usage:
 For most users, the REF stack will need to be computed only once for specific
 dates and then, on routine basis, only compute the MOV stacks:
 
-.. warning With MSNoise 1.6, we have split the two actions, and the REF
-    stacks need to be computed first ! This process will put the corresponding
-    STACK jobs "I"n progress and you will need to reset them before running the
-    MOV stacks.
+
+.. Computing the REF and MOV stacks is done as two separate actions. From MSNoise 2.0, 
+    the REF stack is computed independant of the status (flag) of STACK jobs. 
+    Computing the REF stack will therefore no longer set STACK jobs to "I"n
+    progress, previously requiring them to be reset prior to running the MOV stacks.
 
 .. code-block:: sh
 
     $ msnoise stack -r
-    $ msnoise reset STACK
     $ msnoise stack -m
 
 as for all other steps, this procedure can be run in parallel:
@@ -84,7 +111,6 @@ as for all other steps, this procedure can be run in parallel:
 .. code-block:: sh
 
     $ msnoise -t 4 stack -r
-    $ msnoise reset STACK
     $ msnoise -t 4 stack -m
 
 
@@ -94,6 +120,12 @@ as for all other steps, this procedure can be run in parallel:
 .. versionadded:: 1.6
     The ``hpc`` parameter that can prevent the automatic creation of MWCS jobs.
     The REF and MOV stacks have been separated and need to be run independently.
+
+.. versionadded:: 2.0
+    MOV stack defined as list of tuples (allowing greater flexibility in stack length/sample rate, including subdaily).
+    The REF stack computation no longer depends on STACK jobs table.
+    Wiener filter option added pre-stacking.
+    
 """
 
 import argparse
@@ -134,8 +166,8 @@ def main(stype, interval=1.0, loglevel="INFO"):
 
     filters = get_filters(db, all=False)
 
-    wiener_mlen = params.wiener_Mlen
-    wiener_nlen = params.wiener_Nlen
+    wiener_mlen = params.wiener_mlen
+    wiener_nlen = params.wiener_nlen
     wienerfilt = params.wienerfilt
     wiener_M =  int(pd.to_timedelta(wiener_mlen).total_seconds() / params.corr_duration)
     wiener_N =  int(pd.to_timedelta(wiener_nlen).total_seconds() * params.cc_sampling_rate)
@@ -220,7 +252,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                         wiener_mlen_days = math.ceil(pd.to_timedelta(wiener_mlen).total_seconds() / 86400)
                         max_mov_rolling_days = max(1, math.ceil(max_mov_rolling / 86400), 2*wiener_mlen_days) #2*wiener to deal with edge effect
                     else:
-                        max_mov_rolling_days = max(1, math.ceil(max_mov_rolling / 86400))
+                        max_mov_rolling_days = int(max(1, math.ceil(max_mov_rolling / 86400)))
 
                     days = list(days)
                     days.sort()
@@ -241,7 +273,24 @@ def main(stype, interval=1.0, loglevel="INFO"):
                                 all_days.append(preceding_day)
                                 added_days.append(preceding_day)
 
-                    added_dates = pd.to_datetime(added_days).values
+                        if wienerfilt: #need to add 'future' days (if exists)
+                            end = days[gap_idx-1]
+                            for j in range(1, 2*wiener_mlen_days+1):
+                                future_day = end + datetime.timedelta(days=j)
+                                if future_day not in all_days:
+                                    all_days.append(future_day)
+                                    added_days.append(future_day)
+                    
+                    # Handle adding future days at the very end dataset (if
+                    # exists) for wiener stack
+                    if wienerfilt:
+                        last_day = days[-1]
+                        for j in range(1, 2*wiener_mlen_days + 1):
+                            future_day = last_day + datetime.timedelta(days=j)
+                            if future_day not in all_days:
+                                all_days.append(future_day)
+                                added_days.append(future_day)                    
+
                     c = get_results_all(db, sta1, sta2, filterid, components, all_days, format="xarray") #get ccfs needed for -m stacking
                     dr = c
                     dr = dr.resample(times="%is" % params.corr_duration).mean()
@@ -249,6 +298,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     if wienerfilt:
                         dr = wiener_filt(dr, wiener_M, wiener_N, wiener_gap_threshold)
 
+                    added_dates = pd.to_datetime(added_days).values
                     for mov_stack in mov_stacks:
                         # if mov_stack > len(dr.times):
                         #     logger.error("not enough data for mov_stack=%i" % mov_stack)
@@ -272,12 +322,16 @@ def main(stype, interval=1.0, loglevel="INFO"):
                             # ref: https://github.com/pydata/xarray/issues/3165
                             xx = dr.rolling(times=duration_to_windows, min_periods=1).construct("win").mean("win")
                             xx = xx.resample(times=mov_sample, label="right", skipna=True).asfreq().dropna("times", how="all")
-                        
+                       
                         if wienerfilt: #only remove days at edge of filter
                             added_dates = np.sort(added_dates)
-                            added_dates = added_dates[:wiener_mlen_days] 
-                        
-                        mask = xx.times.dt.floor('D').isin(added_dates)
+                            remove_dates_start = added_dates[:wiener_mlen_days]
+                            remove_dates_end = added_dates[-wiener_mlen_days:]
+                            remove_dates = np.concatenate((remove_dates_start, remove_dates_end))
+                        else:
+                            remove_dates = added_dates
+
+                        mask = xx.times.dt.floor('D').isin(remove_dates)
                         xx_cleaned = xx.where(~mask, drop=True) #remove days not associated with current jobs
 
                         xr_save_ccf(sta1, sta2, components, filterid, mov_stack, taxis, xx_cleaned, overwrite=False)
