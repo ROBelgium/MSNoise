@@ -1420,6 +1420,23 @@ def dvvs(ctx, mov_stack, comp, filterid, pair, show, outfile):
         from ..plots.dvvs import main
     main(mov_stack, comp, filterid, pair, show, outfile)
 
+@dvv_plot.command(name='aurelogram')
+@click.option('-t', '--method', default='MWCS', help='MWCS or STRETCH')
+@click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
+@click.option('-a', '--bystation', default=None, help='Default None. If bystation is median or mean, it means or medians dvv from CC by stations')
+@click.option('-k', '--keep_nopair', default=False, help='Remove the pair of stations without dvv')
+@click.option('-m', '--mov_stack', default=1, help='Mov Stack to read from disk. Defaults to 1.')
+@click.option('-w', '--wiggles', default=False, help='')
+@click.option('-s', '--show', help='Show interactively?', default=False, type=bool)
+@click.option('-o', '--outfile', default=None, help='Path for the outfile figure', type=str)
+@click.pass_context
+def dvv_plot_aurelogram(ctx, method, filterid, comp, bystation, keep_nopair, mov_stack, wiggles, show, outfile) :
+    if ctx.obj['MSNOISE_custom']:
+        from aurelogram import main # NOQA
+    else:
+        from ..plots.aurelogram import main
+    main(method=method, mov_stack_idx=mov_stack, components=comp, filterid=filterid, bystation=bystation, keep_nopair=keep_nopair, wiggles=wiggles, show=show, outfile=outfile)
 
 @plot.command()
 @click.option('-f', '--filterid', default=1, help='Filter ID')
