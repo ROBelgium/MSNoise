@@ -502,6 +502,10 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
     :type used: bool
     :param used: Whether this station must be used in the computations.
     """
+
+    if coordinates == "DEG" and (not -90 <= Y <= 90 or not -180 <= X <= 180):
+        raise ValueError("Coordinates must be valid WGS84 latitude (%.4f) and longitude (%.4f). " % (Y, X))
+
     station = session.query(Station).filter(Station.net == net).\
         filter(Station.sta == sta).first()
     if station is None:
