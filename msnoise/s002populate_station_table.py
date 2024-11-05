@@ -138,7 +138,7 @@ def main(loglevel="INFO"):
         Y = float(lat)
         altitude = float(alt)
         instrument = str(instype)
-        update_station(db, net, sta, X, Y, altitude,
+        update_station(db, net=net, sta=sta, X=X, Y=Y, altitude=altitude,
                        coordinates=coordinates, instrument=instrument)
 
     return True

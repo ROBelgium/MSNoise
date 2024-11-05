@@ -489,9 +489,9 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
     :type sta: str
     :param sta: The station code
     :type X: float
-    :param X: The X coordinate of the station
+    :param X: The X coordinate of the station (Easting or Longitude)
     :type Y: float
-    :param Y: The Y coordinate of the station
+    :param Y: The Y coordinate of the station (Northing or Latitude)
     :type altitude: float
     :param altitude: The altitude of the station
     :type coordinates: str

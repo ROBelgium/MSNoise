@@ -560,7 +560,8 @@ def config_sync():
                 'Problem getting coordinates for '
                 '"%s": %s' % (id, str(coords)))
             continue
-        update_station(db, station.net, station.sta, lat, lon, elevation, "DEG", )
+        update_station(db, net=station.net, sta=station.sta, X=lon, Y=lat,
+                       altitude=elevation, coordinates="DEG")
         logging.info("Added coordinates (%.5f %.5f %.1f) for station %s.%s" %
                      (lon, lat, elevation, station.net, station.sta))
     db.close()
@@ -670,8 +671,9 @@ def populate(ctx, fromda):
             altitude = 0.0
             coordinates = 'UTM'
             instrument = 'N/A'
-            update_station(db, net, sta, X, Y, altitude,
-                           coordinates=coordinates, instrument=instrument)
+            update_station(db, net=net, sta=sta, X=X, Y=Y,
+                           altitude=altitude, coordinates=coordinates,
+                           instrument=instrument)
         logger.info("Checking the available loc ids and chans...")
         ctx.invoke(db_da_stations_update_loc_chan)
     else:

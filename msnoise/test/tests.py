@@ -167,8 +167,8 @@ class MSNoiseTests(unittest.TestCase):
             fullname = "%s.%s" % (station.net, station.sta,)
             try:
                 s = stations.loc[fullname]
-                update_station(db, station.net, station.sta, s['X'],
-                               s['Y'], s['altitude'])
+                update_station(db, net=station.net, sta=station.sta,
+                               X=s['X'], Y=s['Y'], altitude=s['altitude'])
             except:
                 traceback.print_exc()
                 self.fail()
