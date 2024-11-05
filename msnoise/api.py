@@ -12,15 +12,9 @@ except:
     import pickle as cPickle
 import math
 
-import sys
-
 from logbook import Logger, StreamHandler
 import sys
 
-from sqlalchemy import create_engine, func, text
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import NullPool
-from sqlalchemy.sql.expression import func
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -92,6 +86,8 @@ def get_engine(inifile=None):
                                   dbini.hostname, dbini.database),
                                echo=False, poolclass=NullPool,
                                connect_args={'connect_timeout': 15})
+    else:
+        raise ValueError("tech value must be 1, 2 or 3")
     return engine
 
 
@@ -148,7 +144,7 @@ def read_db_inifile(inifile=None):
     :param inifile: The path to the db.ini file to use. Defaults to os.cwd() +
         db.ini
 
-    :rtype: tuple
+    :rtype: collections.namedtuple
     :returns: tech, hostname, database, username, password
     """
     IniFile = collections.namedtuple('IniFile', ['tech', 'hostname',
@@ -270,7 +266,8 @@ def get_params(session):
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
 
-    :returns: a Param class containing the parameters
+    :rtype: :class:`obspy.core.util.attribdict.AttribDict`
+    :returns: a Param object containing the parameters
     """
     # TODO: this could be populated automatically from defauts iff defaults
     # would mention types
@@ -1187,7 +1184,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
         configuration). Defaults to True.
     :type ncorr: int
     :param ncorr: Number of CCF that have been stacked for this CCF.
-    :type params: dict
+    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
     :param params: A dictionnary of MSNoise config parameters as returned by
         :func:`get_params`.
     """
@@ -1387,7 +1384,7 @@ def get_ref(session, station1, station2, filterid, components, params=None):
     :param filterid: The ID (ref) of the filter
     :type components: str
     :param components: The name of the components used (ZZ, ZR, ...)
-    :type params: dict
+    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
     :param params: A dictionnary of MSNoise config parameters as returned by
         :func:`get_params`.
     :rtype: :class:`obspy.trace`
@@ -1434,7 +1431,7 @@ def get_results(session, station1, station2, filterid, components, dates,
     :param format: Either ``stack``: the data will be stacked according to
         the parameters passed with ``params`` or ``matrix``: to get a 2D
         array of CCF.
-    :type params: dict
+    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
     :param params: A dictionnary of MSNoise config parameters as returned by
         :func:`get_params`.
     :rtype: :class:`numpy.ndarray`
