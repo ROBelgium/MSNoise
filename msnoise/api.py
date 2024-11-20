@@ -1129,7 +1129,7 @@ def export_allcorr(session, ccfid, data):
     path = os.path.join(output_folder, "%02i" % int(filterid),
                         station1, station2, components)
     if not os.path.isdir(path):
-        os.makedirs(path)
+        os.makedirs(path, exist_ok=True)
 
     df = pd.DataFrame().from_dict(data).T
     df.columns = get_t_axis(session)
@@ -1145,7 +1145,7 @@ def export_allcorr2(session, ccfid, data):
     path = os.path.join(output_folder, "%02i" % int(filterid),
                         station1, station2, components)
     if not os.path.isdir(path):
-        os.makedirs(path)
+        os.makedirs(path, exist_ok=True)
 
     df = pd.DataFrame().from_dict(data).T
     df.columns = get_t_axis(session)
@@ -1216,7 +1216,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
         path = os.path.join(output_folder, "%02i" % filterid, station1,
                             station2, components, date)
         if not os.path.isdir(path):
-            os.makedirs(path)
+            os.makedirs(path, exist_ok=True)
 
         t = Trace()
         t.data = CF
@@ -1245,7 +1245,7 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
     if cc_sampling_rate is None:
         cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
     try:
-        os.makedirs(os.path.split(filename)[0])
+        os.makedirs(os.path.split(filename)[0], exist_ok=True)
     except:
         pass
     filename += ".SAC"
@@ -1271,7 +1271,7 @@ def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
                  maxlag=None, cc_sampling_rate=None, params=None):
     from obspy import Trace, Stream
     try:
-        os.makedirs(os.path.split(filename)[0])
+        os.makedirs(os.path.split(filename)[0], exist_ok=True)
     except:
         pass
     filename += ".MSEED"
@@ -2094,7 +2094,7 @@ def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=Tru
         return None
     if use_cache:
         if not os.path.isdir(os.path.split(fn)[0]):
-            os.makedirs(os.path.split(fn)[0])
+            os.makedirs(os.path.split(fn)[0], exist_ok=True)
         ppsd.save_npz(fn[:-4])
     return ppsd
 
@@ -2118,7 +2118,7 @@ def hdf_open_store(filename, location=os.path.join("PSD", "HDF"), mode="a",
         filename = filename.replace(".h5", "")
     pd.set_option('io.hdf.default_format', format)
     if not os.path.isdir(location):
-        os.makedirs(location)
+        os.makedirs(location, exist_ok=True)
     fn = os.path.join(location, filename + ".h5")
     store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
     return store
@@ -2197,7 +2197,7 @@ def xr_insert_or_update(dataset, new):
 
 def xr_save_and_close(dataset, fn):
     if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0])
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
     dataset.to_netcdf(fn, mode="w")
     dataset.close()
     del dataset
@@ -2315,7 +2315,7 @@ def xr_save_mwcs(station1, station2, components, filterid, mov_stack, taxis, dat
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
     if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0])
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
     d = dataframe.stack(future_stack=True).stack(future_stack=True)
     d.index = d.index.set_names(["times", "keys", "taxis"])
     d = d.reorder_levels(["times", "taxis", "keys"])
@@ -2360,7 +2360,7 @@ def xr_save_dtt(station1, station2, components, filterid, mov_stack, dataframe):
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
     if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0])
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
     d = dataframe.stack(future_stack=True)
     d.index = d.index.set_names(["times", "keys"])
     d.columns = ["DTT"]
@@ -2400,7 +2400,7 @@ def xr_save_dvv(components, filterid, mov_stack, dataframe):
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s.nc" % components)
     if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0])
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
 
     if dataframe.columns.nlevels > 1:
         d = dataframe.stack(future_stack=True).stack(future_stack=True)
