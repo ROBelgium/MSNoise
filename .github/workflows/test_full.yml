@@ -50,7 +50,7 @@ jobs:
         id: cache
 
       - name: Update environment
-        run: mamba env update -n test${{ matrix.python-version }} -f .github/environment.yml
+        run: conda env update -n test${{ matrix.python-version }} -f .github/environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: print package info
