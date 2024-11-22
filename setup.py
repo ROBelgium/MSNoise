@@ -44,6 +44,8 @@ setup(version=get_git_version(),
           'xarray',  # new in 2.0
           'pooch', # new in 2.0
           'pycwt', # new in 2.0
+          'pytest',  # new in 2.0
+          'pytest-order',  # new in 2.0
       ],
       extras_require={
           'doc': [

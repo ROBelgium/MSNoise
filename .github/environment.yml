@@ -23,6 +23,8 @@ dependencies:
   - xarray
   - sqlalchemy-utils
   - pooch
+  - pytest
+  - pytest-order
   - pip:
       - git+https://github.com/regeirk/pycwt
       - click-command-tree

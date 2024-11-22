@@ -311,6 +311,7 @@ def db_da_stations_update_loc_chan(ctx):
     session = connect()
     stations = get_stations(session)
     for sta in stations:
+        print(sta.net, sta.sta)
         data = session.query(DataAvailability). \
             filter(text("net=:net")). \
             filter(text("sta=:sta")). \
@@ -319,11 +320,14 @@ def db_da_stations_update_loc_chan(ctx):
             params(net=sta.net, sta=sta.sta).all()
         locids = list(set(sorted([d.loc for d in data])))
         chans = list(set(sorted([d.chan for d in data])))
-        logger.info("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
-                                                          locids, chans))
+        # logger.info("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
+        #                                                   locids, chans))
         sta.used_location_codes = ",".join(locids)
         sta.used_channel_names = ",".join(chans)
-        session.commit()
+        try:
+            session.commit()
+        except:
+            traceback.print_exc()
 
 @db.command(name="execute")
 @click.argument('sql_command')
@@ -1639,13 +1643,25 @@ def utils_bugreport(ctx, sys, modules, env, all):
 def utils_test(prefix, tech, content):
     """Runs the test suite in a temporary folder"""
     import matplotlib.pyplot as plt
+    import pytest
     plt.switch_backend("agg")
-    if not content:
-        from ..test.tests import main
-    else:
-        from ..test.content_tests import main
-    main(prefix=prefix, tech=tech)
 
+    # Prepare environment variables for the test session
+    os.environ["PREFIX"] = prefix
+    os.environ["TECH"] = str(tech)
+
+    # Determine which test suite to run
+    test_module = 'content_tests' if content else 'tests'
+
+    # Construct the path to the test module
+    test_path = os.path.join(os.path.dirname(__file__), '..', 'test', f'{test_module}.py')
+
+    # Run pytest on the selected test module
+    exit_code = pytest.main([test_path])
+
+    # Handle the exit code as needed
+    if exit_code != 0:
+        print("Tests failed.")
 
 @utils.command(name="jupyter")
 def utils_jupyter():
