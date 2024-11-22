@@ -37,7 +37,7 @@ setup(version=get_git_version(),
           'flask-wtf',
           'markdown',
           'folium',
-          'wtforms',
+          'wtforms<3.2',
           'jinja2',
           'scandir',  # useful for python < 3.5
           'logbook',

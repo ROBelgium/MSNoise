@@ -11,6 +11,7 @@ dependencies:
   - flask-admin
   - flask-wtf
   - markdown
+  - wtforms<3.2
   - scandir
   - logbook
   - pytables
