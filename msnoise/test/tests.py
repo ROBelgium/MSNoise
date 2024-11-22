@@ -662,4 +662,13 @@ def test_100000_msnoise_admin():
             assert response.status_code == 200
 
         route = "admin/stations/new/?url=/admin/stations/"
+        response = test_client.get(route)
         assert response.status_code == 200
+        #
+        for route in ["admin/filters/edit/?id=1",
+                      "admin/stations/edit/?id=1&",
+                      "admin/config/edit/?id=network",
+                      "admin/data_availability/edit/?id=3",
+                      "admin/jobs/edit/?id=9&url=/admin/jobs/&modal=True"]:
+            response = test_client.get(route, follow_redirects=True)
+            assert response.status_code == 200
