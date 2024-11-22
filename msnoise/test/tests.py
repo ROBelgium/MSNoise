@@ -653,17 +653,17 @@ def test_100000_msnoise_admin():
     # Create a test client using the Flask application configured for testing
     with flask_app.test_client() as test_client:
         response = test_client.get('admin/')
-        assert response.status_code == 200
+        assert response.status_code == 200, f"Error following route {route}"
         assert b"MSNoise Dashboard" in response.data
         for route in ["admin/config/","admin/stations/", "admin/filters/",
                       "admin/data_availability/", "admin/jobs/",
                       "admin/bugreport/"]:
             response = test_client.get(route)
-            assert response.status_code == 200
+            assert response.status_code == 200, f"Error following route {route}"
 
         route = "admin/stations/new/?url=/admin/stations/"
         response = test_client.get(route)
-        assert response.status_code == 200
+        assert response.status_code == 200, f"Error following route {route}"
         #
         for route in ["admin/filters/edit/?id=1",
                       "admin/stations/edit/?id=1&",
@@ -671,4 +671,12 @@ def test_100000_msnoise_admin():
                       "admin/data_availability/edit/?id=3",
                       "admin/jobs/edit/?id=9&url=/admin/jobs/&modal=True"]:
             response = test_client.get(route, follow_redirects=True)
-            assert response.status_code == 200
+            assert response.status_code == 200, f"Error following route {route}"
+
+        for route in ["admin/pairs.json",
+                      "admin/bugreport.json",
+                      "admin/data_availability_flags.json",
+                      ]:
+            response = test_client.get(route, follow_redirects=True)
+            assert response.status_code == 200, f"Error following route {route}"
+
