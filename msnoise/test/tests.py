@@ -637,3 +637,29 @@ def test_99218_crondays_weeks_days_hours_alone():
 def test_99219_crondays_weeks_days_hours_optional_blank():
     parsed_crondays = parse_crondays('3w4d12h')
     assert parsed_crondays == datetime.timedelta(days=3*7+4, seconds=12*3600)
+
+@pytest.mark.order(100000)
+def test_100000_msnoise_admin():
+    from ..msnoise_admin import get_app
+    """
+    GIVEN a Flask application configured for testing
+    WHEN the '/' page is requested (GET)
+    THEN check that the response is valid
+    """
+    # Set the Testing configuration prior to creating the Flask application
+    os.environ['CONFIG_TYPE'] = 'config.TestingConfig'
+    flask_app = get_app()
+
+    # Create a test client using the Flask application configured for testing
+    with flask_app.test_client() as test_client:
+        response = test_client.get('admin/')
+        assert response.status_code == 200
+        assert b"MSNoise Dashboard" in response.data
+        for route in ["admin/config/","admin/stations/", "admin/filters/",
+                      "admin/data_availability/", "admin/jobs/",
+                      "admin/bugreport/"]:
+            response = test_client.get(route)
+            assert response.status_code == 200
+
+        route = "admin/stations/new/?url=/admin/stations/"
+        assert response.status_code == 200
