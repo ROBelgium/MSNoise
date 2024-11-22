@@ -67,7 +67,7 @@ jobs:
       - name: Test suite
         shell: bash -l {0}
         run: |
-          pytest -s --cov msnoise/test/tests.py
+          pytest -s --cov msnoise msnoise/test/tests.py
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
