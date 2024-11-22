@@ -1657,7 +1657,7 @@ def utils_test(prefix, tech, content):
     test_path = os.path.join(os.path.dirname(__file__), '..', 'test', f'{test_module}.py')
 
     # Run pytest on the selected test module
-    exit_code = pytest.main([test_path])
+    exit_code = pytest.main(['-s', test_path])
 
     # Handle the exit code as needed
     if exit_code != 0:

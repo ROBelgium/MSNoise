@@ -33,6 +33,14 @@ from ..psd_export_rms import main as export_rms_main
 from ..ppsd_compute import main as ppsd_compute_main
 from ..psd_to_hdf import main as psd_to_hdf_main
 
+from ..plots.ccftime import main as ccftime_main
+from ..plots.interferogram import main as interferogram_main
+from ..plots.spectime import main as spectime_main
+from ..plots.distance import main as distance_main
+from ..plots.dvv import main as dvv_main
+from ..plots.data_availability import main as data_availability_main
+from ..plots.wct_dvv import main as wct_dvv_main
+
 global logger
 logger = logging.getLogger('matplotlib')
 # set WARNING for Matplotlib
@@ -445,7 +453,100 @@ def test_100_plot_cctfime():
                                                               "ZZ", filter.ref, "1d", "1d")
                     assert os.path.isfile(fn)
 
-# Repeat for other plot tests similarly, using the correct plot modules and asserting on file existences
+@pytest.mark.order(100)
+def test_100_plot_interferogram():
+    db = connect()
+    for sta1, sta2 in get_station_pairs(db):
+        for loc1 in sta1.locs():
+            for loc2 in sta2.locs():
+                sta_id1 = f"{sta1.net}.{sta1.sta}.{loc1}"
+                sta_id2 = f"{sta2.net}.{sta2.sta}.{loc2}"
+                for filter in get_filters(db):
+                    interferogram_main(sta_id1, sta_id2, filter.ref, "ZZ", 1, show=False, outfile="?.png")
+                    fn = f'interferogram {sta_id1}-{sta_id2}-ZZ-f{filter.ref}-m1d_1d.png'
+                    assert os.path.isfile(fn), f"{fn} doesn't exist"
+
+@pytest.mark.order(101)
+def test_101_plot_spectime():
+    db = connect()
+    for sta1, sta2 in get_station_pairs(db):
+        for loc1 in sta1.locs():
+            for loc2 in sta2.locs():
+                sta_id1 = f"{sta1.net}.{sta1.sta}.{loc1}"
+                sta_id2 = f"{sta2.net}.{sta2.sta}.{loc2}"
+                for filter in get_filters(db):
+                    spectime_main(sta_id1, sta_id2, filter.ref, "ZZ", 1, show=False, outfile="?.png")
+                    fn = f'spectime {sta_id1}-{sta_id2}-ZZ-f{filter.ref}-m1d_1d.png'
+                    assert os.path.isfile(fn), f"{fn} doesn't exist"
+
+@pytest.mark.order(102)
+def test_102_plot_distance():
+    distance_main(filterid=1, components="ZZ", show=False, outfile="?.png")
+    fn = "distance ZZ-f1.png"
+    assert os.path.isfile(fn), f"{fn} doesn't exist"
+
+    distance_main(filterid=1, components="ZZ", show=False, outfile="?_refilter.png", refilter="0.2:0.9")
+    fn = "distance ZZ-f1_refilter.png"
+    assert os.path.isfile(fn), f"{fn} doesn't exist"
+
+@pytest.mark.order(103)
+def test_103_plot_dvv():
+    dvv_main(filterid=1, components="ZZ", show=False, outfile="?.png")
+    fn = "dvv ['ZZ']-f1-MM.png"
+    assert os.path.isfile(fn), f"{fn} doesn't exist"
+
+@pytest.mark.order(104)
+def test_104_plot_data_availability():
+    data_availability_main(chan="HHZ", show=False, outfile="?.png")
+    fn = glob.glob("data availability on*.png")
+    assert len(fn) == 1, "Data availability plot doesn't exist"
+
+@pytest.mark.order(105)
+def test_105_db_dump():
+    """ Tests the dump of the database and the creation of csv files """
+    os.system("msnoise db dump")
+    assert os.path.isfile("config.csv")
+    assert os.path.isfile("stations.csv")
+    assert os.path.isfile("filters.csv")
+    assert os.path.isfile("jobs.csv")
+    assert os.path.isfile("data_availability.csv")
+
+@pytest.mark.order(106)
+def test_106_plot_wct():
+    wct_dvv_main(filterid=1, components="ZZ", show=False, outfile="?.png")
+    fn = "wct ZZ-f1-dvv.png"
+    assert os.path.isfile(fn), f"{fn} doesn't exist"
+
+
+@pytest.mark.order(201)
+def test_201_config_get_unknown_param(setup_environment):
+    runner = setup_environment['runner']
+    result = runner.invoke(msnoise_script.config_get, ['inexistant_param'])
+    assert result.exit_code == 0
+    assert 'unknown parameter' in result.output
+
+
+@pytest.mark.order(202)
+def test_202_config_set_unknown_param(setup_environment):
+    runner = setup_environment['runner']
+    result = runner.invoke(msnoise_script.config_set, ['inexistant_param=value'])
+    assert result.exit_code == 0
+    assert 'unknown parameter' in result.output
+
+
+@pytest.mark.order(203)
+def test_203_config_set_param(setup_environment):
+    runner = setup_environment['runner']
+
+    result = runner.invoke(msnoise_script.config_set, ['channels=XXX'])
+    assert result.exit_code == 0
+
+    result = runner.invoke(msnoise_script.config_get, ['channels'])
+    assert result.exit_code == 0
+    assert 'XXX' in result.output
+
+    result = runner.invoke(msnoise_script.config_set, ['channels=*'])
+    assert result.exit_code == 0
 
 @pytest.mark.order(301)
 def test_301_compute_psd():
