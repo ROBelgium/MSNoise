@@ -25,6 +25,8 @@ dependencies:
   - pooch
   - pytest
   - pytest-order
+  - pytest-cov
+  - coverage
   - pip:
       - git+https://github.com/regeirk/pycwt
       - click-command-tree
