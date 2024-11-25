@@ -86,7 +86,7 @@ def setup_environment():
 
     # Copy data folder
     data_folder = os.path.join(os.environ.get("MSNOISE_DATA_DIR", pooch.os_cache("msnoise")), "1.6", "data")
-    response_folder = os.path.join(os.environ.get("MSNOISE_DATA_DIR", pooch.os_cache("msnoise")), "1.6", "extra")
+    response_path = os.path.join(os.environ.get("MSNOISE_DATA_DIR", pooch.os_cache("msnoise")), "1.6", "extra")
 
     if not os.path.isdir("data"):
         shutil.copytree(data_folder, "data/")
@@ -95,7 +95,7 @@ def setup_environment():
 
     yield {
         "data_folder": "data",
-        "response_folder": response_folder,
+        "response_path": response_path,
         "runner": runner
     }
 @pytest.mark.order(1)
@@ -131,11 +131,13 @@ def test_002_ConnectToDB():
 def test_003_set_and_config(setup_environment):
     db = connect()
     data_folder = setup_environment['data_folder']
+    response_path = setup_environment['response_path']
     totests = [
         ['data_folder', data_folder],
         ['data_structure', 'PDF'],
         ['network', 'YA'],
-        ['components_to_compute', 'ZZ']
+        ['components_to_compute', 'ZZ'],
+        ['response_path', response_path]
     ]
     for key, value in totests:
         update_config(db, key, value)
@@ -191,7 +193,7 @@ def test_006_get_stations():
 @pytest.mark.order(7)
 def test_007_update_stations(setup_environment):
     db = connect()
-    stations_file = os.path.join(setup_environment['response_folder'], 'stations.csv')
+    stations_file = os.path.join(setup_environment['response_path'], 'stations.csv')
     stations_df = pd.read_csv(stations_file, header=None, index_col=0, names=['X', 'Y', 'altitude'])
     for station in get_stations(db):
         fullname = f"{station.net}.{station.sta}"
@@ -201,6 +203,13 @@ def test_007_update_stations(setup_environment):
         except:
             traceback.print_exc()
             pytest.fail()
+
+    runner = setup_environment['runner']
+    result = runner.invoke(msnoise_script.config_sync)
+    assert result.exit_code == 0, f"Command failed with exit code {result.exit_code}"
+
+    result = runner.invoke(msnoise_script.info)
+    assert result.exit_code == 0, f"Command failed with exit code {result.exit_code}"
 
 @pytest.mark.order(8)
 def test_008_scan_archive(setup_environment):
@@ -418,8 +427,8 @@ def test_030_create_fake_new_files(setup_environment):
 @pytest.mark.order(31)
 def test_031_instrument_response(setup_environment):
     db = connect()
-    response_folder = setup_environment['response_folder']
-    update_config(db, 'response_path', response_folder)
+    response_path = setup_environment['response_path']
+    update_config(db, 'response_path', response_path)
     update_config(db, 'response_format', "dataless")
     update_config(db, 'remove_response', "Y")
     db.close()
