@@ -383,7 +383,7 @@ def test_028_build_movstack_datelist():
 
 @pytest.mark.order(29)
 def test_029_stretching():
-    from ..stretch import main as stretch_main
+    from ..stretch2 import main as stretch_main
     db = connect()
     update_config(db, "export_format", "MSEED")
     reset_jobs(db, "MWCS", alljobs=True)
