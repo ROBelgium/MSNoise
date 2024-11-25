@@ -74,7 +74,7 @@ def setup_environment():
     BRIAN = pooch.create(
         path=pooch.os_cache("msnoise-testdata"),
         base_url="https://github.com/ROBelgium/msnoise-testdata/raw/{version}/",
-        version="1.0",
+        version="1.1",
         version_dev="main",
         registry=test_files,
         env="MSNOISE_DATA_DIR",
@@ -85,8 +85,8 @@ def setup_environment():
         BRIAN.fetch(fn)
 
     # Copy data folder
-    data_folder = os.path.join(os.environ.get("MSNOISE_DATA_DIR", pooch.os_cache("msnoise-testdata")), "1.0", "classic", "data")
-    response_path = os.path.join(os.environ.get("MSNOISE_DATA_DIR", pooch.os_cache("msnoise-testdata")), "1.0", "classic", "extra")
+    data_folder = os.path.join(os.environ.get("MSNOISE_DATA_DIR", pooch.os_cache("msnoise-testdata")), "1.1", "classic", "data")
+    response_path = os.path.join(os.environ.get("MSNOISE_DATA_DIR", pooch.os_cache("msnoise-testdata")), "1.1", "classic", "extra")
 
     if not os.path.isdir("data"):
         shutil.copytree(data_folder, "data/")

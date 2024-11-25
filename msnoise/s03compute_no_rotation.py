@@ -428,6 +428,8 @@ def main(loglevel="INFO"):
                 for sta1, sta2 in itertools.combinations(names, 2):
                     n1, s1, l1, c1 = sta1
                     n2, s2, l2, c2 = sta2
+                    if n1 == n2 and s1 == s2 and l1 == l2:
+                        continue
                     pair = "%s.%s.%s:%s.%s.%s" % (n1, s1, l1, n2, s2, l2)
                     if pair not in pairs:
                         continue
