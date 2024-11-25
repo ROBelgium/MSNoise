@@ -588,52 +588,42 @@ def test_400_run_manually():
     os.system("msnoise cc dvv compute_dtt")
     os.system("msnoise cc dvv compute_dvv")
 
-@pytest.mark.order(99210)
 def test_99210_crondays_positive_float():
     parsed_crondays = parse_crondays('2.5')
     assert parsed_crondays == datetime.timedelta(days=2.5)
 
-@pytest.mark.order(99211)
 def test_99211_crondays_negative_float():
     parsed_crondays = parse_crondays('-3')
     assert parsed_crondays == datetime.timedelta(days=3)
 
-@pytest.mark.order(99212)
 def test_99212_crondays_weeks():
     parsed_crondays = parse_crondays('2w')
     assert parsed_crondays == datetime.timedelta(days=7*2)
 
-@pytest.mark.order(99213)
 def test_99213_crondays_days():
     parsed_crondays = parse_crondays('5d')
     assert parsed_crondays == datetime.timedelta(days=5)
 
-@pytest.mark.order(99214)
 def test_99214_crondays_hours():
     parsed_crondays = parse_crondays('12h')
     assert parsed_crondays == datetime.timedelta(seconds=12*3600)
 
-@pytest.mark.order(99215)
 def test_99215_crondays_weeks_days_hours():
     parsed_crondays = parse_crondays('2w 3d 12h')
     assert parsed_crondays == datetime.timedelta(days=2*7+3, seconds=12*3600)
 
-@pytest.mark.order(99216)
 def test_99216_crondays_weeks_hours():
     parsed_crondays = parse_crondays('1w 6h')
     assert parsed_crondays == datetime.timedelta(days=1*7, seconds=6*3600)
 
-@pytest.mark.order(99217)
 def test_99217_crondays_weeks_days_hours_order_matters():
     with pytest.raises(FatalError):
         parse_crondays('16h 3d')
 
-@pytest.mark.order(99218)
 def test_99218_crondays_weeks_days_hours_alone():
     with pytest.raises(FatalError):
         parse_crondays('about 16h')
 
-@pytest.mark.order(99219)
 def test_99219_crondays_weeks_days_hours_optional_blank():
     parsed_crondays = parse_crondays('3w4d12h')
     assert parsed_crondays == datetime.timedelta(days=3*7+4, seconds=12*3600)
