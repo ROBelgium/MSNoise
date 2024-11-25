@@ -7,3 +7,4 @@ dist
 msnoise.egg-info
 /.idea
 /msnoise/RELEASE-VERSION
+/data/

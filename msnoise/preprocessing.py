@@ -73,7 +73,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
     :param db: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`msnoise.api.connect`.
     :type stations: list of str
-    :param stations: a list of station names, in the format NET.STA.
+    :param stations: a list of station names, in the format NET.STA.LOC
     :type comps: list of str
     :param comps: a list of component names, in Z,N,E,1,2.
     :type goal_day: str
@@ -201,11 +201,11 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                     stream[i] = check_and_phase_shift(trace, params.preprocess_taper_length)
 
                 logger.debug("%s Checking Gaps" % stream[0].id)
-                if len(getGaps(stream)) > 0:
-                    logger.debug(" found %i gaps" % len(getGaps(stream)))
+                gaps = getGaps(stream)
+                if len(gaps) > 0:
+                    logger.debug(" found %i gaps" % len(gaps))
                     max_gap = params.preprocess_max_gap*stream[0].stats.sampling_rate
 
-                    gaps = getGaps(stream)
                     while len(gaps):
                         too_long = 0
                         for gap in gaps:

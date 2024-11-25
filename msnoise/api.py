@@ -1163,9 +1163,9 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
     :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA)
+    :param station1: The name of station 1 (formatted NET.STA.LOC)
     :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA)
+    :param station2: The name of station 2 (formatted NET.STA.LOC)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type date: datetime.date or str
@@ -1377,9 +1377,9 @@ def get_ref(session, station1, station2, filterid, components, params=None):
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
     :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA)
+    :param station1: The name of station 1 (formatted NET.STA.LOC)
     :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA)
+    :param station2: The name of station 2 (formatted NET.STA.LOC)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type components: str
@@ -1416,9 +1416,9 @@ def get_results(session, station1, station2, filterid, components, dates,
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
     :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA)
+    :param station1: The name of station 1 (formatted NET.STA.LOC)
     :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA)
+    :param station2: The name of station 2 (formatted NET.STA.LOC)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type components: str
@@ -1518,9 +1518,9 @@ def get_results_all(session, station1, station2, filterid, components, dates,
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
     :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA)
+    :param station1: The name of station 1 (formatted NET.STA.LOC)
     :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA)
+    :param station2: The name of station 2 (formatted NET.STA.LOC)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type components: str
@@ -1952,21 +1952,21 @@ def make_same_length(st):
 
 def preload_instrument_responses(session, return_format="dataframe"):
     """
-    This function preloads all instrument responses from ``response_format``
+    This function preloads all instrument responses from ``response_path``
     and stores the seed ids, start and end dates, and paz for every channel
-    in a DataFrame.
-
-    .. warning::
-        This function only works for ``response_format`` being "inventory"
-        or "dataless".
+    in a DataFrame. Any file readable by obspy's read_inventory will be processed.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
 
-    :rtype: pandas.DataFrame
+    :type return_format: str
+    :param return_format: The format of the returned object, either
+        ``dataframe`` or ``inventory``.
+
+    :rtype: :class:`~pandas.DataFrame` or :class:`~obspy.core.inventory.inventory.Inventory`
     :returns: A table containing all channels with the time of operation and
-        poles and zeros.
+        poles and zeros (DataFrame), or an obspy Inventory object.
 
     """
     from obspy.core.inventory import Inventory
