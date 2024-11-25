@@ -679,3 +679,16 @@ def test_100000_msnoise_admin():
             response = test_client.get(route, follow_redirects=True)
             assert response.status_code == 200, f"Error following route {route}"
 
+
+@pytest.mark.order(200000)
+def test_20000_invoke_script(setup_environment):
+    runner = setup_environment['runner']
+
+    for cmd in [
+        msnoise_script.config_sync,
+        msnoise_script.db_upgrade,
+        msnoise_script.db_clean_duplicates,
+        ]:
+
+        result = runner.invoke(cmd)
+        assert result.exit_code == 0, f"Command failed with exit code {result.exit_code}"
