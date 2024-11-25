@@ -63,18 +63,18 @@ def setup_environment():
 
     # Define test files and use pooch to handle fetching
     test_files = {
-        "data/2010/UV05/HHZ.D/YA.UV05.00.HHZ.D.2010.244": "17034091285d485f7c2d4797f435228c408d6940db943be63f1769ec09854f4f",
-        "data/2010/UV06/HHZ.D/YA.UV06.00.HHZ.D.2010.244": "51bfd1e735696e83ee6dba136c9e740c59120fac9f74b386eac75062eb9ca382",
-        "data/2010/UV10/HHZ.D/YA.UV10.00.HHZ.D.2010.244": "530cc7f4a57fe69a8a5cedeb18e64773055c146e4ae4676012f6618dd0c92e82",
-        "extra/DATA.RESIF_Jun_10,14_21_05_20264.RESIF": "95a6d007132fc41b6107d258aeee1170614d234cdd3eb4a6d5652e4661a6adcd",
-        "extra/stations.csv": "057152c2823c5457bce879146d78984af422973ab313e1d1cd8baaa7f7a1d6b3",
-        "extra/test_inventory.xml": "48bf3261a9c23f1782e452583306b73643a4d7f205df4338e5525df3c06eccb9",
+        "classic/data/2010/UV05/HHZ.D/YA.UV05.00.HHZ.D.2010.244": "17034091285d485f7c2d4797f435228c408d6940db943be63f1769ec09854f4f",
+        "classic/data/2010/UV06/HHZ.D/YA.UV06.00.HHZ.D.2010.244": "51bfd1e735696e83ee6dba136c9e740c59120fac9f74b386eac75062eb9ca382",
+        "classic/data/2010/UV10/HHZ.D/YA.UV10.00.HHZ.D.2010.244": "530cc7f4a57fe69a8a5cedeb18e64773055c146e4ae4676012f6618dd0c92e82",
+        "classic/extra/DATA.RESIF_Jun_10,14_21_05_20264.RESIF": "95a6d007132fc41b6107d258aeee1170614d234cdd3eb4a6d5652e4661a6adcd",
+        "classic/extra/stations.csv": "057152c2823c5457bce879146d78984af422973ab313e1d1cd8baaa7f7a1d6b3",
+        "classic/extra/test_inventory.xml": "48bf3261a9c23f1782e452583306b73643a4d7f205df4338e5525df3c06eccb9",
     }
 
     BRIAN = pooch.create(
-        path=pooch.os_cache("msnoise"),
-        base_url="https://github.com/ROBelgium/MSNoise/raw/{version}/msnoise/test",
-        version="1.6",
+        path=pooch.os_cache("msnoise-testdata"),
+        base_url="https://github.com/ROBelgium/msnoise-testdata/raw/{version}/",
+        version="1.0",
         version_dev="main",
         registry=test_files,
         env="MSNOISE_DATA_DIR",
@@ -85,8 +85,8 @@ def setup_environment():
         BRIAN.fetch(fn)
 
     # Copy data folder
-    data_folder = os.path.join(os.environ.get("MSNOISE_DATA_DIR", pooch.os_cache("msnoise")), "1.6", "data")
-    response_path = os.path.join(os.environ.get("MSNOISE_DATA_DIR", pooch.os_cache("msnoise")), "1.6", "extra")
+    data_folder = os.path.join(os.environ.get("MSNOISE_DATA_DIR", pooch.os_cache("msnoise-testdata")), "1.0", "classic", "data")
+    response_path = os.path.join(os.environ.get("MSNOISE_DATA_DIR", pooch.os_cache("msnoise-testdata")), "1.0", "classic", "extra")
 
     if not os.path.isdir("data"):
         shutil.copytree(data_folder, "data/")
@@ -519,6 +519,8 @@ def test_105_db_dump():
     assert os.path.isfile("filters.csv")
     assert os.path.isfile("jobs.csv")
     assert os.path.isfile("data_availability.csv")
+
+    os.system("msnoise db import config --force")
 
 @pytest.mark.order(106)
 def test_106_plot_wct():
