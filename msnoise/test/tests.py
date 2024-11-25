@@ -520,7 +520,7 @@ def test_105_db_dump():
     assert os.path.isfile("jobs.csv")
     assert os.path.isfile("data_availability.csv")
 
-    os.system("msnoise db import config --force")
+    # os.system("msnoise db import config --force")
 
 @pytest.mark.order(106)
 def test_106_plot_wct():
