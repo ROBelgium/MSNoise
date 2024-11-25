@@ -67,7 +67,13 @@ jobs:
       - name: Test suite
         shell: bash -l {0}
         run: |
-          pytest -s --cov msnoise msnoise/test/tests.py msnoise/test/tests-threecomponent.py --cov-report=xml
+          pytest -s --cov msnoise msnoise/test/tests.py --cov-report=xml
+
+      - name: Test 3C data
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash -l {0}
+        run: |
+          pytest -s --cov msnoise msnoise/test/tests-threecomponent.py --cov-report=xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
