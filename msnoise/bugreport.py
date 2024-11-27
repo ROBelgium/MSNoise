@@ -3,12 +3,14 @@
 import os
 import platform
 import sys
+import importlib
 
 def ispresent(module, how=None):
     try:
         mod = __import__(module)
-        if hasattr(mod, '__version__'):
-            return "[X] %s: %s"%(module,mod.__version__)
+        ver = importlib.metadata.version(module)
+        if ver:
+            return "[X] %s: %s"%(module, ver)
         else:
             return "[X] %s: present (no version)"%module
     except:
@@ -53,6 +55,7 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n" + ispresent('tables') + " (pytables)"
         output += "\n" + ispresent('xarray')
         output += "\n" + ispresent('logbook')
+        output += "\n" + ispresent('pycwt')
 
         output += "\n"
         output += "\n" + "Only necessary if you plan to build the doc locally:"
@@ -62,16 +65,16 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n" + ispresent('sphinx_gallery')
         output += "\n" + ispresent('numpydoc')
 
-        output += "\n"
-        output += "\n" + "Graphical Backends:"
-        output += "\n" + ispresent('wx')
-        output += "\n" + ispresent('qt')
-        output += "\n" + ispresent('qt4')
-        output += "\n" + ispresent('qt5')
-        output += "\n" + ispresent('pyqt')
-        output += "\n" + ispresent('PyQt4')
-        output += "\n" + ispresent('PyQt5')
-        output += "\n" + ispresent('PySide')
+        # output += "\n"
+        # output += "\n" + "Graphical Backends:"
+        # output += "\n" + ispresent('wx')
+        # output += "\n" + ispresent('qt')
+        # output += "\n" + ispresent('qt4')
+        # output += "\n" + ispresent('qt5')
+        # output += "\n" + ispresent('pyqt')
+        # output += "\n" + ispresent('PyQt4')
+        # output += "\n" + ispresent('PyQt5')
+        # output += "\n" + ispresent('PySide')
         
         output += "\n"
         output += "\n" + "Not required, just checking:"
@@ -85,11 +88,12 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n" + ispresent('pyparsing')
         output += "\n" + ispresent('distutils')
         output += "\n" + ispresent('IPython')
-        output += "\n" + ispresent('vtk')
-        output += "\n" + ispresent('enable')
-        output += "\n" + ispresent('traitsui')
-        output += "\n" + ispresent('traits')
-        output += "\n" + ispresent('scikits.samplerate')
+        output += "\n" + ispresent('notebook')
+        # output += "\n" + ispresent('vtk')
+        # output += "\n" + ispresent('enable')
+        # output += "\n" + ispresent('traitsui')
+        # output += "\n" + ispresent('traits')
+        # output += "\n" + ispresent('scikits.samplerate')
         
         output += "\n"
     

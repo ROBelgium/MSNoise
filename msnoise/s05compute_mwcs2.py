@@ -337,6 +337,7 @@ def main(loglevel="INFO"):
                     output = pd.concat(output, axis=1)
 
                     xr_save_mwcs(station1, station2, components, filterid, mov_stack, taxis, output)
+                    del data, output
 
         massive_update_job(db, jobs, "D")
         if not params.hpc:

@@ -1,6 +1,8 @@
 """ This script searches the database for files flagged "N"ew or "M"odified.
 For each date in the configured range, it checks if other stations are
-available and defines the new jobs to be processed. Those are inserted in the
+available and defines the new jobs to be processed.  Only jobs within the 
+configured ``startdate`` and ``enddate`` are considered avoiding unnecessary 
+job creation. Those are inserted in the
 *jobs* table of the database.
 
 To run it from the console:
@@ -93,6 +95,8 @@ def main(init=False, nocc=False):
     updated_days = []
     nfs = get_new_files(db)
     now = datetime.datetime.utcnow()
+    start_date, end_date, datelist = build_movstack_datelist(db)
+    
     for nf in nfs:
         tmp = "%s.%s.%s" % (nf.net, nf.sta, nf.loc)
         if tmp not in stations_to_analyse:
@@ -100,16 +104,17 @@ def main(init=False, nocc=False):
 
         start, end = nf.starttime.date(), nf.endtime.date()
         for date in pd.date_range(start, end, freq="D"):
-            updated_days.append(date.date())
-            for jobtype in extra_jobtypes_new_files:
-                job = {"day": date.date().strftime("%Y-%m-%d"),
-                                 "pair": "%s.%s.%s" % (nf.net, nf.sta, nf.loc),
-                                 "jobtype": jobtype,
-                                 "flag": "T", "lastmod": now}
-                jobtxt = ''.join(str(x) for x in job.values())
-                if jobtxt not in crap_all_jobs_text:
-                    all_jobs.append(job)
-                    crap_all_jobs_text.append(jobtxt)
+            if filter_within_daterange(date.date(), start_date, end_date):
+                updated_days.append(date.date())
+                for jobtype in extra_jobtypes_new_files:
+                    job = {"day": date.date().strftime("%Y-%m-%d"),
+                                     "pair": "%s.%s.%s" % (nf.net, nf.sta, nf.loc),
+                                     "jobtype": jobtype,
+                                     "flag": "T", "lastmod": now}
+                    jobtxt = ''.join(str(x) for x in job.values())
+                    if jobtxt not in crap_all_jobs_text:
+                        all_jobs.append(job)
+                        crap_all_jobs_text.append(jobtxt)
 
     # all_jobs = pd.DataFrame(all_jobs)
     # all_jobs.drop_duplicates(inplace=True)

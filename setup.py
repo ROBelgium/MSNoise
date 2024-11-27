@@ -37,13 +37,15 @@ setup(version=get_git_version(),
           'flask-wtf',
           'markdown',
           'folium',
-          'wtforms',
+          'wtforms<3.2',
           'jinja2',
           'scandir',  # useful for python < 3.5
           'logbook',
           'xarray',  # new in 2.0
           'pooch', # new in 2.0
           'pycwt', # new in 2.0
+          'pytest',  # new in 2.0
+          'pytest-order',  # new in 2.0
       ],
       extras_require={
           'doc': [

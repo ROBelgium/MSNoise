@@ -1,6 +1,10 @@
 name: Full test suite
 
-on: [push,pull_request]
+on: 
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 0 * * *'
 
 jobs:
   run_tests:
@@ -31,12 +35,9 @@ jobs:
         id: date
         run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
 
-      - uses: conda-incubator/setup-miniconda@v3.0.4
+      - uses: conda-incubator/setup-miniconda@v3.1.0
         with:
-          miniforge-variant: Mambaforge
-          miniforge-version: latest
           activate-environment: test${{ matrix.python-version }}
-          use-mamba: true
           python-version: ${{ matrix.python-version }}
 
       - uses: actions/cache@v4
@@ -49,7 +50,7 @@ jobs:
         id: cache
 
       - name: Update environment
-        run: mamba env update -n test${{ matrix.python-version }} -f .github/environment.yml
+        run: conda env update -n test${{ matrix.python-version }} -f .github/environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: print package info
@@ -66,4 +67,21 @@ jobs:
       - name: Test suite
         shell: bash -l {0}
         run: |
-          msnoise utils test
+          pytest -s --cov msnoise msnoise/test/tests.py --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Test 3C data
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        shell: bash -l {0}
+        run: |
+          pytest -s --cov msnoise msnoise/test/tests-threecomponent.py --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

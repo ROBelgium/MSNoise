@@ -930,14 +930,14 @@ def index():
     return redirect("/admin/", code=302)
 
 
-def main(port=5000):
+def get_app():
     global db
     db = connect()
     plugins = get_config(db, "plugins")
     db.close()
 
     admin = Admin(app, template_mode='bootstrap4')
-    
+
     if "msnoise_brand" in os.environ:
         tmp = eval(os.environ["msnoise_brand"])
         name, logo = tmp.split("|")
@@ -981,22 +981,20 @@ def main(port=5000):
     app.jinja_loader = jinja2.ChoiceLoader([
         app.jinja_loader,
         jinja2.FileSystemLoader(template_folders),
-        ])
+    ])
 
+    admin.add_view(StationView(db, endpoint='stations', category='Configuration'))
+    admin.add_view(FilterView(db, endpoint='filters', category='Configuration'))
+    admin.add_view(ConfigView(db, endpoint='config', category='Configuration'))
 
-    admin.add_view(StationView(db,endpoint='stations', category='Configuration'))
-    admin.add_view(FilterView(db,endpoint='filters', category='Configuration'))
-    admin.add_view(ConfigView(db,endpoint='config', category='Configuration'))
-
-    admin.add_view(DataAvailabilityView(db,endpoint='data_availability',
+    admin.add_view(DataAvailabilityView(db, endpoint='data_availability',
                                         category='Database'))
 
-    admin.add_view(JobView(db,endpoint='jobs',category='Database'))
-
+    admin.add_view(JobView(db, endpoint='jobs', category='Database'))
 
     admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',
                                         category='Results'))
-    admin.add_view(ResultPlotter(endpoint='results',category='Results'))
+    admin.add_view(ResultPlotter(endpoint='results', category='Results'))
     admin.add_view(InterferogramPlotter(endpoint='interferogram',
                                         category='Results'))
     admin.add_view(
@@ -1008,7 +1006,6 @@ def main(port=5000):
     admin.add_view(
         PSDSpectrogram(name="PSD Spectrogram", endpoint='psd_spectrogram', category='QC'))
 
-
     if plugins:
         plugins = plugins.split(',')
         for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.admin_view'):
@@ -1016,11 +1013,15 @@ def main(port=5000):
             if module_name in plugins:
                 admin.add_view(ep.load()(db))
 
-    a = GenericView(endpoint='about',category='Help', name='About')
+    a = GenericView(endpoint='about', category='Help', name='About')
     a.page = "about"
     admin.add_view(a)
     admin.add_view(BugReport(name='Bug Report', endpoint='bugreport',
                              category='Help'))
+    return app
+
+def main(port=5000):
+    app = get_app()
 
     print("MSNoise admin will run on all interfaces by default")
     print("access it via the machine's IP address or")

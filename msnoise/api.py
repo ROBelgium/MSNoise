@@ -12,15 +12,9 @@ except:
     import pickle as cPickle
 import math
 
-import sys
-
 from logbook import Logger, StreamHandler
 import sys
 
-from sqlalchemy import create_engine, func, text
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import NullPool
-from sqlalchemy.sql.expression import func
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -92,6 +86,8 @@ def get_engine(inifile=None):
                                   dbini.hostname, dbini.database),
                                echo=False, poolclass=NullPool,
                                connect_args={'connect_timeout': 15})
+    else:
+        raise ValueError("tech value must be 1, 2 or 3")
     return engine
 
 
@@ -148,7 +144,7 @@ def read_db_inifile(inifile=None):
     :param inifile: The path to the db.ini file to use. Defaults to os.cwd() +
         db.ini
 
-    :rtype: tuple
+    :rtype: collections.namedtuple
     :returns: tech, hostname, database, username, password
     """
     IniFile = collections.namedtuple('IniFile', ['tech', 'hostname',
@@ -270,7 +266,8 @@ def get_params(session):
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
 
-    :returns: a Param class containing the parameters
+    :rtype: :class:`obspy.core.util.attribdict.AttribDict`
+    :returns: a Param object containing the parameters
     """
     # TODO: this could be populated automatically from defauts iff defaults
     # would mention types
@@ -489,9 +486,9 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
     :type sta: str
     :param sta: The station code
     :type X: float
-    :param X: The X coordinate of the station
+    :param X: The X coordinate of the station (Easting or Longitude)
     :type Y: float
-    :param Y: The Y coordinate of the station
+    :param Y: The Y coordinate of the station (Northing or Latitude)
     :type altitude: float
     :param altitude: The altitude of the station
     :type coordinates: str
@@ -502,6 +499,10 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
     :type used: bool
     :param used: Whether this station must be used in the computations.
     """
+
+    if coordinates == "DEG" and (not -90 <= Y <= 90 or not -180 <= X <= 180):
+        raise ValueError("Coordinates must be valid WGS84 latitude (%.4f) and longitude (%.4f). " % (Y, X))
+
     station = session.query(Station).filter(Station.net == net).\
         filter(Station.sta == sta).first()
     if station is None:
@@ -1128,7 +1129,7 @@ def export_allcorr(session, ccfid, data):
     path = os.path.join(output_folder, "%02i" % int(filterid),
                         station1, station2, components)
     if not os.path.isdir(path):
-        os.makedirs(path)
+        os.makedirs(path, exist_ok=True)
 
     df = pd.DataFrame().from_dict(data).T
     df.columns = get_t_axis(session)
@@ -1144,7 +1145,7 @@ def export_allcorr2(session, ccfid, data):
     path = os.path.join(output_folder, "%02i" % int(filterid),
                         station1, station2, components)
     if not os.path.isdir(path):
-        os.makedirs(path)
+        os.makedirs(path, exist_ok=True)
 
     df = pd.DataFrame().from_dict(data).T
     df.columns = get_t_axis(session)
@@ -1162,9 +1163,9 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
     :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA)
+    :param station1: The name of station 1 (formatted NET.STA.LOC)
     :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA)
+    :param station2: The name of station 2 (formatted NET.STA.LOC)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type date: datetime.date or str
@@ -1183,7 +1184,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
         configuration). Defaults to True.
     :type ncorr: int
     :param ncorr: Number of CCF that have been stacked for this CCF.
-    :type params: dict
+    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
     :param params: A dictionnary of MSNoise config parameters as returned by
         :func:`get_params`.
     """
@@ -1215,7 +1216,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
         path = os.path.join(output_folder, "%02i" % filterid, station1,
                             station2, components, date)
         if not os.path.isdir(path):
-            os.makedirs(path)
+            os.makedirs(path, exist_ok=True)
 
         t = Trace()
         t.data = CF
@@ -1244,7 +1245,7 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
     if cc_sampling_rate is None:
         cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
     try:
-        os.makedirs(os.path.split(filename)[0])
+        os.makedirs(os.path.split(filename)[0], exist_ok=True)
     except:
         pass
     filename += ".SAC"
@@ -1270,7 +1271,7 @@ def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
                  maxlag=None, cc_sampling_rate=None, params=None):
     from obspy import Trace, Stream
     try:
-        os.makedirs(os.path.split(filename)[0])
+        os.makedirs(os.path.split(filename)[0], exist_ok=True)
     except:
         pass
     filename += ".MSEED"
@@ -1376,14 +1377,14 @@ def get_ref(session, station1, station2, filterid, components, params=None):
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
     :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA)
+    :param station1: The name of station 1 (formatted NET.STA.LOC)
     :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA)
+    :param station2: The name of station 2 (formatted NET.STA.LOC)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type components: str
     :param components: The name of the components used (ZZ, ZR, ...)
-    :type params: dict
+    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
     :param params: A dictionnary of MSNoise config parameters as returned by
         :func:`get_params`.
     :rtype: :class:`obspy.trace`
@@ -1415,9 +1416,9 @@ def get_results(session, station1, station2, filterid, components, dates,
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
     :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA)
+    :param station1: The name of station 1 (formatted NET.STA.LOC)
     :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA)
+    :param station2: The name of station 2 (formatted NET.STA.LOC)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type components: str
@@ -1430,7 +1431,7 @@ def get_results(session, station1, station2, filterid, components, dates,
     :param format: Either ``stack``: the data will be stacked according to
         the parameters passed with ``params`` or ``matrix``: to get a 2D
         array of CCF.
-    :type params: dict
+    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
     :param params: A dictionnary of MSNoise config parameters as returned by
         :func:`get_params`.
     :rtype: :class:`numpy.ndarray`
@@ -1517,9 +1518,9 @@ def get_results_all(session, station1, station2, filterid, components, dates,
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
     :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA)
+    :param station1: The name of station 1 (formatted NET.STA.LOC)
     :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA)
+    :param station2: The name of station 2 (formatted NET.STA.LOC)
     :type filterid: int
     :param filterid: The ID (ref) of the filter
     :type components: str
@@ -1953,21 +1954,21 @@ def make_same_length(st):
 
 def preload_instrument_responses(session, return_format="dataframe"):
     """
-    This function preloads all instrument responses from ``response_format``
+    This function preloads all instrument responses from ``response_path``
     and stores the seed ids, start and end dates, and paz for every channel
-    in a DataFrame.
-
-    .. warning::
-        This function only works for ``response_format`` being "inventory"
-        or "dataless".
+    in a DataFrame. Any file readable by obspy's read_inventory will be processed.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
 
-    :rtype: pandas.DataFrame
+    :type return_format: str
+    :param return_format: The format of the returned object, either
+        ``dataframe`` or ``inventory``.
+
+    :rtype: :class:`~pandas.DataFrame` or :class:`~obspy.core.inventory.inventory.Inventory`
     :returns: A table containing all channels with the time of operation and
-        poles and zeros.
+        poles and zeros (DataFrame), or an obspy Inventory object.
 
     """
     from obspy.core.inventory import Inventory
@@ -2095,7 +2096,7 @@ def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=Tru
         return None
     if use_cache:
         if not os.path.isdir(os.path.split(fn)[0]):
-            os.makedirs(os.path.split(fn)[0])
+            os.makedirs(os.path.split(fn)[0], exist_ok=True)
         ppsd.save_npz(fn[:-4])
     return ppsd
 
@@ -2119,7 +2120,7 @@ def hdf_open_store(filename, location=os.path.join("PSD", "HDF"), mode="a",
         filename = filename.replace(".h5", "")
     pd.set_option('io.hdf.default_format', format)
     if not os.path.isdir(location):
-        os.makedirs(location)
+        os.makedirs(location, exist_ok=True)
     fn = os.path.join(location, filename + ".h5")
     store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
     return store
@@ -2198,7 +2199,7 @@ def xr_insert_or_update(dataset, new):
 
 def xr_save_and_close(dataset, fn):
     if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0])
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
     dataset.to_netcdf(fn, mode="w")
     dataset.close()
     del dataset
@@ -2316,7 +2317,7 @@ def xr_save_mwcs(station1, station2, components, filterid, mov_stack, taxis, dat
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
     if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0])
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
     d = dataframe.stack(future_stack=True).stack(future_stack=True)
     d.index = d.index.set_names(["times", "keys", "taxis"])
     d = d.reorder_levels(["times", "taxis", "keys"])
@@ -2361,7 +2362,7 @@ def xr_save_dtt(station1, station2, components, filterid, mov_stack, dataframe):
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
     if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0])
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
     d = dataframe.stack(future_stack=True)
     d.index = d.index.set_names(["times", "keys"])
     d.columns = ["DTT"]
@@ -2401,7 +2402,7 @@ def xr_save_dvv(components, filterid, mov_stack, dataframe):
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s.nc" % components)
     if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0])
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
 
     if dataframe.columns.nlevels > 1:
         d = dataframe.stack(future_stack=True).stack(future_stack=True)
@@ -2650,3 +2651,7 @@ def xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_
     logging.debug(f"Saved WCT data to {fn}")
     # Clean up
     del dvv_da, err_da, coh_da, ds
+
+def filter_within_daterange(date, start_date, end_date):
+    """Check if a date falls within the configured range"""
+    return start_date <= date <= end_date

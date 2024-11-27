@@ -170,6 +170,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
     #     mov_stacks.remove(1)  # remove 1 day stack, it will be done automatically
 
     filters = get_filters(db, all=False)
+<<<<<<< HEAD
 
     wiener_mlen = params.wiener_mlen
     wiener_nlen = params.wiener_nlen
@@ -207,7 +208,13 @@ def main(stype, interval=1.0, loglevel="INFO"):
                         (sta1, sta2, components, filterid))
 
                     start, end, datelist = build_ref_datelist(db)
-                    c = get_results_all(db, sta1, sta2, filterid, components, datelist, format="xarray") #get ccfs corresponding to ref dates
+                    
+                    if params.keep_all:
+                        c = get_results_all(db, sta1, sta2, filterid, components, days, format="xarray")
+                    else:
+                        logger.warning("keep_all=N used by default mov_stack=('1D','1D')")
+                        c = get_results(db, sta1, sta2, filterid, components, days,  mov_stack=1, format="xarray", params=params)
+
                     # dr = xr_save_ccf(sta1, sta2, components, filterid, 1, taxis, c)
                     dr = c
                     if not c.data_vars:
@@ -310,7 +317,12 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     all_days = sorted(set(all_days))
                     excess_days = sorted(set(excess_days))
 
-                    c = get_results_all(db, sta1, sta2, filterid, components, all_days, format="xarray") #get ccfs needed for -m stacking
+                    if params.keep_all:
+                        c = get_results_all(db, sta1, sta2, filterid, components, days, format="xarray")
+                    else:
+                        logger.warning("keep_all=N used by default mov_stack=('1D','1D')")
+                        c = get_results(db, sta1, sta2, filterid, components, days,  mov_stack=1, format="xarray", params=params)
+
                     dr = c
                     dr = dr.resample(times="%is" % params.corr_duration).mean()
 

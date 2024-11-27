@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-import importlib_metadata
+# import importlib_metadata
 import sqlalchemy
 from sqlalchemy import text
 import time
@@ -20,10 +20,6 @@ from .. import MSNoiseError, DBConfigNotFoundError
 from ..api import connect, get_config, update_station, get_logger, get_job_types
 from ..msnoise_table_def import DataAvailability
 
-old = False
-if os.path.isfile(".old"):
-    print("OK, showing old commands too")
-    old = True
 
 class OrderedGroup(click.Group):
     def list_commands(self, ctx):
@@ -311,6 +307,7 @@ def db_da_stations_update_loc_chan(ctx):
     session = connect()
     stations = get_stations(session)
     for sta in stations:
+        print(sta.net, sta.sta)
         data = session.query(DataAvailability). \
             filter(text("net=:net")). \
             filter(text("sta=:sta")). \
@@ -319,11 +316,14 @@ def db_da_stations_update_loc_chan(ctx):
             params(net=sta.net, sta=sta.sta).all()
         locids = list(set(sorted([d.loc for d in data])))
         chans = list(set(sorted([d.chan for d in data])))
-        logger.info("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
-                                                          locids, chans))
+        # logger.info("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
+        #                                                   locids, chans))
         sta.used_location_codes = ",".join(locids)
         sta.used_channel_names = ",".join(chans)
-        session.commit()
+        try:
+            session.commit()
+        except:
+            traceback.print_exc()
 
 @db.command(name="execute")
 @click.argument('sql_command')
@@ -560,7 +560,8 @@ def config_sync():
                 'Problem getting coordinates for '
                 '"%s": %s' % (id, str(coords)))
             continue
-        update_station(db, station.net, station.sta, lat, lon, elevation, "DEG", )
+        update_station(db, net=station.net, sta=station.sta, X=lon, Y=lat,
+                       altitude=elevation, coordinates="DEG")
         logging.info("Added coordinates (%.5f %.5f %.1f) for station %s.%s" %
                      (lon, lat, elevation, station.net, station.sta))
     db.close()
@@ -670,8 +671,9 @@ def populate(ctx, fromda):
             altitude = 0.0
             coordinates = 'UTM'
             instrument = 'N/A'
-            update_station(db, net, sta, X, Y, altitude,
-                           coordinates=coordinates, instrument=instrument)
+            update_station(db, net=net, sta=sta, X=X, Y=Y,
+                           altitude=altitude, coordinates=coordinates,
+                           instrument=instrument)
         logger.info("Checking the available loc ids and chans...")
         ctx.invoke(db_da_stations_update_loc_chan)
     else:
@@ -715,10 +717,12 @@ def plot():
 
 
 @plot.command(name='data_availability')
-@click.option('-c', '--chan', default="?HZ", help="Channel, you can use the ? wildcard, e.g. '?HZ' (default) or 'HH?', etc.")
+@click.option('-c', '--chan', default="?HZ", help="Channel, you can use the ? wildcard, e.g. '?HZ' (default) or "
+                                                  "'HH?', etc.")
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
+                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def plot_data_availability(ctx, chan, show, outfile):
@@ -735,7 +739,8 @@ def plot_data_availability(ctx, chan, show, outfile):
 @plot.command(name='station_map')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
+                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def plot_station_map(ctx, show, outfile):
@@ -827,66 +832,6 @@ def cc_compute_cc_rot(ctx):
             p.join()
 
 
-if old:
-    @cc.command(name="stack_old")
-    @click.pass_context
-    @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
-    @click.option('-m', '--mov', is_flag=True, help='Compute the MOV Stacks')
-    @click.option('-s', '--step', is_flag=True, help='Compute the STEP Stacks')
-    def cc_stack_old(ctx, ref, mov, step):
-        """Stacks the [REF] or [MOV] windows.
-        Computes the STACK jobs.
-        """
-        click.secho('Lets STACK !', fg='green')
-        from ..s04stack import main
-        threads = ctx.obj['MSNOISE_threads']
-        delay = ctx.obj['MSNOISE_threadsdelay']
-        loglevel = ctx.obj['MSNOISE_verbosity']
-
-        if ref and mov:
-            click.secho("With MSNoise 1.6, you can't run REF & MOV stacks"
-                        "simultaneously, please run them one after the other.")
-            sys.exit()
-
-        if threads == 1:
-            if ref:
-                main('ref', loglevel=loglevel)
-            if mov:
-                main('mov', loglevel=loglevel)
-            if step:
-                main('step', loglevel=loglevel)
-        else:
-            from multiprocessing import Process
-            processes = []
-            if ref:
-                for i in range(threads):
-                    p = Process(target=main, args=["ref",],
-                                kwargs={"loglevel": loglevel})
-                    p.start()
-                    processes.append(p)
-                    time.sleep(delay)
-            for p in processes:
-                p.join()
-            if mov:
-                for i in range(threads):
-                    p = Process(target=main, args=["mov",],
-                                kwargs={"loglevel": loglevel})
-                    p.start()
-                    processes.append(p)
-                    time.sleep(delay)
-            for p in processes:
-                p.join()
-            if step:
-                for i in range(threads):
-                    p = Process(target=main, args=["step",],
-                                kwargs={"loglevel": loglevel})
-                    p.start()
-                    processes.append(p)
-                    time.sleep(delay)
-            for p in processes:
-                p.join()
-
-
 @cc.command(name="stack")
 @click.pass_context
 @click.option('-r', '--ref', is_flag=True, help='Compute the REF Stack')
@@ -956,10 +901,12 @@ def cc_plot():
                  context_settings=dict(ignore_unknown_options=True, ))
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
-@click.option('-a', '--ampli', default=1.0, help='Amplification of the individual lines on the vertical axis (default=1)')
+@click.option('-a', '--ampli', default=1.0, help='Amplification of the individual lines on the vertical axis ('
+                                                 'default=1)')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
+                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
@@ -992,7 +939,8 @@ def cc_plot_distance(ctx, filterid, comp, ampli, show, outfile, refilter,
               help='Mov Stack to read from disk. Defaults to 1.')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
+                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
@@ -1004,7 +952,7 @@ def cc_plot_interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show,
                           outfile,
                           refilter, extra_args):
     """Plots the interferogram between sta1 and sta2 (parses the CCFs)
-    STA1 and STA2 must be provided with this format: NET.STA !"""
+    STA1 and STA2 must be provided with this format: NET.STA.LOC !"""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
         from interferogram import main # NOQA
@@ -1022,11 +970,14 @@ def cc_plot_interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show,
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=1,
               help='Mov Stack to read from disk. Defaults to 1.')
-@click.option('-a', '--ampli', default=5.0, help='Amplification of the individual lines on the vertical axis (default=1)')
-@click.option('-S', '--seismic', is_flag=True, help='Seismic style: fill the space between the zero and the positive wiggles')
+@click.option('-a', '--ampli', default=5.0, help='Amplification of the individual lines on the vertical axis ('
+                                                 'default=1)')
+@click.option('-S', '--seismic', is_flag=True, help='Seismic style: fill the space between the zero and the positive '
+                                                    'wiggles')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
+                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.option('-e', '--envelope', is_flag=True, help='Plot envelope instead of '
                                                      'time series')
@@ -1041,7 +992,7 @@ def cc_plot_ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
                     ampli, seismic, show, outfile, envelope, refilter,
                     normalize, extra_args):
     """Plots the ccf vs time between sta1 and sta2
-    STA1 and STA2 must be provided with this format: NET.STA !"""
+    STA1 and STA2 must be provided with this format: NET.STA.LOC !"""
     loglevel = ctx.obj['MSNOISE_verbosity']
     # if sta1 > sta2:
     #     click.echo("Stations STA1 and STA2 must be sorted alphabetically.")
@@ -1062,10 +1013,12 @@ def cc_plot_ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=1,
               help='Mov Stack to read from disk. Defaults to 1.')
-@click.option('-a', '--ampli', default=5.0, help='Amplification of the individual lines on the vertical axis (default=1)')
+@click.option('-a', '--ampli', default=5.0, help='Amplification of the individual lines on the vertical axis ('
+                                                 'default=1)')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
+                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
@@ -1076,7 +1029,7 @@ def cc_plot_ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
 def cc_plot_spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
                      ampli, show, outfile, refilter, extra_args):
     """Plots the ccf's spectrum vs time between sta1 and sta2
-    STA1 and STA2 must be provided with this format: NET.STA !"""
+    STA1 and STA2 must be provided with this format: NET.STA.LOC !"""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
         from spectime import main # NOQA
@@ -1091,28 +1044,6 @@ def dvv():
     """Commands for the "Relative Velocity Variations" Workflow"""
     pass
 
-
-if old:
-    @dvv.command(name='compute_mwcs_old')
-    @click.pass_context
-    def dvv_compute_mwcs_old(ctx):
-        """Computes the MWCS jobs"""
-        from ..s05compute_mwcs import main
-        threads = ctx.obj['MSNOISE_threads']
-        delay = ctx.obj['MSNOISE_threadsdelay']
-        loglevel = ctx.obj['MSNOISE_verbosity']
-        if threads == 1:
-            main(loglevel=loglevel)
-        else:
-            from multiprocessing import Process
-            processes = []
-            for i in range(threads):
-                p = Process(target=main, kwargs={"loglevel": loglevel})
-                p.start()
-                processes.append(p)
-                time.sleep(delay)
-            for p in processes:
-                p.join()
 
 @dvv.command(name='compute_mwcs')
 @click.pass_context
@@ -1136,28 +1067,6 @@ def dvv_compute_mwcs(ctx):
             p.join()
 
 
-if old:
-    @dvv.command(name='compute_stretching_old')
-    @click.pass_context
-    def dvv_compute_stretching(ctx):
-        """Computes the stretching based on the new stacked data"""
-        from ..stretch import main
-        threads = ctx.obj['MSNOISE_threads']
-        delay = ctx.obj['MSNOISE_threadsdelay']
-        loglevel = ctx.obj['MSNOISE_verbosity']
-        if threads == 1:
-            main(loglevel=loglevel)
-        else:
-            from multiprocessing import Process
-            processes = []
-            for i in range(threads):
-                p = Process(target=main, kwargs={"loglevel": loglevel})
-                p.start()
-                processes.append(p)
-                time.sleep(delay)
-            for p in processes:
-                p.join()
-
 @dvv.command(name='compute_stretching')
 @click.pass_context
 def dvv_compute_stretching2(ctx):
@@ -1178,28 +1087,6 @@ def dvv_compute_stretching2(ctx):
             time.sleep(delay)
         for p in processes:
             p.join()
-
-if old:
-    @dvv.command(name='compute_dtt_old')
-    @click.pass_context
-    def dvv_compute_dtt_old(ctx):
-        """Computes the dt/t jobs based on the new MWCS data"""
-        from ..s06compute_dtt import main
-        threads = ctx.obj['MSNOISE_threads']
-        delay = ctx.obj['MSNOISE_threadsdelay']
-        loglevel = ctx.obj['MSNOISE_verbosity']
-        if threads == 1:
-            main(loglevel=loglevel)
-        else:
-            from multiprocessing import Process
-            processes = []
-            for i in range(threads):
-                p = Process(target=main, kwargs={"loglevel": loglevel})
-                p.start()
-                processes.append(p)
-                time.sleep(delay)
-            for p in processes:
-                p.join()
 
 
 @dvv.command(name='compute_dtt')
@@ -1280,12 +1167,13 @@ def dvv_plot():
               help='Mov Stack to read from disk. Defaults to 1.')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
+                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def dvv_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
     """Plots the mwcs results between sta1 and sta2 (parses the CCFs)
-    STA1 and STA2 must be provided with this format: NET.STA !"""
+    STA1 and STA2 must be provided with this format: NET.STA.LOC !"""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
         from mwcs import main # NOQA
@@ -1304,7 +1192,8 @@ def dvv_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
 @click.option('-M', '--dttname', default="M", help='Plot M or M0?')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
+                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def dvv_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
@@ -1332,12 +1221,13 @@ def dvv_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfi
               help='Mov Stack to read from disk. Defaults to 1.')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
+                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
     """Plots a graph of dt against t
-    STA1 and STA2 must be provided with this format: NET.STA !
+    STA1 and STA2 must be provided with this format: NET.STA.LOC !
     DAY must be provided in the ISO format: YYYY-MM-DD"""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
@@ -1354,12 +1244,16 @@ def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
               multiple=True)
 @click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
 @click.option('-e', '--end', default="2100-01-01", help='Plot until which date? (default=2100-01-01 or enddate)')
-@click.option('-b', '--begin',default="1970-01-01",  help="Plot from which date, can be relative to the endate ('-100'days)?(default=1970-01-01 or startdate)")
-@click.option('-v', '--visualize',default="dvv",  help="Which plot : wavelet 'dvv' heat map, wavelet 'coh'erence heat map, dv/v 'curve' with coherence color?", type=str)
-@click.option('-r', '--ranges',default="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]",  help="With visualize = 'curve', which frequency ranges to use?", type=str)
+@click.option('-b', '--begin',default="1970-01-01",  help="Plot from which date, can be relative to the endate ("
+                                                          "'-100'days)?(default=1970-01-01 or startdate)")
+@click.option('-v', '--visualize',default="dvv",  help="Which plot : wavelet 'dvv' heat map, wavelet 'coh'erence heat "
+                                                       "map, dv/v 'curve' with coherence color?", type=str)
+@click.option('-r', '--ranges',default="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]",  help="With visualize = 'curve', which "
+                                                                                   "frequency ranges to use?", type=str)
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
+                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def dvv_plot_wct(ctx, mov_stack, comp, filterid, pair, all, begin, end, visualize,ranges, show,  outfile):
@@ -1411,7 +1305,8 @@ def dvvs(ctx, mov_stack, comp, filterid, pair, show, outfile):
 @click.option('-M', '--dttname', default="A", help='Plot M or M0?')
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
+                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
 def dvv_plot_timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
@@ -1618,13 +1513,25 @@ def utils_bugreport(ctx, sys, modules, env, all):
 def utils_test(prefix, tech, content):
     """Runs the test suite in a temporary folder"""
     import matplotlib.pyplot as plt
+    import pytest
     plt.switch_backend("agg")
-    if not content:
-        from ..test.tests import main
-    else:
-        from ..test.content_tests import main
-    main(prefix=prefix, tech=tech)
 
+    # Prepare environment variables for the test session
+    os.environ["PREFIX"] = prefix
+    os.environ["TECH"] = str(tech)
+
+    # Determine which test suite to run
+    test_module = 'content_tests' if content else 'tests'
+
+    # Construct the path to the test module
+    test_path = os.path.join(os.path.dirname(__file__), '..', 'test', f'{test_module}.py')
+
+    # Run pytest on the selected test module
+    exit_code = pytest.main(['-s', test_path])
+
+    # Handle the exit code as needed
+    if exit_code != 0:
+        print("Tests failed.")
 
 @utils.command(name="jupyter")
 def utils_jupyter():
