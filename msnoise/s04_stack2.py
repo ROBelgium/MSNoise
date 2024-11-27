@@ -317,12 +317,13 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     excess_days = sorted(set(excess_days))
 
                     if params.keep_all:
-                        c = get_results_all(db, sta1, sta2, filterid, components, days, format="xarray")
+                        c = get_results_all(db, sta1, sta2, filterid, components, all_days, format="xarray")
                     else:
                         logger.warning("keep_all=N used by default mov_stack=('1D','1D')")
-                        c = get_results(db, sta1, sta2, filterid, components, days,  mov_stack=1, format="xarray", params=params)
-
+                        c = get_results(db, sta1, sta2, filterid, components, all_days,  mov_stack=1, format="xarray", params=params)
+                    
                     dr = c
+                    dr = dr.sortby('times')
                     dr = dr.resample(times="%is" % params.corr_duration).mean()
 
                     if wienerfilt:
@@ -345,7 +346,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                             # print("Will roll over %i seconds" % mov_rolling)
                             duration_to_windows = mov_rolling / params.corr_duration
                             if not duration_to_windows.is_integer():
-                                print("Warning, rounding down the number of windows to roll over")
+                                logger.print("Warning, rounding down the number of windows to roll over")
                             duration_to_windows = int(max(1, math.floor(duration_to_windows)))
                             # print("Which is %i windows of %i seconds duration" % (duration_to_windows, params.corr_duration))
                             # That construct thing shouldn't be necessary, but without it, tests fail when bottleneck is installed
