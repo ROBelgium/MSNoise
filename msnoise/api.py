@@ -2649,3 +2649,7 @@ def xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_
     logging.debug(f"Saved WCT data to {fn}")
     # Clean up
     del dvv_da, err_da, coh_da, ds
+
+def filter_within_daterange(date, start_date, end_date):
+    """Check if a date falls within the configured range"""
+    return start_date <= date <= end_date
