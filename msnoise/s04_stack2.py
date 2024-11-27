@@ -44,29 +44,34 @@ value is 2.
     of weak, coherent signals through phase-weighted stacks". Geophysical Journal
     International 130, 2 (1997): 497-505.
 
-If ``wienerfilt`` set to 'Y', a Wiener filter is applied to CCFs prior to
-stacking. This applies smoothing to CCFs in both datetime axis (window length
-corresponding to ``wiener_mlen``) and lag time axis (window length corresponding 
-to ``wiener_nlen``). For applying the filter, CCFs are treated as continguous
-or separate segments depending on the temporal gap between them. For gaps
-shorter than ``wiener_mlen``, segments are treated as adjacent by the filter.
-For larger gaps, the segments are considered seperate and the filter is applied
-independently to each segment (thus avoiding smoothing over large temporal
-gaps). To reduce influence of edge effects, an additional window of 2 * ``wiener_mlen``
-(rounded up to nearest day) CCFs are included (if the CCFs exist) at both ends
-of a segment. After filtering, the first ``wiener_mlen`` portion (each side) is
-discarded to retain only well-smoothed data. The second ``wiener_mlen``
-portion, noting that 2 * ``wiener_mlen`` was included either side, will (after stacking) overwrite 
-previously stacked data. This allows data that was previously at the 'edge' to be updated
-with improved smoothing based on neighbouring CCFs (for example, if processing in 
-real-time when no future data was available).
+If ``wienerfilt`` set to 'Y' (default: 'N'), a Wiener filter is applied to CCFs
+prior to stacking. This applies smoothing to CCFs in both datetime axis 
+(window length corresponding to ``wiener_mlen``) and lag time axis (window 
+length corresponding to ``wiener_nlen``). For applying the filter, CCFs are 
+treated as continguous or separate segments depending on the temporal gap between 
+them. For gaps shorter than ``wiener_mlen``, segments are treated as adjacent 
+by the filter. For larger gaps, the segments are considered seperate and the 
+filter is applied independently to each segment (thus avoiding smoothing over 
+large temporal gaps). 
+
+To reduce influence of edge effects in wiener filter, CCF segments are padded 
+in datetime axis with an additional window of 2 * ``wiener_mlen`` CCFs (rounded 
+up to nearest day, if they exist) at both ends. After filtering, the outer 
+half of the padding window (``wiener_mlen``, farthest from original segment) is 
+discarded. The inner half (cloeset to original segment) will (after stacking) 
+overwrite previously stacked data. This ensures that data near the edges of a
+segment, which may have initially been smoothed with limited neighbouring CCFs
+(e.g. if processing data in real-time), are updated when additional data becomes 
+available.
 
 .. warning:: While padding "T"odo jobs with existing data (where possible) may 
-    reduce the influence of edge effects, caution should be exercised when processing
-    data in separate steps/segments (e.g. real-time processing of smaller data segments). 
-    Applying the wiener filter may, therefore, be better suited when possible to process 
-    all jobs at once (i.e. set all STACK jobs as "T"odo).
- 
+    reduce the influence of edge effects of wiener filter, caution should be 
+    exercised when processing data in separate steps/segments (e.g. real-time 
+    processing of smaller data segments) as new data can produce changes further 
+    away from the edge of the CCF 'image'. Applying the wiener filter may, 
+    therefore, be better suited when possible to process all jobs at once 
+    (i.e. set all STACK jobs as "T"odo).
+
 
 Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -171,6 +176,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
     wienerfilt = params.wienerfilt
     wiener_M =  int(pd.to_timedelta(wiener_mlen).total_seconds() / params.corr_duration)
     wiener_N =  int(pd.to_timedelta(wiener_nlen).total_seconds() * params.cc_sampling_rate)
+    
     # is there a better alternative for threshold?
     wiener_gap_threshold = wiener_M #no. indices which will be considered adjacent by wiener
     
@@ -244,13 +250,12 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     logger.info('Processing %s-%s-%i MOV stack' %
                         (pair, components, filterid))
 
-
                     # Calculate the maximum mov_rolling value (in days)
                     max_mov_rolling = max(pd.to_timedelta(mov_stack[0]).total_seconds() for mov_stack in mov_stacks)
                     
                     if wienerfilt:
                         wiener_mlen_days = math.ceil(pd.to_timedelta(wiener_mlen).total_seconds() / 86400)
-                        max_mov_rolling_days = max(1, math.ceil(max_mov_rolling / 86400), 2*wiener_mlen_days) #2*wiener to deal with edge effect
+                        max_mov_rolling_days = max(1, math.ceil(max_mov_rolling / 86400), 2*wiener_mlen_days) #2*wiener to minimise edge effect
                     else:
                         max_mov_rolling_days = int(max(1, math.ceil(max_mov_rolling / 86400)))
 
@@ -262,34 +267,48 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     gaps.insert(0,0) #zero index also 'gap' (need previous data for stacking)
 
                     all_days = list(days)
-                    added_days = [] #keep track of days included for eventual removal pre-saving CCFs
+                    wiener_extra_days = []
+                    excess_days = [] #excess days added for padding, for later removal
 
                     for gap_idx in gaps:
+                        #Add days before start beginning of new segment
                         start = days[gap_idx]
-                        #Add preceding days
-                        for j in range(1, max_mov_rolling_days+1):
+                        for j in range(1, max_mov_rolling_days+1): 
                             preceding_day = start - datetime.timedelta(days=j)
-                            if preceding_day not in all_days:
+                            if preceding_day not in days: #if not already present
                                 all_days.append(preceding_day)
-                                added_days.append(preceding_day)
+                                # Handle excess days
+                                if not wienerfilt:  # If Wiener filter is not true, add all new days to excess
+                                    excess_days.append(preceding_day)
+                                elif j <= wiener_mlen_days:
+                                    #keep first half of padding window  
+                                    wiener_extra_days.append(preceding_day)
+                                    if preceding_day in excess_days:
+                                        #if day previously marked excess, remove
+                                        excess_days.remove(preceding_day)
+                                elif (j > wiener_mlen_days) and (preceding_day not in wiener_extra_days):
+                                    #mark second half of padding window as excess data to be removed pre-save 
+                                    excess_days.append(preceding_day)
 
-                        if wienerfilt: #need to add 'future' days (if exists)
+                        if wienerfilt: 
+                            #add days at end of previous segment (only necessary if wiener filt applied)
                             end = days[gap_idx-1]
-                            for j in range(1, 2*wiener_mlen_days+1):
+                            for j in range(1, 2*wiener_mlen_days+1): #2*wiener to minimise edge effect
                                 future_day = end + datetime.timedelta(days=j)
-                                if future_day not in all_days:
+                                if future_day not in days: #if not already present  
                                     all_days.append(future_day)
-                                    added_days.append(future_day)
-                    
-                    # Handle adding future days at the very end dataset (if
-                    # exists) for wiener stack
-                    if wienerfilt:
-                        last_day = days[-1]
-                        for j in range(1, 2*wiener_mlen_days + 1):
-                            future_day = last_day + datetime.timedelta(days=j)
-                            if future_day not in all_days:
-                                all_days.append(future_day)
-                                added_days.append(future_day)                    
+                                    if j <= wiener_mlen_days:  
+                                        #keep first half of padding window
+                                        wiener_extra_days.append(future_day)
+                                        if future_day in excess_days:
+                                            #if day previously marked excess, remove
+                                            excess_days.remove(future_day)
+                                    elif (j > wiener_mlen_days) and (future_day not in wiener_extra_days):                                         
+                                        #mark second half of padding window as excess data to be removed pre-save
+                                        excess_days.append(future_day)
+
+                    all_days = sorted(set(all_days))
+                    excess_days = sorted(set(excess_days))
 
                     c = get_results_all(db, sta1, sta2, filterid, components, all_days, format="xarray") #get ccfs needed for -m stacking
                     dr = c
@@ -298,7 +317,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     if wienerfilt:
                         dr = wiener_filt(dr, wiener_M, wiener_N, wiener_gap_threshold)
 
-                    added_dates = pd.to_datetime(added_days).values
+                    excess_dates = pd.to_datetime(excess_days).values
                     for mov_stack in mov_stacks:
                         # if mov_stack > len(dr.times):
                         #     logger.error("not enough data for mov_stack=%i" % mov_stack)
@@ -323,15 +342,7 @@ def main(stype, interval=1.0, loglevel="INFO"):
                             xx = dr.rolling(times=duration_to_windows, min_periods=1).construct("win").mean("win")
                             xx = xx.resample(times=mov_sample, label="right", skipna=True).asfreq().dropna("times", how="all")
                        
-                        if wienerfilt: #only remove days at edge of filter
-                            added_dates = np.sort(added_dates)
-                            remove_dates_start = added_dates[:wiener_mlen_days]
-                            remove_dates_end = added_dates[-wiener_mlen_days:]
-                            remove_dates = np.concatenate((remove_dates_start, remove_dates_end))
-                        else:
-                            remove_dates = added_dates
-
-                        mask = xx.times.dt.floor('D').isin(remove_dates)
+                        mask = xx.times.dt.floor('D').isin(excess_dates)
                         xx_cleaned = xx.where(~mask, drop=True) #remove days not associated with current jobs
 
                         xr_save_ccf(sta1, sta2, components, filterid, mov_stack, taxis, xx_cleaned, overwrite=False)
