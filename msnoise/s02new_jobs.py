@@ -95,8 +95,7 @@ def main(init=False, nocc=False):
     updated_days = []
     nfs = get_new_files(db)
     now = datetime.datetime.utcnow()
-    start_date = datetime.datetime.strptime(get_config(db, 'startdate'), '%Y-%m-%d').date()
-    end_date = datetime.datetime.strptime(get_config(db, 'enddate'), '%Y-%m-%d').date()
+    start_date, end_date, datelist = build_movstack_datelist(db)
     
     for nf in nfs:
         tmp = "%s.%s.%s" % (nf.net, nf.sta, nf.loc)
