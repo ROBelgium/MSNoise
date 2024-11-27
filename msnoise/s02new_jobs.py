@@ -1,6 +1,8 @@
 """ This script searches the database for files flagged "N"ew or "M"odified.
 For each date in the configured range, it checks if other stations are
-available and defines the new jobs to be processed. Those are inserted in the
+available and defines the new jobs to be processed.  Only jobs within the 
+configured ``startdate`` and ``enddate`` are considered avoiding unnecessary 
+job creation. Those are inserted in the
 *jobs* table of the database.
 
 To run it from the console:
