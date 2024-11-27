@@ -170,7 +170,6 @@ def main(stype, interval=1.0, loglevel="INFO"):
     #     mov_stacks.remove(1)  # remove 1 day stack, it will be done automatically
 
     filters = get_filters(db, all=False)
-<<<<<<< HEAD
 
     wiener_mlen = params.wiener_mlen
     wiener_nlen = params.wiener_nlen
