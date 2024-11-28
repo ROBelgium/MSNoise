@@ -178,8 +178,11 @@ def main(stype, interval=1.0, loglevel="INFO"):
     wiener_N =  int(pd.to_timedelta(wiener_nlen).total_seconds() * params.cc_sampling_rate)
     
     # is there a better alternative for threshold?
-    wiener_gap_threshold = wiener_M #no. indices which will be considered adjacent by wiener
-    
+    if params.keep_all:
+        wiener_gap_threshold = wiener_M #no. indices which will be considered adjacent by wiener
+    else:
+        wiener_gap_threshold = pd.to_timedelta(wiener_mlen).days
+
     if wienerfilt:
         logger.info('Wiener filter enabled, will apply to CCFs before stacking')
 
@@ -316,14 +319,14 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     excess_days = sorted(set(excess_days))
 
                     if params.keep_all:
-                        c = get_results_all(db, sta1, sta2, filterid, components, all_days, format="xarray")
+                        c = get_results_all(db, sta1, sta2, filterid, components, all_days, format="xarray").sortby('times')
+                        dr = c.resample(times="%is" % params.corr_duration).mean()
+
                     else:
-                        logger.warning("keep_all=N used by default mov_stack=('1D','1D')")
-                        c = get_results(db, sta1, sta2, filterid, components, all_days,  mov_stack=1, format="xarray", params=params)
-                    
-                    dr = c
-                    dr = dr.sortby('times')
-                    dr = dr.resample(times="%is" % params.corr_duration).mean()
+                        logger.warning("keep_all=N used, sampling interval will be 1-day")
+                        c = get_results(db, sta1, sta2, filterid, components, all_days,  mov_stack=1, format="xarray",
+                            params=params).sortby('times')
+                        dr = c.resample(times="1D").mean()
 
                     if wienerfilt:
                         dr = wiener_filt(dr, wiener_M, wiener_N, wiener_gap_threshold)
@@ -343,14 +346,16 @@ def main(stype, interval=1.0, loglevel="INFO"):
                         else:
                             mov_rolling = pd.to_timedelta(mov_rolling).total_seconds()
                             # print("Will roll over %i seconds" % mov_rolling)
-                            duration_to_windows = mov_rolling / params.corr_duration
+                            if params.keep_all:
+                                duration_to_windows = mov_rolling / params.corr_duration
+                            else:
+                                duration_to_windows = mov_rolling / 86400.0
                             if not duration_to_windows.is_integer():
                                 logger.print("Warning, rounding down the number of windows to roll over")
                             duration_to_windows = int(max(1, math.floor(duration_to_windows)))
                             # print("Which is %i windows of %i seconds duration" % (duration_to_windows, params.corr_duration))
-                            # That construct thing shouldn't be necessary, but without it, tests fail when bottleneck is installed
-                            # ref: https://github.com/pydata/xarray/issues/3165
-                            xx = dr.rolling(times=duration_to_windows, min_periods=1).construct("win").mean("win")
+                            with xr.set_options(use_numbagg=False): #no need to use construct thing
+                                xx = dr.rolling(times=duration_to_windows, min_periods=1).mean("win")
                             xx = xx.resample(times=mov_sample, label="right", skipna=True).asfreq().dropna("times", how="all")
                        
                         mask = xx.times.dt.floor('D').isin(excess_dates)
