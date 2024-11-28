@@ -356,6 +356,12 @@ def test_023_stack():
     stack_main('mov', interval)
     reset_jobs(db, "STACK", alljobs=True)
     stack_main('step', interval)
+    
+    update_config(db, 'wienerfilt', 'Y')
+    reset_jobs(db, "STACK", alljobs=True)
+    stack_main('mov', interval)
+    stack_main('ref', interval)
+
     db.close()
 
 @pytest.mark.order(24)

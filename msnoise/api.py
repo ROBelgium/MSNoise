@@ -1456,7 +1456,11 @@ def get_results(session, station1, station2, filterid, components, dates,
     logging.debug("Reading files... in %s" % base)
     lastday = dates[0]
     for j, date in enumerate(dates):
-        daystack = base % str(date)
+
+        if isinstance(date, str):
+            daystack = base % str(date)
+        else:
+            daystack = base % date.strftime('%Y-%m-%d')
 
         try:
             stack_data[j, :] = read(daystack, format=export_format)[0].data[:]
@@ -1559,8 +1563,10 @@ def get_results_all(session, station1, station2, filterid, components, dates,
             dr = dr.sortby('times')
             return dr.to_dataset()
     else:
-        return pd.DataFrame()
-
+        if format == "xarray":
+            return xr.Dataset()
+        else:
+            return pd.DataFrame()
 
 # Some helper functions
 
