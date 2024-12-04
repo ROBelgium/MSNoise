@@ -8,6 +8,9 @@ DTT will only be calculated for new data (e.g. "yesterday" and "today").
 The corresponding configuration bits are ``ref_begin`` and ``ref_end``. In the
 future, we plan on allowing multiple references to be defined.
 
+Each reference and moving stack is validated to ensure data presence and 
+completeness, checking for empty datasets and NaN content before processing.
+
 Only data for new/modified dates need to be exported. If any CC-job has been
 marked "Done" within the last day and triggered the creation of STACK jobs,
 the stacks will be calculated and a new MWCS job will be inserted in the
@@ -216,6 +219,13 @@ def main(stype, interval=1.0, loglevel="INFO"):
                     else:
                         c = get_results(db, sta1, sta2, filterid, components, datelist,  mov_stack=1, format="xarray", params=params)
 
+                    is_valid, message = validate_stack_data(c, "reference")
+                    if not is_valid:
+                        logger.error(f"Invalid reference data for {sta1}:{sta2}-{components}-{filterid}: {message}")
+                        continue
+                    elif "Warning" in message:
+                        logger.warning(f"{sta1}:{sta2}-{components}-{filterid}: {message}")
+                        
                     # dr = xr_save_ccf(sta1, sta2, components, filterid, 1, taxis, c)
                     dr = c
                     if not c.data_vars:
@@ -328,6 +338,13 @@ def main(stype, interval=1.0, loglevel="INFO"):
                             params=params).sortby('times')
                         dr = c.resample(times="1D").mean()
 
+                    is_valid, message = validate_stack_data(c, "moving") 
+                    if not is_valid:
+                        logger.error(f"Invalid moving stack data for {sta1}:{sta2}-{components}-{filterid}: {message}")
+                        continue
+                    elif "Warning" in message:
+                        logger.warning(f"{sta1}:{sta2}-{components}-{filterid}: {message}")
+                        
                     if wienerfilt:
                         dr = wiener_filt(dr, wiener_M, wiener_N, wiener_gap_threshold)
 
