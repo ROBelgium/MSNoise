@@ -447,6 +447,62 @@ def test_032_wct():
     compute_wct_main()
     db.close()
 
+@pytest.mark.order(33)  # Add appropriate order number
+def test_033_validate_stack_data():
+    from ..api import validate_stack_data
+    import xarray as xr
+    import numpy as np
+    import pandas as pd
+    
+    # Test empty dataset
+    ds = xr.Dataset()
+    is_valid, message = validate_stack_data(ds, "reference")
+    assert not is_valid
+    assert "No data found for reference stack" in message
+
+    # Test dataset without CCF
+    ds = xr.Dataset({"wrong_var": 1})
+    is_valid, message = validate_stack_data(ds, "reference") 
+    assert not is_valid
+    assert "Missing CCF data in reference stack" in message
+
+    # Test empty CCF data
+    times = pd.date_range('2020-01-01', periods=0)
+    taxis = np.linspace(-50, 50, 100)
+    data = np.random.random((0, len(taxis)))
+    da = xr.DataArray(data, coords=[times, taxis], dims=['times', 'taxis'])
+    ds = da.to_dataset(name='CCF')
+    is_valid, message = validate_stack_data(ds, "reference")
+    assert not is_valid 
+    assert "Empty dataset in reference stack" in message
+
+    # Test all NaN values
+    times = pd.date_range('2020-01-01', periods=10)
+    data = np.full((len(times), len(taxis)), np.nan)
+    da = xr.DataArray(data, coords=[times, taxis], dims=['times', 'taxis'])
+    ds = da.to_dataset(name='CCF')
+    is_valid, message = validate_stack_data(ds, "reference")
+    assert not is_valid
+    assert "Reference stack contains only NaN values" in message
+
+    # Test partial NaN values
+    data = np.random.random((len(times), len(taxis)))
+    data[0:5, :] = np.nan
+    da = xr.DataArray(data, coords=[times, taxis], dims=['times', 'taxis'])
+    ds = da.to_dataset(name='CCF')
+    is_valid, message = validate_stack_data(ds, "reference")
+    assert is_valid
+    assert "Warning: Reference stack contains" in message
+    assert "50.0% NaN values" in message
+
+    # Test valid data
+    data = np.random.random((len(times), len(taxis)))
+    da = xr.DataArray(data, coords=[times, taxis], dims=['times', 'taxis'])
+    ds = da.to_dataset(name='CCF')
+    is_valid, message = validate_stack_data(ds, "reference")
+    assert is_valid
+    assert message == "OK"
+  
 @pytest.mark.order(100)
 def test_100_plot_cctfime():
     from ..plots.ccftime import main as ccftime_main
