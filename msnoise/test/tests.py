@@ -444,14 +444,6 @@ def test_031_instrument_response(setup_environment):
 def test_032_wct():
     from ..s08compute_wct import main as compute_wct_main
     db = connect()
-    dbini = read_db_inifile()
-    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
-    db.execute(text(
-        f"INSERT INTO {prefix}jobs (pair, day, jobtype, flag) "
-        f"SELECT pair, day, 'WCT', 'T' FROM {prefix}jobs "
-        f"WHERE jobtype='STACK' AND flag='D';"
-    ))
-    db.commit()
     compute_wct_main()
     db.close()
 
