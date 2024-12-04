@@ -92,7 +92,7 @@ Configuration Parameters
 
 
 Once done, each job is marked "D"one in the database and, unless ``hpc`` is
-``Y``, MWCS jobs are inserted/updated in the database.
+``Y``, MWCS and WCT jobs are inserted/updated in the database.
 
 Usage:
 ~~~~~~
@@ -385,3 +385,4 @@ def main(stype, interval=1.0, loglevel="INFO"):
             if stype != "step" and not params.hpc:
                 for job in jobs:
                     update_job(db, job.day, job.pair, 'MWCS', 'T')
+                    update_job(db, job.day, job.pair, 'WCT', 'T')
