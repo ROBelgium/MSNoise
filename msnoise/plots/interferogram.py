@@ -70,7 +70,7 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, show=True,
     # data = stack_total
     if refilter:
         for i, d in enumerate(data):
-            data[i] = bandpass(data[i], freqmin, freqmax, cc_sampling_rate,
+            data.iloc[i] = bandpass(data.iloc[i], freqmin, freqmax, cc_sampling_rate,
                                zerophase=True)
     vmax = np.nanmax(data) * 0.9
     plt.imshow(data.T, extent=xextent, aspect="auto",
