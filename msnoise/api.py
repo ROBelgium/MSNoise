@@ -1683,7 +1683,37 @@ def build_ref_datelist(session):
     datelist = pd.date_range(start, end).map(lambda x: x.date())
     return start, end, datelist.tolist()
 
-
+def validate_stack_data(dataset, stack_type="reference"):
+    """Validates stack data before processing
+    
+    Parameters:
+        dataset: xarray Dataset to validate 
+        stack_type: Type of stack ("reference" or "moving") for error messages
+    Returns:
+        (is_valid, message) tuple
+    """
+    if dataset is None or not dataset.data_vars:
+        return False, f"No data found for {stack_type} stack"
+        
+    if not hasattr(dataset, 'CCF'):
+        return False, f"Missing CCF data in {stack_type} stack"
+        
+    data = dataset.CCF
+    if data.size == 0:
+        return False, f"Empty dataset in {stack_type} stack"
+        
+    nan_count = np.isnan(data.values).sum()
+    total_points = data.values.size
+    
+    if nan_count == total_points:
+        return False, f"{stack_type.capitalize()} stack contains only NaN values"
+    
+    if nan_count > 0:
+        percent_nan = (nan_count / total_points) * 100
+        return True, f"Warning: {stack_type.capitalize()} stack contains {percent_nan:.1f}% NaN values"
+        
+    return True, "OK"
+    
 def build_movstack_datelist(session):
     """
     Creates a date array for the analyse period.
