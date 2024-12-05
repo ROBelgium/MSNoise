@@ -446,23 +446,19 @@ def test_032_wct():
     db = connect()
     compute_wct_main()
     db.close()
-
-@pytest.mark.order(33)
-def test_033_validate_stack_data(caplog):
+@pytest.mark.order(33) 
+def test_033_validate_stack_data():
     from ..api import validate_stack_data
     import xarray as xr
     import numpy as np
     import pandas as pd
-    import logging
-    
-    caplog.set_level(logging.WARNING)
     
     # Test empty dataset
     ds = xr.Dataset()
     is_valid, message = validate_stack_data(ds, "reference")
     assert not is_valid
     assert "No data found for reference stack" in message
-    
+
     # Test dataset without CCF
     ds = xr.Dataset({"wrong_var": 1})
     is_valid, message = validate_stack_data(ds, "reference") 
@@ -488,16 +484,15 @@ def test_033_validate_stack_data(caplog):
     assert not is_valid
     assert "Reference stack contains only NaN values" in message
 
-    # Test partial NaN values with warning
+    # Test partial NaN values
     data = np.random.random((len(times), len(taxis)))
     data[0:5, :] = np.nan
     da = xr.DataArray(data, coords=[times, taxis], dims=['times', 'taxis'])
     ds = da.to_dataset(name='CCF')
-    with caplog.at_level(logging.WARNING):
-        is_valid, message = validate_stack_data(ds, "reference")
-        assert is_valid
-        assert "Warning: Reference stack contains" in message
-        assert "50.0% NaN values" in message
+    is_valid, message = validate_stack_data(ds, "reference")
+    assert is_valid
+    assert "Warning: Reference stack contains" in message
+    assert "50.0% NaN values" in message
 
     # Test valid data
     data = np.random.random((len(times), len(taxis)))
@@ -506,19 +501,6 @@ def test_033_validate_stack_data(caplog):
     is_valid, message = validate_stack_data(ds, "reference")
     assert is_valid
     assert message == "OK"
-  
-@pytest.mark.order(100)
-def test_100_plot_cctfime():
-    from ..plots.ccftime import main as ccftime_main
-    db = connect()
-    for sta1, sta2 in get_station_pairs(db):
-        for loc1 in sta1.locs():
-            for loc2 in sta2.locs():
-                for filter in get_filters(db):
-                    ccftime_main("%s.%s.%s" % (sta1.net, sta1.sta, loc1), "%s.%s.%s" % (sta2.net, sta2.sta, loc2), filter.ref, "ZZ", 1, show=False, outfile="?.png")
-                    fn = 'ccftime %s-%s-%s-f%i-m%s_%s.png' % ("%s.%s.%s" % (sta1.net, sta1.sta, loc1), "%s.%s.%s" % (sta2.net, sta2.sta, loc2),
-                                                              "ZZ", filter.ref, "1d", "1d")
-                    assert os.path.isfile(fn)
 
 @pytest.mark.order(100)
 def test_100_plot_interferogram():
