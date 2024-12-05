@@ -447,19 +447,22 @@ def test_032_wct():
     compute_wct_main()
     db.close()
 
-@pytest.mark.order(33)  # Add appropriate order number
-def test_033_validate_stack_data():
+@pytest.mark.order(33)
+def test_033_validate_stack_data(caplog):
     from ..api import validate_stack_data
     import xarray as xr
     import numpy as np
     import pandas as pd
+    import logging
+    
+    caplog.set_level(logging.WARNING)
     
     # Test empty dataset
     ds = xr.Dataset()
     is_valid, message = validate_stack_data(ds, "reference")
     assert not is_valid
     assert "No data found for reference stack" in message
-
+    
     # Test dataset without CCF
     ds = xr.Dataset({"wrong_var": 1})
     is_valid, message = validate_stack_data(ds, "reference") 
@@ -485,15 +488,16 @@ def test_033_validate_stack_data():
     assert not is_valid
     assert "Reference stack contains only NaN values" in message
 
-    # Test partial NaN values
+    # Test partial NaN values with warning
     data = np.random.random((len(times), len(taxis)))
     data[0:5, :] = np.nan
     da = xr.DataArray(data, coords=[times, taxis], dims=['times', 'taxis'])
     ds = da.to_dataset(name='CCF')
-    is_valid, message = validate_stack_data(ds, "reference")
-    assert is_valid
-    assert "Warning: Reference stack contains" in message
-    assert "50.0% NaN values" in message
+    with caplog.at_level(logging.WARNING):
+        is_valid, message = validate_stack_data(ds, "reference")
+        assert is_valid
+        assert "Warning: Reference stack contains" in message
+        assert "50.0% NaN values" in message
 
     # Test valid data
     data = np.random.random((len(times), len(taxis)))
