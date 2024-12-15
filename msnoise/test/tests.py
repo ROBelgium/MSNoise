@@ -510,28 +510,37 @@ def test_034_stack_validation_handling():
     import numpy as np
     import pandas as pd
     
-    # Prepare test data 
-    sta1, sta2 = "STA1", "STA2"
-    components = "ZZ"
-    filterid = 1
-    
-    # Create empty dataset trigger the error log
-    ds = xr.Dataset()
-    is_valid, message = validate_stack_data(ds, "reference")
-    if not is_valid:
-        logger.error(f"Invalid reference data for {sta1}:{sta2}-{components}-{filterid}: {message}")
-    
-    # Create dataset with some NaN values - trigger the warning log
+    # Create minimal test data
     times = pd.date_range('2020-01-01', periods=10)
     taxis = np.linspace(-50, 50, 100)
-    data = np.random.random((len(times), len(taxis)))
-    data[0:5, :] = np.nan
-    da = xr.DataArray(data, coords=[times, taxis], dims=['times', 'taxis'])
-    ds = da.to_dataset(name='CCF')
     
-    is_valid, message = validate_stack_data(ds, "reference")
-    if "Warning" in message:
-        logger.warning(f"{sta1}:{sta2}-{components}-{filterid}: {message}")
+    # Test with actual code's variables and logic
+    pairs = [('STA1', 'STA2'), ('STA3', 'STA3')]
+    filters = [type('Filter', (), {'ref': '1'})]
+    components = 'ZZ'
+    
+    for sta1, sta2 in pairs:
+        for f in filters:
+            filterid = int(f.ref)
+            
+            # Create test datasets that will trigger our paths
+            if sta1 == 'STA1':
+                # Test error path with empty dataset
+                c = xr.Dataset()
+                is_valid, message = validate_stack_data(c, "reference")
+                if not is_valid:
+                    logger.error(f"Invalid reference data for {sta1}:{sta2}-{components}-{filterid}: {message}")
+                    continue
+            else:
+                # Test warning path with partial NaN data
+                data = np.random.random((len(times), len(taxis)))
+                data[0:5, :] = np.nan
+                da = xr.DataArray(data, coords=[times, taxis], dims=['times', 'taxis'])
+                c = da.to_dataset(name='CCF')
+                
+                is_valid, message = validate_stack_data(c, "reference")
+                if "Warning" in message:
+                    logger.warning(f"{sta1}:{sta2}-{components}-{filterid}: {message}")
                   
 @pytest.mark.order(100)
 def test_100_plot_interferogram():
