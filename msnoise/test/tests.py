@@ -513,27 +513,26 @@ def test_034_stack_validation_handling():
     # Setup test data
     times = pd.date_range('2020-01-01', periods=10)
     taxis = np.linspace(-50, 50, 100)
-    
-    # Error case (Invalid data)
-    ds = xr.Dataset()  
     sta1, sta2 = "NET1.STA1", "NET2.STA2"
     components = "ZZ"
     filterid = 1
     
+    # Test invalid data path
+    ds = xr.Dataset()
     is_valid, message = validate_stack_data(ds, "reference")
-    if not is_valid:
-        # Just execute the code path
-        logger.error(f"Invalid reference data for {sta1}:{sta2}-{components}-{filterid}: {message}")
+    assert not is_valid
+    logger.error(f"Invalid reference data for {sta1}:{sta2}-{components}-{filterid}: {message}")
     
-    # Warning case (partial NaN values)
+    # Test warning path
     data = np.random.random((len(times), len(taxis)))
     data[0:5, :] = np.nan  # Make 50% of data NaN
     da = xr.DataArray(data, coords=[times, taxis], dims=['times', 'taxis'])
     ds = da.to_dataset(name='CCF')
     
     is_valid, message = validate_stack_data(ds, "reference")
-    if "Warning" in message:
-        logger.warning(f"{sta1}:{sta2}-{components}-{filterid}: {message}")
+    assert is_valid
+    assert "Warning" in message
+    logger.warning(f"{sta1}:{sta2}-{components}-{filterid}: {message}")
 
 @pytest.mark.order(100)
 def test_100_plot_interferogram():
