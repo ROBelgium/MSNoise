@@ -505,42 +505,49 @@ def test_033_validate_stack_data():
     
 @pytest.mark.order(34)
 def test_034_stack_validation_handling():
-    from ..api import validate_stack_data
+    from ..api import connect, update_config, validate_stack_data, get_config
     import xarray as xr
     import numpy as np
     import pandas as pd
     
-    # Create minimal test data
-    times = pd.date_range('2020-01-01', periods=10)
-    taxis = np.linspace(-50, 50, 100)
+    # Setup database
+    db = connect()
     
-    # Test with actual code's variables and logic
-    pairs = [('STA1', 'STA2'), ('STA3', 'STA3')]
-    filters = [type('Filter', (), {'ref': '1'})]
-    components = 'ZZ'
+    # Store original config values
+    original_configs = {
+        'ref_begin': get_config(db, 'ref_begin'),
+        'ref_end': get_config(db, 'ref_end'),
+        'startdate': get_config(db, 'startdate'),
+        'enddate': get_config(db, 'enddate'),
+        'mov_stack': get_config(db, 'mov_stack')
+    }
     
-    for sta1, sta2 in pairs:
-        for f in filters:
-            filterid = int(f.ref)
-            
-            # Create test datasets that will trigger our paths
-            if sta1 == 'STA1':
-                # Test error path with empty dataset
-                c = xr.Dataset()
-                is_valid, message = validate_stack_data(c, "reference")
-                if not is_valid:
-                    logger.error(f"Invalid reference data for {sta1}:{sta2}-{components}-{filterid}: {message}")
-                    continue
-            else:
-                # Test warning path with partial NaN data
-                data = np.random.random((len(times), len(taxis)))
-                data[0:5, :] = np.nan
-                da = xr.DataArray(data, coords=[times, taxis], dims=['times', 'taxis'])
-                c = da.to_dataset(name='CCF')
-                
-                is_valid, message = validate_stack_data(c, "reference")
-                if "Warning" in message:
-                    logger.warning(f"{sta1}:{sta2}-{components}-{filterid}: {message}")
+    try:
+        # Test direct validation function
+        # Create empty dataset for error path
+        ds = xr.Dataset()
+        is_valid, message = validate_stack_data(ds, "reference") 
+        assert not is_valid
+        assert "No data found for reference stack" in message
+        
+        # Create dataset with NaNs for warning path
+        times = pd.date_range('2020-01-01', periods=10)
+        taxis = np.linspace(-50, 50, 100)
+        data = np.random.random((len(times), len(taxis)))
+        data[0:5, :] = np.nan  # Add NaNs to trigger warning
+        da = xr.DataArray(data, coords=[times, taxis], dims=['times', 'taxis'])
+        ds = da.to_dataset(name='CCF')
+        
+        is_valid, message = validate_stack_data(ds, "reference")
+        assert is_valid
+        assert "Warning" in message
+        
+    finally:
+        # Restore original config values
+        for key, value in original_configs.items():
+            update_config(db, key, value)
+        
+        db.close()
                   
 @pytest.mark.order(100)
 def test_100_plot_interferogram():
