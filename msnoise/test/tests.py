@@ -443,9 +443,7 @@ def test_031_instrument_response(setup_environment):
 @pytest.mark.order(32)
 def test_032_wct():
     from ..s08compute_wct import main as compute_wct_main
-    db = connect()
     compute_wct_main()
-    db.close()
   
 @pytest.mark.order(33)
 def test_033_validate_stack_data():
