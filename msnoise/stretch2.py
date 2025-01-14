@@ -1,11 +1,6 @@
 """
-.. warning:: if using only ``mov_stack`` = 1, no MWCS jobs is inserted in the
-    database and consequently, no MWCS calculation will be done! FIX!
-
-Following Clarke et al (2011), we apply the :ref:`mwcs`
-to study the relative dephasing between Moving-Window stacks ("Current") and a
-Reference using Moving-Window Cross-Spectral analysis. The *jobs* "T"o do have
-been inserted in the datavase during the stack procedure.
+.. warning:: if using only ``mov_stack`` = 1, no STR jobs is inserted in the
+    database and consequently, no STR calculation will be done! FIX!
 
 
 Filter Configuration Parameters
@@ -56,13 +51,13 @@ To run this step:
 
 .. code-block:: sh
 
-    $ msnoise cc dvv compute_mwcs
+    $ msnoise cc dvv compute_stretching
 
 This step also supports parallel processing/threading:
 
 .. code-block:: sh
 
-    $ msnoise -t 4 cc dvv compute_mwcs
+    $ msnoise -t 4 cc dvv compute_stretching
 
 will start 4 instances of the code (after 1 second delay to avoid database
 conflicts). This works both with SQLite and MySQL but be aware problems
@@ -73,23 +68,13 @@ could occur with SQLite.
 """
 
 from .api import *
-from .move2obspy import mwcs
 
 import logbook
-from obspy.signal.regression import linear_regression
-import scipy.optimize
-import scipy.signal
-from scipy.stats import scoreatpercentile
-from obspy.signal.invsim import cosine_taper
-from obspy.signal.regression import linear_regression
-
-import scipy
-
-import scipy.fft as sf
 from scipy.fft import next_fast_len
 from numpy import asarray as ar
 from scipy.optimize import curve_fit
 from scipy.ndimage import map_coordinates
+
 
 def stretch_mat_creation(refcc, str_range=0.01, nstr=1001):
     """ Matrix of stretched instance of a reference trace.
@@ -135,7 +120,7 @@ def stretch_mat_creation(refcc, str_range=0.01, nstr=1001):
 def main(loglevel="INFO"):
     logger = logbook.Logger(__name__)
     # Reconfigure logger to show the pid number in log records
-    logger = get_logger('msnoise.compute_mwcs_child', loglevel,
+    logger = get_logger('msnoise.compute_str_child', loglevel,
                         with_pid=True)
     logger.info('*** Starting: Compute Stretching ***')
 
@@ -170,9 +155,9 @@ def main(loglevel="INFO"):
     taxis = get_t_axis(db)
     smoothing_half_win= 5
     # hanningwindow = get_window("hanning", smoothing_half_win)
-    while is_dtt_next_job(db, flag='T', jobtype='MWCS'):
+    while is_dtt_next_job(db, flag='T', jobtype='STR'):
         # TODO would it be possible to make the next 8 lines in the API ?
-        jobs = get_dtt_next_job(db, flag='T', jobtype='MWCS')
+        jobs = get_dtt_next_job(db, flag='T', jobtype='STR')
 
         if not len(jobs):
             # edge case, should only occur when is_next returns true, but
@@ -183,7 +168,7 @@ def main(loglevel="INFO"):
         refs, days = zip(*[[job.ref, job.day] for job in jobs])
 
         logger.info(
-            "There are MWCS (stretching) jobs for some days to recompute for %s" % pair)
+            "There are STR (stretching) jobs for some days to recompute for %s" % pair)
         for f in filters:
             filterid = int(f.ref)
             freqmin = f.mwcs_low

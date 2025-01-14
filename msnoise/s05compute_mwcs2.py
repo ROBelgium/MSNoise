@@ -71,23 +71,19 @@ could occur with SQLite.
 .. versionadded:: 1.4
     Parallel Processing
 """
-import pandas as pd
-
-from .api import *
-from .move2obspy import mwcs
 
 import logbook
-from obspy.signal.regression import linear_regression
-import scipy.optimize
-import scipy.signal
-from scipy.stats import scoreatpercentile
+
 from obspy.signal.invsim import cosine_taper
 from obspy.signal.regression import linear_regression
-
+import pandas as pd
 import scipy
-
 import scipy.fft as sf
 from scipy.fft import next_fast_len
+import scipy.optimize
+import scipy.signal
+
+from .api import *
 
 def get_window(window="boxcar", half_win=3):
     window_len = 2 * half_win + 1

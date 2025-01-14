@@ -401,7 +401,7 @@ def test_029_stretching():
     from ..stretch2 import main as stretch_main
     db = connect()
     update_config(db, "export_format", "MSEED")
-    reset_jobs(db, "MWCS", alljobs=True)
+    # reset_jobs(db, "MWCS", alljobs=True)
     db.close()
     stretch_main()
 
@@ -676,6 +676,8 @@ def test_400_run_manually():
     os.system("msnoise cc dvv compute_mwcs")
     os.system("msnoise cc dvv compute_dtt")
     os.system("msnoise cc dvv compute_dvv")
+    os.system("msnoise cc dvv compute_stretching")
+    os.system("msnoise cc dvv compute_wct")
 
 def test_99210_crondays_positive_float():
     parsed_crondays = parse_crondays('2.5')

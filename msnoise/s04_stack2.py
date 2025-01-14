@@ -386,3 +386,4 @@ def main(stype, interval=1.0, loglevel="INFO"):
                 for job in jobs:
                     update_job(db, job.day, job.pair, 'MWCS', 'T')
                     update_job(db, job.day, job.pair, 'WCT', 'T')
+                    update_job(db, job.day, job.pair, 'STR', 'T')
