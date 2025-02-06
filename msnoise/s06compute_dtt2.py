@@ -97,13 +97,13 @@ def main(interval=1, loglevel="INFO"):
                     tArray = M.columns.values
 
                     if params.dtt_lag == "static":
-                        lmlag = -params.dtt_minlag
-                        rmlag = params.dtt_minlag
+                        lmlag = -f.dtt_minlag
+                        rmlag = f.dtt_minlag
                     else:
-                        lmlag = -dist / params.dtt_v
-                        rmlag = dist / params.dtt_v
-                    lMlag = lmlag - params.dtt_width
-                    rMlag = rmlag + params.dtt_width
+                        lmlag = -dist / f.dtt_v
+                        rmlag = dist / f.dtt_v
+                    lMlag = lmlag - f.dtt_width
+                    rMlag = rmlag + f.dtt_width
 
                     if params.dtt_sides == "both":
                         tindex = np.where(

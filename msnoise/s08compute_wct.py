@@ -5,15 +5,15 @@ This script performs the computation of the Wavelet Coherence Transform (WCT), a
 Filter Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* |dtt_minlag|
+* |wct_minlag|
 * |dtt_maxdt|
 * |dtt_mincoh|
-* |dtt_codacycles|
+* |wct_codacycles|
 * |wct_ns|
 * |wct_nt|
 * |wct_vpo|
 * |wct_nptsfreq|
-* |dvv_min_nonzero|
+* |wct_min_nonzero|
 * |wct_norm|
 * |hpc|
 
@@ -361,14 +361,14 @@ def main(loglevel="INFO"):
     nt = params.wct_nt 
     vpo = params.wct_vpo 
     nptsfreq = params.wct_nptsfreq
-    coda_cycles = params.dtt_codacycles 
-    min_nonzero = params.dvv_min_nonzero
+    coda_cycles = params.wct_codacycles 
+    min_nonzero = params.wct_min_nonzero
     wct_norm = params.wct_norm
     wavelet_type = params.wavelet_type
     
     mov_stacks = params.mov_stack
     goal_sampling_rate = params.cc_sampling_rate
-    lag_min = params.dtt_minlag
+    lag_min = params.wct_minlag
     maxdt = params.dtt_maxdt
     mincoh = params.dtt_mincoh
 

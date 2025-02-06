@@ -196,7 +196,7 @@ def main(loglevel="INFO"):
 
                 # zero the data outside of the minlag-maxlag timing
                 if params.dtt_lag == "static":
-                    minlag = params.dtt_minlag
+                    minlag = f.dtt_minlag
                 else:
                     SS1 = station1.split(".")
                     SS2 = station2.split(".")
@@ -204,8 +204,8 @@ def main(loglevel="INFO"):
                     SS1 = get_station(db, SS1[0], SS1[1])
                     SS2 = get_station(db, SS2[0], SS2[1])
                     minlag = get_interstation_distance(SS1, SS2,
-                                                       SS1.coordinates) / params.dtt_v
-                maxlag2 = minlag + params.dtt_width
+                                                       SS1.coordinates) / f.dtt_v
+                maxlag2 = minlag + f.dtt_width
                 mid = int(params.goal_sampling_rate * params.maxlag)
                 print("betweeen", minlag, "and", maxlag2    )
                 ref[mid - int(minlag * goal_sampling_rate):mid + int(

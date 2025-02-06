@@ -137,6 +137,7 @@ import markdown
 from flask import Flask, redirect, request, render_template
 from markupsafe import Markup
 from flask import flash
+from flask_admin.contrib.sqla.filters import FilterLike
 from flask_admin import Admin, BaseView, expose
 from flask_admin.actions import action
 from flask_admin.babel import ngettext, lazy_gettext
@@ -195,9 +196,9 @@ class FilterView(ModelView):
     )
     
     column_list = ('ref', 'low', 'mwcs_low', 'mwcs_high', 'high',
-                   'mwcs_wlen', 'mwcs_step', 'used')
+                    'mwcs_wlen', 'mwcs_step', 'dtt_minlag', 'dtt_width', 'dtt_v', 'used')
     form_columns = ('low', 'mwcs_low', 'mwcs_high', 'high',
-                    'mwcs_wlen', 'mwcs_step', 'used')
+                    'mwcs_wlen', 'mwcs_step', 'dtt_minlag', 'dtt_width', 'dtt_v','used')
     
     def __init__(self, session, **kwargs):
         # You can pass name and other parameters if you want to
@@ -353,9 +354,37 @@ class ConfigView(ModelView):
     can_set_page_size = True
     # Override displayed fields
     column_list = ('name', 'value', 'definition')
-
+    form_excluded_columns = ['used_in']
     column_sortable_list = ["name",]
     column_searchable_list = ["name"]
+
+    def get_used_for_step_choices(self):
+        """Fetch unique values for `used_in` dynamically from `default`."""
+        values = set()
+        
+        for config_name in default:
+            used_in_value = default[config_name].get("used_in", None)
+            if used_in_value:
+                # Convert from stringified list -> actual list of values
+                used_list = used_in_value.strip("[]").split(",")
+                values.update([v.strip() for v in used_list])
+
+        # Custom order: define priority manually
+        custom_order = [
+            "scan_archive",
+            "compute_cc",
+            "stack",
+            "qc",
+            "compute_dtt",
+            "compute_stretching",
+            "compute_wct",
+            "misc",
+        ]
+
+        ordered_choices = sorted(values, key=lambda x: (custom_order.index(x) if x in custom_order else len(custom_order), x))
+        choices = [(v, v) for v in ordered_choices if v]
+
+        return choices
 
     def _value_formatter(view, context, model, name):
         n = default[model.name].default
@@ -367,21 +396,25 @@ class ConfigView(ModelView):
 
     def _def_formatter(view, context, model, name):
         helpstring = default[model.name].definition
-        # helpstring =
         return Markup(markdown.markdown(helpstring))
 
     def _used_formatter(view, context, model, name):
         helpstring = default[model.name].used_in
-        # helpstring =
         return Markup(markdown.markdown(helpstring))
 
     column_formatters = {
         'value': _value_formatter,
         'definition': _def_formatter,
-        'used_for_step': _used_formatter,
+        'used_in': _used_formatter,
     }
 
     def __init__(self, session, **kwargs):
+        # Use `used_in` as a dropdown filter
+        self.column_choices = {
+            'used_in': self.get_used_for_step_choices()}
+
+        self.column_filters = [FilterLike(Config.used_in, "Used In", options=self.column_choices['used_in'])]
+
         super(ConfigView, self).__init__(Config, session, **kwargs)
 
     def edit_form(self, obj=None):
