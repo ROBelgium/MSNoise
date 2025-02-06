@@ -156,6 +156,9 @@ def test_004_set_and_get_filters():
     f.mwcs_high = 0.98
     f.mwcs_wlen = 10
     f.mwcs_step = 5
+    f.dtt_minlag = 5
+    f.dtt_width = 30
+    f.dtt_v = 1
     f.used = True
     filters.append(f)
     f = Filter()
@@ -165,6 +168,9 @@ def test_004_set_and_get_filters():
     f.mwcs_high = 0.98
     f.mwcs_wlen = 10
     f.mwcs_step = 5
+    f.dtt_minlag = 5
+    f.dtt_width = 30
+    f.dtt_v = 1
     f.used = True
     filters.append(f)
     for f in filters:
