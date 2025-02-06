@@ -174,10 +174,11 @@ def test_004_set_and_get_filters():
     f.used = True
     filters.append(f)
     for f in filters:
-        update_filter(db, f.ref, f.low, f.mwcs_low, f.high, f.mwcs_high, f.mwcs_wlen, f.mwcs_step, f.used)
+        print(f)
+        update_filter(db, f.ref, f.low, f.mwcs_low, f.high, f.mwcs_high, f.mwcs_wlen, f.mwcs_step, f.dtt_minlag, f.dtt_width, f.dtt_v, f.used)
     dbfilters = get_filters(db)
     for i, filter in enumerate(dbfilters):
-        for param in ['low', 'mwcs_low', 'high', 'mwcs_high', 'mwcs_wlen', 'mwcs_step', 'used']:
+        for param in ['low', 'mwcs_low', 'high', 'mwcs_high', 'mwcs_wlen', 'mwcs_step', 'dtt_minlag', 'dtt_width', 'dtt_v', 'used']:
             assert eval(f"filter.{param}") == eval(f"filters[i].{param}")
 
 @pytest.mark.order(5)
