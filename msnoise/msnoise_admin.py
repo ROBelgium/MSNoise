@@ -183,9 +183,9 @@ class FilterView(ModelView):
         mwcs_step=dict(validators=[mwcs_step]),
     )
     
-    column_list = ('ref', 'low', 'high',
+    column_list = ('ref', 'freqmin', 'freqmax',
                     'mwcs_wlen', 'mwcs_step', 'dtt_minlag', 'dtt_width', 'dtt_v', 'used')
-    form_columns = ('low', 'high',
+    form_columns = ('freqmin', 'freqmax',
                     'mwcs_wlen', 'mwcs_step', 'dtt_minlag', 'dtt_width', 'dtt_v','used')
     
     def __init__(self, session, **kwargs):
@@ -462,7 +462,7 @@ def select_filter():
     query = get_filters(db, all=False)
     for f in query:
         filters.append({'optid': f.ref,
-                        'text': "%.2f - %.2f" % (f.low, f.high)})
+                        'text': "%.2f - %.2f" % (f.freqmin, f.freqmax)})
     db.close()
     return filters
 
@@ -624,7 +624,7 @@ def filtersJSON():
     data = {}
     filters = get_filters(db, all=False)
     for f in filters:
-        data[f.ref] = "%.2f - %.2f"%(f.low, f.high)
+        data[f.ref] = "%.2f - %.2f"%(f.freqmin, f.freqmax)
     db.close()
     o = json.dumps(data)
     db.close()

@@ -77,10 +77,10 @@ def declare_tables(prefix=None):
 
         :type ref: int
         :param ref: The id of the Filter in the database
-        :type low: float
-        :param low: The lower frequency bound of the Whiten function (in Hz)
-        :type high: float
-        :param high: The upper frequency bound of the Whiten function (in Hz)
+        :type freqmin: float
+        :param freqmin: The lower frequency bound of the Whiten function (in Hz)
+        :type freqmax: float
+        :param : The upper frequency bound of the Whiten function (in Hz)
         :type mwcs_wlen: float
         :param mwcs_wlen: Window length (in seconds) to perform MWCS
         :type mwcs_step: float
@@ -98,8 +98,8 @@ def declare_tables(prefix=None):
         __incomplete_tablename__ = "filters"
 
         ref = Column(Integer, primary_key=True)
-        low = Column(Float())
-        high = Column(Float())
+        freqmin = Column(Float())
+        freqmax = Column(Float())
         mwcs_wlen = Column(Float())
         mwcs_step = Column(Float())
         dtt_minlag = Column(Float())
@@ -109,8 +109,8 @@ def declare_tables(prefix=None):
 
         def __init__(self, **kwargs):
             """"""
-            # self.low = low
-            # self.high = high
+            # self.freqmin = freqmin
+            # self.freqmax = freqmax
             # self.mwcs_wlen = mwcs_wlen
             # self.mwcs_step = mwcs_step
             # self.dtt_minlag = dtt_minlag
