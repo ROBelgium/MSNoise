@@ -81,12 +81,6 @@ def declare_tables(prefix=None):
         :param low: The lower frequency bound of the Whiten function (in Hz)
         :type high: float
         :param high: The upper frequency bound of the Whiten function (in Hz)
-        :type mwcs_low: float
-        :param mwcs_low: The lower frequency bound of the linear regression done in
-            MWCS (in Hz)
-        :type mwcs_high: float
-        :param mwcs_high: The upper frequency bound of the linear regression done in
-            MWCS (in Hz)
         :type mwcs_wlen: float
         :param mwcs_wlen: Window length (in seconds) to perform MWCS
         :type mwcs_step: float
@@ -105,9 +99,7 @@ def declare_tables(prefix=None):
 
         ref = Column(Integer, primary_key=True)
         low = Column(Float())
-        mwcs_low = Column(Float())
         high = Column(Float())
-        mwcs_high = Column(Float())
         mwcs_wlen = Column(Float())
         mwcs_step = Column(Float())
         dtt_minlag = Column(Float())
@@ -118,9 +110,7 @@ def declare_tables(prefix=None):
         def __init__(self, **kwargs):
             """"""
             # self.low = low
-            # self.mwcs_low = mwcs_low
             # self.high = high
-            # self.mwcs_high = mwcs_high
             # self.mwcs_wlen = mwcs_wlen
             # self.mwcs_step = mwcs_step
             # self.dtt_minlag = dtt_minlag

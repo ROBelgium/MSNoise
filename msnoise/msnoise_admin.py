@@ -168,16 +168,6 @@ class FilterView(ModelView):
     view_title = "Filter Configuration"
     name = "filter"
 
-    def mwcs_low(form, field):
-        if field.data < form.data['low']:
-            raise ValidationError("'mwcs_low' should be greater or equal to"
-                                  " 'low'")
-
-    def mwcs_high(form, field):
-        if field.data <= form.data['mwcs_low']:
-            raise ValidationError("'mwcs_high' should be greater than"
-                                  " 'mwcs_low'")
-
     def high(form, field):
         if field.data < form.data['mwcs_high']:
             raise ValidationError("'high' should be greater or equal than"
@@ -189,15 +179,13 @@ class FilterView(ModelView):
                                   " 'mwcs_wlen'")
     
     form_args = dict(
-        mwcs_low=dict(validators=[mwcs_low]),
-        mwcs_high=dict(validators=[mwcs_high]),
         high=dict(validators=[high]),
         mwcs_step=dict(validators=[mwcs_step]),
     )
     
-    column_list = ('ref', 'low', 'mwcs_low', 'mwcs_high', 'high',
+    column_list = ('ref', 'low', 'high',
                     'mwcs_wlen', 'mwcs_step', 'dtt_minlag', 'dtt_width', 'dtt_v', 'used')
-    form_columns = ('low', 'mwcs_low', 'mwcs_high', 'high',
+    form_columns = ('low', 'high',
                     'mwcs_wlen', 'mwcs_step', 'dtt_minlag', 'dtt_width', 'dtt_v','used')
     
     def __init__(self, session, **kwargs):

@@ -150,10 +150,8 @@ def test_004_set_and_get_filters():
     db = connect()
     filters = []
     f = Filter()
-    f.low = 0.01
-    f.mwcs_low = 0.12
-    f.high = 1.0
-    f.mwcs_high = 0.98
+    f.freqmin = 0.01
+    f.freqmax = 1.0
     f.mwcs_wlen = 10
     f.mwcs_step = 5
     f.dtt_minlag = 5
@@ -162,10 +160,8 @@ def test_004_set_and_get_filters():
     f.used = True
     filters.append(f)
     f = Filter()
-    f.low = 0.1
-    f.mwcs_low = 0.12
-    f.high = 1.0
-    f.mwcs_high = 0.98
+    f.freqmin = 0.1
+    f.freqmax = 1.0
     f.mwcs_wlen = 10
     f.mwcs_step = 5
     f.dtt_minlag = 5
@@ -174,11 +170,10 @@ def test_004_set_and_get_filters():
     f.used = True
     filters.append(f)
     for f in filters:
-        print(f)
-        update_filter(db, f.ref, f.low, f.mwcs_low, f.high, f.mwcs_high, f.mwcs_wlen, f.mwcs_step, f.dtt_minlag, f.dtt_width, f.dtt_v, f.used)
+        update_filter(db, f.ref, f.freqmin, f.freqmax, f.mwcs_wlen, f.mwcs_step, f.dtt_minlag, f.dtt_width, f.dtt_v, f.used)
     dbfilters = get_filters(db)
     for i, filter in enumerate(dbfilters):
-        for param in ['low', 'mwcs_low', 'high', 'mwcs_high', 'mwcs_wlen', 'mwcs_step', 'dtt_minlag', 'dtt_width', 'dtt_v', 'used']:
+        for param in ['freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'dtt_minlag', 'dtt_width', 'dtt_v', 'used']:
             assert eval(f"filter.{param}") == eval(f"filters[i].{param}")
 
 @pytest.mark.order(5)

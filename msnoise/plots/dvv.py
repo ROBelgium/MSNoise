@@ -42,8 +42,8 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1,
     print(mov_stacks)
     low = high = 0.0
     filter = get_filters(db, ref=filterid)
-    low = float(filter.low)
-    high = float(filter.high)
+    low = float(filter.freqmin)
+    high = float(filter.freqmax)
 
     fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
 

@@ -65,8 +65,8 @@ def main(interval=1, loglevel="INFO"):
             "There are DTT jobs for some days to recompute for %s" % pair)
         for f in filters:
             filterid = int(f.ref)
-            freqmin = f.mwcs_low
-            freqmax = f.mwcs_high
+            freqmin = f.freqmin
+            freqmax = f.freqmax
             if station1 == station2:
                 components_to_compute = params.components_to_compute_single_station
             else:

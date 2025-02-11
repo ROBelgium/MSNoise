@@ -393,8 +393,8 @@ def main(loglevel="INFO"):
             "There are WCT jobs for some days to recompute for %s" % pair)
         for f in filters:
             filterid = int(f.ref)
-            freqmin = f.low
-            freqmax = f.high
+            freqmin = f.freqmin
+            freqmax = f.freqmax
 
             station1, station2 = pair.split(":")
             if station1 == station2:

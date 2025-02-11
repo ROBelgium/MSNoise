@@ -156,13 +156,12 @@ def info_parameters(db):
 
     click.echo('')
     click.echo('Filters:')
-    click.echo(' ID:   [low:high]   [mwcs_low:mwcs_high] mwcs_wlen mwcs_step Used?')
+    click.echo(' ID:   [freqmin:freqmax]   mwcs_wlen mwcs_step Used?')
 
     for f in get_filters(db, all=True):
         click.echo(' {:2d}: {:^15s} {:^20s} {:^9s} {:^9s}  {:1s}'
             .format(f.ref,
-                '[{:.3f}:{:.3f}]'.format(f.low, f.high),
-                '[{:.3f}:{:.3f}]'.format(f.mwcs_low, f.mwcs_high),
+                '[{:.3f}:{:.3f}]'.format(f.freqmin, f.freqmax),
                 '{:.0f}'.format(f.mwcs_wlen),
                 '{:.0f}'.format(f.mwcs_step),
                 'Y' if f.used else 'N'))

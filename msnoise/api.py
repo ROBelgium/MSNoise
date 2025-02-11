@@ -323,7 +323,7 @@ def get_filters(session, all=False, ref=None):
     return filters
 
 
-def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
+def update_filter(session, ref, low, high,
                   mwcs_wlen, mwcs_step, dtt_minlag, dtt_width, dtt_v, used):
     """Updates or Insert a new Filter in the database.
 
@@ -339,12 +339,6 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
     :param low: The lower frequency bound of the Whiten function (in Hz)
     :type high: float
     :param high: The upper frequency bound of the Whiten function (in Hz)
-    :type mwcs_low: float
-    :type mwcs_low: The lower frequency bound of the linear regression done in
-        MWCS (in Hz)
-    :type mwcs_high: float
-    :type mwcs_high: The upper frequency bound of the linear regression done in
-        WCS (in Hz)
     :type mwcs_wlen: float
     :param mwcs_wlen: Window length (in seconds) to perform MWCS
     :type mwcs_step: float
@@ -363,8 +357,6 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
         filter = Filter()
         filter.low = low
         filter.high = high
-        filter.mwcs_low = mwcs_low
-        filter.mwcs_high = mwcs_high
         filter.mwcs_wlen = mwcs_wlen
         filter.mwcs_step = mwcs_step
         filter.dtt_minlag = dtt_minlag
@@ -375,8 +367,6 @@ def update_filter(session, ref, low, mwcs_low, high, mwcs_high,
     else:
         filter.low = low
         filter.high = high
-        filter.mwcs_low = mwcs_low
-        filter.mwcs_high = mwcs_high
         filter.mwcs_wlen = mwcs_wlen
         filter.mwcs_step = mwcs_step
         filter.dtt_minlag = dtt_minlag

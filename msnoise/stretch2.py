@@ -171,10 +171,8 @@ def main(loglevel="INFO"):
             "There are STR (stretching) jobs for some days to recompute for %s" % pair)
         for f in filters:
             filterid = int(f.ref)
-            freqmin = f.mwcs_low
-            freqmax = f.mwcs_high
-            low = f.low
-            high = f.high
+            low = f.freqmin
+            high = f.freqmax
 
             def ww(a):
                 from .move2obspy import whiten

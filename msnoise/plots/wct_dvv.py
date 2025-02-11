@@ -255,8 +255,8 @@ def main(mov_stackid=None, components='ZZ', filterid=1,
         components = [components, ]
 
     filter = get_filters(db, ref=filterid)
-    low = float(filter.low)
-    high = float(filter.high)
+    low = float(filter.freqmin)
+    high = float(filter.freqmax)
 
     for i, mov_stack in enumerate(mov_stacks):
         for comps in components:

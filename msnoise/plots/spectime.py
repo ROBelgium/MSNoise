@@ -102,8 +102,8 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
         ax.plot(freq, line * ampli + i, c='k', lw=1)
 
     filter = get_filters(db, ref=filterid)
-    low = float(filter.low)
-    high = float(filter.high)
+    low = float(filter.freqmin)
+    high = float(filter.freqmax)
 
 
     ax.set_ylim(start-datetime.timedelta(days=ampli),
