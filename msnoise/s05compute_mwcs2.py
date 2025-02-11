@@ -11,9 +11,9 @@ been inserted in the datavase during the stack procedure.
 Filter Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* ``mwcs_low``: The lower frequency bound of the linear regression done in
+* ``freqmin``: The lower frequency bound of the linear regression done in
   MWCS (in Hz)
-* ``mwcs_high``: The upper frequency bound of the linear regression done in
+* ``freqmax``: The upper frequency bound of the linear regression done in
   MWCS (in Hz)
 * ``mwcs_wlen``: Window length (in seconds) to perform MWCS
 * ``mwcs_step``: Step (in seconds) of the windowing procedure in MWCS
@@ -28,9 +28,9 @@ the cross spectrum and is linearly proportional to frequency. This "Delay" for
 each window between two signals is the slope of a weighted linear regression
 (WLS) of the samples within the frequency band of interest.
 
-For each filter, the frequency band can be configured using ``mwcs_low``
-and ``mwcs_high``, and the window and overlap lengths using ``mwcs_wlen`` and
-``mwcs_step``.
+For each filter, the linear regression done in MWCS is performed between
+``freqmin`` and ``freqmax`` and the window and overlap lengths configured
+using ``mwcs_wlen`` and ``mwcs_step``.
 
 The output of this process is a table of delays measured at each window in the
 functions. The following is an example for lag times between -115 and -90.
@@ -150,16 +150,14 @@ def main(loglevel="INFO"):
             "There are MWCS jobs for some days to recompute for %s" % pair)
         for f in filters:
             filterid = int(f.ref)
-            freqmin = f.mwcs_low
-            freqmax = f.mwcs_high
-            low = f.low
-            high = f.high
+            freqmin = f.freqmin
+            freqmax = f.freqmax
 
             def ww(a):
                 from .move2obspy import whiten
                 n = next_fast_len(len(a))
                 return whiten(a, n, 1./params.cc_sampling_rate,
-                              low, high, returntime=True)
+                              freqmin, freqmax, returntime=True)
             ref_name = pair.replace(':', '_')
             station1, station2 = pair.split(":")
             
