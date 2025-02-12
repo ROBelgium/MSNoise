@@ -96,7 +96,7 @@ def main(interval=1, loglevel="INFO"):
                     MCOH = mwcs.xs("MCOH", level=0, axis=1).copy()
                     tArray = M.columns.values
 
-                    if params.dtt_lag == "static":
+                    if params.mwcs_dtt_lag == "static":
                         lmlag = -f.dtt_minlag
                         rmlag = f.dtt_minlag
                     else:
@@ -105,12 +105,12 @@ def main(interval=1, loglevel="INFO"):
                     lMlag = lmlag - f.dtt_width
                     rMlag = rmlag + f.dtt_width
 
-                    if params.dtt_sides == "both":
+                    if params.mwcs_dtt_sides == "both":
                         tindex = np.where(
                             ((tArray >= lMlag) & (tArray <= lmlag)) | (
                                         (tArray >= rmlag) & (tArray <= rMlag)))[
                             0]
-                    elif params.dtt_sides == "left":
+                    elif params.mwcs_dtt_sides == "left":
                         tindex = \
                         np.where((tArray >= lMlag) & (tArray <= lmlag))[0]
                     else:
@@ -120,8 +120,8 @@ def main(interval=1, loglevel="INFO"):
                     EM.iloc[:, tmp] = 1.0
                     MCOH.iloc[:, tmp] *= 0.0
 
-                    MCOH[MCOH < params.dtt_mincoh] = 0.0
-                    EM[EM > params.dtt_maxerr] = 1.0
+                    MCOH[MCOH < params.mwcs_dtt_mincoh] = 0.0
+                    EM[EM > params.mwcs_dtt_maxerr] = 1.0
 
                     # TODO missing check on max_dt !!
 

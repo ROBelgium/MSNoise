@@ -193,7 +193,7 @@ def main(loglevel="INFO"):
                 # ref = ww(ref)
 
                 # zero the data outside of the minlag-maxlag timing
-                if params.dtt_lag == "static":
+                if params.stretching_lag == "static":
                     minlag = f.dtt_minlag
                 else:
                     SS1 = station1.split(".")

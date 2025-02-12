@@ -6,8 +6,8 @@ Filter Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * |wct_minlag|
-* |dtt_maxdt|
-* |dtt_mincoh|
+* |wct_maxdt|
+* |wct_mincoh|
 * |wct_codacycles|
 * |wct_ns|
 * |wct_nt|
@@ -369,8 +369,8 @@ def main(loglevel="INFO"):
     mov_stacks = params.mov_stack
     goal_sampling_rate = params.cc_sampling_rate
     lag_min = params.wct_minlag
-    maxdt = params.dtt_maxdt
-    mincoh = params.dtt_mincoh
+    maxdt = params.wct_maxdt
+    mincoh = params.wct_mincoh
 
     logger.debug('Ready to compute')
     # Then we compute the jobs

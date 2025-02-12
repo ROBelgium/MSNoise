@@ -219,7 +219,7 @@ def main(mov_stackid=None, components='ZZ', filterid=1,
                         with_pid=True)
     db = connect()
     params = get_params(db)
-    mincoh = params.dtt_mincoh
+    mincoh = params.wct_mincoh
 
     # Check start and end dates
     if start == "1970-01-01":
