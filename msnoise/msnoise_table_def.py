@@ -6,7 +6,7 @@ import datetime
 import os
 from collections import namedtuple
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime,\
-    text, TIMESTAMP, Enum, REAL, UniqueConstraint, Index
+    text, TIMESTAMP, Enum, REAL, UniqueConstraint, Index, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 
 try:
@@ -51,7 +51,7 @@ def declare_tables(prefix=None):
 
     # Define the namedtuple to return
     sqlschema = namedtuple('SQLSchema', ['Base', 'PrefixerBase', 'Filter',
-        'Job', 'Station', 'Config', 'DataAvailability'])
+        'Job', 'Station', 'Config', 'DataAvailability', 'DvvMwcs'])
 
     # Create the SQLAlchemy base and subclass it to prefix the table names
     Base = declarative_base()
@@ -70,6 +70,76 @@ def declare_tables(prefix=None):
             return table_prefix + cls.__incomplete_tablename__
 
     ########################################################################
+
+    class DvvMwcs(PrefixerBase):
+        """
+        Dvv_mwcs base class.
+
+        :type ref: int
+        :param ref: The id of the MWCS_params in the database
+        :type filt_ref: int
+        :param filt_ref: The id of the a filter in the filter table
+        :type freqmin: float
+        :param freqmin: The lower frequency bound to apply MWCS (in Hz)
+        :type freqmax: float
+        :param : The upper frequency bound to apply MWCS (in Hz)        
+        :type mwcs_wlen: float
+        :param mwcs_wlen: Window length (in seconds) to perform MWCS
+        :type mwcs_step: float
+        :param mwcs_step: Step (in seconds) of the windowing procedure in MWCS
+        :type dtt_minlag: float
+        :param dtt_minlag: If ``dtt_lag`` =static (in config table): min lag time (in seconds)
+        :type dtt_width: float
+        :param dtt_width: Width of the time lag window (in seconds)
+        :type dtt_lag: string
+        :params dtt_lag: How is the lag window defined for MWCS [static]/dynamic.
+        :type dtt_v: float
+        :param dtt_v: If ``dttlag`` =dynamic (in config table): what velocity to use to avoid ballistic waves [1.0] km/s (default=1.0)
+        :type dtt_sides: string
+        :params dtt_sides: Which sides to use,str,both/left/right
+        :type dtt_mincoh: float
+        :params dtt_mincoh: Minimum coherence on dt measurement, MWCS points with values lower than that will not be used in the WLS, [0:1] 
+        :type dtt_maxerr: float
+        :params dtt_maxerr: Maximum error on dt measurement, MWCS points with values larger than that will not be used in the WLS [0:1]
+        :type dtt_maxdt: float
+        :params dtt_maxdt: Maximum dt values, MWCS points with values larger than that will not be used in the WLS (in seconds)
+        :type used: bool
+        :param used: Is the parameter set activated for the processing
+        """
+
+        __incomplete_tablename__ = "dvv_mwcs"
+
+        ref = Column(Integer, primary_key=True)
+        filt_ref = Column(Integer, ForeignKey('filters.ref'))
+        freqmin = Column(Float())
+        freqmax = Column(Float())
+        mwcs_wlen = Column(Float())
+        mwcs_step = Column(Float())
+        dtt_minlag = Column(Float())
+        dtt_width = Column(Float())
+        dtt_lag = Column(String(255))
+        dtt_v = Column(Float())
+        dtt_sides = Column(String(255))
+        dtt_mincoh = Column(Float())
+        dtt_maxerr = Column(Float())
+        dtt_maxdt = Column(Float())
+        used = Column(Boolean(), default=True)
+
+        def __init__(self, **kwargs):
+            """"""
+            # self.freqmin = freqmin
+            # self.freqmax = freqmax
+            # self.mwcs_wlen = mwcs_wlen
+            # self.mwcs_step = mwcs_step
+            # self.dtt_minlag = dtt_minlag
+            # self.dtt_width = dtt_width
+            # self.dtt_lag = dtt_lag
+            # self.dtt_v = dtt_v
+            # self.dtt_sides = dtt_sides
+            # self.dtt_mincoh = dtt_mincoh
+            # self.dtt_maxerr = dtt_maxerr
+            # self.dtt_maxdt = dtt_maxdt
+            # self.used = used
 
     class Filter(PrefixerBase):
         """
@@ -315,10 +385,10 @@ def declare_tables(prefix=None):
     ########################################################################
 
     return sqlschema(Base, PrefixerBase,
-                     Filter, Job, Station, Config, DataAvailability)
+                     Filter, Job, Station, Config, DataAvailability, DvvMwcs)
     # end of declare_tables()
 
 
 # These module objects only use the prefix defined in db.ini.
 # They should be re-defined if the prefix is to be changed.
-Base, PrefixerBase, Filter, Job, Station, Config, DataAvailability = declare_tables()
+Base, PrefixerBase, Filter, Job, Station, Config, DataAvailability, DvvMwcs = declare_tables()

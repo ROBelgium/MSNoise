@@ -152,7 +152,7 @@ from flask_admin.form import widgets
 from .api import *
 from .default import default, default_datetime_fields
 
-from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
+from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability, DvvMwcs
 
 
 class GenericView(BaseView):
@@ -162,6 +162,41 @@ class GenericView(BaseView):
     @expose('/')
     def index(self):
         return self.render('admin/%s.html'%self.page, msnoise_project="test")
+
+class DvvMwcsView(ModelView):
+    view_title = "MWCS dv/v Configuration"
+    name = "dvv_mwcs"
+
+    def mwcs_step(form, field):
+        if field.data > form.data['mwcs_wlen']:
+            raise ValidationError("'mwcs_step' should be smaller or equal to 'mwcs_wlen'")
+
+    form_args = dict(
+        mwcs_step=dict(validators=[mwcs_step]),
+    )
+
+    column_list = ('ref', 'filt_ref', 'freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 
+                   'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
+                   'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
+    
+    form_columns = ('filt_ref', 'freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 
+                    'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
+                    'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
+
+    def __init__(self, session, **kwargs):
+        # Initialize the view with the correct model
+        super(DvvMwcsView, self).__init__(DvvMwcs, session, **kwargs)
+
+    @action('used',
+            lazy_gettext('Toggle Used'),
+            lazy_gettext('Are you sure you want to update selected models?'))
+    def used(self, ids):
+        model_pk = getattr(self.model, self._primary_key)
+        query = self.get_query().filter(model_pk.in_(ids))
+        for s in query.all():
+            s.used = not s.used  # Toggle True/False
+        self.session.commit()
+        return  
 
 
 class FilterView(ModelView):
@@ -1007,6 +1042,7 @@ def get_app():
     admin.add_view(StationView(db, endpoint='stations', category='Configuration'))
     admin.add_view(FilterView(db, endpoint='filters', category='Configuration'))
     admin.add_view(ConfigView(db, endpoint='config', category='Configuration'))
+    admin.add_view(DvvMwcsView(db, endpoint='dvv_mwcs', category='Configuration'))
 
     admin.add_view(DataAvailabilityView(db, endpoint='data_availability',
                                         category='Database'))
