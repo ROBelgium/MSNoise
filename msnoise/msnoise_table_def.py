@@ -6,8 +6,10 @@ import datetime
 import os
 from collections import namedtuple
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime,\
-    text, TIMESTAMP, Enum, REAL, UniqueConstraint, Index, ForeignKey
+    text, TIMESTAMP, Enum, REAL, UniqueConstraint, Index, ForeignKey, Table
+
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
+from sqlalchemy.orm import relationship
 
 try:
     import cPickle
@@ -52,7 +54,7 @@ def declare_tables(prefix=None):
     # Define the namedtuple to return
     sqlschema = namedtuple('SQLSchema', ['Base', 'PrefixerBase', 'Filter',
         'Job', 'Station', 'Config', 'DataAvailability', 'DvvMwcs', 'DvvMwcsDtt', 
-        'DvvStretching', 'DvvWct', 'DvvWctDtt'])
+        'DvvStretching', 'DvvWct', 'DvvWctDtt', 'filter_mwcs_assoc', 'mwcs_dtt_assoc'])
 
     # Create the SQLAlchemy base and subclass it to prefix the table names
     Base = declarative_base()
@@ -69,6 +71,21 @@ def declare_tables(prefix=None):
             if prefix:
                 table_prefix += '_'
             return table_prefix + cls.__incomplete_tablename__
+
+    ########################################################################
+    # **Association Tables**
+    
+    filter_mwcs_assoc = Table(
+        "filter_mwcs_assoc", PrefixerBase.metadata,
+        Column("dvv_mwcs_ref", Integer, ForeignKey("dvv_mwcs.ref"), primary_key=True),
+        Column("filt_ref", Integer, ForeignKey("filters.ref"), primary_key=True)
+    )
+
+    mwcs_dtt_assoc = Table(
+        "mwcs_dtt_assoc", PrefixerBase.metadata,
+        Column("dvv_mwcs_dtt_ref", Integer, ForeignKey("dvv_mwcs_dtt.ref"), primary_key=True),
+        Column("dvv_mwcs_ref", Integer, ForeignKey("dvv_mwcs.ref"), primary_key=True)
+    )
 
     ########################################################################
 
@@ -95,12 +112,17 @@ def declare_tables(prefix=None):
         __incomplete_tablename__ = "dvv_mwcs"
 
         ref = Column(Integer, primary_key=True)
-        filt_ref = Column(Integer, ForeignKey('filters.ref'))
         freqmin = Column(Float())
         freqmax = Column(Float())
         mwcs_wlen = Column(Float())
         mwcs_step = Column(Float())
         used = Column(Boolean(), default=True)
+
+        # Many-to-Many relationship with Filters
+        filters = relationship("Filter", secondary=filter_mwcs_assoc, back_populates="mwcs_params")
+
+        # Many-to-Many relationship with MWCS DTT settings
+        dtt_params = relationship("DvvMwcsDtt", secondary=mwcs_dtt_assoc, back_populates="mwcs_params")
 
     class DvvMwcsDtt(PrefixerBase):
         """
@@ -133,7 +155,6 @@ def declare_tables(prefix=None):
         __incomplete_tablename__ = "dvv_mwcs_dtt"
 
         ref = Column(Integer, primary_key=True)
-        dvv_mwcs_ref = Column(Integer, ForeignKey('dvv_mwcs.ref'))
         dtt_minlag = Column(Float())
         dtt_width = Column(Float())
         dtt_lag = Column(String(255))
@@ -143,6 +164,9 @@ def declare_tables(prefix=None):
         dtt_maxerr = Column(Float())
         dtt_maxdt = Column(Float())
         used = Column(Boolean(), default=True)
+
+        # Many-to-Many relationship with MWCS parameter sets
+        mwcs_params = relationship("DvvMwcs", secondary=mwcs_dtt_assoc, back_populates="dtt_params")
 
     class DvvStretching(PrefixerBase):
         """
@@ -299,6 +323,9 @@ def declare_tables(prefix=None):
         dtt_width = Column(Float())
         dtt_v = Column(Float())
         used = Column(Boolean(True))
+
+        # Many-to-Many relationship with MWCS parameter sets
+        mwcs_params = relationship("DvvMwcs", secondary=filter_mwcs_assoc, back_populates="filters")
 
         def __init__(self, **kwargs):
             """"""
@@ -508,10 +535,12 @@ def declare_tables(prefix=None):
     ########################################################################
 
     return sqlschema(Base, PrefixerBase,
-                     Filter, Job, Station, Config, DataAvailability, DvvMwcs, DvvMwcsDtt, DvvStretching, DvvWct, DvvWctDtt)
+                     Filter, Job, Station, Config, DataAvailability, DvvMwcs, DvvMwcsDtt, DvvStretching, DvvWct, DvvWctDtt,
+                     filter_mwcs_assoc, mwcs_dtt_assoc)
     # end of declare_tables()
 
 
 # These module objects only use the prefix defined in db.ini.
 # They should be re-defined if the prefix is to be changed.
-Base, PrefixerBase, Filter, Job, Station, Config, DataAvailability, DvvMwcs, DvvMwcsDtt, DvvStretching, DvvWct, DvvWctDtt = declare_tables()
+Base, PrefixerBase, Filter, Job, Station, Config, DataAvailability, DvvMwcs, DvvMwcsDtt, DvvStretching, DvvWct, DvvWctDtt, \
+     filter_mwcs_assoc, mwcs_dtt_assoc = declare_tables()

@@ -142,9 +142,12 @@ from flask_admin import Admin, BaseView, expose
 from flask_admin.actions import action
 from flask_admin.babel import ngettext, lazy_gettext
 from flask_admin.contrib.sqla import ModelView
+from flask_admin.form.widgets import Select2Widget
 from flask_admin.model import typefmt
+from wtforms import SelectMultipleField
+from wtforms.widgets import ListWidget, CheckboxInput
 from wtforms.validators import ValidationError
-from wtforms.fields import SelectField, StringField, BooleanField, DateField
+from wtforms.fields import SelectField, StringField, BooleanField, DateField, SelectMultipleField
 from wtforms.utils import unset_value
 from flask_wtf import Form
 from flask_admin.form import widgets
@@ -178,11 +181,16 @@ class DvvMwcsView(ModelView):
         mwcs_step=dict(validators=[mwcs_step]),
     )
 
-    column_list = ('ref', 'filt_ref', 'freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 
-                    'used')
-    
-    form_columns = ('filt_ref', 'freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 
-                    'used')
+    column_list = ('ref', 'filters', 'freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used')
+    form_columns = ('filters','freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used')
+
+    # Formatter to display associated filters as a comma-separated list
+    def _filters_formatter(view, context, model, name):
+        return ", ".join(str(flt.ref) for flt in model.filters)
+
+    column_formatters = {
+        'filters': _filters_formatter,
+    }
 
     def __init__(self, session, **kwargs):
         # Initialize the view with the correct model
@@ -197,18 +205,16 @@ class DvvMwcsView(ModelView):
         for s in query.all():
             s.used = not s.used  # Toggle True/False
         self.session.commit()
-        return  
+        return
 
 class DvvMwcsDttView(ModelView):
     view_title = "DTT parameters Configuration for dv/v with MWCS"
     name = "dvv_mwcs_dtt"
 
-    column_list = ('ref', 'dvv_mwcs_ref',
-                    'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
+    column_list = ('ref', 'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
                     'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
     
-    form_columns = ('ref','dvv_mwcs_ref',
-                    'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
+    form_columns = ('dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
                     'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
 
     def __init__(self, session, **kwargs):
