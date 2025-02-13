@@ -51,7 +51,8 @@ def declare_tables(prefix=None):
 
     # Define the namedtuple to return
     sqlschema = namedtuple('SQLSchema', ['Base', 'PrefixerBase', 'Filter',
-        'Job', 'Station', 'Config', 'DataAvailability', 'DvvMwcs'])
+        'Job', 'Station', 'Config', 'DataAvailability', 'DvvMwcs', 'DvvMwcsDtt', 
+        'DvvStretching', 'DvvWct', 'DvvWctDtt'])
 
     # Create the SQLAlchemy base and subclass it to prefix the table names
     Base = declarative_base()
@@ -87,6 +88,28 @@ def declare_tables(prefix=None):
         :param mwcs_wlen: Window length (in seconds) to perform MWCS
         :type mwcs_step: float
         :param mwcs_step: Step (in seconds) of the windowing procedure in MWCS
+        :type used: bool
+        :param used: Is the parameter set activated for the processing
+        """
+
+        __incomplete_tablename__ = "dvv_mwcs"
+
+        ref = Column(Integer, primary_key=True)
+        filt_ref = Column(Integer, ForeignKey('filters.ref'))
+        freqmin = Column(Float())
+        freqmax = Column(Float())
+        mwcs_wlen = Column(Float())
+        mwcs_step = Column(Float())
+        used = Column(Boolean(), default=True)
+
+    class DvvMwcsDtt(PrefixerBase):
+        """
+        Dvv_mwcs_dtt base class.
+
+        :type ref: int
+        :param ref: The id of the dtt params for mwcs in the database
+        :type dvv_mwcs_ref: int
+        :param dvv_mwcs_ref: The id of mwcs parameters from dvv_mwcs table
         :type dtt_minlag: float
         :param dtt_minlag: If ``dtt_lag`` =static (in config table): min lag time (in seconds)
         :type dtt_width: float
@@ -107,14 +130,10 @@ def declare_tables(prefix=None):
         :param used: Is the parameter set activated for the processing
         """
 
-        __incomplete_tablename__ = "dvv_mwcs"
+        __incomplete_tablename__ = "dvv_mwcs_dtt"
 
         ref = Column(Integer, primary_key=True)
-        filt_ref = Column(Integer, ForeignKey('filters.ref'))
-        freqmin = Column(Float())
-        freqmax = Column(Float())
-        mwcs_wlen = Column(Float())
-        mwcs_step = Column(Float())
+        dvv_mwcs_ref = Column(Integer, ForeignKey('dvv_mwcs.ref'))
         dtt_minlag = Column(Float())
         dtt_width = Column(Float())
         dtt_lag = Column(String(255))
@@ -125,21 +144,125 @@ def declare_tables(prefix=None):
         dtt_maxdt = Column(Float())
         used = Column(Boolean(), default=True)
 
-        def __init__(self, **kwargs):
-            """"""
-            # self.freqmin = freqmin
-            # self.freqmax = freqmax
-            # self.mwcs_wlen = mwcs_wlen
-            # self.mwcs_step = mwcs_step
-            # self.dtt_minlag = dtt_minlag
-            # self.dtt_width = dtt_width
-            # self.dtt_lag = dtt_lag
-            # self.dtt_v = dtt_v
-            # self.dtt_sides = dtt_sides
-            # self.dtt_mincoh = dtt_mincoh
-            # self.dtt_maxerr = dtt_maxerr
-            # self.dtt_maxdt = dtt_maxdt
-            # self.used = used
+    class DvvStretching(PrefixerBase):
+        """
+        Dvv_stretching base class.
+
+        :type ref: int
+        :param ref: The ID of the stretching parameters in the database
+        :type filt_ref: int
+        :param filt_ref: The ID of a filter in the filters table
+        :type stretching_minlag: float
+        :param stretching_minlag: Minimum lag time for stretching analysis (in seconds)
+        :type stretching_width: float
+        :param stretching_width: Width of the time lag window (in seconds)
+        :type stretching_lag: string
+        :param stretching_lag: How the lag window is defined for stretching [static]/dynamic
+        :type stretching_v: float
+        :param stretching_v: If ``stretching_lag`` = dynamic, what velocity to use to avoid ballistic waves [1.0] km/s
+        :type stretching_sides: string
+        :param stretching_sides: Which sides to use, options: both/left/right
+        :type stretching_max: float
+        :param stretching_max: Maximum stretching coefficient, e.g. 0.5 = 50%, 0.01 = 1%
+        :type stretching_nsteps: int
+        :param stretching_nsteps: Number of stretching steps between 1-``stretching_max`` and 1+``stretching_max``
+        :type used: bool
+        :param used: Is the parameter set activated for the processing
+        """
+
+        __incomplete_tablename__ = "dvv_stretching"
+
+        ref = Column(Integer, primary_key=True)
+        filt_ref = Column(Integer, ForeignKey('filters.ref'))
+        stretching_minlag = Column(Float())
+        stretching_width = Column(Float())
+        stretching_lag = Column(String(255))
+        stretching_v = Column(Float())
+        stretching_sides = Column(String(255))
+        stretching_max = Column(Float())
+        stretching_nsteps = Column(Integer())
+        used = Column(Boolean(), default=True)
+
+    class DvvWct(PrefixerBase):
+        """
+        Dvv_wct base class.
+
+        :type ref: int
+        :param ref: The id of the WCT parameters in the database
+        :type filt_ref: int
+        :param filt_ref: The id of a filter in the filter table
+        :type wct_ns: float
+        :param wct_ns: Smoothing parameter in frequency
+        :type wct_nt: float
+        :param wct_nt: Smoothing parameter in time
+        :type wct_vpo: float
+        :param wct_vpo: Spacing parameter between discrete scales
+        :type wct_nptsfreq: int
+        :param wct_nptsfreq: Number of frequency points between min and max
+        :type wct_norm: bool
+        :param wct_norm: If the REF and CCF are normalized before computing wavelet? [Y]/N
+        :type wavelet_type: string
+        :param wavelet_type: Type of wavelet function used (e.g., Morlet, Paul, DOG, MexicanHat)
+        :type used: bool
+        :param used: Is the parameter set activated for the processing?
+        """
+
+        __incomplete_tablename__ = "dvv_wct"
+
+        ref = Column(Integer, primary_key=True)
+        filt_ref = Column(Integer, ForeignKey('filters.ref'))
+        wct_ns = Column(Float())
+        wct_nt = Column(Float())
+        wct_vpo = Column(Float())
+        wct_nptsfreq = Column(Integer())
+        wct_norm = Column(Boolean(), default=True)
+        wavelet_type = Column(String(255))
+        used = Column(Boolean(), default=True)
+
+    class DvvWctDtt(PrefixerBase):
+        """
+        Dvv_wct_dtt base class.
+
+        :type ref: int
+        :param ref: The id of the dtt params for wct in the database
+        :type dvv_wct_ref: int
+        :param dvv_wct_ref: The id of wct parameters from dvv_wct table
+        :type wct_minlag: float
+        :param wct_minlag: Minimum lag time (in seconds)
+        :type wct_width: float
+        :param wct_width: Width of the time lag window (in seconds)
+        :type wct_lag: string
+        :param wct_lag: How is the lag window defined for WCT [static]/dynamic.
+        :type wct_v: float
+        :param wct_v: Velocity parameter used for dynamic lag calculation
+        :type wct_sides: string
+        :param wct_sides: Which sides to use (both/left/right)
+        :type wct_mincoh: float
+        :param wct_mincoh: Minimum coherence on dt measurement
+        :type wct_maxdt: float
+        :param wct_maxdt: Maximum dt values (in seconds)
+        :type wct_codacycles: int
+        :param wct_codacycles: Number of cycles of period (1/freq) between lag_min and lag_max
+        :type wct_min_nonzero: float
+        :param wct_min_nonzero: Percentage of data points with non-zero weighting required for regression
+        :type used: bool
+        :param used: Is the parameter set activated for the processing?
+        """
+
+        __incomplete_tablename__ = "dvv_wct_dtt"
+
+        ref = Column(Integer, primary_key=True)
+        dvv_wct_ref = Column(Integer, ForeignKey('dvv_wct.ref'))
+        wct_minlag = Column(Float())
+        wct_width = Column(Float())
+        wct_lag = Column(String(255))
+        wct_v = Column(Float())
+        wct_sides = Column(String(255))
+        wct_mincoh = Column(Float())
+        wct_maxdt = Column(Float())
+        wct_codacycles = Column(Integer())
+        wct_min_nonzero = Column(Float())
+        used = Column(Boolean(), default=True)
 
     class Filter(PrefixerBase):
         """
@@ -385,10 +508,10 @@ def declare_tables(prefix=None):
     ########################################################################
 
     return sqlschema(Base, PrefixerBase,
-                     Filter, Job, Station, Config, DataAvailability, DvvMwcs)
+                     Filter, Job, Station, Config, DataAvailability, DvvMwcs, DvvMwcsDtt, DvvStretching, DvvWct, DvvWctDtt)
     # end of declare_tables()
 
 
 # These module objects only use the prefix defined in db.ini.
 # They should be re-defined if the prefix is to be changed.
-Base, PrefixerBase, Filter, Job, Station, Config, DataAvailability, DvvMwcs = declare_tables()
+Base, PrefixerBase, Filter, Job, Station, Config, DataAvailability, DvvMwcs, DvvMwcsDtt, DvvStretching, DvvWct, DvvWctDtt = declare_tables()

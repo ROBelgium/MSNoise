@@ -152,7 +152,10 @@ from flask_admin.form import widgets
 from .api import *
 from .default import default, default_datetime_fields
 
-from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability, DvvMwcs
+from .msnoise_table_def import (
+    Filter, Job, Station, Config, DataAvailability, 
+    DvvMwcs, DvvMwcsDtt, DvvStretching, DvvWct, DvvWctDtt
+)
 
 
 class GenericView(BaseView):
@@ -164,7 +167,7 @@ class GenericView(BaseView):
         return self.render('admin/%s.html'%self.page, msnoise_project="test")
 
 class DvvMwcsView(ModelView):
-    view_title = "MWCS dv/v Configuration"
+    view_title = "MWCS Configuration for dv/v"
     name = "dvv_mwcs"
 
     def mwcs_step(form, field):
@@ -176,12 +179,10 @@ class DvvMwcsView(ModelView):
     )
 
     column_list = ('ref', 'filt_ref', 'freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 
-                   'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
-                   'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
+                    'used')
     
     form_columns = ('filt_ref', 'freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 
-                    'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
-                    'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
+                    'used')
 
     def __init__(self, session, **kwargs):
         # Initialize the view with the correct model
@@ -198,6 +199,108 @@ class DvvMwcsView(ModelView):
         self.session.commit()
         return  
 
+class DvvMwcsDttView(ModelView):
+    view_title = "DTT parameters Configuration for dv/v with MWCS"
+    name = "dvv_mwcs_dtt"
+
+    column_list = ('ref', 'dvv_mwcs_ref',
+                    'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
+                    'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
+    
+    form_columns = ('ref','dvv_mwcs_ref',
+                    'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
+                    'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
+
+    def __init__(self, session, **kwargs):
+        # Initialize the view with the correct model
+        super(DvvMwcsDttView, self).__init__(DvvMwcsDtt, session, **kwargs)
+
+    @action('used',
+            lazy_gettext('Toggle Used'),
+            lazy_gettext('Are you sure you want to update selected models?'))
+    def used(self, ids):
+        model_pk = getattr(self.model, self._primary_key)
+        query = self.get_query().filter(model_pk.in_(ids))
+        for s in query.all():
+            s.used = not s.used  # Toggle True/False
+        self.session.commit()
+        return  
+
+class DvvStretchingView(ModelView):
+    view_title = "Stretching Configuration for dv/v"
+    name = "dvv_stretching"
+
+    column_list = ('ref', 'filt_ref', 'stretching_minlag', 'stretching_width', 
+                   'stretching_lag', 'stretching_v', 'stretching_sides', 
+                   'stretching_max', 'stretching_nsteps', 'used')
+    
+    form_columns = ('filt_ref', 'stretching_minlag', 'stretching_width', 
+                    'stretching_lag', 'stretching_v', 'stretching_sides', 
+                    'stretching_max', 'stretching_nsteps', 'used')
+
+    def __init__(self, session, **kwargs):
+        super(DvvStretchingView, self).__init__(DvvStretching, session, **kwargs)
+
+    @action('used',
+            lazy_gettext('Toggle Used'),
+            lazy_gettext('Are you sure you want to update selected models?'))
+    def used(self, ids):
+        model_pk = getattr(self.model, self._primary_key)
+        query = self.get_query().filter(model_pk.in_(ids))
+        for s in query.all():
+            s.used = not s.used  # Toggle True/False
+        self.session.commit()
+        return  
+    
+class DvvWctView(ModelView):
+    view_title = "Wavelet Transform Configuration for dv/v"
+    name = "dvv_wct"
+
+    column_list = ('ref', 'filt_ref', 'wct_ns', 'wct_nt', 'wct_vpo', 
+                   'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used')
+    
+    form_columns = ('filt_ref', 'wct_ns', 'wct_nt', 'wct_vpo', 
+                    'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used')
+
+    def __init__(self, session, **kwargs):
+        super(DvvWctView, self).__init__(DvvWct, session, **kwargs)
+
+    @action('used',
+            lazy_gettext('Toggle Used'),
+            lazy_gettext('Are you sure you want to update selected models?'))
+    def used(self, ids):
+        model_pk = getattr(self.model, self._primary_key)
+        query = self.get_query().filter(model_pk.in_(ids))
+        for s in query.all():
+            s.used = not s.used  # Toggle True/False
+        self.session.commit()
+        return  
+    
+class DvvWctDttView(ModelView):
+    view_title = "DTT parameters Configuration for dv/v with WCT"
+    name = "dvv_wct_dtt"
+
+    column_list = ('ref', 'dvv_wct_ref', 'wct_minlag', 'wct_width', 
+                   'wct_lag', 'wct_v', 'wct_sides', 'wct_mincoh', 
+                   'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used')
+    
+    form_columns = ('dvv_wct_ref', 'wct_minlag', 'wct_width', 
+                    'wct_lag', 'wct_v', 'wct_sides', 'wct_mincoh', 
+                    'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used')
+
+    def __init__(self, session, **kwargs):
+        super(DvvWctDttView, self).__init__(DvvWctDtt, session, **kwargs)
+
+    @action('used',
+            lazy_gettext('Toggle Used'),
+            lazy_gettext('Are you sure you want to update selected models?'))
+    def used(self, ids):
+        model_pk = getattr(self.model, self._primary_key)
+        query = self.get_query().filter(model_pk.in_(ids))
+        for s in query.all():
+            s.used = not s.used  # Toggle True/False
+        self.session.commit()
+        return  
 
 class FilterView(ModelView):
     view_title = "Filter Configuration"
@@ -1042,7 +1145,15 @@ def get_app():
     admin.add_view(StationView(db, endpoint='stations', category='Configuration'))
     admin.add_view(FilterView(db, endpoint='filters', category='Configuration'))
     admin.add_view(ConfigView(db, endpoint='config', category='Configuration'))
+
     admin.add_view(DvvMwcsView(db, endpoint='dvv_mwcs', category='Configuration'))
+    admin.add_view(DvvMwcsDttView(db, endpoint='dvv_mwcs_dtt', category='Configuration'))
+
+    admin.add_view(DvvWctView(db, endpoint='dvv_wct', category='Configuration'))
+    admin.add_view(DvvWctDttView(db, endpoint='dvv_wct_dtt', category='Configuration'))
+
+    admin.add_view(DvvStretchingView(db, endpoint='dvv_stretching', category='Configuration'))
+   
 
     admin.add_view(DataAvailabilityView(db, endpoint='data_availability',
                                         category='Database'))

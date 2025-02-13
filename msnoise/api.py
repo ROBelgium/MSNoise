@@ -21,7 +21,7 @@ import xarray as xr
 
 
 from . import DBConfigNotFoundError
-from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
+from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability, DvvMwcs
 
 
 def get_logger(name, loglevel=None, with_pid=False):
