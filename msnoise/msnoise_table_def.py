@@ -124,6 +124,9 @@ def declare_tables(prefix=None):
         # Many-to-Many relationship with MWCS DTT settings
         dtt_params = relationship("DvvMwcsDtt", secondary=mwcs_dtt_assoc, back_populates="mwcs_params")
 
+        def __str__(self):
+            return f"MWCS Params {self.ref} ({self.freqmin}-{self.freqmax} Hz, mwcs_wlen:{self.mwcs_wlen}, mwcs_step:{self.mwcs_step})"
+
     class DvvMwcsDtt(PrefixerBase):
         """
         Dvv_mwcs_dtt base class.
@@ -326,6 +329,9 @@ def declare_tables(prefix=None):
 
         # Many-to-Many relationship with MWCS parameter sets
         mwcs_params = relationship("DvvMwcs", secondary=filter_mwcs_assoc, back_populates="filters")
+
+        def __str__(self):
+            return f"Filter {self.ref} ({self.freqmin}-{self.freqmax} Hz)"
 
         def __init__(self, **kwargs):
             """"""

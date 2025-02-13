@@ -211,11 +211,34 @@ class DvvMwcsDttView(ModelView):
     view_title = "DTT parameters Configuration for dv/v with MWCS"
     name = "dvv_mwcs_dtt"
 
-    column_list = ('ref', 'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
+    column_list = ('ref', 'mwcs_params', 'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
                     'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
     
-    form_columns = ('dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
+    form_columns = ('mwcs_params','dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
                     'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
+
+    # Formatter to display associated mwcs params as a comma-separated list
+    def _mwcsparams_formatter(view, context, model, name):
+        return ", ".join(str(param.ref) for param in model.mwcs_params)
+
+    column_formatters = {
+        'mwcs_params': _mwcsparams_formatter,
+    }
+
+    # Define the dropdown fields explicitly
+    form_extra_fields = {
+        'dtt_lag': SelectField(
+            'DTT Lag',
+            choices=[('static', 'Static'), ('dynamic', 'Dynamic')],
+            default='static'
+        ),
+        'dtt_sides': SelectField(
+            'DTT Sides',
+            choices=[('both', 'Both'), ('left', 'Left'), ('right', 'Right')],
+            default='both'
+        )
+    }
+
 
     def __init__(self, session, **kwargs):
         # Initialize the view with the correct model
