@@ -260,13 +260,21 @@ class DvvStretchingView(ModelView):
     view_title = "Stretching Configuration for dv/v"
     name = "dvv_stretching"
 
-    column_list = ('ref', 'filt_ref', 'stretching_minlag', 'stretching_width', 
+    column_list = ('ref', 'filters', 'stretching_minlag', 'stretching_width', 
                    'stretching_lag', 'stretching_v', 'stretching_sides', 
                    'stretching_max', 'stretching_nsteps', 'used')
     
-    form_columns = ('filt_ref', 'stretching_minlag', 'stretching_width', 
+    form_columns = ('filters', 'stretching_minlag', 'stretching_width', 
                     'stretching_lag', 'stretching_v', 'stretching_sides', 
                     'stretching_max', 'stretching_nsteps', 'used')
+
+    # Formatter to display associated filters as a comma-separated list
+    def _filters_formatter(view, context, model, name):
+        return ", ".join(str(flt.ref) for flt in model.filters)
+
+    column_formatters = {
+        'filters': _filters_formatter,
+    }
 
     def __init__(self, session, **kwargs):
         super(DvvStretchingView, self).__init__(DvvStretching, session, **kwargs)
@@ -286,11 +294,19 @@ class DvvWctView(ModelView):
     view_title = "Wavelet Transform Configuration for dv/v"
     name = "dvv_wct"
 
-    column_list = ('ref', 'filt_ref', 'wct_ns', 'wct_nt', 'wct_vpo', 
+    column_list = ('ref', 'filters', 'wct_ns', 'wct_nt', 'wct_vpo', 
                    'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used')
     
-    form_columns = ('filt_ref', 'wct_ns', 'wct_nt', 'wct_vpo', 
+    form_columns = ('filters', 'wct_ns', 'wct_nt', 'wct_vpo', 
                     'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used')
+
+    # Formatter to display associated filters as a comma-separated list
+    def _filters_formatter(view, context, model, name):
+        return ", ".join(str(flt.ref) for flt in model.filters)
+
+    column_formatters = {
+        'filters': _filters_formatter,
+    }
 
     def __init__(self, session, **kwargs):
         super(DvvWctView, self).__init__(DvvWct, session, **kwargs)
@@ -310,13 +326,21 @@ class DvvWctDttView(ModelView):
     view_title = "DTT parameters Configuration for dv/v with WCT"
     name = "dvv_wct_dtt"
 
-    column_list = ('ref', 'dvv_wct_ref', 'wct_minlag', 'wct_width', 
+    column_list = ('ref', 'wct_params', 'wct_minlag', 'wct_width', 
                    'wct_lag', 'wct_v', 'wct_sides', 'wct_mincoh', 
                    'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used')
     
-    form_columns = ('dvv_wct_ref', 'wct_minlag', 'wct_width', 
+    form_columns = ('wct_params', 'wct_minlag', 'wct_width', 
                     'wct_lag', 'wct_v', 'wct_sides', 'wct_mincoh', 
                     'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used')
+
+    # Formatter to display associated mwcs params as a comma-separated list
+    def _wctparams_formatter(view, context, model, name):
+        return ", ".join(str(param.ref) for param in model.wct_params)
+
+    column_formatters = {
+        'wct_params': _wctparams_formatter,
+    }
 
     def __init__(self, session, **kwargs):
         super(DvvWctDttView, self).__init__(DvvWctDtt, session, **kwargs)
