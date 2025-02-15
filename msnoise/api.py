@@ -21,7 +21,8 @@ import xarray as xr
 
 
 from . import DBConfigNotFoundError
-from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability, DvvMwcs
+from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability, \
+    DvvMwcs, DvvMwcsDtt, filter_mwcs_assoc, mwcs_dtt_assoc
 
 
 def get_logger(name, loglevel=None, with_pid=False):
@@ -324,7 +325,7 @@ def get_filters(session, all=False, ref=None):
 
 
 def update_filter(session, ref, freqmin, freqmax,
-                  mwcs_wlen, mwcs_step, dtt_minlag, dtt_width, dtt_v, used):
+                  CC, SC, AC, used):
     """Updates or Insert a new Filter in the database.
 
     .. seealso:: :class:`msnoise.msnoise_table_def.declare_tables.Filter`
@@ -339,16 +340,12 @@ def update_filter(session, ref, freqmin, freqmax,
     :param freqmin: The lower frequency bound of the Whiten function (in Hz)
     :type freqmax: float
     :param freqmax: The upper frequency bound of the Whiten function (in Hz)
-    :type mwcs_wlen: float
-    :param mwcs_wlen: Window length (in seconds) to perform MWCS
-    :type mwcs_step: float
-    :param mwcs_step: Step (in seconds) of the windowing procedure in MWCS
-    :type dtt_minlag: float
-    :param dtt_minlag: If ``dtt_lag`` =static (in config table): min lag time (in seconds)
-    :type dtt_width: float
-    :param dtt_width: Width of the time lag window (in seconds)
-    :type dtt_v: float
-    :param dtt_v: If ``dttlag`` =dynamic (in config table): what velocity to use to avoid ballistic waves [1.0] km/s (default=1.0)
+    :type CC: bool
+    :param CC: Compute cross-correlation functions between different pairs?
+    :type SC: bool
+    :param SC: Compute cross-correlation functions between different components of single station?
+    :type AC: bool
+    :param AC: Compute auto-correlation functions from single station components?   
     :type used: bool
     :param used: Is the filter activated for the processing
     """
@@ -357,22 +354,268 @@ def update_filter(session, ref, freqmin, freqmax,
         filter = Filter()
         filter.freqmin = freqmin
         filter.freqmax = freqmax
-        filter.mwcs_wlen = mwcs_wlen
-        filter.mwcs_step = mwcs_step
-        filter.dtt_minlag = dtt_minlag
-        filter.dtt_width = dtt_width
-        filter.dtt_v = dtt_v
+        filter.CC = CC
+        filter.SC = SC
+        filter.AC = AC
         filter.used = used
         session.add(filter)
     else:
         filter.freqmin = freqmin
         filter.freqmax = freqmax
-        filter.mwcs_wlen = mwcs_wlen
-        filter.mwcs_step = mwcs_step
-        filter.dtt_minlag = dtt_minlag
-        filter.dtt_width = dtt_width
-        filter.dtt_v = dtt_v
+        filter.CC = CC
+        filter.SC = SC
+        filter.AC = AC
         filter.used = used
+    session.commit()
+    return
+
+# DVV_MWCS
+
+def get_dvv_mwcs_jobs(session, all=False):
+    """Get all MWCS parameter sets linked to used filters."""
+
+    print("DEBUG: Running get_dvv_mwcs()...")
+
+    query = (
+        session.query(Filter.ref, DvvMwcs)
+        .select_from(Filter)  # Explicitly select Filter as the starting table
+        .join(filter_mwcs_assoc, Filter.ref == filter_mwcs_assoc.c.filt_ref)
+        .join(DvvMwcs, filter_mwcs_assoc.c.dvv_mwcs_ref == DvvMwcs.ref)
+    )
+
+    if not all:
+        query = query.filter(Filter.used == True)
+
+    print("DEBUG: Executing query...")
+    try:
+        results = query.all()
+        print(f"DEBUG: Query returned {len(results)} results.")
+    except Exception as e:
+        print(f"ERROR: Query failed with exception: {e}")
+        return {}
+
+    mwcs_mapping = {}
+
+    for filter_ref, mwcs in results:
+        print(f"DEBUG: Processing Filter {filter_ref} linked to MWCS {mwcs.ref}")
+
+        if filter_ref not in mwcs_mapping:
+            mwcs_mapping[filter_ref] = []
+        
+        mwcs_mapping[filter_ref].append(mwcs)
+
+    print("DEBUG: Finished get_dvv_mwcs(). Returning data.")
+    return mwcs_mapping
+
+def get_dvv_mwcs(session, all=False):
+    """Retrieve all MWCS parameter sets as ORM objects."""
+    query = session.query(DvvMwcs)
+
+    if not all:
+        query = query.filter(DvvMwcs.used == True)
+
+    results = query.all()  # Returns ORM objects
+
+    return results  # No conversion to dictionaries
+
+def update_dvv_mwcs(session, ref, freqmin, freqmax, mwcs_wlen, mwcs_step, used, filter_refs):
+    """Updates or Inserts a new MWCS parameter set in the database and links it to filters.
+
+    .. seealso:: :class:`msnoise.msnoise_table_def.declare_tables.DvvMwcs`
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as obtained by :func:`connect`
+
+    :type ref: int
+    :param ref: The id of the MWCS parameter set in the database
+
+    :type freqmin: float
+    :param freqmin: The lower frequency bound of the MWCS step (in Hz)
+
+    :type freqmax: float
+    :param freqmax: The upper frequency bound of the MWCS step (in Hz)
+
+    :type mwcs_wlen: float
+    :param mwcs_wlen: Window length (in seconds) to perform MWCS
+
+    :type mwcs_step: float
+    :param mwcs_step: Step (in seconds) of the windowing procedure in MWCS
+
+    :type used: bool
+    :param used: Is the MWCS parameter set activated for processing
+
+    :type filter_refs: list[int]
+    :param filter_refs: A list of filter IDs to associate with this MWCS parameter set
+    """
+
+    # Debugging: Check the ref value before querying
+    print(f"DEBUG: Received ref = {ref}")
+
+    # Check if MWCS parameters already exist
+    mwcs = session.query(DvvMwcs).filter(DvvMwcs.ref == ref).first()
+
+    if mwcs is None:
+        # Create a new MWCS parameter set
+        print("DEBUG: Creating new MWCS parameter set")
+        mwcs = DvvMwcs()
+        mwcs.freqmin = freqmin
+        mwcs.freqmax = freqmax
+        mwcs.mwcs_wlen = mwcs_wlen
+        mwcs.mwcs_step = mwcs_step
+        mwcs.used = used
+        session.add(mwcs)
+        session.commit()  # Ensure the ref is assigned
+
+        print(f"DEBUG: Assigned ref (after commit) = {mwcs.ref}")
+    else:
+        # Update existing MWCS parameter set
+        mwcs.freqmin = freqmin
+        mwcs.freqmax = freqmax
+        mwcs.mwcs_wlen = mwcs_wlen
+        mwcs.mwcs_step = mwcs_step
+        mwcs.used = used
+
+    # Print the MWCS object before linking filters
+    print(f"DEBUG: MWCS Object: {mwcs}")
+
+    # Update MWCS-Filter associations
+    mwcs.filters = session.query(Filter).filter(Filter.ref.in_(filter_refs)).all()
+
+    session.commit()
+    print(f"DEBUG: Successfully updated MWCS with ref {mwcs.ref}")
+
+    return
+
+# DVV_MWCS_DTT
+
+def get_dvv_mwcs_dtt_jobs(session, all=False):
+    """Get all MWCS DTT parameter sets linked to used filters and MWCS sets.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A SQLAlchemy session object
+
+    :type all: bool
+    :param all: If True, fetch all filters; otherwise, only where `used` = True
+
+    :rtype: dict
+    :returns: A nested dictionary where:
+              - `filter_ref`: The filter ID
+              - `mwcs_ref`: The associated MWCS parameter ID
+              - `dtt_params`: A list of associated MWCS DTT parameter sets
+    """
+
+    query = (
+        session.query(Filter.ref, DvvMwcs.ref, DvvMwcsDtt)
+        .join(filter_mwcs_assoc, Filter.ref == filter_mwcs_assoc.c.filt_ref)  # Explicit join
+        .join(DvvMwcs, filter_mwcs_assoc.c.dvv_mwcs_ref == DvvMwcs.ref)
+        .join(mwcs_dtt_assoc, DvvMwcs.ref == mwcs_dtt_assoc.c.dvv_mwcs_ref)
+        .join(DvvMwcsDtt, mwcs_dtt_assoc.c.dvv_mwcs_dtt_ref == DvvMwcsDtt.ref)
+    )
+
+    if not all:
+        query = query.filter(Filter.used == True)
+
+    results = query.all()
+
+    mwcs_dtt_mapping = {}
+
+    for filter_ref, mwcs_ref, dtt in results:
+        if filter_ref not in mwcs_dtt_mapping:
+            mwcs_dtt_mapping[filter_ref] = {}
+
+        if mwcs_ref not in mwcs_dtt_mapping[filter_ref]:
+            mwcs_dtt_mapping[filter_ref][mwcs_ref] = []
+
+        mwcs_dtt_mapping[filter_ref][mwcs_ref].append(dtt)  # Directly append the ORM object)
+
+    return mwcs_dtt_mapping
+
+def get_dvv_mwcs_dtt(session, all=False):
+    """Retrieve all DTT parameter sets as ORM objects."""
+    query = session.query(DvvMwcsDtt)
+
+    if not all:
+        query = query.filter(DvvMwcsDtt.used == True)
+
+    results = query.all()  # Returns ORM objects
+
+    return results  # No conversion to dictionaries
+
+def update_dvv_mwcs_dtt(session, ref, dtt_minlag, dtt_width, dtt_lag, dtt_v,
+                         dtt_sides, dtt_mincoh, dtt_maxerr, dtt_maxdt, used,
+                         mwcs_refs):
+    """Updates or Inserts a new MWCS DTT parameter set in the database and links it to MWCS sets.
+
+    .. seealso:: :class:`msnoise.msnoise_table_def.declare_tables.DvvMwcsDtt`
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as obtained by :func:`connect`
+
+    :type ref: int
+    :param ref: The id of the MWCS DTT parameter set in the database
+
+    :type dtt_minlag: float
+    :param dtt_minlag: Minimum lag time for MWCS DTT (in seconds)
+
+    :type dtt_width: float
+    :param dtt_width: Width of the time lag window (in seconds)
+
+    :type dtt_lag: str
+    :param dtt_lag: Method to define lag window [static/dynamic]
+
+    :type dtt_v: float
+    :param dtt_v: Velocity threshold for avoiding ballistic waves (if `dtt_lag=dynamic`)
+
+    :type dtt_sides: str
+    :param dtt_sides: Sides to use for DTT analysis [both/left/right]
+
+    :type dtt_mincoh: float
+    :param dtt_mincoh: Minimum coherence on dt measurement [0:1]
+
+    :type dtt_maxerr: float
+    :param dtt_maxerr: Maximum allowable error on dt measurement [0:1]
+
+    :type dtt_maxdt: float
+    :param dtt_maxdt: Maximum dt values for MWCS DTT (in seconds)
+
+    :type used: bool
+    :param used: Is the MWCS DTT parameter set activated for processing
+
+    :type mwcs_refs: list[int]
+    :param mwcs_refs: A list of MWCS parameter set IDs to associate with this DTT parameter set
+    """
+
+    # Check if MWCS DTT parameters already exist
+    dtt = session.query(DvvMwcsDtt).filter(DvvMwcsDtt.ref == ref).first()
+
+    if dtt is None:
+        # Create a new MWCS DTT parameter set
+        dtt = DvvMwcsDtt()
+        dtt.dtt_minlag = dtt_minlag
+        dtt.dtt_width = dtt_width
+        dtt.dtt_lag = dtt_lag
+        dtt.dtt_v = dtt_v
+        dtt.dtt_sides = dtt_sides
+        dtt.dtt_mincoh = dtt_mincoh
+        dtt.dtt_maxerr = dtt_maxerr
+        dtt.dtt_maxdt = dtt_maxdt
+        dtt.used = used
+        session.add(dtt)
+    else:
+        # Update existing MWCS DTT parameter set
+        dtt.dtt_minlag = dtt_minlag
+        dtt.dtt_width = dtt_width
+        dtt.dtt_lag = dtt_lag
+        dtt.dtt_v = dtt_v
+        dtt.dtt_sides = dtt_sides
+        dtt.dtt_mincoh = dtt_mincoh
+        dtt.dtt_maxerr = dtt_maxerr
+        dtt.dtt_maxdt = dtt_maxdt
+        dtt.used = used
+
+    # Update MWCS-DTT associations
+    dtt.mwcs_params = session.query(DvvMwcs).filter(DvvMwcs.ref.in_(mwcs_refs)).all()
+
     session.commit()
     return
 
@@ -2378,6 +2621,37 @@ def xr_get_mwcs(station1, station2, components, filterid, mov_stack):
     data = data.MWCS.to_dataframe().reorder_levels(['times', 'taxis', 'keys']).unstack().droplevel(0, axis=1).unstack()
     return data
 
+def xr_save_mwcs2(station1, station2, components, filterid, mwcsid, mov_stack, taxis, dataframe):
+    fn = os.path.join("DVV/MWCS/MWCS", "%02i" % filterid, "%02i" % mwcsid,
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
+                      "%s" % components,
+                      "%s_%s.nc" % (station1, station2))
+    if not os.path.isdir(os.path.split(fn)[0]):
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
+    d = dataframe.stack(future_stack=True).stack(future_stack=True)
+    d.index = d.index.set_names(["times", "keys", "taxis"])
+    d = d.reorder_levels(["times", "taxis", "keys"])
+    d.columns = ["MWCS"]
+    taxis = np.unique(d.index.get_level_values('taxis'))
+    dr = xr_create_or_open(fn, taxis=taxis, name="MWCS")
+    rr = d.to_xarray().to_dataset(name="MWCS")
+    rr = xr_insert_or_update(dr, rr)
+    xr_save_and_close(rr, fn)
+    del dr, rr, d
+
+def xr_get_mwcs2(station1, station2, components, filterid, mwcsid, mov_stack):
+    fn = os.path.join("DVV/MWCS/MWCS", "%02i" % filterid, "%02i" % mwcsid,
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
+                      "%s" % components,
+                      "%s_%s.nc" % (station1, station2))
+    if not os.path.isfile(fn):
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
+        raise FileNotFoundError(fn)
+    data = xr_create_or_open(fn, name="MWCS")
+    data = data.MWCS.to_dataframe().reorder_levels(['times', 'taxis', 'keys']).unstack().droplevel(0, axis=1).unstack()
+    return data
+
+
 
 def xr_save_dtt(station1, station2, components, filterid, mov_stack, dataframe):
     """
@@ -2432,6 +2706,60 @@ def xr_get_dtt(station1, station2, components, filterid, mov_stack):
     data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
     return data
 
+def xr_save_dtt2(station1, station2, components, filterid, mwcsid, dttid, mov_stack, dataframe):
+    """
+    :param station1: string, name of station 1
+    :param station2: string, name of station 2
+    :param components: string, name of the components
+    :param filterid: int, filter id
+    :param mov_stack: int, number of days in the moving stack
+    :param dataframe: pandas DataFrame containing the data
+    :return: None
+
+    This method saves the given data in a NetCDF file using the specified parameters. The file path is constructed based on the station names, components, filter id, and moving stack number
+    *. The data in the DataFrame is stacked, and the index is set to include "times" and "keys" as names. The column in the DataFrame is renamed to "DTT". A new or existing NetCDF file is
+    * opened using the given file path, and the stacked data is inserted or updated in the file. The resulting dataset is then saved and the file is closed.
+    """
+    fn = os.path.join("DVV/MWCS/DTT", "%02i" % filterid,
+                      "%02i" % mwcsid, "%02i" % dttid,
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
+                      "%s" % components,
+                      "%s_%s.nc" % (station1, station2))
+    if not os.path.isdir(os.path.split(fn)[0]):
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
+    d = dataframe.stack(future_stack=True)
+    d.index = d.index.set_names(["times", "keys"])
+    d.columns = ["DTT"]
+    dr = xr_create_or_open(fn, taxis=[], name="DTT")
+    rr = d.to_xarray().to_dataset(name="DTT")
+    rr = xr_insert_or_update(dr, rr)
+    xr_save_and_close(rr, fn)
+
+def xr_get_dtt2(station1, station2, components, filterid, mwcsid, dttid, mov_stack):
+    """
+    :param station1: The first station name
+    :param station2: The second station name
+    :param components: The components to be used
+    :param filterid: The filter ID
+    :param mov_stack: The movement stack
+    :return: The extracted data
+
+    This method retrieves the DTT data from a NetCDF file based on the given inputs. It constructs the file path using the provided parameters and checks if the file exists. If the file
+    * does not exist, it raises a FileNotFoundError. Otherwise, it opens the NetCDF file and extracts the DTT variable as a dataframe. The dataframe is then rearranged and returned as the
+    * result.
+    """
+    fn = os.path.join("DVV/MWCS/DTT", "%02i" % filterid,
+                      "%02i" % mwcsid, "%02i" % dttid,                      
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
+                      "%s" % components,
+                      "%s_%s.nc" % (station1, station2))
+    if not os.path.isfile(fn):
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
+        raise FileNotFoundError(fn)
+    dr = xr_create_or_open(fn, taxis=[], name="DTT")
+    data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
+    return data
+
 
 def xr_save_dvv(components, filterid, mov_stack, dataframe):
     fn = os.path.join("DVV2", "%02i" % filterid,
@@ -2471,6 +2799,45 @@ def xr_get_dvv(components, filterid, mov_stack):
     data = data.DVV.to_dataframe().reorder_levels(['times', 'level1', 'level0']).unstack().droplevel(0, axis=1).unstack()
     return data
 
+def xr_save_dvv2(components, filterid, mwcsid, dttid, mov_stack, dataframe):
+    fn = os.path.join("DVV/MWCS/DVV", "%02i" % filterid,
+                      "%02i" % mwcsid, "%02i" % dttid,
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
+                      "%s.nc" % components)
+    if not os.path.isdir(os.path.split(fn)[0]):
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
+
+    if dataframe.columns.nlevels > 1:
+        d = dataframe.stack(future_stack=True).stack(future_stack=True)
+    else:
+        d = dataframe.stack(future_stack=True)
+    
+    level_names = ["times", "level1", "level0"]
+    d.index = d.index.set_names(level_names[:d.index.nlevels])
+
+    if d.index.nlevels == 3:
+        d = d.reorder_levels(["times", "level0", "level1"])
+
+    d.columns = ["DVV"]
+    # taxis = np.unique(d.index.get_level_values('taxis'))
+    dr = xr_create_or_open(fn, taxis=[], name="DVV")
+    rr = d.to_xarray().to_dataset(name="DVV")
+    rr = xr_insert_or_update(dr, rr)
+    xr_save_and_close(rr, fn)
+    del dr, rr, d
+
+
+def xr_get_dvv2(components, filterid, mwcsid, dttid, mov_stack):
+    fn = os.path.join("DVV/MWCS/DVV", "%02i" % filterid,
+                      "%02i" % mwcsid, "%02i" % dttid,
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
+                      "%s.nc" % components)
+    if not os.path.isfile(fn):
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
+        raise FileNotFoundError(fn)
+    data = xr_create_or_open(fn, name="DVV")
+    data = data.DVV.to_dataframe().reorder_levels(['times', 'level1', 'level0']).unstack().droplevel(0, axis=1).unstack()
+    return data
 
 def wavg(group, dttname, errname):
     """
@@ -2618,6 +2985,78 @@ def compute_dvv(session, filterid, mov_stack, pairs=None, components=None, param
 
             try:
                 dtt = xr_get_dtt(s1, s2, comp, filterid, mov_stack)
+                all.append(dtt)
+            except FileNotFoundError:
+                traceback.print_exc()
+                continue
+    if not len(all):
+        raise ValueError
+    if len(all) == 1:
+        return all[0]
+    all = pd.concat(all)
+    percentiles = kwargs.get("percentiles", [.05, .10, .25, .5, .75, .90, .95])
+    stats = all.groupby(level=0).describe(percentiles=percentiles)
+    for c in ["m", "m0", "a"]:
+        stats[(c, "weighted_mean")], stats[(c, "weighted_std")] = get_wavgwstd(all, c, 'e'+c)
+        stats[(c, "trimmed_mean")], stats[(c, "trimmed_std")] = trim(all, c, kwargs.get("limits", None))
+
+    return stats.sort_index(axis=1)
+
+def compute_dvv2(session, filterid, mwcsid, dttid, mov_stack, pairs=None, components=None, params=None, method=None, **kwargs):
+    """
+    Compute DVV statistics for a given seismic session, filter ID, and movement stack. The method calculates various
+    statistical measures for DVV values based on the provided parameters.
+
+    :param session: Seismic session object.
+    :type session: object
+    :param filterid: ID of the filter.
+    :type filterid: str
+    :param mov_stack: Movement stack object.
+    :type mov_stack: object
+    :param pairs: List of station pairs. Defaults to None.
+    :type pairs: list, optional
+    :param components: Component(s) to compute DVV for. Defaults to None.
+    :type components: str, optional
+    :param params: Parameters object containing configuration settings. Defaults to None.
+    :type params: object, optional
+    :param method: Method to use for computation. Defaults to None.
+    :type method: str, optional
+    :param **kwargs: Additional keyword arguments
+    :return: DataFrame containing the computed statistical measures for DVV values.
+    :rtype: DataFrame
+    :raises ValueError: If no DVV values are computed.
+    """
+    if pairs == None:
+        pairs = []
+        for sta1, sta2 in get_station_pairs(session):
+            for loc1 in sta1.locs():
+                s1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
+                for loc2 in sta2.locs():
+                    s2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
+                    pairs.append((s1, s2))
+    all = []
+    for (s1, s2) in pairs:
+        if components == None:
+            if s1 == s2:
+                # if not provided, we'll load all:
+                comps = params.components_to_compute_single_station
+            else:
+                comps = params.components_to_compute
+        else:
+            if components.count(',') == 0:
+                comps = [components, ]
+            else:
+                comps = components.split(',')
+
+        for comp in comps:
+
+            if (s1 == s2) and (comp not in params.components_to_compute_single_station):
+                continue
+            if (s1 != s2) and (comp not in params.components_to_compute):
+                continue
+
+            try:
+                dtt = xr_get_dtt2(s1, s2, comp, filterid, mwcsid, dttid, mov_stack)
                 all.append(dtt)
             except FileNotFoundError:
                 traceback.print_exc()

@@ -175,7 +175,8 @@ class DvvMwcsView(ModelView):
 
     def mwcs_step(form, field):
         if field.data > form.data['mwcs_wlen']:
-            raise ValidationError("'mwcs_step' should be smaller or equal to 'mwcs_wlen'")
+            raise ValidationError("'mwcs_step' should be smaller or equal to"
+                                  " 'mwcs_wlen'")
 
     form_args = dict(
         mwcs_step=dict(validators=[mwcs_step]),
@@ -335,25 +336,10 @@ class FilterView(ModelView):
     view_title = "Filter Configuration"
     name = "filter"
 
-    def high(form, field):
-        if field.data < form.data['mwcs_high']:
-            raise ValidationError("'high' should be greater or equal than"
-                                  " 'mwcs_high'")
-
-    def mwcs_step(form, field):
-        if field.data > form.data['mwcs_wlen']:
-            raise ValidationError("'mwcs_step' should be smaller or equal to"
-                                  " 'mwcs_wlen'")
-    
-    form_args = dict(
-        high=dict(validators=[high]),
-        mwcs_step=dict(validators=[mwcs_step]),
-    )
-    
     column_list = ('ref', 'freqmin', 'freqmax',
-                    'mwcs_wlen', 'mwcs_step', 'dtt_minlag', 'dtt_width', 'dtt_v', 'used')
+                    'CC', 'SC', 'AC', 'used')
     form_columns = ('freqmin', 'freqmax',
-                    'mwcs_wlen', 'mwcs_step', 'dtt_minlag', 'dtt_width', 'dtt_v','used')
+                    'CC', 'SC', 'AC', 'used')
     
     def __init__(self, session, **kwargs):
         # You can pass name and other parameters if you want to

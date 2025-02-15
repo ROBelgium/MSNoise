@@ -301,18 +301,14 @@ def declare_tables(prefix=None):
         :param freqmin: The lower frequency bound of the Whiten function (in Hz)
         :type freqmax: float
         :param : The upper frequency bound of the Whiten function (in Hz)
-        :type mwcs_wlen: float
-        :param mwcs_wlen: Window length (in seconds) to perform MWCS
-        :type mwcs_step: float
-        :param mwcs_step: Step (in seconds) of the windowing procedure in MWCS
-        :type dtt_minlag: float
-        :param dtt_minlag: If ``dtt_lag`` =static (in config table): min lag time (in seconds)
-        :type dtt_width: float
-        :param dtt_width: Width of the time lag window (in seconds)
-        :type dtt_v: float
-        :param dtt_v: If ``dttlag`` =dynamic (in config table): what velocity to use to avoid ballistic waves [1.0] km/s (default=1.0)
+        :type CC: bool
+        :param CC: Compute cross-correlation functions between different pairs?
+        :type SC: bool
+        :param SC: Compute cross-correlation functions between different components of single station?
+        :type AC: bool
+        :param AC: Compute auto-correlation functions from single station components?        
         :type used: bool
-        :param used: Is the filter activated for the processing
+        :param used: Is the filter activated for the processing?
         """
 
         __incomplete_tablename__ = "filters"
@@ -320,11 +316,9 @@ def declare_tables(prefix=None):
         ref = Column(Integer, primary_key=True)
         freqmin = Column(Float())
         freqmax = Column(Float())
-        mwcs_wlen = Column(Float())
-        mwcs_step = Column(Float())
-        dtt_minlag = Column(Float())
-        dtt_width = Column(Float())
-        dtt_v = Column(Float())
+        CC = Column(Boolean(True))
+        SC = Column(Boolean(True))
+        AC = Column(Boolean(True))
         used = Column(Boolean(True))
 
         # Many-to-Many relationship with MWCS parameter sets
@@ -337,11 +331,6 @@ def declare_tables(prefix=None):
             """"""
             # self.freqmin = freqmin
             # self.freqmax = freqmax
-            # self.mwcs_wlen = mwcs_wlen
-            # self.mwcs_step = mwcs_step
-            # self.dtt_minlag = dtt_minlag
-            # self.dtt_width = dtt_width
-            # self.dtt_v = dtt_v
             # self.used = used
 
     ########################################################################

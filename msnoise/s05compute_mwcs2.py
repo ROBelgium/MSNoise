@@ -130,7 +130,10 @@ def main(loglevel="INFO"):
     logger.debug('Ready to compute')
     # Then we compute the jobs
     outfolders = []
-    filters = get_filters(db, all=False)
+    #filters = get_filters(db, all=False)
+    dvv_mwcs_params = get_dvv_mwcs_jobs(db, all=False)
+    logger.info(
+        "There are this many mwcs-dtt jobs  %f" % len(dvv_mwcs_params))
     time.sleep(np.random.random() * 5)
     smoothing_half_win= 5
     hanningwindow = get_window("hanning", smoothing_half_win)
@@ -148,190 +151,192 @@ def main(loglevel="INFO"):
 
         logger.info(
             "There are MWCS jobs for some days to recompute for %s" % pair)
-        for f in filters:
-            filterid = int(f.ref)
-            freqmin = f.freqmin
-            freqmax = f.freqmax
+        for filter_ref, mwcs_list in dvv_mwcs_params.items():
+            filterid = int(filter_ref)  
+            for mwcs_params in mwcs_list:
+                mwcsid = int(mwcs_params.ref)
+                freqmin = mwcs_params.freqmin
+                freqmax = mwcs_params.freqmax
 
-            def ww(a):
-                from .move2obspy import whiten
-                n = next_fast_len(len(a))
-                return whiten(a, n, 1./params.cc_sampling_rate,
-                              freqmin, freqmax, returntime=True)
-            ref_name = pair.replace(':', '_')
-            station1, station2 = pair.split(":")
-            
-            if station1 == station2:
-                components_to_compute = params.components_to_compute_single_station
-            else:
-                components_to_compute = params.components_to_compute
+                def ww(a):
+                    from .move2obspy import whiten
+                    n = next_fast_len(len(a))
+                    return whiten(a, n, 1./params.cc_sampling_rate,
+                                  freqmin, freqmax, returntime=True)
+                ref_name = pair.replace(':', '_')
+                station1, station2 = pair.split(":")
+                
+                if station1 == station2:
+                    components_to_compute = params.components_to_compute_single_station
+                else:
+                    components_to_compute = params.components_to_compute
 
 
-            for components in components_to_compute:
-                try:
-                    ref = xr_get_ref(station1, station2, components, filterid, taxis)
-                    ref = ref.CCF.values
-                except FileNotFoundError as fullpath:
-                    logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-                    continue
-                if not len(ref):
-                    continue
-                # print("Whitening ref")
-                # ref = ww(ref)
-
-                for mov_stack in mov_stacks:
-                    output = []
+                for components in components_to_compute:
                     try:
-                        data = xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis)
+                        ref = xr_get_ref(station1, station2, components, filterid, taxis)
+                        ref = ref.CCF.values
                     except FileNotFoundError as fullpath:
                         logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                         continue
-                    logger.debug("Processing %s:%s f%i m%s %s" % (station1, station2, filterid, mov_stack, components))
-                    # todo = data.index.intersection()
-                    # data = data.loc[todo]
+                    if not len(ref):
+                        continue
+                    # print("Whitening ref")
+                    # ref = ww(ref)
 
-                    to_search = pd.to_datetime(days)
-                    to_search = to_search.append(pd.DatetimeIndex([to_search[-1]+pd.Timedelta("1d"),]))
-                    # data = data[(data.index.floor('d').isin(to_search) or data.index.ceil('d').isin(to_search))]
-                    data = data[data.index.floor('d').isin(to_search)]
-                    data = data.dropna()
+                    for mov_stack in mov_stacks:
+                        output = []
+                        try:
+                            data = xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis)
+                        except FileNotFoundError as fullpath:
+                            logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+                            continue
+                        logger.debug("Processing %s:%s f%i m%s %s" % (station1, station2, filterid, mov_stack, components))
+                        # todo = data.index.intersection()
+                        # data = data.loc[todo]
 
-                    # print("Whitening %s" % fn)
-                    # data = pd.DataFrame(data)
-                    # data = data.apply(ww, axis=1, result_type="broadcast")
+                        to_search = pd.to_datetime(days)
+                        to_search = to_search.append(pd.DatetimeIndex([to_search[-1]+pd.Timedelta("1d"),]))
+                        # data = data[(data.index.floor('d').isin(to_search) or data.index.ceil('d').isin(to_search))]
+                        data = data[data.index.floor('d').isin(to_search)]
+                        data = data.dropna()
 
-                    # work on 2D mwcs:
-                    window_length_samples = int(
-                        f.mwcs_wlen * goal_sampling_rate)
+                        # print("Whitening %s" % fn)
+                        # data = pd.DataFrame(data)
+                        # data = data.apply(ww, axis=1, result_type="broadcast")
 
-                    padd = int(2 ** (nextpow2(window_length_samples) + 2))
+                        # work on 2D mwcs:
+                        window_length_samples = int(
+                            mwcs_params.mwcs_wlen * goal_sampling_rate)
 
-                    count = 0
-                    tp = cosine_taper(window_length_samples, 0.85)
-                    minind = 0
-                    maxind = window_length_samples
-                    step_samples = int(f.mwcs_step * goal_sampling_rate)
-                    if step_samples != (f.mwcs_step * goal_sampling_rate):
-                        logger.warning('mwcs_step of %g s incompatible with %i Hz sampling rate. Step size of %g s used instead' % 
-                                        (f.mwcs_step, goal_sampling_rate, step_samples/goal_sampling_rate))
+                        padd = int(2 ** (nextpow2(window_length_samples) + 2))
 
-                    freq_vec = sf.fftfreq(padd, 1. / goal_sampling_rate)[
-                               :padd // 2]
-                    # Find the values the frequency range of interest
-                    index_range = np.argwhere(
-                        np.logical_and(freq_vec >= freqmin,
-                                       freq_vec <= freqmax)).flatten()
-                    cci = np.empty((data.shape[0], window_length_samples))
-                    while maxind <= data.shape[1]:
-                        cci[:] = data.iloc[:,
-                                 minind:(minind + window_length_samples)].values
-                        scipy.signal.detrend(cci, type="linear", axis=1,
-                                             overwrite_data=True)
-                        for i in range(cci.shape[0]):
-                            cci[i] *= tp
+                        count = 0
+                        tp = cosine_taper(window_length_samples, 0.85)
+                        minind = 0
+                        maxind = window_length_samples
+                        step_samples = int(mwcs_params.mwcs_step * goal_sampling_rate)
+                        if step_samples != (mwcs_params.mwcs_step * goal_sampling_rate):
+                            logger.warning('mwcs_step of %g s incompatible with %i Hz sampling rate. Step size of %g s used instead' % 
+                                            (mwcs_params.mwcs_step, goal_sampling_rate, step_samples/goal_sampling_rate))
 
-                        cri = ref[
-                              minind:(minind + window_length_samples)].copy()
-                        scipy.signal.detrend(cri, type='linear',
-                                             overwrite_data=True)
-                        cri *= tp
+                        freq_vec = sf.fftfreq(padd, 1. / goal_sampling_rate)[
+                                :padd // 2]
+                        # Find the values the frequency range of interest
+                        index_range = np.argwhere(
+                            np.logical_and(freq_vec >= freqmin,
+                                        freq_vec <= freqmax)).flatten()
+                        cci = np.empty((data.shape[0], window_length_samples))
+                        while maxind <= data.shape[1]:
+                            cci[:] = data.iloc[:,
+                                    minind:(minind + window_length_samples)].values
+                            scipy.signal.detrend(cci, type="linear", axis=1,
+                                                overwrite_data=True)
+                            for i in range(cci.shape[0]):
+                                cci[i] *= tp
 
-                        minind += step_samples
-                        maxind += step_samples
+                            cri = ref[
+                                minind:(minind + window_length_samples)].copy()
+                            scipy.signal.detrend(cri, type='linear',
+                                                overwrite_data=True)
+                            cri *= tp
 
-                        fcur = sf.fft(cci, axis=1, n=padd)[:, :padd // 2]
-                        fref = sf.fft(cri, n=padd)[:padd // 2]
+                            minind += step_samples
+                            maxind += step_samples
 
-                        fcur2 = np.real(fcur) ** 2 + np.imag(fcur) ** 2
-                        fcur2 = fcur2.astype(float)
-                        fref2 = np.real(fref) ** 2 + np.imag(fref) ** 2
-                        fref2 = fref2.astype(float)
+                            fcur = sf.fft(cci, axis=1, n=padd)[:, :padd // 2]
+                            fref = sf.fft(cri, n=padd)[:padd // 2]
 
-                        X = fref * fcur.conj()
-                        if smoothing_half_win != 0:
-                            for i in range(fcur2.shape[0]):
-                                fcur2[i] = np.sqrt(
-                                    scipy.signal.convolve(fcur2[i],
-                                                          hanningwindow.real,
-                                                          "same"))
+                            fcur2 = np.real(fcur) ** 2 + np.imag(fcur) ** 2
+                            fcur2 = fcur2.astype(float)
+                            fref2 = np.real(fref) ** 2 + np.imag(fref) ** 2
+                            fref2 = fref2.astype(float)
 
-                            fref2 = np.sqrt(scipy.signal.convolve(fref2,
-                                                                  hanningwindow.real,
-                                                                  "same"))
+                            X = fref * fcur.conj()
+                            if smoothing_half_win != 0:
+                                for i in range(fcur2.shape[0]):
+                                    fcur2[i] = np.sqrt(
+                                        scipy.signal.convolve(fcur2[i],
+                                                            hanningwindow.real,
+                                                            "same"))
 
-                            for i in range(X.shape[0]):
-                                X[i] = scipy.signal.convolve(X[i],
-                                                             hanningwindow,
-                                                             "same")
+                                fref2 = np.sqrt(scipy.signal.convolve(fref2,
+                                                                    hanningwindow.real,
+                                                                    "same"))
 
-                        else:
-                            fcur2 = fcur2.apply(np.sqrt)
-                            fref2 = fref2.apply(np.sqrt)
+                                for i in range(X.shape[0]):
+                                    X[i] = scipy.signal.convolve(X[i],
+                                                                hanningwindow,
+                                                                "same")
 
-                        dcs = np.abs(X)
+                            else:
+                                fcur2 = fcur2.apply(np.sqrt)
+                                fref2 = fref2.apply(np.sqrt)
 
-                        # Get Coherence and its mean value
-                        W = []
-                        MCOH = []
-                        for i in range(dcs.shape[0]):
-                            coh = getCoherence(dcs[i, index_range],
-                                               fref2[index_range],
-                                               fcur2[i, index_range])
-                            mcoh = np.mean(coh)
-                            MCOH.append(np.real(mcoh))
-                            # Get Weights, avoid zero division here below:
-                            coh[coh==1] = 1.0-1e-9
-                            w = 1.0 / (1.0 / (coh ** 2) - 1.0)
-                            w[coh >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
-                            w = np.sqrt(w * np.sqrt(dcs[i][index_range]))
-                            w = np.real(w)
-                            W.append(w)
+                            dcs = np.abs(X)
 
-                        W = np.asarray(W)
-                        #                     # Frequency array:
-                        v = np.real(freq_vec[index_range]) * 2 * np.pi
+                            # Get Coherence and its mean value
+                            W = []
+                            MCOH = []
+                            for i in range(dcs.shape[0]):
+                                coh = getCoherence(dcs[i, index_range],
+                                                fref2[index_range],
+                                                fcur2[i, index_range])
+                                mcoh = np.mean(coh)
+                                MCOH.append(np.real(mcoh))
+                                # Get Weights, avoid zero division here below:
+                                coh[coh==1] = 1.0-1e-9
+                                w = 1.0 / (1.0 / (coh ** 2) - 1.0)
+                                w[coh >= 0.99] = 1.0 / (1.0 / 0.9801 - 1.0)
+                                w = np.sqrt(w * np.sqrt(dcs[i][index_range]))
+                                w = np.real(w)
+                                W.append(w)
 
-                        # Phase:
+                            W = np.asarray(W)
+                            #                     # Frequency array:
+                            v = np.real(freq_vec[index_range]) * 2 * np.pi
 
-                        phi = np.angle(X)
-                        phi = phi.astype(float)
-                        phi[:, 0] = 0.0
-                        phi = np.unwrap(phi, axis=1)
-                        phi = phi[:, index_range]
+                            # Phase:
 
-                        # Calculate the slope with a weighted least square linear regression
-                        # forced through the origin
-                        # weights for the WLS must be the variance !
+                            phi = np.angle(X)
+                            phi = phi.astype(float)
+                            phi[:, 0] = 0.0
+                            phi = np.unwrap(phi, axis=1)
+                            phi = phi[:, index_range]
 
-                        result = np.array([linear_regression(v.flatten(),
-                                                             phi[i].flatten(),
-                                                             W[i].flatten(),
-                                                             ) for i in
-                                           range(phi.shape[0])])
+                            # Calculate the slope with a weighted least square linear regression
+                            # forced through the origin
+                            # weights for the WLS must be the variance !
 
-                        M = result[:, 0]
-                        e = np.sum((phi - np.outer(M, v)) ** 2, axis=1) / (
-                                    len(v) - 1)
-                        s2x2 = np.sum(v ** 2 * W ** 2, axis=1)
-                        sx2 = np.sum(W * v ** 2, axis=1)
-                        E = np.sqrt(e * s2x2 / sx2 ** 2)
+                            result = np.array([linear_regression(v.flatten(),
+                                                                phi[i].flatten(),
+                                                                W[i].flatten(),
+                                                                ) for i in
+                                            range(phi.shape[0])])
 
-                        ti = -params.maxlag + f.mwcs_wlen / 2. + count * (step_samples/goal_sampling_rate)
-                        # print("Finished processing t_center=", ti, "s")
-                        S = pd.DataFrame(np.array([M, E, MCOH]).T,
-                                         index=data.index,
-                                         columns=["M", "EM", "MCOH"])
-                        S.columns = pd.MultiIndex.from_product(
-                            [[ti], S.columns])
-                        output.append(S)
-                        count += 1
-                        del fcur, fref, fcur2, fref2, result, cri
-                        del X
-                        del M, E, MCOH
-                    output = pd.concat(output, axis=1)
+                            M = result[:, 0]
+                            e = np.sum((phi - np.outer(M, v)) ** 2, axis=1) / (
+                                        len(v) - 1)
+                            s2x2 = np.sum(v ** 2 * W ** 2, axis=1)
+                            sx2 = np.sum(W * v ** 2, axis=1)
+                            E = np.sqrt(e * s2x2 / sx2 ** 2)
 
-                    xr_save_mwcs(station1, station2, components, filterid, mov_stack, taxis, output)
-                    del data, output
+                            ti = -params.maxlag + mwcs_params.mwcs_wlen / 2. + count * (step_samples/goal_sampling_rate)
+                            # print("Finished processing t_center=", ti, "s")
+                            S = pd.DataFrame(np.array([M, E, MCOH]).T,
+                                            index=data.index,
+                                            columns=["M", "EM", "MCOH"])
+                            S.columns = pd.MultiIndex.from_product(
+                                [[ti], S.columns])
+                            output.append(S)
+                            count += 1
+                            del fcur, fref, fcur2, fref2, result, cri
+                            del X
+                            del M, E, MCOH
+                        output = pd.concat(output, axis=1)
+
+                        xr_save_mwcs2(station1, station2, components, filterid, mwcsid, mov_stack, taxis, output)
+                        del data, output
 
         massive_update_job(db, jobs, "D")
         if not params.hpc:

@@ -20,7 +20,8 @@ from ..api import (connect, get_config, update_config, get_job_types,
                    get_stations, update_station, get_data_availability,
                    count_data_availability_flags, is_next_job, get_next_job,
                    Job, reset_jobs, build_ref_datelist, build_movstack_datelist,
-                   read_db_inifile)
+                   read_db_inifile, DvvMwcs, update_dvv_mwcs, get_dvv_mwcs,
+                   DvvMwcsDtt, update_dvv_mwcs_dtt, get_dvv_mwcs_dtt)
 from ..s01scan_archive import parse_crondays
 from ..s02new_jobs import main as new_jobs_main
 from ..s03compute_no_rotation import main as compute_cc_main
@@ -152,28 +153,24 @@ def test_004_set_and_get_filters():
     f = Filter()
     f.freqmin = 0.01
     f.freqmax = 1.0
-    f.mwcs_wlen = 10
-    f.mwcs_step = 5
-    f.dtt_minlag = 5
-    f.dtt_width = 30
-    f.dtt_v = 1
+    f.CC = True
+    f.SC = False
+    f.AC = False
     f.used = True
     filters.append(f)
     f = Filter()
     f.freqmin = 0.1
     f.freqmax = 1.0
-    f.mwcs_wlen = 10
-    f.mwcs_step = 5
-    f.dtt_minlag = 5
-    f.dtt_width = 30
-    f.dtt_v = 1
+    f.CC = False
+    f.SC = True
+    f.AC = True
     f.used = True
     filters.append(f)
     for f in filters:
-        update_filter(db, f.ref, f.freqmin, f.freqmax, f.mwcs_wlen, f.mwcs_step, f.dtt_minlag, f.dtt_width, f.dtt_v, f.used)
+        update_filter(db, f.ref, f.freqmin, f.freqmax, f.CC, f.SC, f.AC, f.used)
     dbfilters = get_filters(db)
     for i, filter in enumerate(dbfilters):
-        for param in ['freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'dtt_minlag', 'dtt_width', 'dtt_v', 'used']:
+        for param in ['freqmin', 'freqmax', 'CC', 'SC', 'AC', 'used']:
             assert eval(f"filter.{param}") == eval(f"filters[i].{param}")
 
 @pytest.mark.order(5)
@@ -367,19 +364,122 @@ def test_023_stack():
     db.close()
 
 @pytest.mark.order(24)
-def test_024_mwcs():
-    compute_mwcs_main()
+def test_024_mwcs_param_update():
+    db = connect()
+
+    dvv_mwcs_params = []
+
+    mwcs_param = DvvMwcs()
+    mwcs_param.freqmin = 0.2
+    mwcs_param.freqmax = 0.6
+    mwcs_param.mwcs_wlen = 10
+    mwcs_param.mwcs_step = 5
+    mwcs_param.used = True
+    dvv_mwcs_params.append(mwcs_param)
+    filter_refs = [1]
+    update_dvv_mwcs(db, mwcs_param.ref, mwcs_param.freqmin, mwcs_param.freqmax,
+                         mwcs_param.mwcs_wlen, mwcs_param.mwcs_step, mwcs_param.used, filter_refs)
+
+    mwcs_param = DvvMwcs()
+    mwcs_param.freqmin = 0.5
+    mwcs_param.freqmax = 0.9
+    mwcs_param.mwcs_wlen = 6
+    mwcs_param.mwcs_step = 3
+    mwcs_param.used = True
+    dvv_mwcs_params.append(mwcs_param)
+    filter_refs = [1,2]
+    update_dvv_mwcs(db, mwcs_param.ref, mwcs_param.freqmin, mwcs_param.freqmax,
+                         mwcs_param.mwcs_wlen, mwcs_param.mwcs_step, mwcs_param.used, filter_refs)  
+
+    db_dvv_mwcs = get_dvv_mwcs(db)
+
+    print("DEBUG: Retrieved MWCS params from DB:")
+    for mwcs in db_dvv_mwcs:
+        print(vars(mwcs))  # Print all attributes of MWCS objects
+
+    print("DEBUG: Expected MWCS params:")
+    for mwcs in dvv_mwcs_params:
+        print(vars(mwcs))  # Print expected attributes
+
+    for i, dvv_mwcs in enumerate(db_dvv_mwcs):
+        for param in ['freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used']:
+            db_value = getattr(dvv_mwcs, param, None)
+            expected_value = getattr(dvv_mwcs_params[i], param, None)
+
+            print(f"DEBUG: Checking {param}: DB = {db_value}, Expected = {expected_value}")
+
+            assert db_value == expected_value, f"Mismatch in {param}: DB={db_value}, Expected={expected_value}"
 
 @pytest.mark.order(25)
-def test_025_dtt():
-    compute_dtt_main()
+def test_025_mwcs():
+    compute_mwcs_main()
 
 @pytest.mark.order(26)
-def test_026_dvv():
-    compute_dvv_main()
+def test_026_mwcs_dtt_param_update():
+    db = connect()
+
+    dvv_mwcs_dtt_params = []
+
+    # First MWCS DTT parameter set
+    dtt_param = DvvMwcsDtt()
+    dtt_param.dtt_minlag = 5.0
+    dtt_param.dtt_width = 30.0
+    dtt_param.dtt_lag = "static"
+    dtt_param.dtt_v = 1.0
+    dtt_param.dtt_sides = "both"
+    dtt_param.dtt_mincoh = 0.5
+    dtt_param.dtt_maxerr = 0.2
+    dtt_param.dtt_maxdt = 2.0
+    dtt_param.used = True
+    dvv_mwcs_dtt_params.append(dtt_param)
+    mwcs_refs = [1,2]  # Linking to MWCS 1
+
+    update_dvv_mwcs_dtt(
+        db, dtt_param.ref, dtt_param.dtt_minlag, dtt_param.dtt_width, dtt_param.dtt_lag,
+        dtt_param.dtt_v, dtt_param.dtt_sides, dtt_param.dtt_mincoh,
+        dtt_param.dtt_maxerr, dtt_param.dtt_maxdt, dtt_param.used, mwcs_refs
+    )
+
+    # Second MWCS DTT parameter set linked to multiple MWCS sets
+    dtt_param = DvvMwcsDtt()
+    dtt_param.dtt_minlag = 6.0
+    dtt_param.dtt_width = 40.0
+    dtt_param.dtt_lag = "dynamic"
+    dtt_param.dtt_v = 1.0
+    dtt_param.dtt_sides = "left"
+    dtt_param.dtt_mincoh = 0.6
+    dtt_param.dtt_maxerr = 0.3
+    dtt_param.dtt_maxdt = 2.5
+    dtt_param.used = True
+    dvv_mwcs_dtt_params.append(dtt_param)
+    mwcs_refs = [2]  # Linking to MWCS 1 & 2
+
+    update_dvv_mwcs_dtt(
+        db, dtt_param.ref, dtt_param.dtt_minlag, dtt_param.dtt_width, dtt_param.dtt_lag,
+        dtt_param.dtt_v, dtt_param.dtt_sides, dtt_param.dtt_mincoh,
+        dtt_param.dtt_maxerr, dtt_param.dtt_maxdt, dtt_param.used, mwcs_refs
+    )
+
+    # Retrieve and validate stored parameters
+    db_dvv_mwcs_dtt = get_dvv_mwcs_dtt(db)
+
+    assert len(db_dvv_mwcs_dtt) == len(dvv_mwcs_dtt_params), "Mismatch in number of MWCS-DTT entries"
+
+    for i, dtt in enumerate(db_dvv_mwcs_dtt):
+        for param in ['dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
+                      'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used']:
+            assert getattr(dtt, param) == getattr(dvv_mwcs_dtt_params[i], param)
 
 @pytest.mark.order(27)
-def test_027_build_ref_datelist():
+def test_027_dtt():
+    compute_dtt_main()
+
+@pytest.mark.order(28)
+def test_028_dvv():
+    compute_dvv_main()
+
+@pytest.mark.order(29)
+def test_029_build_ref_datelist():
     from ..api import build_ref_datelist
     db = connect()
     start, end, datelist = build_ref_datelist(db)
@@ -388,8 +488,8 @@ def test_027_build_ref_datelist():
     assert len(datelist) == 731
     db.close()
 
-@pytest.mark.order(28)
-def test_028_build_movstack_datelist():
+@pytest.mark.order(30)
+def test_030_build_movstack_datelist():
     from ..api import build_movstack_datelist
     db = connect()
     start, end, datelist = build_movstack_datelist(db)
@@ -398,8 +498,8 @@ def test_028_build_movstack_datelist():
     assert len(datelist) == 731
     db.close()
 
-@pytest.mark.order(29)
-def test_029_stretching():
+@pytest.mark.order(31)
+def test_031_stretching():
     from ..stretch2 import main as stretch_main
     db = connect()
     update_config(db, "export_format", "MSEED")
@@ -407,8 +507,8 @@ def test_029_stretching():
     db.close()
     stretch_main()
 
-@pytest.mark.order(30)
-def test_030_create_fake_new_files(setup_environment):
+@pytest.mark.order(32)
+def test_032_create_fake_new_files(setup_environment):
     data_folder = setup_environment['data_folder']
     for f in sorted(glob.glob(os.path.join(data_folder, "2010", "*", "HHZ.D", "*"))):
         st = read(f)
@@ -432,8 +532,8 @@ def test_030_create_fake_new_files(setup_environment):
     assert jobs[1][0] == 3
     assert jobs[1][1] == 'T'
 
-@pytest.mark.order(31)
-def test_031_instrument_response(setup_environment):
+@pytest.mark.order(33)
+def test_033_instrument_response(setup_environment):
     db = connect()
     response_path = setup_environment['response_path']
     update_config(db, 'response_path', response_path)
@@ -442,13 +542,13 @@ def test_031_instrument_response(setup_environment):
     db.close()
     test_013_s03compute_cc()
 
-@pytest.mark.order(32)
-def test_032_wct():
+@pytest.mark.order(34)
+def test_034_wct():
     from ..s08compute_wct import main as compute_wct_main
     compute_wct_main()
   
-@pytest.mark.order(33)
-def test_033_validate_stack_data():
+@pytest.mark.order(35)
+def test_035_validate_stack_data():
     from ..api import validate_stack_data
     import xarray as xr
     import numpy as np
@@ -503,8 +603,8 @@ def test_033_validate_stack_data():
     assert is_valid
     assert message == "OK"
     
-@pytest.mark.order(34)
-def test_034_stack_validation_handling():
+@pytest.mark.order(36)
+def test_036_stack_validation_handling():
     from ..api import validate_stack_data
     import xarray as xr
     import numpy as np
