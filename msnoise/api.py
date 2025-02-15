@@ -22,7 +22,8 @@ import xarray as xr
 
 from . import DBConfigNotFoundError
 from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability, \
-    DvvMwcs, DvvMwcsDtt, filter_mwcs_assoc, mwcs_dtt_assoc
+    DvvMwcs, DvvMwcsDtt, DvvStretching, DvvWct, DvvWctDtt, filter_mwcs_assoc, \
+    mwcs_dtt_assoc, filter_stretching_assoc, filter_wct_assoc, wct_dtt_assoc
 
 
 def get_logger(name, loglevel=None, with_pid=False):
@@ -619,8 +620,185 @@ def update_dvv_mwcs_dtt(session, ref, dtt_minlag, dtt_width, dtt_lag, dtt_v,
     session.commit()
     return
 
-# NETWORK AND STATION
+# DVV STRETCHING
 
+def get_dvv_stretching_jobs(session, all=False):
+    """Get all stretching parameter sets linked to used filters."""
+
+    query = (
+        session.query(Filter.ref, DvvStretching)
+        .select_from(Filter)
+        .join(filter_stretching_assoc, Filter.ref == filter_stretching_assoc.c.filt_ref)
+        .join(DvvStretching, filter_stretching_assoc.c.dvv_stretching_ref == DvvStretching.ref)
+    )
+
+    if not all:
+        query = query.filter(Filter.used == True)
+    try:
+        results = query.all()
+    except Exception as e:
+        print(f"ERROR: Query failed with exception: {e}")
+        return {}
+
+    stretching_mapping = {}
+
+    for filter_ref, stretching in results:
+        if filter_ref not in stretching_mapping:
+            stretching_mapping[filter_ref] = []
+        
+        stretching_mapping[filter_ref].append(stretching)
+    return stretching_mapping
+
+
+def get_dvv_stretching(session, all=False):
+    """Retrieve all Stretching parameter sets as ORM objects."""
+    query = session.query(DvvStretching)
+
+    if not all:
+        query = query.filter(DvvStretching.used == True)
+
+    results = query.all()  # Returns ORM objects
+
+    return results 
+
+
+def update_dvv_stretching(session, ref, stretching_minlag, stretching_width, stretching_lag,
+                           stretching_v, stretching_sides, stretching_max, stretching_nsteps, used, filter_refs):
+    """Updates or Inserts a new Stretching parameter set in the database and links it to filters."""
+
+    stretching = session.query(DvvStretching).filter(DvvStretching.ref == ref).first()
+
+    if stretching is None:
+        stretching = DvvStretching()
+        stretching.stretching_minlag = stretching_minlag
+        stretching.stretching_width = stretching_width
+        stretching.stretching_lag = stretching_lag
+        stretching.stretching_v = stretching_v
+        stretching.stretching_sides = stretching_sides
+        stretching.stretching_max = stretching_max
+        stretching.stretching_nsteps = stretching_nsteps
+        stretching.used = used
+        session.add(stretching)
+        session.commit()
+    else:
+        stretching.stretching_minlag = stretching_minlag
+        stretching.stretching_width = stretching_width
+        stretching.stretching_lag = stretching_lag
+        stretching.stretching_v = stretching_v
+        stretching.stretching_sides = stretching_sides
+        stretching.stretching_max = stretching_max
+        stretching.stretching_nsteps = stretching_nsteps
+        stretching.used = used
+
+    stretching.filters = session.query(Filter).filter(Filter.ref.in_(filter_refs)).all()
+    session.commit()
+
+    return
+
+# DVV WCT
+
+def get_dvv_wct_jobs(session, all=False):
+    """Get all WCT parameter sets linked to used filters."""
+
+    query = (
+        session.query(Filter.ref, DvvWct)
+        .select_from(Filter)
+        .join(filter_wct_assoc, Filter.ref == filter_wct_assoc.c.filt_ref)
+        .join(DvvWct, filter_wct_assoc.c.dvv_wct_ref == DvvWct.ref)
+    )
+
+    if not all:
+        query = query.filter(Filter.used == True)
+
+    try:
+        results = query.all()
+    except Exception as e:
+        print(f"ERROR: Query failed with exception: {e}")
+        return {}
+
+    wct_mapping = {}
+
+    for filter_ref, wct in results:
+        if filter_ref not in wct_mapping:
+            wct_mapping[filter_ref] = []
+        
+        wct_mapping[filter_ref].append(wct)
+    return wct_mapping
+
+
+def get_dvv_wct(session, all=False):
+    """Retrieve all WCT parameter sets as ORM objects."""
+    query = session.query(DvvWct)
+
+    if not all:
+        query = query.filter(DvvWct.used == True)
+
+    results = query.all()
+
+    return results
+
+
+def update_dvv_wct(session, ref, wct_freqmin, wct_freqmax, wct_ns, wct_nt, wct_vpo, wct_nptsfreq,
+                    wct_norm, wavelet_type, used, filter_refs):
+    """Updates or Inserts a new WCT parameter set in the database and links it to filters."""
+
+    wct = session.query(DvvWct).filter(DvvWct.ref == ref).first()
+
+    if wct is None:
+        wct = DvvWct()
+        wct.wct_freqmin = wct_freqmin
+        wct.wct_freqmax = wct_freqmax
+        wct.wct_ns = wct_ns
+        wct.wct_nt = wct_nt
+        wct.wct_vpo = wct_vpo
+        wct.wct_nptsfreq = wct_nptsfreq
+        wct.wct_norm = wct_norm
+        wct.wavelet_type = wavelet_type
+        wct.used = used
+        session.add(wct)
+        session.commit()
+    else:
+        wct.wct_freqmin = wct_freqmin
+        wct.wct_freqmax = wct_freqmax
+        wct.wct_ns = wct_ns
+        wct.wct_nt = wct_nt
+        wct.wct_vpo = wct_vpo
+        wct.wct_nptsfreq = wct_nptsfreq
+        wct.wct_norm = wct_norm
+        wct.wavelet_type = wavelet_type
+        wct.used = used
+
+    wct.filters = session.query(Filter).filter(Filter.ref.in_(filter_refs)).all()
+    session.commit()
+
+    return
+
+def get_dvv_wct_dtt_jobs(session, all=False):
+    """Get all WCT DTT parameter sets linked to used WCT parameter sets."""
+    
+    query = (
+        session.query(Filter.ref, DvvWct.ref, DvvWctDtt)
+        .join(filter_wct_assoc, Filter.ref == filter_wct_assoc.c.filt_ref)  # Explicitly join filters
+        .join(DvvWct, filter_wct_assoc.c.dvv_wct_ref == DvvWct.ref)  # Join WCT parameters
+        .join(wct_dtt_assoc, DvvWct.ref == wct_dtt_assoc.c.dvv_wct_ref)  # Join WCT-DTT association
+        .join(DvvWctDtt, wct_dtt_assoc.c.dvv_wct_dtt_ref == DvvWctDtt.ref)  # Join WCT DTT parameters
+    )
+
+    if not all:
+        query = query.filter(DvvWct.used == True)
+
+    results = query.all()
+
+    wct_dtt_mapping = {}
+
+    for wct_ref, dtt in results:
+        if wct_ref not in wct_dtt_mapping:
+            wct_dtt_mapping[wct_ref] = []
+        wct_dtt_mapping[wct_ref].append(dtt)
+
+    return wct_dtt_mapping
+
+# NETWORK AND STATION
 
 def get_networks(session, all=False):
     """Get Networks from the database.

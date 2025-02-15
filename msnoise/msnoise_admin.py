@@ -294,10 +294,10 @@ class DvvWctView(ModelView):
     view_title = "Wavelet Transform Configuration for dv/v"
     name = "dvv_wct"
 
-    column_list = ('ref', 'filters', 'wct_ns', 'wct_nt', 'wct_vpo', 
+    column_list = ('ref', 'filters', 'wct_freqmin', 'wct_freqmax', 'wct_ns', 'wct_nt', 'wct_vpo', 
                    'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used')
     
-    form_columns = ('filters', 'wct_ns', 'wct_nt', 'wct_vpo', 
+    form_columns = ('filters', 'wct_freqmin', 'wct_freqmax', 'wct_ns', 'wct_nt', 'wct_vpo', 
                     'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used')
 
     # Formatter to display associated filters as a comma-separated list

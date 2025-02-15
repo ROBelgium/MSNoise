@@ -114,12 +114,10 @@ def declare_tables(prefix=None):
 
         :type ref: int
         :param ref: The id of the MWCS_params in the database
-        :type filt_ref: int
-        :param filt_ref: The id of the a filter in the filter table
         :type freqmin: float
         :param freqmin: The lower frequency bound to apply MWCS (in Hz)
         :type freqmax: float
-        :param : The upper frequency bound to apply MWCS (in Hz)        
+        :param freqmax: The upper frequency bound to apply MWCS (in Hz)        
         :type mwcs_wlen: float
         :param mwcs_wlen: Window length (in seconds) to perform MWCS
         :type mwcs_step: float
@@ -219,7 +217,6 @@ def declare_tables(prefix=None):
         __incomplete_tablename__ = "dvv_stretching"
 
         ref = Column(Integer, primary_key=True)
-        filt_ref = Column(Integer, ForeignKey('filters.ref'))
         stretching_minlag = Column(Float())
         stretching_width = Column(Float())
         stretching_lag = Column(String(255))
@@ -238,8 +235,10 @@ def declare_tables(prefix=None):
 
         :type ref: int
         :param ref: The id of the WCT parameters in the database
-        :type filt_ref: int
-        :param filt_ref: The id of a filter in the filter table
+        :type wct_freqmin: float
+        :param wct_freqmin: The lower frequency bound to apply MWCS (in Hz)
+        :type wct_freqmax: float
+        :param wct_freqmax: The upper frequency bound to apply MWCS (in Hz)    
         :type wct_ns: float
         :param wct_ns: Smoothing parameter in frequency
         :type wct_nt: float
@@ -259,7 +258,8 @@ def declare_tables(prefix=None):
         __incomplete_tablename__ = "dvv_wct"
 
         ref = Column(Integer, primary_key=True)
-        filt_ref = Column(Integer, ForeignKey('filters.ref'))
+        wct_freqmin = Column(Float())
+        wct_freqmax = Column(Float())
         wct_ns = Column(Float())
         wct_nt = Column(Float())
         wct_vpo = Column(Float())
@@ -273,6 +273,9 @@ def declare_tables(prefix=None):
 
         # Many-to-Many relationship with WCT DTT settings
         dtt_params = relationship("DvvWctDtt", secondary=wct_dtt_assoc, back_populates="wct_params")
+
+        def __str__(self):
+            return f"WCT Params {self.ref} ({self.wct_freqmin}-{self.wct_freqmax} Hz, wavelet_type:{self.wavelet_type})"
 
     class DvvWctDtt(PrefixerBase):
         """
@@ -307,7 +310,6 @@ def declare_tables(prefix=None):
         __incomplete_tablename__ = "dvv_wct_dtt"
 
         ref = Column(Integer, primary_key=True)
-        dvv_wct_ref = Column(Integer, ForeignKey('dvv_wct.ref'))
         wct_minlag = Column(Float())
         wct_width = Column(Float())
         wct_lag = Column(String(255))
