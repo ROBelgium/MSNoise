@@ -791,10 +791,14 @@ def get_dvv_wct_dtt_jobs(session, all=False):
 
     wct_dtt_mapping = {}
 
-    for wct_ref, dtt in results:
-        if wct_ref not in wct_dtt_mapping:
-            wct_dtt_mapping[wct_ref] = []
-        wct_dtt_mapping[wct_ref].append(dtt)
+    for filter_ref, wct_ref, dtt in results:
+        if filter_ref not in wct_dtt_mapping:
+            wct_dtt_mapping[filter_ref] = {}
+
+        if wct_ref not in wct_dtt_mapping[filter_ref]:
+            wct_dtt_mapping[filter_ref][wct_ref] = []
+
+        wct_dtt_mapping[filter_ref][wct_ref].append(dtt) 
 
     return wct_dtt_mapping
 
@@ -3280,6 +3284,147 @@ def xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_
     # Construct the file path
     fn = os.path.join("WCT", f"{filterid:02d}", f"{mov_stack[0]}_{mov_stack[1]}",
                       components, f"{station1}_{station2}.nc")
+
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(fn), exist_ok=True)
+
+    # Convert DataFrames to xarray.DataArrays
+    dvv_da = xr.DataArray(dvv_df.values, coords=[dvv_df.index, dvv_df.columns], dims=['times', 'frequency'])
+    err_da = xr.DataArray(err_df.values, coords=[err_df.index, err_df.columns], dims=['times', 'frequency'])
+    coh_da = xr.DataArray(coh_df.values, coords=[coh_df.index, coh_df.columns], dims=['times', 'frequency'])
+
+    # Combine into a single xarray.Dataset
+    ds = xr.Dataset({
+        'dvv': dvv_da,
+        'err': err_da,
+        'coh': coh_da
+    })
+
+    existing_ds = xr_create_or_open(fn, name="WCT")
+    updated_ds = xr_insert_or_update(existing_ds, ds)
+    xr_save_and_close(updated_ds, fn)
+
+
+    logging.debug(f"Saved WCT data to {fn}")
+    # Clean up
+    del dvv_da, err_da, coh_da, ds
+
+def xr_save_wct2(station1, station2, components, filterid, wctid, mov_stack, taxis, freqs, WXamp_list, WXcoh_list, WXdt_list, dates_list):
+    """
+    Save WCT results into an xarray Dataset and store it as a NetCDF file.
+
+    Parameters:
+    - station1, station2: str, Station pair
+    - components: str, Seismic component (e.g., ZZ)
+    - filterid: int, Filter reference ID
+    - wctid: int, WCT parameter ID
+    - mov_stack: tuple, Moving stack window (e.g., ('1d', '1d'))
+    - taxis, freqs: np.array, Time axis and frequency axis
+    - WXamp_list, Wcoh_list, WXdt_list: list of np.array, WCT outputs
+    - dates_list: list of datetime, Timestamps for each WCT calculation
+    """
+
+    # Convert lists to xarray DataArrays
+    WXamp_da = xr.DataArray(
+        data=np.array(WXamp_list),
+        dims=["times", "freqs", "taxis"],
+        coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
+        name="WXamp"
+    )
+
+    Wcoh_da = xr.DataArray(
+        data=np.array(WXcoh_list),
+        dims=["times", "freqs", "taxis"],
+        coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
+        name="Wcoh"
+    )
+
+    WXdt_da = xr.DataArray(
+        data=np.array(WXdt_list),
+        dims=["times", "freqs", "taxis"],
+        coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
+        name="WXdt"
+    )
+
+    # Combine into an xarray Dataset
+    ds = xr.Dataset({"WXamp": WXamp_da, "Wcoh": Wcoh_da, "WXdt": WXdt_da})
+
+    # Define output directory
+    fn = os.path.join("DVV/WCT/WCT", "%02i" % filterid, "%02i" % wctid, 
+                            "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components, 
+                            f"{station1}_{station2}.nc")
+    
+    os.makedirs(os.path.dirname(fn), exist_ok=True)
+
+    # Save to NetCDF
+    xr_save_and_close(ds, fn)
+    
+    print(f"Saved WCT data for {station1}-{station2} to {fn}")
+
+    # Cleanup memory
+    del ds, WXamp_da, Wcoh_da, WXdt_da
+
+def xr_load_wct(station1, station2, components, filterid, wctid, mov_stack):
+    """
+    Load WCT results from an xarray Dataset stored in a NetCDF file.
+
+    Parameters:
+    - station1, station2: str, Station pair
+    - components: str, Seismic component (e.g., ZZ)
+    - filterid: int, Filter reference ID
+    - wctid: int, WCT parameter ID
+    - mov_stack: tuple, Moving stack window (e.g., ('1d', '1d'))
+
+    Returns:
+    - ds: xarray.Dataset containing the WCT data (WXamp, Wcoh, WXdt)
+    """
+
+    # Construct the file path
+    fn = os.path.join(
+        "DVV/WCT/WCT", f"{filterid:02d}", f"{wctid:02d}",
+        f"{mov_stack[0]}_{mov_stack[1]}", components,
+        f"{station1}_{station2}.nc"
+    )
+
+    # Check if the file exists
+    if not os.path.exists(fn):
+        raise FileNotFoundError(f"File not found: {fn}")
+
+    # Load and return the dataset
+    ds = xr.load_dataset(fn)
+    return ds
+
+def xr_save_wct2(station1, station2, components, filterid, wctid, dttid, mov_stack, taxis, dvv_df, err_df, coh_df):
+    """
+    Save the Wavelet Coherence Transform (WCT) results as a NetCDF file.
+
+    :param station1: The first station in the pair.
+    :type station1: str
+    :param station2: The second station in the pair.
+    :type station2: str
+    :param components: The components (e.g., Z, N, E) being analyzed.
+    :type components: str
+    :param filterid: Filter ID used in the analysis.
+    :type filterid: int
+    :param mov_stack: Tuple of (start, end) representing the moving stack window.
+    :type mov_stack: tuple
+    :param taxis: Time axis corresponding to the WCT data.
+    :type taxis: array-like
+    :param dvv_df: DataFrame containing dvv data (2D).
+    :type dvv_df: pandas.DataFrame
+    :param err_df: DataFrame containing err data (2D).
+    :type err_df: pandas.DataFrame
+    :param coh_df: DataFrame containing coh data (2D).
+    :type coh_df: pandas.DataFrame
+    :returns: None
+    """
+
+    # Construct the file path
+    fn = os.path.join(
+        "DVV/WCT/DTT", f"{filterid:02d}", f"{wctid:02d}", f"{dttid:02d}",
+        f"{mov_stack[0]}_{mov_stack[1]}", components,
+        f"{station1}_{station2}.nc"
+    )
 
     # Ensure the directory exists
     os.makedirs(os.path.dirname(fn), exist_ok=True)

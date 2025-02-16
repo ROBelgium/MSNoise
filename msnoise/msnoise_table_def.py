@@ -310,6 +310,8 @@ def declare_tables(prefix=None):
         __incomplete_tablename__ = "dvv_wct_dtt"
 
         ref = Column(Integer, primary_key=True)
+        wct_dtt_freqmin = Column(Float())
+        wct_dtt_freqmax = Column(Float())
         wct_minlag = Column(Float())
         wct_width = Column(Float())
         wct_lag = Column(String(255))

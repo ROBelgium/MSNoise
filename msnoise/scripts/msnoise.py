@@ -1134,7 +1134,7 @@ def dvv_compute_dvv(ctx):
 @dvv.command(name='compute_wct')
 @click.pass_context
 def dvv_compute_wct(ctx):
-    """Computes the wavelet dv/v jobs based on the new STACK data"""
+    """Computes the wavelet jobs based on the new STACK data"""
     from ..s08compute_wct import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
@@ -1151,6 +1151,7 @@ def dvv_compute_wct(ctx):
             time.sleep(delay)
         for p in processes:
             p.join()
+
 
 @dvv.group(name="plot")
 def dvv_plot():

@@ -53,47 +53,7 @@ from .api import *
 import logbook
 import scipy
 import scipy.fft as sf
-
-def get_avgcoh(freqs, tvec, wcoh, freqmin, freqmax, lag_min=5, coda_cycles=20):
-    """
-    Calculate the average wavelet coherence over a specified frequency range and time lags.
-
-    :param freqs: A numpy array that represents frequency values.
-    :type freqs: numpy.ndarray
-    :param tvec: A time vector represented as a numpy array.
-    :type tvec: numpy.ndarray
-    :param wcoh: The wavelet coherence array, represented as a numpy array.
-    :type wcoh: numpy.ndarray
-    :param freqmin: The minimum frequency for coherence calculation, represented as a floating-point number.
-    :type freqmin: float
-    :param freqmax: The maximum frequency for coherence calculation, represented as a floating-point number.
-    :type freqmax: float
-    :param lag_min: The minimum lag in seconds for coherence calculation. This is optional and it defaults to 5.
-    :type lag_min: int, optional
-    :param coda_cycles: The number of coda cycles to consider. This is optional and it defaults to 20.
-    :type coda_cycles: int, optional
-    :returns: A numpy array of average coherence values computed over the specified frequency range and time lags.
-    :rtype: numpy.ndarray
-    """
-    inx = np.where((freqs>=freqmin) & (freqs<=freqmax)) 
-    coh = np.zeros(inx[0].shape) # Create empty vector for coherence
-
-    for ii, ifreq in enumerate(inx[0]): # Loop through frequencies index     
-        period = 1.0/freqs[ifreq]
-        lag_max = lag_min + (period*coda_cycles) 
-        tindex = np.where(((tvec >= -lag_max) & (tvec <= -lag_min)) | ((tvec >= lag_min) & (tvec <= lag_max)))[0] # Index of the coda
-
-        if len(tvec)>2: # check time vector size
-            if not np.any(wcoh[ifreq]): # check non-empty dt array
-                continue
-            c = np.nanmean(wcoh[ifreq][tindex])
-            coh[ii] = c
-
-        else:
-            logger.debug('not enough points to compute average coherence') #not sure why it would ever get here, but just in case.
-            coh[ii] = np.nan
-
-    return coh
+import ast
 
 def smoothCFS(cfs, scales, dt, ns, nt):
     """
@@ -175,77 +135,7 @@ def get_wavelet_type(wavelet_type):
     else:
         raise logger.error(f"Unknown wavelet type: {wavelet_name}")
 
-def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20, mincoh=0.5, maxdt=0.2, 
-            min_nonzero=0.25, freqmin=0.1, freqmax=2.0):
-    """
-    Compute the dv/v values and associated errors from the wavelet transform results.
-    Parameters
-    ----------
-    freqs : numpy.ndarray
-        Frequency values corresponding to the wavelet transform.
-    tvec : numpy.ndarray
-        Time vector.
-    WXamp : numpy.ndarray
-        Amplitude of the cross-wavelet transform.
-    Wcoh : numpy.ndarray
-        Wavelet coherence.
-    delta_t : numpy.ndarray
-        Time delays between signals.
-    lag_min : int, optional
-        Minimum lag in seconds. Default is 5.
-    coda_cycles : int, optional
-        Number of coda cycles to consider. Default is 20.
-    mincoh : float, optional
-        Minimum coherence value for weighting. Default is 0.5.
-    maxdt : float, optional
-        Maximum time delay for weighting. Default is 0.2.
-    min_nonzero : float, optional
-        Minimum percentage of non-zero weights required for valid estimation. Default is 0.25.
-    freqmin : float, optional
-        Minimum frequency for calculation. Default is 0.1 Hz.
-    freqmax : float, optional
-        Maximum frequency for calculation. Default is 2.0 Hz.
-    Returns
-    -------
-    tuple
-        dvv values (percentage), errors (percentage), and weighting function used.
-    """   
-    inx = np.where((freqs >= freqmin) & (freqs <= freqmax))  # Filter frequencies within the specified range
-    dvv, err = np.zeros(len(inx[0])), np.zeros(len(inx[0])) # Initialize dvv and err arrays
 
-    # Weighting function based on WXamp
-    weight_func = np.log(np.abs(WXamp)) / np.log(np.abs(WXamp)).max()
-    zero_idx = np.where((Wcoh < mincoh) | (delta_t > maxdt))
-    wf = (weight_func + abs(np.nanmin(weight_func))) / weight_func.max()
-    wf[zero_idx] = 0
-
-    # Loop through frequency indices for linear regression
-    for ii, ifreq in enumerate(inx[0]):
-        period = 1.0 / freqs[ifreq]
-        lag_max = lag_min + (period * coda_cycles)
-
-        # Coda selection
-        tindex = np.where(((tvec >= -lag_max) & (tvec <= -lag_min)) | ((tvec >= lag_min) & (tvec <= lag_max)))[0]
-
-        if len(tvec) > 2:
-            if not np.any(delta_t[ifreq]):
-                continue
-
-            delta_t[ifreq][tindex] = np.nan_to_num(delta_t[ifreq][tindex])
-            w = wf[ifreq]  # Weighting function for the specific frequency
-            w[~np.isfinite(w)] = 1.0
-
-            # Percentage of non-zero weights
-            nzc_perc = np.count_nonzero(w[tindex]) / len(tindex)
-            if nzc_perc >= min_nonzero:
-                m, em = linear_regression(tvec[tindex], delta_t[ifreq][tindex], w[tindex], intercept_origin=True)
-                dvv[ii], err[ii] = -m, em
-            else:
-                dvv[ii], err[ii] = np.nan, np.nan
-        else:
-            logger.debug('Not enough points to estimate dv/v for WCT')
-    
-    return dvv * 100, err * 100, wf
 
 def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqmax=8.0, nptsfreq=100, wavelet_type=('Morlet',6.)):
     """
@@ -346,6 +236,119 @@ def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqma
 
     return WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi
 
+def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20, mincoh=0.5, maxdt=0.2, 
+            min_nonzero=0.25, freqmin=0.1, freqmax=2.0):
+    """
+    Compute the dv/v values and associated errors from the wavelet transform results.
+    Parameters
+    ----------
+    freqs : numpy.ndarray
+        Frequency values corresponding to the wavelet transform.
+    tvec : numpy.ndarray
+        Time vector.
+    WXamp : numpy.ndarray
+        Amplitude of the cross-wavelet transform.
+    Wcoh : numpy.ndarray
+        Wavelet coherence.
+    delta_t : numpy.ndarray
+        Time delays between signals.
+    lag_min : int, optional
+        Minimum lag in seconds. Default is 5.
+    coda_cycles : int, optional
+        Number of coda cycles to consider. Default is 20.
+    mincoh : float, optional
+        Minimum coherence value for weighting. Default is 0.5.
+    maxdt : float, optional
+        Maximum time delay for weighting. Default is 0.2.
+    min_nonzero : float, optional
+        Minimum percentage of non-zero weights required for valid estimation. Default is 0.25.
+    freqmin : float, optional
+        Minimum frequency for calculation. Default is 0.1 Hz.
+    freqmax : float, optional
+        Maximum frequency for calculation. Default is 2.0 Hz.
+    Returns
+    -------
+    tuple
+        dvv values (percentage), errors (percentage), and weighting function used.
+    """   
+    inx = np.where((freqs >= freqmin) & (freqs <= freqmax))  # Filter frequencies within the specified range
+    dvv, err = np.zeros(len(inx[0])), np.zeros(len(inx[0])) # Initialize dvv and err arrays
+
+    # Weighting function based on WXamp
+    weight_func = np.log(np.abs(WXamp)) / np.log(np.abs(WXamp)).max()
+    zero_idx = np.where((Wcoh < mincoh) | (delta_t > maxdt))
+    wf = (weight_func + abs(np.nanmin(weight_func))) / weight_func.max()
+    wf[zero_idx] = 0
+
+    # Loop through frequency indices for linear regression
+    for ii, ifreq in enumerate(inx[0]):
+        period = 1.0 / freqs[ifreq]
+        lag_max = lag_min + (period * coda_cycles)
+
+        # Coda selection
+        tindex = np.where(((tvec >= -lag_max) & (tvec <= -lag_min)) | ((tvec >= lag_min) & (tvec <= lag_max)))[0]
+
+        if len(tvec) > 2:
+            if not np.any(delta_t[ifreq]):
+                continue
+
+            delta_t[ifreq][tindex] = np.nan_to_num(delta_t[ifreq][tindex])
+            w = wf[ifreq]  # Weighting function for the specific frequency
+            w[~np.isfinite(w)] = 1.0
+
+            # Percentage of non-zero weights
+            nzc_perc = np.count_nonzero(w[tindex]) / len(tindex)
+            if nzc_perc >= min_nonzero:
+                m, em = linear_regression(tvec[tindex], delta_t[ifreq][tindex], w[tindex], intercept_origin=True)
+                dvv[ii], err[ii] = -m, em
+            else:
+                dvv[ii], err[ii] = np.nan, np.nan
+        else:
+            logger.debug('Not enough points to estimate dv/v for WCT')
+    
+    return dvv * 100, err * 100, wf
+
+def get_avgcoh(freqs, tvec, wcoh, freqmin, freqmax, lag_min=5, coda_cycles=20):
+    """
+    Calculate the average wavelet coherence over a specified frequency range and time lags.
+
+    :param freqs: A numpy array that represents frequency values.
+    :type freqs: numpy.ndarray
+    :param tvec: A time vector represented as a numpy array.
+    :type tvec: numpy.ndarray
+    :param wcoh: The wavelet coherence array, represented as a numpy array.
+    :type wcoh: numpy.ndarray
+    :param freqmin: The minimum frequency for coherence calculation, represented as a floating-point number.
+    :type freqmin: float
+    :param freqmax: The maximum frequency for coherence calculation, represented as a floating-point number.
+    :type freqmax: float
+    :param lag_min: The minimum lag in seconds for coherence calculation. This is optional and it defaults to 5.
+    :type lag_min: int, optional
+    :param coda_cycles: The number of coda cycles to consider. This is optional and it defaults to 20.
+    :type coda_cycles: int, optional
+    :returns: A numpy array of average coherence values computed over the specified frequency range and time lags.
+    :rtype: numpy.ndarray
+    """
+    inx = np.where((freqs>=freqmin) & (freqs<=freqmax)) 
+    coh = np.zeros(inx[0].shape) # Create empty vector for coherence
+
+    for ii, ifreq in enumerate(inx[0]): # Loop through frequencies index     
+        period = 1.0/freqs[ifreq]
+        lag_max = lag_min + (period*coda_cycles) 
+        tindex = np.where(((tvec >= -lag_max) & (tvec <= -lag_min)) | ((tvec >= lag_min) & (tvec <= lag_max)))[0] # Index of the coda
+
+        if len(tvec)>2: # check time vector size
+            if not np.any(wcoh[ifreq]): # check non-empty dt array
+                continue
+            c = np.nanmean(wcoh[ifreq][tindex])
+            coh[ii] = c
+
+        else:
+            logger.debug('not enough points to compute average coherence') #not sure why it would ever get here, but just in case.
+            coh[ii] = np.nan
+
+    return coh
+
 def main(loglevel="INFO"):
     # Reconfigure logger to show the pid number in log records
     global logger
@@ -357,24 +360,17 @@ def main(loglevel="INFO"):
     params = get_params(db)
     taxis = get_t_axis(db)
 
-    ns = params.wct_ns
-    nt = params.wct_nt 
-    vpo = params.wct_vpo 
-    nptsfreq = params.wct_nptsfreq
-    coda_cycles = params.wct_codacycles 
-    min_nonzero = params.wct_min_nonzero
-    wct_norm = params.wct_norm
-    wavelet_type = params.wavelet_type
-    
     mov_stacks = params.mov_stack
     goal_sampling_rate = params.cc_sampling_rate
-    lag_min = params.wct_minlag
-    maxdt = params.wct_maxdt
-    mincoh = params.wct_mincoh
 
     logger.debug('Ready to compute')
     # Then we compute the jobs
-    filters = get_filters(db, all=False)
+    #filters = get_filters(db, all=False)
+
+    # Fetch all WCT and DTT parameter sets
+    dvv_wct_params = get_dvv_wct_jobs(db, all=False)
+    wct_dtt_params = get_dvv_wct_dtt_jobs(db, all=False)
+
     time.sleep(np.random.random() * 5)
 
     while is_dtt_next_job(db, flag='T', jobtype='WCT'):
@@ -391,75 +387,97 @@ def main(loglevel="INFO"):
 
         logger.info(
             "There are WCT jobs for some days to recompute for %s" % pair)
-        for f in filters:
-            filterid = int(f.ref)
-            freqmin = f.freqmin
-            freqmax = f.freqmax
+        for filter_ref, wct_list in dvv_wct_params.items():
+            filterid = int(filter_ref)  
+            for wct_params in wct_list:
+                wctid = int(wct_params.ref)
+                freqmin = wct_params.wct_freqmin
+                freqmax = wct_params.wct_freqmax
 
-            station1, station2 = pair.split(":")
-            if station1 == station2:
-                components_to_compute = params.components_to_compute_single_station
-            else:
-                components_to_compute = params.components_to_compute
+                ns = wct_params.wct_ns
+                nt = wct_params.wct_nt 
+                vpo = wct_params.wct_vpo 
+                nptsfreq = wct_params.wct_nptsfreq
+                wct_norm = wct_params.wct_norm
+                wavelet_type = wct_params.wavelet_type
 
-            for components in components_to_compute:
-                try:
-                    ref = xr_get_ref(station1, station2, components, filterid, taxis)
-                    ref = ref.CCF.values
-                    if wct_norm:
-                        ori_waveform = (ref/ref.max()) 
-                    else:
-                        ori_waveform = ref
-                except FileNotFoundError as fullpath:
-                    logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-                    continue
-                if not len(ref):
-                    continue
+                if isinstance(wavelet_type, str):  # If it's stored as a string, convert it
+                    wavelet_type = ast.literal_eval(wavelet_type)
 
-                for mov_stack in mov_stacks:
-                    dvv_list = []
-                    err_list = []
-                    coh_list = []
-                    data_dates=[]
-                    try:
-                        data = xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis)
-                    except FileNotFoundError as fullpath:
-                        logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-                        continue
-                    logger.debug("Processing %s:%s f%i m%s %s" % (station1, station2, filterid, mov_stack, components))
+                station1, station2 = pair.split(":")
+                if station1 == station2:
+                    components_to_compute = params.components_to_compute_single_station
+                else:
+                    components_to_compute = params.components_to_compute
 
-                    to_search = pd.to_datetime(days)
-                    to_search = to_search.append(pd.DatetimeIndex([to_search[-1]+pd.Timedelta("1d"),]))
-                    data = data[data.index.floor('d').isin(to_search)]
-                    data = data.dropna()
+                for dtt_params in wct_dtt_params[filterid][wctid]:
+                    dttid = int(dtt_params.ref)
 
-                    cur = data#.CCF.values
-                    if wct_norm:
-                        new_waveform = (cur/cur.max()) 
-                    else:
-                        new_waveform = cur
+                    freqmin = dtt_params.wct_dtt_freqmin
+                    freqmax = dtt_params.wct_dtt_freqmax
+                    coda_cycles = dtt_params.wct_codacycles 
+                    min_nonzero = dtt_params.wct_min_nonzero
+                    lag_min = dtt_params.wct_minlag
+                    maxdt = dtt_params.wct_maxdt
+                    mincoh = dtt_params.wct_mincoh
 
-                    for date, row in new_waveform.iterrows():
-                        WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi = xwt(ori_waveform, row.values, goal_sampling_rate, int(ns), int(nt), int(vpo), freqmin, freqmax, int(nptsfreq), wavelet_type)
-                        dvv, err, wf = compute_wct_dvv(freqs, taxis, WXamp, Wcoh, WXdt, lag_min=int(lag_min), coda_cycles=coda_cycles, mincoh=mincoh, maxdt=maxdt, min_nonzero=min_nonzero, freqmin=freqmin, freqmax=freqmax)
-                        coh = get_avgcoh(freqs, taxis, Wcoh, freqmin, freqmax, lag_min=int(lag_min), coda_cycles=coda_cycles)
-                        dvv_list.append(dvv)
-                        err_list.append(err)
-                        coh_list.append(coh)
-                        data_dates.append(date)
+                    for components in components_to_compute:
+                        try:
+                            ref = xr_get_ref(station1, station2, components, filterid, taxis)
+                            ref = ref.CCF.values
+                            if wct_norm:
+                                ori_waveform = (ref/ref.max()) 
+                            else:
+                                ori_waveform = ref
+                        except FileNotFoundError as fullpath:
+                            logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+                            continue
+                        if not len(ref):
+                            continue
 
-                    if len(dvv_list) > 0:#1:
-                        inx = np.where((freqs >= freqmin) & (freqs <= freqmax))
+                        for mov_stack in mov_stacks:
+                            try:
+                                data = xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis)
+                            except FileNotFoundError as fullpath:
+                                logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+                                continue
+                            logger.debug("Processing %s:%s f%i m%s %s" % (station1, station2, filterid, mov_stack, components))
 
-                        dvv_df = pd.DataFrame(dvv_list, columns=freqs[inx], index=data_dates)
-                        err_df = pd.DataFrame(err_list, columns=freqs[inx], index=data_dates)
-                        coh_df = pd.DataFrame(coh_list, columns=freqs[inx], index=data_dates)
+                            to_search = pd.to_datetime(days)
+                            to_search = to_search.append(pd.DatetimeIndex([to_search[-1]+pd.Timedelta("1d"),]))
+                            data = data[data.index.floor('d').isin(to_search)]
+                            data = data.dropna()
 
-                        # Saving
-                        xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_df, err_df, coh_df)
+                            cur = data#.CCF.values
+                            if wct_norm:
+                                new_waveform = (cur/cur.max()) 
+                            else:
+                                new_waveform = cur
 
-                        del dvv_df, err_df, coh_df
-                    del cur
+                            dvv_list, err_list, coh_list, dates_list = [], [], [], []
+
+                            for date, row in new_waveform.iterrows():
+                                WXamp, WXspec, WXangle, WXcoh, WXdt, freqs, coi = xwt(ori_waveform, row.values, goal_sampling_rate, int(ns), int(nt), int(vpo), freqmin, freqmax, int(nptsfreq), wavelet_type)
+                                
+                                dvv, err, _ = compute_wct_dvv(freqs, taxis, WXamp, WXcoh, WXdt, 
+                                                              lag_min=int(lag_min), coda_cycles=coda_cycles, 
+                                                              mincoh=mincoh, maxdt=maxdt, min_nonzero=min_nonzero, 
+                                                              freqmin=freqmin, freqmax=freqmax)
+
+                                coh = get_avgcoh(freqs, taxis, WXcoh, freqmin, freqmax, lag_min=int(lag_min), coda_cycles=coda_cycles)
+
+                                dvv_list.append(dvv)
+                                err_list.append(err)
+                                coh_list.append(coh)
+                                dates_list.append(date)
+
+                            if len(dvv_list) > 0:
+                                dvv_df = pd.DataFrame(dvv_list, columns=freqs, index=dates_list)
+                                err_df = pd.DataFrame(err_list, columns=freqs, index=dates_list)
+                                coh_df = pd.DataFrame(coh_list, columns=freqs, index=dates_list)
+                            
+                                xr_save_wct2(station1, station2, components, filterid, wctid, dttid, mov_stack, taxis, dvv_df, err_df, coh_df)
+
 
         massive_update_job(db, jobs, "D")
 

@@ -326,11 +326,11 @@ class DvvWctDttView(ModelView):
     view_title = "DTT parameters Configuration for dv/v with WCT"
     name = "dvv_wct_dtt"
 
-    column_list = ('ref', 'wct_params', 'wct_minlag', 'wct_width', 
+    column_list = ('ref', 'wct_params', 'wct_dtt_freqmin', 'wct_dtt_freqmax', 'wct_minlag', 'wct_width', 
                    'wct_lag', 'wct_v', 'wct_sides', 'wct_mincoh', 
                    'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used')
     
-    form_columns = ('wct_params', 'wct_minlag', 'wct_width', 
+    form_columns = ('wct_params', 'wct_dtt_freqmin', 'wct_dtt_freqmax', 'wct_minlag', 'wct_width', 
                     'wct_lag', 'wct_v', 'wct_sides', 'wct_mincoh', 
                     'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used')
 
