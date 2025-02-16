@@ -171,7 +171,9 @@ def main(loglevel="INFO"):
         logger.info(
             "There are STR (stretching) jobs for some days to recompute for %s" % pair)
         for filter_ref, stretching_list in dvv_stretching_params.items():
-            filterid = int(filter_ref)  
+            filterid = int(filter_ref)
+            filt_components, filt_components_single_station = get_filter_components_to_compute(db, filterid, params)
+            filt_all_components = np.unique(filt_components + filt_components_single_station)    
             for str_params in stretching_list:
                 strid = int(str_params.ref)
                 #low = f.freqmin
@@ -182,7 +184,7 @@ def main(loglevel="INFO"):
                 #    n = next_fast_len(len(a))
                 #    return whiten(a, n, 1./params.cc_sampling_rate,
                 #                low, high, returntime=True)
-                for components in params.all_components:
+                for components in filt_all_components:
                     ref_name = pair.replace(':', '_')
                     station1, station2 = pair.split(":")
                     try:

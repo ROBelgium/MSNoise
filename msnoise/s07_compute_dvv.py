@@ -22,13 +22,15 @@ def main(interval=1, loglevel="INFO"):
 
     for filter_ref, mwcs_list in mwcs_dtt_params.items():
         filterid = int(filter_ref)
+        filt_components, filt_components_single_station = get_filter_components_to_compute(db, filterid, params)
+        filt_all_components = np.unique(filt_components + filt_components_single_station)    
         for mwcs_ref, mwcs_list in mwcs_list.items():
             mwcsid = int(mwcs_ref)
             for dtt_params in mwcs_list:
                 dttid = int(dtt_params.ref)
 
                 for mov_stack in mov_stacks:
-                    for components in params.all_components:
+                    for components in filt_all_components:
                         logger.debug("Processing f%i m%s %s" % (filterid,   mov_stack, components))
                         try:
                             dvv = compute_dvv2(db, filterid, mwcsid, dttid, mov_stack, pairs=None,

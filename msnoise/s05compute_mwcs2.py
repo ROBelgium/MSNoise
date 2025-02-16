@@ -152,7 +152,9 @@ def main(loglevel="INFO"):
         logger.info(
             "There are MWCS jobs for some days to recompute for %s" % pair)
         for filter_ref, mwcs_list in dvv_mwcs_params.items():
-            filterid = int(filter_ref)  
+            filterid = int(filter_ref)
+            filt_components, filt_components_single_station = get_filter_components_to_compute(db, filterid, params)  
+            
             for mwcs_params in mwcs_list:
                 mwcsid = int(mwcs_params.ref)
                 freqmin = mwcs_params.freqmin
@@ -167,9 +169,9 @@ def main(loglevel="INFO"):
                 station1, station2 = pair.split(":")
                 
                 if station1 == station2:
-                    components_to_compute = params.components_to_compute_single_station
+                    components_to_compute = filt_components_single_station
                 else:
-                    components_to_compute = params.components_to_compute
+                    components_to_compute = filt_components
 
 
                 for components in components_to_compute:

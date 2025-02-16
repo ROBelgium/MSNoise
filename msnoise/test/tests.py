@@ -156,14 +156,14 @@ def test_004_set_and_get_filters():
     f.freqmin = 0.01
     f.freqmax = 1.0
     f.CC = True
-    f.SC = False
-    f.AC = False
+    f.SC = True
+    f.AC = True
     f.used = True
     filters.append(f)
     f = Filter()
     f.freqmin = 0.1
     f.freqmax = 1.0
-    f.CC = False
+    f.CC = True
     f.SC = True
     f.AC = True
     f.used = True

@@ -170,8 +170,8 @@ def test_004_set_and_get_filters():
     f.freqmin = 1
     f.freqmax = 5
     f.CC = True
-    f.SC = False
-    f.AC = False
+    f.SC = True
+    f.AC = True
     f.used = True
     filters.append(f)
 

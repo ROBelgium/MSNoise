@@ -389,6 +389,7 @@ def main(loglevel="INFO"):
             "There are WCT jobs for some days to recompute for %s" % pair)
         for filter_ref, wct_list in dvv_wct_params.items():
             filterid = int(filter_ref)  
+            filt_components, filt_components_single_station = get_filter_components_to_compute(db, filterid, params)
             for wct_params in wct_list:
                 wctid = int(wct_params.ref)
                 freqmin = wct_params.wct_freqmin
@@ -406,9 +407,9 @@ def main(loglevel="INFO"):
 
                 station1, station2 = pair.split(":")
                 if station1 == station2:
-                    components_to_compute = params.components_to_compute_single_station
+                    components_to_compute = filt_components_single_station
                 else:
-                    components_to_compute = params.components_to_compute
+                    components_to_compute = filt_components
 
                 for dtt_params in wct_dtt_params[filterid][wctid]:
                     dttid = int(dtt_params.ref)

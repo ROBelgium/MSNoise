@@ -66,14 +66,15 @@ def main(interval=1, loglevel="INFO"):
             "There are DTT jobs for some days to recompute for %s" % pair)
         for filter_ref, mwcs_list in mwcs_dtt_params.items():
             filterid = int(filter_ref)
+            filt_components, filt_components_single_station = get_filter_components_to_compute(db, filterid, params)
             for mwcs_ref, mwcs_list in mwcs_list.items():
                 mwcsid = int(mwcs_ref)
                 for dtt_params in mwcs_list:
                     dttid = int(dtt_params.ref)
                     if station1 == station2:
-                        components_to_compute = params.components_to_compute_single_station
+                        components_to_compute = filt_components_single_station
                     else:
-                        components_to_compute = params.components_to_compute
+                        components_to_compute = filt_components
 
                     for components in components_to_compute:
                         for mov_stack in mov_stacks:

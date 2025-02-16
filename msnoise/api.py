@@ -2158,6 +2158,54 @@ def get_components_to_compute_single_station(session, plugin=None):
         components_to_compute = components_to_compute.split(",")
     return list(np.unique([''.join(sorted(a)) for a in components_to_compute]))
 
+def get_filter_components_to_compute(session, filterid, params):
+    """
+    Returns the components to compute for a specific filter based on whether CC, SC, or AC are enabled.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as obtained by :func:`connect`
+
+    :type filterid: int
+    :param filterid: The ID of the filter to get components for.
+
+    :type params: obspy.core.util.attribdict.AttribDict
+    :param params: A parameters object containing components_to_compute and components_to_compute_single_station.
+
+    :rtype: tuple of lists
+    :returns: (components_to_compute, components_to_compute_single_station)
+    """
+
+    # Get the filter object
+    filter_obj = session.query(Filter).filter(Filter.ref == filterid).first()
+    if not filter_obj:
+        return [], []
+
+    # Get the global component lists
+    global_components = params.components_to_compute
+    global_components_single_station = params.components_to_compute_single_station
+
+    # Initialize empty lists for selected components
+    filt_components = []
+    filt_components_single_station = []
+
+    # **Filter components based on filter settings**
+    if filter_obj.CC:
+        filt_components.extend(global_components)
+
+    if filter_obj.SC or filter_obj.AC:
+        for comp in global_components_single_station:
+            if comp[0] == comp[1]:  # Auto-correlation (AC) → same component (e.g., ZZ, EE, NN)
+                if filter_obj.AC:
+                    filt_components_single_station.append(comp)
+            else:  # Cross-component (SC) → different components (e.g., ZN, EZ, NE)
+                if filter_obj.SC:
+                    filt_components_single_station.append(comp)
+
+    # Remove duplicates and sort for consistency
+    filt_components = list(np.unique(filt_components))
+    filt_components_single_station = list(np.unique(filt_components_single_station))
+
+    return filt_components, filt_components_single_station
 
 def build_ref_datelist(session):
     """
@@ -3214,6 +3262,7 @@ def compute_dvv(session, filterid, mov_stack, pairs=None, components=None, param
     :rtype: DataFrame
     :raises ValueError: If no DVV values are computed.
     """
+   
     if pairs == None:
         pairs = []
         for sta1, sta2 in get_station_pairs(session):
