@@ -215,6 +215,7 @@ def declare_tables(prefix=None):
         """
 
         __incomplete_tablename__ = "dvv_stretching"
+        
 
         ref = Column(Integer, primary_key=True)
         stretching_minlag = Column(Float())

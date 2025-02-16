@@ -171,7 +171,7 @@ class GenericView(BaseView):
 
 class DvvMwcsView(ModelView):
     view_title = "MWCS Configuration for dv/v"
-    name = "dvv_mwcs"
+    name = "MWCS config"
 
     def mwcs_step(form, field):
         if field.data > form.data['mwcs_wlen']:
@@ -210,7 +210,7 @@ class DvvMwcsView(ModelView):
 
 class DvvMwcsDttView(ModelView):
     view_title = "DTT parameters Configuration for dv/v with MWCS"
-    name = "dvv_mwcs_dtt"
+    name = "Moving-Window Cross-Spectral (MWCS) dtt config"
 
     column_list = ('ref', 'mwcs_params', 'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
                     'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
@@ -258,7 +258,7 @@ class DvvMwcsDttView(ModelView):
 
 class DvvStretchingView(ModelView):
     view_title = "Stretching Configuration for dv/v"
-    name = "dvv_stretching"
+    name = "Stretching config"
 
     column_list = ('ref', 'filters', 'stretching_minlag', 'stretching_width', 
                    'stretching_lag', 'stretching_v', 'stretching_sides', 
@@ -274,6 +274,20 @@ class DvvStretchingView(ModelView):
 
     column_formatters = {
         'filters': _filters_formatter,
+    }
+
+    # Define the dropdown fields explicitly
+    form_extra_fields = {
+        'stretching_lag': SelectField(
+            'Stretching Lag',
+            choices=[('static', 'Static'), ('dynamic', 'Dynamic')],
+            default='static'
+        ),
+        'stretching_sides': SelectField(
+            'Stretching Sides',
+            choices=[('both', 'Both'), ('left', 'Left'), ('right', 'Right')],
+            default='both'
+        )
     }
 
     def __init__(self, session, **kwargs):
@@ -292,8 +306,7 @@ class DvvStretchingView(ModelView):
     
 class DvvWctView(ModelView):
     view_title = "Wavelet Transform Configuration for dv/v"
-    name = "dvv_wct"
-
+    name = "Wavelet transform (WCT) config"
     column_list = ('ref', 'filters', 'wct_freqmin', 'wct_freqmax', 'wct_ns', 'wct_nt', 'wct_vpo', 
                    'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used')
     
@@ -324,7 +337,7 @@ class DvvWctView(ModelView):
     
 class DvvWctDttView(ModelView):
     view_title = "DTT parameters Configuration for dv/v with WCT"
-    name = "dvv_wct_dtt"
+    name = "Wavelet transform (WCT) dtt config"
 
     column_list = ('ref', 'wct_params', 'wct_dtt_freqmin', 'wct_dtt_freqmax', 'wct_minlag', 'wct_width', 
                    'wct_lag', 'wct_v', 'wct_sides', 'wct_mincoh', 
@@ -333,6 +346,20 @@ class DvvWctDttView(ModelView):
     form_columns = ('wct_params', 'wct_dtt_freqmin', 'wct_dtt_freqmax', 'wct_minlag', 'wct_width', 
                     'wct_lag', 'wct_v', 'wct_sides', 'wct_mincoh', 
                     'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used')
+
+    # Define the dropdown fields explicitly
+    form_extra_fields = {
+        'wct_lag': SelectField(
+            'WCT Lag',
+            choices=[('static', 'Static'), ('dynamic', 'Dynamic')],
+            default='static'
+        ),
+        'wct_sides': SelectField(
+            'Stretching Sides',
+            choices=[('both', 'Both'), ('left', 'Left'), ('right', 'Right')],
+            default='both'
+        )
+    }
 
     # Formatter to display associated mwcs params as a comma-separated list
     def _wctparams_formatter(view, context, model, name):
@@ -1181,17 +1208,17 @@ def get_app():
         jinja2.FileSystemLoader(template_folders),
     ])
 
-    admin.add_view(StationView(db, endpoint='stations', category='Configuration'))
-    admin.add_view(FilterView(db, endpoint='filters', category='Configuration'))
-    admin.add_view(ConfigView(db, endpoint='config', category='Configuration'))
+    admin.add_view(StationView(db, endpoint='stations', category='CC Config', name = 'Stations'))
+    admin.add_view(FilterView(db, endpoint='filters', category='CC Config', name='Filters'))
+    admin.add_view(ConfigView(db, endpoint='config', category='CC Config'))
 
-    admin.add_view(DvvMwcsView(db, endpoint='dvv_mwcs', category='Configuration'))
-    admin.add_view(DvvMwcsDttView(db, endpoint='dvv_mwcs_dtt', category='Configuration'))
+    admin.add_view(DvvMwcsView(db, endpoint='dvv_mwcs', category='DVV Config', name='MWCS'))
+    admin.add_view(DvvMwcsDttView(db, endpoint='dvv_mwcs_dtt', category='DVV Config', name='MWCS dt/t'))
 
-    admin.add_view(DvvWctView(db, endpoint='dvv_wct', category='Configuration'))
-    admin.add_view(DvvWctDttView(db, endpoint='dvv_wct_dtt', category='Configuration'))
+    admin.add_view(DvvWctView(db, endpoint='dvv_wct', category='DVV Config', name='Wavelet Transform (WCT)'))
+    admin.add_view(DvvWctDttView(db, endpoint='dvv_wct_dtt', category='DVV Config', name='Wavelet Transform (WCT) dt/t'))
 
-    admin.add_view(DvvStretchingView(db, endpoint='dvv_stretching', category='Configuration'))
+    admin.add_view(DvvStretchingView(db, endpoint='dvv_stretching', category='DVV Config', name='Stretching'))
    
 
     admin.add_view(DataAvailabilityView(db, endpoint='data_availability',
