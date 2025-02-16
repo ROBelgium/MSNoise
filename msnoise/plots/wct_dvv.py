@@ -170,8 +170,9 @@ def create_folder(folder_path, logger):
     except FileExistsError:
         pass
 
-def xr_get_wct_pair(pair, components, filterid, mov_stack, logger):
-    fn = os.path.join("WCT", "%02i" % filterid,
+def xr_get_wct_pair(pair, components, filterid, wctid, dttid, mov_stack, logger):
+    fn = os.path.join("DVV/WCT/DTT", "%02i" % filterid,
+                      "%02i" % wctid, "%02i" % dttid,
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components, "%s.nc" % (pair))
     if not os.path.isfile(fn):
@@ -184,8 +185,9 @@ def xr_get_wct_pair(pair, components, filterid, mov_stack, logger):
     data = data.to_dataframe().unstack(level='frequency')
     return data
 
-def xr_get_wct(components, filterid, mov_stack, logger):
-    fn = os.path.join("WCT", "%02i" % filterid,
+def xr_get_wct(components, filterid, wctid, dttid, mov_stack, logger):
+    fn = os.path.join("DVV/WCT/DTT", "%02i" % filterid,
+                      "%02i" % wctid, "%02i" % dttid,
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components, "*.nc" )
     matching_files = glob.glob(fn)
@@ -213,13 +215,20 @@ def validate_and_adjust_date(date_string, end_date, logger):
             return None
     return start_date
 
-def main(mov_stackid=None, components='ZZ', filterid=1,
+def main(mov_stackid=None, components='ZZ', filterid=1, wctid=1, dttid=1,
         pairs=[], showALL=False, start="1970-01-01", end="2100-01-01", visualize='dvv', ranges="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]", show=True,outfile=None, loglevel="INFO"):
     logger = get_logger('msnoise.cc_dvv_plot_dvv', loglevel,
                         with_pid=True)
     db = connect()
     params = get_params(db)
-    mincoh = params.wct_mincoh
+
+    session = connect()
+    dvv_wct_dtt = session.query(DvvWctDtt).filter(DvvWctDtt.ref == dttid).first()
+
+    if dvv_wct_dtt is None:
+        raise ValueError(f"No WCT-DTT parameters found for dttid={dttid}")
+
+    mincoh = dvv_wct_dtt.wct_mincoh 
 
     # Check start and end dates
     if start == "1970-01-01":
@@ -254,19 +263,18 @@ def main(mov_stackid=None, components='ZZ', filterid=1,
     else:
         components = [components, ]
 
-    filter = get_filters(db, ref=filterid)
-    low = float(filter.freqmin)
-    high = float(filter.freqmax)
+    low = float(dvv_wct_dtt.wct_dtt_freqmin)
+    high = float(dvv_wct_dtt.wct_dtt_freqmax)
 
     for i, mov_stack in enumerate(mov_stacks):
         for comps in components:
             # Get the data
             if not pairs:
-                dvv = xr_get_wct(comps, filterid, mov_stack, logger)
+                dvv = xr_get_wct(comps, filterid, wctid, dttid, mov_stack, logger)
                 pairs = ["all stations",]
             else:
                 try:
-                    dvv = xr_get_wct_pair(pairs, comps, filterid, mov_stack, logger)    
+                    dvv = xr_get_wct_pair(pairs, comps, filterid, wctid, dttid, mov_stack, logger)    
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue

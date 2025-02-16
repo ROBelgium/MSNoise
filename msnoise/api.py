@@ -802,6 +802,84 @@ def get_dvv_wct_dtt_jobs(session, all=False):
 
     return wct_dtt_mapping
 
+def update_dvv_wct_dtt(session, ref, wct_dtt_freqmin, wct_dtt_freqmax, wct_minlag, wct_width,
+                       wct_lag, wct_v, wct_sides, wct_mincoh, wct_maxdt, wct_codacycles,
+                       wct_min_nonzero, used, wct_refs):
+    """
+    Updates or Inserts a new WCT-DTT parameter set in the database and links it to WCT parameter sets.
+
+    Parameters:
+    - session: SQLAlchemy session object.
+    - ref: int, Reference ID for the WCT-DTT parameter set.
+    - wct_dtt_freqmin, wct_dtt_freqmax: float, Frequency bounds.
+    - wct_minlag: float, Minimum lag time (seconds).
+    - wct_width: float, Width of the time lag window (seconds).
+    - wct_lag: str, Lag window definition ('static' or 'dynamic').
+    - wct_v: float, Velocity parameter for dynamic lag calculation.
+    - wct_sides: str, Which sides to use ('both', 'left', 'right').
+    - wct_mincoh: float, Minimum coherence threshold.
+    - wct_maxdt: float, Maximum time delay (seconds).
+    - wct_codacycles: int, Number of cycles between lag_min and lag_max.
+    - wct_min_nonzero: float, Minimum nonzero weighting percentage for regression.
+    - used: bool, Whether the parameter set is activated.
+    - wct_refs: list, References to `DvvWct` parameter sets.
+
+    Returns:
+    - None
+    """
+
+    # Check if the WCT-DTT parameter set already exists
+    wct_dtt = session.query(DvvWctDtt).filter(DvvWctDtt.ref == ref).first()
+
+    if wct_dtt is None:
+        # If not found, create a new one
+        wct_dtt = DvvWctDtt()
+        wct_dtt.wct_dtt_freqmin = wct_dtt_freqmin
+        wct_dtt.wct_dtt_freqmax = wct_dtt_freqmax
+        wct_dtt.wct_minlag = wct_minlag
+        wct_dtt.wct_width = wct_width
+        wct_dtt.wct_lag = wct_lag
+        wct_dtt.wct_v = wct_v
+        wct_dtt.wct_sides = wct_sides
+        wct_dtt.wct_mincoh = wct_mincoh
+        wct_dtt.wct_maxdt = wct_maxdt
+        wct_dtt.wct_codacycles = wct_codacycles
+        wct_dtt.wct_min_nonzero = wct_min_nonzero
+        wct_dtt.used = used
+        session.add(wct_dtt)
+        session.commit()
+    else:
+        # Update existing entry
+        wct_dtt.wct_dtt_freqmin = wct_dtt_freqmin
+        wct_dtt.wct_dtt_freqmax = wct_dtt_freqmax
+        wct_dtt.wct_minlag = wct_minlag
+        wct_dtt.wct_width = wct_width
+        wct_dtt.wct_lag = wct_lag
+        wct_dtt.wct_v = wct_v
+        wct_dtt.wct_sides = wct_sides
+        wct_dtt.wct_mincoh = wct_mincoh
+        wct_dtt.wct_maxdt = wct_maxdt
+        wct_dtt.wct_codacycles = wct_codacycles
+        wct_dtt.wct_min_nonzero = wct_min_nonzero
+        wct_dtt.used = used
+
+    # Link WCT-DTT parameters to WCT parameter sets
+    wct_dtt.wct_params = session.query(DvvWct).filter(DvvWct.ref.in_(wct_refs)).all()
+
+    session.commit()
+
+def get_dvv_wct_dtt(session, all=False):
+    """Retrieve all DTT parameter sets as ORM objects."""
+    query = session.query(DvvWctDtt)
+
+    if not all:
+        query = query.filter(DvvWctDtt.used == True)
+
+    results = query.all() 
+
+    return results  
+
+
 # NETWORK AND STATION
 
 def get_networks(session, all=False):

@@ -588,12 +588,131 @@ def test_034_instrument_response(setup_environment):
     test_013_s03compute_cc()
 
 @pytest.mark.order(35)
-def test_035_wct():
+def test_035_wct_param_update():
+    """Test updating and retrieving WCT parameters from the database."""
+    db = connect()
+
+    dvv_wct_params = []
+
+    # First WCT parameter set
+    wct_param = DvvWct()
+    wct_param.wct_freqmin = 0.1
+    wct_param.wct_freqmax = 2.0
+    wct_param.wct_ns = 3
+    wct_param.wct_nt = 0.25
+    wct_param.wct_vpo = 12
+    wct_param.wct_nptsfreq = 100
+    wct_param.wct_norm = True
+    wct_param.wavelet_type = str(('Morlet', 6.))
+    wct_param.used = True
+    dvv_wct_params.append(wct_param)
+    filter_refs = [1]
+
+    update_dvv_wct(db, wct_param.ref, wct_param.wct_freqmin, wct_param.wct_freqmax,
+                         wct_param.wct_ns, wct_param.wct_nt, wct_param.wct_vpo,
+                         wct_param.wct_nptsfreq, wct_param.wct_norm, wct_param.wavelet_type,
+                         wct_param.used, filter_refs)
+
+    # Second WCT parameter set
+    wct_param = DvvWct()
+    wct_param.wct_freqmin = 0.5
+    wct_param.wct_freqmax = 4
+    wct_param.wct_ns = 4
+    wct_param.wct_nt = 1
+    wct_param.wct_vpo = 10
+    wct_param.wct_nptsfreq = 80
+    wct_param.wct_norm = False
+    wct_param.wavelet_type = str(('Morlet', 8.))
+    wct_param.used = True
+    dvv_wct_params.append(wct_param)
+    filter_refs = [1,2]
+
+    update_dvv_wct(db, wct_param.ref, wct_param.wct_freqmin, wct_param.wct_freqmax,
+                         wct_param.wct_ns, wct_param.wct_nt, wct_param.wct_vpo,
+                         wct_param.wct_nptsfreq, wct_param.wct_norm, wct_param.wavelet_type,
+                         wct_param.used, filter_refs)
+
+    db_dvv_wct = get_dvv_wct(db)
+
+    for i, dvv_wct in enumerate(db_dvv_wct):  # Assuming filter ID 1
+        for param in ['wct_freqmin', 'wct_freqmax', 'wct_ns', 'wct_nt', 'wct_vpo', 'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used']:
+            db_value = getattr(dvv_wct, param, None)
+            expected_value = getattr(dvv_wct_params[i], param, None)
+            assert db_value == expected_value, f"Mismatch in {param}: DB={db_value}, Expected={expected_value}"
+
+@pytest.mark.order(36)
+def test_036_wct_dtt_param_update():
+    """Test updating and retrieving WCT-DTT parameters from the database."""
+    db = connect()
+
+    dvv_wct_dtt_params = []
+
+    # First WCT-DTT parameter set
+    dtt_param = DvvWctDtt()
+    dtt_param.wct_dtt_freqmin = 0.1
+    dtt_param.wct_dtt_freqmax = 1.0
+    dtt_param.wct_minlag = 5.0
+    dtt_param.wct_width = 30.0
+    dtt_param.wct_lag = "static"
+    dtt_param.wct_v = 1.0
+    dtt_param.wct_sides = "both"
+    dtt_param.wct_mincoh = 0.5
+    dtt_param.wct_maxdt = 2.0
+    dtt_param.wct_codacycles = 20
+    dtt_param.wct_min_nonzero = 0.25
+    dtt_param.used = True
+    dvv_wct_dtt_params.append(dtt_param)
+    wct_refs = [1]  # Linking to WCT 1
+
+    update_dvv_wct_dtt(
+        db, dtt_param.ref, dtt_param.wct_dtt_freqmin, dtt_param.wct_dtt_freqmax,
+        dtt_param.wct_minlag, dtt_param.wct_width, dtt_param.wct_lag,
+        dtt_param.wct_v, dtt_param.wct_sides, dtt_param.wct_mincoh,
+        dtt_param.wct_maxdt, dtt_param.wct_codacycles, dtt_param.wct_min_nonzero,
+        dtt_param.used, wct_refs
+    )
+
+    # Second WCT-DTT parameter set
+    dtt_param = DvvWctDtt()
+    dtt_param.wct_dtt_freqmin = 0.2
+    dtt_param.wct_dtt_freqmax = 2.0
+    dtt_param.wct_minlag = 6.0
+    dtt_param.wct_width = 40.0
+    dtt_param.wct_lag = "dynamic"
+    dtt_param.wct_v = 1.0
+    dtt_param.wct_sides = "left"
+    dtt_param.wct_mincoh = 0.6
+    dtt_param.wct_maxdt = 2.5
+    dtt_param.wct_codacycles = 25
+    dtt_param.wct_min_nonzero = 0.3
+    dtt_param.used = True
+    dvv_wct_dtt_params.append(dtt_param)
+    wct_refs = [1, 2]  # Linking to WCT 1 & 2
+
+    update_dvv_wct_dtt(
+        db, dtt_param.ref, dtt_param.wct_dtt_freqmin, dtt_param.wct_dtt_freqmax,
+        dtt_param.wct_minlag, dtt_param.wct_width, dtt_param.wct_lag,
+        dtt_param.wct_v, dtt_param.wct_sides, dtt_param.wct_mincoh,
+        dtt_param.wct_maxdt, dtt_param.wct_codacycles, dtt_param.wct_min_nonzero,
+        dtt_param.used, wct_refs
+    )
+
+    db_dvv_wct_dtt = get_dvv_wct_dtt(db)
+
+    for i, dvv_wct_dtt in enumerate(db_dvv_wct_dtt): 
+        for param in ['wct_dtt_freqmin', 'wct_dtt_freqmax', 'wct_minlag', 'wct_width', 'wct_lag',
+                      'wct_v', 'wct_sides', 'wct_mincoh', 'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used']:
+            db_value = getattr(dvv_wct_dtt, param, None)
+            expected_value = getattr(dvv_wct_dtt_params[i], param, None)
+            assert db_value == expected_value, f"Mismatch in {param}: DB={db_value}, Expected={expected_value}"
+
+@pytest.mark.order(37)
+def test_037_wct():
     from ..s08compute_wct import main as compute_wct_main
     compute_wct_main()
   
-@pytest.mark.order(36)
-def test_036_validate_stack_data():
+@pytest.mark.order(38)
+def test_038_validate_stack_data():
     from ..api import validate_stack_data
     import xarray as xr
     import numpy as np
@@ -648,8 +767,8 @@ def test_036_validate_stack_data():
     assert is_valid
     assert message == "OK"
     
-@pytest.mark.order(37)
-def test_037_stack_validation_handling():
+@pytest.mark.order(39)
+def test_039_stack_validation_handling():
     from ..api import validate_stack_data
     import xarray as xr
     import numpy as np
@@ -749,7 +868,7 @@ def test_105_db_dump():
 
 @pytest.mark.order(106)
 def test_106_plot_wct():
-    wct_dvv_main(filterid=1, components="ZZ", show=False, outfile="?.png")
+    wct_dvv_main(filterid=1, wctid=1, dttid=1, components="ZZ", show=False, outfile="?.png")
     fn = "wct ZZ-f1-dvv.png"
     assert os.path.isfile(fn), f"{fn} doesn't exist"
 
