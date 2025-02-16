@@ -375,8 +375,8 @@ def main(loglevel="INFO"):
 
                     for filterdb in filters:
                         filterid = filterdb.ref
-                        low = float(filterdb.low)
-                        high = float(filterdb.high)
+                        low = float(filterdb.freqmin)
+                        high = float(filterdb.freqmax)
 
                         trames2hWb = np.zeros((2, int(nfft)), dtype=np.complex)
                         skip = False

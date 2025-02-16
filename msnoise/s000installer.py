@@ -238,7 +238,7 @@ def main(tech=None, hostname=None, username=None, password=None,
 
     # Add default configuration values to the database
     for name in default.keys():
-        session.add(schema.Config(name=name, value=default[name].default))
+        session.add(schema.Config(name=name, value=default[name].default, used_in=default[name].used_in))
 
     try:
         session.commit()

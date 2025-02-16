@@ -20,7 +20,7 @@ from matplotlib.dates import DateFormatter
 from ..api import *
 
 
-def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1,
+def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1, mwcsid=1, dttid=1,
          pairs=[], showALL=False, show=False, outfile=None, loglevel="INFO"):
     logger = get_logger('msnoise.cc_dvv_plot_dvv', loglevel,
                         with_pid=True)
@@ -42,8 +42,8 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1,
     print(mov_stacks)
     low = high = 0.0
     filter = get_filters(db, ref=filterid)
-    low = float(filter.low)
-    high = float(filter.high)
+    low = float(filter.freqmin)
+    high = float(filter.freqmax)
 
     fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
 
@@ -57,7 +57,7 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1,
         # plt.title('%s Moving Window' % mov_stack)
         for comps in components:
             try:
-                dvv = xr_get_dvv(comps, filterid, mov_stack)
+                dvv = xr_get_dvv2(comps, filterid, mwcsid, dttid, mov_stack)
             except FileNotFoundError as fullpath:
                 logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                 continue

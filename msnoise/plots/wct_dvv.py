@@ -219,7 +219,7 @@ def main(mov_stackid=None, components='ZZ', filterid=1,
                         with_pid=True)
     db = connect()
     params = get_params(db)
-    mincoh = params.dtt_mincoh
+    mincoh = params.wct_mincoh
 
     # Check start and end dates
     if start == "1970-01-01":
@@ -255,8 +255,8 @@ def main(mov_stackid=None, components='ZZ', filterid=1,
         components = [components, ]
 
     filter = get_filters(db, ref=filterid)
-    low = float(filter.low)
-    high = float(filter.high)
+    low = float(filter.freqmin)
+    high = float(filter.freqmax)
 
     for i, mov_stack in enumerate(mov_stacks):
         for comps in components:

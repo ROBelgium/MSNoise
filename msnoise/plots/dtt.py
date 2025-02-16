@@ -26,7 +26,7 @@ def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True,
     logger = get_logger('msnoise.cc_dvv_plot_dtt', loglevel,
                         with_pid=True)
     db = connect()
-    dtt_lag = get_config(db, "dtt_lag")
+    dtt_lag = get_config(db, "mwcs_dtt_lag")
     dtt_v = float(get_config(db, "dtt_v"))
     dtt_minlag = float(get_config(db, "dtt_minlag"))
     dtt_width = float(get_config(db, "dtt_width"))

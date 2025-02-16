@@ -114,8 +114,8 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, seismic=False
                              interpolate=True)
 
     filter = get_filters(db, ref=filterid)
-    low = float(filter.low)
-    high = float(filter.high)
+    low = float(filter.freqmin)
+    high = float(filter.freqmax)
 
     plt.xlabel("Lag Time (s)")
     plt.axhline(0, lw=0.5, c='k')

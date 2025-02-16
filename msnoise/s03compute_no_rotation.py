@@ -474,8 +474,8 @@ def main(loglevel="INFO"):
 
             for filterdb in filters:
                 filterid = filterdb.ref
-                filterlow = float(filterdb.low)
-                filterhigh = float(filterdb.high)
+                filterlow = float(filterdb.freqmin)
+                filterhigh = float(filterdb.freqmax)
 
                 freq_vec = sf.fftfreq(nfft, d=dt)[:nfft // 2]
                 freq_sel = np.where((freq_vec >= filterlow) & (freq_vec <= filterhigh))[0]
