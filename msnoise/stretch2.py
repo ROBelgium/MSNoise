@@ -150,7 +150,8 @@ def main(loglevel="INFO"):
     logger.debug('Ready to compute')
     # Then we compute the jobs
     outfolders = []
-    filters = get_filters(db, all=False)
+    #filters = get_filters(db, all=False)
+    dvv_stretching_params = get_dvv_stretching_jobs(db, all=False)
     time.sleep(np.random.random() * 5)
     taxis = get_t_axis(db)
     smoothing_half_win= 5
@@ -169,150 +170,152 @@ def main(loglevel="INFO"):
 
         logger.info(
             "There are STR (stretching) jobs for some days to recompute for %s" % pair)
-        for f in filters:
-            filterid = int(f.ref)
-            low = f.freqmin
-            high = f.freqmax
+        for filter_ref, stretching_list in dvv_stretching_params.items():
+            filterid = int(filter_ref)  
+            for str_params in stretching_list:
+                strid = int(str_params.ref)
+                #low = f.freqmin
+                #high = f.freqmax
 
-            def ww(a):
-                from .move2obspy import whiten
-                n = next_fast_len(len(a))
-                return whiten(a, n, 1./params.cc_sampling_rate,
-                              low, high, returntime=True)
-            for components in params.all_components:
-                ref_name = pair.replace(':', '_')
-                station1, station2 = pair.split(":")
-                try:
-                    ref = xr_get_ref(station1, station2, components, filterid,
-                                     taxis)
-                    ref = ref.CCF.values
-                except FileNotFoundError as fullpath:
-                    logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-                    continue
-                # print("Whitening ref")
-                # ref = ww(ref)
-
-                # zero the data outside of the minlag-maxlag timing
-                if params.stretching_lag == "static":
-                    minlag = f.dtt_minlag
-                else:
-                    SS1 = station1.split(".")
-                    SS2 = station2.split(".")
-
-                    SS1 = get_station(db, SS1[0], SS1[1])
-                    SS2 = get_station(db, SS2[0], SS2[1])
-                    minlag = get_interstation_distance(SS1, SS2,
-                                                       SS1.coordinates) / f.dtt_v
-                maxlag2 = minlag + f.dtt_width
-                mid = int(params.goal_sampling_rate * params.maxlag)
-                print("betweeen", minlag, "and", maxlag2    )
-                ref[mid - int(minlag * goal_sampling_rate):mid + int(
-                    minlag * goal_sampling_rate)] *= 0.
-                ref[:mid - int(maxlag2 * goal_sampling_rate)] *= 0.
-                ref[mid + int(maxlag2 * goal_sampling_rate):] *= 0.
-                # TODO ADD the def here or in the API
-                str_range = params.stretching_max
-                nstr = params.stretching_nsteps
-                ref_stretched, deltas = stretch_mat_creation(ref,str_range=str_range, nstr=nstr)
-
-                for mov_stack in mov_stacks:
-                    output = []
-                    #alldays = []
-                    #alldeltas = []
-                    #allcoefs = []
-                    #allerrs = []
-
-                    fn = r"STACKS2/%02i/%s_%s/%s/%s_%s.nc" % (
-                    filterid, mov_stack[0], mov_stack[1], components, station1, station2)
-                    print("Reading %s" % fn)
-                    if not os.path.isfile(fn):
-                        print("FILE DOES NOT EXIST: %s, skipping" % fn)
+                #def ww(a):
+                #    from .move2obspy import whiten
+                #    n = next_fast_len(len(a))
+                #    return whiten(a, n, 1./params.cc_sampling_rate,
+                #                low, high, returntime=True)
+                for components in params.all_components:
+                    ref_name = pair.replace(':', '_')
+                    station1, station2 = pair.split(":")
+                    try:
+                        ref = xr_get_ref(station1, station2, components, filterid,
+                                        taxis)
+                        ref = ref.CCF.values
+                    except FileNotFoundError as fullpath:
+                        logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                         continue
-                    data = xr_create_or_open(fn)
-                    data = data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
-                    to_search = pd.to_datetime(days)
-                    data = data[data.index.floor('d').isin(to_search)]
-                    data = data.dropna()
+                    # print("Whitening ref")
+                    # ref = ww(ref)
 
-                    # print("Whitening %s" % fn)
-                    # data = pd.DataFrame(data)
-                    # data = data.apply(ww, axis=1, result_type="broadcast")
-
-                    data.iloc[:,mid - int(minlag * params.goal_sampling_rate):mid + int(
-                        minlag * params.goal_sampling_rate)] *= 0.
-                    data.iloc[:,mid - int(maxlag2 * params.goal_sampling_rate)] *= 0.
-                    data.iloc[:,mid + int(maxlag2 * params.goal_sampling_rate):] *= 0.
-
-                    data_values = data.values
-                    num_days = data_values.shape[0]
-                    num_stretch = ref_stretched.shape[0]
-
-                    # Normalizing the data for correlation
-                    data_norm = (data_values - data_values.mean(axis=1, keepdims=True)) / data_values.std(axis=1, keepdims=True)
-                    ref_stretched_norm = (ref_stretched - ref_stretched.mean(axis=1, keepdims=True)) / ref_stretched.std(axis=1, keepdims=True)
-
-                    # Compute the correlation coefficients
-                    corr_coeffs = np.dot(ref_stretched_norm, data_norm.T) / ref_stretched.shape[1]
-
-                    max_corr_indices = np.argmax(corr_coeffs, axis=0)
-                    max_corr_values = corr_coeffs[max_corr_indices, np.arange(num_days)]
-
-                    alldays = data.index
-                    alldeltas = deltas[max_corr_indices]
-                    allcoefs = max_corr_values
-
-                    allerrs = []
-
-                    for day_idx in range(data_values.shape[0]):
-
-                        ###### gaussian fit ######
-                        def gauss_function(x, a, x0, sigma):
-                            return a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
-
-                        coeffs = corr_coeffs[:, day_idx]
-                        x = ar(range(len(coeffs)))
-                        ymax_index = np.argmax(coeffs)
-                        ymin = np.min(coeffs)
-                        coeffs_shift = []
-                        for j in coeffs:
-                            j += np.absolute(ymin)  # make all points above zero
-                            coeffs_shift.append(j)
-                        n = len(coeffs)
-                        x0 = sum(x) / n
-                        sigma = (sum((x - x0) ** 2) / n) ** 0.5
-                        try:
-                            popt, pcov = curve_fit(gauss_function, x,
-                                                   coeffs_shift,
-                                                   [ymax_index, x0, sigma])
-                            FWHM = 2 * ((2 * np.log(2)) ** 0.5) * popt[
-                                2]  # convert sigma (popt[2]) to FWHM
-                            error = FWHM / 2  ### error is half width at full maximum
-                        except RuntimeError:
-                            error = np.nan  # gaussian fit failed
-
-                        allerrs.append(error)
-                    df = pd.DataFrame(
-                        np.array([alldeltas, allcoefs, allerrs]).T,
-                        index=alldays, columns=["Delta", "Coeff", "Error"], )
-                    output = os.path.join('STR2', "%02i" % filterid,
-                                          "%s_%s" % (mov_stack[0],mov_stack[1]), components)
-                    # print(df.head())
-                    if not os.path.isdir(output):
-                        os.makedirs(output)
-                    fn = os.path.join(output, "%s.csv" % ref_name)
-                    if not os.path.isfile(fn):
-                        df.to_csv(fn, index_label="Date")
+                    # zero the data outside of the minlag-maxlag timing
+                    if str_params.stretching_lag == "static":
+                        minlag = str_params.stretching_minlag
                     else:
-                        dest = pd.read_csv(fn, index_col=0,
-                                           parse_dates=True)
-                        final = pd.concat([dest, df])
-                        final = final[~final.index.duplicated(keep='last')]
-                        final = final.sort_index()
-                        final.to_csv(fn, index_label="Date")
-                    ### TODO END
+                        SS1 = station1.split(".")
+                        SS2 = station2.split(".")
+
+                        SS1 = get_station(db, SS1[0], SS1[1])
+                        SS2 = get_station(db, SS2[0], SS2[1])
+                        minlag = get_interstation_distance(SS1, SS2,
+                                                        SS1.coordinates) / str_params.stretching_v
+                    maxlag2 = minlag + str_params.stretching_width
+                    mid = int(params.goal_sampling_rate * params.maxlag)
+                    print("betweeen", minlag, "and", maxlag2    )
+                    ref[mid - int(minlag * goal_sampling_rate):mid + int(
+                        minlag * goal_sampling_rate)] *= 0.
+                    ref[:mid - int(maxlag2 * goal_sampling_rate)] *= 0.
+                    ref[mid + int(maxlag2 * goal_sampling_rate):] *= 0.
+                    # TODO ADD the def here or in the API
+                    str_range = str_params.stretching_max
+                    nstr = str_params.stretching_nsteps
+                    ref_stretched, deltas = stretch_mat_creation(ref,str_range=str_range, nstr=nstr)
+
+                    for mov_stack in mov_stacks:
+                        output = []
+                        #alldays = []
+                        #alldeltas = []
+                        #allcoefs = []
+                        #allerrs = []
+
+                        fn = r"STACKS2/%02i/%s_%s/%s/%s_%s.nc" % (
+                        filterid, mov_stack[0], mov_stack[1], components, station1, station2)
+                        print("Reading %s" % fn)
+                        if not os.path.isfile(fn):
+                            print("FILE DOES NOT EXIST: %s, skipping" % fn)
+                            continue
+                        data = xr_create_or_open(fn)
+                        data = data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
+                        to_search = pd.to_datetime(days)
+                        data = data[data.index.floor('d').isin(to_search)]
+                        data = data.dropna()
+
+                        # print("Whitening %s" % fn)
+                        # data = pd.DataFrame(data)
+                        # data = data.apply(ww, axis=1, result_type="broadcast")
+
+                        data.iloc[:,mid - int(minlag * params.goal_sampling_rate):mid + int(
+                            minlag * params.goal_sampling_rate)] *= 0.
+                        data.iloc[:,mid - int(maxlag2 * params.goal_sampling_rate)] *= 0.
+                        data.iloc[:,mid + int(maxlag2 * params.goal_sampling_rate):] *= 0.
+
+                        data_values = data.values
+                        num_days = data_values.shape[0]
+                        num_stretch = ref_stretched.shape[0]
+
+                        # Normalizing the data for correlation
+                        data_norm = (data_values - data_values.mean(axis=1, keepdims=True)) / data_values.std(axis=1, keepdims=True)
+                        ref_stretched_norm = (ref_stretched - ref_stretched.mean(axis=1, keepdims=True)) / ref_stretched.std(axis=1, keepdims=True)
+
+                        # Compute the correlation coefficients
+                        corr_coeffs = np.dot(ref_stretched_norm, data_norm.T) / ref_stretched.shape[1]
+
+                        max_corr_indices = np.argmax(corr_coeffs, axis=0)
+                        max_corr_values = corr_coeffs[max_corr_indices, np.arange(num_days)]
+
+                        alldays = data.index
+                        alldeltas = deltas[max_corr_indices]
+                        allcoefs = max_corr_values
+
+                        allerrs = []
+
+                        for day_idx in range(data_values.shape[0]):
+
+                            ###### gaussian fit ######
+                            def gauss_function(x, a, x0, sigma):
+                                return a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
+
+                            coeffs = corr_coeffs[:, day_idx]
+                            x = ar(range(len(coeffs)))
+                            ymax_index = np.argmax(coeffs)
+                            ymin = np.min(coeffs)
+                            coeffs_shift = []
+                            for j in coeffs:
+                                j += np.absolute(ymin)  # make all points above zero
+                                coeffs_shift.append(j)
+                            n = len(coeffs)
+                            x0 = sum(x) / n
+                            sigma = (sum((x - x0) ** 2) / n) ** 0.5
+                            try:
+                                popt, pcov = curve_fit(gauss_function, x,
+                                                    coeffs_shift,
+                                                    [ymax_index, x0, sigma])
+                                FWHM = 2 * ((2 * np.log(2)) ** 0.5) * popt[
+                                    2]  # convert sigma (popt[2]) to FWHM
+                                error = FWHM / 2  ### error is half width at full maximum
+                            except RuntimeError:
+                                error = np.nan  # gaussian fit failed
+
+                            allerrs.append(error)
+                        df = pd.DataFrame(
+                            np.array([alldeltas, allcoefs, allerrs]).T,
+                            index=alldays, columns=["Delta", "Coeff", "Error"], )
+                        output = os.path.join('DVV/STR', "%02i" % filterid, "%02i" % strid,
+                                            "%s_%s" % (mov_stack[0],mov_stack[1]), components)
+                        # print(df.head())
+                        if not os.path.isdir(output):
+                            os.makedirs(output)
+                        fn = os.path.join(output, "%s.csv" % ref_name)
+                        if not os.path.isfile(fn):
+                            df.to_csv(fn, index_label="Date")
+                        else:
+                            dest = pd.read_csv(fn, index_col=0,
+                                            parse_dates=True)
+                            final = pd.concat([dest, df])
+                            final = final[~final.index.duplicated(keep='last')]
+                            final = final.sort_index()
+                            final.to_csv(fn, index_label="Date")
+                        ### TODO END
 
         massive_update_job(db, jobs, "D")
-        if not params.hpc:
-            for job in jobs:
-                update_job(db, job.day, job.pair, 'DTT', 'T')
+    #    if not params.hpc:
+   #        for job in jobs:
+     #           update_job(db, job.day, job.pair, 'DTT', 'T')
     logger.info('*** Finished: Compute Stretching ***')
