@@ -127,8 +127,13 @@ def main(interval=1, loglevel="INFO"):
                             MCOH[MCOH < dtt_params.dtt_mincoh] = 0.0
                             EM[EM > dtt_params.dtt_maxerr] = 1.0
 
-                            # TODO missing check on max_dt !!
+                            #compute dt/t and exclude values exceeding dtt_maxdtt
+                            dtt_values = np.abs(M / tArray)
+                            invalid_dtt_indices = np.where(dtt_values > dtt_params.dtt_maxdtt)
+                            row_indices, col_indices = invalid_dtt_indices
 
+                            EM.values[row_indices, col_indices] = 1.0
+                            MCOH.values[row_indices, col_indices] = 0.0
 
                             values = []
                             dates = []

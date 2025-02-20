@@ -213,10 +213,10 @@ class DvvMwcsDttView(ModelView):
     name = "Moving-Window Cross-Spectral (MWCS) dtt config"
 
     column_list = ('ref', 'mwcs_params', 'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
-                    'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
+                    'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdtt', 'used')
     
     form_columns = ('mwcs_params','dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
-                    'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used')
+                    'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdtt', 'used')
 
     # Formatter to display associated mwcs params as a comma-separated list
     def _mwcsparams_formatter(view, context, model, name):

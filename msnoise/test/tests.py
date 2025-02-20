@@ -420,7 +420,7 @@ def test_026_mwcs_dtt_param_update():
     dtt_param.dtt_sides = "both"
     dtt_param.dtt_mincoh = 0.5
     dtt_param.dtt_maxerr = 0.2
-    dtt_param.dtt_maxdt = 2.0
+    dtt_param.dtt_maxdtt = 0.05
     dtt_param.used = True
     dvv_mwcs_dtt_params.append(dtt_param)
     mwcs_refs = [1,2]  # Linking to MWCS 1
@@ -428,7 +428,7 @@ def test_026_mwcs_dtt_param_update():
     update_dvv_mwcs_dtt(
         db, dtt_param.ref, dtt_param.dtt_minlag, dtt_param.dtt_width, dtt_param.dtt_lag,
         dtt_param.dtt_v, dtt_param.dtt_sides, dtt_param.dtt_mincoh,
-        dtt_param.dtt_maxerr, dtt_param.dtt_maxdt, dtt_param.used, mwcs_refs
+        dtt_param.dtt_maxerr, dtt_param.dtt_maxdtt, dtt_param.used, mwcs_refs
     )
 
     # Second MWCS DTT parameter set linked to multiple MWCS sets
@@ -440,7 +440,7 @@ def test_026_mwcs_dtt_param_update():
     dtt_param.dtt_sides = "left"
     dtt_param.dtt_mincoh = 0.6
     dtt_param.dtt_maxerr = 0.3
-    dtt_param.dtt_maxdt = 2.5
+    dtt_param.dtt_maxdtt = 0.025
     dtt_param.used = True
     dvv_mwcs_dtt_params.append(dtt_param)
     mwcs_refs = [2]  # Linking to MWCS 1 & 2
@@ -448,7 +448,7 @@ def test_026_mwcs_dtt_param_update():
     update_dvv_mwcs_dtt(
         db, dtt_param.ref, dtt_param.dtt_minlag, dtt_param.dtt_width, dtt_param.dtt_lag,
         dtt_param.dtt_v, dtt_param.dtt_sides, dtt_param.dtt_mincoh,
-        dtt_param.dtt_maxerr, dtt_param.dtt_maxdt, dtt_param.used, mwcs_refs
+        dtt_param.dtt_maxerr, dtt_param.dtt_maxdtt, dtt_param.used, mwcs_refs
     )
 
     # Retrieve and validate stored parameters
@@ -458,7 +458,7 @@ def test_026_mwcs_dtt_param_update():
 
     for i, dtt in enumerate(db_dvv_mwcs_dtt):
         for param in ['dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
-                      'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdt', 'used']:
+                      'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdtt', 'used']:
             assert getattr(dtt, param) == getattr(dvv_mwcs_dtt_params[i], param)
 
 @pytest.mark.order(27)

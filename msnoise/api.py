@@ -375,8 +375,6 @@ def update_filter(session, ref, freqmin, freqmax,
 def get_dvv_mwcs_jobs(session, all=False):
     """Get all MWCS parameter sets linked to used filters."""
 
-    print("DEBUG: Running get_dvv_mwcs()...")
-
     query = (
         session.query(Filter.ref, DvvMwcs)
         .select_from(Filter)  # Explicitly select Filter as the starting table
@@ -387,10 +385,8 @@ def get_dvv_mwcs_jobs(session, all=False):
     if not all:
         query = query.filter(Filter.used == True)
 
-    print("DEBUG: Executing query...")
     try:
         results = query.all()
-        print(f"DEBUG: Query returned {len(results)} results.")
     except Exception as e:
         print(f"ERROR: Query failed with exception: {e}")
         return {}
@@ -398,14 +394,11 @@ def get_dvv_mwcs_jobs(session, all=False):
     mwcs_mapping = {}
 
     for filter_ref, mwcs in results:
-        print(f"DEBUG: Processing Filter {filter_ref} linked to MWCS {mwcs.ref}")
-
         if filter_ref not in mwcs_mapping:
             mwcs_mapping[filter_ref] = []
         
         mwcs_mapping[filter_ref].append(mwcs)
 
-    print("DEBUG: Finished get_dvv_mwcs(). Returning data.")
     return mwcs_mapping
 
 def get_dvv_mwcs(session, all=False):
@@ -543,7 +536,7 @@ def get_dvv_mwcs_dtt(session, all=False):
     return results  # No conversion to dictionaries
 
 def update_dvv_mwcs_dtt(session, ref, dtt_minlag, dtt_width, dtt_lag, dtt_v,
-                         dtt_sides, dtt_mincoh, dtt_maxerr, dtt_maxdt, used,
+                         dtt_sides, dtt_mincoh, dtt_maxerr, dtt_maxdtt, used,
                          mwcs_refs):
     """Updates or Inserts a new MWCS DTT parameter set in the database and links it to MWCS sets.
 
@@ -576,8 +569,8 @@ def update_dvv_mwcs_dtt(session, ref, dtt_minlag, dtt_width, dtt_lag, dtt_v,
     :type dtt_maxerr: float
     :param dtt_maxerr: Maximum allowable error on dt measurement [0:1]
 
-    :type dtt_maxdt: float
-    :param dtt_maxdt: Maximum dt values for MWCS DTT (in seconds)
+    :type dtt_maxdtt: float
+    :param dtt_maxdtt: Maximum dt/t values for MWCS DTT (in seconds)
 
     :type used: bool
     :param used: Is the MWCS DTT parameter set activated for processing
@@ -599,7 +592,7 @@ def update_dvv_mwcs_dtt(session, ref, dtt_minlag, dtt_width, dtt_lag, dtt_v,
         dtt.dtt_sides = dtt_sides
         dtt.dtt_mincoh = dtt_mincoh
         dtt.dtt_maxerr = dtt_maxerr
-        dtt.dtt_maxdt = dtt_maxdt
+        dtt.dtt_maxdtt = dtt_maxdtt
         dtt.used = used
         session.add(dtt)
     else:
@@ -611,7 +604,7 @@ def update_dvv_mwcs_dtt(session, ref, dtt_minlag, dtt_width, dtt_lag, dtt_v,
         dtt.dtt_sides = dtt_sides
         dtt.dtt_mincoh = dtt_mincoh
         dtt.dtt_maxerr = dtt_maxerr
-        dtt.dtt_maxdt = dtt_maxdt
+        dtt.dtt_maxdtt = dtt_maxdtt
         dtt.used = used
 
     # Update MWCS-DTT associations

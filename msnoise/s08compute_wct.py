@@ -53,7 +53,6 @@ from .api import *
 import logbook
 import scipy
 import scipy.fft as sf
-import ast
 
 def smoothCFS(cfs, scales, dt, ns, nt):
     """
@@ -403,7 +402,10 @@ def main(loglevel="INFO"):
                 wavelet_type = wct_params.wavelet_type
 
                 if isinstance(wavelet_type, str):  # If it's stored as a string, convert it
-                    wavelet_type = ast.literal_eval(wavelet_type)
+                    try:
+                        wavelet_type = eval(wavelet_type, {"__builtins__": {}})
+                    except (SyntaxError, NameError):
+                        wavelet_type = None
 
                 station1, station2 = pair.split(":")
                 if station1 == station2:

@@ -167,7 +167,7 @@ def declare_tables(prefix=None):
         :type dtt_maxerr: float
         :params dtt_maxerr: Maximum error on dt measurement, MWCS points with values larger than that will not be used in the WLS [0:1]
         :type dtt_maxdt: float
-        :params dtt_maxdt: Maximum dt values, MWCS points with values larger than that will not be used in the WLS (in seconds)
+        :params dtt_maxdtt: Maximum dt/t value, MWCS points with absolute values larger than that will not be used in the WLS (in seconds)
         :type used: bool
         :param used: Is the parameter set activated for the processing
         """
@@ -182,7 +182,7 @@ def declare_tables(prefix=None):
         dtt_sides = Column(String(255))
         dtt_mincoh = Column(Float())
         dtt_maxerr = Column(Float())
-        dtt_maxdt = Column(Float())
+        dtt_maxdtt = Column(Float())
         used = Column(Boolean(), default=True)
 
         # Many-to-Many relationship with MWCS parameter sets
@@ -299,7 +299,7 @@ def declare_tables(prefix=None):
         :type wct_mincoh: float
         :param wct_mincoh: Minimum coherence on dt measurement
         :type wct_maxdt: float
-        :param wct_maxdt: Maximum dt values (in seconds)
+        :param wct_maxdt: Maximum dt values
         :type wct_codacycles: int
         :param wct_codacycles: Number of cycles of period (1/freq) between lag_min and lag_max
         :type wct_min_nonzero: float
