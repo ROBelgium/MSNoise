@@ -3,7 +3,7 @@ Stretching...
 """
 
 from .api import *
-from scipy import asarray as ar
+from numpy import asarray as ar
 from scipy.optimize import curve_fit
 from scipy.ndimage import map_coordinates
 

@@ -141,7 +141,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                         try:
                             # print("Reading %s" % file)
                             # t=  time.time()
-                            st = read(file, dytpe=np.float,
+                            st = read(file, dytpe=float,
                                       starttime=UTCDateTime(gd),
                                       endtime=UTCDateTime(gd)+86400,
                                       station=sta,
@@ -149,6 +149,8 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                             # print("done in", time.time()-t)
                         except:
                             logger.debug("ERROR reading file %s" % file)
+                            import traceback
+                            traceback.print_exc()
                             # TODO add traceback (optional?)
                             continue
                     for tr in st:
@@ -163,7 +165,7 @@ def preprocess(db, stations, comps, goal_day, params, responses=None):
                     else:
                         st = tmp
                     for tr in st:
-                        tr.data = tr.data.astype(np.float)
+                        tr.data = tr.data.astype(float)
                         tr.stats.network = tr.stats.network.upper()
                         tr.stats.station = tr.stats.station.upper()
                         tr.stats.channel = tr.stats.channel.upper()

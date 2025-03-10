@@ -25,13 +25,9 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 import scipy.signal as ss
-if sp.__version__ < "1.4.0":
-    import scipy.fftpack as sf
-    from scipy.fftpack.helper import next_fast_len
-    import scipy.fftpack._fftpack as sff
-else:
-    import scipy.fft as sf
-    from scipy.fft import next_fast_len
+
+import scipy.fft as sf
+from scipy.fft import next_fast_len
 
 
 import scipy.optimize
@@ -1659,7 +1655,7 @@ def check_and_phase_shift(trace, taper_length=20.0):
         FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
         FFTdata = FFTdata.astype(np.complex64)
         sf.ifft(FFTdata, n=n, overwrite_x=True)
-        trace.data = np.real(FFTdata[:len(trace.data)]).astype(np.float)
+        trace.data = np.real(FFTdata[:len(trace.data)]).astype(float)
         trace.stats.starttime += dt
         del FFTdata, fftfreq
         clean_scipy_cache()
@@ -1768,25 +1764,26 @@ def make_same_length(st):
 def clean_scipy_cache():
     """This functions wraps all destroy scipy cache at once. It is a workaround
     to the memory leak induced by the "caching" functions in scipy fft."""
-    if scipy.__version__ >= "1.4.0":
-        return
-    sff.destroy_zfft_cache()
-    sff.destroy_zfftnd_cache()
-    sff.destroy_drfft_cache()
-    sff.destroy_cfft_cache()
-    sff.destroy_cfftnd_cache()
-    sff.destroy_rfft_cache()
-    sff.destroy_ddct2_cache()
-    sff.destroy_ddct1_cache()
-    # sff.destroy_ddct4_cache()
-    sff.destroy_dct2_cache()
-    sff.destroy_dct1_cache()
-    # sff.destroy_dct4_cache()
-    sff.destroy_ddst2_cache()
-    sff.destroy_ddst1_cache()
-    sff.destroy_dst2_cache()
-    sff.destroy_dst1_cache()
-    sf.convolve.destroy_convolve_cache()
+    return
+    # if scipy.__version__ >= "1.4.0":
+    #     return
+    # sff.destroy_zfft_cache()
+    # sff.destroy_zfftnd_cache()
+    # sff.destroy_drfft_cache()
+    # sff.destroy_cfft_cache()
+    # sff.destroy_cfftnd_cache()
+    # sff.destroy_rfft_cache()
+    # sff.destroy_ddct2_cache()
+    # sff.destroy_ddct1_cache()
+    # # sff.destroy_ddct4_cache()
+    # sff.destroy_dct2_cache()
+    # sff.destroy_dct1_cache()
+    # # sff.destroy_dct4_cache()
+    # sff.destroy_ddst2_cache()
+    # sff.destroy_ddst1_cache()
+    # sff.destroy_dst2_cache()
+    # sff.destroy_dst1_cache()
+    # sf.convolve.destroy_convolve_cache()
 
 
 def preload_instrument_responses(session):
