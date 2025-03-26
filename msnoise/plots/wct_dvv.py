@@ -171,8 +171,8 @@ def create_folder(folder_path, logger):
         pass
 
 def xr_get_wct_pair(pair, components, filterid, wctid, dttid, mov_stack, logger):
-    fn = os.path.join("DVV/WCT/DTT", "%02i" % filterid,
-                      "%02i" % wctid, "%02i" % dttid,
+    fn = os.path.join("DVV/WCT/DTT", "f%02i" % filterid,
+                      "wct%02i" % wctid, "dtt%02i" % dttid,
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components, "%s.nc" % (pair))
     if not os.path.isfile(fn):
@@ -186,8 +186,8 @@ def xr_get_wct_pair(pair, components, filterid, wctid, dttid, mov_stack, logger)
     return data
 
 def xr_get_wct(components, filterid, wctid, dttid, mov_stack, logger):
-    fn = os.path.join("DVV/WCT/DTT", "%02i" % filterid,
-                      "%02i" % wctid, "%02i" % dttid,
+    fn = os.path.join("DVV/WCT/DTT", "f%02i" % filterid,
+                      "wct%02i" % wctid, "dtt%02i" % dttid,
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components, "*.nc" )
     matching_files = glob.glob(fn)

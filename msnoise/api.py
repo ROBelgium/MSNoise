@@ -2891,39 +2891,8 @@ def xr_get_ref(station1, station2, components, filterid, taxis):
     return data.CCF.to_dataframe()
 
 
-def xr_save_mwcs(station1, station2, components, filterid, mov_stack, taxis, dataframe):
-    fn = os.path.join("MWCS2", "%02i" % filterid,
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s" % components,
-                      "%s_%s.nc" % (station1, station2))
-    if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0], exist_ok=True)
-    d = dataframe.stack(future_stack=True).stack(future_stack=True)
-    d.index = d.index.set_names(["times", "keys", "taxis"])
-    d = d.reorder_levels(["times", "taxis", "keys"])
-    d.columns = ["MWCS"]
-    taxis = np.unique(d.index.get_level_values('taxis'))
-    dr = xr_create_or_open(fn, taxis=taxis, name="MWCS")
-    rr = d.to_xarray().to_dataset(name="MWCS")
-    rr = xr_insert_or_update(dr, rr)
-    xr_save_and_close(rr, fn)
-    del dr, rr, d
-
-
-def xr_get_mwcs(station1, station2, components, filterid, mov_stack):
-    fn = os.path.join("MWCS2", "%02i" % filterid,
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s" % components,
-                      "%s_%s.nc" % (station1, station2))
-    if not os.path.isfile(fn):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
-        raise FileNotFoundError(fn)
-    data = xr_create_or_open(fn, name="MWCS")
-    data = data.MWCS.to_dataframe().reorder_levels(['times', 'taxis', 'keys']).unstack().droplevel(0, axis=1).unstack()
-    return data
-
 def xr_save_mwcs2(station1, station2, components, filterid, mwcsid, mov_stack, taxis, dataframe):
-    fn = os.path.join("DVV/MWCS/MWCS", "%02i" % filterid, "%02i" % mwcsid,
+    fn = os.path.join("DVV/MWCS/MWCS", "f%02i" % filterid, "mwcs%02i" % mwcsid,
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
@@ -2941,7 +2910,7 @@ def xr_save_mwcs2(station1, station2, components, filterid, mwcsid, mov_stack, t
     del dr, rr, d
 
 def xr_get_mwcs2(station1, station2, components, filterid, mwcsid, mov_stack):
-    fn = os.path.join("DVV/MWCS/MWCS", "%02i" % filterid, "%02i" % mwcsid,
+    fn = os.path.join("DVV/MWCS/MWCS", "f%02i" % filterid, "mwcs%02i" % mwcsid,
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
@@ -2952,60 +2921,6 @@ def xr_get_mwcs2(station1, station2, components, filterid, mwcsid, mov_stack):
     data = data.MWCS.to_dataframe().reorder_levels(['times', 'taxis', 'keys']).unstack().droplevel(0, axis=1).unstack()
     return data
 
-
-
-def xr_save_dtt(station1, station2, components, filterid, mov_stack, dataframe):
-    """
-    :param station1: string, name of station 1
-    :param station2: string, name of station 2
-    :param components: string, name of the components
-    :param filterid: int, filter id
-    :param mov_stack: int, number of days in the moving stack
-    :param dataframe: pandas DataFrame containing the data
-    :return: None
-
-    This method saves the given data in a NetCDF file using the specified parameters. The file path is constructed based on the station names, components, filter id, and moving stack number
-    *. The data in the DataFrame is stacked, and the index is set to include "times" and "keys" as names. The column in the DataFrame is renamed to "DTT". A new or existing NetCDF file is
-    * opened using the given file path, and the stacked data is inserted or updated in the file. The resulting dataset is then saved and the file is closed.
-    """
-    fn = os.path.join("DTT2", "%02i" % filterid,
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s" % components,
-                      "%s_%s.nc" % (station1, station2))
-    if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0], exist_ok=True)
-    d = dataframe.stack(future_stack=True)
-    d.index = d.index.set_names(["times", "keys"])
-    d.columns = ["DTT"]
-    dr = xr_create_or_open(fn, taxis=[], name="DTT")
-    rr = d.to_xarray().to_dataset(name="DTT")
-    rr = xr_insert_or_update(dr, rr)
-    xr_save_and_close(rr, fn)
-
-
-def xr_get_dtt(station1, station2, components, filterid, mov_stack):
-    """
-    :param station1: The first station name
-    :param station2: The second station name
-    :param components: The components to be used
-    :param filterid: The filter ID
-    :param mov_stack: The movement stack
-    :return: The extracted data
-
-    This method retrieves the DTT data from a NetCDF file based on the given inputs. It constructs the file path using the provided parameters and checks if the file exists. If the file
-    * does not exist, it raises a FileNotFoundError. Otherwise, it opens the NetCDF file and extracts the DTT variable as a dataframe. The dataframe is then rearranged and returned as the
-    * result.
-    """
-    fn = os.path.join("DTT2", "%02i" % filterid,
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s" % components,
-                      "%s_%s.nc" % (station1, station2))
-    if not os.path.isfile(fn):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
-        raise FileNotFoundError(fn)
-    dr = xr_create_or_open(fn, taxis=[], name="DTT")
-    data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
-    return data
 
 def xr_save_dtt2(station1, station2, components, filterid, mwcsid, dttid, mov_stack, dataframe):
     """
@@ -3021,8 +2936,8 @@ def xr_save_dtt2(station1, station2, components, filterid, mwcsid, dttid, mov_st
     *. The data in the DataFrame is stacked, and the index is set to include "times" and "keys" as names. The column in the DataFrame is renamed to "DTT". A new or existing NetCDF file is
     * opened using the given file path, and the stacked data is inserted or updated in the file. The resulting dataset is then saved and the file is closed.
     """
-    fn = os.path.join("DVV/MWCS/DTT", "%02i" % filterid,
-                      "%02i" % mwcsid, "%02i" % dttid,
+    fn = os.path.join("DVV/MWCS/DTT", "f%02i" % filterid,
+                      "mwcs%02i" % mwcsid, "dtt%02i" % dttid,
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
@@ -3049,8 +2964,8 @@ def xr_get_dtt2(station1, station2, components, filterid, mwcsid, dttid, mov_sta
     * does not exist, it raises a FileNotFoundError. Otherwise, it opens the NetCDF file and extracts the DTT variable as a dataframe. The dataframe is then rearranged and returned as the
     * result.
     """
-    fn = os.path.join("DVV/MWCS/DTT", "%02i" % filterid,
-                      "%02i" % mwcsid, "%02i" % dttid,                      
+    fn = os.path.join("DVV/MWCS/DTT", "f%02i" % filterid,
+                      "mwcs%02i" % mwcsid, "dtt%02i" % dttid,                      
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
@@ -3061,48 +2976,9 @@ def xr_get_dtt2(station1, station2, components, filterid, mwcsid, dttid, mov_sta
     data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
     return data
 
-
-def xr_save_dvv(components, filterid, mov_stack, dataframe):
-    fn = os.path.join("DVV2", "%02i" % filterid,
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s.nc" % components)
-    if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0], exist_ok=True)
-
-    if dataframe.columns.nlevels > 1:
-        d = dataframe.stack(future_stack=True).stack(future_stack=True)
-    else:
-        d = dataframe.stack(future_stack=True)
-    
-    level_names = ["times", "level1", "level0"]
-    d.index = d.index.set_names(level_names[:d.index.nlevels])
-
-    if d.index.nlevels == 3:
-        d = d.reorder_levels(["times", "level0", "level1"])
-
-    d.columns = ["DVV"]
-    # taxis = np.unique(d.index.get_level_values('taxis'))
-    dr = xr_create_or_open(fn, taxis=[], name="DVV")
-    rr = d.to_xarray().to_dataset(name="DVV")
-    rr = xr_insert_or_update(dr, rr)
-    xr_save_and_close(rr, fn)
-    del dr, rr, d
-
-
-def xr_get_dvv(components, filterid, mov_stack):
-    fn = os.path.join("DVV2", "%02i" % filterid,
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s.nc" % components)
-    if not os.path.isfile(fn):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
-        raise FileNotFoundError(fn)
-    data = xr_create_or_open(fn, name="DVV")
-    data = data.DVV.to_dataframe().reorder_levels(['times', 'level1', 'level0']).unstack().droplevel(0, axis=1).unstack()
-    return data
-
 def xr_save_dvv2(components, filterid, mwcsid, dttid, mov_stack, dataframe):
-    fn = os.path.join("DVV/MWCS/DVV", "%02i" % filterid,
-                      "%02i" % mwcsid, "%02i" % dttid,
+    fn = os.path.join("DVV/MWCS/DVV", "f%02i" % filterid,
+                      "mwcs%02i" % mwcsid, "dtt%02i" % dttid,
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s.nc" % components)
     if not os.path.isdir(os.path.split(fn)[0]):
@@ -3129,8 +3005,8 @@ def xr_save_dvv2(components, filterid, mwcsid, dttid, mov_stack, dataframe):
 
 
 def xr_get_dvv2(components, filterid, mwcsid, dttid, mov_stack):
-    fn = os.path.join("DVV/MWCS/DVV", "%02i" % filterid,
-                      "%02i" % mwcsid, "%02i" % dttid,
+    fn = os.path.join("DVV/MWCS/DVV", "f%02i" % filterid,
+                      "mwcs%02i" % mwcsid, "dtt%02i" % dttid,
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s.nc" % components)
     if not os.path.isfile(fn):
@@ -3376,59 +3252,6 @@ def compute_dvv2(session, filterid, mwcsid, dttid, mov_stack, pairs=None, compon
 
     return stats.sort_index(axis=1)
 
-def xr_save_wct(station1, station2, components, filterid, mov_stack, taxis, dvv_df, err_df, coh_df):
-    """
-    Save the Wavelet Coherence Transform (WCT) results as a NetCDF file.
-
-    :param station1: The first station in the pair.
-    :type station1: str
-    :param station2: The second station in the pair.
-    :type station2: str
-    :param components: The components (e.g., Z, N, E) being analyzed.
-    :type components: str
-    :param filterid: Filter ID used in the analysis.
-    :type filterid: int
-    :param mov_stack: Tuple of (start, end) representing the moving stack window.
-    :type mov_stack: tuple
-    :param taxis: Time axis corresponding to the WCT data.
-    :type taxis: array-like
-    :param dvv_df: DataFrame containing dvv data (2D).
-    :type dvv_df: pandas.DataFrame
-    :param err_df: DataFrame containing err data (2D).
-    :type err_df: pandas.DataFrame
-    :param coh_df: DataFrame containing coh data (2D).
-    :type coh_df: pandas.DataFrame
-    :returns: None
-    """
-
-    # Construct the file path
-    fn = os.path.join("WCT", f"{filterid:02d}", f"{mov_stack[0]}_{mov_stack[1]}",
-                      components, f"{station1}_{station2}.nc")
-
-    # Ensure the directory exists
-    os.makedirs(os.path.dirname(fn), exist_ok=True)
-
-    # Convert DataFrames to xarray.DataArrays
-    dvv_da = xr.DataArray(dvv_df.values, coords=[dvv_df.index, dvv_df.columns], dims=['times', 'frequency'])
-    err_da = xr.DataArray(err_df.values, coords=[err_df.index, err_df.columns], dims=['times', 'frequency'])
-    coh_da = xr.DataArray(coh_df.values, coords=[coh_df.index, coh_df.columns], dims=['times', 'frequency'])
-
-    # Combine into a single xarray.Dataset
-    ds = xr.Dataset({
-        'dvv': dvv_da,
-        'err': err_da,
-        'coh': coh_da
-    })
-
-    existing_ds = xr_create_or_open(fn, name="WCT")
-    updated_ds = xr_insert_or_update(existing_ds, ds)
-    xr_save_and_close(updated_ds, fn)
-
-
-    logging.debug(f"Saved WCT data to {fn}")
-    # Clean up
-    del dvv_da, err_da, coh_da, ds
-
 def xr_save_wct2(station1, station2, components, filterid, wctid, mov_stack, taxis, freqs, WXamp_list, WXcoh_list, WXdt_list, dates_list):
     """
     Save WCT results into an xarray Dataset and store it as a NetCDF file.
@@ -3470,7 +3293,7 @@ def xr_save_wct2(station1, station2, components, filterid, wctid, mov_stack, tax
     ds = xr.Dataset({"WXamp": WXamp_da, "Wcoh": Wcoh_da, "WXdt": WXdt_da})
 
     # Define output directory
-    fn = os.path.join("DVV/WCT/WCT", "%02i" % filterid, "%02i" % wctid, 
+    fn = os.path.join("DVV/WCT/WCT", "f%02i" % filterid, "wct%02i" % wctid, 
                             "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components, 
                             f"{station1}_{station2}.nc")
     
@@ -3501,7 +3324,7 @@ def xr_load_wct(station1, station2, components, filterid, wctid, mov_stack):
 
     # Construct the file path
     fn = os.path.join(
-        "DVV/WCT/WCT", f"{filterid:02d}", f"{wctid:02d}",
+        "DVV/WCT/WCT", f"f{filterid:02d}", f"wct{wctid:02d}",
         f"{mov_stack[0]}_{mov_stack[1]}", components,
         f"{station1}_{station2}.nc"
     )
@@ -3514,7 +3337,7 @@ def xr_load_wct(station1, station2, components, filterid, wctid, mov_stack):
     ds = xr.load_dataset(fn)
     return ds
 
-def xr_save_wct2(station1, station2, components, filterid, wctid, dttid, mov_stack, taxis, dvv_df, err_df, coh_df):
+def xr_save_wct_dtt2(station1, station2, components, filterid, wctid, dttid, mov_stack, taxis, dvv_df, err_df, coh_df):
     """
     Save the Wavelet Coherence Transform (WCT) results as a NetCDF file.
 
@@ -3541,7 +3364,7 @@ def xr_save_wct2(station1, station2, components, filterid, wctid, dttid, mov_sta
 
     # Construct the file path
     fn = os.path.join(
-        "DVV/WCT/DTT", f"{filterid:02d}", f"{wctid:02d}", f"{dttid:02d}",
+        "DVV/WCT/DTT", f"f{filterid:02d}", f"wct{wctid:02d}", f"dtt{dttid:02d}",
         f"{mov_stack[0]}_{mov_stack[1]}", components,
         f"{station1}_{station2}.nc"
     )

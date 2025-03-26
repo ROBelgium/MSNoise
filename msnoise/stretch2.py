@@ -299,7 +299,7 @@ def main(loglevel="INFO"):
                         df = pd.DataFrame(
                             np.array([alldeltas, allcoefs, allerrs]).T,
                             index=alldays, columns=["Delta", "Coeff", "Error"], )
-                        output = os.path.join('DVV/STR', "%02i" % filterid, "%02i" % strid,
+                        output = os.path.join('DVV/STR', "f%02i" % filterid, "str%02i" % strid,
                                             "%s_%s" % (mov_stack[0],mov_stack[1]), components)
                         # print(df.head())
                         if not os.path.isdir(output):

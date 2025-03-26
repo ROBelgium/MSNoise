@@ -479,7 +479,7 @@ def main(loglevel="INFO"):
                                 err_df = pd.DataFrame(err_list, columns=freqs, index=dates_list)
                                 coh_df = pd.DataFrame(coh_list, columns=freqs, index=dates_list)
                             
-                                xr_save_wct2(station1, station2, components, filterid, wctid, dttid, mov_stack, taxis, dvv_df, err_df, coh_df)
+                                xr_save_wct_dtt2(station1, station2, components, filterid, wctid, dttid, mov_stack, taxis, dvv_df, err_df, coh_df)
 
 
         massive_update_job(db, jobs, "D")
