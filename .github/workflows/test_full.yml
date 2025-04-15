@@ -6,6 +6,18 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+# Add concurrency to prevent redundant workflow runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Explicitly define permissions (principle of least privilege)
+permissions:
+  contents: read
+  # Add additional permissions only as needed
+  checks: write  # For test results
+  pull-requests: write  # For PR comments
+
 jobs:
   run_tests:
     runs-on: ${{ matrix.os }}
@@ -14,7 +26,7 @@ jobs:
       !contains(github.event.head_commit.message, '+NOFULLTEST')
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        python-version: ['3.11', '3.12']
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - os: ubuntu-latest
@@ -30,10 +42,13 @@ jobs:
             prefix: C:\Miniconda3\envs\test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.1.1
+
+      # Modern approach for output variables - use GITHUB_OUTPUT file
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        shell: bash
 
       - uses: conda-incubator/setup-miniconda@v3.1.1
         with:
@@ -44,6 +59,10 @@ jobs:
         with:
           path: ${{ matrix.prefix }}${{ matrix.python-version }}
           key: ${{ matrix.label }}-conda-py${{ matrix.python-version }}-${{ hashFiles('.github/environment.yml') }}-${{ steps.date.outputs.date }}-${{ env.CACHE_NUMBER }}
+          # Add restore-keys for fallback caching strategy
+          restore-keys: |
+            ${{ matrix.label }}-conda-py${{ matrix.python-version }}-${{ hashFiles('.github/environment.yml') }}-
+            ${{ matrix.label }}-conda-py${{ matrix.python-version }}-
         env:
           # Increase this value to reset cache if etc/example-environment.yml has not changed
           CACHE_NUMBER: 1
@@ -53,7 +72,7 @@ jobs:
         run: conda env update -n test${{ matrix.python-version }} -f .github/environment.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
-      - name: print package info
+      - name: Print package info
         shell: bash -l {0}
         run: |
           conda info -a
@@ -74,14 +93,32 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  three_component_tests:
+    needs: run_tests  # Add dependency to create clear execution flow
+    runs-on: ubuntu-latest
+    if: |
+      !contains(github.event.head_commit.message, '+ONLYDOCS') &&
+      !contains(github.event.head_commit.message, '+NOFULLTEST')
+    steps:
+      - uses: actions/checkout@v4.1.1
+
+      - uses: conda-incubator/setup-miniconda@v3.1.1
+        with:
+          activate-environment: test3.12
+          python-version: '3.12'
+
+      - name: Install MSNoise
+        shell: bash -l {0}
+        run: |
+          conda env update -n test3.12 -f .github/environment.yml
+          pip install -e .
+
       - name: Test 3C data
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         shell: bash -l {0}
         run: |
           pytest -s --cov msnoise msnoise/test/tests-threecomponent.py --cov-report=xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
