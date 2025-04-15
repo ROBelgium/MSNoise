@@ -14,13 +14,16 @@ import pooch
 import pytest
 from .. import s01scan_archive, FatalError
 from ..scripts import msnoise as msnoise_script
-from ..api import (connect, get_config, update_config, get_job_types,
-                   get_new_files, get_filters, get_station_pairs,
-                   get_components_to_compute, update_filter, Filter,
-                   get_stations, update_station, get_data_availability,
-                   count_data_availability_flags, is_next_job, get_next_job,
-                   Job, reset_jobs, build_ref_datelist, build_movstack_datelist,
-                   read_db_inifile)
+from ..api import *
+                #(connect, get_config, update_config, get_job_types,
+                #   get_new_files, get_filters, get_station_pairs,
+                #   get_components_to_compute, update_filter, Filter,
+                #   get_stations, update_station, get_data_availability,
+                #   count_data_availability_flags, is_next_job, get_next_job,
+                #   Job, reset_jobs, build_ref_datelist, build_movstack_datelist,
+                #   read_db_inifile, DvvMwcs, update_dvv_mwcs, get_dvv_mwcs,
+                #   DvvMwcsDtt, update_dvv_mwcs_dtt, get_dvv_mwcs_dtt,
+                #   DvvStretching)
 from ..s01scan_archive import parse_crondays
 from ..s02new_jobs import main as new_jobs_main
 from ..s03compute_no_rotation import main as compute_cc_main
@@ -150,28 +153,26 @@ def test_004_set_and_get_filters():
     db = connect()
     filters = []
     f = Filter()
-    f.low = 0.01
-    f.mwcs_low = 0.12
-    f.high = 1.0
-    f.mwcs_high = 0.98
-    f.mwcs_wlen = 10
-    f.mwcs_step = 5
+    f.freqmin = 0.01
+    f.freqmax = 1.0
+    f.CC = True
+    f.SC = True
+    f.AC = True
     f.used = True
     filters.append(f)
     f = Filter()
-    f.low = 0.1
-    f.mwcs_low = 0.12
-    f.high = 1.0
-    f.mwcs_high = 0.98
-    f.mwcs_wlen = 10
-    f.mwcs_step = 5
+    f.freqmin = 0.1
+    f.freqmax = 1.0
+    f.CC = True
+    f.SC = True
+    f.AC = True
     f.used = True
     filters.append(f)
     for f in filters:
-        update_filter(db, f.ref, f.low, f.mwcs_low, f.high, f.mwcs_high, f.mwcs_wlen, f.mwcs_step, f.used)
+        update_filter(db, f.ref, f.freqmin, f.freqmax, f.CC, f.SC, f.AC, f.used)
     dbfilters = get_filters(db)
     for i, filter in enumerate(dbfilters):
-        for param in ['low', 'mwcs_low', 'high', 'mwcs_high', 'mwcs_wlen', 'mwcs_step', 'used']:
+        for param in ['freqmin', 'freqmax', 'CC', 'SC', 'AC', 'used']:
             assert eval(f"filter.{param}") == eval(f"filters[i].{param}")
 
 @pytest.mark.order(5)
@@ -365,19 +366,111 @@ def test_023_stack():
     db.close()
 
 @pytest.mark.order(24)
-def test_024_mwcs():
-    compute_mwcs_main()
+def test_024_mwcs_param_update():
+    db = connect()
+
+    dvv_mwcs_params = []
+
+    mwcs_param = DvvMwcs()
+    mwcs_param.freqmin = 0.2
+    mwcs_param.freqmax = 0.6
+    mwcs_param.mwcs_wlen = 10
+    mwcs_param.mwcs_step = 5
+    mwcs_param.used = True
+    dvv_mwcs_params.append(mwcs_param)
+    filter_refs = [1]
+    update_dvv_mwcs(db, mwcs_param.ref, mwcs_param.freqmin, mwcs_param.freqmax,
+                         mwcs_param.mwcs_wlen, mwcs_param.mwcs_step, mwcs_param.used, filter_refs)
+
+    mwcs_param = DvvMwcs()
+    mwcs_param.freqmin = 0.5
+    mwcs_param.freqmax = 0.9
+    mwcs_param.mwcs_wlen = 6
+    mwcs_param.mwcs_step = 3
+    mwcs_param.used = True
+    dvv_mwcs_params.append(mwcs_param)
+    filter_refs = [1,2]
+    update_dvv_mwcs(db, mwcs_param.ref, mwcs_param.freqmin, mwcs_param.freqmax,
+                         mwcs_param.mwcs_wlen, mwcs_param.mwcs_step, mwcs_param.used, filter_refs)  
+
+    db_dvv_mwcs = get_dvv_mwcs(db)
+
+    for i, dvv_mwcs in enumerate(db_dvv_mwcs):
+        for param in ['freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used']:
+            db_value = getattr(dvv_mwcs, param, None)
+            expected_value = getattr(dvv_mwcs_params[i], param, None)
+            assert db_value == expected_value, f"Mismatch in {param}: DB={db_value}, Expected={expected_value}"
 
 @pytest.mark.order(25)
-def test_025_dtt():
-    compute_dtt_main()
+def test_025_mwcs():
+    compute_mwcs_main()
 
 @pytest.mark.order(26)
-def test_026_dvv():
-    compute_dvv_main()
+def test_026_mwcs_dtt_param_update():
+    db = connect()
+
+    dvv_mwcs_dtt_params = []
+
+    # First MWCS DTT parameter set
+    dtt_param = DvvMwcsDtt()
+    dtt_param.dtt_minlag = 5.0
+    dtt_param.dtt_width = 30.0
+    dtt_param.dtt_lag = "static"
+    dtt_param.dtt_v = 1.0
+    dtt_param.dtt_sides = "both"
+    dtt_param.dtt_mincoh = 0.5
+    dtt_param.dtt_maxerr = 0.2
+    dtt_param.dtt_maxdtt = 0.05
+    dtt_param.used = True
+    dvv_mwcs_dtt_params.append(dtt_param)
+    mwcs_refs = [1,2]  # Linking to MWCS 1
+
+    update_dvv_mwcs_dtt(
+        db, dtt_param.ref, dtt_param.dtt_minlag, dtt_param.dtt_width, dtt_param.dtt_lag,
+        dtt_param.dtt_v, dtt_param.dtt_sides, dtt_param.dtt_mincoh,
+        dtt_param.dtt_maxerr, dtt_param.dtt_maxdtt, dtt_param.used, mwcs_refs
+    )
+
+    # Second MWCS DTT parameter set linked to multiple MWCS sets
+    dtt_param = DvvMwcsDtt()
+    dtt_param.dtt_minlag = 6.0
+    dtt_param.dtt_width = 40.0
+    dtt_param.dtt_lag = "dynamic"
+    dtt_param.dtt_v = 1.0
+    dtt_param.dtt_sides = "left"
+    dtt_param.dtt_mincoh = 0.6
+    dtt_param.dtt_maxerr = 0.3
+    dtt_param.dtt_maxdtt = 0.025
+    dtt_param.used = True
+    dvv_mwcs_dtt_params.append(dtt_param)
+    mwcs_refs = [2]  # Linking to MWCS 1 & 2
+
+    update_dvv_mwcs_dtt(
+        db, dtt_param.ref, dtt_param.dtt_minlag, dtt_param.dtt_width, dtt_param.dtt_lag,
+        dtt_param.dtt_v, dtt_param.dtt_sides, dtt_param.dtt_mincoh,
+        dtt_param.dtt_maxerr, dtt_param.dtt_maxdtt, dtt_param.used, mwcs_refs
+    )
+
+    # Retrieve and validate stored parameters
+    db_dvv_mwcs_dtt = get_dvv_mwcs_dtt(db)
+
+    assert len(db_dvv_mwcs_dtt) == len(dvv_mwcs_dtt_params), "Mismatch in number of MWCS-DTT entries"
+
+    for i, dtt in enumerate(db_dvv_mwcs_dtt):
+        for param in ['dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
+                      'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdtt', 'used']:
+            assert getattr(dtt, param) == getattr(dvv_mwcs_dtt_params[i], param)
 
 @pytest.mark.order(27)
-def test_027_build_ref_datelist():
+def test_027_dtt():
+    compute_dtt_main()
+
+@pytest.mark.order(28)
+def test_028_dvv():
+    compute_dvv_main()
+
+@pytest.mark.order(29)
+def test_029_build_ref_datelist():
     from ..api import build_ref_datelist
     db = connect()
     start, end, datelist = build_ref_datelist(db)
@@ -386,8 +479,8 @@ def test_027_build_ref_datelist():
     assert len(datelist) == 731
     db.close()
 
-@pytest.mark.order(28)
-def test_028_build_movstack_datelist():
+@pytest.mark.order(30)
+def test_030_build_movstack_datelist():
     from ..api import build_movstack_datelist
     db = connect()
     start, end, datelist = build_movstack_datelist(db)
@@ -396,8 +489,62 @@ def test_028_build_movstack_datelist():
     assert len(datelist) == 731
     db.close()
 
-@pytest.mark.order(29)
-def test_029_stretching():
+@pytest.mark.order(31)
+def test_031_stretching_param_update():
+    db = connect()
+
+    dvv_stretching_params = []
+
+    # First Stretching parameter set
+    stretching_param = DvvStretching()
+    stretching_param.stretching_minlag = 5
+    stretching_param.stretching_width = 20.0
+    stretching_param.stretching_lag = "static"
+    stretching_param.stretching_v = 1
+    stretching_param.stretching_sides = "both"
+    stretching_param.stretching_max = 0.05
+    stretching_param.stretching_nsteps = 500
+    stretching_param.used = True
+    dvv_stretching_params.append(stretching_param)
+    filter_refs = [1]  # Linking to Filter 1
+
+    update_dvv_stretching(
+        db, stretching_param.ref, stretching_param.stretching_minlag, stretching_param.stretching_width,
+        stretching_param.stretching_lag, stretching_param.stretching_v, stretching_param.stretching_sides,
+        stretching_param.stretching_max, stretching_param.stretching_nsteps, stretching_param.used, filter_refs
+    )
+
+    # Second Stretching parameter set linked to multiple Filters
+    stretching_param = DvvStretching()
+    stretching_param.stretching_minlag = 10
+    stretching_param.stretching_width = 40
+    stretching_param.stretching_lag = "dynamic"
+    stretching_param.stretching_v = 2.0
+    stretching_param.stretching_sides = "both"
+    stretching_param.stretching_max = 0.1
+    stretching_param.stretching_nsteps = 250
+    stretching_param.used = True
+    dvv_stretching_params.append(stretching_param)
+    filter_refs = [1, 2]  # Linking to Filters 1 & 2
+
+    update_dvv_stretching(
+        db, stretching_param.ref, stretching_param.stretching_minlag, stretching_param.stretching_width,
+        stretching_param.stretching_lag, stretching_param.stretching_v, stretching_param.stretching_sides,
+        stretching_param.stretching_max, stretching_param.stretching_nsteps, stretching_param.used, filter_refs
+    )
+
+    # Retrieve and validate stored parameters
+    db_dvv_stretching = get_dvv_stretching(db)
+
+    for i, dvv_stretching in enumerate(db_dvv_stretching):
+        for param in ['stretching_minlag', 'stretching_width', 'stretching_lag', 'stretching_v',
+                      'stretching_sides', 'stretching_max', 'stretching_nsteps', 'used']:
+            db_value = getattr(dvv_stretching, param, None)
+            expected_value = getattr(dvv_stretching_params[i], param, None)
+            assert db_value == expected_value, f"Mismatch in {param}: DB={db_value}, Expected={expected_value}"
+
+@pytest.mark.order(32)
+def test_032_stretching():
     from ..stretch2 import main as stretch_main
     db = connect()
     update_config(db, "export_format", "MSEED")
@@ -405,8 +552,8 @@ def test_029_stretching():
     db.close()
     stretch_main()
 
-@pytest.mark.order(30)
-def test_030_create_fake_new_files(setup_environment):
+@pytest.mark.order(33)
+def test_033_create_fake_new_files(setup_environment):
     data_folder = setup_environment['data_folder']
     for f in sorted(glob.glob(os.path.join(data_folder, "2010", "*", "HHZ.D", "*"))):
         st = read(f)
@@ -430,8 +577,8 @@ def test_030_create_fake_new_files(setup_environment):
     assert jobs[1][0] == 3
     assert jobs[1][1] == 'T'
 
-@pytest.mark.order(31)
-def test_031_instrument_response(setup_environment):
+@pytest.mark.order(34)
+def test_034_instrument_response(setup_environment):
     db = connect()
     response_path = setup_environment['response_path']
     update_config(db, 'response_path', response_path)
@@ -440,13 +587,132 @@ def test_031_instrument_response(setup_environment):
     db.close()
     test_013_s03compute_cc()
 
-@pytest.mark.order(32)
-def test_032_wct():
+@pytest.mark.order(35)
+def test_035_wct_param_update():
+    """Test updating and retrieving WCT parameters from the database."""
+    db = connect()
+
+    dvv_wct_params = []
+
+    # First WCT parameter set
+    wct_param = DvvWct()
+    wct_param.wct_freqmin = 0.1
+    wct_param.wct_freqmax = 2.0
+    wct_param.wct_ns = 3
+    wct_param.wct_nt = 0.25
+    wct_param.wct_vpo = 12
+    wct_param.wct_nptsfreq = 100
+    wct_param.wct_norm = True
+    wct_param.wavelet_type = str(('Morlet', 6.))
+    wct_param.used = True
+    dvv_wct_params.append(wct_param)
+    filter_refs = [1]
+
+    update_dvv_wct(db, wct_param.ref, wct_param.wct_freqmin, wct_param.wct_freqmax,
+                         wct_param.wct_ns, wct_param.wct_nt, wct_param.wct_vpo,
+                         wct_param.wct_nptsfreq, wct_param.wct_norm, wct_param.wavelet_type,
+                         wct_param.used, filter_refs)
+
+    # Second WCT parameter set
+    wct_param = DvvWct()
+    wct_param.wct_freqmin = 0.5
+    wct_param.wct_freqmax = 4
+    wct_param.wct_ns = 4
+    wct_param.wct_nt = 1
+    wct_param.wct_vpo = 10
+    wct_param.wct_nptsfreq = 80
+    wct_param.wct_norm = False
+    wct_param.wavelet_type = str(('Morlet', 8.))
+    wct_param.used = True
+    dvv_wct_params.append(wct_param)
+    filter_refs = [1,2]
+
+    update_dvv_wct(db, wct_param.ref, wct_param.wct_freqmin, wct_param.wct_freqmax,
+                         wct_param.wct_ns, wct_param.wct_nt, wct_param.wct_vpo,
+                         wct_param.wct_nptsfreq, wct_param.wct_norm, wct_param.wavelet_type,
+                         wct_param.used, filter_refs)
+
+    db_dvv_wct = get_dvv_wct(db)
+
+    for i, dvv_wct in enumerate(db_dvv_wct):  # Assuming filter ID 1
+        for param in ['wct_freqmin', 'wct_freqmax', 'wct_ns', 'wct_nt', 'wct_vpo', 'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used']:
+            db_value = getattr(dvv_wct, param, None)
+            expected_value = getattr(dvv_wct_params[i], param, None)
+            assert db_value == expected_value, f"Mismatch in {param}: DB={db_value}, Expected={expected_value}"
+
+@pytest.mark.order(36)
+def test_036_wct_dtt_param_update():
+    """Test updating and retrieving WCT-DTT parameters from the database."""
+    db = connect()
+
+    dvv_wct_dtt_params = []
+
+    # First WCT-DTT parameter set
+    dtt_param = DvvWctDtt()
+    dtt_param.wct_dtt_freqmin = 0.1
+    dtt_param.wct_dtt_freqmax = 1.0
+    dtt_param.wct_minlag = 5.0
+    dtt_param.wct_width = 30.0
+    dtt_param.wct_lag = "static"
+    dtt_param.wct_v = 1.0
+    dtt_param.wct_sides = "both"
+    dtt_param.wct_mincoh = 0.5
+    dtt_param.wct_maxdt = 2.0
+    dtt_param.wct_codacycles = 20
+    dtt_param.wct_min_nonzero = 0.25
+    dtt_param.used = True
+    dvv_wct_dtt_params.append(dtt_param)
+    wct_refs = [1]  # Linking to WCT 1
+
+    update_dvv_wct_dtt(
+        db, dtt_param.ref, dtt_param.wct_dtt_freqmin, dtt_param.wct_dtt_freqmax,
+        dtt_param.wct_minlag, dtt_param.wct_width, dtt_param.wct_lag,
+        dtt_param.wct_v, dtt_param.wct_sides, dtt_param.wct_mincoh,
+        dtt_param.wct_maxdt, dtt_param.wct_codacycles, dtt_param.wct_min_nonzero,
+        dtt_param.used, wct_refs
+    )
+
+    # Second WCT-DTT parameter set
+    dtt_param = DvvWctDtt()
+    dtt_param.wct_dtt_freqmin = 0.2
+    dtt_param.wct_dtt_freqmax = 2.0
+    dtt_param.wct_minlag = 6.0
+    dtt_param.wct_width = 40.0
+    dtt_param.wct_lag = "dynamic"
+    dtt_param.wct_v = 1.0
+    dtt_param.wct_sides = "left"
+    dtt_param.wct_mincoh = 0.6
+    dtt_param.wct_maxdt = 2.5
+    dtt_param.wct_codacycles = 25
+    dtt_param.wct_min_nonzero = 0.3
+    dtt_param.used = True
+    dvv_wct_dtt_params.append(dtt_param)
+    wct_refs = [1, 2]  # Linking to WCT 1 & 2
+
+    update_dvv_wct_dtt(
+        db, dtt_param.ref, dtt_param.wct_dtt_freqmin, dtt_param.wct_dtt_freqmax,
+        dtt_param.wct_minlag, dtt_param.wct_width, dtt_param.wct_lag,
+        dtt_param.wct_v, dtt_param.wct_sides, dtt_param.wct_mincoh,
+        dtt_param.wct_maxdt, dtt_param.wct_codacycles, dtt_param.wct_min_nonzero,
+        dtt_param.used, wct_refs
+    )
+
+    db_dvv_wct_dtt = get_dvv_wct_dtt(db)
+
+    for i, dvv_wct_dtt in enumerate(db_dvv_wct_dtt): 
+        for param in ['wct_dtt_freqmin', 'wct_dtt_freqmax', 'wct_minlag', 'wct_width', 'wct_lag',
+                      'wct_v', 'wct_sides', 'wct_mincoh', 'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used']:
+            db_value = getattr(dvv_wct_dtt, param, None)
+            expected_value = getattr(dvv_wct_dtt_params[i], param, None)
+            assert db_value == expected_value, f"Mismatch in {param}: DB={db_value}, Expected={expected_value}"
+
+@pytest.mark.order(37)
+def test_037_wct():
     from ..s08compute_wct import main as compute_wct_main
     compute_wct_main()
   
-@pytest.mark.order(33)
-def test_033_validate_stack_data():
+@pytest.mark.order(38)
+def test_038_validate_stack_data():
     from ..api import validate_stack_data
     import xarray as xr
     import numpy as np
@@ -501,8 +767,8 @@ def test_033_validate_stack_data():
     assert is_valid
     assert message == "OK"
     
-@pytest.mark.order(34)
-def test_034_stack_validation_handling():
+@pytest.mark.order(39)
+def test_039_stack_validation_handling():
     from ..api import validate_stack_data
     import xarray as xr
     import numpy as np
@@ -602,7 +868,7 @@ def test_105_db_dump():
 
 @pytest.mark.order(106)
 def test_106_plot_wct():
-    wct_dvv_main(filterid=1, components="ZZ", show=False, outfile="?.png")
+    wct_dvv_main(filterid=1, wctid=1, dttid=1, components="ZZ", show=False, outfile="?.png")
     fn = "wct ZZ-f1-dvv.png"
     assert os.path.isfile(fn), f"{fn} doesn't exist"
 

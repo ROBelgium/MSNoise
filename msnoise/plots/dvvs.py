@@ -39,8 +39,8 @@ def main(mov_stackid=None, components='ZZ', filterid=1, pairs=[],
     low = high = 0.0
     low = high = 0.0
     filter = get_filters(db, ref=filterid)
-    low = float(filter.low)
-    high = float(filter.high)
+    low = float(filter.freqmin)
+    high = float(filter.freqmax)
 
     gs = gridspec.GridSpec(len(mov_stacks), 1)
     fig = plt.figure(figsize=(12, 9))

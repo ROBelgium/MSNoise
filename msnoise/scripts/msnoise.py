@@ -156,15 +156,15 @@ def info_parameters(db):
 
     click.echo('')
     click.echo('Filters:')
-    click.echo(' ID:   [low:high]   [mwcs_low:mwcs_high] mwcs_wlen mwcs_step Used?')
+    click.echo(' ID:   [freqmin:freqmax]    CC  SC  AC   Used?') 
 
     for f in get_filters(db, all=True):
-        click.echo(' {:2d}: {:^15s} {:^20s} {:^9s} {:^9s}  {:1s}'
+        click.echo(' {:2d}: {:^15s} {:1s} {:1s} {:1s}  {:1s}'
             .format(f.ref,
-                '[{:.3f}:{:.3f}]'.format(f.low, f.high),
-                '[{:.3f}:{:.3f}]'.format(f.mwcs_low, f.mwcs_high),
-                '{:.0f}'.format(f.mwcs_wlen),
-                '{:.0f}'.format(f.mwcs_step),
+                '[{:.3f}:{:.3f}]'.format(f.freqmin, f.freqmax),
+                'Y' if f.CC else 'N',
+                'Y' if f.SC else 'N',
+                'Y' if f.AC else 'N',
                 'Y' if f.used else 'N'))
 
 
@@ -1134,7 +1134,7 @@ def dvv_compute_dvv(ctx):
 @dvv.command(name='compute_wct')
 @click.pass_context
 def dvv_compute_wct(ctx):
-    """Computes the wavelet dv/v jobs based on the new STACK data"""
+    """Computes the wavelet jobs based on the new STACK data"""
     from ..s08compute_wct import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
@@ -1151,6 +1151,7 @@ def dvv_compute_wct(ctx):
             time.sleep(delay)
         for p in processes:
             p.join()
+
 
 @dvv.group(name="plot")
 def dvv_plot():

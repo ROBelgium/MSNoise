@@ -35,14 +35,14 @@ def main(sta1, sta2, filterid, components, mov_stack=1, show=True,
     maxlag = float(get_config(db, 'maxlag'))
     start, end, datelist = build_movstack_datelist(db)
     
-    dtt_lag = get_config(db, "dtt_lag")
+    dtt_lag = get_config(db, "mwcs_dtt_lag")
     dtt_v = float(get_config(db, "dtt_v"))
     dtt_minlag = float(get_config(db, "dtt_minlag"))
     dtt_width = float(get_config(db, "dtt_width"))
-    dtt_sides = get_config(db, "dtt_sides")
-    minCoh = float(get_config(db, "dtt_mincoh"))
-    maxErr = float(get_config(db, "dtt_maxerr"))
-    maxDt = float(get_config(db, "dtt_maxdt"))
+    dtt_sides = get_config(db, "mwcs_dtt_sides")
+    minCoh = float(get_config(db, "mwcs_dtt_mincoh"))
+    maxErr = float(get_config(db, "mwcs_dtt_maxerr"))
+    maxDt = float(get_config(db, "mwcs_dtt_maxdt"))
 
     def plot_lags(minlag, maxlag):
         plt.axhline(minlag, c='g')

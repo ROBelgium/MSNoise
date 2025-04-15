@@ -137,13 +137,17 @@ import markdown
 from flask import Flask, redirect, request, render_template
 from markupsafe import Markup
 from flask import flash
+from flask_admin.contrib.sqla.filters import FilterLike
 from flask_admin import Admin, BaseView, expose
 from flask_admin.actions import action
 from flask_admin.babel import ngettext, lazy_gettext
 from flask_admin.contrib.sqla import ModelView
+from flask_admin.form.widgets import Select2Widget
 from flask_admin.model import typefmt
+from wtforms import SelectMultipleField
+from wtforms.widgets import ListWidget, CheckboxInput
 from wtforms.validators import ValidationError
-from wtforms.fields import SelectField, StringField, BooleanField, DateField
+from wtforms.fields import SelectField, StringField, BooleanField, DateField, SelectMultipleField
 from wtforms.utils import unset_value
 from flask_wtf import Form
 from flask_admin.form import widgets
@@ -151,7 +155,10 @@ from flask_admin.form import widgets
 from .api import *
 from .default import default, default_datetime_fields
 
-from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
+from .msnoise_table_def import (
+    Filter, Job, Station, Config, DataAvailability, 
+    DvvMwcs, DvvMwcsDtt, DvvStretching, DvvWct, DvvWctDtt
+)
 
 
 class GenericView(BaseView):
@@ -162,42 +169,228 @@ class GenericView(BaseView):
     def index(self):
         return self.render('admin/%s.html'%self.page, msnoise_project="test")
 
-
-class FilterView(ModelView):
-    view_title = "Filter Configuration"
-    name = "filter"
-
-    def mwcs_low(form, field):
-        if field.data < form.data['low']:
-            raise ValidationError("'mwcs_low' should be greater or equal to"
-                                  " 'low'")
-
-    def mwcs_high(form, field):
-        if field.data <= form.data['mwcs_low']:
-            raise ValidationError("'mwcs_high' should be greater than"
-                                  " 'mwcs_low'")
-
-    def high(form, field):
-        if field.data < form.data['mwcs_high']:
-            raise ValidationError("'high' should be greater or equal than"
-                                  " 'mwcs_high'")
+class DvvMwcsView(ModelView):
+    view_title = "MWCS Configuration for dv/v"
+    name = "MWCS config"
 
     def mwcs_step(form, field):
         if field.data > form.data['mwcs_wlen']:
             raise ValidationError("'mwcs_step' should be smaller or equal to"
                                   " 'mwcs_wlen'")
-    
+
     form_args = dict(
-        mwcs_low=dict(validators=[mwcs_low]),
-        mwcs_high=dict(validators=[mwcs_high]),
-        high=dict(validators=[high]),
         mwcs_step=dict(validators=[mwcs_step]),
     )
+
+    column_list = ('ref', 'filters', 'freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used')
+    form_columns = ('filters','freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used')
+
+    # Formatter to display associated filters as a comma-separated list
+    def _filters_formatter(view, context, model, name):
+        return ", ".join(str(flt.ref) for flt in model.filters)
+
+    column_formatters = {
+        'filters': _filters_formatter,
+    }
+
+    def __init__(self, session, **kwargs):
+        # Initialize the view with the correct model
+        super(DvvMwcsView, self).__init__(DvvMwcs, session, **kwargs)
+
+    @action('used',
+            lazy_gettext('Toggle Used'),
+            lazy_gettext('Are you sure you want to update selected models?'))
+    def used(self, ids):
+        model_pk = getattr(self.model, self._primary_key)
+        query = self.get_query().filter(model_pk.in_(ids))
+        for s in query.all():
+            s.used = not s.used  # Toggle True/False
+        self.session.commit()
+        return
+
+class DvvMwcsDttView(ModelView):
+    view_title = "DTT parameters Configuration for dv/v with MWCS"
+    name = "Moving-Window Cross-Spectral (MWCS) dtt config"
+
+    column_list = ('ref', 'mwcs_params', 'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
+                    'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdtt', 'used')
     
-    column_list = ('ref', 'low', 'mwcs_low', 'mwcs_high', 'high',
-                   'mwcs_wlen', 'mwcs_step', 'used')
-    form_columns = ('low', 'mwcs_low', 'mwcs_high', 'high',
-                    'mwcs_wlen', 'mwcs_step', 'used')
+    form_columns = ('mwcs_params','dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
+                    'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdtt', 'used')
+
+    # Formatter to display associated mwcs params as a comma-separated list
+    def _mwcsparams_formatter(view, context, model, name):
+        return ", ".join(str(param.ref) for param in model.mwcs_params)
+
+    column_formatters = {
+        'mwcs_params': _mwcsparams_formatter,
+    }
+
+    # Define the dropdown fields explicitly
+    form_extra_fields = {
+        'dtt_lag': SelectField(
+            'DTT Lag',
+            choices=[('static', 'Static'), ('dynamic', 'Dynamic')],
+            default='static'
+        ),
+        'dtt_sides': SelectField(
+            'DTT Sides',
+            choices=[('both', 'Both'), ('left', 'Left'), ('right', 'Right')],
+            default='both'
+        )
+    }
+
+
+    def __init__(self, session, **kwargs):
+        # Initialize the view with the correct model
+        super(DvvMwcsDttView, self).__init__(DvvMwcsDtt, session, **kwargs)
+
+    @action('used',
+            lazy_gettext('Toggle Used'),
+            lazy_gettext('Are you sure you want to update selected models?'))
+    def used(self, ids):
+        model_pk = getattr(self.model, self._primary_key)
+        query = self.get_query().filter(model_pk.in_(ids))
+        for s in query.all():
+            s.used = not s.used  # Toggle True/False
+        self.session.commit()
+        return  
+
+class DvvStretchingView(ModelView):
+    view_title = "Stretching Configuration for dv/v"
+    name = "Stretching config"
+
+    column_list = ('ref', 'filters', 'stretching_minlag', 'stretching_width', 
+                   'stretching_lag', 'stretching_v', 'stretching_sides', 
+                   'stretching_max', 'stretching_nsteps', 'used')
+    
+    form_columns = ('filters', 'stretching_minlag', 'stretching_width', 
+                    'stretching_lag', 'stretching_v', 'stretching_sides', 
+                    'stretching_max', 'stretching_nsteps', 'used')
+
+    # Formatter to display associated filters as a comma-separated list
+    def _filters_formatter(view, context, model, name):
+        return ", ".join(str(flt.ref) for flt in model.filters)
+
+    column_formatters = {
+        'filters': _filters_formatter,
+    }
+
+    # Define the dropdown fields explicitly
+    form_extra_fields = {
+        'stretching_lag': SelectField(
+            'Stretching Lag',
+            choices=[('static', 'Static'), ('dynamic', 'Dynamic')],
+            default='static'
+        ),
+        'stretching_sides': SelectField(
+            'Stretching Sides',
+            choices=[('both', 'Both'), ('left', 'Left'), ('right', 'Right')],
+            default='both'
+        )
+    }
+
+    def __init__(self, session, **kwargs):
+        super(DvvStretchingView, self).__init__(DvvStretching, session, **kwargs)
+
+    @action('used',
+            lazy_gettext('Toggle Used'),
+            lazy_gettext('Are you sure you want to update selected models?'))
+    def used(self, ids):
+        model_pk = getattr(self.model, self._primary_key)
+        query = self.get_query().filter(model_pk.in_(ids))
+        for s in query.all():
+            s.used = not s.used  # Toggle True/False
+        self.session.commit()
+        return  
+    
+class DvvWctView(ModelView):
+    view_title = "Wavelet Transform Configuration for dv/v"
+    name = "Wavelet transform (WCT) config"
+    column_list = ('ref', 'filters', 'wct_freqmin', 'wct_freqmax', 'wct_ns', 'wct_nt', 'wct_vpo', 
+                   'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used')
+    
+    form_columns = ('filters', 'wct_freqmin', 'wct_freqmax', 'wct_ns', 'wct_nt', 'wct_vpo', 
+                    'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used')
+
+    # Formatter to display associated filters as a comma-separated list
+    def _filters_formatter(view, context, model, name):
+        return ", ".join(str(flt.ref) for flt in model.filters)
+
+    column_formatters = {
+        'filters': _filters_formatter,
+    }
+
+    def __init__(self, session, **kwargs):
+        super(DvvWctView, self).__init__(DvvWct, session, **kwargs)
+
+    @action('used',
+            lazy_gettext('Toggle Used'),
+            lazy_gettext('Are you sure you want to update selected models?'))
+    def used(self, ids):
+        model_pk = getattr(self.model, self._primary_key)
+        query = self.get_query().filter(model_pk.in_(ids))
+        for s in query.all():
+            s.used = not s.used  # Toggle True/False
+        self.session.commit()
+        return  
+    
+class DvvWctDttView(ModelView):
+    view_title = "DTT parameters Configuration for dv/v with WCT"
+    name = "Wavelet transform (WCT) dtt config"
+
+    column_list = ('ref', 'wct_params', 'wct_dtt_freqmin', 'wct_dtt_freqmax', 'wct_minlag', 'wct_width', 
+                   'wct_lag', 'wct_v', 'wct_sides', 'wct_mincoh', 
+                   'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used')
+    
+    form_columns = ('wct_params', 'wct_dtt_freqmin', 'wct_dtt_freqmax', 'wct_minlag', 'wct_width', 
+                    'wct_lag', 'wct_v', 'wct_sides', 'wct_mincoh', 
+                    'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used')
+
+    # Define the dropdown fields explicitly
+    form_extra_fields = {
+        'wct_lag': SelectField(
+            'WCT Lag',
+            choices=[('static', 'Static'), ('dynamic', 'Dynamic')],
+            default='static'
+        ),
+        'wct_sides': SelectField(
+            'Stretching Sides',
+            choices=[('both', 'Both'), ('left', 'Left'), ('right', 'Right')],
+            default='both'
+        )
+    }
+
+    # Formatter to display associated mwcs params as a comma-separated list
+    def _wctparams_formatter(view, context, model, name):
+        return ", ".join(str(param.ref) for param in model.wct_params)
+
+    column_formatters = {
+        'wct_params': _wctparams_formatter,
+    }
+
+    def __init__(self, session, **kwargs):
+        super(DvvWctDttView, self).__init__(DvvWctDtt, session, **kwargs)
+
+    @action('used',
+            lazy_gettext('Toggle Used'),
+            lazy_gettext('Are you sure you want to update selected models?'))
+    def used(self, ids):
+        model_pk = getattr(self.model, self._primary_key)
+        query = self.get_query().filter(model_pk.in_(ids))
+        for s in query.all():
+            s.used = not s.used  # Toggle True/False
+        self.session.commit()
+        return  
+
+class FilterView(ModelView):
+    view_title = "Filter Configuration"
+    name = "filter"
+
+    column_list = ('ref', 'freqmin', 'freqmax',
+                    'CC', 'SC', 'AC', 'used')
+    form_columns = ('freqmin', 'freqmax',
+                    'CC', 'SC', 'AC', 'used')
     
     def __init__(self, session, **kwargs):
         # You can pass name and other parameters if you want to
@@ -353,9 +546,37 @@ class ConfigView(ModelView):
     can_set_page_size = True
     # Override displayed fields
     column_list = ('name', 'value', 'definition')
-
+    form_excluded_columns = ['used_in']
     column_sortable_list = ["name",]
     column_searchable_list = ["name"]
+
+    def get_used_for_step_choices(self):
+        """Fetch unique values for `used_in` dynamically from `default`."""
+        values = set()
+        
+        for config_name in default:
+            used_in_value = default[config_name].get("used_in", None)
+            if used_in_value:
+                # Convert from stringified list -> actual list of values
+                used_list = used_in_value.strip("[]").split(",")
+                values.update([v.strip() for v in used_list])
+
+        # Custom order: define priority manually
+        custom_order = [
+            "scan_archive",
+            "compute_cc",
+            "stack",
+            "qc",
+            "compute_dtt",
+            "compute_stretching",
+            "compute_wct",
+            "misc",
+        ]
+
+        ordered_choices = sorted(values, key=lambda x: (custom_order.index(x) if x in custom_order else len(custom_order), x))
+        choices = [(v, v) for v in ordered_choices if v]
+
+        return choices
 
     def _value_formatter(view, context, model, name):
         n = default[model.name].default
@@ -367,21 +588,25 @@ class ConfigView(ModelView):
 
     def _def_formatter(view, context, model, name):
         helpstring = default[model.name].definition
-        # helpstring =
         return Markup(markdown.markdown(helpstring))
 
     def _used_formatter(view, context, model, name):
         helpstring = default[model.name].used_in
-        # helpstring =
         return Markup(markdown.markdown(helpstring))
 
     column_formatters = {
         'value': _value_formatter,
         'definition': _def_formatter,
-        'used_for_step': _used_formatter,
+        'used_in': _used_formatter,
     }
 
     def __init__(self, session, **kwargs):
+        # Use `used_in` as a dropdown filter
+        self.column_choices = {
+            'used_in': self.get_used_for_step_choices()}
+
+        self.column_filters = [FilterLike(Config.used_in, "Used In", options=self.column_choices['used_in'])]
+
         super(ConfigView, self).__init__(Config, session, **kwargs)
 
     def edit_form(self, obj=None):
@@ -441,7 +666,7 @@ def select_filter():
     query = get_filters(db, all=False)
     for f in query:
         filters.append({'optid': f.ref,
-                        'text': "%.2f - %.2f" % (f.low, f.high)})
+                        'text': "%.2f - %.2f" % (f.freqmin, f.freqmax)})
     db.close()
     return filters
 
@@ -603,7 +828,7 @@ def filtersJSON():
     data = {}
     filters = get_filters(db, all=False)
     for f in filters:
-        data[f.ref] = "%.2f - %.2f"%(f.low, f.high)
+        data[f.ref] = "%.2f - %.2f"%(f.freqmin, f.freqmax)
     db.close()
     o = json.dumps(data)
     db.close()
@@ -983,9 +1208,18 @@ def get_app():
         jinja2.FileSystemLoader(template_folders),
     ])
 
-    admin.add_view(StationView(db, endpoint='stations', category='Configuration'))
-    admin.add_view(FilterView(db, endpoint='filters', category='Configuration'))
-    admin.add_view(ConfigView(db, endpoint='config', category='Configuration'))
+    admin.add_view(StationView(db, endpoint='stations', category='CC Config', name = 'Stations'))
+    admin.add_view(FilterView(db, endpoint='filters', category='CC Config', name='Filters'))
+    admin.add_view(ConfigView(db, endpoint='config', category='CC Config'))
+
+    admin.add_view(DvvMwcsView(db, endpoint='dvv_mwcs', category='DVV Config', name='MWCS'))
+    admin.add_view(DvvMwcsDttView(db, endpoint='dvv_mwcs_dtt', category='DVV Config', name='MWCS dt/t'))
+
+    admin.add_view(DvvWctView(db, endpoint='dvv_wct', category='DVV Config', name='Wavelet Transform (WCT)'))
+    admin.add_view(DvvWctDttView(db, endpoint='dvv_wct_dtt', category='DVV Config', name='Wavelet Transform (WCT) dt/t'))
+
+    admin.add_view(DvvStretchingView(db, endpoint='dvv_stretching', category='DVV Config', name='Stretching'))
+   
 
     admin.add_view(DataAvailabilityView(db, endpoint='data_availability',
                                         category='Database'))

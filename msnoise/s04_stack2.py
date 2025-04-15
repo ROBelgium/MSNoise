@@ -202,11 +202,12 @@ def main(stype, interval=1.0, loglevel="INFO"):
         for sta1, sta2 in pairs:
             for f in filters:
                 filterid = int(f.ref)
+                filt_components, filt_components_single_station = get_filter_components_to_compute(db, filterid, params)
 
                 if sta1 == sta2:
-                    components_to_compute = params.components_to_compute_single_station
+                    components_to_compute = filt_components_single_station
                 else:
-                    components_to_compute = params.components_to_compute
+                    components_to_compute = filt_components
 
                 for components in components_to_compute:
                     logger.info('Processing %s:%s-%s-%i REF stack' %
@@ -258,11 +259,11 @@ def main(stype, interval=1.0, loglevel="INFO"):
             sta1, sta2 = pair.split(':')
             for f in filters:
                 filterid = int(f.ref)
-
+                filt_components, filt_components_single_station = get_filter_components_to_compute(db, filterid, params)
                 if sta1 == sta2:
-                    components_to_compute = params.components_to_compute_single_station
+                    components_to_compute = filt_components_single_station
                 else:
-                    components_to_compute = params.components_to_compute
+                    components_to_compute = filt_components
 
                 for components in components_to_compute:
                     logger.info('Processing %s-%s-%i MOV stack' %

@@ -422,60 +422,64 @@ def main(loglevel="INFO"):
             tmptime = tmp[0].stats.endtime.datetime
             thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
 
-            # Standard operator for CC
-            cc_index = []
-            if len(params.components_to_compute):
-                for sta1, sta2 in itertools.combinations(names, 2):
-                    n1, s1, l1, c1 = sta1
-                    n2, s2, l2, c2 = sta2
-                    if n1 == n2 and s1 == s2 and l1 == l2:
-                        continue
-                    pair = "%s.%s.%s:%s.%s.%s" % (n1, s1, l1, n2, s2, l2)
-                    if pair not in pairs:
-                        continue
-                    comp = "%s%s" % (c1[-1], c2[-1])
-                    if comp in params.components_to_compute:
-                        cc_index.append(
-                            ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
-                             names.index(sta1), names.index(sta2)])
-
-            # Different iterator func for single station AC or SC:
-            single_station_pair_index_sc = []
-            single_station_pair_index_ac = []
-
-            if len(params.components_to_compute_single_station):
-                for sta1, sta2 in itertools.combinations_with_replacement(names, 2):
-                    n1, s1, l1, c1 = sta1
-                    n2, s2, l2, c2 = sta2
-                    if n1 != n2 or s1 != s2:
-                        continue
-                    pair = "%s.%s.%s:%s.%s.%s" % (n1, s1, l1, n2, s2, l2)
-                    if pair not in pairs:
-                        continue
-                    comp = "%s%s" % (c1[-1], c2[-1])
-                    if comp in params.components_to_compute_single_station:
-                        if c1[-1] == c2[-1]:
-                            single_station_pair_index_ac.append(
-                                ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
-                                 names.index(sta1), names.index(sta2)])
-                        else:
-                        # If the components are different, we can just
-                        # process them using the default CC code (should warn)
-                            single_station_pair_index_sc.append(
-                                ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
-                                 names.index(sta1), names.index(sta2)])
-                    if comp[::-1] in params.components_to_compute_single_station:
-                        if c1[-1] != c2[-1]:
-                            # If the components are different, we can just
-                            # process them using the default CC code (should warn)
-                            single_station_pair_index_sc.append(
-                                ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp[::-1]),
-                                 names.index(sta2), names.index(sta1)])
-
             for filterdb in filters:
                 filterid = filterdb.ref
-                filterlow = float(filterdb.low)
-                filterhigh = float(filterdb.high)
+
+                filt_components, filt_components_single_station = get_filter_components_to_compute(db, filterid, params)
+
+                # Standard operator for CC
+                cc_index = []
+                if len(filt_components):
+                    for sta1, sta2 in itertools.combinations(names, 2):
+                        n1, s1, l1, c1 = sta1
+                        n2, s2, l2, c2 = sta2
+                        if n1 == n2 and s1 == s2 and l1 == l2:
+                            continue
+                        pair = "%s.%s.%s:%s.%s.%s" % (n1, s1, l1, n2, s2, l2)
+                        if pair not in pairs:
+                            continue
+                        comp = "%s%s" % (c1[-1], c2[-1])
+                        if comp in filt_components:
+                            cc_index.append(
+                                ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
+                                names.index(sta1), names.index(sta2)])
+
+                # Different iterator func for single station AC or SC:
+                single_station_pair_index_sc = []
+                single_station_pair_index_ac = []
+
+                if len(filt_components_single_station):
+                    for sta1, sta2 in itertools.combinations_with_replacement(names, 2):
+                        n1, s1, l1, c1 = sta1
+                        n2, s2, l2, c2 = sta2
+                        if n1 != n2 or s1 != s2:
+                            continue
+                        pair = "%s.%s.%s:%s.%s.%s" % (n1, s1, l1, n2, s2, l2)
+                        if pair not in pairs:
+                            continue
+                        comp = "%s%s" % (c1[-1], c2[-1])
+                        if comp in filt_components_single_station:
+                            if c1[-1] == c2[-1]:
+                                single_station_pair_index_ac.append(
+                                    ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
+                                    names.index(sta1), names.index(sta2)])
+                            else:
+                            # If the components are different, we can just
+                            # process them using the default CC code (should warn)
+                                single_station_pair_index_sc.append(
+                                    ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
+                                    names.index(sta1), names.index(sta2)])
+                        if comp[::-1] in filt_components_single_station:
+                            if c1[-1] != c2[-1]:
+                                # If the components are different, we can just
+                                # process them using the default CC code (should warn)
+                                single_station_pair_index_sc.append(
+                                    ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp[::-1]),
+                                    names.index(sta2), names.index(sta1)])
+
+
+                filterlow = float(filterdb.freqmin)
+                filterhigh = float(filterdb.freqmax)
 
                 freq_vec = sf.fftfreq(nfft, d=dt)[:nfft // 2]
                 freq_sel = np.where((freq_vec >= filterlow) & (freq_vec <= filterhigh))[0]
