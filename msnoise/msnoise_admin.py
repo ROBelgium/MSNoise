@@ -1325,10 +1325,10 @@ def get_app():
     admin.add_view(ConfigView(db, endpoint='config', category='CC Config'))
 
     admin.add_view(DvvMwcsView(db, endpoint='dvv_mwcs', category='DVV Config', name='MWCS'))
-    admin.add_view(DvvMwcsDttView(db, endpoint='dvv_mwcs_dtt', category='DVV Config', name='MWCS dt/t'))
+    admin.add_view(DvvMwcsDttView(db, endpoint='dvv_mwcs_dtt', category='DVV Config', name='- MWCS dt/t'))
 
     admin.add_view(DvvWctView(db, endpoint='dvv_wct', category='DVV Config', name='Wavelet Transform (WCT)'))
-    admin.add_view(DvvWctDttView(db, endpoint='dvv_wct_dtt', category='DVV Config', name='Wavelet Transform (WCT) dt/t'))
+    admin.add_view(DvvWctDttView(db, endpoint='dvv_wct_dtt', category='DVV Config', name='- Wavelet Transform (WCT) dt/t'))
 
     admin.add_view(DvvStretchingView(db, endpoint='dvv_stretching', category='DVV Config', name='Stretching'))
    
