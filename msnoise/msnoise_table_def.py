@@ -129,14 +129,32 @@ def declare_tables(prefix=None):
         __incomplete_tablename__ = "dvv_mwcs"
 
         ref = Column(Integer, primary_key=True)
-        freqmin = Column(Float())
-        freqmax = Column(Float())
-        mwcs_wlen = Column(Float())
-        mwcs_step = Column(Float())
+        freqmin = Column(Float(),
+                    info={'description': 'The lower frequency bound to apply MWCS',
+                          'default': '0.1',
+                          'units': 'Hz'}
+                    )
+        freqmax = Column(Float(),
+                    info={'description': 'The upper frequency bound to apply MWCS',
+                          'default': '1.0',
+                          'units': 'Hz'}
+                    )
+        mwcs_wlen = Column(Float(),
+                    info={'description': 'Window length to perform MWCS',
+                          'default': '10',
+                          'units': 's'}
+                    )
+        mwcs_step = Column(Float(),
+                    info={'description': 'Step of the windowing procedure in MWCS',
+                          'default': '2',
+                          'units': 's'}
+                    )
         used = Column(Boolean(), default=True)
 
         # Many-to-Many relationship with Filters
-        filters = relationship("Filter", secondary=filter_mwcs_assoc, back_populates="mwcs_params")
+        filters = relationship("Filter", secondary=filter_mwcs_assoc, back_populates="mwcs_params",
+                               info={'description': 'The filters used for this MWCS parameter set',
+                                     'note': "Select one or more filters to apply this set to"})
 
         # Many-to-Many relationship with MWCS DTT settings
         dtt_params = relationship("DvvMwcsDtt", secondary=mwcs_dtt_assoc, back_populates="mwcs_params")
@@ -175,14 +193,30 @@ def declare_tables(prefix=None):
         __incomplete_tablename__ = "dvv_mwcs_dtt"
 
         ref = Column(Integer, primary_key=True)
-        dtt_minlag = Column(Float())
-        dtt_width = Column(Float())
-        dtt_lag = Column(String(255))
-        dtt_v = Column(Float())
-        dtt_sides = Column(String(255))
-        dtt_mincoh = Column(Float())
-        dtt_maxerr = Column(Float())
-        dtt_maxdtt = Column(Float())
+        dtt_minlag = Column(Float(),
+                            info={'description': 'Minimum lag time',
+                                  'units': 's'})
+        dtt_width = Column(Float(),
+                           info={'description': 'Width of the time lag window',
+                                 'units': 's'})
+        dtt_lag = Column(String(255),
+                         info={'description': 'How is the lag window defined for MWCS',
+                               'choices': ['static', 'dynamic']})
+        dtt_v = Column(Float(),
+                       info={'description': 'What velocity to use to avoid ballistic waves',
+                             'default': '1.0',
+                             'units': 'km/s'})
+        dtt_sides = Column(String(255),
+                           info={'description': 'Which sides to use',
+                                 'choices': ['both', 'left', 'right']})
+        dtt_mincoh = Column(Float(),
+                            info={'description': 'Minimum coherence on dt measurement',
+                                  'default': '0.0',})
+        dtt_maxerr = Column(Float(),
+                            info={'description': 'Maximum error on dt measurement',
+                                  'default': '0.0', })
+        dtt_maxdtt = Column(Float(),
+                            info={'description': 'Maximum dt/t value',})
         used = Column(Boolean(), default=True)
 
         # Many-to-Many relationship with MWCS parameter sets
@@ -218,17 +252,34 @@ def declare_tables(prefix=None):
         
 
         ref = Column(Integer, primary_key=True)
-        stretching_minlag = Column(Float())
-        stretching_width = Column(Float())
-        stretching_lag = Column(String(255))
-        stretching_v = Column(Float())
-        stretching_sides = Column(String(255))
-        stretching_max = Column(Float())
-        stretching_nsteps = Column(Integer())
+        stretching_minlag = Column(Float(),
+                                   info={'description': 'Minimum lag time',
+                                         'units': 's'})
+        stretching_width = Column(Float(),
+                                  info={'description': 'Width of the time lag window',
+                                        'units': 's'})
+        stretching_lag = Column(String(255),
+                                info={'description': 'How the lag window is defined for stretching',
+                                      'choices': ['static', 'dynamic']})
+        stretching_v = Column(Float(),
+                              info={'description': 'What velocity to use to avoid ballistic waves',
+                                    'units':'km/s',
+                                    'default':'1.0',})
+        stretching_sides = Column(String(255),
+                                  info={'description': 'Which sides to use',
+                                        'choices': ['both', 'left', 'right']})
+        stretching_max = Column(Float(),
+                                info={'description': 'Maximum stretching coefficient, e.g. 0.5 = 50%, 0.01 = 1%',
+                                      'default':'0.5',})
+        stretching_nsteps = Column(Integer(),
+                                   info={'description': 'Number of stretching steps between 1-``stretching_max`` and 1+``stretching_max``',
+                                         'default':'1000',})
         used = Column(Boolean(), default=True)
 
         # Many-to-Many relationship with Filters
-        filters = relationship("Filter", secondary=filter_stretching_assoc, back_populates="stretching_params")
+        filters = relationship("Filter", secondary=filter_stretching_assoc, back_populates="stretching_params",
+                               info={'description': 'The filters used for this Stretching parameter set',
+                                     'note': "Select one or more filters to apply this set to"})
 
     class DvvWct(PrefixerBase):
         """
@@ -259,18 +310,33 @@ def declare_tables(prefix=None):
         __incomplete_tablename__ = "dvv_wct"
 
         ref = Column(Integer, primary_key=True)
-        wct_freqmin = Column(Float())
-        wct_freqmax = Column(Float())
-        wct_ns = Column(Float())
-        wct_nt = Column(Float())
-        wct_vpo = Column(Float())
-        wct_nptsfreq = Column(Integer())
-        wct_norm = Column(Boolean(), default=True)
-        wavelet_type = Column(String(255))
+        wct_freqmin = Column(Float(),
+                             info={'description': 'The lower frequency bound to apply WCT',
+                                  'default': '0.1',
+                                  'units': 'Hz'})
+        wct_freqmax = Column(Float(),
+                             info={'description': 'The upper frequency bound to apply WCT',
+                                  'default': '1.0',
+                             })
+        wct_ns = Column(Float(),
+                        info={'description': 'Smoothing parameter in frequency',})
+        wct_nt = Column(Float(),
+                        info={'description': 'Smoothing parameter in time',})
+        wct_vpo = Column(Float(),
+                         info={'description': 'Spacing parameter between discrete scales',})
+        wct_nptsfreq = Column(Integer(),
+                              info={'description': 'Number of frequency points between min and max',})
+        wct_norm = Column(Boolean(), default=True,
+                          info={'description': 'If the REF and CCF are normalized before computing wavelet?',})
+        wavelet_type = Column(String(255),
+                              info={'description':'Type of wavelet function used (e.g., Morlet, Paul, DOG, MexicanHat)'})
         used = Column(Boolean(), default=True)
 
         # Many-to-Many relationship with Filters
-        filters = relationship("Filter", secondary=filter_wct_assoc, back_populates="wct_params")
+        filters = relationship("Filter", secondary=filter_wct_assoc, back_populates="wct_params",
+                               info={'description': 'The filters used for this MWCS parameter set',
+                                     'note': "Select one or more filters to apply this set to"}
+                               )
 
         # Many-to-Many relationship with WCT DTT settings
         dtt_params = relationship("DvvWctDtt", secondary=wct_dtt_assoc, back_populates="wct_params")
@@ -311,17 +377,36 @@ def declare_tables(prefix=None):
         __incomplete_tablename__ = "dvv_wct_dtt"
 
         ref = Column(Integer, primary_key=True)
-        wct_dtt_freqmin = Column(Float())
-        wct_dtt_freqmax = Column(Float())
-        wct_minlag = Column(Float())
-        wct_width = Column(Float())
-        wct_lag = Column(String(255))
-        wct_v = Column(Float())
-        wct_sides = Column(String(255))
-        wct_mincoh = Column(Float())
-        wct_maxdt = Column(Float())
-        wct_codacycles = Column(Integer())
-        wct_min_nonzero = Column(Float())
+        wct_dtt_freqmin = Column(Float(),
+                                 info={'description':'The lower frequency bound to compute the dv/v from the WCT',
+                                       'units':'Hz'})
+        wct_dtt_freqmax = Column(Float(),
+                                 info={'description':'The upper frequency bound to compute the dv/v from the WCT',
+                                       'units':'Hz'})
+        wct_minlag = Column(Float(),
+                            info={'description': 'Minimum lag time',
+                                  'units': 's'})
+        wct_width = Column(Float(),
+                           info={'description': 'Width of the time lag window',
+                                 'units': 's'})
+        wct_lag = Column(String(255),
+                         info={'description': 'How is the lag window defined for WCT',
+                               'choices': ['static', 'dynamic']})
+        wct_v = Column(Float(),
+                       info={'description': 'Velocity parameter used for dynamic lag calculation',
+                             'units':'km/s'})
+        wct_sides = Column(String(255),
+                           info={'description': 'Which sides to use',
+                                 'choices': ['both', 'left', 'right']})
+        wct_mincoh = Column(Float(),
+                            info={'description': 'Minimum coherence on dt measurement',})
+        wct_maxdt = Column(Float(),
+                           info={'description': 'Maximum dt values',
+                                 'units': 's'})
+        wct_codacycles = Column(Integer(),
+                                info={'description': 'Number of cycles of period (1/freq) between lag_min and lag_max',})
+        wct_min_nonzero = Column(Float(),
+                                 info={'description': 'Percentage of data points with non-zero weighting required for regression',})
         used = Column(Boolean(), default=True)
 
         # Many-to-Many relationship with MWCS parameter sets

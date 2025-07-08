@@ -169,7 +169,119 @@ class GenericView(BaseView):
     def index(self):
         return self.render('admin/%s.html'%self.page, msnoise_project="test")
 
-class DvvMwcsView(ModelView):
+from wtforms import StringField, SelectField, BooleanField
+from flask_admin.form import BaseForm
+from sqlalchemy import inspect
+# from flask import Markup
+
+class DescriptionField:
+    """Mixin to add description to form fields"""
+    def __call__(self, **kwargs):
+        if hasattr(self, 'description') and self.description:
+            kwargs.setdefault('title', self.description)  # For tooltip
+            field = super().__call__(**kwargs)
+            return Markup(f'''
+                {field}
+                {self.description}
+            ''')
+        return super().__call__(**kwargs)
+
+class DescriptionStringField(DescriptionField, StringField):
+    pass
+
+class DescriptionSelectField(DescriptionField, SelectField):
+    pass
+
+class DescriptionBooleanField(DescriptionField, BooleanField):
+    pass
+
+class BaseModelView(ModelView):
+    edit_template = 'admin/model/custom_edit.html'
+    create_template = 'admin/model/custom_edit.html'
+
+    def __init__(self, model, session, **kwargs):
+        super(BaseModelView, self).__init__(model, session, **kwargs)
+        self._form_descriptions = {}
+
+        # Add custom CSS
+        if not hasattr(self, 'extra_css'):
+            self.extra_css = []
+
+        self.extra_css.extend([
+            'div.help-block { padding: 5px; color: #666; font-style: italic; }',
+            'div.param-help { padding: 5px; }',
+            'div.param-help p { margin: 0; }',
+        ])
+
+        # Setup form customization
+        self.form_overrides = {}
+        self.form_widget_args = {}
+
+        # Get inspector for the model
+        inspector = inspect(model)
+
+        # Handle regular columns
+        for column in inspector.columns:
+            if hasattr(column, 'info') and 'description' in column.info:
+                self._setup_field(column.key, column.info)
+
+        # Handle relationships
+        for relationship in inspector.relationships:
+            if hasattr(relationship, 'info') and 'description' in relationship.info:
+                self._setup_field(relationship.key, relationship.info)
+
+    def _setup_field(self, key, info):
+        # Create description text
+        description = [info['description']]
+        if 'units' in info:
+            description.append(f"Units: {info['units']}")
+        if 'default' in info:
+            description.append(f"Default: {info['default']}")
+        if 'note' in info:
+            description.append(f"Note: {info['note']}")
+
+        description_text = ' | '.join(description)
+        self.column_descriptions[key] = description_text
+        self._form_descriptions[key] = description_text
+        # Override field type
+        if key in self.form_columns:
+            field_type = type(getattr(self.model, key))
+            if field_type == bool:
+                self.form_overrides[key] = DescriptionBooleanField
+            elif hasattr(getattr(self.model, key), 'property'):  # For relationships
+                self.form_overrides[key] = DescriptionSelectField
+            else:
+                self.form_overrides[key] = DescriptionStringField
+
+            # Add widget arguments
+            self.form_widget_args[key] = {
+                'description': description_text
+            }
+
+    def create_form(self, obj=None):
+        form = super(BaseModelView, self).create_form(obj)
+        self._add_descriptions_to_form(form)
+        return form
+
+    def edit_form(self, obj=None):
+        form = super(BaseModelView, self).edit_form(obj)
+        self._add_descriptions_to_form(form)
+        return form
+
+    def _add_descriptions_to_form(self, form):
+        for field_name, field in form._fields.items():
+            if field_name in self._form_descriptions:
+                field.description = Markup(self._form_descriptions[field_name])
+
+
+class DvvMwcsView(BaseModelView):
+    column_list = ['ref', 'freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used', 'filters']
+    form_columns = ['freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used', 'filters']
+
+    # Any additional view-specific configuration
+    pass
+
+class DvvMwcsView(BaseModelView):
     view_title = "MWCS Configuration for dv/v"
     name = "MWCS config"
 
@@ -208,7 +320,7 @@ class DvvMwcsView(ModelView):
         self.session.commit()
         return
 
-class DvvMwcsDttView(ModelView):
+class DvvMwcsDttView(BaseModelView):
     view_title = "DTT parameters Configuration for dv/v with MWCS"
     name = "Moving-Window Cross-Spectral (MWCS) dtt config"
 
@@ -256,7 +368,7 @@ class DvvMwcsDttView(ModelView):
         self.session.commit()
         return  
 
-class DvvStretchingView(ModelView):
+class DvvStretchingView(BaseModelView):
     view_title = "Stretching Configuration for dv/v"
     name = "Stretching config"
 
@@ -304,7 +416,7 @@ class DvvStretchingView(ModelView):
         self.session.commit()
         return  
     
-class DvvWctView(ModelView):
+class DvvWctView(BaseModelView):
     view_title = "Wavelet Transform Configuration for dv/v"
     name = "Wavelet transform (WCT) config"
     column_list = ('ref', 'filters', 'wct_freqmin', 'wct_freqmax', 'wct_ns', 'wct_nt', 'wct_vpo', 
@@ -335,7 +447,7 @@ class DvvWctView(ModelView):
         self.session.commit()
         return  
     
-class DvvWctDttView(ModelView):
+class DvvWctDttView(BaseModelView):
     view_title = "DTT parameters Configuration for dv/v with WCT"
     name = "Wavelet transform (WCT) dtt config"
 

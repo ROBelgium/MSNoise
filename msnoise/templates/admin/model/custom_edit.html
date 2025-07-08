@@ -1,0 +1,25 @@
+{% extends 'admin/model/edit.html' %}
+
+{% block form_fields %}
+    {% for field in form %}
+        {% if field.type != 'CSRFTokenField' %}
+            <div class="form-group">
+                <label for="{{ field.id }}" class="control-label">{{ field.label.text }}</label>
+                {{ field }}
+                {% if field.info.description %}
+                    <div class="help-block">
+                        <i class="fa fa-info-circle"></i>
+                        {{ field.info.description|safe }}
+                    </div>
+                {% endif %}
+                {% if field.errors %}
+                    <ul class="errors">
+                        {% for error in field.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endfor %}
+{% endblock %}
