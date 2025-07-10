@@ -1,0 +1,8 @@
+name,default,definition,type,possible_values
+resampling_method,Decimate,Resampling method,str,Lanczos/Decimate
+preprocess_lowpass,8,Preprocessing Low-pass value (in Hz),float,
+preprocess_highpass,0.01,Preprocessing High-pass value (in Hz),float,
+preprocess_max_gap,10,Preprocessing maximum gap length that will be filled by interpolation (in seconds),float,
+preprocess_taper_length,20,"Duration of the taper applied at the beginning and end of trace during the preprocessing, to allow highpass filtering (in seconds)",float,
+remove_response,N,Remove instrument response,bool,Y/N
+response_prefilt,"(0.005, 0.006, 30.0, 35.0)","Remove instrument correction pre-filter (in Hz, see <a href='https://docs.obspy.org/packages/autogen/obspy.core.trace.Trace.remove_response.html' target=""_blank"">ObsPy Doc</a> for what it means.)",eval,

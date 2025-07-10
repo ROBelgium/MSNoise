@@ -1,0 +1,75 @@
+{% extends 'admin/model/list.html' %}
+
+{% block list %}
+<!-- Workflow Chains Summary -->
+<div class="panel panel-info" style="margin-bottom: 20px;">
+    <div class="panel-heading">
+        <h3 class="panel-title">
+            <i class="fa fa-sitemap"></i> Current Workflow Chains
+        </h3>
+    </div>
+    <div class="panel-body">
+        hello bubu
+        {% if chains_summary %}
+        {% for filter_info in chains_summary %}
+        <div class="filter-chains" style="margin-bottom: 15px;">
+            <h5>
+                <span class="label label-primary">Filter {{ filter_info.filter.ref }}</span>
+                <small>({{ "%.3f"|format(filter_info.filter.freqmin) }}-{{ "%.3f"|format(filter_info.filter.freqmax) }} Hz)</small>
+            </h5>
+            <ul class="list-unstyled" style="margin-left: 20px;">
+                {% for chain in filter_info.chains %}
+                <li style="margin-bottom: 5px;">
+                                <span class="workflow-chain">
+                                    <i class="fa fa-arrow-right"></i>
+                                    {{ chain.path }}
+                                </span>
+                    <span class="pull-right">
+                                    {% if chain.is_active %}
+                                        <span class="label label-success">Active</span>
+                                    {% else %}
+                                        <span class="label label-warning">Inactive</span>
+                                    {% endif %}
+                                    <span class="badge">{{ chain.steps_count }} steps</span>
+                                    <a href="{{ url_for('workflowsteps.edit_view', id=chain.terminal_step.ref) }}"
+                                       class="btn btn-xs btn-default" title="Edit terminal step">
+                                        <i class="fa fa-edit"></i>
+                                    </a>
+                                </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% if not loop.last %}<hr>{% endif %}
+        {% endfor %}
+        {% else %}
+        <div class="text-muted">
+            <i class="fa fa-info-circle"></i>
+            No workflow chains defined yet. Create workflow steps and link them to filters to build processing chains.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Original list content -->
+{{ super() }}
+
+<style>
+    .workflow-chain {
+        font-family: monospace;
+        font-size: 0.9em;
+        color: #333;
+    }
+    .filter-chains h5 {
+        margin-top: 0;
+        margin-bottom: 10px;
+    }
+    .filter-chains ul li {
+        padding: 5px 0;
+        border-bottom: 1px solid #eee;
+    }
+    .filter-chains ul li:last-child {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}

@@ -1,1376 +1,1419 @@
-"""MSNoise Admin is a web interface that helps the user define the
-configuration for all the processing steps. It allows configuring the
-stations and filters to be used in the different steps of the workflow and
-provides a view on the database tables.
+"""
+MSNoise Web Administration Interface - Consolidated Version
 
-To start the admin:
+This module provides a Flask-Admin based web interface for managing MSNoise
+configurations, workflow chains, filters, and data processing jobs.
 
-.. code-block:: sh
-
-    $ msnoise admin
-
-Which, by default, starts a web server listening on all interfaces on port
-5000. This can be overridden by passing parameters to the command, e.g. for port
-5099:
-
-.. code-block:: sh
-
-    $ msnoise admin -p 5099
-
-
-The next step consists of opening a web browser and open the ip address of the
-machine, by default on the current machine, it'll be http://localhost:5000/ or
-http://127.0.0.1:5000/.
-
-.. image:: ../.static/msnoise_admin_home.png
-    :align: center
-
-
-The top level menu shows four items:
-
-Home
-----
-
-The index page shows
-
-* The project location and its database
-* Stats of the Data Availability, the CC, STACK, MWCS and DTT jobs.
-* Quick action buttons for resetting or deleting jobs.
-
-The name and the logo of the page can be overridden by setting an environment
-variable with a name and the HTML tag of the logo image:
-
-.. code:: sh
-    
-    set msnoise_brand="ROB|<img src='http://www.seismologie.be/img/oma/ROB-logo.svg' width=200 height=200>"
-    
-and then starting msnoise admin:
-
-.. image:: ../.static/branding.png
-    :align: center
-
-
-Configuration
---------------
-
-Station
-~~~~~~~
-
-Stations appear as a table and are editable.
-
-Stations are defined as:
-
-.. autoclass:: Station
-
-
-Filter
-~~~~~~
-
-Filters appear as a table and are editable. The filter parameters are validated
-before submission, so no errors should happen. Note: by default, the `used`
-parameter is set to `False`, **don't forget to change it!**
-
-Filters are defined as:
-
-.. autoclass:: Filter
-
-Config
-~~~~~~
-
-All configuration bits appear as a table and are editable. When editing one
-configuration item, the Edit tab shows extra information about the
-parameter, where it is used and its default value. Most of the configuration
-bits are case-sensitive!
-
-Example view:
-
-.. image:: ../.static/msnoise_admin_config.png
-    :align: center
-
-The table below lists the different fields:
-
-.. include:: ../defaults.rst
-
-Database
---------
-
-Data Availability
-~~~~~~~~~~~~~~~~~
-
-Gives a view of the `data_availability` table. Allows to bulk edit/select rows.
-Its main goal is to check that the `scan_archive` procedure has successfully
-managed to list all files from one's archive.
-
-Jobs
-~~~~
-
-Gives a view of the `jobs` table. Allows to bulk edit/select rows. Its main
-goal is to check the `new_jobs` or any other workflow step (or Plugins)
-successfully inserted/updated jobs.
-
-
-Help
-----
-
-About
-~~~~~
-
-Shows some links and information about the package. Mostly the information
-present on the github readme file.
-
-Bug Report
-~~~~~~~~~~
-
-Web view of the `msnoise bugreport -m`, allows viewing if all required python
-modules are properly installed and available for MSNoise.
-
-
+Key Features:
+- Unified Configuration Management (global and workflow-specific)
+- Dynamic Workflow Chain Creation and Management
+- Enhanced Filter Management with Workflow Associations
+- Simplified Base Classes with Modern Flask-Admin
+- Generic Workflow Handling driven by Database Schema
 """
 
-import json
+import datetime
+import logging
 import os
-from io import BytesIO
+import sys
+import traceback
+from collections import OrderedDict
 
-import flask
-import jinja2
-import markdown
-from flask import Flask, redirect, request, render_template
-from markupsafe import Markup
-from flask import flash
-from flask_admin.contrib.sqla.filters import FilterLike
-from flask_admin import Admin, BaseView, expose
-from flask_admin.actions import action
-from flask_admin.babel import ngettext, lazy_gettext
+from flask import Flask, request, redirect, url_for, flash, jsonify, render_template_string
+from flask_admin import Admin, BaseView, expose, AdminIndexView
 from flask_admin.contrib.sqla import ModelView
-from flask_admin.form.widgets import Select2Widget
+from flask_admin.form import Select2Widget
 from flask_admin.model import typefmt
-from wtforms import SelectMultipleField
-from wtforms.widgets import ListWidget, CheckboxInput
-from wtforms.validators import ValidationError
-from wtforms.fields import SelectField, StringField, BooleanField, DateField, SelectMultipleField
-from wtforms.utils import unset_value
-from flask_wtf import Form
-from flask_admin.form import widgets
+from flask_admin import helpers as admin_helpers
+from flask_babel import Babel, gettext, ngettext, lazy_gettext
+from markupsafe import Markup
+SafeMarkup = Markup
+from sqlalchemy import and_, or_, func, desc, asc
+from sqlalchemy.orm import sessionmaker
+from wtforms import Form, StringField, TextAreaField, SelectField, BooleanField, IntegerField, FloatField
+from wtforms.validators import DataRequired, Optional, NumberRange, ValidationError
+from wtforms.widgets import TextArea, Select, CheckboxInput, NumberInput
 
-from .api import *
-from .default import default, default_datetime_fields
-
-from .msnoise_table_def import (
-    Filter, Job, Station, Config, DataAvailability, 
-    DvvMwcs, DvvMwcsDtt, DvvStretching, DvvWct, DvvWctDtt
-)
+from .api import connect, get_config, get_logger
+from .msnoise_table_def import declare_tables
 
 
-class GenericView(BaseView):
-    name = "MSNoise"
-    page = "index"
+# Initialize Flask app and extensions
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'msnoise-admin-secret-key')
+app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'
+
+# Babel for internationalization
+babel = Babel(app)
+
+# Database connection
+db_session = connect()
+
+# Get schema from declare_tables
+schema = declare_tables()
+
+# Logger
+logger = get_logger('msnoise.admin', loglevel="INFO")
+
+
+# ============================================================================
+# Base Classes and Utilities
+# ============================================================================
+
+class BaseModelView(ModelView):
+    """
+    Enhanced base model view with common functionality for all MSNoise models.
+    Simplified from the original complex implementation.
+    """
+
+    # Common settings
+    can_export = True
+    can_view_details = True
+    page_size = 50
+    can_set_page_size = True
+
+    # Default column formatters
+    column_formatters = {
+        'used': lambda view, context, model, name: SafeMarkup('✓' if model.used else '✗') if hasattr(model, 'used') else '',
+    }
+
+    def __init__(self, model, session, *args, **kwargs):
+        super(BaseModelView, self).__init__(model, session, *args, **kwargs)
+        self.session = session
+
+    def get_query(self):
+        """Override to add common filters"""
+        return self.session.query(self.model)
+
+    def get_count_query(self):
+        """Override to add common filters"""
+        return self.session.query(func.count('*')).select_from(self.model)
+
+
+class MSNoiseAdminIndexView(AdminIndexView):
+    """Custom admin index view with MSNoise-specific dashboard"""
 
     @expose('/')
     def index(self):
-        return self.render('admin/%s.html'%self.page, msnoise_project="test")
+        """Display MSNoise dashboard"""
+        # Get basic statistics
+        stats = {}
+        try:
+            stats['stations'] = db_session.query(schema.Station).filter(schema.Station.used == True).count()
+            stats['filters'] = db_session.query(schema.Filter).filter(schema.Filter.used == True).count()
+            stats['workflow_steps'] = db_session.query(schema.WorkflowSteps).filter(schema.WorkflowSteps.used == True).count()
+            stats['jobs_total'] = db_session.query(schema.Job).count()
+            stats['jobs_todo'] = db_session.query(schema.Job).filter(schema.Job.flag == 'T').count()
+            stats['jobs_done'] = db_session.query(schema.Job).filter(schema.Job.flag == 'D').count()
+            stats['config_params'] = db_session.query(schema.Config).filter(schema.Config.used == True).count()
+        except Exception as e:
+            logger.error(f"Error getting dashboard stats: {e}")
+            stats = {}
 
-from wtforms import StringField, SelectField, BooleanField
-from flask_admin.form import BaseForm
-from sqlalchemy import inspect
-# from flask import Markup
+        return self.render('admin/index.html', stats=stats)
 
-class DescriptionField:
-    """Mixin to add description to form fields"""
-    def __call__(self, **kwargs):
-        if hasattr(self, 'description') and self.description:
-            kwargs.setdefault('title', self.description)  # For tooltip
-            field = super().__call__(**kwargs)
-            return Markup(f'''
-                {field}
-                {self.description}
-            ''')
-        return super().__call__(**kwargs)
 
-class DescriptionStringField(DescriptionField, StringField):
-    pass
+# ============================================================================
+# 1. Single ConfigView - Unified Configuration Management
+# ============================================================================
 
-class DescriptionSelectField(DescriptionField, SelectField):
-    pass
+class ConfigView(BaseModelView):
+    """
+    Unified configuration management for both global and workflow-specific settings.
+    This replaces all the separate DvvMwcsView, DvvStretchingView, etc. classes.
+    """
 
-class DescriptionBooleanField(DescriptionField, BooleanField):
-    pass
+    column_list = ['category', 'name', 'set_number', 'value', 'description', 'used']
+    column_searchable_list = ['name', 'category', 'value', 'description']
+    column_filters = ['category', 'set_number', 'used']
+    column_sortable_list = ['name', 'category', 'set_number']
 
-class BaseModelView(ModelView):
-    edit_template = 'admin/model/custom_edit.html'
-    create_template = 'admin/model/custom_edit.html'
+    form_columns = ['name', 'category', 'set_number', 'value', 'param_type',
+                    'default_value', 'description', 'units', 'possible_values', 'used_in', 'used']
 
-    def __init__(self, model, session, **kwargs):
-        super(BaseModelView, self).__init__(model, session, **kwargs)
-        self._form_descriptions = {}
+    column_descriptions = {
+        'name': 'Parameter name (e.g., maxlag, dtt_minlag)',
+        'category': 'Configuration category (global, mwcs, stretching, etc.)',
+        'set_number': 'Configuration set number (NULL for global configs)',
+        'value': 'Current parameter value',
+        'param_type': 'Data type of the parameter',
+        'description': 'Description of what this parameter does',
+        'used_in': 'Which processing steps use this parameter',
+        'used': 'Whether this parameter is active'
+    }
 
-        # Add custom CSS
-        if not hasattr(self, 'extra_css'):
-            self.extra_css = []
+    form_choices = {
+        'category': [
+            ('preprocess', 'preprocess'),
+            ('cc', 'cc'),
+            ('filter', 'filter'),
+            ('stack', 'stack'),
+            ('mwcs', 'MWCS'),
+            ('mwcs_dtt', 'MWCS dt/t'),
+            ('stretching', 'Stretching'),
+            ('wavelet', 'Wavelet'),
+            ('wavelet_dtt', 'Wavelet dt/t'),
+        ],
+        'param_type': [
+            ('str', 'String'),
+            ('int', 'Integer'),
+            ('float', 'Float'),
+            ('bool', 'Boolean'),
+        ]
+    }
 
-        self.extra_css.extend([
-            'div.help-block { padding: 5px; color: #666; font-style: italic; }',
-            'div.param-help { padding: 5px; }',
-            'div.param-help p { margin: 0; }',
-        ])
+    # Custom column formatters
+    column_formatters = dict(BaseModelView.column_formatters, **{
+        'value': lambda view, context, model, name: SafeMarkup(f'<code>{model.value}</code>') if model.value else '',
+        'category': lambda view, context, model, name: SafeMarkup(f'<span class="label label-info">{model.category}</span>'),
+        'param_type': lambda view, context, model, name: SafeMarkup(f'<span class="label label-default">{model.param_type}</span>'),
+        'set_number': lambda view, context, model, name: str(model.set_number) if model.set_number is not None else 'Global',
+    })
 
-        # Setup form customization
-        self.form_overrides = {}
-        self.form_widget_args = {}
+    def __init__(self, session, *args, **kwargs):
+        super(ConfigView, self).__init__(schema.Config, session, *args, **kwargs)
 
-        # Get inspector for the model
-        inspector = inspect(model)
+    def create_model(self, form):
+        """Create new configuration parameter with validation"""
+        try:
+            model = self.model()
+            form.populate_obj(model)
 
-        # Handle regular columns
-        for column in inspector.columns:
-            if hasattr(column, 'info') and 'description' in column.info:
-                self._setup_field(column.key, column.info)
+            # Validate value type
+            if model.param_type == 'int':
+                int(model.value)
+            elif model.param_type == 'float':
+                float(model.value)
+            elif model.param_type == 'bool':
+                model.value = str(model.value).lower() in ('true', 'yes', '1', 'on')
 
-        # Handle relationships
-        for relationship in inspector.relationships:
-            if hasattr(relationship, 'info') and 'description' in relationship.info:
-                self._setup_field(relationship.key, relationship.info)
+            # Validate against possible values if defined
+            model.validate_value()
 
-    def _setup_field(self, key, info):
-        # Create description text
-        description = [info['description']]
-        if 'units' in info:
-            description.append(f"Units: {info['units']}")
-        if 'default' in info:
-            description.append(f"Default: {info['default']}")
-        if 'note' in info:
-            description.append(f"Note: {info['note']}")
+            self.session.add(model)
+            self.session.commit()
+            return model
+        except Exception as e:
+            self.session.rollback()
+            flash(f'Failed to create configuration: {str(e)}', 'error')
+            return False
 
-        description_text = ' | '.join(description)
-        self.column_descriptions[key] = description_text
-        self._form_descriptions[key] = description_text
-        # Override field type
-        if key in self.form_columns:
-            field_type = type(getattr(self.model, key))
-            if field_type == bool:
-                self.form_overrides[key] = DescriptionBooleanField
-            elif hasattr(getattr(self.model, key), 'property'):  # For relationships
-                self.form_overrides[key] = DescriptionSelectField
-            else:
-                self.form_overrides[key] = DescriptionStringField
+    def update_model(self, form, model):
+        """Update configuration parameter with validation"""
+        try:
+            form.populate_obj(model)
 
-            # Add widget arguments
-            self.form_widget_args[key] = {
-                'description': description_text
-            }
+            # Validate value type
+            if model.param_type == 'int':
+                int(model.value)
+            elif model.param_type == 'float':
+                float(model.value)
+            elif model.param_type == 'bool':
+                model.value = str(model.value).lower() in ('true', 'yes', '1', 'on')
+
+            # Validate against possible values if defined
+            model.validate_value()
+
+            self.session.commit()
+            return True
+        except Exception as e:
+            self.session.rollback()
+            flash(f'Failed to update configuration: {str(e)}', 'error')
+            return False
+
+    @expose('/bulk_update/', methods=['GET', 'POST'])
+    def bulk_update(self):
+        """Bulk update configuration parameters"""
+        if request.method == 'POST':
+            try:
+                updates = request.form.to_dict()
+                for key, value in updates.items():
+                    if key.startswith('config_'):
+                        config_id = int(key.split('_')[1])
+                        config = self.session.query(schema.Config).get(config_id)
+                        if config:
+                            config.value = value
+                            config.updated_at = datetime.datetime.utcnow()
+
+                self.session.commit()
+                flash('Configuration updated successfully', 'success')
+            except Exception as e:
+                self.session.rollback()
+                flash(f'Failed to update configuration: {str(e)}', 'error')
+
+            return redirect(url_for('.index_view'))
+
+        # GET request - show bulk update form
+        configs = self.session.query(schema.Config).filter(schema.Config.used == True).all()
+        return self.render('admin/config_bulk_update.html', configs=configs)
+
+
+# ============================================================================
+# 2. Single WorkflowStepsView - Workflow Chain Management
+# ============================================================================
+
+class WorkflowStepsView(BaseModelView):
+    """
+    Enhanced workflow steps management with chain validation and filter linking.
+    This replaces the complex workflow-specific view classes.
+    """
+
+    column_list = ['ref', 'step_type', 'name', 'chain_order', 'parent_step', 'config_set_number', 'filters_count', 'used']
+    column_searchable_list = ['step_type', 'name', 'description']
+    column_filters = ['step_type', 'used', 'chain_order']
+    column_sortable_list = ['ref', 'step_type', 'chain_order', 'config_set_number', 'created_at']
+    form_columns = ['step_type', 'name', 'description', 'parent_step_ref', 'config_set_number', 'filters', 'used']
+
+    list_template = "admin/model/workflow_steps_list.html"
+
+    column_descriptions = {
+        'step_type': 'Type of workflow step (mwcs, stretching, etc.)',
+        'name': 'User-friendly name for this step',
+        'chain_order': 'Order in the processing chain',
+        'parent_step': 'Parent step in the workflow chain',
+        'config_set_number': 'Configuration set number for this step',
+        'filters': 'Filters associated with this workflow step (root steps only)',
+        'used': 'Whether this step is active'
+    }
+
+    form_choices = {
+        'step_type': [
+            ('preprocess', 'preprocess'),
+            ('cc', 'cc'),
+            ('filter', 'filter'),
+            ('stack', 'stack'),
+            ('mwcs', 'MWCS'),
+            ('mwcs_dtt', 'MWCS dt/t'),
+            ('stretching', 'Stretching'),
+            ('wavelet', 'Wavelet'),
+            ('wavelet_dtt', 'Wavelet dt/t'),
+        ]
+    }
+
+    # Custom column formatters
+    column_formatters = dict(BaseModelView.column_formatters, **{
+        'step_type': lambda view, context, model, name: SafeMarkup(f'<span class="label label-primary">{model.step_type}</span>'),
+        'parent_step': lambda view, context, model, name: f'{model.parent_step.step_type} ({model.parent_step.ref})' if model.parent_step else 'Root',
+        'chain_order': lambda view, context, model, name: SafeMarkup(f'<span class="badge">{model.chain_order}</span>'),
+        'filters_count': lambda view, context, model, name: SafeMarkup(f'<span class="badge badge-info">{len(model.filters)}</span>') if model.filters else '0',
+    })
+
+    def __init__(self, session, *args, **kwargs):
+        super(WorkflowStepsView, self).__init__(schema.WorkflowSteps, session, *args, **kwargs)
+
+    def scaffold_form(self):
+        """Override to create custom form with dynamic parent selection"""
+        form_class = super(WorkflowStepsView, self).scaffold_form()
+
+        # Replace parent_step_ref with a custom SelectField
+        from wtforms import SelectField
+
+        class CustomWorkflowStepForm(form_class):
+            parent_step_ref = SelectField(
+                'Parent Step',
+                choices=[],
+                coerce=lambda x: int(x) if x and str(x).isdigit() else None,
+                validators=[Optional()]
+            )
+
+        return CustomWorkflowStepForm
 
     def create_form(self, obj=None):
-        form = super(BaseModelView, self).create_form(obj)
-        self._add_descriptions_to_form(form)
+        """Override to populate parent choices for creation"""
+        form = super(WorkflowStepsView, self).create_form(obj)
+
+        # Set initial parent choices (empty until step type is selected)
+        form.parent_step_ref.choices = [('', 'No parent (root step)')]
+
+        # Add help text for filters field
+        if hasattr(form, 'filters'):
+            form.filters.description = 'Only root workflow steps (without parent) can be directly linked to filters'
+
         return form
 
     def edit_form(self, obj=None):
-        form = super(BaseModelView, self).edit_form(obj)
-        self._add_descriptions_to_form(form)
+        """Override to populate parent choices for editing"""
+        form = super(WorkflowStepsView, self).edit_form(obj)
+
+        if obj:
+            # Get valid parent choices for this step type
+            valid_parents = self.get_valid_parent_choices(obj.step_type, exclude_id=obj.ref)
+            form.parent_step_ref.choices = valid_parents
+
+            # Set current parent if exists
+            if obj.parent_step_ref:
+                form.parent_step_ref.data = obj.parent_step_ref
+
+            # Only show filters field for root steps
+            if obj.parent_step_ref is not None:
+                # This is a child step, remove filters field
+                if hasattr(form, 'filters'):
+                    delattr(form, 'filters')
+        else:
+            # For new objects, start with basic choices
+            form.parent_step_ref.choices = [('', 'No parent (root step)')]
+
         return form
 
-    def _add_descriptions_to_form(self, form):
-        for field_name, field in form._fields.items():
-            if field_name in self._form_descriptions:
-                field.description = Markup(self._form_descriptions[field_name])
+    def get_valid_parent_choices(self, step_type, exclude_id=None):
+        """Get valid parent choices for a given step type"""
+        choices = [('', 'No parent (root step)')]
 
+        if not step_type:
+            return choices
 
-class DvvMwcsView(BaseModelView):
-    column_list = ['ref', 'freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used', 'filters']
-    form_columns = ['freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used', 'filters']
+        # Find which step types can be parents of this step type
+        valid_parent_types = []
+        for parent_type, child_types in schema.WorkflowSteps.VALID_CHAINS.items():
+            if step_type in child_types:
+                valid_parent_types.append(parent_type)
 
-    # Any additional view-specific configuration
-    pass
+        if valid_parent_types:
+            # Get workflow steps of valid parent types
+            query = self.session.query(schema.WorkflowSteps).filter(
+                schema.WorkflowSteps.step_type.in_(valid_parent_types),
+                schema.WorkflowSteps.used == True
+            )
 
-class DvvMwcsView(BaseModelView):
-    view_title = "MWCS Configuration for dv/v"
-    name = "MWCS config"
+            # Exclude current step if editing
+            if exclude_id:
+                query = query.filter(schema.WorkflowSteps.ref != exclude_id)
 
-    def mwcs_step(form, field):
-        if field.data > form.data['mwcs_wlen']:
-            raise ValidationError("'mwcs_step' should be smaller or equal to"
-                                  " 'mwcs_wlen'")
+            valid_parents = query.all()
 
-    form_args = dict(
-        mwcs_step=dict(validators=[mwcs_step]),
-    )
-
-    column_list = ('ref', 'filters', 'freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used')
-    form_columns = ('filters','freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used')
-
-    # Formatter to display associated filters as a comma-separated list
-    def _filters_formatter(view, context, model, name):
-        return ", ".join(str(flt.ref) for flt in model.filters)
-
-    column_formatters = {
-        'filters': _filters_formatter,
-    }
-
-    def __init__(self, session, **kwargs):
-        # Initialize the view with the correct model
-        super(DvvMwcsView, self).__init__(DvvMwcs, session, **kwargs)
-
-    @action('used',
-            lazy_gettext('Toggle Used'),
-            lazy_gettext('Are you sure you want to update selected models?'))
-    def used(self, ids):
-        model_pk = getattr(self.model, self._primary_key)
-        query = self.get_query().filter(model_pk.in_(ids))
-        for s in query.all():
-            s.used = not s.used  # Toggle True/False
-        self.session.commit()
-        return
-
-class DvvMwcsDttView(BaseModelView):
-    view_title = "DTT parameters Configuration for dv/v with MWCS"
-    name = "Moving-Window Cross-Spectral (MWCS) dtt config"
-
-    column_list = ('ref', 'mwcs_params', 'dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
-                    'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdtt', 'used')
-    
-    form_columns = ('mwcs_params','dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
-                    'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdtt', 'used')
-
-    # Formatter to display associated mwcs params as a comma-separated list
-    def _mwcsparams_formatter(view, context, model, name):
-        return ", ".join(str(param.ref) for param in model.mwcs_params)
-
-    column_formatters = {
-        'mwcs_params': _mwcsparams_formatter,
-    }
-
-    # Define the dropdown fields explicitly
-    form_extra_fields = {
-        'dtt_lag': SelectField(
-            'DTT Lag',
-            choices=[('static', 'Static'), ('dynamic', 'Dynamic')],
-            default='static'
-        ),
-        'dtt_sides': SelectField(
-            'DTT Sides',
-            choices=[('both', 'Both'), ('left', 'Left'), ('right', 'Right')],
-            default='both'
-        )
-    }
-
-
-    def __init__(self, session, **kwargs):
-        # Initialize the view with the correct model
-        super(DvvMwcsDttView, self).__init__(DvvMwcsDtt, session, **kwargs)
-
-    @action('used',
-            lazy_gettext('Toggle Used'),
-            lazy_gettext('Are you sure you want to update selected models?'))
-    def used(self, ids):
-        model_pk = getattr(self.model, self._primary_key)
-        query = self.get_query().filter(model_pk.in_(ids))
-        for s in query.all():
-            s.used = not s.used  # Toggle True/False
-        self.session.commit()
-        return  
-
-class DvvStretchingView(BaseModelView):
-    view_title = "Stretching Configuration for dv/v"
-    name = "Stretching config"
-
-    column_list = ('ref', 'filters', 'stretching_minlag', 'stretching_width', 
-                   'stretching_lag', 'stretching_v', 'stretching_sides', 
-                   'stretching_max', 'stretching_nsteps', 'used')
-    
-    form_columns = ('filters', 'stretching_minlag', 'stretching_width', 
-                    'stretching_lag', 'stretching_v', 'stretching_sides', 
-                    'stretching_max', 'stretching_nsteps', 'used')
-
-    # Formatter to display associated filters as a comma-separated list
-    def _filters_formatter(view, context, model, name):
-        return ", ".join(str(flt.ref) for flt in model.filters)
-
-    column_formatters = {
-        'filters': _filters_formatter,
-    }
-
-    # Define the dropdown fields explicitly
-    form_extra_fields = {
-        'stretching_lag': SelectField(
-            'Stretching Lag',
-            choices=[('static', 'Static'), ('dynamic', 'Dynamic')],
-            default='static'
-        ),
-        'stretching_sides': SelectField(
-            'Stretching Sides',
-            choices=[('both', 'Both'), ('left', 'Left'), ('right', 'Right')],
-            default='both'
-        )
-    }
-
-    def __init__(self, session, **kwargs):
-        super(DvvStretchingView, self).__init__(DvvStretching, session, **kwargs)
-
-    @action('used',
-            lazy_gettext('Toggle Used'),
-            lazy_gettext('Are you sure you want to update selected models?'))
-    def used(self, ids):
-        model_pk = getattr(self.model, self._primary_key)
-        query = self.get_query().filter(model_pk.in_(ids))
-        for s in query.all():
-            s.used = not s.used  # Toggle True/False
-        self.session.commit()
-        return  
-    
-class DvvWctView(BaseModelView):
-    view_title = "Wavelet Transform Configuration for dv/v"
-    name = "Wavelet transform (WCT) config"
-    column_list = ('ref', 'filters', 'wct_freqmin', 'wct_freqmax', 'wct_ns', 'wct_nt', 'wct_vpo', 
-                   'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used')
-    
-    form_columns = ('filters', 'wct_freqmin', 'wct_freqmax', 'wct_ns', 'wct_nt', 'wct_vpo', 
-                    'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used')
-
-    # Formatter to display associated filters as a comma-separated list
-    def _filters_formatter(view, context, model, name):
-        return ", ".join(str(flt.ref) for flt in model.filters)
-
-    column_formatters = {
-        'filters': _filters_formatter,
-    }
-
-    def __init__(self, session, **kwargs):
-        super(DvvWctView, self).__init__(DvvWct, session, **kwargs)
-
-    @action('used',
-            lazy_gettext('Toggle Used'),
-            lazy_gettext('Are you sure you want to update selected models?'))
-    def used(self, ids):
-        model_pk = getattr(self.model, self._primary_key)
-        query = self.get_query().filter(model_pk.in_(ids))
-        for s in query.all():
-            s.used = not s.used  # Toggle True/False
-        self.session.commit()
-        return  
-    
-class DvvWctDttView(BaseModelView):
-    view_title = "DTT parameters Configuration for dv/v with WCT"
-    name = "Wavelet transform (WCT) dtt config"
-
-    column_list = ('ref', 'wct_params', 'wct_dtt_freqmin', 'wct_dtt_freqmax', 'wct_minlag', 'wct_width', 
-                   'wct_lag', 'wct_v', 'wct_sides', 'wct_mincoh', 
-                   'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used')
-    
-    form_columns = ('wct_params', 'wct_dtt_freqmin', 'wct_dtt_freqmax', 'wct_minlag', 'wct_width', 
-                    'wct_lag', 'wct_v', 'wct_sides', 'wct_mincoh', 
-                    'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used')
-
-    # Define the dropdown fields explicitly
-    form_extra_fields = {
-        'wct_lag': SelectField(
-            'WCT Lag',
-            choices=[('static', 'Static'), ('dynamic', 'Dynamic')],
-            default='static'
-        ),
-        'wct_sides': SelectField(
-            'Stretching Sides',
-            choices=[('both', 'Both'), ('left', 'Left'), ('right', 'Right')],
-            default='both'
-        )
-    }
-
-    # Formatter to display associated mwcs params as a comma-separated list
-    def _wctparams_formatter(view, context, model, name):
-        return ", ".join(str(param.ref) for param in model.wct_params)
-
-    column_formatters = {
-        'wct_params': _wctparams_formatter,
-    }
-
-    def __init__(self, session, **kwargs):
-        super(DvvWctDttView, self).__init__(DvvWctDtt, session, **kwargs)
-
-    @action('used',
-            lazy_gettext('Toggle Used'),
-            lazy_gettext('Are you sure you want to update selected models?'))
-    def used(self, ids):
-        model_pk = getattr(self.model, self._primary_key)
-        query = self.get_query().filter(model_pk.in_(ids))
-        for s in query.all():
-            s.used = not s.used  # Toggle True/False
-        self.session.commit()
-        return  
-
-class FilterView(ModelView):
-    view_title = "Filter Configuration"
-    name = "filter"
-
-    column_list = ('ref', 'freqmin', 'freqmax',
-                    'CC', 'SC', 'AC', 'used')
-    form_columns = ('freqmin', 'freqmax',
-                    'CC', 'SC', 'AC', 'used')
-    
-    def __init__(self, session, **kwargs):
-        # You can pass name and other parameters if you want to
-        super(FilterView, self).__init__(Filter, session, **kwargs)
-        
-    @action('used',
-            lazy_gettext('Toggle Used'),
-            lazy_gettext('Are you sure you want to update selected models?'))
-    def used(self, ids):
-        model_pk = getattr(self.model, self._primary_key)
-        query = self.get_query().filter(model_pk.in_(ids))
-        for s in query.all():
-            if s.used:
-                s.used = False
-            else:
-                s.used = True
-        self.session.commit()
-        return  
-
-
-MY_DEFAULT_FORMATTERS = dict(typefmt.BASE_FORMATTERS)
-MY_DEFAULT_FORMATTERS.update({
-        type(None): typefmt.null_formatter,
-    })
-
-
-class StationView(ModelView):
-    view_title = "Station Configuration"
-    column_filters = ('net', 'used')
-    column_type_formatters = MY_DEFAULT_FORMATTERS
-    can_set_page_size = True
-
-    def __init__(self, session, **kwargs):
-        super(StationView, self).__init__(Station, session, **kwargs)
-    
-    @action('used',
-            lazy_gettext('Toggle Used'),
-            lazy_gettext('Are you sure you want to update selected models?'))
-    def used(self, ids):
-        model_pk = getattr(self.model, self._primary_key)
-        query = self.get_query().filter(model_pk.in_(ids))
-        for s in query.all():
-            if s.used:
-                s.used = False
-            else:
-                s.used = True
-        self.session.commit()
-        return  
-
-
-class DataAvailabilityView(ModelView):
-    view_title = "Data Availability"
-    can_create = False
-    can_delete = True
-    can_edit = True
-    page_size = 100
-    can_set_page_size = True
-    column_filters = ('net', 'sta', 'loc', 'chan', 'data_duration', 'gaps_duration',
-                      'samplerate', 'flag')
-
-    def __init__(self, session, **kwargs):
-        super(DataAvailabilityView, self).__init__(DataAvailability, session,
-                                                   **kwargs)
-    
-    @action('modified',
-            lazy_gettext('Mark as (M)odified'),
-            lazy_gettext('Are you sure you want to update selected models?'))
-    def modified(self, ids):
-        model_pk = getattr(self.model, self._primary_key)
-        query = self.get_query().filter(model_pk.in_(ids))
-        count = 0
-        for s in query.all():
-            s.flag = 'M'
-            count += 1
-        self.session.commit()
-        flash(ngettext('Model was successfully flagged (M)odified.',
-                       '%(count)s models were successfully flagged (M)odified.',
-              count, count=count))
-        return
-    
-
-class JobView(ModelView):
-    view_title = "Jobs"
-    can_create = False
-    can_delete = True
-    can_edit = True
-    column_filters = ('pair', 'jobtype', 'flag')
-    page_size = 100
-    edit_modal = True
-    can_set_page_size = True
-
-    def __init__(self, session, **kwargs):
-        super(JobView, self).__init__(Job, session, **kwargs)
-    
-    @action('todo',
-            lazy_gettext('Mark as (T)odo'),
-            lazy_gettext('Are you sure you want to update selected models?'))
-    def todo(self, ids):
-        model_pk = getattr(self.model, self._primary_key)
-        query = self.get_query().filter(model_pk.in_(ids))
-        for s in query.all():
-            s.flag = 'T'
-        self.session.commit()
-        return
-    
-    @action('done',
-            lazy_gettext('Mark as (D)one'),
-            lazy_gettext('Are you sure you want to update selected models?'))
-    def done(self, ids):
-        model_pk = getattr(self.model, self._primary_key)
-        query = self.get_query().filter(model_pk.in_(ids))
-        for s in query.all():
-            s.flag = 'D'
-        self.session.commit()
-        return
-    
-    @action('deletetype',
-            lazy_gettext('Delete all Jobs of the same "Type"'),
-            lazy_gettext('Are you sure you want to delete all those models?'))
-    def deletetype(self, ids):
-        model_pk = getattr(self.model, self._primary_key)
-        query = self.get_query().filter(model_pk.in_(ids))
-        for s in query.all():
-            type_to_delete = s.jobtype
-        self.get_query().filter(Job.jobtype == type_to_delete).delete()
-        self.session.commit()
-        return
-    
-    @action('massTodo',
-            lazy_gettext('Mark all Jobs of the same Type as (T)odo'),
-            lazy_gettext('Are you sure you want to update all those models?'))
-    def massTodo(self, ids):
-        model_pk = getattr(self.model, self._primary_key)
-        query = self.get_query().filter(model_pk.in_(ids))
-        for s in query.all():
-            type_to_delete = s.jobtype
-        
-        for s in self.get_query().filter(Job.jobtype == type_to_delete).all():
-            s.flag = 'T'
-        self.session.commit()
-        return
-
-
-
-class ConfigView(ModelView):
-    # Disable model creation
-    edit_template = 'admin/model/edit-config.html'
-
-    view_title = "MSNoise General Configuration"
-    can_create = False
-    can_delete = False
-    page_size = 100
-    can_set_page_size = True
-    # Override displayed fields
-    column_list = ('name', 'value', 'definition')
-    form_excluded_columns = ['used_in']
-    column_sortable_list = ["name",]
-    column_searchable_list = ["name"]
-
-    def get_used_for_step_choices(self):
-        """Fetch unique values for `used_in` dynamically from `default`."""
-        values = set()
-        
-        for config_name in default:
-            used_in_value = default[config_name].get("used_in", None)
-            if used_in_value:
-                # Convert from stringified list -> actual list of values
-                used_list = used_in_value.strip("[]").split(",")
-                values.update([v.strip() for v in used_list])
-
-        # Custom order: define priority manually
-        custom_order = [
-            "scan_archive",
-            "compute_cc",
-            "stack",
-            "qc",
-            "compute_dtt",
-            "compute_stretching",
-            "compute_wct",
-            "misc",
-        ]
-
-        ordered_choices = sorted(values, key=lambda x: (custom_order.index(x) if x in custom_order else len(custom_order), x))
-        choices = [(v, v) for v in ordered_choices if v]
+            for parent in valid_parents:
+                choice_text = f'{parent.step_type} - {parent.name or "Unnamed"} (ID: {parent.ref})'
+                choices.append((str(parent.ref), choice_text))
 
         return choices
 
-    def _value_formatter(view, context, model, name):
-        n = default[model.name].default
-        if n != model.value:
-            helpstring = "<strike>%s</strike><br><b><span style='color:green'>%s</span></b>" % (n, model.value)
+    def create_model(self, form):
+        """Create new workflow step with chain validation"""
+        try:
+            # Basic validation before creating model
+            step_type = form.step_type.data
+            parent_step_ref = form.parent_step_ref.data
+
+            # Validate parent-child relationship
+            if parent_step_ref:
+                parent = self.session.query(schema.WorkflowSteps).get(parent_step_ref)
+                if not parent:
+                    flash('Selected parent step does not exist', 'error')
+                    return False
+
+                # Check if this is a valid chain
+                valid_children = schema.WorkflowSteps.VALID_CHAINS.get(parent.step_type, [])
+                if step_type not in valid_children:
+                    flash(f'Invalid chain: {parent.step_type} cannot be followed by {step_type}', 'error')
+                    return False
+
+            # Create the model
+            model = self.model()
+            form.populate_obj(model)
+
+            # Set chain order
+            if model.parent_step_ref:
+                parent = self.session.query(schema.WorkflowSteps).get(model.parent_step_ref)
+                if parent:
+                    model.chain_order = parent.chain_order + 1
+                # Child steps should not have direct filter connections
+                if hasattr(model, 'filters'):
+                    model.filters = []
+            else:
+                model.chain_order = 0
+                # Root steps must have filter connections
+                if not form.filters.data:
+                    flash('Root workflow steps must be connected to at least one filter', 'error')
+                    return False
+
+            self.session.add(model)
+            self.session.commit()
+            return model
+
+        except Exception as e:
+            self.session.rollback()
+            flash(f'Failed to create workflow step: {str(e)}', 'error')
+            return False
+
+    def update_model(self, form, model):
+        """Update workflow step with chain validation"""
+        try:
+            # Store old values
+            old_parent = model.parent_step_ref
+            old_step_type = model.step_type
+
+            # Basic validation
+            step_type = form.step_type.data
+            parent_step_ref = form.parent_step_ref.data
+
+            # Validate parent-child relationship
+            if parent_step_ref:
+                parent = self.session.query(schema.WorkflowSteps).get(parent_step_ref)
+                if not parent:
+                    flash('Selected parent step does not exist', 'error')
+                    return False
+
+                # Check if this is a valid chain
+                valid_children = schema.WorkflowSteps.VALID_CHAINS.get(parent.step_type, [])
+                if step_type not in valid_children:
+                    flash(f'Invalid chain: {parent.step_type} cannot be followed by {step_type}', 'error')
+                    return False
+
+                # Check for circular reference (simple check)
+                if parent_step_ref == model.ref:
+                    flash('A workflow step cannot be its own parent', 'error')
+                    return False
+
+            # Update the model
+            form.populate_obj(model)
+
+            # Update chain order if parent changed
+            if model.parent_step_ref != old_parent:
+                if model.parent_step_ref:
+                    parent = self.session.query(schema.WorkflowSteps).get(model.parent_step_ref)
+                    if parent:
+                        model.chain_order = parent.chain_order + 1
+                else:
+                    model.chain_order = 0
+
+            # Handle filter connections
+            if model.parent_step_ref is not None:
+                # Child steps should not have direct filter connections
+                if hasattr(model, 'filters'):
+                    model.filters = []
+            else:
+                # Root steps should have filter connections
+                if not model.filters:
+                    flash('Root workflow steps should be connected to at least one filter', 'warning')
+
+            self.session.commit()
+            return True
+
+        except Exception as e:
+            self.session.rollback()
+            flash(f'Failed to update workflow step: {str(e)}', 'error')
+            return False
+
+    @expose('/get_parent_options')
+    def get_parent_options(self):
+        """AJAX endpoint to get valid parent options for a step type"""
+        step_type = request.args.get('step_type')
+        current_id = request.args.get('current_id')
+
+        if not step_type:
+            return jsonify({'options': [{'value': '', 'text': 'No parent (root step)'}]})
+
+        try:
+            exclude_id = int(current_id) if current_id else None
+            choices = self.get_valid_parent_choices(step_type, exclude_id=exclude_id)
+
+            options = []
+            for value, text in choices:
+                options.append({'value': value, 'text': text})
+
+            return jsonify({'options': options})
+
+        except Exception as e:
+            return jsonify({'error': str(e)})
+
+    @expose('/chain_builder/')
+    def chain_builder(self):
+        """Interactive workflow chain builder"""
+        filters = self.session.query(schema.Filter).filter(schema.Filter.used == True).all()
+        workflow_steps = self.session.query(schema.WorkflowSteps).all()
+
+        return self.render('admin/workflow_chain_builder.html',
+                           filters=filters,
+                           workflow_steps=workflow_steps,
+                           valid_chains=schema.WorkflowSteps.VALID_CHAINS)
+
+    @expose('/filter_associations/<int:step_id>')
+    def filter_associations(self, step_id):
+        """Show filter associations for a workflow step"""
+        step = self.session.query(schema.WorkflowSteps).get_or_404(step_id)
+
+        if step.parent_step_ref is not None:
+            # Child step - show filters from root step
+            root_step = step.get_root_step(self.session)
+            filters = root_step.filters if root_step else []
+            message = f"This child step inherits filters from root step: {root_step.name or root_step.step_type}" if root_step else "No root step found"
         else:
-            helpstring = n
-        return Markup(markdown.markdown(helpstring))
+            # Root step - show direct filters
+            filters = step.filters
+            message = "This root step has the following direct filter associations:"
 
-    def _def_formatter(view, context, model, name):
-        helpstring = default[model.name].definition
-        return Markup(markdown.markdown(helpstring))
+        return self.render('admin/workflow_step_filters.html',
+                           step=step,
+                           filters=filters,
+                           message=message)
 
-    def _used_formatter(view, context, model, name):
-        helpstring = default[model.name].used_in
-        return Markup(markdown.markdown(helpstring))
+# ============================================================================
+# 3. Enhanced FilterView - Filter Management with Workflow Associations
+# ============================================================================
 
-    column_formatters = {
-        'value': _value_formatter,
-        'definition': _def_formatter,
-        'used_in': _used_formatter,
+class FilterView(BaseModelView):
+    """
+    Enhanced filter management with workflow associations and validation.
+    """
+
+    column_list = ['ref', 'freqmin', 'freqmax', 'CC', 'SC', 'AC', 'used', 'workflow_steps_count']
+    column_searchable_list = ['freqmin', 'freqmax']
+    column_filters = ['CC', 'SC', 'AC', 'used']
+    column_sortable_list = ['ref', 'freqmin', 'freqmax', 'used']
+
+    form_columns = ['freqmin', 'freqmax', 'CC', 'SC', 'AC', 'workflow_steps', 'used']
+
+    column_descriptions = {
+        'freqmin': 'Lower frequency bound (Hz)',
+        'freqmax': 'Upper frequency bound (Hz)',
+        'CC': 'Compute cross-correlation between different stations',
+        'SC': 'Compute cross-correlation between different components of same station',
+        'AC': 'Compute auto-correlation from single station components',
+        'workflow_steps': 'Root workflow steps that use this filter',
+        'used': 'Whether this filter is active'
     }
 
-    def __init__(self, session, **kwargs):
-        # Use `used_in` as a dropdown filter
-        self.column_choices = {
-            'used_in': self.get_used_for_step_choices()}
+    # Custom column formatters
+    column_formatters = dict(BaseModelView.column_formatters, **{
+        'freqmin': lambda view, context, model, name: f'{model.freqmin:.3f}' if model.freqmin else '',
+        'freqmax': lambda view, context, model, name: f'{model.freqmax:.3f}' if model.freqmax else '',
+        'workflow_steps_count': lambda view, context, model, name: SafeMarkup(f'<span class="badge badge-success">{len(model.workflow_steps)}</span>') if model.workflow_steps else '0',
+    })
 
-        self.column_filters = [FilterLike(Config.used_in, "Used In", options=self.column_choices['used_in'])]
+    def __init__(self, session, *args, **kwargs):
+        super(FilterView, self).__init__(schema.Filter, session, *args, **kwargs)
 
-        super(ConfigView, self).__init__(Config, session, **kwargs)
+    def get_form(self):
+        """Override to customize the workflow_steps field"""
+        form = super(FilterView, self).get_form()
 
-    def edit_form(self, obj=None):
-        form = super(ModelView, self).edit_form(obj)
-        d = default[obj.name]
-        if obj.name in default_datetime_fields:
-            nf = DateField("value", widget=widgets.DatePickerWidget())
-            nf = nf.bind(form, "value")
-            if obj.value == "1970-01-01":
-                nf.data = datetime.datetime.strptime("2023-01-01", "%Y-%m-%d")
-            else:
-                nf.data = datetime.datetime.strptime(obj.value, "%Y-%m-%d")
-            form._fields["value"] = nf
+        # Customize the workflow_steps field to only show root steps
+        if hasattr(form, 'workflow_steps'):
+            form.workflow_steps.query_factory = lambda: self.session.query(schema.WorkflowSteps).filter(
+                schema.WorkflowSteps.parent_step_ref.is_(None),
+                schema.WorkflowSteps.used == True
+            ).all()
 
-        elif len(d.possible_values):
-            choices = [(val, val) for val in d.possible_values.split("/")]
-            nf = SelectField("Value", choices=choices)
-            nf = nf.bind(form, "value")
-            nf.data = obj.value
-            form._fields["value"] = nf
-
-        elif default[obj.name].type is bool:
-            nf = SelectField("Value", choices=[("Y", "Yes"),
-                                               ("N", "No")])
-            nf = nf.bind(form, "value")
-            nf.data = obj.value
-            form._fields["value"] = nf
+            form.workflow_steps.render_kw = {
+                'data-toggle': 'tooltip',
+                'data-placement': 'top',
+                'title': 'Only root workflow steps (without parent) can be directly linked to filters'
+            }
 
         return form
 
-    @expose('/edit/', methods=['GET', 'POST'])
-    def edit_view(self):
-        id = request.args.get('id')
-        helpstring = default[id].definition
-        helpstring = Markup(markdown.markdown(helpstring))
-        self._template_args['helpstring'] = helpstring
-        self._template_args['helpstringdefault'] = default[id].default
-        return super(ConfigView, self).edit_view()
+    def create_model(self, form):
+        """Create new filter with frequency validation"""
+        try:
+            model = self.model()
+            form.populate_obj(model)
 
-    def on_model_change(self, form, model, is_created):
-        if form.data['value']:
-            model.value = form.value.data.strip()
+            # Validate frequencies
+            model.validate_frequencies()
+
+            # Validate that only root workflow steps are associated
+            for step in model.workflow_steps:
+                if step.parent_step_ref is not None:
+                    raise ValueError(f"Cannot associate filter with child workflow step: {step.name}")
+
+            self.session.add(model)
+            self.session.commit()
+            return model
+        except Exception as e:
+            self.session.rollback()
+            flash(f'Failed to create filter: {str(e)}', 'error')
+            return False
+
+    def update_model(self, form, model):
+        """Update filter with frequency validation"""
+        try:
+            form.populate_obj(model)
+
+            # Validate frequencies
+            model.validate_frequencies()
+
+            # Validate that only root workflow steps are associated
+            for step in model.workflow_steps:
+                if step.parent_step_ref is not None:
+                    raise ValueError(f"Cannot associate filter with child workflow step: {step.name}")
+
+            self.session.commit()
+            return True
+        except Exception as e:
+            self.session.rollback()
+            flash(f'Failed to update filter: {str(e)}', 'error')
+            return False
+
+    @expose('/workflow_associations/<int:filter_id>')
+    def workflow_associations(self, filter_id):
+        """Show workflow associations for a filter"""
+        filter_obj = self.session.query(schema.Filter).get_or_404(filter_id)
+        workflows = filter_obj.get_processing_workflows(self.session)
+
+        return self.render('admin/filter_workflows.html',
+                           filter=filter_obj,
+                           workflows=workflows)
+
+# ============================================================================
+# 4. Simplified Base Classes - Standard Model Views
+# ============================================================================
+
+class StationView(BaseModelView):
+    """Simplified station management"""
+
+    column_list = ['ref', 'net', 'sta', 'X', 'Y', 'altitude', 'coordinates', 'used']
+    column_searchable_list = ['net', 'sta']
+    column_filters = ['net', 'coordinates', 'used']
+    column_sortable_list = ['ref', 'net', 'sta', 'X', 'Y', 'used']
+
+    form_columns = ['net', 'sta', 'X', 'Y', 'altitude', 'coordinates',
+                    'used_location_codes', 'used_channel_names', 'used']
+
+    def __init__(self, session, *args, **kwargs):
+        super(StationView, self).__init__(schema.Station, session, *args, **kwargs)
+
+
+class JobView(BaseModelView):
+    """Simplified job management"""
+
+    column_list = ['ref', 'day', 'pair', 'jobtype', 'flag', 'lastmod']
+    column_searchable_list = ['day', 'pair', 'jobtype']
+    column_filters = ['jobtype', 'flag']
+    column_sortable_list = ['ref', 'day', 'pair', 'jobtype', 'flag', 'lastmod']
+
+    form_columns = ['day', 'pair', 'jobtype', 'flag']
+
+    # Custom column formatters
+    column_formatters = dict(BaseModelView.column_formatters, **{
+        'flag': lambda view, context, model, name: SafeMarkup(
+            f'<span class="label label-{"success" if model.flag == "D" else "warning" if model.flag == "I" else "default"}">'
+            f'{"Done" if model.flag == "D" else "In Progress" if model.flag == "I" else "Todo"}</span>'
+        ),
+        'lastmod': lambda view, context, model, name: model.lastmod.strftime('%Y-%m-%d %H:%M:%S') if model.lastmod else '',
+    })
+
+    def __init__(self, session, *args, **kwargs):
+        super(JobView, self).__init__(schema.Job, session, *args, **kwargs)
+
+
+class DataAvailabilityView(BaseModelView):
+    """Simplified data availability management"""
+
+    column_list = ['ref', 'net', 'sta', 'loc', 'chan', 'starttime', 'endtime', 'samplerate', 'flag']
+    column_searchable_list = ['net', 'sta', 'loc', 'chan', 'file']
+    column_filters = ['net', 'sta', 'chan', 'flag']
+    column_sortable_list = ['ref', 'net', 'sta', 'starttime', 'endtime', 'samplerate']
+
+    # Read-only view
+    can_create = False
+    can_edit = False
+    can_delete = False
+
+    def __init__(self, session, *args, **kwargs):
+        super(DataAvailabilityView, self).__init__(schema.DataAvailability, session, *args, **kwargs)
+
+from flask_admin import BaseView, expose
+from flask_admin.form import BaseForm
+from flask import request, redirect, url_for, flash
+from wtforms import Form, StringField, FloatField, IntegerField, BooleanField, SelectField, TextAreaField
+from wtforms.validators import DataRequired, Optional
+import datetime
+
+class ConfigSetView(BaseView):
+    """
+    View for managing configuration sets as single forms.
+    Allows editing all parameters in a set together.
+    """
+
+    def __init__(self, session, *args, **kwargs):
+        super(ConfigSetView, self).__init__(*args, **kwargs)
+        self.session = session
+
+    @expose('/')
+    def index(self):
+        """Display all configuration sets grouped by category"""
+
+        # Define the category order and display names
+        category_order = [
+            ('preprocess', 'preprocess'),
+            ('cc', 'cc'),
+            ('filter', 'filter'),
+            ('stack', 'stack'),
+            ('mwcs', 'MWCS'),
+            ('mwcs_dtt', 'MWCS dt/t'),
+            ('stretching', 'Stretching'),
+            ('wavelet', 'Wavelet'),
+            ('wavelet_dtt', 'Wavelet dt/t'),
+        ]
+
+        # Get all config sets grouped by category and set_number
+        all_sets = self.session.query(
+            schema.Config.category,
+            schema.Config.set_number,
+            func.count(schema.Config.ref).label('param_count')
+        ).group_by(
+            schema.Config.category,
+            schema.Config.set_number
+        ).all()
+
+        # Group sets by category
+        sets_by_category = {}
+        for category, set_number, param_count in all_sets:
+            if category not in sets_by_category:
+                sets_by_category[category] = []
+            sets_by_category[category].append({
+                'category': category,
+                'set_number': set_number,
+                'param_count': param_count
+            })
+
+        # Sort sets within each category by set_number
+        for category in sets_by_category:
+            sets_by_category[category].sort(key=lambda x: x['set_number'])
+
+        # Create ordered list of categories with their sets
+        ordered_categories = []
+        for category_key, display_name in category_order:
+            if category_key in sets_by_category:
+                ordered_categories.append({
+                    'category': category_key,
+                    'display_name': display_name,
+                    'sets': sets_by_category[category_key]
+                })
+
+        # Add any additional categories not in the predefined order
+        for category in sets_by_category:
+            if category not in [cat[0] for cat in category_order]:
+                ordered_categories.append({
+                    'category': category,
+                    'display_name': category.title(),
+                    'sets': sets_by_category[category]
+                })
+
+        return self.render('admin/config_sets_index.html',
+                           categories=ordered_categories)
+
+    @expose('/create/<category>/', methods=['GET', 'POST'])
+    def create_set(self, category):
+        """Create a new configuration set for a category"""
+
+        from .api import create_config_set
+        set_number = create_config_set(self.session, category)
+
+
+        if set_number is not None:
+            self.session.commit()
+            flash(f'Configuration set "{category}" #{set_number} created successfully', 'success')
+            return redirect(url_for('.edit_set', category=category, set_number=set_number))
+
+        return
+
+    @expose('/edit/<category>/<int:set_number>/', methods=['GET', 'POST'])
+    def edit_set(self, category, set_number):
+        """Edit a complete configuration set as a single form"""
+
+        # Get all config parameters for this set
+        configs = self.session.query(schema.Config).filter(
+            schema.Config.category == category,
+            schema.Config.set_number == set_number
+        ).order_by(schema.Config.name).all()
+
+        if not configs:
+            flash(f'Configuration set "{category}" #{set_number} not found', 'error')
+            return redirect(url_for('.index'))
+
+        # Create dynamic form class
+        form_class = self._create_dynamic_form(configs)
+        # Initialize form with request data for POST requests
+        if request.method == 'POST':
+            form = form_class(request.form)
         else:
-            model.value = ''
+            form = form_class()
+
+        if request.method == 'POST' and form.validate():
+            try:
+                # Update all config values
+                for config in configs:
+                    field_name = f"param_{config.ref}"
+                    if hasattr(form, field_name):
+                        field = getattr(form, field_name)
+                        new_value = field.data
+
+                        # Handle different field types and preserve existing values if new value is empty
+                        if config.param_type == 'bool':
+                            # For boolean fields
+                            if isinstance(field, BooleanField):
+                                # WTForms BooleanField returns True/False
+                                new_value = 'Y' if new_value else 'N'
+                            elif isinstance(field, SelectField):
+                                # SelectField for boolean with Y/N choices
+                                new_value = str(new_value) if new_value else config.value
+                            else:
+                                new_value = str(new_value) if new_value else config.value
+                        elif config.param_type == 'int':
+                            if new_value is not None and str(new_value).strip():
+                                try:
+                                    new_value = str(int(new_value))
+                                except (ValueError, TypeError):
+                                    # Keep original value if conversion fails
+                                    new_value = config.value
+                            else:
+                                # Keep original value if empty
+                                new_value = config.value
+                        elif config.param_type == 'float':
+                            if new_value is not None and str(new_value).strip():
+                                try:
+                                    new_value = str(float(new_value))
+                                except (ValueError, TypeError):
+                                    # Keep original value if conversion fails
+                                    new_value = config.value
+                            else:
+                                # Keep original value if empty
+                                new_value = config.value
+                        else:  # string type
+                            if new_value is not None:
+                                new_value = str(new_value).strip()
+                                # Allow empty strings for string fields
+                            else:
+                                new_value = config.value
+
+                        # Only update if we have a valid new value
+                        if new_value is not None:
+                            config.value = new_value
+                            config.updated_at = datetime.datetime.utcnow()
+
+                            # Validate against possible values (only for non-empty values)
+                            if new_value.strip():
+                                try:
+                                    config.validate_value()
+                                except ValueError as ve:
+                                    flash(f'Validation error for {config.name}: {str(ve)}', 'error')
+                                    raise ve
+                            # flash(f'Updated parameter "{config.name}"="{new_value}"', 'success')
+                            self.session.commit()
+                self.session.commit()
+                flash(f'Configuration set "{category}" #{set_number} updated successfully', 'success')
+                return redirect(url_for('.index'))
+
+            except Exception as e:
+                self.session.rollback()
+                flash(f'Error updating configuration: {str(e)}', 'error')
+
+        else:
+            # Populate form with current values (GET request or validation failed)
+            for config in configs:
+                field_name = f"param_{config.ref}"
+                if hasattr(form, field_name):
+                    field = getattr(form, field_name)
+                    current_value = config.value if config.value is not None else ''
+
+                    if config.param_type == 'bool':
+                        # Handle boolean conversion for different formats
+                        if isinstance(field, BooleanField):
+                            field.data = current_value.upper() in ('Y', 'TRUE', 'YES', '1', 'ON')
+                        else:  # SelectField for boolean
+                            field.data = current_value
+                    elif config.param_type in ['int', 'float']:
+                        try:
+                            if current_value and str(current_value).strip():
+                                if config.param_type == 'float':
+                                    field.data = float(current_value)
+                                else:
+                                    field.data = int(current_value)
+                            else:
+                                field.data = None
+                        except (ValueError, TypeError):
+                            # If conversion fails, set as string for display
+                            field.data = current_value
+                    else:
+                        field.data = current_value
+
+            # Show validation errors if any
+            if request.method == 'POST':
+                for field_name, errors in form.errors.items():
+                    for error in errors:
+                        flash(f'Validation error in {field_name}: {error}', 'error')
+
+        return self.render('admin/config_set_edit.html',
+                           form=form,
+                           configs=configs,
+                           category=category,
+                           set_number=set_number)
+
+    @expose('/copy/<category>/<int:set_number>/', methods=['GET', 'POST'])
+    def copy_set(self, category, set_number):
+        """Copy a configuration set to create a new one"""
+
+        if request.method == 'POST':
+            new_category = request.form.get('new_category', category)
+            new_set_number = int(request.form.get('new_set_number', set_number + 1))
+
+            try:
+                # Check if target already exists
+                existing = self.session.query(schema.Config).filter(
+                    schema.Config.category == new_category,
+                    schema.Config.set_number == new_set_number
+                ).first()
+
+                if existing:
+                    flash(f'Configuration set "{new_category}" #{new_set_number} already exists', 'error')
+                    return redirect(url_for('.index'))
+
+                # Get source configs
+                source_configs = self.session.query(schema.Config).filter(
+                    schema.Config.category == category,
+                    schema.Config.set_number == set_number
+                ).all()
+
+                if not source_configs:
+                    flash(f'Source configuration set not found', 'error')
+                    return redirect(url_for('.index'))
+
+                # Copy configs
+                for config in source_configs:
+                    new_config = schema.Config(
+                        name=config.name,
+                        category=new_category,
+                        set_number=new_set_number,
+                        value=config.value,
+                        param_type=config.param_type,
+                        default_value=config.default_value,
+                        description=config.description,
+                        units=config.units,
+                        possible_values=config.possible_values,
+                        used_in=config.used_in,
+                        used=config.used
+                    )
+                    self.session.add(new_config)
+
+                self.session.commit()
+                flash(f'Configuration set copied to "{new_category}" #{new_set_number}', 'success')
+                return redirect(url_for('.edit_set', category=new_category, set_number=new_set_number))
+
+            except Exception as e:
+                self.session.rollback()
+                flash(f'Error copying configuration: {str(e)}', 'error')
+
+        return self.render('admin/config_set_copy.html',
+                           category=category,
+                           set_number=set_number)
+
+    @expose('/delete/<category>/<int:set_number>/', methods=['POST'])
+    def delete_set(self, category, set_number):
+        """Delete a configuration set"""
+
+        try:
+            deleted_count = self.session.query(schema.Config).filter(
+                schema.Config.category == category,
+                schema.Config.set_number == set_number
+            ).delete()
+            self.session.commit()
+            if deleted_count > 0:
+                self.session.commit()
+                flash(f'Configuration set "{category}" #{set_number} deleted ({deleted_count} parameters)', 'success')
+            else:
+                flash(f'Configuration set "{category}" #{set_number} not found', 'error')
+
+        except Exception as e:
+            self.session.rollback()
+            flash(f'Error deleting configuration: {str(e)}', 'error')
+
+        return redirect(url_for('.index'))
+
+    def _create_dynamic_form(self, configs):
+        """Create a dynamic WTForms class based on config parameters"""
+
+        class DynamicConfigForm(Form):
+            pass
+
+        for config in configs:
+            field_name = f"param_{config.ref}"
+
+            # Determine field type based on param_type
+            if config.param_type == 'int':
+                field = IntegerField(
+                    label=config.name,
+                    description=config.description,
+                    validators=[Optional()]  # Make all fields optional to prevent erasure
+                )
+            elif config.param_type == 'float':
+                field = FloatField(
+                    label=config.name,
+                    description=config.description,
+                    validators=[Optional()]  # Make all fields optional to prevent erasure
+                )
+            elif config.param_type == 'bool':
+                # Check if we should use a dropdown or checkbox
+                field = BooleanField(
+                    label=config.name,
+                    description=config.description
+                )
+            else:  # string type
+                # Check if there are possible values (dropdown)
+                if config.possible_values:
+                    # Parse possible values and ensure current value is included
+                    possible_vals = [v.strip() for v in config.possible_values.split('/') if v.strip()]
+
+                    # Make sure the current value is in the choices (for validation)
+                    current_value = config.value.strip() if config.value else ''
+                    if current_value and current_value not in possible_vals:
+                        possible_vals.append(current_value)
+
+                    # Create choices as (value, label) tuples
+                    choices = [(v, v) for v in possible_vals]
+
+                    # Add empty choice for optional fields
+                    if not current_value or 'optional' in (config.description or '').lower():
+                        choices.insert(0, ('', '-- Select --'))
+
+                    field = SelectField(
+                        label=config.name,
+                        description=config.description,
+                        choices=choices,
+                        validators=[Optional()]
+                    )
+                else:
+                    # Long text or regular string
+                    if config.description and len(config.description) > 100:
+                        field = TextAreaField(
+                            label=config.name,
+                            description=config.description,
+                            validators=[Optional()]
+                        )
+                    else:
+                        field = StringField(
+                            label=config.name,
+                            description=config.description,
+                            validators=[Optional()]
+                        )
+
+            # # Add units to description if available
+            # if config.units:
+            #     current_desc = field.description or ""
+            #     field.description = f"{current_desc} (Units: {config.units})".strip()
+            #
+            # # Add possible values to description if available and not already a select field
+            # if config.possible_values and not isinstance(field, SelectField):
+            #     current_desc = field.description or ""
+            #     field.description = f"{current_desc} Possible values: {config.possible_values}".strip()
+
+            setattr(DynamicConfigForm, field_name, field)
+
+        return DynamicConfigForm
 
 
-def getitem(obj, item, default):
-    if item not in obj:
-        return default
-    else:
-        return obj[item]
+# ============================================================================
+# 5. Generic Workflow Handling - API Endpoints
+# ============================================================================
+
+class WorkflowAPIView(BaseView):
+    """
+    Generic workflow handling driven by database schema.
+    Provides REST-like API endpoints for workflow management.
+    """
+
+    @expose('/api/workflow_types')
+    def get_workflow_types(self):
+        """Get available workflow step types"""
+        return jsonify({
+            'workflow_types': list(schema.WorkflowSteps.VALID_CHAINS.keys()),
+            'valid_chains': schema.WorkflowSteps.VALID_CHAINS
+        })
+
+    @expose('/api/config_categories')
+    def get_config_categories(self):
+        """Get available configuration categories"""
+        categories = db_session.query(schema.Config.category).all()
+        return jsonify({
+            'categories': [cat[0] for cat in categories]
+        })
+
+    @expose('/api/validate_workflow_chain', methods=['POST'])
+    def validate_workflow_chain_api(self):
+        """Validate a workflow chain via API"""
+        try:
+            chain_data = request.json
+            steps = chain_data.get('steps', [])
+
+            # Validate each step in the chain
+            for i, step in enumerate(steps):
+                if i > 0:
+                    parent_type = steps[i-1]['type']
+                    current_type = step['type']
+
+                    if current_type not in schema.WorkflowSteps.VALID_CHAINS.get(parent_type, []):
+                        return jsonify({
+                            'valid': False,
+                            'message': f'Invalid chain: {parent_type} cannot be followed by {current_type}'
+                        })
+
+            return jsonify({'valid': True, 'message': 'Chain is valid'})
+        except Exception as e:
+            return jsonify({'valid': False, 'message': str(e)})
+
+    @expose('/api/create_workflow_chain', methods=['POST'])
+    def create_workflow_chain_api(self):
+        """Create a complete workflow chain via API"""
+        try:
+            chain_data = request.json
+            steps = chain_data.get('steps', [])
+            filter_ids = chain_data.get('filter_ids', [])
+
+            created_steps = []
+            parent_ref = None
+
+            for i, step_data in enumerate(steps):
+                step = schema.WorkflowSteps(
+                    step_type=step_data['type'],
+                    name=step_data.get('name', f"{step_data['type']} step {i+1}"),
+                    description=step_data.get('description', ''),
+                    parent_step_ref=parent_ref,
+                    config_set_number=step_data.get('config_set_number', 1),
+                    chain_order=i
+                )
+
+                db_session.add(step)
+                db_session.flush()  # Get the ID
+
+                # Connect filters to root step
+                if i == 0 and filter_ids:
+                    filters = db_session.query(schema.Filter).filter(schema.Filter.ref.in_(filter_ids)).all()
+                    step.filters = filters
+
+                created_steps.append(step)
+                parent_ref = step.ref
+
+            db_session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': f'Created workflow chain with {len(created_steps)} steps',
+                'step_ids': [step.ref for step in created_steps]
+            })
+        except Exception as e:
+            db_session.rollback()
+            return jsonify({'success': False, 'message': str(e)})
 
 
-def select_filter():
-    db = connect()
-    filters = []
-    query = get_filters(db, all=False)
-    for f in query:
-        filters.append({'optid': f.ref,
-                        'text': "%.2f - %.2f" % (f.freqmin, f.freqmax)})
-    db.close()
-    return filters
+# ============================================================================
+# Custom Templates
+# ============================================================================
 
+# Custom templates for enhanced UI
+WORKFLOW_CHAIN_BUILDER_TEMPLATE = """
+{% extends 'admin/base.html' %}
 
-def select_pair():
-    db = connect()
-    stations = ["%s.%s" % (s.net, s.sta) for s in get_stations(db, all=False)]
-    pairs = itertools.combinations(stations, 2)
-    output = []
-    i = 0
-    for pair in pairs:
-        output.append({'optid': i,
-                       'text': "%s - %s" % (pair[0], pair[1])})
-        i += 1
-    db.close()
-    return output
-
-
-class ResultPlotter(BaseView):
-    name = "MSNoise"
-    view_title = "Result Plotter"
-
-    @expose('/')
-    def index(self):
-        args = flask.request.args
-
-        filters = select_filter()
-        pairs = select_pair()
-
-        # Get all the form arguments in the url with defaults
-        filter = int(getitem(args, 'filter', 1))
-        pair = int(getitem(args, 'pair', 0))
-        component = getitem(args, 'component', 'ZZ')
-        format = getitem(args, 'format', 'stack')
-
-        db = connect()
-        params = get_params(db)
-        station1, station2 = pairs[pair]['text'].replace('.', '_').split(' - ')
-        start, end, dates = build_movstack_datelist(db)
-        i, result = get_results(db,station1, station2, filter, component, dates,
-                                format=format, params=params)
-
-        if format == 'stack':
-            if i != 0:
-                x = get_t_axis(db)
-                y = result
-        db.close()
-        # print(result)
-        # fig = figure(title=pairs[pair]['text'], plot_width=1000)
-        # fig.line(x, y, line_width=2)
-        #
-        # plot_resources = RESOURCES.render(
-        #     js_raw=CDN.js_raw,
-        #     css_raw=CDN.css_raw,
-        #     js_files=CDN.js_files,
-        #     css_files=CDN.css_files,
-        # )
-        #
-        # script, div = components(fig, INLINE)
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(12,5))
-        plt.plot(x, y)
-
-        from io import BytesIO
-        figfile = BytesIO()
-        plt.savefig(figfile, format='png')
-        figfile.seek(0)  # rewind to beginning of file
-        import base64
-        # figdata_png = base64.b64encode(figfile.read())
-        figdata_png = base64.b64encode(figfile.getvalue())
-        result= figdata_png
-
-        plot_div = ""
-
-        return self.render(
-            'admin/results.html',
-            plot_script="", plot_div=plot_div, plot_resources="",
-            filter_list=filters,
-            pair_list=pairs, result=result.decode('utf8')
-        )
-
-
-class InterferogramPlotter(BaseView):
-    name = "MSNoise"
-    view_title = "Interferogram Plotter"
-
-    @expose('/')
-    def index(self):
-        return self.render('admin/interferogram.html')
-
-
-class DataAvailabilityPlot(BaseView):
-    name = "MSNoise"
-    view_title = "Data Availability"
-
-    @expose('/')
-    def index(self):
-        return self.render('admin/data_availability.html')
-
-class PSDPlot(BaseView):
-    name = "MSNoise"
-    view_title = "Probabilistic Power Spectral Density"
-
-    @expose('/')
-    def index(self):
-        return self.render('admin/psd.html')
-
-class PSDTimeline(BaseView):
-    name = "MSNoise"
-    view_title = "Probabilistic Power Spectral Density (Timeline)"
-
-    @expose('/')
-    def index(self):
-        return self.render('admin/ppsd-multi.html')
-
-class PSDSpectrogram(BaseView):
-    name = "MSNoise"
-    view_title = "Power Spectral Density Spectrogram"
-
-    @expose('/')
-    def index(self):
-        return self.render('admin/psd-spectrogram.html')
-
-
-
-class BugReport(BaseView):
-    name = "MSNoise"
-    view_title = "BugReport"
-
-    @expose('/')
-    def index(self):
-        return self.render('admin/bugreport.html')
-
-app = Flask(__name__)
-app.secret_key = 'why would I tell you my secret key?'
-
-
-@app.route('/admin/networks.json')
-def networksJSON():
-    db = connect()
-    data = {}
-    networks = get_networks(db)
-    for network in networks:
-        stations = get_stations(db, net=network)
-        data[network] = {}
-        for sta in stations:
-            data[network][sta.sta] = {}
-            data[network][sta.sta]["locs"] = sta.locs()
-            data[network][sta.sta]["chans"] = sta.chans()
-        #data[network] = [s.sta for s in stations]
-    o = json.dumps(data)
-    db.close()
-    return flask.Response(o, mimetype='application/json')
-
-
-@app.route('/admin/filters.json')
-def filtersJSON():
-    db = connect()
-    data = {}
-    filters = get_filters(db, all=False)
-    for f in filters:
-        data[f.ref] = "%.2f - %.2f"%(f.freqmin, f.freqmax)
-    db.close()
-    o = json.dumps(data)
-    db.close()
-    return flask.Response(o, mimetype='application/json')
-
-
-@app.route('/admin/components.json')
-def componentsJSON():
-    db = connect()
-    components = get_components_to_compute(db)
-    data = {}
-    for i,c in enumerate(components):
-        data[i] = c
-    db.close()
-    o = json.dumps(data)
-    db.close()
-    return flask.Response(o, mimetype='application/json')
-
-
-@app.route('/admin/pairs.json')
-def pairs():
-    db = connect()
-    stations = ["%s.%s" % (s.net, s.sta) for s in get_stations(db, all=False)]
-    pairs = itertools.combinations(stations, 2)
-    output = []
-    for pair in pairs:
-        output.append("%s - %s" % (pair[0], pair[1]))
-    o = json.dumps(output)
-    db.close()
-    return flask.Response(o, mimetype='application/json')
-
-
-@app.route('/admin/bugreport.json')
-def bugreporter():
-    from .bugreport import main
-    output = main(modules=True, show=False)
-    o = json.dumps(output)
-    db.close()
-    return flask.Response(o, mimetype='application/json')
-
-
-@app.route('/admin/data_availability.json',methods=['GET','POST'])
-def dataAvail():
-    data = flask.request.get_json()
-    db = connect()
-    data = get_data_availability(db, net=data['net'], sta=data['sta'],
-                                 loc=data['loc'], chan='HHZ')
-    o = {'dates': [o.starttime.strftime('%Y-%m-%d') for o in data]}
-    db.close()
-    o['result'] = 'ok'
-    o = json.dumps(o)
-    return flask.Response(o, mimetype='application/json')
-
-
-@app.route('/admin/all_results.json',methods=['POST'])
-def allresults():
-    data = flask.request.get_json(force=True)
-    db = connect()
-    station1, station2 = data['pair'].replace('.','_').split(' - ')
-    filterid = int(data['filter'])
-    components = data['component']
-    format = data['format']
-    start, end, dates = build_ref_datelist(db)
-    i, result = get_results(db,station1, station2, filterid, components, dates,
-                            format=format)
+{% block body %}
+<div class="container-fluid">
+    <h2>Workflow Chain Builder</h2>
     
-    data = {}
-    if format == 'stack':
-        if i != 0:
-            maxlag = float(get_config(db, 'maxlag'))
-            data['x'] = np.linspace(-maxlag, maxlag, get_maxlag_samples(db)).\
-                tolist()
-            data['y'] = result.tolist()
-            data["info"] = "Data OK"
-        else:
-            data["info"] = "No Data"
-    else:
-        if i != 0:
-            x = []
-            for y in range(len(dates)):
-                r = result[y]
-                r = np.nan_to_num(r)
-                x.append(r.tolist())
-            data["image"] = x
-            data["nx"] = len(r)
-            data["ny"] = len(x)
-            data["info"] = "Data OK"
-        else:
-            data["info"] = "No Data"
-    o = json.dumps(data)
-    return flask.Response(o, mimetype='application/json')
+    <div class="row">
+        <div class="col-md-4">
+            <div class="panel panel-default">
+                <div class="panel-heading">Available Filters</div>
+                <div class="panel-body">
+                    {% for filter in filters %}
+                    <div class="checkbox">
+                        <label>
+                            <input type="checkbox" name="filters" value="{{ filter.ref }}">
+                            {{ filter.freqmin }}-{{ filter.freqmax }} Hz
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="panel panel-default">
+                <div class="panel-heading">Workflow Chain</div>
+                <div class="panel-body">
+                    <div id="workflow-chain">
+                        <!-- Chain builder interface will be here -->
+                    </div>
+                    <button class="btn btn-primary" onclick="createWorkflowChain()">Create Chain</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
+<script>
+var validChains = {{ valid_chains|tojson }};
 
-@app.route('/admin/new_jobs_TRIG.json')
-def new_jobsTRIG():
-    from .s02new_jobs import main
-    count = main()
-    global db
-    db.flush()
-    db.commit()
-    o = {}
-    o['count'] = count
-    o = json.dumps(o)
-    return flask.Response(o, mimetype='application/json')
+function createWorkflowChain() {
+    // Implementation for creating workflow chain
+    console.log('Creating workflow chain...');
+}
+</script>
+{% endblock %}
+"""
+
+CONFIG_BULK_UPDATE_TEMPLATE = """
+{% extends 'admin/base.html' %}
+
+{% block body %}
+<div class="container-fluid">
+    <h2>Bulk Configuration Update</h2>
     
+    <form method="post">
+        {% for config in configs %}
+        <div class="form-group">
+            <label>{{ config.name }} ({{ config.category }})</label>
+            <input type="text" name="config_{{ config.ref }}" value="{{ config.value }}" class="form-control">
+            <small class="help-block">{{ config.description }}</small>
+        </div>
+        {% endfor %}
+        
+        <button type="submit" class="btn btn-primary">Update All</button>
+    </form>
+</div>
+{% endblock %}
+"""
 
-@app.route('/admin/jobs_list.json')
-def joblists():
-    jobtype = flask.request.args['type']
-    db = connect()
-    data = get_job_types(db, jobtype)
-    db.close()
-    o = {'T': 0, 'I': 0, 'D': 0}
-    for count, flag in data:
-        o[flag] = count
-    o = json.dumps(o)
-    return flask.Response(o, mimetype='application/json')
+MSNOISE_INDEX_TEMPLATE = """
+{% extends 'admin/index.html' %}
 
+{% block body %}
+<div class="container-fluid">
+    <h2>MSNoise Dashboard</h2>
+    
+    <div class="row">
+        <div class="col-md-3">
+            <div class="panel panel-primary">
+                <div class="panel-heading">Stations</div>
+                <div class="panel-body">
+                    <h3>{{ stats.get('stations', 0) }}</h3>
+                    <p>Active stations</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="panel panel-info">
+                <div class="panel-heading">Filters</div>
+                <div class="panel-body">
+                    <h3>{{ stats.get('filters', 0) }}</h3>
+                    <p>Active filters</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="panel panel-success">
+                <div class="panel-heading">Workflows</div>
+                <div class="panel-body">
+                    <h3>{{ stats.get('workflow_steps', 0) }}</h3>
+                    <p>Active workflow steps</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="panel panel-warning">
+                <div class="panel-heading">Jobs</div>
+                <div class="panel-body">
+                    <h3>{{ stats.get('jobs_todo', 0) }} / {{ stats.get('jobs_total', 0) }}</h3>
+                    <p>Todo / Total jobs</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+"""
 
-@app.route('/admin/resetjobs.json')
-def resetjobs():
-    jobtype = flask.request.args['type']
-    alljobs = flask.request.args['all']
-    from msnoise.api import reset_jobs
-    reset_jobs(db, jobtype, alljobs=eval(alljobs))
-    o = {}
-    o["Done"] = "Jobs reset: Done."
-    o = json.dumps(o)
-    return flask.Response(o, mimetype='application/json')
+import csv
+import os
+from flask import request, redirect, url_for, flash, render_template_string, render_template
+from flask_admin import BaseView, expose
+from wtforms import Form, SelectField, StringField, TextAreaField, IntegerField, validators
 
+# ============================================================================
+# Main Application Setup
+# ============================================================================
 
-@app.route('/admin/data_availability.png')
-def DA_PNG():
-    from .plots.data_availability import main
-    output = BytesIO()
-    main(show=False, outfile=output)
-    output.seek(0)
-    return flask.Response(output.read(), mimetype='image/png')
+def create_admin_app():
+    """Create and configure the Flask-Admin application"""
 
-from flask import send_file, make_response
-import base64
+    # Initialize Flask-Admin
+    admin = Admin(
+        app,
+        name='MSNoise Admin',
+        template_mode='bootstrap3',
+        index_view=MSNoiseAdminIndexView(),
+        base_template='admin/base.html'
+    )
 
+    # Add model views
+    admin.add_view(FilterView(db_session, name='Filters', category='Configuration'))
+    admin.add_view(ConfigView(db_session, name='Configuration', category='Configuration'))
+    config_set_view = ConfigSetView(db_session, name='Config Sets', endpoint='config_sets')
+    admin.add_view(config_set_view)
+    admin.add_view(StationView(db_session, name='Stations', category='Configuration'))
+    admin.add_view(DataAvailabilityView(db_session, name='Data Availability', category='Data'))
 
-@app.route('/admin/PSD.json',methods=['GET','POST'])
-def PSDAvail():
-    data = flask.request.get_json()
-    if not data:
-        data = flask.request.args
-    fn = os.path.join(os.getcwd(), "PSD", "PNG", "*", data["net"], data["sta"], "%s.D"%data["chan"], "*")
-    files = sorted(glob.glob(fn))
-    o = {}
-    o['files']= [os.path.split(f)[1] for f in files]
-    dates = [datetime.date(int(os.path.split(f)[1].split('.')[5]), 1,
-                   1) + datetime.timedelta(
-        int(os.path.split(f)[1].split('.')[6]) - 1) for f in files]
-    o['dates']= [d.strftime("%Y-%m-%d") for d in dates]
-    o['result'] = 'ok'
-    o = json.dumps(o)
-    return flask.Response(o, mimetype='application/json')
+    admin.add_view(WorkflowStepsView(db_session, name='Workflow Steps', category='Workflows'))
 
+    admin.add_view(JobView(db_session, name='Jobs', category='Processing'))
+    # Add API view
+    # admin.add_view(WorkflowAPIView(name='Workflow API', category='API'))
 
-@app.route('/admin/PSD.png',methods=['GET','POST'])
-def PSD_PNG():
-    data = flask.request.get_json()
-    if not data:
-        data = flask.request.args
-    file = "*"
-    year = "*"
-    if 'file' in data:
-        file = data["file"]
-    elif 'date' in data:
-        from obspy import UTCDateTime
-        d = UTCDateTime(data['date'])
-        file = ".".join([data["net"], data["sta"], data["loc"], data["chan"],"D","%04i"%d.year, "%03i"%d.julday,"*"])
-        # needed to remove the empty loc ids:
-        file = file.replace("--", "")
-        year = "%04i"%d.year
-    fn = os.path.join(os.getcwd(), "PSD", "PNG", year, data["net"], data["sta"],
-                      "%s.D" % data["chan"], file)
-    format = "png"
-    if 'format' in data:
-        format = data["format"]
-
-    files = glob.glob(fn)
-    with open(files[0], "rb") as f:
-        image_binary = f.read()
-        if format == "base64":
-            output = {}
-            output["image"] = base64.b64encode(image_binary).decode("utf-8")
-            o = json.dumps(output)
-            return flask.Response(o, mimetype='application/json')
-
-        else:
-            response = make_response(image_binary)
-            response.headers.set('Content-Type', 'image/png')
-            return response
-
-
-
-@app.route('/admin/PSD-spectrogram.png',methods=['GET','POST'])
-def PSD_spectrogram():
-    import matplotlib.pyplot as plt
-    data = flask.request.get_json()
-    if not data:
-        data = flask.request.args
-
-    format = data.get("format", "png")
-    vmin = data.get("vmin", None, float)
-    vmax = data.get("vmax", None, float)
-    cmap = data.get("cmap", "viridis")
-    fmin = data.get("fmin", None, float)
-    fmax = data.get("fmax", None, float)
-
-    pmin = data.get("pmin", None, float)
-    pmax = data.get("pmax", None, float)
-
-    resample = data.get("resample", None, str)
-    resample_method = data.get("resample_method", "mean", str)
-
-    yaxis = data.get("yaxis", "period", str)
-    yaxis_scale = data.get("yaxis_scale", "linear", str)
-
-    if fmin is not None and pmax is None:
-        pmax = 1.0 / fmin
-
-    if fmax is not None and pmin is None:
-        pmin = 1.0 / fmax
-
-    db = connect()
-    start, end, datelist = build_movstack_datelist(db)
-    db.close()
-
-    # ppsd = psd_read_results(data["net"], data["sta"], data["loc"], data["chan"], datelist)
-    # data = psd_ppsd_to_dataframe(ppsd)
-    seed_id = "%s.%s.%s.%s" % (data["net"], data["sta"], data["loc"], data["chan"])
-    store = hdf_open_store(seed_id, location=os.path.join("PSD", "HDF"), mode="r")
-    data = store.PSD
-    data = data.sort_index()
-    if pmin is not None:
-        data = data.loc[:,pmin:]
-    if pmax is not None:
-        data = data.loc[:, :pmax]
-
-    if yaxis == "frequency":
-        data.columns = 1. / data.columns
-        data = data.sort_index(axis="columns")
+    # Add custom templates
+    # app.jinja_env.globals['WORKFLOW_CHAIN_BUILDER_TEMPLATE'] = WORKFLOW_CHAIN_BUILDER_TEMPLATE
+    app.jinja_env.globals['CONFIG_BULK_UPDATE_TEMPLATE'] = CONFIG_BULK_UPDATE_TEMPLATE
+    app.jinja_env.globals['MSNOISE_INDEX_TEMPLATE'] = MSNOISE_INDEX_TEMPLATE
 
 
-    if resample is not None:
-        rs = data.resample(resample)
-        if resample_method == "mean":
-            data = rs.mean()
-        elif resample_method == "median":
-            data = rs.median()
-        elif resample_method == "max":
-            data = rs.max()
-        elif resample_method == "min":
-            data = rs.min()
-
-    fig = plt.figure(figsize=(14,7))
-    plt.pcolormesh(data.index, data.columns, data.T, cmap=cmap,
-                   rasterized=True, vmin=vmin, vmax=vmax)
-    plt.colorbar(shrink=0.7).set_label("Amplitude [dB]")
-    if yaxis == "frequency":
-        plt.ylabel("Frequency [Hz]")
-    else:
-        plt.ylabel("Period [s]")
-
-    plt.yscale(yaxis_scale)
-    plt.title("%s: %s - %s" % (seed_id, data.index[0], data.index[-1]))
-
-    fig.autofmt_xdate()
-    plt.tight_layout()
-    from io import BytesIO
-    f = BytesIO()
-    plt.savefig(f, format='png')
-    plt.close("all")
-    f.seek(0)  # rewind to beginning of file
-
-    image_binary = f.read()
-    if format == "base64":
-        output = {}
-        output["image"] = base64.b64encode(image_binary).decode("utf-8")
-        o = json.dumps(output)
-        return flask.Response(o, mimetype='application/json')
-
-    else:
-        response = make_response(image_binary)
-        response.headers.set('Content-Type', 'image/png')
-        return response
+    return admin
 
 
+# ============================================================================
+# Main Entry Point
+# ============================================================================
+
+def main(port=5099):
+    """Main entry point for the MSNoise admin interface"""
+
+    logger.info("Starting MSNoise Admin Interface")
+
+    # Create admin interface
+    admin = create_admin_app()
+
+    # Configure Flask app
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+    # Add template filters
+    @app.template_filter('datetime')
+    def datetime_filter(value):
+        if value is None:
+            return ''
+        return value.strftime('%Y-%m-%d %H:%M:%S')
+
+    # Error handlers
+    @app.errorhandler(404)
+    def not_found(error):
+        return render_template_string('<h1>Page not found</h1>'), 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        db_session.rollback()
+        return render_template_string('<h1>Internal server error</h1>'), 500
+
+    # Cleanup
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        db_session.close()
+
+    # Start the application
+    try:
+        app.run(host='0.0.0.0', port=port, debug=True)
+    except KeyboardInterrupt:
+        logger.info("Shutting down MSNoise Admin Interface")
+    finally:
+        db_session.close()
 
 
-@app.route('/admin/data_availability_flags.json')
-def DA_flags():
-    db = connect()
-    data = count_data_availability_flags(db)
-    db.close()
-    o = {'N': 0, 'M': 0, 'A': 0}
-    for count, flag in data:
-        o[flag] = count
-    o = json.dumps(o)
-    return flask.Response(o, mimetype='application/json')
-
-
-def shutdown_server():
-    func = request.environ.get('werkzeug.server.shutdown')
-    if func is None:
-        raise RuntimeError('Not running with the Werkzeug Server')
-    func()
-
-
-@app.route('/shutdown', methods=['GET'])
-def shutdown():
-    shutdown_server()
-    return 'Server shutting down...'
-
-
-# Flask views
-@app.route('/')
-def index():
-    db = connect()
-    return redirect("/admin/", code=302)
-
-
-def get_app():
-    global db
-    db = connect()
-    plugins = get_config(db, "plugins")
-    db.close()
-
-    admin = Admin(app, template_mode='bootstrap4')
-
-    if "msnoise_brand" in os.environ:
-        tmp = eval(os.environ["msnoise_brand"])
-        name, logo = tmp.split("|")
-        admin.logo = logo
-        admin.name = name
-    else:
-        admin.name = "MSNoise"
-    admin.project_folder = os.getcwd()
-    dbini = read_db_inifile()
-    if dbini.prefix != "":
-        prefix = "/%s_*" % dbini.prefix
-    else:
-        prefix = ""
-    if dbini.tech == 1:
-        database = "SQLite: %s%s" % (dbini.hostname, prefix)
-    elif dbini.tech == 2:
-        database = "MySQL: %s@%s:%s%s" % (dbini.username, dbini.hostname,
-                                          dbini.database, prefix)
-    elif dbini.tech == 3:
-        database = "PostgreSQL: %s@%s:%s%s" % (dbini.username, dbini.hostname,
-                                               dbini.database, prefix)
-    admin.project_database = database
-
-    jobtypes = ["CC", "STACK", "MWCS", "DTT"]
-    template_folders = []
-    if plugins:
-        import pkg_resources
-        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
-            module_name = ep.module_name.split(".")[0]
-            if module_name in plugins:
-                tmp = ep.load()()
-                for t in tmp:
-                    jobtypes.append(t["name"])
-        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.templates'):
-            module_name = ep.module_name.split(".")[0]
-            if module_name in plugins:
-                tmp = ep.load()()
-                for t in tmp:
-                    template_folders.append(t)
-
-    app.jinja_loader = jinja2.ChoiceLoader([
-        app.jinja_loader,
-        jinja2.FileSystemLoader(template_folders),
-    ])
-
-    admin.add_view(StationView(db, endpoint='stations', category='CC Config', name = 'Stations'))
-    admin.add_view(FilterView(db, endpoint='filters', category='CC Config', name='Filters'))
-    admin.add_view(ConfigView(db, endpoint='config', category='CC Config'))
-
-    admin.add_view(DvvMwcsView(db, endpoint='dvv_mwcs', category='DVV Config', name='MWCS'))
-    admin.add_view(DvvMwcsDttView(db, endpoint='dvv_mwcs_dtt', category='DVV Config', name='- MWCS dt/t'))
-
-    admin.add_view(DvvWctView(db, endpoint='dvv_wct', category='DVV Config', name='Wavelet Transform (WCT)'))
-    admin.add_view(DvvWctDttView(db, endpoint='dvv_wct_dtt', category='DVV Config', name='- Wavelet Transform (WCT) dt/t'))
-
-    admin.add_view(DvvStretchingView(db, endpoint='dvv_stretching', category='DVV Config', name='Stretching'))
-   
-
-    admin.add_view(DataAvailabilityView(db, endpoint='data_availability',
-                                        category='Database'))
-
-    admin.add_view(JobView(db, endpoint='jobs', category='Database'))
-
-    admin.add_view(DataAvailabilityPlot(endpoint='data_availability_plot',
-                                        category='Results'))
-    admin.add_view(ResultPlotter(endpoint='results', category='Results'))
-    admin.add_view(InterferogramPlotter(endpoint='interferogram',
-                                        category='Results'))
-    admin.add_view(
-        PSDPlot(name="Individual PPSD", endpoint='psd_plot', category='QC'))
-
-    admin.add_view(
-        PSDTimeline(name="Timeline PPSD", endpoint='psd_timeline', category='QC'))
-
-    admin.add_view(
-        PSDSpectrogram(name="PSD Spectrogram", endpoint='psd_spectrogram', category='QC'))
-
-    if plugins:
-        plugins = plugins.split(',')
-        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.admin_view'):
-            module_name = ep.module_name.split(".")[0]
-            if module_name in plugins:
-                admin.add_view(ep.load()(db))
-
-    a = GenericView(endpoint='about', category='Help', name='About')
-    a.page = "about"
-    admin.add_view(a)
-    admin.add_view(BugReport(name='Bug Report', endpoint='bugreport',
-                             category='Help'))
-    return app
-
-def main(port=5000):
-    app = get_app()
-
-    print("MSNoise admin will run on all interfaces by default")
-    print("access it via the machine's IP address or")
-    print("via http://127.0.0.1:%i when running locally."%port)
-    app.run(host='0.0.0.0', port=port, debug=True, reloader_interval=1,
-            threaded=True)
+if __name__ == '__main__':
+    main()

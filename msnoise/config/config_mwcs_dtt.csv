@@ -1,0 +1,9 @@
+name,default,definition,type,possible_values
+dtt_minlag,5,Minimum lag time,float,
+dtt_width,30,Width of the time lag window,float,
+dtt_lag,static,How is the lag window defined for MWCS,str,static/dynamic
+dtt_v,1.0,What velocity to use to avoid ballistic waves,float,
+dtt_sides,both,Which sides to use,str,both/left/right
+dtt_mincoh,0.0,Minimum coherence on dt measurement,float,
+dtt_maxerr,0.0,Maximum error on dt measurement,float,
+dtt_maxdtt,1.0,Maximum dt/t value,float,
