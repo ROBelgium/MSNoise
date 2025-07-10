@@ -1,0 +1,24 @@
+name,default,definition,type,possible_values
+output_folder,CROSS_CORRELATIONS,"CC Output Folder in case keep_all=Y, to store the individual windows. The daily CCF will always be stored in the STACKS/001_DAYS folder.",str,
+analysis_duration,86400,Duration of the Analysis in seconds (this shouldn't be changed for now),float,
+cc_sampling_rate,20,Sampling Rate for the CrossCorrelation (in Hz),float,
+cc_normalisation,NO,"Normalisation method for individual `corr_duration`) CCFs, default is not normalized (NO), but can be normalized based on the power of the two traces (POW), or by the maximum (MAX) or absolute maximum (ABSMAX) of the CCF",str,NO/POW/MAX/ABSMAX
+maxlag,120,Maximum lag (in seconds),float,
+corr_duration,1800,Data windows to correlate (in seconds),float,
+overlap,0,Amount of overlap between data windows [0:1],float,
+winsorizing,3,"Winsorizing at N time RMS , 0 disables winsorizing, -1 enables 1-bit normalization",float,
+whitening,A,"Whiten Traces before cross-correlation: [A]ll (except for autocorr), [N]one, or only if [C]omponents are different",str,A/N/C
+whitening_type,B,"Type of spectral whitening function to use: [B]rutal (amplitude to 1.0), divide spectrum by its [PSD] or by band-passing the white spectrum with a hanning-window [HANN]. WARNING: only works for compute_cc, not compute_cc_rot, where it will always be B",str,B/PSD/HANN
+clip_after_whiten,N,Do the clipping (winsorizing) after whitening?,bool,Y/N
+stack_method,linear,Stack Method: Linear Mean or Phase Weighted Stack,str,linear/pws
+pws_timegate,10,"If ``stack_method`` ='pws', width of the smoothing (in seconds)",float,
+pws_power,2,"If ``stack_method`` =""pws"", Power of the Weighting",float,
+components_to_compute,ZZ,List (comma separated) of components to compute between two different stations,str,
+cc_type,CC,Cross-Correlation type,str,
+components_to_compute_single_station,,"List (comma separated) of components within a single station. ZZ would be the autocorrelation of Z component, while ZE or ZN are the cross-components. Defaults to [], no single-station computations are done.",str,
+cc_type_single_station_AC,CC,Auto-Correlation type,str,
+cc_type_single_station_SC,CC,Cross-Correlation type for Cross-Components,str,
+keep_all,Y,Keep all cross-corr (length: ``corr_duration``),bool,Y/N
+keep_days,Y,Keep all daily cross-corr,bool,Y/N
+export_format,MSEED,Export stacks in which format(s) ?,str,SAC/MSEED/BOTH
+sac_format,doublets,Format for SAC stacks ?,str,doublets/clarke

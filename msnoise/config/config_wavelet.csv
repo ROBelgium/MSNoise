@@ -1,0 +1,9 @@
+name,default,definition,type,possible_values
+wct_freqmin,0.1,The lower frequency bound to apply WCT,float,
+wct_freqmax,1.0,The upper frequency bound to apply WCT,float,
+wct_ns,,Smoothing parameter in frequency,float,
+wct_nt,,Smoothing parameter in time,float,
+wct_vpo,,Spacing parameter between discrete scales,float,
+wct_nptsfreq,,Number of frequency points between min and max,int,
+wct_norm,True,If the REF and CCF are normalized before computing wavelet,bool,True/False
+wavelet_type,,Type of wavelet function used,str,

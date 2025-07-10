@@ -1,0 +1,7 @@
+name,default,definition,type,possible_values
+freqmin,0.1,Lower frequency bound (Hz),float
+freqmax,1.0,Upper frequency bound (Hz),float,
+CC,Y,Compute cross-correlation between different stations,bool,Y/N
+SC,N,Compute cross-correlation between different components of same station,bool,Y/N
+AC,N,Compute auto-correlation from single station components,bool,Y/N
+used,Y,Whether this filter is active,bool,Y/N

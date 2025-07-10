@@ -21,9 +21,7 @@ import xarray as xr
 
 
 from . import DBConfigNotFoundError
-from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability, \
-    DvvMwcs, DvvMwcsDtt, DvvStretching, DvvWct, DvvWctDtt, filter_mwcs_assoc, \
-    mwcs_dtt_assoc, filter_stretching_assoc, filter_wct_assoc, wct_dtt_assoc
+from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
 
 
 def get_logger(name, loglevel=None, with_pid=False):
@@ -260,6 +258,187 @@ def update_config(session, name, value, plugin=None):
     session.commit()
     return
 
+def create_config_set(session, set_name):
+    """
+    Create a configuration set for a workflow step.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type set_name: str
+    :param set_name: The name of the workflow step (e.g., 'mwcs', 'mwcs_dtt', etc.)
+
+    :rtype: int or None
+    :returns: The set_number if set was created successfully, None otherwise
+    """
+    import os
+    import csv
+    from sqlalchemy import func
+
+    # Define the config file path
+    config_file = os.path.join(os.path.dirname(__file__), 'config', f'config_{set_name}.csv')
+
+    if not os.path.exists(config_file):
+        return None
+
+    # Find the next available set_number for this category
+    max_set_number = session.query(func.max(Config.set_number)).filter(
+        Config.category == set_name
+    ).scalar()
+    next_set_number = (max_set_number + 1) if max_set_number is not None else 1
+
+    # Read the CSV file and add config entries
+    with open(config_file, 'r', newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            name = row['name']
+            default_value = row['default']
+            definition = row.get('definition', '')
+            param_type = row.get('type', 'str')
+            possible_values = row.get('possible_values', '')
+
+            # Create new config entry with set_number
+            config = Config(
+                name=name,
+                category=set_name,
+                set_number=next_set_number,
+                value=default_value,
+                param_type=param_type,
+                default_value=default_value,
+                description=definition,
+                possible_values=possible_values,
+                used_in=f"[{set_name}]",
+                used=True
+            )
+            session.add(config)
+
+    session.commit()
+    return next_set_number
+
+def delete_config_set(session, set_name, set_number):
+    """
+    Delete a configuration set for a workflow step.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type set_name: str
+    :param set_name: The name of the workflow step (e.g., 'mwcs', 'mwcs_dtt', etc.)
+    :type set_number: int
+    :param set_number: The set number to delete
+    :rtype: bool
+    :returns: True if set was deleted successfully, False otherwise
+    """
+    try:
+        from sqlalchemy import func
+        from .msnoise_table_def import Config
+
+        # Validate input parameters
+        if not isinstance(set_number, int) or set_number < 1:
+            raise ValueError("set_number must be a positive integer")
+
+        if not set_name or not isinstance(set_name, str):
+            raise ValueError("set_name must be a non-empty string")
+
+        # Check if the config set exists
+        config_count = session.query(func.count(Config.ref)).filter(
+            Config.category == set_name,
+            Config.set_number == set_number
+        ).scalar()
+
+        if config_count == 0:
+            return False  # Set doesn't exist
+
+        # Delete all config entries for this set
+        deleted_count = session.query(Config).filter(
+            Config.category == set_name,
+            Config.set_number == set_number
+        ).delete()
+
+        session.commit()
+
+        get_logger("msnoise", "INFO").info(f"Deleted config set '{set_name}' set_number {set_number} "
+                          f"({deleted_count} entries)")
+
+        return True
+
+    except Exception as e:
+        session.rollback()
+        traceback.print_exc()
+        get_logger("msnoise").error(f"Failed to delete config set '{set_name}' set_number {set_number}: {str(e)}")
+        return False
+
+
+def list_config_sets(session, set_name=None):
+    """
+    List all configuration sets, optionally filtered by category.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object
+    :type set_name: str or None
+    :param set_name: Optional category filter (e.g., 'mwcs', 'mwcs_dtt', etc.)
+    :rtype: list
+    :returns: List of tuples (category, set_number, entry_count)
+    """
+    try:
+        from sqlalchemy import func
+        from .msnoise_table_def import Config
+
+        query = session.query(
+            Config.category,
+            Config.set_number,
+            func.count(Config.ref).label('entry_count')
+        ).filter(
+            Config.set_number.isnot(None)  # Exclude global configs
+        )
+
+        if set_name:
+            query = query.filter(Config.category == set_name)
+
+        results = query.group_by(
+            Config.category,
+            Config.set_number
+        ).order_by(
+            Config.category,
+            Config.set_number
+        ).all()
+
+        return [(row.category, row.set_number, row.entry_count) for row in results]
+
+    except Exception as e:
+        traceback.print_exc()
+        get_logger("msnoise").error(f"Failed to list config sets: {str(e)}")
+
+        return []
+
+
+def get_config_set_details(session, set_name, set_number):
+    """
+    Get details of a specific configuration set.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object
+    :type set_name: str
+    :param set_name: The category name
+    :type set_number: int
+    :param set_number: The set number
+    :rtype: list
+    :returns: List of config entries in the set
+    """
+    try:
+        from .msnoise_table_def import Config
+
+        configs = session.query(Config).filter(
+            Config.category == set_name,
+            Config.set_number == set_number
+        ).order_by(Config.name).all()
+
+        return [{'name': c.name, 'value': c.value, 'description': c.description}
+                for c in configs]
+
+    except Exception as e:
+        get_logger("msnoise").error(f"Failed to get config set details: {str(e)}")
+        return []
 
 def get_params(session):
     """Get config parameters from the database.
