@@ -1254,15 +1254,13 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
     station = session.query(Station).filter(Station.net == net).\
         filter(Station.sta == sta).first()
     if station is None:
-        station = Station(net, sta, X, Y, altitude, coordinates, instrument,
-                          used)
+        station = Station(net, sta, X, Y, altitude, coordinates, used)
         session.add(station)
     else:
         station.X = X
         station.Y = Y
         station.altitude = altitude
         station.coordinates = coordinates
-        station.instrument = instrument
         station.used = used
     session.commit()
     return True

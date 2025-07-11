@@ -260,8 +260,6 @@ def declare_tables(prefix=None):
         :type coordinates: str
         :param coordinates: The coordinates system. "DEG" is WGS84 latitude/
             longitude in degrees. "UTM" is expressed in meters.
-        :type instrument: str
-        :param instrument: The instrument code, useful with PAZ correction
         :type used: bool
         :param used: Whether this station must be used in the computations.
         """
