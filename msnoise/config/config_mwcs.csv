@@ -1,5 +1,5 @@
 name,default,definition,type,possible_values
 freqmin,0.1,The lower frequency bound to apply MWCS,float,
 freqmax,1.0,The upper frequency bound to apply MWCS,float,
-mwcs_wlen,10,Window length to perform MWCS,float,
-mwcs_step,2,Step of the windowing procedure in MWCS,float,
+mwcs_wlen,10.0,Window length to perform MWCS,float,
+mwcs_step,2.0,Step of the windowing procedure in MWCS,float,

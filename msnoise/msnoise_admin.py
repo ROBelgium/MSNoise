@@ -35,6 +35,7 @@ from wtforms.validators import DataRequired, Optional, NumberRange, ValidationEr
 from wtforms.widgets import TextArea, Select, CheckboxInput, NumberInput
 
 from .api import connect, get_config, get_logger
+from .api import get_config_categories_definition
 from .msnoise_table_def import declare_tables
 
 
@@ -143,17 +144,7 @@ class ConfigView(BaseModelView):
     }
 
     form_choices = {
-        'category': [
-            ('preprocess', 'preprocess'),
-            ('cc', 'cc'),
-            ('filter', 'filter'),
-            ('stack', 'stack'),
-            ('mwcs', 'MWCS'),
-            ('mwcs_dtt', 'MWCS dt/t'),
-            ('stretching', 'Stretching'),
-            ('wavelet', 'Wavelet'),
-            ('wavelet_dtt', 'Wavelet dt/t'),
-        ],
+        'category': get_config_categories_definition(),
         'param_type': [
             ('str', 'String'),
             ('int', 'Integer'),
@@ -277,17 +268,7 @@ class WorkflowStepsView(BaseModelView):
     }
 
     form_choices = {
-        'step_type': [
-            ('preprocess', 'preprocess'),
-            ('cc', 'cc'),
-            ('filter', 'filter'),
-            ('stack', 'stack'),
-            ('mwcs', 'MWCS'),
-            ('mwcs_dtt', 'MWCS dt/t'),
-            ('stretching', 'Stretching'),
-            ('wavelet', 'Wavelet'),
-            ('wavelet_dtt', 'Wavelet dt/t'),
-        ]
+        'step_type': get_config_categories_definition()
     }
 
     # Custom column formatters
@@ -733,65 +714,14 @@ class ConfigSetView(BaseView):
     def index(self):
         """Display all configuration sets grouped by category"""
 
-        # Define the category order and display names
-        category_order = [
-            ('preprocess', 'preprocess'),
-            ('cc', 'cc'),
-            ('filter', 'filter'),
-            ('stack', 'stack'),
-            ('mwcs', 'MWCS'),
-            ('mwcs_dtt', 'MWCS dt/t'),
-            ('stretching', 'Stretching'),
-            ('wavelet', 'Wavelet'),
-            ('wavelet_dtt', 'Wavelet dt/t'),
-        ]
+        """Display all configuration sets grouped by category"""
+        from .api import get_config_sets_organized
 
-        # Get all config sets grouped by category and set_number
-        all_sets = self.session.query(
-            schema.Config.category,
-            schema.Config.set_number,
-            func.count(schema.Config.ref).label('param_count')
-        ).group_by(
-            schema.Config.category,
-            schema.Config.set_number
-        ).all()
-
-        # Group sets by category
-        sets_by_category = {}
-        for category, set_number, param_count in all_sets:
-            if category not in sets_by_category:
-                sets_by_category[category] = []
-            sets_by_category[category].append({
-                'category': category,
-                'set_number': set_number,
-                'param_count': param_count
-            })
-
-        # Sort sets within each category by set_number
-        for category in sets_by_category:
-            sets_by_category[category].sort(key=lambda x: x['set_number'])
-
-        # Create ordered list of categories with their sets
-        ordered_categories = []
-        for category_key, display_name in category_order:
-            if category_key in sets_by_category:
-                ordered_categories.append({
-                    'category': category_key,
-                    'display_name': display_name,
-                    'sets': sets_by_category[category_key]
-                })
-
-        # Add any additional categories not in the predefined order
-        for category in sets_by_category:
-            if category not in [cat[0] for cat in category_order]:
-                ordered_categories.append({
-                    'category': category,
-                    'display_name': category.title(),
-                    'sets': sets_by_category[category]
-                })
+        ordered_categories = get_config_sets_organized(self.session)
 
         return self.render('admin/config_sets_index.html',
                            categories=ordered_categories)
+
 
     @expose('/create/<category>/', methods=['GET', 'POST'])
     def create_set(self, category):
@@ -807,6 +737,38 @@ class ConfigSetView(BaseView):
             return redirect(url_for('.edit_set', category=category, set_number=set_number))
 
         return
+
+    @expose('/view/<category>/<int:set_number>/')
+    def view_set(self, category, set_number):
+        """View configuration set in read-only mode"""
+
+        # Get all configs for this category and set
+        configs = self.session.query(schema.Config).filter(
+            schema.Config.category == category,
+            schema.Config.set_number == set_number
+        ).order_by(schema.Config.name).all()
+
+        if not configs:
+            flash(f'Configuration set "{category}" #{set_number} not found', 'error')
+            return redirect(url_for('.index'))
+
+        # Group configs by logical sections if needed
+        config_groups = {}
+        for config in configs:
+            config.description = Markup(config.description)
+            # You can add logic here to group configs by prefix or type
+            group_name = "Configuration Parameters"
+            if group_name not in config_groups:
+                config_groups[group_name] = []
+
+            config_groups[group_name].append(config)
+
+        return self.render('admin/config_set_view.html',
+                           category=category,
+                           set_number=set_number,
+                           configs=configs,
+                           config_groups=config_groups)
+
 
     @expose('/edit/<category>/<int:set_number>/', methods=['GET', 'POST'])
     def edit_set(self, category, set_number):
@@ -893,7 +855,7 @@ class ConfigSetView(BaseView):
                             self.session.commit()
                 self.session.commit()
                 flash(f'Configuration set "{category}" #{set_number} updated successfully', 'success')
-                return redirect(url_for('.index'))
+                return redirect(url_for('.view_set', category=category, set_number=set_number))
 
             except Exception as e:
                 self.session.rollback()
@@ -902,11 +864,12 @@ class ConfigSetView(BaseView):
         else:
             # Populate form with current values (GET request or validation failed)
             for config in configs:
+                config.description = Markup(config.description)
                 field_name = f"param_{config.ref}"
                 if hasattr(form, field_name):
                     field = getattr(form, field_name)
                     current_value = config.value if config.value is not None else ''
-
+                    field.description = config.description
                     if config.param_type == 'bool':
                         # Handle boolean conversion for different formats
                         if isinstance(field, BooleanField):
@@ -1332,7 +1295,7 @@ from wtforms import Form, SelectField, StringField, TextAreaField, IntegerField,
 # ============================================================================
 # Main Application Setup
 # ============================================================================
-
+ 
 def create_admin_app():
     """Create and configure the Flask-Admin application"""
 
@@ -1346,16 +1309,17 @@ def create_admin_app():
     )
 
     # Add model views
-    admin.add_view(FilterView(db_session, name='Filters', category='Configuration'))
-    admin.add_view(ConfigView(db_session, name='Configuration', category='Configuration'))
-    config_set_view = ConfigSetView(db_session, name='Config Sets', endpoint='config_sets')
-    admin.add_view(config_set_view)
+    # admin.add_view(FilterView(db_session, name='Filters', category='Configuration'))
+
+    admin.add_view(ConfigSetView(db_session, name='Configuration Sets', endpoint='config_sets', category='Configuration'))
     admin.add_view(StationView(db_session, name='Stations', category='Configuration'))
     admin.add_view(DataAvailabilityView(db_session, name='Data Availability', category='Data'))
 
     admin.add_view(WorkflowStepsView(db_session, name='Workflow Steps', category='Workflows'))
 
     admin.add_view(JobView(db_session, name='Jobs', category='Processing'))
+
+    admin.add_view(ConfigView(db_session, name='Configuration (Expert)', category='Expert'))
     # Add API view
     # admin.add_view(WorkflowAPIView(name='Workflow API', category='API'))
 

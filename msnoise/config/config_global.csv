@@ -1,0 +1,13 @@
+name,default,definition,type,possible_values
+data_folder,,Data Folder,str,
+data_structure,SDS,"Either a predefined acronym [SDS]/BUD/IDDS, or /-separated path (e.g. NET/STA/YEAR/NET.STA.YEAR.DAY.MSEED).",str,
+archive_format,,"Force format of archive files to read? Leave empty for slightly slower auto-detection by Obspy, or specify any format supported by <a href='https://docs.obspy.org/packages/autogen/obspy.core.stream.read.html' target='_blank'>obspy.core.stream.read()</a>.",str,
+response_format,dataless,Remove instrument file format,str,dataless/inventory/paz/resp
+response_path,inventory,"Instrument correction file(s) location (path relative to db.ini), defaults to './inventory', i.e. a subfolder in the current project folder. All files in that folder will be parsed.",str,
+network,*,Network to analyse,str,
+channels,*,"Channels need to match the value (ex: [&ast;], &ast;Z, BH&ast;, HHZ,...)",str,
+startdate,1970-01-01,Start Date to process: [1970-01-01]='since beginning of the archive',str,
+enddate,2100-01-01,End Date to process: [2100-01-01]='No end',str,
+crondays,1,"Number of days to monitor with scan_archive, typically used in cron (should be a float representing a number of days, or a string designating weeks, days, and/or hours using the format 'Xw Xd Xh')",str,
+plugins,,Comma separated list of plugin names. Plugins names should be importable Python modules.,str,
+hpc,N,Is MSNoise going to run on an HPC?,bool,Y/N

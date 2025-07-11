@@ -825,6 +825,7 @@ def create_all_sets(force, dry_run):
     """
 
     categories = [
+        'global',
         'qc',
         'preprocess',
         'cc',
