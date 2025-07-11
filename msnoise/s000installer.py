@@ -237,12 +237,13 @@ def main(tech=None, hostname=None, username=None, password=None,
     session = Session()
 
     # Add default configuration values to the database
-    for name in default.keys():
-        session.add(schema.Config(name=name, value=default[name].default, used_in=default[name].used_in))
+    from .api import create_config_set
+
 
     try:
-        session.commit()
+        create_config_set(session, "global")
     except IntegrityError:
+        session.rollback()
         logging.error("The database seems to already exist and is not empty, "
                       "cannot continue")
         return 1

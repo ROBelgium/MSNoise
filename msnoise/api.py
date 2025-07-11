@@ -21,7 +21,7 @@ import xarray as xr
 
 
 from . import DBConfigNotFoundError
-from .msnoise_table_def import Filter, Job, Station, Config, DataAvailability
+from .msnoise_table_def import Job, Station, Config, DataAvailability
 
 
 def get_logger(name, loglevel=None, with_pid=False):
@@ -564,6 +564,7 @@ def get_filters(session, all=False, ref=None):
     :rtype: list of :class:`~msnoise.msnoise_table_def.declare_tables.Filter`
     :returns: a list of Filter
     """
+    return [] #TODOOOOOOOO
     if ref:
         filter = session.query(Filter).filter(Filter.ref == ref).first()
         return filter
