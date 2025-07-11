@@ -101,12 +101,12 @@ class MSNoiseAdminIndexView(AdminIndexView):
         stats = {}
         try:
             stats['stations'] = db_session.query(schema.Station).filter(schema.Station.used == True).count()
-            stats['filters'] = db_session.query(schema.Filter).filter(schema.Filter.used == True).count()
-            stats['workflow_steps'] = db_session.query(schema.WorkflowSteps).filter(schema.WorkflowSteps.used == True).count()
+            # stats['filters'] = db_session.query(schema.Filter).filter(schema.Filter.used == True).count()
+            # stats['workflow_steps'] = db_session.query(schema.WorkflowSteps).filter(schema.WorkflowSteps.used == True).count()
             stats['jobs_total'] = db_session.query(schema.Job).count()
             stats['jobs_todo'] = db_session.query(schema.Job).filter(schema.Job.flag == 'T').count()
             stats['jobs_done'] = db_session.query(schema.Job).filter(schema.Job.flag == 'D').count()
-            stats['config_params'] = db_session.query(schema.Config).filter(schema.Config.used == True).count()
+            stats['config_params'] = db_session.query(schema.Config).count()
         except Exception as e:
             logger.error(f"Error getting dashboard stats: {e}")
             stats = {}
@@ -124,13 +124,13 @@ class ConfigView(BaseModelView):
     This replaces all the separate DvvMwcsView, DvvStretchingView, etc. classes.
     """
 
-    column_list = ['category', 'name', 'set_number', 'value', 'description', 'used']
+    column_list = ['category', 'name', 'set_number', 'value', 'description']
     column_searchable_list = ['name', 'category', 'value', 'description']
-    column_filters = ['category', 'set_number', 'used']
+    column_filters = ['category', 'set_number']
     column_sortable_list = ['name', 'category', 'set_number']
 
     form_columns = ['name', 'category', 'set_number', 'value', 'param_type',
-                    'default_value', 'description', 'units', 'possible_values', 'used_in', 'used']
+                    'default_value', 'description', 'units', 'possible_values']
 
     column_descriptions = {
         'name': 'Parameter name (e.g., maxlag, dtt_minlag)',
@@ -139,8 +139,6 @@ class ConfigView(BaseModelView):
         'value': 'Current parameter value',
         'param_type': 'Data type of the parameter',
         'description': 'Description of what this parameter does',
-        'used_in': 'Which processing steps use this parameter',
-        'used': 'Whether this parameter is active'
     }
 
     form_choices = {
@@ -235,405 +233,9 @@ class ConfigView(BaseModelView):
             return redirect(url_for('.index_view'))
 
         # GET request - show bulk update form
-        configs = self.session.query(schema.Config).filter(schema.Config.used == True).all()
+        configs = self.session.query(schema.Config).all()
         return self.render('admin/config_bulk_update.html', configs=configs)
 
-
-# ============================================================================
-# 2. Single WorkflowStepsView - Workflow Chain Management
-# ============================================================================
-
-class WorkflowStepsView(BaseModelView):
-    """
-    Enhanced workflow steps management with chain validation and filter linking.
-    This replaces the complex workflow-specific view classes.
-    """
-
-    column_list = ['ref', 'step_type', 'name', 'chain_order', 'parent_step', 'config_set_number', 'filters_count', 'used']
-    column_searchable_list = ['step_type', 'name', 'description']
-    column_filters = ['step_type', 'used', 'chain_order']
-    column_sortable_list = ['ref', 'step_type', 'chain_order', 'config_set_number', 'created_at']
-    form_columns = ['step_type', 'name', 'description', 'parent_step_ref', 'config_set_number', 'filters', 'used']
-
-    list_template = "admin/model/workflow_steps_list.html"
-
-    column_descriptions = {
-        'step_type': 'Type of workflow step (mwcs, stretching, etc.)',
-        'name': 'User-friendly name for this step',
-        'chain_order': 'Order in the processing chain',
-        'parent_step': 'Parent step in the workflow chain',
-        'config_set_number': 'Configuration set number for this step',
-        'filters': 'Filters associated with this workflow step (root steps only)',
-        'used': 'Whether this step is active'
-    }
-
-    form_choices = {
-        'step_type': get_config_categories_definition()
-    }
-
-    # Custom column formatters
-    column_formatters = dict(BaseModelView.column_formatters, **{
-        'step_type': lambda view, context, model, name: SafeMarkup(f'<span class="label label-primary">{model.step_type}</span>'),
-        'parent_step': lambda view, context, model, name: f'{model.parent_step.step_type} ({model.parent_step.ref})' if model.parent_step else 'Root',
-        'chain_order': lambda view, context, model, name: SafeMarkup(f'<span class="badge">{model.chain_order}</span>'),
-        'filters_count': lambda view, context, model, name: SafeMarkup(f'<span class="badge badge-info">{len(model.filters)}</span>') if model.filters else '0',
-    })
-
-    def __init__(self, session, *args, **kwargs):
-        super(WorkflowStepsView, self).__init__(schema.WorkflowSteps, session, *args, **kwargs)
-
-    def scaffold_form(self):
-        """Override to create custom form with dynamic parent selection"""
-        form_class = super(WorkflowStepsView, self).scaffold_form()
-
-        # Replace parent_step_ref with a custom SelectField
-        from wtforms import SelectField
-
-        class CustomWorkflowStepForm(form_class):
-            parent_step_ref = SelectField(
-                'Parent Step',
-                choices=[],
-                coerce=lambda x: int(x) if x and str(x).isdigit() else None,
-                validators=[Optional()]
-            )
-
-        return CustomWorkflowStepForm
-
-    def create_form(self, obj=None):
-        """Override to populate parent choices for creation"""
-        form = super(WorkflowStepsView, self).create_form(obj)
-
-        # Set initial parent choices (empty until step type is selected)
-        form.parent_step_ref.choices = [('', 'No parent (root step)')]
-
-        # Add help text for filters field
-        if hasattr(form, 'filters'):
-            form.filters.description = 'Only root workflow steps (without parent) can be directly linked to filters'
-
-        return form
-
-    def edit_form(self, obj=None):
-        """Override to populate parent choices for editing"""
-        form = super(WorkflowStepsView, self).edit_form(obj)
-
-        if obj:
-            # Get valid parent choices for this step type
-            valid_parents = self.get_valid_parent_choices(obj.step_type, exclude_id=obj.ref)
-            form.parent_step_ref.choices = valid_parents
-
-            # Set current parent if exists
-            if obj.parent_step_ref:
-                form.parent_step_ref.data = obj.parent_step_ref
-
-            # Only show filters field for root steps
-            if obj.parent_step_ref is not None:
-                # This is a child step, remove filters field
-                if hasattr(form, 'filters'):
-                    delattr(form, 'filters')
-        else:
-            # For new objects, start with basic choices
-            form.parent_step_ref.choices = [('', 'No parent (root step)')]
-
-        return form
-
-    def get_valid_parent_choices(self, step_type, exclude_id=None):
-        """Get valid parent choices for a given step type"""
-        choices = [('', 'No parent (root step)')]
-
-        if not step_type:
-            return choices
-
-        # Find which step types can be parents of this step type
-        valid_parent_types = []
-        for parent_type, child_types in schema.WorkflowSteps.VALID_CHAINS.items():
-            if step_type in child_types:
-                valid_parent_types.append(parent_type)
-
-        if valid_parent_types:
-            # Get workflow steps of valid parent types
-            query = self.session.query(schema.WorkflowSteps).filter(
-                schema.WorkflowSteps.step_type.in_(valid_parent_types),
-                schema.WorkflowSteps.used == True
-            )
-
-            # Exclude current step if editing
-            if exclude_id:
-                query = query.filter(schema.WorkflowSteps.ref != exclude_id)
-
-            valid_parents = query.all()
-
-            for parent in valid_parents:
-                choice_text = f'{parent.step_type} - {parent.name or "Unnamed"} (ID: {parent.ref})'
-                choices.append((str(parent.ref), choice_text))
-
-        return choices
-
-    def create_model(self, form):
-        """Create new workflow step with chain validation"""
-        try:
-            # Basic validation before creating model
-            step_type = form.step_type.data
-            parent_step_ref = form.parent_step_ref.data
-
-            # Validate parent-child relationship
-            if parent_step_ref:
-                parent = self.session.query(schema.WorkflowSteps).get(parent_step_ref)
-                if not parent:
-                    flash('Selected parent step does not exist', 'error')
-                    return False
-
-                # Check if this is a valid chain
-                valid_children = schema.WorkflowSteps.VALID_CHAINS.get(parent.step_type, [])
-                if step_type not in valid_children:
-                    flash(f'Invalid chain: {parent.step_type} cannot be followed by {step_type}', 'error')
-                    return False
-
-            # Create the model
-            model = self.model()
-            form.populate_obj(model)
-
-            # Set chain order
-            if model.parent_step_ref:
-                parent = self.session.query(schema.WorkflowSteps).get(model.parent_step_ref)
-                if parent:
-                    model.chain_order = parent.chain_order + 1
-                # Child steps should not have direct filter connections
-                if hasattr(model, 'filters'):
-                    model.filters = []
-            else:
-                model.chain_order = 0
-                # Root steps must have filter connections
-                if not form.filters.data:
-                    flash('Root workflow steps must be connected to at least one filter', 'error')
-                    return False
-
-            self.session.add(model)
-            self.session.commit()
-            return model
-
-        except Exception as e:
-            self.session.rollback()
-            flash(f'Failed to create workflow step: {str(e)}', 'error')
-            return False
-
-    def update_model(self, form, model):
-        """Update workflow step with chain validation"""
-        try:
-            # Store old values
-            old_parent = model.parent_step_ref
-            old_step_type = model.step_type
-
-            # Basic validation
-            step_type = form.step_type.data
-            parent_step_ref = form.parent_step_ref.data
-
-            # Validate parent-child relationship
-            if parent_step_ref:
-                parent = self.session.query(schema.WorkflowSteps).get(parent_step_ref)
-                if not parent:
-                    flash('Selected parent step does not exist', 'error')
-                    return False
-
-                # Check if this is a valid chain
-                valid_children = schema.WorkflowSteps.VALID_CHAINS.get(parent.step_type, [])
-                if step_type not in valid_children:
-                    flash(f'Invalid chain: {parent.step_type} cannot be followed by {step_type}', 'error')
-                    return False
-
-                # Check for circular reference (simple check)
-                if parent_step_ref == model.ref:
-                    flash('A workflow step cannot be its own parent', 'error')
-                    return False
-
-            # Update the model
-            form.populate_obj(model)
-
-            # Update chain order if parent changed
-            if model.parent_step_ref != old_parent:
-                if model.parent_step_ref:
-                    parent = self.session.query(schema.WorkflowSteps).get(model.parent_step_ref)
-                    if parent:
-                        model.chain_order = parent.chain_order + 1
-                else:
-                    model.chain_order = 0
-
-            # Handle filter connections
-            if model.parent_step_ref is not None:
-                # Child steps should not have direct filter connections
-                if hasattr(model, 'filters'):
-                    model.filters = []
-            else:
-                # Root steps should have filter connections
-                if not model.filters:
-                    flash('Root workflow steps should be connected to at least one filter', 'warning')
-
-            self.session.commit()
-            return True
-
-        except Exception as e:
-            self.session.rollback()
-            flash(f'Failed to update workflow step: {str(e)}', 'error')
-            return False
-
-    @expose('/get_parent_options')
-    def get_parent_options(self):
-        """AJAX endpoint to get valid parent options for a step type"""
-        step_type = request.args.get('step_type')
-        current_id = request.args.get('current_id')
-
-        if not step_type:
-            return jsonify({'options': [{'value': '', 'text': 'No parent (root step)'}]})
-
-        try:
-            exclude_id = int(current_id) if current_id else None
-            choices = self.get_valid_parent_choices(step_type, exclude_id=exclude_id)
-
-            options = []
-            for value, text in choices:
-                options.append({'value': value, 'text': text})
-
-            return jsonify({'options': options})
-
-        except Exception as e:
-            return jsonify({'error': str(e)})
-
-    @expose('/chain_builder/')
-    def chain_builder(self):
-        """Interactive workflow chain builder"""
-        filters = self.session.query(schema.Filter).filter(schema.Filter.used == True).all()
-        workflow_steps = self.session.query(schema.WorkflowSteps).all()
-
-        return self.render('admin/workflow_chain_builder.html',
-                           filters=filters,
-                           workflow_steps=workflow_steps,
-                           valid_chains=schema.WorkflowSteps.VALID_CHAINS)
-
-    @expose('/filter_associations/<int:step_id>')
-    def filter_associations(self, step_id):
-        """Show filter associations for a workflow step"""
-        step = self.session.query(schema.WorkflowSteps).get_or_404(step_id)
-
-        if step.parent_step_ref is not None:
-            # Child step - show filters from root step
-            root_step = step.get_root_step(self.session)
-            filters = root_step.filters if root_step else []
-            message = f"This child step inherits filters from root step: {root_step.name or root_step.step_type}" if root_step else "No root step found"
-        else:
-            # Root step - show direct filters
-            filters = step.filters
-            message = "This root step has the following direct filter associations:"
-
-        return self.render('admin/workflow_step_filters.html',
-                           step=step,
-                           filters=filters,
-                           message=message)
-
-# ============================================================================
-# 3. Enhanced FilterView - Filter Management with Workflow Associations
-# ============================================================================
-
-class FilterView(BaseModelView):
-    """
-    Enhanced filter management with workflow associations and validation.
-    """
-
-    column_list = ['ref', 'freqmin', 'freqmax', 'CC', 'SC', 'AC', 'used', 'workflow_steps_count']
-    column_searchable_list = ['freqmin', 'freqmax']
-    column_filters = ['CC', 'SC', 'AC', 'used']
-    column_sortable_list = ['ref', 'freqmin', 'freqmax', 'used']
-
-    form_columns = ['freqmin', 'freqmax', 'CC', 'SC', 'AC', 'workflow_steps', 'used']
-
-    column_descriptions = {
-        'freqmin': 'Lower frequency bound (Hz)',
-        'freqmax': 'Upper frequency bound (Hz)',
-        'CC': 'Compute cross-correlation between different stations',
-        'SC': 'Compute cross-correlation between different components of same station',
-        'AC': 'Compute auto-correlation from single station components',
-        'workflow_steps': 'Root workflow steps that use this filter',
-        'used': 'Whether this filter is active'
-    }
-
-    # Custom column formatters
-    column_formatters = dict(BaseModelView.column_formatters, **{
-        'freqmin': lambda view, context, model, name: f'{model.freqmin:.3f}' if model.freqmin else '',
-        'freqmax': lambda view, context, model, name: f'{model.freqmax:.3f}' if model.freqmax else '',
-        'workflow_steps_count': lambda view, context, model, name: SafeMarkup(f'<span class="badge badge-success">{len(model.workflow_steps)}</span>') if model.workflow_steps else '0',
-    })
-
-    def __init__(self, session, *args, **kwargs):
-        super(FilterView, self).__init__(schema.Filter, session, *args, **kwargs)
-
-    def get_form(self):
-        """Override to customize the workflow_steps field"""
-        form = super(FilterView, self).get_form()
-
-        # Customize the workflow_steps field to only show root steps
-        if hasattr(form, 'workflow_steps'):
-            form.workflow_steps.query_factory = lambda: self.session.query(schema.WorkflowSteps).filter(
-                schema.WorkflowSteps.parent_step_ref.is_(None),
-                schema.WorkflowSteps.used == True
-            ).all()
-
-            form.workflow_steps.render_kw = {
-                'data-toggle': 'tooltip',
-                'data-placement': 'top',
-                'title': 'Only root workflow steps (without parent) can be directly linked to filters'
-            }
-
-        return form
-
-    def create_model(self, form):
-        """Create new filter with frequency validation"""
-        try:
-            model = self.model()
-            form.populate_obj(model)
-
-            # Validate frequencies
-            model.validate_frequencies()
-
-            # Validate that only root workflow steps are associated
-            for step in model.workflow_steps:
-                if step.parent_step_ref is not None:
-                    raise ValueError(f"Cannot associate filter with child workflow step: {step.name}")
-
-            self.session.add(model)
-            self.session.commit()
-            return model
-        except Exception as e:
-            self.session.rollback()
-            flash(f'Failed to create filter: {str(e)}', 'error')
-            return False
-
-    def update_model(self, form, model):
-        """Update filter with frequency validation"""
-        try:
-            form.populate_obj(model)
-
-            # Validate frequencies
-            model.validate_frequencies()
-
-            # Validate that only root workflow steps are associated
-            for step in model.workflow_steps:
-                if step.parent_step_ref is not None:
-                    raise ValueError(f"Cannot associate filter with child workflow step: {step.name}")
-
-            self.session.commit()
-            return True
-        except Exception as e:
-            self.session.rollback()
-            flash(f'Failed to update filter: {str(e)}', 'error')
-            return False
-
-    @expose('/workflow_associations/<int:filter_id>')
-    def workflow_associations(self, filter_id):
-        """Show workflow associations for a filter"""
-        filter_obj = self.session.query(schema.Filter).get_or_404(filter_id)
-        workflows = filter_obj.get_processing_workflows(self.session)
-
-        return self.render('admin/filter_workflows.html',
-                           filter=filter_obj,
-                           workflows=workflows)
 
 # ============================================================================
 # 4. Simplified Base Classes - Standard Model Views
@@ -944,8 +546,6 @@ class ConfigSetView(BaseView):
                         description=config.description,
                         units=config.units,
                         possible_values=config.possible_values,
-                        used_in=config.used_in,
-                        used=config.used
                     )
                     self.session.add(new_config)
 
@@ -1065,152 +665,6 @@ class ConfigSetView(BaseView):
         return DynamicConfigForm
 
 
-# ============================================================================
-# 5. Generic Workflow Handling - API Endpoints
-# ============================================================================
-
-class WorkflowAPIView(BaseView):
-    """
-    Generic workflow handling driven by database schema.
-    Provides REST-like API endpoints for workflow management.
-    """
-
-    @expose('/api/workflow_types')
-    def get_workflow_types(self):
-        """Get available workflow step types"""
-        return jsonify({
-            'workflow_types': list(schema.WorkflowSteps.VALID_CHAINS.keys()),
-            'valid_chains': schema.WorkflowSteps.VALID_CHAINS
-        })
-
-    @expose('/api/config_categories')
-    def get_config_categories(self):
-        """Get available configuration categories"""
-        categories = db_session.query(schema.Config.category).all()
-        return jsonify({
-            'categories': [cat[0] for cat in categories]
-        })
-
-    @expose('/api/validate_workflow_chain', methods=['POST'])
-    def validate_workflow_chain_api(self):
-        """Validate a workflow chain via API"""
-        try:
-            chain_data = request.json
-            steps = chain_data.get('steps', [])
-
-            # Validate each step in the chain
-            for i, step in enumerate(steps):
-                if i > 0:
-                    parent_type = steps[i-1]['type']
-                    current_type = step['type']
-
-                    if current_type not in schema.WorkflowSteps.VALID_CHAINS.get(parent_type, []):
-                        return jsonify({
-                            'valid': False,
-                            'message': f'Invalid chain: {parent_type} cannot be followed by {current_type}'
-                        })
-
-            return jsonify({'valid': True, 'message': 'Chain is valid'})
-        except Exception as e:
-            return jsonify({'valid': False, 'message': str(e)})
-
-    @expose('/api/create_workflow_chain', methods=['POST'])
-    def create_workflow_chain_api(self):
-        """Create a complete workflow chain via API"""
-        try:
-            chain_data = request.json
-            steps = chain_data.get('steps', [])
-            filter_ids = chain_data.get('filter_ids', [])
-
-            created_steps = []
-            parent_ref = None
-
-            for i, step_data in enumerate(steps):
-                step = schema.WorkflowSteps(
-                    step_type=step_data['type'],
-                    name=step_data.get('name', f"{step_data['type']} step {i+1}"),
-                    description=step_data.get('description', ''),
-                    parent_step_ref=parent_ref,
-                    config_set_number=step_data.get('config_set_number', 1),
-                    chain_order=i
-                )
-
-                db_session.add(step)
-                db_session.flush()  # Get the ID
-
-                # Connect filters to root step
-                if i == 0 and filter_ids:
-                    filters = db_session.query(schema.Filter).filter(schema.Filter.ref.in_(filter_ids)).all()
-                    step.filters = filters
-
-                created_steps.append(step)
-                parent_ref = step.ref
-
-            db_session.commit()
-
-            return jsonify({
-                'success': True,
-                'message': f'Created workflow chain with {len(created_steps)} steps',
-                'step_ids': [step.ref for step in created_steps]
-            })
-        except Exception as e:
-            db_session.rollback()
-            return jsonify({'success': False, 'message': str(e)})
-
-
-# ============================================================================
-# Custom Templates
-# ============================================================================
-
-# Custom templates for enhanced UI
-WORKFLOW_CHAIN_BUILDER_TEMPLATE = """
-{% extends 'admin/base.html' %}
-
-{% block body %}
-<div class="container-fluid">
-    <h2>Workflow Chain Builder</h2>
-    
-    <div class="row">
-        <div class="col-md-4">
-            <div class="panel panel-default">
-                <div class="panel-heading">Available Filters</div>
-                <div class="panel-body">
-                    {% for filter in filters %}
-                    <div class="checkbox">
-                        <label>
-                            <input type="checkbox" name="filters" value="{{ filter.ref }}">
-                            {{ filter.freqmin }}-{{ filter.freqmax }} Hz
-                        </label>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-8">
-            <div class="panel panel-default">
-                <div class="panel-heading">Workflow Chain</div>
-                <div class="panel-body">
-                    <div id="workflow-chain">
-                        <!-- Chain builder interface will be here -->
-                    </div>
-                    <button class="btn btn-primary" onclick="createWorkflowChain()">Create Chain</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-var validChains = {{ valid_chains|tojson }};
-
-function createWorkflowChain() {
-    // Implementation for creating workflow chain
-    console.log('Creating workflow chain...');
-}
-</script>
-{% endblock %}
-"""
 
 CONFIG_BULK_UPDATE_TEMPLATE = """
 {% extends 'admin/base.html' %}
@@ -1251,16 +705,7 @@ MSNOISE_INDEX_TEMPLATE = """
                 </div>
             </div>
         </div>
-        
-        <div class="col-md-3">
-            <div class="panel panel-info">
-                <div class="panel-heading">Filters</div>
-                <div class="panel-body">
-                    <h3>{{ stats.get('filters', 0) }}</h3>
-                    <p>Active filters</p>
-                </div>
-            </div>
-        </div>
+       
         
         <div class="col-md-3">
             <div class="panel panel-success">
@@ -1295,7 +740,7 @@ from wtforms import Form, SelectField, StringField, TextAreaField, IntegerField,
 # ============================================================================
 # Main Application Setup
 # ============================================================================
- 
+
 def create_admin_app():
     """Create and configure the Flask-Admin application"""
 
@@ -1315,8 +760,6 @@ def create_admin_app():
     admin.add_view(StationView(db_session, name='Stations', category='Configuration'))
     admin.add_view(DataAvailabilityView(db_session, name='Data Availability', category='Data'))
 
-    admin.add_view(WorkflowStepsView(db_session, name='Workflow Steps', category='Workflows'))
-
     admin.add_view(JobView(db_session, name='Jobs', category='Processing'))
 
     admin.add_view(ConfigView(db_session, name='Configuration (Expert)', category='Expert'))
@@ -1324,7 +767,6 @@ def create_admin_app():
     # admin.add_view(WorkflowAPIView(name='Workflow API', category='API'))
 
     # Add custom templates
-    # app.jinja_env.globals['WORKFLOW_CHAIN_BUILDER_TEMPLATE'] = WORKFLOW_CHAIN_BUILDER_TEMPLATE
     app.jinja_env.globals['CONFIG_BULK_UPDATE_TEMPLATE'] = CONFIG_BULK_UPDATE_TEMPLATE
     app.jinja_env.globals['MSNOISE_INDEX_TEMPLATE'] = MSNOISE_INDEX_TEMPLATE
 
