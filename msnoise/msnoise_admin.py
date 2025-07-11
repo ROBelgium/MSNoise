@@ -22,6 +22,7 @@ from collections import OrderedDict
 from flask import Flask, request, redirect, url_for, flash, jsonify, render_template_string
 from flask_admin import Admin, BaseView, expose, AdminIndexView
 from flask_admin.contrib.sqla import ModelView
+from flask_admin.actions import action
 from flask_admin.form import Select2Widget
 from flask_admin.model import typefmt
 from flask_admin import helpers as admin_helpers
@@ -56,6 +57,78 @@ schema = declare_tables()
 # Logger
 logger = get_logger('msnoise.admin', loglevel="INFO")
 
+@app.route('/admin/job-stats')
+def job_stats():
+    """API endpoint for job statistics"""
+    try:
+        from .api import get_workflow_job_counts
+        db = connect()
+
+        # Get all workflows
+        workflows = db.query(Job.workflow_id).distinct().all()
+        stats = {}
+
+        for workflow in workflows:
+            workflow_id = workflow[0]
+            stats[workflow_id] = get_workflow_job_counts(db, workflow_id)
+
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/job-dependencies/<int:job_id>')
+def job_dependencies(job_id):
+    """API endpoint for job dependencies"""
+    try:
+        db = connect()
+        job = db.query(Job).filter(Job.ref == job_id).first()
+
+        if not job:
+            return jsonify({'error': 'Job not found'}), 404
+
+        dependencies = {
+            'predecessors': [],
+            'successors': []
+        }
+
+        if job.workflow_step:
+            # Get predecessor jobs
+            for link in job.workflow_step.incoming_links:
+                if link.is_active:
+                    pred_jobs = db.query(Job).filter(
+                        Job.day == job.day,
+                        Job.pair == job.pair,
+                        Job.step_id == link.from_step_id,
+                        Job.workflow_id == job.workflow_id
+                    ).all()
+
+                    for pred_job in pred_jobs:
+                        dependencies['predecessors'].append({
+                            'id': pred_job.ref,
+                            'step_name': pred_job.workflow_step.step_name if pred_job.workflow_step else 'Unknown',
+                            'flag': pred_job.flag
+                        })
+
+            # Get successor jobs
+            for link in job.workflow_step.outgoing_links:
+                if link.is_active:
+                    succ_jobs = db.query(Job).filter(
+                        Job.day == job.day,
+                        Job.pair == job.pair,
+                        Job.step_id == link.to_step_id,
+                        Job.workflow_id == job.workflow_id
+                    ).all()
+
+                    for succ_job in succ_jobs:
+                        dependencies['successors'].append({
+                            'id': succ_job.ref,
+                            'step_name': succ_job.workflow_step.step_name if succ_job.workflow_step else 'Unknown',
+                            'flag': succ_job.flag
+                        })
+
+        return jsonify(dependencies)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ============================================================================
 # Base Classes and Utilities
@@ -257,27 +330,153 @@ class StationView(BaseModelView):
 
 
 class JobView(BaseModelView):
-    """Simplified job management"""
-
-    column_list = ['ref', 'day', 'pair', 'jobtype', 'flag', 'lastmod']
-    column_searchable_list = ['day', 'pair', 'jobtype']
-    column_filters = ['jobtype', 'flag']
-    column_sortable_list = ['ref', 'day', 'pair', 'jobtype', 'flag', 'lastmod']
-
-    form_columns = ['day', 'pair', 'jobtype', 'flag']
-
-    # Custom column formatters
-    column_formatters = dict(BaseModelView.column_formatters, **{
-        'flag': lambda view, context, model, name: SafeMarkup(
-            f'<span class="label label-{"success" if model.flag == "D" else "warning" if model.flag == "I" else "default"}">'
-            f'{"Done" if model.flag == "D" else "In Progress" if model.flag == "I" else "Todo"}</span>'
-        ),
-        'lastmod': lambda view, context, model, name: model.lastmod.strftime('%Y-%m-%d %H:%M:%S') if model.lastmod else '',
-    })
+    """Enhanced Job view with workflow support"""
 
     def __init__(self, session, *args, **kwargs):
-        super(JobView, self).__init__(schema.Job, session, *args, **kwargs)
+        # Import Job model here to avoid circular imports
+        from .msnoise_table_def import Job
+        # Call parent with model and session
+        super(JobView, self).__init__(Job, session, *args, **kwargs)
 
+    # Update column list to include new workflow fields
+    column_list = ['ref', 'day', 'pair', 'workflow_id', 'step_name', 'priority', 'jobtype', 'flag', 'lastmod']
+
+    # Add searchable columns
+    column_searchable_list = ['day', 'pair', 'workflow_id', 'jobtype']
+
+    # Add filters for better navigation
+    column_filters = ['flag', 'workflow_id', 'jobtype', 'day', 'priority']
+
+    # Sort by priority and last modified by default
+    column_default_sort = [('priority', True), ('lastmod', False)]
+
+    # Add column labels for better readability
+    column_labels = {
+        'ref': 'Job ID',
+        'day': 'Date',
+        'pair': 'Station Pair',
+        'workflow_id': 'Workflow',
+        'step_name': 'Step',
+        'priority': 'Priority',
+        'jobtype': 'Job Type',
+        'flag': 'Status',
+        'lastmod': 'Last Modified'
+    }
+
+    # Add descriptions for columns
+    column_descriptions = {
+        'workflow_id': 'Workflow identifier this job belongs to',
+        'step_name': 'Workflow step name',
+        'priority': 'Job priority (higher = more important)',
+        'flag': 'T=Todo, I=In Progress, D=Done'
+    }
+
+    # Custom column formatting
+    column_formatters = {
+        'flag': lambda v, c, m, p: {
+            'T': Markup('<span class="label label-warning">Todo</span>'),
+            'I': Markup('<span class="label label-info">In Progress</span>'),
+            'D': Markup('<span class="label label-success">Done</span>')
+        }.get(m.flag, m.flag),
+        'priority': lambda v, c, m, p: Markup(f'<span class="badge badge-{"danger" if m.priority > 5 else "warning" if m.priority > 0 else "default"}">{m.priority}</span>'),
+        'step_name': lambda v, c, m, p: Markup(m.workflow_step.step_name if hasattr(m, 'workflow_step') and m.workflow_step else 'N/A'),
+
+    }
+
+    # Form configuration
+    form_columns = ['day', 'pair', 'workflow_id', 'step_id', 'priority', 'flag']
+
+    # Custom query to join with WorkflowStep
+    def get_query(self):
+        from .msnoise_table_def import WorkflowStep
+        return self.session.query(self.model).outerjoin(WorkflowStep)
+
+    def get_count_query(self):
+        from .msnoise_table_def import WorkflowStep
+        from sqlalchemy import func
+        return self.session.query(func.count('*')).select_from(self.model).outerjoin(WorkflowStep)
+
+    # Add custom actions with proper decorator
+    @action('reset_jobs', 'Reset Selected Jobs', 'Are you sure you want to reset the selected jobs?')
+    def action_reset_jobs(self, ids):
+        try:
+            from datetime import datetime
+            query = self.session.query(self.model).filter(self.model.ref.in_(ids))
+            count = 0
+            for job in query.all():
+                job.flag = 'T'
+                job.lastmod = datetime.utcnow()
+                count += 1
+            self.session.commit()
+            flash(ngettext('Job was successfully reset.',
+                           '%(count)s jobs were successfully reset.',
+                           count, count=count), 'success')
+        except Exception as ex:
+            if not self.handle_view_exception(ex):
+                raise
+            flash(gettext('Failed to reset jobs. %(error)s', error=str(ex)), 'error')
+
+    @action('mark_done', 'Mark as Done', 'Are you sure you want to mark the selected jobs as done?')
+    def action_mark_done(self, ids):
+        try:
+            from datetime import datetime
+            query = self.session.query(self.model).filter(self.model.ref.in_(ids))
+            count = 0
+            for job in query.all():
+                job.flag = 'D'
+                job.lastmod = datetime.utcnow()
+                count += 1
+            self.session.commit()
+            flash(ngettext('Job was successfully marked as done.',
+                           '%(count)s jobs were successfully marked as done.',
+                           count, count=count), 'success')
+        except Exception as ex:
+            if not self.handle_view_exception(ex):
+                raise
+            flash(gettext('Failed to mark jobs as done. %(error)s', error=str(ex)), 'error')
+
+    @action('mark_todo', 'Mark as Todo', 'Are you sure you want to mark the selected jobs as todo?')
+    def action_mark_todo(self, ids):
+        try:
+            from datetime import datetime
+            query = self.session.query(self.model).filter(self.model.ref.in_(ids))
+            count = 0
+            for job in query.all():
+                job.flag = 'T'
+                job.lastmod = datetime.utcnow()
+                count += 1
+            self.session.commit()
+            flash(ngettext('Job was successfully marked as todo.',
+                           '%(count)s jobs were successfully marked as todo.',
+                           count, count=count), 'success')
+        except Exception as ex:
+            if not self.handle_view_exception(ex):
+                raise
+            flash(gettext('Failed to mark jobs as todo. %(error)s', error=str(ex)), 'error')
+
+    # Add workflow statistics to context
+    def get_list_stats(self):
+        """Get job statistics for the current workflow"""
+        from sqlalchemy import func
+        stats = {}
+        workflows = self.session.query(self.model.workflow_id).distinct().all()
+
+        for workflow in workflows:
+            workflow_id = workflow[0]
+            counts = self.session.query(
+                self.model.flag,
+                func.count(self.model.ref).label('count')
+            ).filter(
+                self.model.workflow_id == workflow_id
+            ).group_by(self.model.flag).all()
+
+            stats[workflow_id] = {
+                'T': 0, 'I': 0, 'D': 0
+            }
+            for flag, count in counts:
+                stats[workflow_id][flag] = count
+
+        return stats
 
 class DataAvailabilityView(BaseModelView):
     """Simplified data availability management"""
@@ -663,8 +862,263 @@ class ConfigSetView(BaseView):
             setattr(DynamicConfigForm, field_name, field)
 
         return DynamicConfigForm
+class WorkflowStepView(BaseModelView):
+    """Workflow step management"""
+
+    column_list = ['step_id', 'step_name', 'category', 'set_number', 'workflow_id', 'is_active', 'created_at']
+    column_searchable_list = ['step_name', 'category', 'workflow_id']
+    column_filters = ['category', 'workflow_id', 'is_active']
+    column_sortable_list = ['step_id', 'step_name', 'category', 'set_number', 'workflow_id', 'created_at']
+
+    form_columns = ['step_name', 'category', 'set_number', 'workflow_id', 'description', 'is_active']
+
+    column_descriptions = {
+        'step_name': 'Unique name for this workflow step',
+        'category': 'Configuration category (preprocess, cc, filter, stack, etc.)',
+        'set_number': 'Configuration set number',
+        'workflow_id': 'Workflow identifier',
+        'description': 'Optional description of what this step does',
+    }
+
+    # Custom column formatters
+    column_formatters = dict(BaseModelView.column_formatters, **{
+        'category': lambda view, context, model, name: SafeMarkup(f'<span class="label label-info">{model.category}</span>'),
+        'workflow_id': lambda view, context, model, name: SafeMarkup(f'<span class="label label-primary">{model.workflow_id}</span>'),
+        'is_active': lambda view, context, model, name: SafeMarkup('✓' if model.is_active else '✗'),
+    })
+
+    def __init__(self, session, *args, **kwargs):
+        super(WorkflowStepView, self).__init__(schema.WorkflowStep, session, *args, **kwargs)
 
 
+class WorkflowLinkView(BaseModelView):
+    """Workflow link management with smart step selection"""
+
+    column_list = ['link_id', 'from_step', 'to_step', 'link_type', 'is_active', 'created_at']
+    column_searchable_list = ['link_type']
+    column_filters = ['link_type', 'is_active']
+    column_sortable_list = ['link_id', 'from_step_id', 'to_step_id', 'link_type', 'created_at']
+
+    form_columns = ['from_step_id', 'to_step_id', 'link_type', 'is_active']
+
+    column_descriptions = {
+        'from_step_id': 'Source workflow step',
+        'to_step_id': 'Target workflow step (filtered based on workflow logic)',
+        'link_type': 'Type of connection (default, conditional, etc.)',
+    }
+
+    # Custom column formatters
+    column_formatters = dict(BaseModelView.column_formatters, **{
+        'from_step': lambda view, context, model, name: model.from_step.step_name if model.from_step else '',
+        'to_step': lambda view, context, model, name: model.to_step.step_name if model.to_step else '',
+        'link_type': lambda view, context, model, name: SafeMarkup(f'<span class="label label-default">{model.link_type}</span>'),
+        'is_active': lambda view, context, model, name: SafeMarkup('✓' if model.is_active else '✗'),
+    })
+
+    def __init__(self, session, *args, **kwargs):
+        super(WorkflowLinkView, self).__init__(schema.WorkflowLink, session, *args, **kwargs)
+
+    def create_form(self, obj=None):
+        """Override create form to provide smart step selection"""
+        form = super().create_form(obj)
+
+        # Get all workflow steps for from_step selection
+        from_steps = self.session.query(schema.WorkflowStep).filter(
+            schema.WorkflowStep.is_active == True
+        ).order_by(schema.WorkflowStep.step_name).all()
+
+        form.from_step_id.choices = [
+            (step.step_id, f"{step.step_name} ({step.category}:{step.set_number})")
+            for step in from_steps
+        ]
+
+        # Initially populate to_step with all steps (will be filtered via JavaScript)
+        to_steps = self.session.query(schema.WorkflowStep).filter(
+            schema.WorkflowStep.is_active == True
+        ).order_by(schema.WorkflowStep.step_name).all()
+
+        form.to_step_id.choices = [
+            (step.step_id, f"{step.step_name} ({step.category}:{step.set_number})")
+            for step in to_steps
+        ]
+
+        return form
+
+    def edit_form(self, obj=None):
+        """Override edit form to provide smart step selection"""
+        form = super().edit_form(obj)
+
+        # Get all workflow steps
+        from_steps = self.session.query(schema.WorkflowStep).filter(
+            schema.WorkflowStep.is_active == True
+        ).order_by(schema.WorkflowStep.step_name).all()
+
+        form.from_step_id.choices = [
+            (step.step_id, f"{step.step_name} ({step.category}:{step.set_number})")
+            for step in from_steps
+        ]
+
+        to_steps = self.session.query(schema.WorkflowStep).filter(
+            schema.WorkflowStep.is_active == True
+        ).order_by(schema.WorkflowStep.step_name).all()
+
+        form.to_step_id.choices = [
+            (step.step_id, f"{step.step_name} ({step.category}:{step.set_number})")
+            for step in to_steps
+        ]
+
+        return form
+
+    @expose('/get_valid_targets/<int:from_step_id>')
+    def get_valid_targets(self, from_step_id):
+        """AJAX endpoint to get valid target steps for a given source step"""
+        from_step = self.session.query(schema.WorkflowStep).get(from_step_id)
+        if not from_step:
+            return jsonify([])
+
+        # Define workflow logic - what steps can follow what
+        WORKFLOW_CHAINS = {
+            'global': ['preprocess', 'qc'],
+            'preprocess': ['cc'],
+            'cc': ['filter'],
+            'filter': ['stack'],
+            'stack': ['mwcs', 'stretching', 'wavelet'],
+            'mwcs': ['mwcs_dtt'],
+            'stretching': [],  # Terminal step
+            'wavelet': ['wavelet_dtt'],
+            'wavelet_dtt': [],  # Terminal step
+            'mwcs_dtt': [],  # Terminal step
+            'qc': []  # Terminal step
+        }
+
+        # Get possible next categories for this step's category
+        next_categories = WORKFLOW_CHAINS.get(from_step.category, [])
+
+        # Get all steps in those categories
+        valid_targets = self.session.query(schema.WorkflowStep).filter(
+            schema.WorkflowStep.category.in_(next_categories),
+            schema.WorkflowStep.is_active == True,
+            schema.WorkflowStep.step_id != from_step_id  # Don't allow self-links
+        ).order_by(schema.WorkflowStep.step_name).all()
+
+        return jsonify([
+            {
+                'id': step.step_id,
+                'name': f"{step.step_name} ({step.category}:{step.set_number})"
+            }
+            for step in valid_targets
+        ])
+
+class WorkflowBuilderView(BaseView):
+    """
+    Visual workflow builder interface
+    """
+
+    def __init__(self, session, *args, **kwargs):
+        super(WorkflowBuilderView, self).__init__(*args, **kwargs)
+        self.session = session
+
+    @expose('/')
+    def index(self):
+        """Display workflow builder interface"""
+        from .api import get_workflow_graph
+
+        # Get available workflows
+        workflows = self.session.query(schema.WorkflowStep.workflow_id).distinct().all()
+        workflow_ids = [w[0] for w in workflows]
+
+        # Get current workflow (default to 'default')
+        current_workflow = request.args.get('workflow', 'default')
+
+        # Get workflow graph data
+        graph_data = get_workflow_graph(self.session, current_workflow)
+
+        return self.render('admin/workflow_builder.html',
+                           workflows=workflow_ids,
+                           current_workflow=current_workflow,
+                           graph_data=graph_data)
+
+    @expose('/create_step', methods=['POST'])
+    def create_step(self):
+        """Create a new workflow step"""
+        from .api import create_workflow_step
+
+        step_name = request.form.get('step_name')
+        category = request.form.get('category')
+        set_number = int(request.form.get('set_number'))
+        workflow_id = request.form.get('workflow_id', 'default')
+        description = request.form.get('description')
+
+        try:
+            step = create_workflow_step(self.session, step_name, category, set_number, workflow_id, description)
+            flash(f'Workflow step "{step_name}" created successfully', 'success')
+        except Exception as e:
+            flash(f'Error creating workflow step: {str(e)}', 'error')
+
+        return redirect(url_for('.index', workflow=workflow_id))
+
+    @expose('/create_link', methods=['POST'])
+    def create_link(self):
+        """Create a new workflow link"""
+        from .api import create_workflow_link
+
+        from_step_id = int(request.form.get('from_step_id'))
+        to_step_id = int(request.form.get('to_step_id'))
+        link_type = request.form.get('link_type', 'default')
+
+        try:
+            link = create_workflow_link(self.session, from_step_id, to_step_id, link_type)
+            flash('Workflow link created successfully', 'success')
+        except Exception as e:
+            flash(f'Error creating workflow link: {str(e)}', 'error')
+
+        return redirect(url_for('.index'))
+
+    @expose('/create_steps_from_configs', methods=['POST'])
+    def create_steps_from_configs(self):
+        """Create workflow steps automatically from all existing config sets"""
+        from .api import create_workflow_steps_from_config_sets
+
+        workflow_id = request.form.get('workflow_id', 'default')
+
+        created_count, existing_count, error_message = create_workflow_steps_from_config_sets(
+            self.session, workflow_id
+        )
+
+        if error_message:
+            flash(f'Error creating workflow steps: {error_message}', 'error')
+        else:
+            if created_count > 0:
+                flash(f'Created {created_count} workflow steps from config sets', 'success')
+            if existing_count > 0:
+                flash(f'{existing_count} workflow steps already existed', 'info')
+            if created_count == 0 and existing_count == 0:
+                flash('No config sets found to create workflow steps from', 'warning')
+
+        return redirect(url_for('.index', workflow=workflow_id))
+
+    @expose('/create_links_from_steps', methods=['POST'])
+    def create_links_from_steps(self):
+        """Create workflow links automatically from existing workflow steps"""
+        from .api import create_workflow_links_from_steps
+
+        workflow_id = request.form.get('workflow_id', 'default')
+
+        created_count, existing_count, error_message = create_workflow_links_from_steps(
+            self.session, workflow_id
+        )
+
+        if error_message:
+            flash(f'Error creating workflow links: {error_message}', 'error')
+        else:
+            if created_count > 0:
+                flash(f'Created {created_count} workflow links automatically', 'success')
+            if existing_count > 0:
+                flash(f'{existing_count} workflow links already existed', 'info')
+            if created_count == 0 and existing_count == 0:
+                flash('No workflow steps found to create links between', 'warning')
+
+        return redirect(url_for('.index', workflow=workflow_id))
 
 CONFIG_BULK_UPDATE_TEMPLATE = """
 {% extends 'admin/base.html' %}
@@ -759,6 +1213,12 @@ def create_admin_app():
     admin.add_view(ConfigSetView(db_session, name='Configuration Sets', endpoint='config_sets', category='Configuration'))
     admin.add_view(StationView(db_session, name='Stations', category='Configuration'))
     admin.add_view(DataAvailabilityView(db_session, name='Data Availability', category='Data'))
+
+    # Add workflow views
+    admin.add_view(WorkflowStepView(db_session, name='Workflow Steps', category='Workflow'))
+    admin.add_view(WorkflowLinkView(db_session, name='Workflow Links', category='Workflow'))
+    admin.add_view(
+        WorkflowBuilderView(db_session, name='Workflow Builder', endpoint='workflow_builder', category='Workflow'))
 
     admin.add_view(JobView(db_session, name='Jobs', category='Processing'))
 

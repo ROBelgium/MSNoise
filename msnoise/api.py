@@ -21,7 +21,7 @@ import xarray as xr
 
 
 from . import DBConfigNotFoundError
-from .msnoise_table_def import Job, Station, Config, DataAvailability
+from .msnoise_table_def import Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink
 
 
 def get_logger(name, loglevel=None, with_pid=False):
@@ -412,7 +412,7 @@ def list_config_sets(session, set_name=None):
         return []
 
 
-def get_config_set_details(session, set_name, set_number):
+def get_config_set_details(session, set_name, set_number, format="list"):
     """
     Get details of a specific configuration set.
 
@@ -433,8 +433,24 @@ def get_config_set_details(session, set_name, set_number):
             Config.set_number == set_number
         ).order_by(Config.name).all()
 
-        return [{'name': c.name, 'value': c.value, 'description': c.description}
-                for c in configs]
+        if format == "list":
+            return [{'name': c.name, 'value': c.value, 'description': c.description}
+             for c in configs]
+        elif format == "AttribDict":
+            from obspy.core import AttribDict
+            import pydoc
+            attrib_dict = AttribDict()
+            for c in configs:
+                itemtype = pydoc.locate(c.param_type)
+                if itemtype is bool:
+                    if c.value in [True, 'True', 'true', 'Y', 'y', '1', 1]:
+                        attrib_dict[c.name] = True
+                    else:
+                        attrib_dict[c.name] = False
+                else:
+                    attrib_dict[c.name] = itemtype(c.value)
+            return attrib_dict
+
 
     except Exception as e:
         get_logger("msnoise").error(f"Failed to get config set details: {str(e)}")
@@ -534,17 +550,17 @@ def get_params(session):
             params[name] = itemtype(get_config(s, name))
 
     # TODO remove reference to goal_sampling_rate
-    params.goal_sampling_rate = params.cc_sampling_rate
-    params.min30 = params.corr_duration * params.goal_sampling_rate
-    params.components_to_compute = get_components_to_compute(s)
-    params.components_to_compute_single_station = get_components_to_compute_single_station(s)
-    params.all_components = np.unique(params.components_to_compute_single_station + \
-                            params.components_to_compute)
+    # params.goal_sampling_rate = params.cc_sampling_rate
+    # params.min30 = params.corr_duration * params.goal_sampling_rate
+    # params.components_to_compute = get_components_to_compute(s)
+    # params.components_to_compute_single_station = get_components_to_compute_single_station(s)
+    # params.all_components = np.unique(params.components_to_compute_single_station + \
+    #                         params.components_to_compute)
 
-    if not isinstance(params.mov_stack[0], tuple):
-        params.mov_stack = [params.mov_stack, ]
-    else:
-        params.mov_stack = params.mov_stack
+    # if not isinstance(params.mov_stack[0], tuple):
+    #     params.mov_stack = [params.mov_stack, ]
+    # else:
+    #     params.mov_stack = params.mov_stack
     return params
 
 # FILTERS PART
@@ -3644,3 +3660,680 @@ def xr_save_wct_dtt2(station1, station2, components, filterid, wctid, dttid, mov
 def filter_within_daterange(date, start_date, end_date):
     """Check if a date falls within the configured range"""
     return start_date <= date <= end_date
+
+# ============================================================================
+# Workflow Management Functions
+# ============================================================================
+
+def get_workflow_steps(session, workflow_id="default"):
+    """Get all steps in a workflow"""
+    from .msnoise_table_def import declare_tables
+    schema = declare_tables()
+
+    return session.query(schema.WorkflowStep) \
+        .filter(schema.WorkflowStep.workflow_id == workflow_id) \
+        .filter(schema.WorkflowStep.is_active == True) \
+        .order_by(schema.WorkflowStep.step_name).all()
+
+def get_workflow_links(session, workflow_id="default"):
+    """Get all links in a workflow"""
+    from .msnoise_table_def import declare_tables
+    schema = declare_tables()
+
+    return session.query(schema.WorkflowLink) \
+        .join(schema.WorkflowStep, schema.WorkflowLink.from_step_id == schema.WorkflowStep.step_id) \
+        .filter(schema.WorkflowStep.workflow_id == workflow_id) \
+        .filter(schema.WorkflowLink.is_active == True).all()
+
+def get_step_predecessors(session, step_id):
+    """Get all steps that feed into this step"""
+    from .msnoise_table_def import declare_tables
+    schema = declare_tables()
+
+    return session.query(schema.WorkflowStep) \
+        .join(schema.WorkflowLink, schema.WorkflowStep.step_id == schema.WorkflowLink.from_step_id) \
+        .filter(schema.WorkflowLink.to_step_id == step_id) \
+        .filter(schema.WorkflowLink.is_active == True).all()
+
+def get_step_successors(session, step_id):
+    """Get all steps that this step feeds into"""
+    from .msnoise_table_def import declare_tables
+    schema = declare_tables()
+
+    return session.query(schema.WorkflowStep) \
+        .join(schema.WorkflowLink, schema.WorkflowStep.step_id == schema.WorkflowLink.to_step_id) \
+        .filter(schema.WorkflowLink.from_step_id == step_id) \
+        .filter(schema.WorkflowLink.is_active == True).all()
+
+def create_workflow_step(session, step_name, category, set_number, workflow_id="default", description=None):
+    """Create a new workflow step"""
+    from .msnoise_table_def import declare_tables
+    schema = declare_tables()
+
+    step = schema.WorkflowStep(
+        step_name=step_name,
+        category=category,
+        set_number=set_number,
+        workflow_id=workflow_id,
+        description=description
+    )
+
+    session.add(step)
+    session.commit()
+    return step
+
+def create_workflow_link(session, from_step_id, to_step_id, link_type="default"):
+    """Create a link between two workflow steps"""
+    from .msnoise_table_def import declare_tables
+    schema = declare_tables()
+
+    # Check if link already exists
+    existing = session.query(schema.WorkflowLink).filter(
+        schema.WorkflowLink.from_step_id == from_step_id,
+        schema.WorkflowLink.to_step_id == to_step_id
+    ).first()
+
+    if existing:
+        return existing
+
+    link = schema.WorkflowLink(
+        from_step_id=from_step_id,
+        to_step_id=to_step_id,
+        link_type=link_type
+    )
+
+    session.add(link)
+    session.commit()
+    return link
+
+def get_workflow_execution_order(session, workflow_id="default"):
+    """Get workflow steps in execution order using topological sort"""
+    steps = get_workflow_steps(session, workflow_id)
+    links = get_workflow_links(session, workflow_id)
+
+    # Build dependency graph
+    dependencies = {}
+    for link in links:
+        if link.to_step_id not in dependencies:
+            dependencies[link.to_step_id] = []
+        dependencies[link.to_step_id].append(link.from_step_id)
+
+    # Topological sort
+    ordered = []
+    visited = set()
+
+    def visit(step_id):
+        if step_id in visited:
+            return
+        visited.add(step_id)
+
+        # Visit dependencies first
+        for dep_id in dependencies.get(step_id, []):
+            visit(dep_id)
+
+        ordered.append(step_id)
+
+    for step in steps:
+        visit(step.step_id)
+
+    return ordered
+
+def get_workflow_graph(session, workflow_id="default"):
+    """Return workflow as nodes and edges for visualization, sorted by workflow order"""
+    steps = get_workflow_steps(session, workflow_id)
+    links = get_workflow_links(session, workflow_id)
+
+    # Define the natural workflow order
+    WORKFLOW_ORDER = [
+        'global',
+        'preprocess',
+        'cc',
+        'qc',
+        'filter',
+        'stack',
+        'mwcs',
+        'mwcs_dtt',
+        'stretching',
+        'wavelet',
+        'wavelet_dtt'
+    ]
+
+    # Sort steps by workflow order
+    def get_workflow_order_key(step):
+        try:
+            category_order = WORKFLOW_ORDER.index(step.category)
+        except ValueError:
+            # If category not in predefined order, put it at the end
+            category_order = len(WORKFLOW_ORDER)
+
+        # Sort by category first, then by set_number
+        return (category_order, step.set_number or 0)
+
+    sorted_steps = sorted(steps, key=get_workflow_order_key)
+
+    nodes = []
+    for step in sorted_steps:
+        nodes.append({
+            "id": step.step_id,
+            "name": step.step_name,
+            "category": step.category,
+            "set_number": step.set_number,
+            "description": step.description
+        })
+
+    edges = []
+    for link in links:
+        edges.append({
+            "from": link.from_step_id,
+            "to": link.to_step_id,
+            "type": link.link_type
+        })
+
+    return {"nodes": nodes, "edges": edges}
+
+def get_config_sets_summary(session):
+    """Get summary of all configuration sets for workflow creation"""
+    from .msnoise_table_def import declare_tables
+    schema = declare_tables()
+
+    # Get all unique category+set_number combinations
+    config_sets = session.query(
+        schema.Config.category,
+        schema.Config.set_number,
+        func.count(schema.Config.ref).label('param_count')
+    ).filter(
+        schema.Config.set_number.isnot(None)  # Exclude global configs
+    ).group_by(
+        schema.Config.category,
+        schema.Config.set_number
+    ).order_by(
+        schema.Config.category,
+        schema.Config.set_number
+    ).all()
+
+    return [
+        {
+            'category': cs.category,
+            'set_number': cs.set_number,
+            'param_count': cs.param_count,
+            'display_name': f"{cs.category}_{cs.set_number}"
+        }
+        for cs in config_sets
+    ]
+
+def create_workflow_steps_from_config_sets(session, workflow_id='default'):
+    """
+    Create workflow steps automatically from all existing config sets,
+    sorted by natural workflow order.
+
+    Returns:
+        tuple: (created_count, existing_count, error_message)
+    """
+    from .msnoise_table_def import declare_tables
+
+    schema = declare_tables()
+
+    # Define the natural workflow order
+    WORKFLOW_ORDER = [
+        'global',
+        'preprocess',
+        'cc',
+        'qc',
+        'filter',
+        'stack',
+        'mwcs',
+        'mwcs_dtt',
+        'stretching',
+        'wavelet',
+        'wavelet_dtt'
+    ]
+
+    try:
+        # Get all unique category+set_number combinations
+        config_sets = session.query(
+            schema.Config.category,
+            schema.Config.set_number
+        ).filter(
+            schema.Config.set_number.isnot(None)  # Exclude global configs
+        ).distinct().all()
+
+        # Sort by workflow order
+        def get_workflow_order(config_set):
+            category, set_number = config_set
+            try:
+                return WORKFLOW_ORDER.index(category)
+            except ValueError:
+                # If category not in predefined order, put it at the end
+                return len(WORKFLOW_ORDER)
+
+        config_sets = sorted(config_sets, key=get_workflow_order)
+
+        created_count = 0
+        existing_count = 0
+
+        for category, set_number in config_sets:
+            # Check if step already exists
+            existing_step = session.query(schema.WorkflowStep).filter(
+                schema.WorkflowStep.category == category,
+                schema.WorkflowStep.set_number == set_number,
+                schema.WorkflowStep.workflow_id == workflow_id
+            ).first()
+
+            if not existing_step:
+                step_name = f"{category}_{set_number}"
+                description = f"Auto-generated step for {category} configuration set {set_number}"
+
+                create_workflow_step(
+                    session,
+                    step_name,
+                    category,
+                    set_number,
+                    workflow_id,
+                    description
+                )
+                created_count += 1
+            else:
+                existing_count += 1
+
+        return created_count, existing_count, None
+
+    except Exception as e:
+        return 0, 0, str(e)
+
+def create_workflow_links_from_steps(session, workflow_id='default'):
+    """
+    Create workflow links automatically between existing workflow steps,
+    following natural workflow progression.
+
+    Returns:
+        tuple: (created_count, existing_count, error_message)
+    """
+    from .msnoise_table_def import declare_tables
+
+    schema = declare_tables()
+
+    # Define the natural workflow chains
+    WORKFLOW_CHAINS = {
+        'global': ['preprocess', 'qc'],
+        'preprocess': ['cc'],
+        'cc': ['filter'],
+        'qc': [],
+        'filter': ['stack'],
+        'stack': ['mwcs', 'stretching', 'wavelet'],
+        'mwcs': ['mwcs_dtt'],
+        'stretching': [],
+        'wavelet': ['wavelet_dtt'],
+        'wavelet_dtt': [],
+        'mwcs_dtt': []
+    }
+
+    try:
+        # Get all workflow steps for this workflow
+        steps = session.query(schema.WorkflowStep).filter(
+            schema.WorkflowStep.workflow_id == workflow_id
+        ).all()
+
+        # Group steps by category and set_number
+        steps_by_category = {}
+        for step in steps:
+            category = step.category
+            if category not in steps_by_category:
+                steps_by_category[category] = {}
+            steps_by_category[category][step.set_number] = step
+
+        created_count = 0
+        existing_count = 0
+
+        # Create links based on workflow chains
+        for source_category, target_categories in WORKFLOW_CHAINS.items():
+            if source_category not in steps_by_category:
+                continue
+
+            # For each source step in this category
+            for source_set_number, source_step in steps_by_category[source_category].items():
+
+                # Link to each target category
+                for target_category in target_categories:
+                    if target_category not in steps_by_category:
+                        continue
+
+                    # Strategy: Create links based on workflow logic
+                    target_steps_to_link = []
+
+                    if source_category == 'global':
+                        # Global steps link to all steps in target categories
+                        target_steps_to_link = list(steps_by_category[target_category].values())
+
+                    elif target_category in ['filter', 'mwcs', 'stretching', 'wavelet', 'mwcs_dtt', 'wavelet_dtt']:
+                        # For all processing steps that can have multiple instances,
+                        # link to all target steps in the category
+                        # This includes DTT steps which can process results from multiple MWCS/wavelet sets
+                        target_steps_to_link = list(steps_by_category[target_category].values())
+
+                    else:
+                        # Default: link to matching set numbers if available, otherwise to all
+                        if source_set_number in steps_by_category[target_category]:
+                            target_steps_to_link = [steps_by_category[target_category][source_set_number]]
+                        else:
+                            target_steps_to_link = list(steps_by_category[target_category].values())
+
+                    # Create the links
+                    for target_step in target_steps_to_link:
+                        # Check if link already exists
+                        existing_link = session.query(schema.WorkflowLink).filter(
+                            schema.WorkflowLink.from_step_id == source_step.step_id,
+                            schema.WorkflowLink.to_step_id == target_step.step_id
+                        ).first()
+
+                        if not existing_link:
+                            create_workflow_link(
+                                session,
+                                source_step.step_id,
+                                target_step.step_id,
+                                'default'
+                            )
+                            created_count += 1
+                        else:
+                            existing_count += 1
+
+        return created_count, existing_count, None
+
+    except Exception as e:
+        return 0, 0, str(e)
+
+# Job management functions for workflow-aware jobs
+
+def create_job_for_step(db, step_id, day, pair, workflow_id="default", priority=0, flag='T'):
+    """
+    Create a job for a specific workflow step
+
+    :param db: Database connection
+    :param step_id: WorkflowStep ID
+    :param day: Day in YYYY-MM-DD format
+    :param pair: Station pair
+    :param workflow_id: Workflow identifier
+    :param priority: Job priority
+    :param flag: Job status flag
+    :return: Created Job instance
+    """
+    # Get the step to derive jobtype
+    step = db.query(WorkflowStep).filter(
+        WorkflowStep.step_id == step_id
+    ).first()
+
+    if not step:
+        raise ValueError(f"WorkflowStep with id {step_id} not found")
+
+    jobtype = f"{step.step_name}_{step.set_number}"
+
+    job = Job(
+        day=day,
+        pair=pair,
+        flag=flag,
+        workflow_id=workflow_id,
+        step_id=step_id,
+        jobtype=jobtype,
+        priority=priority
+    )
+
+    db.add(job)
+    db.commit()
+    return job
+
+def get_jobs_for_step(db, step_id, workflow_id="default", flag=None):
+    """
+    Get all jobs for a specific workflow step
+
+    :param db: Database connection
+    :param step_id: WorkflowStep ID
+    :param workflow_id: Workflow identifier
+    :param flag: Optional job status filter
+    :return: List of Job instances
+    """
+    query = db.query(Job).filter(
+        Job.step_id == step_id,
+        Job.workflow_id == workflow_id
+    )
+
+    if flag:
+        query = query.filter(Job.flag == flag)
+
+    return query.all()
+
+def get_ready_jobs(db, workflow_id="default", step_name=None, limit=None):
+    """
+    Get jobs that are ready to run based on workflow dependencies
+
+    :param db: Database connection
+    :param workflow_id: Workflow identifier
+    :param step_name: Optional step name filter
+    :param limit: Maximum number of jobs to return
+    :return: List of ready Job instances
+    """
+    query = db.query(Job).filter(
+        Job.flag == 'T',
+        Job.workflow_id == workflow_id
+    )
+
+    if step_name:
+        query = query.join(WorkflowStep).filter(
+            WorkflowStep.step_name == step_name
+        )
+
+    query = query.order_by(Job.priority.desc(), Job.lastmod.asc())
+
+    if limit:
+        query = query.limit(limit)
+
+    jobs = query.all()
+
+    # Filter by workflow dependencies
+    ready_jobs = []
+    for job in jobs:
+        if is_job_ready_to_run(db, job):
+            ready_jobs.append(job)
+
+    return ready_jobs
+
+def is_job_ready_to_run(db, job):
+    """
+    Check if a job is ready to run based on workflow dependencies
+
+    :param db: Database connection
+    :param job: Job instance
+    :return: Boolean indicating if job is ready
+    """
+    if job.flag != 'T':
+        return False
+
+    # Check if predecessor steps are completed
+    if job.workflow_step and job.workflow_step.incoming_links:
+        for link in job.workflow_step.incoming_links:
+            if link.is_active:
+                # Check if there are completed jobs for the predecessor step
+                predecessor_jobs = db.query(Job).filter(
+                    Job.day == job.day,
+                    Job.pair == job.pair,
+                    Job.step_id == link.from_step_id,
+                    Job.workflow_id == job.workflow_id,
+                    Job.flag == 'D'
+                ).count()
+
+                if predecessor_jobs == 0:
+                    return False
+
+    return True
+
+def create_workflow_jobs(db, current_step_name, workflow_id="default", days=None, pairs=None):
+    """
+    Create jobs for the next workflow step(s) after completing a step
+
+    :param db: Database connection
+    :param current_step_name: Name of the completed step
+    :param workflow_id: Workflow identifier
+    :param days: List of days to create jobs for
+    :param pairs: List of station pairs to create jobs for
+    :return: List of created Job instances
+    """
+    # Find current step
+    current_step = db.query(WorkflowStep).filter(
+        WorkflowStep.step_name == current_step_name,
+        WorkflowStep.workflow_id == workflow_id
+    ).first()
+
+    if not current_step:
+        raise ValueError(f"WorkflowStep '{current_step_name}' not found in workflow '{workflow_id}'")
+
+    # Find next steps via WorkflowLink
+    next_steps = db.query(WorkflowStep).join(
+        WorkflowLink, WorkflowLink.to_step_id == WorkflowStep.step_id
+    ).filter(
+        WorkflowLink.from_step_id == current_step.step_id,
+        WorkflowLink.is_active == True
+    ).all()
+
+    created_jobs = []
+
+    # Create jobs for each next step
+    for next_step in next_steps:
+        # Get appropriate pairs/days based on step type or use provided ones
+        if pairs is None:
+            pairs = get_pairs_for_step(db, next_step)
+        if days is None:
+            days = get_days_for_step(db, next_step)
+
+        for pair in pairs:
+            for day in days:
+                # Check if job already exists
+                existing_job = db.query(Job).filter(
+                    Job.day == day,
+                    Job.pair == pair,
+                    Job.step_id == next_step.step_id,
+                    Job.workflow_id == workflow_id
+                ).first()
+
+                if not existing_job:
+                    job = create_job_for_step(
+                        db, next_step.step_id, day, pair, workflow_id
+                    )
+                    created_jobs.append(job)
+
+    return created_jobs
+
+def get_pairs_for_step(db, step):
+    """
+    Get appropriate station pairs for a workflow step
+
+    :param db: Database connection
+    :param step: WorkflowStep instance
+    :return: List of station pairs
+    """
+    # This is a placeholder - implement based on step type and requirements
+    # For now, return all active station pairs
+    return get_station_pairs(db, used=True)
+
+def get_days_for_step(db, step):
+    """
+    Get appropriate days for a workflow step
+
+    :param db: Database connection
+    :param step: WorkflowStep instance
+    :return: List of days
+    """
+    # This is a placeholder - implement based on step type and requirements
+    # For now, return days from data availability
+    from datetime import datetime, timedelta
+
+    # Get recent days as example
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+
+    days = []
+    current_date = start_date
+    while current_date <= end_date:
+        days.append(current_date.strftime('%Y-%m-%d'))
+        current_date += timedelta(days=1)
+
+    return days
+
+def update_job_status(db, job_id, flag, commit=True):
+    """
+    Update job status with timestamp
+
+    :param db: Database connection
+    :param job_id: Job ID
+    :param flag: New status flag
+    :param commit: Whether to commit the transaction
+    """
+    job = db.query(Job).filter(Job.ref == job_id).first()
+    if job:
+        job.flag = flag
+        job.lastmod = datetime.datetime.utcnow()
+        if commit:
+            db.commit()
+    return job
+
+def get_workflow_job_counts(db, workflow_id="default"):
+    """
+    Get job counts by status for a workflow
+
+    :param db: Database connection
+    :param workflow_id: Workflow identifier
+    :return: Dictionary with job counts by status
+    """
+    from sqlalchemy import func
+
+    counts = db.query(
+        Job.flag,
+        func.count(Job.ref).label('count')
+    ).filter(
+        Job.workflow_id == workflow_id
+    ).group_by(Job.flag).all()
+
+    result = {'T': 0, 'I': 0, 'D': 0}
+    for flag, count in counts:
+        result[flag] = count
+
+    return result
+
+def get_next_preprocess_job(session, workflow_id="default", step_category="preprocess"):
+    """
+    Get the next set of preprocessing jobs to process.
+
+    Returns jobs for the same workflow step and day that are ready to be processed.
+    This mimics the behavior of get_next_job but for preprocessing workflow steps.
+
+    :param session: Database session
+    :param workflow_id: Workflow ID to filter by
+    :return: List of jobs sharing the same workflow step and day, or empty list
+    """
+    from .msnoise_table_def import declare_tables
+
+    schema = declare_tables()
+    Job = schema.Job
+    WorkflowStep = schema.WorkflowStep
+
+    # First, find the next workflow step + day combination for preprocessing
+    next_job = session.query(Job, WorkflowStep) \
+        .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name) \
+        .filter(WorkflowStep.category == step_category) \
+        .filter(Job.flag == 'T') \
+        .filter(Job.workflow_id == workflow_id) \
+        .order_by(Job.priority.desc(), Job.lastmod) \
+        .first()
+    print(next_job)
+    if not next_job:
+        return []
+
+    job, step = next_job
+
+    # Get all jobs for the same step and day
+    jobs = session.query(Job) \
+        .filter(Job.jobtype == job.jobtype) \
+        .filter(Job.day == job.day) \
+        .filter(Job.workflow_id == workflow_id) \
+        .filter(Job.step_id == step.step_id) \
+        .filter(Job.flag == 'T') \
+        .all()
+
+    return jobs

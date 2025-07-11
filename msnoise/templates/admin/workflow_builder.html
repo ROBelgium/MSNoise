@@ -1,0 +1,778 @@
+{% extends 'admin/master.html' %}
+
+{% block head %}
+{{ super() }}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+    .workflow-container {
+        width: 100%;
+        height: 600px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #f8f9fa;
+    }
+
+    .node {
+        cursor: pointer;
+        transition: all 0.3s ease;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+    }
+
+    .node:hover {
+        filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+        transform: scale(1.05);
+    }
+
+    .node-rect {
+        stroke: #fff;
+        stroke-width: 3px;
+        rx: 12;
+        ry: 12;
+    }
+
+    .node-text {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        text-anchor: middle;
+        pointer-events: none;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+
+    .node-category {
+        font-weight: bold;
+        font-size: 11px;
+        fill: rgba(255, 255, 255, 0.9);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .node-title {
+        font-weight: 600;
+        font-size: 13px;
+        fill: white;
+    }
+
+    .node-subtitle {
+        font-size: 10px;
+        fill: rgba(255, 255, 255, 0.8);
+    }
+
+    .link {
+        fill: none;
+        stroke: #6c757d;
+        stroke-width: 2;
+        marker-end: url(#arrowhead);
+        transition: all 0.2s ease;
+    }
+
+    .link:hover {
+        stroke: #495057;
+        stroke-width: 3;
+    }
+
+    .workflow-tooltip {
+        position: absolute;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        max-width: 250px;
+    }
+
+    .workflow-controls {
+        margin: 10px 0;
+        text-align: center;
+    }
+
+    .workflow-controls .btn {
+        margin: 0 5px;
+    }
+
+    .workflow-stats {
+        margin: 15px 0;
+        padding: 15px;
+        background: #e9ecef;
+        border-radius: 6px;
+    }
+
+    .workflow-stats h6 {
+        margin-bottom: 10px;
+        color: #495057;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+    }
+
+    .stat-item {
+        padding: 8px;
+        background: white;
+        border-radius: 4px;
+        text-align: center;
+    }
+
+    .stat-item strong {
+        display: block;
+        font-size: 18px;
+        color: #007bff;
+    }
+
+    .empty-workflow {
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
+        padding: 50px;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Workflow Builder</h1>
+
+            <!-- Workflow Selection -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Select Workflow</h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" class="form-inline">
+                        <div class="form-group mr-3">
+                            <label for="workflow_select" class="mr-2">Workflow:</label>
+                            <select name="workflow" id="workflow_select" class="form-control" onchange="this.form.submit()">
+                                {% for workflow in workflows %}
+                                <option value="{{ workflow }}" {% if workflow == current_workflow %}selected{% endif %}>
+                                    {{ workflow }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Workflow Graph Visualization -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Workflow Graph - {{ current_workflow }}</h5>
+                </div>
+                <div class="card-body">
+                    {% if graph_data.nodes %}
+                    <div class="workflow-controls">
+                        <button class="btn btn-secondary btn-sm" onclick="resetZoom()">Reset View</button>
+                        <button class="btn btn-primary btn-sm" onclick="arrangeHierarchical()">Hierarchical Layout</button>
+                        <button class="btn btn-info btn-sm" onclick="arrangeCircular()">Circular Layout</button>
+                        <button class="btn btn-success btn-sm" onclick="exportSVG()">Export SVG</button>
+                    </div>
+
+                    <div class="workflow-container">
+                        <svg id="workflow-svg" width="100%" height="100%"></svg>
+                    </div>
+
+                    <div class="workflow-stats">
+                        <h6>Workflow Statistics</h6>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <strong id="stat-nodes">{{ graph_data.nodes|length }}</strong>
+                                <small>Total Steps</small>
+                            </div>
+                            <div class="stat-item">
+                                <strong id="stat-edges">{{ graph_data.edges|length }}</strong>
+                                <small>Connections</small>
+                            </div>
+                            <div class="stat-item">
+                                <strong id="stat-categories">-</strong>
+                                <small>Categories</small>
+                            </div>
+                            <div class="stat-item">
+                                <strong id="stat-completeness">-</strong>
+                                <small>Completeness</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="empty-workflow">
+                        <p>No workflow steps found for "{{ current_workflow }}"</p>
+                        <p>Create some steps using the forms below or auto-create from existing config sets.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Create Step Form -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Create New Step</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('.create_step') }}">
+                        <div class="form-row">
+                            <div class="form-group col-md-3">
+                                <label for="step_name">Step Name</label>
+                                <input type="text" class="form-control" id="step_name" name="step_name" required>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label for="category">Category</label>
+                                <select class="form-control" id="category" name="category" required>
+                                    <option value="">Select...</option>
+                                    <option value="global">Global</option>
+                                    <option value="preprocess">Preprocess</option>
+                                    <option value="cc">Cross-Correlation</option>
+                                    <option value="qc">Quality Control</option>
+                                    <option value="filter">Filter</option>
+                                    <option value="stack">Stack</option>
+                                    <option value="mwcs">MWCS</option>
+                                    <option value="mwcs_dtt">MWCS DTT</option>
+                                    <option value="stretching">Stretching</option>
+                                    <option value="wavelet">Wavelet</option>
+                                    <option value="wavelet_dtt">Wavelet DTT</option>
+                                </select>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label for="set_number">Set Number</label>
+                                <input type="number" class="form-control" id="set_number" name="set_number" min="1" required>
+                            </div>
+                            <div class="form-group col-md-3">
+                                <label for="description">Description</label>
+                                <input type="text" class="form-control" id="description" name="description">
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label>&nbsp;</label>
+                                <button type="submit" class="form-control btn btn-primary">Create Step</button>
+                            </div>
+                        </div>
+                        <input type="hidden" name="workflow_id" value="{{ current_workflow }}">
+                    </form>
+                </div>
+            </div>
+
+            <!-- Create Link Form -->
+            {% if graph_data.nodes %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Create New Link</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('.create_link') }}">
+                        <div class="form-row">
+                            <div class="form-group col-md-4">
+                                <label for="from_step_select">From Step</label>
+                                <select class="form-control" id="from_step_select" name="from_step_id" required>
+                                    <option value="">Select source step...</option>
+                                    {% for node in graph_data.nodes %}
+                                    <option value="{{ node.id }}">{{ node.name }} ({{ node.category }}:{{ node.set_number }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-4">
+                                <label for="to_step_select">To Step</label>
+                                <select class="form-control" id="to_step_select" name="to_step_id" required>
+                                    <option value="">Select target step...</option>
+                                    {% for node in graph_data.nodes %}
+                                    <option value="{{ node.id }}">{{ node.name }} ({{ node.category }}:{{ node.set_number }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label for="link_type">Link Type</label>
+                                <select class="form-control" id="link_type" name="link_type">
+                                    <option value="default">Default</option>
+                                    <option value="conditional">Conditional</option>
+                                    <option value="parallel">Parallel</option>
+                                </select>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label>&nbsp;</label>
+                                <button type="submit" class="form-control btn btn-success">Create Link</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Auto-create Steps -->
+            <div class="card">
+                <div class="card-header">
+                    <h5>Auto-create Steps from Config Sets</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('.create_steps_from_configs') }}">
+                        <div class="form-row">
+                            <div class="form-group col-md-10">
+                                <p class="text-muted">
+                                    This will automatically create workflow steps for all existing configuration sets.
+                                </p>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <button type="submit" class="btn btn-warning btn-block">Auto-create Steps</button>
+                            </div>
+                        </div>
+                        <input type="hidden" name="workflow_id" value="{{ current_workflow }}">
+                    </form>
+                </div>
+            </div>
+            <!-- Auto-create Links -->
+            <div class="card">
+                <div class="card-header">
+                    <h5>Auto-create Links from Workflow Steps</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('.create_links_from_steps') }}">
+                        <div class="form-row">
+                            <div class="form-group col-md-10">
+                                <p class="text-muted">
+                                    This will automatically create workflow links between existing steps following the natural workflow progression:
+                                    <strong>preprocess → cc → filter → stack → mwcs/stretching/wavelet → mwcs_dtt/wavelet_dtt</strong>
+                                </p>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <button type="submit" class="btn btn-info btn-block">Auto-create Links</button>
+                            </div>
+                        </div>
+                        <input type="hidden" name="workflow_id" value="{{ current_workflow }}">
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Tooltip for graph -->
+<div class="workflow-tooltip" id="workflow-tooltip"></div>
+
+<script>
+    // Global variables
+    let simulation;
+    let svg, container, link, node, tooltip;
+    let workflowData = {{ graph_data | tojson }};
+
+    // Category colors with gradients
+    const categoryColors = {
+        'global': '#28a745',
+        'preprocess': '#17a2b8',
+        'cc': '#6f42c1',
+        'qc': '#fd7e14',
+        'filter': '#e83e8c',
+        'stack': '#20c997',
+        'mwcs': '#ffc107',
+        'mwcs_dtt': '#dc3545',
+        'stretching': '#6c757d',
+        'wavelet': '#007bff',
+        'wavelet_dtt': '#343a40'
+    };
+
+    // Category nice names
+    const categoryNames = {
+        'global': 'Global Config',
+        'preprocess': 'Preprocessing',
+        'cc': 'Cross-Correlation',
+        'qc': 'Quality Control',
+        'filter': 'Filtering',
+        'stack': 'Stacking',
+        'mwcs': 'MWCS Analysis',
+        'mwcs_dtt': 'MWCS dt/t',
+        'stretching': 'Stretching',
+        'wavelet': 'Wavelet Analysis',
+        'wavelet_dtt': 'Wavelet dt/t'
+    };
+
+    // Initialize D3 graph only if we have nodes
+    function initializeGraph() {
+        if (!workflowData.nodes || workflowData.nodes.length === 0) {
+            console.log('No workflow nodes to display');
+            return;
+        }
+
+        console.log('Initializing graph with data:', workflowData);
+
+        // Set up SVG
+        svg = d3.select("#workflow-svg");
+        container = svg.append("g");
+
+        // Get dimensions
+        const svgNode = svg.node();
+        const rect = svgNode.getBoundingClientRect();
+        const width = rect.width || 1000;
+        const height = rect.height || 600;
+
+        svg.attr("viewBox", `0 0 ${width} ${height}`);
+
+        // Add zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on("zoom", (event) => {
+                container.attr("transform", event.transform);
+            });
+
+        svg.call(zoom);
+
+        // Add definitions for gradients and effects
+        const defs = svg.append("defs");
+
+        // Add arrow marker
+        defs.append("marker")
+            .attr("id", "arrowhead")
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 22)
+            .attr("refY", 0)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("fill", "#6c757d");
+
+        // Add gradients for each category
+        Object.entries(categoryColors).forEach(([category, color]) => {
+            const gradient = defs.append("linearGradient")
+                .attr("id", `gradient-${category}`)
+                .attr("x1", "0%")
+                .attr("y1", "0%")
+                .attr("x2", "0%")
+                .attr("y2", "100%");
+
+            gradient.append("stop")
+                .attr("offset", "0%")
+                .attr("style", `stop-color:${color};stop-opacity:1`);
+
+            gradient.append("stop")
+                .attr("offset", "100%")
+                .attr("style", `stop-color:${d3.color(color).darker(0.5)};stop-opacity:1`);
+        });
+
+        // Tooltip
+        tooltip = d3.select("#workflow-tooltip");
+
+        // Convert edges to D3 format and validate
+        const validEdges = [];
+        if (workflowData.edges && workflowData.edges.length > 0) {
+            workflowData.edges.forEach(edge => {
+                const sourceNode = workflowData.nodes.find(n => n.id === edge.from);
+                const targetNode = workflowData.nodes.find(n => n.id === edge.to);
+
+                if (sourceNode && targetNode) {
+                    validEdges.push({
+                        source: edge.from,
+                        target: edge.to,
+                        from: edge.from,
+                        to: edge.to,
+                        type: edge.type || 'default'
+                    });
+                } else {
+                    console.warn('Invalid edge found:', edge, 'Source exists:', !!sourceNode, 'Target exists:', !!targetNode);
+                }
+            });
+        }
+
+        console.log('Valid edges:', validEdges);
+
+        // Create force simulation
+        simulation = d3.forceSimulation(workflowData.nodes)
+            .force("link", d3.forceLink(validEdges).id(d => d.id).distance(180))
+            .force("charge", d3.forceManyBody().strength(-1000))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collision", d3.forceCollide().radius(80));
+
+        // Create links
+        link = container.append("g")
+            .selectAll(".link")
+            .data(validEdges)
+            .join("path")
+            .attr("class", "link");
+
+        // Create nodes
+        node = container.append("g")
+            .selectAll(".node")
+            .data(workflowData.nodes)
+            .join("g")
+            .attr("class", "node")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+
+        // Add rectangles to nodes with gradients
+        node.append("rect")
+            .attr("class", "node-rect")
+            .attr("width", 140)
+            .attr("height", 80)
+            .attr("x", -70)
+            .attr("y", -40)
+            .attr("fill", d => `url(#gradient-${d.category})`);
+
+        // Add category text (top)
+        node.append("text")
+            .attr("class", "node-text node-category")
+            .attr("y", -20)
+            .text(d => categoryNames[d.category] || d.category.toUpperCase());
+
+        // Add step name (middle)
+        node.append("text")
+            .attr("class", "node-text node-title")
+            .attr("y", 0)
+            .text(d => d.name.length > 12 ? d.name.substring(0, 12) + '...' : d.name);
+
+        // Add set number (bottom)
+        node.append("text")
+            .attr("class", "node-text node-subtitle")
+            .attr("y", 18)
+            .text(d => `Set ${d.set_number}`);
+
+        // Add hover effects
+        node.on("mouseover", function(event, d) {
+            const categoryName = categoryNames[d.category] || d.category;
+            tooltip.style("opacity", 1)
+                .html(`
+                    <div style="font-weight: bold; margin-bottom: 5px;">${categoryName}</div>
+                    <div style="margin-bottom: 3px;"><strong>Step:</strong> ${d.name}</div>
+                    <div style="margin-bottom: 3px;"><strong>Set:</strong> ${d.set_number}</div>
+                    <div style="margin-bottom: 3px;"><strong>Category:</strong> ${d.category}</div>
+                    ${d.description ? `<div style="margin-top: 8px; font-style: italic;">${d.description}</div>` : ''}
+                `)
+                .style("left", (event.pageX + 15) + "px")
+                .style("top", (event.pageY - 10) + "px");
+
+            // Highlight connected nodes
+            const connectedNodes = new Set([d.id]);
+            validEdges.forEach(edge => {
+                const sourceId = edge.source.id || edge.source;
+                const targetId = edge.target.id || edge.target;
+
+                if (sourceId === d.id || targetId === d.id) {
+                    connectedNodes.add(sourceId);
+                    connectedNodes.add(targetId);
+                }
+            });
+
+            node.style("opacity", n => connectedNodes.has(n.id) ? 1 : 0.3)
+                .style("transform", n => connectedNodes.has(n.id) ? "scale(1.05)" : "scale(1)");
+
+            link.style("opacity", l => {
+                const sourceId = l.source.id || l.source;
+                const targetId = l.target.id || l.target;
+                return (sourceId === d.id || targetId === d.id) ? 1 : 0.1;
+            }).style("stroke-width", l => {
+                const sourceId = l.source.id || l.source;
+                const targetId = l.target.id || l.target;
+                return (sourceId === d.id || targetId === d.id) ? 3 : 2;
+            });
+        })
+            .on("mouseout", function() {
+                tooltip.style("opacity", 0);
+                node.style("opacity", 1).style("transform", "scale(1)");
+                link.style("opacity", 1).style("stroke-width", 2);
+            });
+
+        // Update positions on simulation tick
+        simulation.on("tick", () => {
+            link.attr("d", d => {
+                const sourceX = d.source.x || 0;
+                const sourceY = d.source.y || 0;
+                const targetX = d.target.x || 0;
+                const targetY = d.target.y || 0;
+                return `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
+            });
+
+            node.attr("transform", d => `translate(${d.x || 0},${d.y || 0})`);
+        });
+
+        // Store zoom and dimensions for global access
+        window.workflowZoom = zoom;
+        window.workflowDimensions = { width, height };
+
+        // Auto-arrange after initialization
+        setTimeout(() => {
+            if (typeof arrangeHierarchical === 'function') {
+                arrangeHierarchical();
+            }
+        }, 1000);
+    }
+
+    // Rest of the functions remain the same...
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+
+    function resetZoom() {
+        if (svg && window.workflowZoom) {
+            svg.transition().duration(750).call(
+                window.workflowZoom.transform,
+                d3.zoomIdentity
+            );
+        }
+    }
+
+    function arrangeHierarchical() {
+        if (!simulation || !workflowData.nodes || workflowData.nodes.length === 0) {
+            return;
+        }
+
+        const { width, height } = window.workflowDimensions || { width: 1000, height: 600 };
+
+        const levels = {
+            'global': 0,
+            'preprocess': 1,
+            'cc': 2,
+            'qc': 1,
+            'filter': 3,
+            'stack': 4,
+            'mwcs': 5,
+            'stretching': 5,
+            'wavelet': 5,
+            'mwcs_dtt': 6,
+            'wavelet_dtt': 6
+        };
+
+        const levelCounts = {};
+        workflowData.nodes.forEach(node => {
+            const level = levels[node.category] || 0;
+            levelCounts[level] = (levelCounts[level] || 0) + 1;
+        });
+
+        const levelPositions = {};
+        workflowData.nodes.forEach((node, i) => {
+            const level = levels[node.category] || 0;
+            if (!levelPositions[level]) levelPositions[level] = 0;
+
+            const x = 150 + level * 160;
+            const y = height / 2 + (levelPositions[level] - (levelCounts[level] - 1) / 2) * 120;
+
+            node.fx = x;
+            node.fy = y;
+            levelPositions[level]++;
+        });
+
+        simulation.alpha(0.3).restart();
+    }
+
+    function arrangeCircular() {
+        if (!simulation || !workflowData.nodes || workflowData.nodes.length === 0) {
+            return;
+        }
+
+        const { width, height } = window.workflowDimensions || { width: 1000, height: 600 };
+
+        const radius = Math.min(width, height) / 3;
+        const center = { x: width / 2, y: height / 2 };
+
+        workflowData.nodes.forEach((node, i) => {
+            const angle = (i / workflowData.nodes.length) * 2 * Math.PI;
+            node.fx = center.x + radius * Math.cos(angle);
+            node.fy = center.y + radius * Math.sin(angle);
+        });
+
+        simulation.alpha(0.3).restart();
+    }
+
+    function exportSVG() {
+        if (!svg) return;
+
+        const svgData = new XMLSerializer().serializeToString(svg.node());
+        const blob = new Blob([svgData], { type: "image/svg+xml" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `workflow-{{ current_workflow }}.svg`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function updateStats() {
+        if (!workflowData.nodes) return;
+
+        const categories = [...new Set(workflowData.nodes.map(n => n.category))];
+        const expectedCategories = ['global', 'preprocess', 'cc', 'filter', 'stack'];
+        const completeness = Math.round((categories.filter(c => expectedCategories.includes(c)).length / expectedCategories.length) * 100);
+
+        const statCategories = document.getElementById('stat-categories');
+        const statCompleteness = document.getElementById('stat-completeness');
+
+        if (statCategories) statCategories.textContent = categories.length;
+        if (statCompleteness) statCompleteness.textContent = completeness + '%';
+    }
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM loaded, initializing graph...');
+        initializeGraph();
+        updateStats();
+
+        // Update form dropdowns based on workflow logic
+        const fromStepSelect = document.getElementById('from_step_select');
+        const toStepSelect = document.getElementById('to_step_select');
+
+        if (fromStepSelect && toStepSelect && workflowData.nodes) {
+            fromStepSelect.addEventListener('change', function() {
+                const fromStepId = parseInt(this.value);
+                const fromNode = workflowData.nodes.find(n => n.id === fromStepId);
+
+                // Clear options
+                toStepSelect.innerHTML = '<option value="">Select target step...</option>';
+
+                if (fromNode) {
+                    const WORKFLOW_CHAINS = {
+                        'global': ['preprocess',' qc'],
+                        'preprocess': ['cc'],
+                        'cc': ['filter'],
+                        'qc': [],
+                        'filter': ['stack'],
+                        'stack': ['mwcs', 'stretching', 'wavelet'],
+                        'mwcs': ['mwcs_dtt'],
+                        'stretching': [],
+                        'wavelet': ['wavelet_dtt'],
+                        'wavelet_dtt': [],
+                        'mwcs_dtt': []
+                    };
+
+                    const validNextCategories = WORKFLOW_CHAINS[fromNode.category] || [];
+
+                    workflowData.nodes.forEach(node => {
+                        if (node.id !== fromStepId &&
+                            (validNextCategories.includes(node.category) || validNextCategories.length === 0)) {
+
+                            const existingLink = workflowData.edges.find(e =>
+                                e.from === fromStepId && e.to === node.id
+                            );
+
+                            const linkStatus = existingLink ? ' (already linked)' : '';
+                            const option = document.createElement('option');
+                            option.value = node.id;
+                            option.textContent = `${node.name} (${node.category}:${node.set_number})${linkStatus}`;
+                            if (existingLink) {
+                                option.style.color = '#6c757d';
+                                option.style.fontStyle = 'italic';
+                            }
+                            toStepSelect.appendChild(option);
+                        }
+                    });
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

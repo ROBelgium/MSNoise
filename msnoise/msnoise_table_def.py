@@ -6,24 +6,70 @@ and improved workflow chain management using PrefixerBase and declare_tables.
 import datetime
 from collections import namedtuple
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, \
-    DateTime, Text, ForeignKey, Table, UniqueConstraint, Index, Enum, REAL, TIMESTAMP
+    DateTime, Text, ForeignKey, Table, UniqueConstraint, Index, Enum, REAL, TIMESTAMP, CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm import relationship, sessionmaker, backref
 from sqlalchemy.sql import func, text
 # from .api import read_prefix
 
-VALID_CHAINS = {
-            'preprocess': ['qc', 'cc'],
-            'qc': [], # Terminal step
-            'cc': ['filter'],
-            'filter': ['stack'],
-            'stack': ['mwcs', 'stretching', 'wavelet'],
-            'mwcs': ['mwcs_dtt'],
-            'mwcs_dtt': [],  # Terminal step
-            'stretching': [],  # Terminal step
-            'wavelet': ['wavelet_dtt'],
-            'wavelet_dtt': [],  # Terminal step
-        }
+WORKFLOW_CHAINS = {
+    'global': {
+        'next_steps': ['preprocess'],
+        'is_entry_point': True,
+        'is_terminal': False
+    },
+    'preprocess': {
+        'next_steps': ['qc', 'cc'],
+        'is_entry_point': False,
+        'is_terminal': False
+    },
+    'qc': {
+        'next_steps': [],
+        'is_entry_point': False,
+        'is_terminal': True
+    },
+    'cc': {
+        'next_steps': ['filter'],
+        'is_entry_point': False,
+        'is_terminal': False
+    },
+    'filter': {
+        'next_steps': ['stack'],
+        'is_entry_point': False,
+        'is_terminal': False
+    },
+    'stack': {
+        'next_steps': ['mwcs', 'stretching', 'wavelet'],
+        'is_entry_point': False,
+        'is_terminal': False
+    },
+    'mwcs': {
+        'next_steps': ['mwcs_dtt'],
+        'is_entry_point': False,
+        'is_terminal': False
+    },
+    'mwcs_dtt': {
+        'next_steps': [],
+        'is_entry_point': False,
+        'is_terminal': True
+    },
+    'stretching': {
+        'next_steps': [],
+        'is_entry_point': False,
+        'is_terminal': True
+    },
+    'wavelet': {
+        'next_steps': ['wavelet_dtt'],
+        'is_entry_point': False,
+        'is_terminal': False
+    },
+    'wavelet_dtt': {
+        'next_steps': [],
+        'is_entry_point': False,
+        'is_terminal': True
+    }
+}
+
 
 def declare_tables(prefix=None):
     """
@@ -41,7 +87,7 @@ def declare_tables(prefix=None):
 
     # Define the namedtuple to return
     sqlschema = namedtuple('SQLSchema', ['Base', 'PrefixerBase',
-        'Job', 'Station', 'Config', 'DataAvailability'])
+        'Job', 'Station', 'Config', 'DataAvailability', 'WorkflowStep', 'WorkflowLink',])
 
     # Create the SQLAlchemy base and subclass it to prefix the table names
     Base = declarative_base()
@@ -197,47 +243,115 @@ def declare_tables(prefix=None):
 
     class Job(PrefixerBase):
         """
-        Job Object
+        Enhanced Job Object with workflow support
+
+        This class maintains backward compatibility while adding workflow awareness.
+        Jobs are now linked to specific workflow steps and their associated config sets.
 
         :type ref: int
         :param ref: The Job ID in the database
         :type day: str
         :param day: The day in YYYY-MM-DD format
         :type pair: str
-        :param pair: the name of the pair (EXAMPLE?)
-        :type jobtype: str
-        :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+        :param pair: the name of the pair (STATION1:STATION2)
         :type flag: str
         :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+        :type workflow_id: str
+        :param workflow_id: Identifier for the workflow (default: "default")
+        :type step_id: int
+        :param step_id: Foreign key to WorkflowStep table
+        :type jobtype: str
+        :param jobtype: Legacy job type, now derived from step info (for backward compatibility)
+        :type priority: int
+        :param priority: Job priority (higher number = higher priority)
         """
         __incomplete_tablename__ = "jobs"
 
         ref = Column(Integer, primary_key=True)
         day = Column(String(10))
         pair = Column(String(23))
-        jobtype = Column(String(10))
         flag = Column(String(1))
         lastmod = Column(TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP'),
                          server_default=text("CURRENT_TIMESTAMP"))
 
+        # New workflow-aware fields
+        workflow_id = Column(String(50), nullable=False, default="default")
+        step_id = Column(Integer, ForeignKey(f"{prefix}workflow_steps.step_id"), nullable=False)
+
+        # Enhanced fields
+        jobtype = Column(String(50))  # Now derived from step info, but kept for compatibility
+        priority = Column(Integer, default=0)  # Job priority
+
+        # Relationships
+        workflow_step = relationship("WorkflowStep", backref="jobs")
+
         __table_args__ = (
-            Index('job_index', "day", "pair", "jobtype", unique=True),
-            Index('job_index2', "jobtype", "flag", unique=False),
+            # Updated unique constraint to include workflow context
+            Index('job_index', "day", "pair", "step_id", "workflow_id", unique=True),
+            Index('job_index2', "flag", "step_id", "priority", unique=False),
+            Index('job_index3', "workflow_id", "step_id", unique=False),
+            # Legacy index for backward compatibility
+            Index('job_legacy_index', "day", "pair", "jobtype", unique=False),
         )
 
-        def __init__(self, day=None, pair=None, jobtype=None, flag=None,
-                     lastmod=None, **kwargs):
-            """Initialize job"""
+        def __init__(self, day=None, pair=None, flag=None, workflow_id="default",
+                     step_id=None, jobtype=None, priority=0, lastmod=None, **kwargs):
+            """Initialize job with workflow support"""
             self.day = day
             self.pair = pair
-            self.jobtype = jobtype
             self.flag = flag
+            self.workflow_id = workflow_id
+            self.step_id = step_id
+            self.priority = priority
             self.lastmod = lastmod or datetime.datetime.utcnow()
+
+            # Handle jobtype - derive from step if not provided
+            if jobtype is not None:
+                self.jobtype = jobtype
+            elif step_id is not None:
+                # Will be set via property or method once step relationship is loaded
+                self.jobtype = None
+            else:
+                self.jobtype = None
+
             for key, val in kwargs.items():
                 setattr(self, key, val)
 
+        @property
+        def derived_jobtype(self):
+            """Derive jobtype from workflow step information"""
+            if self.workflow_step:
+                return f"{self.workflow_step.step_name}_{self.workflow_step.set_number}"
+            return self.jobtype
+
+        @property
+        def config_category(self):
+            """Get the config category for this job"""
+            if self.workflow_step:
+                return self.workflow_step.category
+            return None
+
+        @property
+        def config_set_number(self):
+            """Get the config set number for this job"""
+            if self.workflow_step:
+                return self.workflow_step.set_number
+            return None
+
+        @property
+        def step_name(self):
+            """Get the step name for this job"""
+            if self.workflow_step:
+                return self.workflow_step.step_name
+            return None
+
         def __str__(self):
-            return f"Job({self.day}, {self.pair}, {self.jobtype}, {self.flag})"
+            return f"Job({self.day}, {self.pair}, {self.derived_jobtype or self.jobtype}, {self.flag})"
+
+        def __repr__(self):
+            return f"<Job(day='{self.day}', pair='{self.pair}', " \
+                   f"step_id={self.step_id}, workflow_id='{self.workflow_id}', " \
+                   f"flag='{self.flag}')>"
 
     ########################################################################
 
@@ -388,12 +502,84 @@ def declare_tables(prefix=None):
 
     ########################################################################
 
+    class WorkflowStep(Base):
+        """
+        Simple workflow step container - just wraps a config category+set_number
+        """
+        __tablename__ = f"{prefix}workflow_steps"
+
+        # Primary key
+        step_id = Column(Integer, primary_key=True, autoincrement=True)
+
+        # Step identification
+        step_name = Column(String(50), nullable=False)
+
+        # Reference to config set
+        category = Column(String(20), nullable=False)
+        set_number = Column(Integer, nullable=False)
+
+        # Workflow organization
+        workflow_id = Column(String(50), nullable=False, default="default")
+
+        # Metadata
+        description = Column(String(200), nullable=True)
+        is_active = Column(Boolean, default=True)
+        created_at = Column(DateTime, default=datetime.datetime.utcnow)
+        updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+        # Constraints
+        __table_args__ = (
+            UniqueConstraint('step_name', 'workflow_id', name='unique_step_name_per_workflow'),
+            UniqueConstraint('category', 'set_number', 'workflow_id', name='unique_config_per_workflow'),
+        )
+
+        def __repr__(self):
+            return f"<WorkflowStep('{self.step_name}', {self.category}:{self.set_number})>"
+
+        def get_config_params(self, session):
+            """Get configuration parameters for this step"""
+            return session.query(Config).filter(
+                Config.category == self.category,
+                Config.set_number == self.set_number
+            ).all()
+
+    class WorkflowLink(Base):
+        """
+        Links between workflow steps - supports all relationship types
+        """
+        __tablename__ = f"{prefix}workflow_links"
+
+        # Primary key
+        link_id = Column(Integer, primary_key=True, autoincrement=True)
+
+        # Relationship definition
+        from_step_id = Column(Integer, ForeignKey(f"{prefix}workflow_steps.step_id"), nullable=False)
+        to_step_id = Column(Integer, ForeignKey(f"{prefix}workflow_steps.step_id"), nullable=False)
+
+        # Metadata
+        link_type = Column(String(20), default="default")  # For different types of connections
+        is_active = Column(Boolean, default=True)
+        created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+        # Relationships
+        from_step = relationship("WorkflowStep", foreign_keys=[from_step_id], backref="outgoing_links")
+        to_step = relationship("WorkflowStep", foreign_keys=[to_step_id], backref="incoming_links")
+
+        # Constraints
+        __table_args__ = (
+            UniqueConstraint('from_step_id', 'to_step_id', name='unique_link'),
+            CheckConstraint('from_step_id != to_step_id', name='no_self_links'),
+        )
+
+        def __repr__(self):
+            return f"<WorkflowLink({self.from_step_id} -> {self.to_step_id})>"
+
     # Return the schema namedtuple
     return sqlschema(Base, PrefixerBase,
-                     Job, Station, Config, DataAvailability)
+                     Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink)
     # end of declare_tables()
 
-Base, PrefixerBase, Job, Station, Config, DataAvailability = declare_tables()
+Base, PrefixerBase, Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink = declare_tables()
 
 
 # Helper functions for configuration management
