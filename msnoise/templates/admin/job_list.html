@@ -1,0 +1,107 @@
+{% extends 'admin/model/list.html' %}
+
+{% block list_header %}
+{{ super() }}
+
+<!-- Add workflow statistics -->
+<div class="row" style="margin-bottom: 15px;">
+    <div class="col-md-12">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4 class="panel-title">Job Statistics by Workflow</h4>
+            </div>
+            <div class="panel-body">
+                <div id="workflow-stats">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add workflow filter buttons -->
+<div class="row" style="margin-bottom: 15px;">
+    <div class="col-md-12">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-default" onclick="filterByWorkflow('all')">All Workflows</button>
+            <button type="button" class="btn btn-default" onclick="filterByWorkflow('default')">Default</button>
+            <button type="button" class="btn btn-info" onclick="filterByStatus('T')">Todo</button>
+            <button type="button" class="btn btn-warning" onclick="filterByStatus('I')">In Progress</button>
+            <button type="button" class="btn btn-success" onclick="filterByStatus('D')">Done</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block list_row_actions_column %}
+<td class="list-buttons-column">
+    {{ super() }}
+
+    <!-- Add workflow-specific actions -->
+    {% if row.workflow_step %}
+    <a href="{{ url_for('workflowstep.details_view', id=row.step_id) }}"
+       class="btn btn-sm btn-default" title="View Step Details">
+        <i class="glyphicon glyphicon-info-sign"></i>
+    </a>
+    {% endif %}
+
+    <!-- Add job dependency viewer -->
+    <a href="javascript:void(0)" onclick="showJobDependencies({{ row.ref }})"
+       class="btn btn-sm btn-info" title="Show Dependencies">
+        <i class="glyphicon glyphicon-random"></i>
+    </a>
+</td>
+{% endblock %}
+
+{% block tail %}
+{{ super() }}
+
+<script>
+    // Load workflow statistics
+    function loadWorkflowStats() {
+        fetch('/admin/job-stats')
+            .then(response => response.json())
+            .then(data => {
+                const statsDiv = document.getElementById('workflow-stats');
+                let html = '';
+
+                for (const [workflowId, stats] of Object.entries(data)) {
+                    html += `
+                            <div class="col-md-3">
+                                <div class="small-box bg-blue">
+                                    <div class="inner">
+                                        <h4>${workflowId}</h4>
+                                        <p>T:${stats.T} | I:${stats.I} | D:${stats.D}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                }
+
+                statsDiv.innerHTML = html;
+            })
+            .catch(error => console.error('Error loading stats:', error));
+    }
+
+    // Filter functions
+    function filterByWorkflow(workflowId) {
+        if (workflowId === 'all') {
+            window.location.href = '{{ url_for("job.index_view") }}';
+        } else {
+            window.location.href = '{{ url_for("job.index_view") }}?flt1_workflow_id=' + encodeURIComponent(workflowId);
+        }
+    }
+
+    function filterByStatus(status) {
+        window.location.href = '{{ url_for("job.index_view") }}?flt1_flag=' + encodeURIComponent(status);
+    }
+
+    function showJobDependencies(jobId) {
+        // This would show a modal with job dependencies
+        alert('Job dependencies for job ID: ' + jobId);
+    }
+
+    // Load stats on page load
+    document.addEventListener('DOMContentLoaded', loadWorkflowStats);
+</script>
+{% endblock %}
