@@ -440,6 +440,76 @@ def get_config_set_details(session, set_name, set_number):
         get_logger("msnoise").error(f"Failed to get config set details: {str(e)}")
         return []
 
+def get_config_categories_definition():
+    """Get the standard configuration categories with their display names and order"""
+    return [
+        ('global', 'Global Parameters'),
+        ('preprocess', 'Preprocessing'),
+        ('cc', 'Cross-Correlation'),
+        ('filter', 'Filters'),
+        ('stack', 'Stacks'),
+        ('mwcs', 'MWCS'),
+        ('mwcs_dtt', 'MWCS dt/t'),
+        ('stretching', 'Stretching'),
+        ('wavelet', 'Wavelet'),
+        ('wavelet_dtt', 'Wavelet dt/t'),
+        ('qc', 'QC')
+    ]
+
+def get_config_sets_organized(session):
+    """Get configuration sets organized by category in the standard order"""
+    from sqlalchemy import func
+    from . import msnoise_table_def as schema
+
+    # Get category definitions
+    category_order = get_config_categories_definition()
+
+    # Get all config sets grouped by category and set_number
+    all_sets = session.query(
+        schema.Config.category,
+        schema.Config.set_number,
+        func.count(schema.Config.ref).label('param_count')
+    ).group_by(
+        schema.Config.category,
+        schema.Config.set_number
+    ).all()
+
+    # Group sets by category
+    sets_by_category = {}
+    for category, set_number, param_count in all_sets:
+        if category not in sets_by_category:
+            sets_by_category[category] = []
+        sets_by_category[category].append({
+            'category': category,
+            'set_number': set_number,
+            'param_count': param_count
+        })
+
+    # Sort sets within each category by set_number
+    for category in sets_by_category:
+        sets_by_category[category].sort(key=lambda x: x['set_number'])
+
+    # Create ordered list of categories with their sets
+    ordered_categories = []
+    for category_key, display_name in category_order:
+        if category_key in sets_by_category:
+            ordered_categories.append({
+                'category': category_key,
+                'display_name': display_name,
+                'sets': sets_by_category[category_key]
+            })
+
+    # Add any additional categories not in the predefined order
+    for category in sets_by_category:
+        if category not in [cat[0] for cat in category_order]:
+            ordered_categories.append({
+                'category': category,
+                'display_name': category.title(),
+                'sets': sets_by_category[category]
+            })
+
+    return ordered_categories
+
 def get_params(session):
     """Get config parameters from the database.
 

@@ -1,7 +1,7 @@
 name,default,definition,type,possible_values
 stack_method,linear,Stack Method: Linear Mean or Phase Weighted Stack,str,linear/pws
-pws_timegate,10,"If ``stack_method`` ='pws', width of the smoothing (in seconds)",float,
-pws_power,2,"If ``stack_method`` =""pws"", Power of the Weighting",float,
+pws_timegate,10.0,"If ``stack_method`` ='pws', width of the smoothing (in seconds)",float,
+pws_power,2.0,"If ``stack_method`` =""pws"", Power of the Weighting",float,
 ref_begin,1970-01-01,Beginning or REF stacks. Can be absolute (2012-01-01) or relative (-100) days,str,
 ref_end,2100-01-01,End or REF stacks. Same as ``ref_begin``,str,
 mov_stack,"(('1d','1d'))","A list of two parameters: the time to ""roll"" over (default 1 day) and the granularity (step) of the resulting stacked CCFs (default 1 day) to stack for the Moving-window stacks. This can be a list of tuples, e.g. (('1d','1d'),('2d','1d')) corresponds to the MSNoise 1.6 ""1,2"" before. Time deltas can be anything pandas can interpret (""d"", ""min"", ""sec"", etc).",eval,
