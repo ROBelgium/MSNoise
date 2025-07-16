@@ -325,16 +325,19 @@ def main(loglevel="INFO"):
         #     comps.append(comp[0])
         #     comps.append(comp[1])
         #
+
+        #TODO LOOP OVER PREPROCESS STEP SETS
+        current_process = get_step_predecessors(db, step.step_id)[0]
+
+
+        stream = read(r"PREPROCESSED\%s\%s.mseed" % (current_process.step_name, goal_day))
+
+        # TODO PREPROCESS IF THE "PREPROCESS_ON_THE_FLY" config?
         # comps = np.unique(comps)
         # with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
         #     stream = executor.submit(preprocess, stations, comps, goal_day, params, responses, loglevel).result()
         # logger.info("Received preprocessed traces")
 
-
-        #TODO LOOP OVER PREPROCESS STEP SETS
-        current_process = get_step_predecessors(db, step.step_id)[0]
-
-        stream = read(r"PREPROCESSED\%s\%s.mseed" % (current_process.step_name, goal_day))
         print(stream)
 
         # stream = preprocess(db, stations, comps, goal_day, params, responses)
