@@ -9,7 +9,7 @@ import pickle
 import traceback
 import numpy as np
 from .api import (connect, get_logger, get_params, update_job,
-                  preload_instrument_responses, get_workflow_steps, get_config_set_details, get_next_preprocess_job)
+                  preload_instrument_responses, get_workflow_steps, get_config_set_details, get_next_job_for_step)
 from .preprocessing import preprocess
 from obspy.core import AttribDict
 
@@ -70,7 +70,7 @@ def main(init=False, threads=1, loglevel="INFO"):
 
     while True:
         # Get next set of preprocessing jobs (same step + day)
-        jobs = get_next_preprocess_job(db, step_category="preprocess")
+        jobs, step = get_next_job_for_step(db, step_category="preprocess")
 
         if not jobs:
             logger.info("No more preprocessing jobs to process")

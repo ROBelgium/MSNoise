@@ -2038,7 +2038,7 @@ def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
         pass
     filename += ".MSEED"
     maxlag = params.maxlag
-    cc_sampling_rate = params.goal_sampling_rate
+    cc_sampling_rate = params.cc_sampling_rate
     if maxlag is None:
         maxlag = float(get_config(db, "maxlag"))
     if cc_sampling_rate is None:
@@ -4296,7 +4296,7 @@ def get_workflow_job_counts(db, workflow_id="default"):
 
     return result
 
-def get_next_preprocess_job(session, workflow_id="default", step_category="preprocess"):
+def get_next_job_for_step(session, workflow_id="default", step_category="preprocess"):
     """
     Get the next set of preprocessing jobs to process.
 
@@ -4308,6 +4308,7 @@ def get_next_preprocess_job(session, workflow_id="default", step_category="prepr
     :return: List of jobs sharing the same workflow step and day, or empty list
     """
     from .msnoise_table_def import declare_tables
+    from sqlalchemy import update
 
     schema = declare_tables()
     Job = schema.Job
@@ -4334,6 +4335,100 @@ def get_next_preprocess_job(session, workflow_id="default", step_category="prepr
         .filter(Job.workflow_id == workflow_id) \
         .filter(Job.step_id == step.step_id) \
         .filter(Job.flag == 'T') \
+        .with_for_update() \
         .all()
 
-    return jobs
+    # Update job status to "I" (In Progress) before returning
+    if jobs:
+        refs = [job.ref for job in jobs]
+        q = update(Job).values({"flag": "I"}).where(Job.ref.in_(refs))
+        session.execute(q)
+        session.commit()
+
+    return jobs, step
+
+
+def is_next_job_for_step(session, workflow_id="default", step_category="preprocess", flag='T'):
+    """
+    Are there any workflow-aware Jobs in the database with the specified
+    flag and step category?
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type workflow_id: str
+    :param workflow_id: Workflow ID to filter by
+    :type step_category: str
+    :param step_category: Workflow step category (e.g., "preprocess", "qc")
+    :type flag: str
+    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+
+    :rtype: bool
+    :returns: True if at least one Job matches the criteria, False otherwise.
+    """
+    from .msnoise_table_def import declare_tables
+
+    schema = declare_tables()
+    Job = schema.Job
+    WorkflowStep = schema.WorkflowStep
+
+    job = session.query(Job) \
+        .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name) \
+        .filter(WorkflowStep.category == step_category) \
+        .filter(Job.flag == flag) \
+        .filter(Job.workflow_id == workflow_id) \
+        .first()
+
+    if job is None:
+        return False
+    else:
+        return True
+
+def get_filter_steps_for_cc_step(session, cc_step_id, workflow_id="default"):
+    """
+    Get all filter steps that are children of a specific CC step.
+
+    :param session: Database session
+    :param cc_step_id: The step_id of the CC step
+    :param workflow_id: Workflow ID to filter by (default: "default")
+    :return: List of filter workflow steps that are successors of the CC step
+    """
+    from .api import get_step_successors
+
+    # Get all steps that are successors of the CC step
+    successor_steps = get_step_successors(session, cc_step_id)
+
+    # Filter to only include steps with category "filter"
+    filter_steps = [step for step in successor_steps if step.category == "filter"]
+
+    return filter_steps
+
+def get_filter_steps_for_cc_step_name(session, cc_step_name, workflow_id="default"):
+    """
+    Get all filter steps that are children of a specific CC step by step name.
+
+    :param session: Database session
+    :param cc_step_name: The step name of the CC step (e.g., "CC_01")
+    :param workflow_id: Workflow ID to filter by (default: "default")
+    :return: List of filter workflow steps that are successors of the CC step
+    """
+    from .api import get_workflow_steps, get_step_successors
+
+    # First, find the CC step by name
+    cc_step = None
+    workflow_steps = get_workflow_steps(session, workflow_id)
+    for step in workflow_steps:
+        if step.step_name == cc_step_name and step.category == "cc":
+            cc_step = step
+            break
+
+    if not cc_step:
+        return []
+
+    # Get all steps that are successors of the CC step
+    successor_steps = get_step_successors(session, cc_step.step_id)
+
+    # Filter to only include steps with category "filter"
+    filter_steps = [step for step in successor_steps if step.category == "filter"]
+
+    return filter_steps
