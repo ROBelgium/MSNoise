@@ -211,8 +211,8 @@ import scipy.signal
 import scipy.fft as sf
 from scipy.fft import next_fast_len
 from obspy.signal.filter import bandpass
-
-
+from obspy import read
+from obspy.core import AttribDict
 
 import logbook
 
@@ -255,33 +255,34 @@ def main(loglevel="INFO"):
     # Connection to the DB
     db = connect()
 
-    if len(get_filters(db, all=False)) == 0:
-        logger.info("NO FILTERS DEFINED, exiting")
-        sys.exit()
+    # if len(get_filters(db, all=False)) == 0:
+    #     logger.info("NO FILTERS DEFINED, exiting")
+    #     sys.exit()
 
     # Get Configuration
-    params = get_params(db)
-    filters = get_filters(db, all=False)
-    logger.info("Will compute [%s] for different stations" % " ".join(params.components_to_compute))
-    logger.info("Will compute [%s] for single stations" % " ".join(params.components_to_compute_single_station))
+    orig_params = get_params(db)
+    # filters = get_filters(db, all=False)
+    # logger.info("Will compute [%s] for different stations" % " ".join(params.components_to_compute))
+    # logger.info("Will compute [%s] for single stations" % " ".join(params.components_to_compute_single_station))
 
-    if "R" in ''.join(params.components_to_compute) or "T" in ''.join(params.components_to_compute):
-        logger.info("You seem to have configured R and/or T components, thus rotations ARE needed. You should therefore use the 'msnoise compute_cc_rot' instead.")
-        return()
-    
-    if params.whitening not in ["A", "N"]:
-        logger.info("The 'whitening' parameter is set to '%s', which is not supported by this process. Set it to 'A' or 'N', or use the 'msnoise compute_cc_rot' instead." % params.whitening)
-        return ()
-
-    if params.remove_response:
-        logger.debug('Pre-loading all instrument response')
-        responses = preload_instrument_responses(db, return_format="inventory")
-    else:
-        responses = None
+    # if "R" in ''.join(params.components_to_compute) or "T" in ''.join(params.components_to_compute):
+    #     logger.info("You seem to have configured R and/or T components, thus rotations ARE needed. You should therefore use the 'msnoise compute_cc_rot' instead.")
+    #     return()
+    #
+    # if params.whitening not in ["A", "N"]:
+    #     logger.info("The 'whitening' parameter is set to '%s', which is not supported by this process. Set it to 'A' or 'N', or use the 'msnoise compute_cc_rot' instead." % params.whitening)
+    #     return ()
+    #
+    # if params.remove_response:
+    #     logger.debug('Pre-loading all instrument response')
+    #     responses = preload_instrument_responses(db, return_format="inventory")
+    # else:
+    #     responses = None
     logger.info("Checking if there are jobs to do")
-    while is_next_job(db, jobtype='CC'):
+    while is_next_job_for_step(db, step_category="cc"):
         logger.info("Getting the next job")
-        jobs = get_next_job(db, jobtype='CC')
+        jobs, step = get_next_job_for_step(db, step_category="cc")
+        print(jobs)
 
         stations = []
         pairs = []
@@ -297,29 +298,54 @@ def main(loglevel="INFO"):
 
         stations = np.unique(stations)
 
+        step_config = get_config_set_details(db, job.config_category, job.config_set_number,
+                                             format='AttribDict')
+        params = AttribDict(**orig_params, **step_config)
+        print(step_config)
+        params.components_to_compute =  params.components_to_compute.split(',')
+        params.components_to_compute_single_station = params.components_to_compute_single_station.split(',')
+
+        print(params)
+
+        # Filters:
+        filter_steps = get_filter_steps_for_cc_step(db, step.step_id, workflow_id='default')
+        print(filter_steps)
+        filters = []
+        for filter in filter_steps:
+            filters.append(get_config_set_details(db, filter.category, filter.set_number, format='AttribDict'))
+        print(filters)
+
         logger.info("New CC Job: %s (%i pairs with %i stations)" %
                      (goal_day, len(pairs), len(stations)))
         jt = time.time()
 
-        comps = []
-        #TODO check if comp is 3, 4 or else?
-        for comp in params.all_components:
-            comps.append(comp[0])
-            comps.append(comp[1])
+        # comps = []
+        # #TODO check if comp is 3, 4 or else?
+        # for comp in params.all_components:
+        #     comps.append(comp[0])
+        #     comps.append(comp[1])
+        #
+        # comps = np.unique(comps)
+        # with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+        #     stream = executor.submit(preprocess, stations, comps, goal_day, params, responses, loglevel).result()
+        # logger.info("Received preprocessed traces")
 
-        comps = np.unique(comps)
-        with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
-            stream = executor.submit(preprocess, stations, comps, goal_day, params, responses, loglevel).result()
-        logger.info("Received preprocessed traces")
+
+        #TODO LOOP OVER PREPROCESS STEP SETS
+        current_process = get_step_predecessors(db, step.step_id)[0]
+
+        stream = read(r"PREPROCESSED\%s\%s.mseed" % (current_process.step_name, goal_day))
+        print(stream)
+
         # stream = preprocess(db, stations, comps, goal_day, params, responses)
         if not len(stream):
             logger.debug("Not enough data for this day !")
-            logger.debug("Marking job Done and continuing with next !")
+            logger.debug("Marking jobs 'Fail' and continuing with next !")
             for job in jobs:
-                update_job(db, job.day, job.pair, 'CC', 'D', ref=job.ref)
+                update_job(db, job.day, job.pair, job.jobtype, 'F', ref=job.ref)
             continue
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
-        dt = 1. / params.goal_sampling_rate
+        dt = 1. / params.cc_sampling_rate
         logger.debug("Starting slides")
         start_processing = time.time()
         allcorr = {}
@@ -348,7 +374,7 @@ def main(loglevel="INFO"):
                 continue
 
             base = np.amax([tr.stats.npts for tr in tmp])
-            if base <= (params.maxlag*params.goal_sampling_rate*2+1):
+            if base <= (params.maxlag*params.cc_sampling_rate*2+1):
                 logger.debug("All traces shorter are too short to export"
                               " +-maxlag")
                 continue
@@ -422,33 +448,33 @@ def main(loglevel="INFO"):
             tmptime = tmp[0].stats.endtime.datetime
             thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
 
-            for filterdb in filters:
-                filterid = filterdb.ref
-
-                filt_components, filt_components_single_station = get_filter_components_to_compute(db, filterid, params)
+            for filterid, filter in enumerate(filters):
+                logger.debug("Processing filter %i" % filterid)
+                print(filter)
 
                 # Standard operator for CC
                 cc_index = []
-                if len(filt_components):
-                    for sta1, sta2 in itertools.combinations(names, 2):
-                        n1, s1, l1, c1 = sta1
-                        n2, s2, l2, c2 = sta2
-                        if n1 == n2 and s1 == s2 and l1 == l2:
-                            continue
-                        pair = "%s.%s.%s:%s.%s.%s" % (n1, s1, l1, n2, s2, l2)
-                        if pair not in pairs:
-                            continue
-                        comp = "%s%s" % (c1[-1], c2[-1])
-                        if comp in filt_components:
-                            cc_index.append(
-                                ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
-                                names.index(sta1), names.index(sta2)])
+                if filter.CC:
+                    if len(params.components_to_compute):
+                        for sta1, sta2 in itertools.combinations(names, 2):
+                            n1, s1, l1, c1 = sta1
+                            n2, s2, l2, c2 = sta2
+                            if n1 == n2 and s1 == s2 and l1 == l2:
+                                continue
+                            pair = "%s.%s.%s:%s.%s.%s" % (n1, s1, l1, n2, s2, l2)
+                            if pair not in pairs:
+                                continue
+                            comp = "%s%s" % (c1[-1], c2[-1])
+                            if comp in params.components_to_compute:
+                                cc_index.append(
+                                    ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
+                                    names.index(sta1), names.index(sta2)])
 
                 # Different iterator func for single station AC or SC:
                 single_station_pair_index_sc = []
                 single_station_pair_index_ac = []
 
-                if len(filt_components_single_station):
+                if len(params.components_to_compute_single_station):
                     for sta1, sta2 in itertools.combinations_with_replacement(names, 2):
                         n1, s1, l1, c1 = sta1
                         n2, s2, l2, c2 = sta2
@@ -458,29 +484,32 @@ def main(loglevel="INFO"):
                         if pair not in pairs:
                             continue
                         comp = "%s%s" % (c1[-1], c2[-1])
-                        if comp in filt_components_single_station:
-                            if c1[-1] == c2[-1]:
+                        if comp in params.components_to_compute_single_station:
+                            if filter.AC and c1[-1] == c2[-1]:
                                 single_station_pair_index_ac.append(
                                     ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
                                     names.index(sta1), names.index(sta2)])
-                            else:
+                            elif filter.SC:
                             # If the components are different, we can just
                             # process them using the default CC code (should warn)
                                 single_station_pair_index_sc.append(
                                     ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
                                     names.index(sta1), names.index(sta2)])
-                        if comp[::-1] in filt_components_single_station:
-                            if c1[-1] != c2[-1]:
+                        if comp[::-1] in params.components_to_compute_single_station:
+                            if filter.SC and c1[-1] != c2[-1]:
                                 # If the components are different, we can just
                                 # process them using the default CC code (should warn)
                                 single_station_pair_index_sc.append(
                                     ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp[::-1]),
                                     names.index(sta2), names.index(sta1)])
 
+                logger.debug("CC index: %s" % cc_index)
+                logger.debug("single station AC: ", single_station_pair_index_ac)
+                logger.debug("single station SC: ", single_station_pair_index_sc)
 
-                filterlow = float(filterdb.freqmin)
-                filterhigh = float(filterdb.freqmax)
-
+                filterlow = float(filter.freqmin)
+                filterhigh = float(filter.freqmax)
+                logger.debug("Filter: %s - %s Hz" % (filterlow, filterhigh))
                 freq_vec = sf.fftfreq(nfft, d=dt)[:nfft // 2]
                 freq_sel = np.where((freq_vec >= filterlow) & (freq_vec <= filterhigh))[0]
                 low = freq_sel[0] - napod
@@ -500,7 +529,7 @@ def main(loglevel="INFO"):
                     for i, _ in enumerate(_data):
                         _data[i] = bandpass(_, freqmin=filterlow,
                                             freqmax=filterhigh,
-                                            df=params.goal_sampling_rate,
+                                            df=params.cc_sampling_rate,
                                             corners=8)
 
                 # First let's compute the AC and SC
@@ -512,7 +541,7 @@ def main(loglevel="INFO"):
                         for i, _ in enumerate(tmp):
                             tmp[i] = bandpass(_, freqmin=filterlow,
                                               freqmax=filterhigh,
-                                              df=params.goal_sampling_rate,
+                                              df=params.cc_sampling_rate,
                                               corners=8)
                     if params.clip_after_whiten:
                         # logger.debug("Winsorizing (clipping) data after bandpass (AC)")
@@ -524,7 +553,6 @@ def main(loglevel="INFO"):
                         energy = np.real(np.sqrt(np.mean(
                             sf.ifft(ffts, n=nfft, axis=1) ** 2,
                             axis=1)))
-
                         # Computing standard CC
                         corr = myCorr2(ffts,
                                        np.ceil(params.maxlag / dt),
@@ -544,6 +572,7 @@ def main(loglevel="INFO"):
 
                     for key in corr:
                         ccfid = key + "_%02i" % filterid + "_" + thisdate
+                        logger.debug("CCF ID: %s" % ccfid)
                         if ccfid not in allcorr:
                             allcorr[ccfid] = {}
                         allcorr[ccfid][thistime] = corr[key]
@@ -575,6 +604,7 @@ def main(loglevel="INFO"):
                         
                         for key in corr:
                             ccfid = key + "_%02i" % filterid + "_" + thisdate
+                            logger.debug("CCF ID - CC: %s" % ccfid)
                             if ccfid not in allcorr:
                                 allcorr[ccfid] = {}
                             allcorr[ccfid][thistime] = corr[key]
@@ -611,6 +641,7 @@ def main(loglevel="INFO"):
 
                         for key in corr:
                             ccfid = key + "_%02i" % filterid + "_" + thisdate
+                            logger.debug("CCF ID - SC: %s" % ccfid)
                             if ccfid not in allcorr:
                                 allcorr[ccfid] = {}
                             allcorr[ccfid][thistime] = corr[key]
@@ -636,7 +667,7 @@ def main(loglevel="INFO"):
                     logger.debug("No data to stack.")
                     continue
                 corr = stack(corrs, params.stack_method, params.pws_timegate,
-                             params.pws_power, params.goal_sampling_rate)
+                             params.pws_power, params.cc_sampling_rate)
                 if not len(corr):
                     logger.debug("No data to save.")
                     continue
@@ -644,18 +675,17 @@ def main(loglevel="INFO"):
                 thistime = "0_0"
                 add_corr(
                     db, station1, station2, int(filterid),
-                    thisdate, thistime, params.min30 /
-                                        params.goal_sampling_rate,
+                    thisdate, thistime, params.corr_duration,
                     components, corr,
-                    params.goal_sampling_rate, day=True,
+                    params.cc_sampling_rate, day=True,
                     ncorr=corrs.shape[0],
                     params=params)
 
         # THIS SHOULD BE IN THE API
         massive_update_job(db, jobs, "D")
-        if not params.hpc:
-            for job in jobs:
-                update_job(db, job.day, job.pair, 'STACK', 'T')
+        # if not params.hpc:
+        #     for job in jobs:
+        #         update_job(db, job.day, job.pair, 'STACK', 'T')
 
         logger.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & "
                      "process %.2f s)" % ((time.time() - jt),

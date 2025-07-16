@@ -384,7 +384,7 @@ class JobView(BaseModelView):
     }
 
     # Form configuration
-    form_columns = ['day', 'pair', 'workflow_id', 'step_id', 'priority', 'flag']
+    form_columns = ['day', 'pair', 'workflow_id', 'step_id', 'priority', 'jobtype', 'flag']
 
     # Custom query to join with WorkflowStep
     def get_query(self):

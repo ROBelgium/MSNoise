@@ -43,6 +43,146 @@ import pandas as pd
 import logbook
 logger = logbook.Logger(__name__)
 
+def create_cc_jobs_from_preprocess(session, workflow_id="default"):
+    """
+    Create CC jobs based on completed preprocess jobs.
+
+    This function looks for preprocess jobs marked as 'D'one and creates
+    corresponding CC jobs based on workflow links and CC step configurations.
+    """
+    from .msnoise_table_def import declare_tables
+    from .api import get_workflow_steps, get_step_successors, get_config_set_details
+
+    schema = declare_tables()
+    Job = schema.Job
+    WorkflowStep = schema.WorkflowStep
+
+    logger.info('Creating CC jobs from completed preprocess jobs')
+
+    # Get all preprocess steps
+    preprocess_steps = session.query(WorkflowStep) \
+        .filter(WorkflowStep.workflow_id == workflow_id) \
+        .filter(WorkflowStep.category == "preprocess") \
+        .filter(WorkflowStep.is_active == True) \
+        .all()
+
+    all_jobs = []
+    crap_all_jobs_text = []
+    count = 0
+    now = datetime.datetime.utcnow()
+
+    for preprocess_step in preprocess_steps:
+        logger.debug(f'Processing preprocess step: {preprocess_step.step_name}')
+
+        # Get CC steps that follow this preprocess step
+        cc_successor_steps = get_step_successors(session, preprocess_step.step_id)
+        cc_steps = [step for step in cc_successor_steps if step.category == "cc"]
+
+        if not cc_steps:
+            logger.debug(f'No CC successors found for {preprocess_step.step_name}')
+            continue
+
+        # Get all completed preprocess jobs for this step
+        completed_jobs = session.query(Job) \
+            .filter(Job.jobtype == preprocess_step.step_name) \
+            .filter(Job.workflow_id == workflow_id) \
+            .filter(Job.step_id == preprocess_step.step_id) \
+            .filter(Job.flag == 'D') \
+            .all()
+
+        if not completed_jobs:
+            logger.debug(f'No completed jobs found for {preprocess_step.step_name}')
+            continue
+
+        # Group completed jobs by day
+        jobs_by_day = {}
+        for job in completed_jobs:
+            day = job.day
+            if day not in jobs_by_day:
+                jobs_by_day[day] = []
+            jobs_by_day[day].append(job)
+
+        # Create CC jobs for each CC step
+        for cc_step in cc_steps:
+            logger.debug(f'Creating jobs for CC step: {cc_step.step_name}')
+
+            # Get CC step configuration
+            cc_config = get_config_set_details(session, cc_step.category,
+                                               cc_step.set_number, format='AttribDict')
+
+            if not cc_config:
+                logger.error(f'No configuration found for CC step: {cc_step.step_name}')
+                continue
+
+            # Determine job type based on configuration
+            has_cross_station = bool(getattr(cc_config, 'components_to_compute', None))
+            has_single_station = bool(getattr(cc_config, 'components_to_compute_single_station', None))
+
+            for day, day_jobs in jobs_by_day.items():
+                if has_cross_station:
+                    # Create cross-station CC jobs (pair-based)
+                    stations = [job.pair for job in day_jobs]
+                    pairs = create_station_pairs(stations)
+
+                    for pair in pairs:
+                        job_data = {
+                            "day": day,
+                            "pair": pair,
+                            "jobtype": cc_step.step_name,
+                            "workflow_id": cc_step.workflow_id,
+                            "step_id": cc_step.step_id,
+                            "priority": getattr(cc_step, 'priority', 0),
+                            "flag": "T",
+                            "lastmod": now,
+                            "category": cc_step.category,
+                            "set_number": cc_step.set_number
+                        }
+
+                        jobtxt = ''.join(str(x) for x in job_data.values())
+                        if jobtxt not in crap_all_jobs_text:
+                            all_jobs.append(job_data)
+                            crap_all_jobs_text.append(jobtxt)
+                            count += 1
+
+                if has_single_station:
+                    # Create single-station CC jobs
+                    for job in day_jobs:
+                        job_data = {
+                            "day": day,
+                            "pair": f"{job.pair}:{job.pair}",  # Single station
+                            "jobtype": cc_step.step_name,
+                            "workflow_id": cc_step.workflow_id,
+                            "step_id": cc_step.step_id,
+                            "priority": getattr(cc_step, 'priority', 0),
+                            "flag": "T",
+                            "lastmod": now,
+                            "category": cc_step.category,
+                            "set_number": cc_step.set_number
+                        }
+
+                        jobtxt = ''.join(str(x) for x in job_data.values())
+                        if jobtxt not in crap_all_jobs_text:
+                            all_jobs.append(job_data)
+                            crap_all_jobs_text.append(jobtxt)
+                            count += 1
+
+    return all_jobs, count
+
+def create_station_pairs(stations):
+    """
+    Create station pairs for cross-station correlation.
+
+    :param stations: List of station identifiers (NET.STA.LOC format)
+    :return: List of station pairs
+    """
+    pairs = []
+    for i in range(len(stations)):
+        for j in range(i + 1, len(stations)):
+            pair = f"{stations[i]}:{stations[j]}"
+            pairs.append(pair)
+    return pairs
+
+
 def main(init=False, nocc=False):
     logger.info('*** Starting: New Jobs (Workflow-aware) ***')
 
@@ -154,6 +294,25 @@ def main(init=False, nocc=False):
     db.commit()
     logger.info("Inserted %i jobs" % count)
     logger.info('*** Finished: New Jobs (Workflow-aware) ***')
+
+    if not nocc:
+        logger.info('Creating CC jobs from completed preprocess jobs')
+        cc_jobs, cc_count = create_cc_jobs_from_preprocess(db)
+
+        if cc_jobs:
+            logger.debug(f'Inserting/Updating {len(cc_jobs)} CC jobs')
+            if init:
+                massive_insert_job_workflow(db, cc_jobs)
+            else:
+                for job in cc_jobs:
+                    update_job_workflow(db, job['day'], job['pair'],
+                                        job['jobtype'], job['flag'],
+                                        workflow_id=job.get('workflow_id', 'default'),
+                                        step_id=job.get('step_id'),
+                                        priority=job.get('priority', 0),
+                                        commit=False)
+            db.commit()
+            logger.info(f"Created {cc_count} CC jobs")
 
     return count
 
