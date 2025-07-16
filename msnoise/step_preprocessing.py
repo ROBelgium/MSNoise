@@ -37,6 +37,8 @@ def save_preprocessed_streams(stream, output_dir, step_name, goal_day):
     os.makedirs(workflow_dir, exist_ok=True)
     filename = f"{goal_day}.mseed"
     output_path = os.path.join(workflow_dir, filename)
+    for tr in stream:
+        tr.data = tr.data.astype(np.float32)
     stream.write(output_path, format="MSEED")
 
 
