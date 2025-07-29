@@ -528,7 +528,7 @@ def process_wct_job(pair, day, params, taxis, filters):
     if params.dtt_lag == "static":
         lag_min = params.dtt_minlag
     else:
-        lmlag = dist / params.dtt_v
+        lag_min = dist / params.dtt_v
     lag_max = lmlag - params.dtt_width
 
 
