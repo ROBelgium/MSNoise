@@ -5,8 +5,11 @@ This script performs the computation of the Wavelet Coherence Transform (WCT), a
 Filter Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* |wct_minlag|
-* |wct_maxdt|
+* |dtt_minlag|
+* |dtt_lag|
+* |dtt_v|
+* |dtt_width|
+* |dtt_maxdt|
 * |wct_mincoh|
 * |wct_codacycles|
 * |wct_ns|
@@ -492,7 +495,21 @@ def process_wct_job(pair, day, params, taxis, filters):
         components_to_compute = params.components_to_compute
         
     logger.info(f"Processing Pair: {pair}, Day: {day} for {len(filters)} filters, {len(components_to_compute)} components and {len(params.mov_stack)} moving windows")
-    
+
+    interstations = {}
+    s1 = "%s_%s" % (station1.net, station1.sta)
+    s2 = "%s_%s" % (station2.net, station2.sta)
+    if s1 == s2:
+        interstations["%s_%s" % (s1, s2)] = 0.0
+    else:
+        interstations["%s_%s" % (s1, s2)] = get_interstation_distance(station1,
+                                                                      station2,
+                                                                      station1.coordinates)
+    n1, s1, l1 = station1.split(".")
+    n2, s2, l2 = station2.split(".")
+    dpair = "%s_%s_%s_%s" % (n1, s1, n2, s2)
+    dist = interstations[dpair] if dpair in interstations else 0.0
+        
     # Extract parameters
     ns = params.wct_ns
     nt = params.wct_nt 
@@ -505,10 +522,16 @@ def process_wct_job(pair, day, params, taxis, filters):
     
     mov_stacks = params.mov_stack
     goal_sampling_rate = params.cc_sampling_rate
-    lag_min = params.dtt_minlag
     maxdt = params.dtt_maxdt
     mincoh = params.dtt_mincoh
-        
+
+    if params.dtt_lag == "static":
+        lag_min = params.dtt_minlag
+    else:
+        lmlag = dist / params.dtt_v
+    lag_max = lmlag - params.dtt_width
+
+
     # Convert date string to datetime
     try:
         date = pd.to_datetime(day)
