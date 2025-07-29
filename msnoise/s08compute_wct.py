@@ -340,9 +340,7 @@ def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20
             logger.debug('Not enough points to estimate dv/v for WCT')
             
     if problematic_freqs:
-        logger.warning(f"Covariance estimation issues between {min(problematic_freqs):.2f}-{max(problematic_freqs):.2f} Hz: 
-        Modify min_nonzero (current: {min_nonzero}), mincoh (current: {mincoh}), maxdt (current: {maxdt}) and/or coda_cycles 
-        (current: {coda_cycles})")
+        logger.warning(f"Covariance estimation issues between {min(problematic_freqs):.2f}-{max(problematic_freqs):.2f} Hz: Modify min_nonzero (current: {min_nonzero}), mincoh (current: {mincoh}), maxdt (current: {maxdt}) and/or coda_cycles (current: {coda_cycles})")
     
     return dvv * 100, err * 100, wf
 
