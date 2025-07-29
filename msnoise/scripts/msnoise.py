@@ -1133,25 +1133,35 @@ def dvv_compute_dvv(ctx):
 
 @dvv.command(name='compute_wct')
 @click.pass_context
-def dvv_compute_wct(ctx):
+@click.option('-b', '--batch-size', default=5, help='Number of jobs to process in each batch', type=int)
+def dvv_compute_wct(ctx, batch_size):
     """Computes the wavelet jobs based on the new STACK data"""
     from ..s08compute_wct import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
     if threads == 1:
-        main(loglevel=loglevel)
+        main(loglevel=loglevel, batch_size=batch_size)
     else:
         from multiprocessing import Process
         processes = []
         for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel})
+            p = Process(target=main, kwargs={"loglevel": loglevel, "batch_size": batch_size})
             p.start()
             processes.append(p)
             time.sleep(delay)
         for p in processes:
             p.join()
 
+@dvv.command(name='merge_wct')
+@click.pass_context
+@click.option('--wct-dir', default='WCT', help='Directory containing WCT results')
+@click.option('--output-dir', default='WCT_MERGED', help='Directory to save merged results')
+def dvv_merge_wct(ctx, wct_dir, output_dir):
+    """Merges daily WCT files into consolidated files with hierarchical structure"""
+    from ..s09merge_wct import main
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    main(wct_dir=wct_dir, output_dir=output_dir, loglevel=loglevel)
 
 @dvv.group(name="plot")
 def dvv_plot():
