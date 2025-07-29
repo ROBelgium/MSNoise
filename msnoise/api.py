@@ -3285,7 +3285,7 @@ def compute_dvv2(session, filterid, mwcsid, dttid, mov_stack, pairs=None, compon
 
     return stats.sort_index(axis=1)
 
-def xr_save_wct2(station1, station2, components, filterid, wctid, mov_stack, taxis, freqs, WXamp_list, WXcoh_list, WXdt_list, dates_list):
+def xr_save_wct2(station1, station2, components, filterid, wctid, mov_stack, taxis, freqs, WXamp_list, WXcoh_list, WXdt_list, dates_list, output_dir="WCT"):
     """
     Save WCT results into an xarray Dataset and store it as a NetCDF file.
 
@@ -3326,7 +3326,7 @@ def xr_save_wct2(station1, station2, components, filterid, wctid, mov_stack, tax
     ds = xr.Dataset({"WXamp": WXamp_da, "Wcoh": Wcoh_da, "WXdt": WXdt_da})
 
     # Define output directory
-    fn = os.path.join("DVV/WCT/WCT", "f%02i" % filterid, "wct%02i" % wctid, 
+    fn = os.path.join("DVV/WCT/", output_dir, "f%02i" % filterid, "wct%02i" % wctid, 
                             "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components, 
                             f"{station1}_{station2}.nc")
     
