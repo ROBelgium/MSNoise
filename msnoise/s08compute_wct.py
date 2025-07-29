@@ -798,7 +798,7 @@ def main(loglevel="INFO", batch_size=5):
                 day = job.day
 
                 # Process this job
-                success = process_wct_job_adaptive(pair, day, params, taxis, filter_dicts, distances_cache)
+                success = process_wct_job(pair, day, params, taxis, filter_dicts)
                                 
                 # Update job status
                 db = connect()
