@@ -590,11 +590,12 @@ def process_wct_job(pair, day, params, taxis, filters):
                     
                     # Get frequency indices
                     inx = np.where((freqs >= freqmin) & (freqs <= freqmax))
-                    
+
+                    wctid = 1 #Didn't get where it is from, no function get_wctid in api
                     # Save results for this day
                     save_day_wct_results(
                         station1, station2, date, component, 
-                        filterid, mov_stack, taxis, 
+                        filterid, wctid, mov_stack, taxis, 
                         dvv, err, coh, freqs, inx
                     )
                     
