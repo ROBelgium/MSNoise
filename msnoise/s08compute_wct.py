@@ -386,10 +386,10 @@ def get_avgcoh(freqs, tvec, wcoh, freqmin, freqmax, lag_min=5, coda_cycles=20):
 
     return coh
 
-def save_day_wct_results(station1, station2, date, component, filterid, mov_stack, taxis, dvv, err, coh, freqs, inx):
+def save_day_wct_results(station1, station2, date, component, filterid, wctid, mov_stack, taxis, dvv, err, coh, freqs, inx):
     """
     Save the WCT results for a single day to a file in a hierarchical folder structure:
-    WCT/[filter_id]/[mov_stack]/[component]/[station_pair]/[date].npz
+    DVV/WCT/WCT/f{filterid}/wct{wctid}/{mov_stack}/{component}/{station_pair}/{date}.npz
     
     Parameters:
     ----------
@@ -419,6 +419,7 @@ def save_day_wct_results(station1, station2, date, component, filterid, mov_stac
     """
     # Format filterid with leading zeros (e.g., 1 -> "01")
     filter_str = f"{int(filterid):02d}"
+    wct_str = f"wct{int(wctid):02d}"
     
     # Format mov_stack (could be string like '10d_1d' or int)
     if isinstance(mov_stack, (list, tuple)):
@@ -430,8 +431,8 @@ def save_day_wct_results(station1, station2, date, component, filterid, mov_stac
     pair_str = f"{station1}_{station2}"
     
     # Create directory structure
-    # WCT/[filter_id]/[mov_stack]/[component]/[station_pair]/
-    dir_path = os.path.join('WCT', filter_str, mov_stack_str, component, pair_str)
+    #DVV/WCT/WCT/f{filterid}/wct{wctid}/{mov_stack}/{component}/{station_pair}/
+    dir_path = os.path.join('DVV', 'WCT','WCT', filter_str, wct_str, mov_stack_str, component, pair_str)
     os.makedirs(dir_path, exist_ok=True)
     
     # Filename is just the date: YYYY-MM-DD.npz
