@@ -710,9 +710,14 @@ def test_036_wct_dtt_param_update():
 def test_037_wct():
     from ..s08compute_wct import main as compute_wct_main
     compute_wct_main()
-  
+
 @pytest.mark.order(38)
-def test_038_validate_stack_data():
+def test_038_wct():
+    from ..s09merge_wct import main as merge_wct_main
+    merge_wct_main()
+  
+@pytest.mark.order(39)
+def test_039_validate_stack_data():
     from ..api import validate_stack_data
     import xarray as xr
     import numpy as np
@@ -767,8 +772,8 @@ def test_038_validate_stack_data():
     assert is_valid
     assert message == "OK"
     
-@pytest.mark.order(39)
-def test_039_stack_validation_handling():
+@pytest.mark.order(40)
+def test_040_stack_validation_handling():
     from ..api import validate_stack_data
     import xarray as xr
     import numpy as np
