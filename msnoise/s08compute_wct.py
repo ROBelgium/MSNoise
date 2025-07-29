@@ -58,6 +58,7 @@ import scipy
 import scipy.fft as sf
 import warnings
 from scipy.optimize import OptimizeWarning
+import re
 
 def smoothCFS(cfs, scales, dt, ns, nt):
     """
@@ -389,7 +390,7 @@ def get_avgcoh(freqs, tvec, wcoh, freqmin, freqmax, lag_min=5, coda_cycles=20):
 
     return coh
 
-def save_day_wct_results(station1, station2, date, component, filterid, wctid, mov_stack, taxis, dvv, err, coh, freqs, inx):
+def save_day_wct_results(station1, station2, date, component, filterid, wctid, dttid, mov_stack, taxis, dvv, err, coh, freqs, inx):
     """
     Save the WCT results for a single day to a file in a hierarchical folder structure:
     DVV/WCT/WCT/f{filterid}/wct{wctid}/{mov_stack}/{component}/{station_pair}/{date}.npz
@@ -423,7 +424,8 @@ def save_day_wct_results(station1, station2, date, component, filterid, wctid, m
     # Format filterid with leading zeros (e.g., 1 -> "01")
     filter_str = f"{int(filterid):02d}"
     wct_str = f"wct{int(wctid):02d}"
-    
+    dtt_str = f"dtt{int(dttid):02d}"
+
     # Format mov_stack (could be string like '10d_1d' or int)
     if isinstance(mov_stack, (list, tuple)):
         mov_stack_str = '_'.join(str(m) for m in mov_stack)
@@ -435,7 +437,7 @@ def save_day_wct_results(station1, station2, date, component, filterid, wctid, m
     
     # Create directory structure
     #DVV/WCT/WCT/f{filterid}/wct{wctid}/{mov_stack}/{component}/{station_pair}/
-    dir_path = os.path.join('DVV', 'WCT','WCT', filter_str, wct_str, mov_stack_str, component, pair_str)
+    dir_path = os.path.join('DVV', 'WCT','WCT', filter_str, wct_str, dtt_str, mov_stack_str, component, pair_str)
     os.makedirs(dir_path, exist_ok=True)
     
     # Filename is just the date: YYYY-MM-DD.npz
@@ -464,8 +466,161 @@ def save_day_wct_results(station1, station2, date, component, filterid, wctid, m
     
     logger.debug(f"Saved WCT results to {filepath}")
     return filepath
+
+def get_all_station_distances(db):
+    """
+    Pre-calculate distances for all station pairs using MSNoise's get_interstation_distance API.
     
-def process_wct_job(pair, day, params, taxis, filters): 
+    Parameters:
+    -----------
+    db : database session
+        MSNoise database session
+        
+    Returns:
+    --------
+    dict
+        Dictionary with station pair keys and distance values in km
+    """
+    from itertools import combinations
+    
+    logger.info("Pre-calculating all station distances...")
+    
+    # Get all stations from database
+    stations = get_stations(db, all=True)
+    
+    # Filter stations that have coordinates
+    valid_stations = []
+    for station in stations:
+        if station.X is not None and station.Y is not None:
+            valid_stations.append(station)
+        else:
+            logger.debug(f"Station {station.net}.{station.sta} has no coordinates, skipping")
+    
+    logger.info(f"Found {len(valid_stations)} stations with coordinates")
+    
+    # Calculate distances for all station pairs
+    distances = {}
+    
+    for station1, station2 in combinations(valid_stations, 2):
+        try:
+            # Calculate distance using MSNoise's built-in function
+            distance = get_interstation_distance(station1, station2, coordinates="DEG")
+            
+            # Create comprehensive key formats for this pair
+            # Basic formats
+            basic_keys = [
+                f"{station1.net}.{station1.sta}:{station2.net}.{station2.sta}",
+                f"{station2.net}.{station2.sta}:{station1.net}.{station1.sta}",
+                f"{station1.net}.{station1.sta}_{station2.net}.{station2.sta}",
+                f"{station2.net}.{station2.sta}_{station1.net}.{station1.sta}",
+                # Station codes only
+                f"{station1.sta}:{station2.sta}",
+                f"{station2.sta}:{station1.sta}",
+                f"{station1.sta}_{station2.sta}",
+                f"{station2.sta}_{station1.sta}",
+            ]
+            
+            # Add formats with location codes (common in MSNoise jobs)
+            location_formats = [
+                f"{station1.net}.{station1.sta}.--:{station2.net}.{station2.sta}.--",
+                f"{station2.net}.{station2.sta}.--:{station1.net}.{station1.sta}.--",
+                f"{station1.net}.{station1.sta}.---{station2.net}.{station2.sta}.--",
+                f"{station2.net}.{station2.sta}.---{station1.net}.{station1.sta}.--",
+                f"{station1.net}.{station1.sta}.--_{station2.net}.{station2.sta}.--",
+                f"{station2.net}.{station2.sta}.--_{station1.net}.{station1.sta}.--",
+            ]
+            
+            # Combine all key formats
+            all_keys = basic_keys + location_formats
+            
+            # Store distance with all possible key formats
+            for key in all_keys:
+                distances[key] = distance
+                
+            logger.debug(f"Distance {station1.net}.{station1.sta} - {station2.net}.{station2.sta}: {distance:.2f} km")
+            
+        except Exception as e:
+            logger.error(f"Error calculating distance between {station1.net}.{station1.sta} and {station2.net}.{station2.sta}: {e}")
+            continue
+    
+    logger.info(f"Pre-calculated {len(distances)//(len(basic_keys) + len(location_formats))} unique station pair distances")
+    logger.info(f"Total cache entries: {len(distances)}")
+    
+    # Debug: show a few cache keys
+    sample_keys = list(distances.keys())[:10]
+    logger.debug(f"Sample cache keys: {sample_keys}")
+    
+    return distances
+
+
+
+def get_distance_from_cache(distances_cache, station1, station2):
+    """
+    Get distance from pre-calculated cache.
+    
+    Parameters:
+    -----------
+    distances_cache : dict
+        Pre-calculated distances dictionary
+    station1, station2 : str
+        Station names (can include location codes like 8K.ASK.-- or just 8K.ASK)
+        
+    Returns:
+    --------
+    float or None
+        Distance in kilometers, or None if not found or if it's an autocorrelation
+    """
+    def clean_station_name(station_name):
+        """Clean station name by removing location/channel codes"""
+        # Remove location codes (anything after the second dot)
+        parts = station_name.split('.')
+        if len(parts) >= 2:
+            # Keep only NET.STA, remove location/channel codes
+            return f"{parts[0]}.{parts[1]}"
+        return station_name
+    
+    # Clean the station names
+    clean_sta1 = clean_station_name(station1)
+    clean_sta2 = clean_station_name(station2)
+    
+    logger.debug(f"Looking for distance between {station1} ({clean_sta1}) and {station2} ({clean_sta2})")
+    
+    # Handle autocorrelations (same station)
+    if clean_sta1 == clean_sta2:
+        logger.debug(f"Autocorrelation detected for {clean_sta1}, distance = 0.0 km")
+        return 0.0
+    
+    # For cross-correlations, try different key formats with both original and cleaned names
+    possible_keys = [
+        # Try with cleaned names first
+        f"{clean_sta1}:{clean_sta2}",
+        f"{clean_sta2}:{clean_sta1}",
+        f"{clean_sta1}_{clean_sta2}",
+        f"{clean_sta2}_{clean_sta1}",
+        # Try with original names
+        f"{station1}:{station2}",
+        f"{station2}:{station1}",
+        f"{station1}_{station2}",
+        f"{station2}_{station1}",
+        # Try extracting just station codes (without network)
+        f"{clean_sta1.split('.')[1]}:{clean_sta2.split('.')[1]}" if '.' in clean_sta1 and '.' in clean_sta2 else None,
+        f"{clean_sta2.split('.')[1]}:{clean_sta1.split('.')[1]}" if '.' in clean_sta1 and '.' in clean_sta2 else None,
+    ]
+    
+    # Filter out None values
+    possible_keys = [k for k in possible_keys if k is not None]
+    
+    logger.debug(f"Trying keys: {possible_keys[:4]}...")  # Log first few keys
+    
+    for key in possible_keys:
+        if key in distances_cache:
+            logger.debug(f"Found cached distance for {station1}-{station2} using key '{key}': {distances_cache[key]:.2f} km")
+            return distances_cache[key]
+    
+    logger.debug(f"No cached distance found for {station1}-{station2} after trying {len(possible_keys)} key formats")
+    return None
+      
+def process_wct_job(pair, day, params, taxis, filters, wct_params_dict, distances_cache= None):  
     """
     Process a single WCT job without database access.
     
@@ -479,7 +634,8 @@ def process_wct_job(pair, day, params, taxis, filters):
         Time axis
     filters : list
         List of filters to use
-        
+    distances_cache : dict, optional
+        Pre-calculated station distances dictionary
     Returns:
     -------
     bool
@@ -488,6 +644,28 @@ def process_wct_job(pair, day, params, taxis, filters):
     # Parse pair and day
     station1, station2 = pair.split(":")
     
+    dist = 0.0  # Default for autocorrelations
+    if distances_cache:
+        cached_dist = get_distance_from_cache(distances_cache, station1, station2)
+        if cached_dist is not None:
+            dist = cached_dist
+        else:
+            logger.warning(f"Distance not found in cache for {pair}, using default 0.0")
+    else:
+        # Fallback to original calculation if no cache available
+        try:
+            n1, s1, l1 = station1.split(".")
+            n2, s2, l2 = station2.split(".")
+            s1 = "%s_%s" % (n1, s1)
+            s2 = "%s_%s" % (n2, s2)
+            if s1 != s2:
+                # This would require database access - not ideal in this approach
+                logger.warning(f"No distance cache available and cannot calculate distance for {pair}")
+        except:
+            logger.warning(f"Could not parse station names for distance calculation: {pair}")
+    
+    logger.debug(f"Using distance {dist:.2f} km for pair {pair}")
+
     # Determine components to compute
     if station1 == station2:
         components_to_compute = params.components_to_compute_single_station
@@ -495,42 +673,21 @@ def process_wct_job(pair, day, params, taxis, filters):
         components_to_compute = params.components_to_compute
         
     logger.info(f"Processing Pair: {pair}, Day: {day} for {len(filters)} filters, {len(components_to_compute)} components and {len(params.mov_stack)} moving windows")
-
-    interstations = {}
-    s1 = "%s_%s" % (station1.net, station1.sta)
-    s2 = "%s_%s" % (station2.net, station2.sta)
-    if s1 == s2:
-        interstations["%s_%s" % (s1, s2)] = 0.0
-    else:
-        interstations["%s_%s" % (s1, s2)] = get_interstation_distance(station1,
-                                                                      station2,
-                                                                      station1.coordinates)
-    n1, s1, l1 = station1.split(".")
-    n2, s2, l2 = station2.split(".")
-    dpair = "%s_%s_%s_%s" % (n1, s1, n2, s2)
-    dist = interstations[dpair] if dpair in interstations else 0.0
         
     # Extract parameters
-    ns = params.wct_ns
-    nt = params.wct_nt 
-    vpo = params.wct_vpo 
-    nptsfreq = params.wct_nptsfreq
-    coda_cycles = params.dtt_codacycles 
-    min_nonzero = params.dvv_min_nonzero
-    wct_norm = params.wct_norm
-    wavelet_type = params.wavelet_type
+    #ns = params.wct_ns
+    #nt = params.wct_nt 
+    #vpo = params.wct_vpo 
+    #nptsfreq = params.wct_nptsfreq
+    #coda_cycles = params.dtt_codacycles 
+    #min_nonzero = params.dvv_min_nonzero
+    #wct_norm = params.wct_norm
+    #wavelet_type = params.wavelet_type
     
     mov_stacks = params.mov_stack
     goal_sampling_rate = params.cc_sampling_rate
-    maxdt = params.dtt_maxdt
-    mincoh = params.dtt_mincoh
-
-    if params.dtt_lag == "static":
-        lag_min = params.dtt_minlag
-    else:
-        lag_min = dist / params.dtt_v
-    lag_max = lmlag - params.dtt_width
-
+    #maxdt = params.dtt_maxdt
+    #mincoh = params.dtt_mincoh
 
     # Convert date string to datetime
     try:
@@ -546,87 +703,136 @@ def process_wct_job(pair, day, params, taxis, filters):
         filterid = int(f['ref'])
         freqmin = f['low']
         freqmax = f['high']
+
+        #### due to strcucure change####
+        if filterid not in wct_params_dict:
+            logger.debug(f"No WCT parameters found for filter {filterid}, skipping")
+            continue
         
-        # Process each component
-        for component in components_to_compute:
-            try:
-                # Get reference waveform
-                ref = xr_get_ref(station1, station2, component, filterid, taxis, ignore_network=True)
-                ref = ref.CCF.values
-                if wct_norm:
-                    ori_waveform = (ref/ref.max()) 
+        # Process each WCT parameter set for this filter
+        for wctid, dtt_param_list in wct_params_dict[filterid].items():
+            
+            # Process each DTT parameter set
+            for dtt_params in dtt_param_list:
+                if not dtt_params['used']:
+                    continue
+                
+                dttid = dtt_params['ref']
+                
+                # Extract WCT parameters (with defaults if not in DTT params)
+                ns = getattr(params, 'wct_ns', 5)
+                nt = getattr(params, 'wct_nt', 5) 
+                vpo = getattr(params, 'wct_vpo', 20)
+                nptsfreq = getattr(params, 'wct_nptsfreq', 300)
+                wct_norm = getattr(params, 'wct_norm', "Y")
+                wavelet_type = getattr(params, 'wavelet_type', "('Morlet',6.)")
+                
+                # Use DTT parameters for processing
+                coda_cycles = dtt_params['wct_codacycles']
+                min_nonzero = dtt_params['wct_min_nonzero'] / 100.0  # Convert percentage to fraction
+                maxdt = dtt_params['wct_maxdt']
+                mincoh = dtt_params['wct_mincoh']
+                
+                # Calculate lag parameters based on DTT settings
+                if dtt_params['wct_lag'] == "static":
+                    lag_min = dtt_params['wct_minlag']
                 else:
-                    ori_waveform = ref
-            except FileNotFoundError as fullpath:
-                logger.error(f"FILE DOES NOT EXIST: {fullpath}, skipping")
-                continue
-            except Exception as e:
-                logger.error(f"Error getting reference waveform: {str(e)}")
-                continue
-            
-            if not len(ref):
-                logger.warning(f"Empty reference waveform for {station1}:{station2} {component} f{filterid}")
-                continue
-            
-            # Process each moving stack
-            for mov_stack in mov_stacks:
-                try:
-                    # Get the data for this day and moving stack
-                    data = xr_get_ccf(station1, station2, component, filterid, mov_stack, taxis)
-                    
-                    # Filter data to get only this specific day
-                    day_data = data[data.index == date]
-                    
-                    if day_data.empty:
-                        logger.warning(f"No data for {date} in {station1}:{station2} {component} f{filterid} m{mov_stack}")
+                    if dtt_params['wct_v'] > 0:
+                        lag_min = dist / dtt_params['wct_v']
+                    else:
+                        logger.warning(f"Invalid velocity {dtt_params['wct_v']} for dynamic lag, using static")
+                        lag_min = dtt_params['wct_minlag']
+                
+                lag_max = lag_min + dtt_params['wct_width']
+                
+                # Use frequency bounds from DTT parameters
+                processing_freqmin = dtt_params['wct_dtt_freqmin']
+                processing_freqmax = dtt_params['wct_dtt_freqmax']
+                
+                logger.debug(f"Using DTT params - lag_min: {lag_min}, lag_max: {lag_max}, "
+                           f"freq_range: {processing_freqmin}-{processing_freqmax} Hz, "
+                           f"sides: {dtt_params['wct_sides']}")
+        #### end: due to strcucure change####
+                
+                # Process each component
+                for component in components_to_compute:
+                    try:
+                        # Get reference waveform
+                        ref = xr_get_ref(station1, station2, component, filterid, taxis, ignore_network=True)
+                        ref = ref.CCF.values
+                        if wct_norm:
+                            ori_waveform = (ref/ref.max()) 
+                        else:
+                            ori_waveform = ref
+                    except FileNotFoundError as fullpath:
+                        logger.error(f"FILE DOES NOT EXIST: {fullpath}, skipping")
+                        continue
+                    except Exception as e:
+                        logger.error(f"Error getting reference waveform: {str(e)}")
                         continue
                     
-                    logger.debug(f"Processing {station1}:{station2} {component} f{filterid} m{mov_stack} - {date}")
+                    if not len(ref):
+                        logger.warning(f"Empty reference waveform for {station1}:{station2} {component} f{filterid}")
+                        continue
                     
-                    # Get the waveform for this day
-                    waveform = day_data.iloc[0].values
-                    if wct_norm:
-                        new_waveform = (waveform/waveform.max()) 
-                    else:
-                        new_waveform = waveform
-                    
-                    # Calculate wavelet coherence transform
-                    WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi = xwt(
-                        ori_waveform, new_waveform, goal_sampling_rate, 
-                        int(ns), float(nt), int(vpo), 
-                        freqmin, freqmax, int(nptsfreq), wavelet_type, maxdt
-                    )
-                    
-                    # Compute dv/v values
-                    dvv, err, wf = compute_wct_dvv(
-                        freqs, taxis, WXamp, Wcoh, WXdt, 
-                        lag_min=int(lag_min), coda_cycles=coda_cycles, 
-                        mincoh=mincoh, maxdt=maxdt, min_nonzero=min_nonzero, 
-                        freqmin=freqmin, freqmax=freqmax
-                    )
-                    
-                    # Calculate average coherence
-                    coh = get_avgcoh(
-                        freqs, taxis, Wcoh, freqmin, freqmax, 
-                        lag_min=int(lag_min), coda_cycles=coda_cycles
-                    )
-                    
-                    # Get frequency indices
-                    inx = np.where((freqs >= freqmin) & (freqs <= freqmax))
-
-                    wctid = 1 #Didn't get where it is from, no function get_wctid in api
-                    # Save results for this day
-                    save_day_wct_results(
-                        station1, station2, date, component, 
-                        filterid, wctid, mov_stack, taxis, 
-                        dvv, err, coh, freqs, inx
-                    )
-                    
-                    operations_succeeded += 1
-                
-                except Exception as e:
-                    logger.error(f"Error processing {component} f{filterid} m{mov_stack}: {str(e)}")
-                    continue
+                    # Process each moving stack
+                    for mov_stack in mov_stacks:
+                        try:
+                            # Get the data for this day and moving stack
+                            data = xr_get_ccf(station1, station2, component, filterid, mov_stack, taxis)
+                            
+                            # Filter data to get only this specific day
+                            day_data = data[data.index == date]
+                            
+                            if day_data.empty:
+                                logger.warning(f"No data for {date} in {station1}:{station2} {component} f{filterid} m{mov_stack}")
+                                continue
+                            
+                            logger.debug(f"Processing {station1}:{station2} {component} f{filterid} m{mov_stack} - {date}")
+                            
+                            # Get the waveform for this day
+                            waveform = day_data.iloc[0].values
+                            if wct_norm:
+                                new_waveform = (waveform/waveform.max()) 
+                            else:
+                                new_waveform = waveform
+                            
+                            # Calculate wavelet coherence transform
+                            WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi = xwt(
+                                ori_waveform, new_waveform, goal_sampling_rate, 
+                                int(ns), float(nt), int(vpo), 
+                                freqmin, freqmax, int(nptsfreq), wavelet_type, maxdt
+                            )
+                            
+                            # Compute dv/v values
+                            dvv, err, wf = compute_wct_dvv(
+                                freqs, taxis, WXamp, Wcoh, WXdt, 
+                                lag_min=int(lag_min), coda_cycles=coda_cycles, 
+                                mincoh=mincoh, maxdt=maxdt, min_nonzero=min_nonzero, 
+                                freqmin=freqmin, freqmax=freqmax
+                            )
+                            
+                            # Calculate average coherence
+                            coh = get_avgcoh(
+                                freqs, taxis, Wcoh, freqmin, freqmax, 
+                                lag_min=int(lag_min), coda_cycles=coda_cycles
+                            )
+                            
+                            # Get frequency indices
+                            inx = np.where((freqs >= freqmin) & (freqs <= freqmax))
+        
+                            # Save results for this day
+                            save_day_wct_results(
+                                station1, station2, date, component, 
+                                filterid, wctid, dttid, mov_stack, taxis, 
+                                dvv, err, coh, freqs, inx
+                            )
+                            
+                            operations_succeeded += 1
+                        
+                        except Exception as e:
+                            logger.error(f"Error processing {component} f{filterid} m{mov_stack}: {str(e)}")
+                            continue
     
     # Determine overall success status
     if operations_succeeded == 0:
@@ -638,31 +844,13 @@ def process_wct_job(pair, day, params, taxis, filters):
 
 def claim_available_jobs(db, batch_size=5, max_attempts=3):
     """
-    Claims a batch of available jobs
-    
-    Parameters:
-    ----------
-    db : Session
-        Database session
-    batch_size : int
-        Maximum number of jobs to claim at once
-    max_attempts : int
-        Number of retries if no jobs found
-        
-    Returns:
-    -------
-    list
-        List of claimed Job objects
+    Claims a batch of available jobs - SIMPLE VERSION
     """
-    from sqlalchemy import text
     import time
+    from datetime import datetime
         
     for attempt in range(max_attempts):
         try:
-            # Make sure we're not in a transaction already
-            if db.in_transaction():
-                db.rollback()
-            
             # Find available jobs
             available_jobs = db.query(Job).filter(
                 Job.flag == 'T',
@@ -675,48 +863,25 @@ def claim_available_jobs(db, batch_size=5, max_attempts=3):
                     time.sleep(1 * (attempt + 1))
                     continue
                 else:
-                    logger.info("No jobs available after {max_attempts} retries")
                     return []
             
-            # Make a copy of the job data before updating
-            jobs = []
-            job_ids = []
+            # Get job IDs
+            job_ids = [job.ref for job in available_jobs]
             
-            for job in available_jobs:
-                # Properly create job copies with all required attributes
-                job_copy = Job(
-                    day=job.day,
-                    pair=job.pair,
-                    jobtype=job.jobtype,
-                    flag='I'
-                )
-                job_copy.ref = job.ref
-                jobs.append(job_copy)
-                job_ids.append(job.ref)
+            # Use ORM update - much simpler and more reliable
+            updated_count = db.query(Job).filter(
+                Job.ref.in_(job_ids),
+                Job.flag == 'T'
+            ).update(
+                {Job.flag: 'I', Job.lastmod: datetime.utcnow()},
+                synchronize_session=False
+            )
             
-            # Start a transaction for the update
-            if db.in_transaction():
-                db.rollback()
-            db.begin()
-            
-            # Update the jobs to mark them as in progress
-            update_query = text("""
-                UPDATE jobs
-                SET flag = 'I', lastmod = NOW()
-                WHERE ref IN :job_ids
-                AND flag = 'T'  -- Double-check it hasn't been claimed
-            """)
-            
-            result = db.execute(update_query, {'job_ids': tuple(job_ids)})
-            updated_count = result.rowcount
-            
-            # Commit the transaction
             db.commit()
             
-            # Check if we actually updated anything (race condition check)
             if updated_count > 0:
-                # Only return jobs that were actually updated
-                return jobs[:updated_count]
+                # Return the updated jobs
+                return available_jobs[:updated_count]
             else:
                 if attempt < max_attempts - 1:
                     time.sleep(1 * (attempt + 1))
@@ -725,10 +890,12 @@ def claim_available_jobs(db, batch_size=5, max_attempts=3):
                     return []
                 
         except Exception as e:
-            if db.in_transaction():
-                db.rollback()
+            db.rollback()
             logger.error(f"Error claiming jobs: {str(e)}")
-            time.sleep(1)
+            if attempt < max_attempts - 1:
+                time.sleep(1)
+            else:
+                raise
     
     return []
 
@@ -754,23 +921,50 @@ def main(loglevel="INFO", batch_size=5):
         params = get_params(db)
         taxis = get_t_axis(db)
         filters = get_filters(db, all=False)
+        wct_dtt_params = get_dvv_wct_dtt_jobs(db, all=False)
         
         # Convert filters to dictionaries before closing the session
         filter_dicts = []
         for f in filters:
+            filter_str = str(f)
+            match = re.match(r'Filter (\d+) \(([\d.]+)-([\d.]+) Hz\)', filter_str)
+    
             filter_dicts.append({
-                'ref': f.ref,
-                'low': f.low,
-                'high': f.high,
-                'mwcs_low': getattr(f, 'mwcs_low', None),
-                'mwcs_high': getattr(f, 'mwcs_high', None),
-                'rms_threshold': getattr(f, 'rms_threshold', None),
-                'mwcs_wlen': getattr(f, 'mwcs_wlen', None),
-                'mwcs_step': getattr(f, 'mwcs_step', None)
+                'ref': match.group(1),
+                'low': float(match.group(2)),
+                'high': float(match.group(3))
             })
+        
+        wct_params = {}
+        for filter_ref, wct_list in wct_dtt_params.items():
+            filterid = int(filter_ref)
+            wct_params[filterid] = {}
             
-        params.coda_velocity = 2.0
-        params.coda_safety_factor = 1.3
+            for wct_ref, dtt_list in wct_list.items():
+                wctid = int(wct_ref)
+                wct_params[filterid][wctid] = []
+                
+                for dtt_params in dtt_list:
+                    # Convert ORM object to dictionary for easier handling
+                    dtt_dict = {
+                        'ref': dtt_params.ref,
+                        'wct_dtt_freqmin': dtt_params.wct_dtt_freqmin,
+                        'wct_dtt_freqmax': dtt_params.wct_dtt_freqmax,
+                        'wct_minlag': dtt_params.wct_minlag,
+                        'wct_width': dtt_params.wct_width,
+                        'wct_lag': dtt_params.wct_lag,
+                        'wct_v': dtt_params.wct_v,
+                        'wct_sides': dtt_params.wct_sides,
+                        'wct_mincoh': dtt_params.wct_mincoh,
+                        'wct_maxdt': dtt_params.wct_maxdt,
+                        'wct_codacycles': dtt_params.wct_codacycles,
+                        'wct_min_nonzero': dtt_params.wct_min_nonzero,
+                        'used': dtt_params.used
+                    }
+                    wct_params[filterid][wctid].append(dtt_dict)
+                    
+        #params.coda_velocity = 2.0
+        #params.coda_safety_factor = 1.3
         
         # Pre-calculate all station distances
         try:
@@ -822,7 +1016,7 @@ def main(loglevel="INFO", batch_size=5):
                 day = job.day
 
                 # Process this job
-                success = process_wct_job(pair, day, params, taxis, filter_dicts)
+                success = process_wct_job(pair, day, params, taxis, filter_dicts, wct_params, distances_cache)
                                 
                 # Update job status
                 db = connect()
