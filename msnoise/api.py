@@ -2897,15 +2897,29 @@ def xr_save_ref(station1, station2, components, filterid, taxis, new, overwrite=
         return dr
 
 
-def xr_get_ref(station1, station2, components, filterid, taxis):
+def xr_get_ref(station1, station2, components, filterid, taxis, ignore_network=False):
     path = os.path.join("STACKS2", "%02i" % filterid,
                         "REF", "%s" % components)
-    fn = "%s_%s.nc" % (station1, station2)
 
-    fullpath = os.path.join(path, fn)
-    if not os.path.isfile(fullpath):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-        raise FileNotFoundError(fullpath)
+    # If ignore_network is True, strip the network code from the station names
+    if ignore_network:
+        s1_parts = station1.split('.')
+        s2_parts = station2.split('.')
+        
+        available_files = glob.glob(os.path.join(path, "*.%s.%s_*.%s.%s.nc" % (s1_parts[1],s1_parts[2], s2_parts[1], s1_parts[2])))
+        
+        if available_files:
+            # Use the first available reference file
+            fullpath = available_files[0]
+        else:
+            raise FileNotFoundError(f"No reference file found for station {s1_parts[1]} and {s2_parts[1]}")
+    else:
+        fn = "%s_%s.nc" % (station1, station2)
+    
+        fullpath = os.path.join(path, fn)
+        if not os.path.isfile(fullpath):
+            # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+            raise FileNotFoundError(fullpath)
     data = xr_create_or_open(fullpath, taxis, name="REF")
     return data.CCF.to_dataframe()
 
