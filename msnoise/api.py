@@ -1535,7 +1535,7 @@ def get_dtt_next_job(session, flag='T', jobtype='DTT'):
         return []
 
 
-def reset_jobs(session, jobtype, alljobs=False, rule=None):
+def reset_jobs(session, jobtype, alljobs=False, rule=None, reset_i=True, reset_e=True):
     """
     Sets the flag of all `jobtype` Jobs to "T"odo.
 
@@ -1545,20 +1545,39 @@ def reset_jobs(session, jobtype, alljobs=False, rule=None):
     :type jobtype: str
     :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
     :type alljobs: bool
-    :param alljobs: If True, resets all jobs. If False (default), only resets
-        jobs "I"n progress.
+    :param alljobs: If True, resets all jobsregardless of flag. If False (default), 
+        only resets jobs with flags specified by reset_i and reset_e.
+    :type rule: str
+    :param rule: Optional custom SQL clause for filtering jobs to reset
+    :type reset_i: bool
+    :param reset_i: If True (default), reset jobs with 'I' flag
+    :type reset_e: bool
+    :param reset_e: If True (default), reset jobs with 'E' flag
     """
     dbini = read_db_inifile()
     prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
-    jobs = session.query(Job).filter(Job.jobtype == jobtype)
+     # If a custom rule is provided, use direct SQL
     if rule:
-        session.execute("UPDATE %sjobs set flag='T' where jobtype='%s' and  %s"
+        session.execute("UPDATE %sjobs set flag='T' where jobtype='%s' and %s"
                         % (prefix, jobtype, rule))
         session.commit()
         return
-    if not alljobs:
-        jobs = jobs.filter(Job.flag == "I")
-    jobs.update({Job.flag: 'T'})
+    
+    # Get all jobs of the specified jobtype
+    base_query = session.query(Job).filter(Job.jobtype == jobtype)
+    
+    if alljobs:
+        # If alljobs is True, reset all jobs regardless of flag
+        base_query.update({Job.flag: 'T'})
+    else:
+        # Reset only jobs with specified flags
+        if reset_i:
+            jobs_i = base_query.filter(Job.flag == "I")
+            jobs_i.update({Job.flag: 'T'})
+            
+        if reset_e:
+            jobs_e = base_query.filter(Job.flag == "E")
+            jobs_e.update({Job.flag: 'T'})
     session.commit()
 
 
