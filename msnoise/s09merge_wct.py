@@ -24,7 +24,7 @@ import xarray as xr
 import datetime
 import traceback
 from .api import (get_logger, xr_create_or_open, xr_save_and_close, 
-                 xr_insert_or_update, validate_stack_data, xr_save_wct2)
+                 xr_insert_or_update, validate_stack_data, xr_save_wct2, xr_save_wct_dtt2)
 
 def setup_progress_tracking(output_dir):
     """Set up progress tracking with log file"""
@@ -74,15 +74,30 @@ def parse_pair_name(pair_folder):
 
 def get_filter_directories(wct_dir):
     """Get list of filter directories in the WCT directory"""
+    logger = get_logger('msnoise.merge_wct', "DEBUG")
+        
     if not os.path.exists(wct_dir):
+        logger.error(f"WCT directory does not exist: {wct_dir}")
+        return []
+    
+    # List all items in the directory
+    try:
+        all_items = os.listdir(wct_dir)
+    except Exception as e:
+        logger.error(f"Error listing directory {wct_dir}: {e}")
         return []
     
     # Look for filter directories (numbered folders like "01", "02", etc.)
     filters = []
-    for item in os.listdir(wct_dir):
-        if os.path.isdir(os.path.join(wct_dir, item)) and item.isdigit():
+    for item in all_items:
+        item_path = os.path.join(wct_dir, item)
+        is_dir = os.path.isdir(item_path)
+        is_digit = item.isdigit()
+        
+        if is_dir and is_digit:
             filters.append(item)
     
+    logger.info(f"Found filter directories: {filters}")
     return sorted(filters)
 
 def get_movstack_directories(wct_dir, filter_dir):
@@ -115,7 +130,7 @@ def get_station_pair_directories(wct_dir, filter_dir, movstack_dir, component_di
     
     return sorted(pairs)
 
-def merge_daily_files(wct_dir, output_dir, filter_dir, movstack_dir, component_dir, pair_dir, logger):
+def merge_daily_files(wct_dir, output_dir, filter_dir, wct_dir_name, dtt_dir_name, movstack_dir, component_dir, pair_dir, logger):
     """
     Merge daily files for a specific station pair and parameter set
     
@@ -127,6 +142,10 @@ def merge_daily_files(wct_dir, output_dir, filter_dir, movstack_dir, component_d
         Path to the output directory
     filter_dir : str
         Name of the filter directory
+    wct_dir_name : str
+        Name of the WCT parameter directory (wct01, wct02, etc.)
+    dtt_dir_name : str
+        Name of the DTT parameter directory (dtt01, dtt02, etc.)
     movstack_dir : str
         Name of the moving stack directory
     component_dir : str
@@ -141,8 +160,11 @@ def merge_daily_files(wct_dir, output_dir, filter_dir, movstack_dir, component_d
     bool
         True if successful, False otherwise
     """
-    full_path = os.path.join(wct_dir, filter_dir, movstack_dir, component_dir, pair_dir)
+    # Build the full path using the complete directory structure
+    full_path = os.path.join(wct_dir, filter_dir, wct_dir_name, dtt_dir_name, movstack_dir, component_dir, pair_dir)
     station1, station2 = parse_pair_name(pair_dir)
+    
+    logger.debug(f'full_path: {full_path}')
     
     # Find all date files (*.npz)
     files = glob.glob(os.path.join(full_path, "*.npz"))
@@ -151,7 +173,19 @@ def merge_daily_files(wct_dir, output_dir, filter_dir, movstack_dir, component_d
         logger.warning(f"No .npz files found in {full_path}")
         return False
     
-    logger.info(f"Found {len(files)} files for filter {filter_dir}, movstack {movstack_dir}, component {component_dir}, pair {pair_dir}")
+    logger.info(f"Found {len(files)} files for filter {filter_dir}, wct {wct_dir_name}, dtt {dtt_dir_name}, movstack {movstack_dir}, component {component_dir}, pair {pair_dir}")
+    
+    # Extract numeric IDs from directory names
+    try:
+        # Extract wctid from wct_dir_name (e.g., "wct01" -> 1)
+        wctid = int(wct_dir_name.replace('wct', ''))
+        # Extract dttid from dtt_dir_name (e.g., "dtt01" -> 1) 
+        dttid = int(dtt_dir_name.replace('dtt', ''))
+        # Extract filterid from filter_dir
+        filterid = int(filter_dir)
+    except ValueError as e:
+        logger.error(f"Error extracting numeric IDs from directory names: {e}")
+        return False
     
     # Initialize lists to store data
     dates = []
@@ -160,7 +194,6 @@ def merge_daily_files(wct_dir, output_dir, filter_dir, movstack_dir, component_d
     coh_values = []
     
     # Pre-define variables that will be used later
-    filterid = int(filter_dir)
     component = component_dir
     taxis = None
     
@@ -242,17 +275,7 @@ def merge_daily_files(wct_dir, output_dir, filter_dir, movstack_dir, component_d
                     logger.warning(f"No taxis found in {file}, will use default")
                     taxis = np.linspace(-120, 120, 241)  # Default taxis
                     
-                # Override metadata if available in the file
-                if 'filterid' in data:
-                    try:
-                        filterid_val = data['filterid']
-                        if isinstance(filterid_val, np.ndarray) and filterid_val.size == 1:
-                            filterid = int(filterid_val.item())
-                        else:
-                            filterid = int(filterid_val)
-                    except:
-                        filterid = int(filter_dir)
-                        
+                # Override component if available in the file
                 if 'component' in data:
                     try:
                         component_val = data['component']
@@ -268,7 +291,7 @@ def merge_daily_files(wct_dir, output_dir, filter_dir, movstack_dir, component_d
             continue
     
     if not dates or len(dates) != len(dvv_values):
-        logger.warning(f"No valid data found or data mismatch for {pair_dir} - {component_dir} f{filter_dir} m{movstack_dir}")
+        logger.warning(f"No valid data found or data mismatch for {pair_dir} - {component_dir} f{filter_dir} w{wct_dir_name} d{dtt_dir_name} m{movstack_dir}")
         return False
     
     # Get frequencies from the first file
@@ -337,79 +360,118 @@ def merge_daily_files(wct_dir, output_dir, filter_dir, movstack_dir, component_d
     else:
         mov_stack = (movstack_dir, movstack_dir)
     
-    # Use api xr_save_wct function
+    # Use MSNoise API function with correct parameters
     try:
-        logger.info(f"Attempting to save using xr_save_wct function")
-        xr_save_wct2(station1, station2, component, filterid, mov_stack, taxis, dvv_df, err_df, coh_df, output_dir=output_dir)
-        logger.info(f"Successfully saved WCT data using xr_save_wct for {pair_dir}")
+        logger.info(f"Saving using xr_save_wct_dtt2 function with parameters:")
+        logger.info(f"  station1={station1}, station2={station2}")
+        logger.info(f"  component={component}, filterid={filterid}")
+        logger.info(f"  wctid={wctid}, dttid={dttid}")
+        logger.info(f"  mov_stack={mov_stack}")
+        logger.info(f"  taxis shape: {taxis.shape if taxis is not None else 'None'}")
+        logger.info(f"  dvv_df shape: {dvv_df.shape}")
+        logger.info(f"  err_df shape: {err_df.shape}")
+        logger.info(f"  coh_df shape: {coh_df.shape}")
+        
+        xr_save_wct_dtt2(station1, station2, component, filterid, wctid, dttid, 
+                         mov_stack, taxis, dvv_df, err_df, coh_df)
+        
+        logger.info(f"Successfully saved WCT data using xr_save_wct_dtt2 for {pair_dir}")
         return True
         
     except Exception as e:
-        logger.error(f"Error with xr_save_wct: {str(e)}")
-        logger.info("Attempting fallback to direct netCDF save")
+        logger.error(f"Error with xr_save_wct_dtt2: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         
-        # Fallback to direct xarray save if MSNoise function fails
+        # Since the API function failed, let's use the direct approach which works
+        logger.info("Using direct netCDF save approach")
+        
         try:
-            # Create output directory matching the input hierarchy
-            output_subdir = os.path.join(output_dir, filter_dir, movstack_dir, component_dir)
-            os.makedirs(output_subdir, exist_ok=True)
-            
-            # Create xarray dataset
-            coords = {
-                'time': dvv_df.index,
-                'freq': freqs
-            }
-            
-            attrs = {
-                'station1': station1,
-                'station2': station2,
-                'component': component,
-                'filterid': filterid,
-                'mov_stack': movstack_dir,
-                'created': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'merged_from': f"{len(filtered_dates)} daily files"
-            }
-            
-            dvv_da = xr.DataArray(
-                dvv_df.values,
-                dims=['time', 'freq'],
-                coords=coords,
-                name='dvv'
+            # Create output directory matching the MSNoise API structure
+            # Based on the API function, it should create: DVV/WCT/DTT/f{filterid:02d}/wct{wctid:02d}/dtt{dttid:02d}/{mov_stack[0]}_{mov_stack[1]}/{components}/{station1}_{station2}.nc
+            output_path = os.path.join(
+                "DVV/WCT/DTT", f"f{filterid:02d}", f"wct{wctid:02d}", f"dtt{dttid:02d}",
+                f"{mov_stack[0]}_{mov_stack[1]}", component,
+                f"{station1}_{station2}.nc"
             )
             
-            err_da = xr.DataArray(
-                err_df.values,
-                dims=['time', 'freq'],
-                coords=coords,
-                name='err'
-            )
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
-            coh_da = xr.DataArray(
-                coh_df.values,
-                dims=['time', 'freq'],
-                coords=coords,
-                name='coh'
-            )
-            
-            ds = xr.Dataset(
-                {'dvv': dvv_da, 'err': err_da, 'coh': coh_da},
-                attrs=attrs
-            )
-            
-            # Save to file - use the same station pair name for the output file
-            filename = f"{pair_dir}.nc"
-            output_path = os.path.join(output_subdir, filename)
-            
+            # Convert DataFrames to xarray.DataArrays (matching the API function approach)
+            dvv_da = xr.DataArray(dvv_df.values, coords=[dvv_df.index, dvv_df.columns], dims=['times', 'frequency'])
+            err_da = xr.DataArray(err_df.values, coords=[err_df.index, err_df.columns], dims=['times', 'frequency'])
+            coh_da = xr.DataArray(coh_df.values, coords=[coh_df.index, coh_df.columns], dims=['times', 'frequency'])
+
+            # Combine into a single xarray.Dataset (matching the API function)
+            ds = xr.Dataset({
+                'dvv': dvv_da,
+                'err': err_da,
+                'coh': coh_da
+            })
+
+            # Save directly without using the problematic API functions
             ds.to_netcdf(output_path)
-            logger.info(f"Saved merged file using fallback method: {output_path}")
+            logger.info(f"Successfully saved WCT data directly to: {output_path}")
             return True
             
         except Exception as e2:
-            logger.error(f"Error with fallback save method: {str(e2)}")
-            logger.debug(traceback.format_exc())
+            logger.error(f"Error with direct save method: {str(e2)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return False
 
-def main(wct_dir='WCT', output_dir='WCT_MERGED', loglevel="INFO", num_processes=1, use_tqdm=False):
+def get_wct_directories(wct_dir, filter_dir):
+    """Get list of WCT parameter directories (wct01, wct02, etc.)"""
+    path = os.path.join(wct_dir, filter_dir)
+    wct_dirs = []
+    for item in os.listdir(path):
+        if os.path.isdir(os.path.join(path, item)) and item.startswith('wct'):
+            wct_dirs.append(item)
+    return sorted(wct_dirs)
+
+def get_dtt_directories(wct_dir, filter_dir, wct_dir_name):
+    """Get list of DTT parameter directories (dtt01, dtt02, etc.)"""
+    path = os.path.join(wct_dir, filter_dir, wct_dir_name)
+    dtt_dirs = []
+    for item in os.listdir(path):
+        if os.path.isdir(os.path.join(path, item)) and item.startswith('dtt'):
+            dtt_dirs.append(item)
+    return sorted(dtt_dirs)
+
+def create_merge_key(filter_dir, wct_dir_name, dtt_dir_name, movstack_dir, component_dir, pair_dir):
+    """Create a unique key for a merge operation"""
+    return f"{filter_dir}|{wct_dir_name}|{dtt_dir_name}|{movstack_dir}|{component_dir}|{pair_dir}"
+
+def get_movstack_directories(wct_dir, filter_dir, wct_dir_name, dtt_dir_name):
+    """Get list of moving stack directories for a filter, wct, and dtt combination"""
+    path = os.path.join(wct_dir, filter_dir, wct_dir_name, dtt_dir_name)
+    movstacks = []
+    for item in os.listdir(path):
+        if os.path.isdir(os.path.join(path, item)):
+            movstacks.append(item)
+    
+    return sorted(movstacks)
+
+def get_component_directories(wct_dir, filter_dir, wct_dir_name, dtt_dir_name, movstack_dir):
+    """Get list of component directories for a filter, wct, dtt, and moving stack"""
+    path = os.path.join(wct_dir, filter_dir, wct_dir_name, dtt_dir_name, movstack_dir)
+    components = []
+    for item in os.listdir(path):
+        if os.path.isdir(os.path.join(path, item)):
+            components.append(item)
+    
+    return sorted(components)
+
+def get_station_pair_directories(wct_dir, filter_dir, wct_dir_name, dtt_dir_name, movstack_dir, component_dir):
+    """Get list of station pair directories"""
+    path = os.path.join(wct_dir, filter_dir, wct_dir_name, dtt_dir_name, movstack_dir, component_dir)
+    pairs = []
+    for item in os.listdir(path):
+        if os.path.isdir(os.path.join(path, item)) and '_' in item:
+            pairs.append(item)
+    
+    return sorted(pairs)
+    
+def main(wct_dir='DVV/WCT/WCT', output_dir='DVV/WCT/WCT_MERGED', loglevel="INFO", num_processes=1, use_tqdm=False):
     """
     Main function to merge all daily WCT files
     
@@ -453,20 +515,35 @@ def main(wct_dir='WCT', output_dir='WCT_MERGED', loglevel="INFO", num_processes=
         total_combinations = 0
         for filter_dir in filters:
             try:
-                movstacks = get_movstack_directories(wct_dir, filter_dir)
-                for movstack_dir in movstacks:
+                # Get WCT parameter directories (wct01, wct02, etc.)
+                wct_dirs = get_wct_directories(wct_dir, filter_dir)
+                for wct_dir_name in wct_dirs:
                     try:
-                        components = get_component_directories(wct_dir, filter_dir, movstack_dir)
-                        for component_dir in components:
+                        # Get DTT parameter directories (dtt01, dtt02, etc.)
+                        dtt_dirs = get_dtt_directories(wct_dir, filter_dir, wct_dir_name)
+                        for dtt_dir_name in dtt_dirs:
                             try:
-                                pairs = get_station_pair_directories(wct_dir, filter_dir, movstack_dir, component_dir)
-                                total_combinations += len(pairs)
+                                # Get moving stack directories
+                                movstacks = get_movstack_directories(wct_dir, filter_dir, wct_dir_name, dtt_dir_name)
+                                for movstack_dir in movstacks:
+                                    try:
+                                        # Get component directories
+                                        components = get_component_directories(wct_dir, filter_dir, wct_dir_name, dtt_dir_name, movstack_dir)
+                                        for component_dir in components:
+                                            try:
+                                                # Get station pair directories
+                                                pairs = get_station_pair_directories(wct_dir, filter_dir, wct_dir_name, dtt_dir_name, movstack_dir, component_dir)
+                                                total_combinations += len(pairs)
+                                            except Exception as e:
+                                                logger.warning(f"Error accessing pairs in {filter_dir}/{wct_dir_name}/{dtt_dir_name}/{movstack_dir}/{component_dir}: {e}")
+                                    except Exception as e:
+                                        logger.warning(f"Error accessing components in {filter_dir}/{wct_dir_name}/{dtt_dir_name}/{movstack_dir}: {e}")
                             except Exception as e:
-                                logger.warning(f"Error accessing pairs in {filter_dir}/{movstack_dir}/{component_dir}: {e}")
+                                logger.warning(f"Error accessing movstacks in {filter_dir}/{wct_dir_name}/{dtt_dir_name}: {e}")
                     except Exception as e:
-                        logger.warning(f"Error accessing components in {filter_dir}/{movstack_dir}: {e}")
+                        logger.warning(f"Error accessing DTT dirs in {filter_dir}/{wct_dir_name}: {e}")
             except Exception as e:
-                logger.warning(f"Error accessing movstacks in {filter_dir}: {e}")
+                logger.warning(f"Error accessing WCT dirs in {filter_dir}: {e}")
         
         logger.info(f"Total combinations to process: {total_combinations}")
         
@@ -486,56 +563,75 @@ def main(wct_dir='WCT', output_dir='WCT_MERGED', loglevel="INFO", num_processes=
         for filter_dir in filters:
             logger.info(f"Processing filter: {filter_dir}")
             
-            try:
-                # Get moving stack directories
-                movstacks = get_movstack_directories(wct_dir, filter_dir)
-                for movstack_dir in movstacks:
-                    logger.info(f"Processing movstack: {movstack_dir}")
+            try:                
+                # Get WCT parameter directories
+                wct_dirs = get_wct_directories(wct_dir, filter_dir)
+                for wct_dir_name in wct_dirs:
+                    logger.info(f"Processing WCT params: {wct_dir_name}")
                     
                     try:
-                        # Get component directories
-                        components = get_component_directories(wct_dir, filter_dir, movstack_dir)
-                        for component_dir in components:
-                            logger.info(f"Processing component: {component_dir}")
+                        # Get DTT parameter directories
+                        dtt_dirs = get_dtt_directories(wct_dir, filter_dir, wct_dir_name)
+                        for dtt_dir_name in dtt_dirs:
+                            logger.info(f"Processing DTT params: {dtt_dir_name}")
                             
                             try:
-                                # Get station pair directories
-                                pairs = get_station_pair_directories(wct_dir, filter_dir, movstack_dir, component_dir)
-                                for pair_dir in pairs:
-                                    processed += 1
+                                # Get moving stack directories
+                                movstacks = get_movstack_directories(wct_dir, filter_dir, wct_dir_name, dtt_dir_name)
+                                for movstack_dir in movstacks:
+                                    logger.info(f"Processing movstack: {movstack_dir}")
                                     
-                                    # Check if this merge was already completed
-                                    merge_key = create_merge_key(filter_dir, movstack_dir, component_dir, pair_dir)
-                                    
-                                    if merge_key in completed_merges:
-                                        logger.debug(f"Skipping already completed merge: {merge_key}")
-                                        skipped_count += 1
+                                    try:
+                                        # Get component directories
+                                        components = get_component_directories(wct_dir, filter_dir, wct_dir_name, dtt_dir_name, movstack_dir)
+                                        for component_dir in components:
+                                            logger.info(f"Processing component: {component_dir}")
+                                            
+                                            try:
+                                                # Get station pair directories
+                                                pairs = get_station_pair_directories(wct_dir, filter_dir, wct_dir_name, dtt_dir_name, movstack_dir, component_dir)
+                                                for pair_dir in pairs:
+                                                    processed += 1
+                                                    
+                                                    # Check if this merge was already completed
+                                                    merge_key = create_merge_key(filter_dir, wct_dir_name, dtt_dir_name, movstack_dir, component_dir, pair_dir)
+                                                    
+                                                    if merge_key in completed_merges:
+                                                        logger.debug(f"Skipping already completed merge: {merge_key}")
+                                                        skipped_count += 1
+                                                        continue
+                                                    
+                                                    logger.info(f"Merging files for filter {filter_dir}, WCT {wct_dir_name}, DTT {dtt_dir_name}, movstack {movstack_dir}, component {component_dir}, pair {pair_dir} ({processed}/{total_combinations})")
+                                                    
+                                                    result = merge_daily_files(
+                                                        wct_dir, output_dir, filter_dir, wct_dir_name, dtt_dir_name,
+                                                        movstack_dir, component_dir, pair_dir, logger
+                                                    )
+                                                    
+                                                    if result:
+                                                        merged_count += 1
+                                                        # Log the completed merge
+                                                        save_completed_merge(log_file, merge_key)
+                                                        logger.info(f"Completed merge {merged_count}: {merge_key}")
+                                                    else:
+                                                        failed_count += 1
+                                                        logger.warning(f"Failed to merge: {merge_key}")
+                                            except Exception as e:
+                                                logger.error(f"Error processing pairs in {filter_dir}/{wct_dir_name}/{dtt_dir_name}/{movstack_dir}/{component_dir}: {e}")
+                                                continue
+                                    except Exception as e:
+                                        logger.error(f"Error processing components in {filter_dir}/{wct_dir_name}/{dtt_dir_name}/{movstack_dir}: {e}")
                                         continue
-                                    
-                                    logger.info(f"Merging files for filter {filter_dir}, movstack {movstack_dir}, component {component_dir}, pair {pair_dir} ({processed}/{total_combinations})")
-                                    
-                                    result = merge_daily_files(
-                                        wct_dir, output_dir, filter_dir, 
-                                        movstack_dir, component_dir, pair_dir, logger
-                                    )
-                                    
-                                    if result:
-                                        merged_count += 1
-                                        # Log the completed merge
-                                        save_completed_merge(log_file, merge_key)
-                                        logger.info(f"Completed merge {merged_count}: {merge_key}")
-                                    else:
-                                        failed_count += 1
-                                        logger.warning(f"Failed to merge: {merge_key}")
                             except Exception as e:
-                                logger.error(f"Error processing pairs in {filter_dir}/{movstack_dir}/{component_dir}: {e}")
+                                logger.error(f"Error processing movstacks in {filter_dir}/{wct_dir_name}/{dtt_dir_name}: {e}")
                                 continue
                     except Exception as e:
-                        logger.error(f"Error processing components in {filter_dir}/{movstack_dir}: {e}")
+                        logger.error(f"Error processing DTT dirs in {filter_dir}/{wct_dir_name}: {e}")
                         continue
             except Exception as e:
-                logger.error(f"Error processing movstacks in {filter_dir}: {e}")
+                logger.error(f"Error processing WCT dirs in {filter_dir}: {e}")
                 continue
+        
         
         # Calculate summary statistics
         elapsed = datetime.datetime.now() - start_time
