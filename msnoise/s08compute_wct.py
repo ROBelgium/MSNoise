@@ -674,20 +674,9 @@ def process_wct_job(pair, day, params, taxis, filters, wct_params_dict, distance
         
     logger.info(f"Processing Pair: {pair}, Day: {day} for {len(filters)} filters, {len(components_to_compute)} components and {len(params.mov_stack)} moving windows")
         
-    # Extract parameters
-    #ns = params.wct_ns
-    #nt = params.wct_nt 
-    #vpo = params.wct_vpo 
-    #nptsfreq = params.wct_nptsfreq
-    #coda_cycles = params.dtt_codacycles 
-    #min_nonzero = params.dvv_min_nonzero
-    #wct_norm = params.wct_norm
-    #wavelet_type = params.wavelet_type
-    
+    # Extract parameters   
     mov_stacks = params.mov_stack
     goal_sampling_rate = params.cc_sampling_rate
-    #maxdt = params.dtt_maxdt
-    #mincoh = params.dtt_mincoh
 
     # Convert date string to datetime
     try:
@@ -725,7 +714,7 @@ def process_wct_job(pair, day, params, taxis, filters, wct_params_dict, distance
                 vpo = getattr(params, 'wct_vpo', 20)
                 nptsfreq = getattr(params, 'wct_nptsfreq', 300)
                 wct_norm = getattr(params, 'wct_norm', "Y")
-                wavelet_type = getattr(params, 'wavelet_type', "('Morlet',6.)")
+                wavelet_type = eval(getattr(params, 'wavelet_type', "('Morlet',6.)"))
                 
                 # Use DTT parameters for processing
                 coda_cycles = dtt_params['wct_codacycles']
@@ -801,7 +790,7 @@ def process_wct_job(pair, day, params, taxis, filters, wct_params_dict, distance
                             WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi = xwt(
                                 ori_waveform, new_waveform, goal_sampling_rate, 
                                 int(ns), float(nt), int(vpo), 
-                                freqmin, freqmax, int(nptsfreq), wavelet_type, maxdt
+                                freqmin, freqmax, int(nptsfreq), wavelet_type
                             )
                             
                             # Compute dv/v values
@@ -844,7 +833,7 @@ def process_wct_job(pair, day, params, taxis, filters, wct_params_dict, distance
 
 def claim_available_jobs(db, batch_size=5, max_attempts=3):
     """
-    Claims a batch of available jobs - SIMPLE VERSION
+    Claims a batch of available jobs
     """
     import time
     from datetime import datetime
@@ -865,8 +854,20 @@ def claim_available_jobs(db, batch_size=5, max_attempts=3):
                 else:
                     return []
             
-            # Get job IDs
-            job_ids = [job.ref for job in available_jobs]
+            # Extract job data BEFORE updating (while session is active)
+            job_data_list = []
+            job_ids = []
+            
+            for job in available_jobs:
+                job_data = {
+                    'ref': job.ref,
+                    'pair': job.pair,
+                    'day': job.day,
+                    'jobtype': job.jobtype,
+                    'flag': job.flag
+                }
+                job_data_list.append(job_data)
+                job_ids.append(job.ref)
             
             # Use ORM update - much simpler and more reliable
             updated_count = db.query(Job).filter(
@@ -880,8 +881,8 @@ def claim_available_jobs(db, batch_size=5, max_attempts=3):
             db.commit()
             
             if updated_count > 0:
-                # Return the updated jobs
-                return available_jobs[:updated_count]
+                # Return the job data as dictionaries (not ORM objects)
+                return job_data_list[:updated_count]
             else:
                 if attempt < max_attempts - 1:
                     time.sleep(1 * (attempt + 1))
@@ -1012,8 +1013,8 @@ def main(loglevel="INFO", batch_size=5):
                 
             # Process each job in the batch
             for job in jobs:
-                pair = job.pair
-                day = job.day
+                pair = job['pair']
+                day = job['day']
 
                 # Process this job
                 success = process_wct_job(pair, day, params, taxis, filter_dicts, wct_params, distances_cache)
