@@ -1247,39 +1247,42 @@ def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
         from ..plots.dtt import main
     main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile, loglevel=loglevel)
 
-@dvv_plot.command(name="wct")
+@dvv_plot.command(name="wct",
+                 context_settings=dict(ignore_unknown_options=True, ))
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
-@click.option('-p', '--pair', default=None, help='Plot a specific pair',
-              multiple=True)
+@click.option('-w', '--wctid', default=1, help='WCT parameter ID')
+@click.option('-d', '--dttid', default=1, help='DTT parameter ID')
+@click.option('-p', '--pair', default=None, help='Plot a specific pair', multiple=True)
 @click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
-@click.option('-e', '--end', default="2100-01-01", help='Plot until which date? (default=2100-01-01 or enddate)')
-@click.option('-b', '--begin',default="1970-01-01",  help="Plot from which date, can be relative to the endate ("
-                                                          "'-100'days)?(default=1970-01-01 or startdate)")
-@click.option('-v', '--visualize',default="dvv",  help="Which plot : wavelet 'dvv' heat map, wavelet 'coh'erence heat "
-                                                       "map, dv/v 'curve' with coherence color?", type=str)
-@click.option('-r', '--ranges',default="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]",  help="With visualize = 'curve', which "
-                                                                                   "frequency ranges to use?", type=str)
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
-                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
-              default=None, type=str)
+@click.option('-e', '--end', default="2100-01-01", help='Plot until which date?')
+@click.option('-b', '--begin', default="1970-01-01", help="Plot from which date?")
+@click.option('-v', '--visualize', default="dvv", help="Which plot type?", type=str)
+@click.option('-r', '--ranges', default="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]", help="Frequency ranges?", type=str)
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)', default=None, type=str)
 @click.pass_context
-def dvv_plot_wct(ctx, mov_stack, comp, filterid, pair, all, begin, end, visualize,ranges, show,  outfile):
-    """Plots the dv/v (parses the wct results)
-    Individual pairs can be plotted extra using the -p flag one or more times.
-    Example: msnoise plot dvv -p ID_KWUI_ID_POSI
-    Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
-    Remember to order stations alphabetically !
-    """
+def dvv_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, pair, all, begin, end, 
+                 visualize, ranges, show, outfile):
+    """Plots the dv/v from WCT results"""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from wct_dvv import main # NOQA
+        from wct_dvv2 import main
     else:
-        from ..plots.wct_dvv import main
-    main(mov_stack, comp, filterid, pair, all, begin, end, visualize, ranges, show, outfile, loglevel=loglevel)
+        from ..plots.wct_dvv2 import main
+    
+    # Convert parameters to match function signature
+    pairs = list(pair) if pair else []
+    showALL = all
+    start = begin
+    components = comp
+    mov_stackid = mov_stack
+    
+    main(mov_stackid=mov_stackid, components=components, filterid=filterid, 
+         wctid=wctid, dttid=dttid, pairs=pairs, showALL=showALL, 
+         start=start, end=end, visualize=visualize, ranges=ranges, 
+         show=show, outfile=outfile, loglevel=loglevel)
 
 @dvv_plot.command(name="dvvs")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
