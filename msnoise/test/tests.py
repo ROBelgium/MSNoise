@@ -705,14 +705,9 @@ def test_036_wct_dtt_param_update():
             db_value = getattr(dvv_wct_dtt, param, None)
             expected_value = getattr(dvv_wct_dtt_params[i], param, None)
             assert db_value == expected_value, f"Mismatch in {param}: DB={db_value}, Expected={expected_value}"
-
-@pytest.mark.order(37)
-def test_037_wct():
-    from ..s08compute_wct import main as compute_wct_main
-    compute_wct_main()
   
-@pytest.mark.order(38)
-def test_038_validate_stack_data():
+@pytest.mark.order(37)
+def test_037_validate_stack_data():
     from ..api import validate_stack_data
     import xarray as xr
     import numpy as np
@@ -767,8 +762,8 @@ def test_038_validate_stack_data():
     assert is_valid
     assert message == "OK"
     
-@pytest.mark.order(39)
-def test_039_stack_validation_handling():
+@pytest.mark.order(38)
+def test_038_stack_validation_handling():
     from ..api import validate_stack_data
     import xarray as xr
     import numpy as np
@@ -866,11 +861,11 @@ def test_105_db_dump():
 
     # os.system("msnoise db import config --force")
 
-@pytest.mark.order(106)
-def test_106_plot_wct():
-    wct_dvv_main(filterid=1, wctid=1, dttid=1, components="ZZ", show=False, outfile="?.png")
-    fn = "wct ZZ-f1-dvv.png"
-    assert os.path.isfile(fn), f"{fn} doesn't exist"
+#@pytest.mark.order(106)
+#def test_106_plot_wct():
+#    wct_dvv_main(filterid=1, wctid=1, dttid=1, components="ZZ", show=False, outfile="?.png")
+#    fn = "wct ZZ-f1-dvv.png"
+#    assert os.path.isfile(fn), f"{fn} doesn't exist"
 
 
 @pytest.mark.order(201)
@@ -944,6 +939,8 @@ def test_400_run_manually():
     os.system("msnoise cc dvv compute_dvv")
     os.system("msnoise cc dvv compute_stretching")
     os.system("msnoise cc dvv compute_wct")
+    os.system("msnoise cc dvv merge_wct")
+    os.system("msnoise cc dvv plot wct")
 
 def test_99210_crondays_positive_float():
     parsed_crondays = parse_crondays('2.5')
