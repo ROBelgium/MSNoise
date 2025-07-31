@@ -940,7 +940,7 @@ def test_400_run_manually():
     os.system("msnoise cc dvv compute_stretching")
     os.system("msnoise cc dvv compute_wct")
     os.system("msnoise cc dvv merge_wct")
-    os.system("msnoise cc dvv plot wct -o '?.png'")
+    os.system("msnoise cc dvv plot wct")
 
 def test_99210_crondays_positive_float():
     parsed_crondays = parse_crondays('2.5')
