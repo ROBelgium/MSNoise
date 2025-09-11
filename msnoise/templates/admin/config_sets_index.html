@@ -1,0 +1,154 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h2>Configuration Sets</h2>
+            <p>Manage workflow configuration sets as unified forms.</p>
+            <!-- Add Set Button -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown">
+                            <i class="fa fa-plus"></i> Add New Set <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            {% for category_key, display_name in [
+                                ('preprocess', 'Preprocessing'),
+                                ('cc', 'Cross-Correlation'),
+                                ('filter', 'Filters'),
+                                ('stack', 'Stacks'),
+                                ('mwcs', 'MWCS'),
+                                ('mwcs_dtt', 'MWCS dt/t'),
+                                ('stretching', 'Stretching'),
+                                ('wavelet', 'Wavelet'),
+                                ('wavelet_dtt', 'Wavelet dt/t'),
+                                ('qc', "QC")
+                            ] %}
+                            <li>
+                                <a href="{{ url_for('.create_set', category=category_key) }}">
+                                    {{ display_name }}
+                                </a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th width="15%">Category</th>
+                            <th width="10%">Set Number</th>
+                            <th width="15%">Parameters</th>
+                            <th width="60%">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for category_info in categories %}
+                        <tr><td colspan=4><h4>{{ category_info.display_name }}</h4></td> </tr>
+                            {% if category_info.sets %}
+                                {% for set_info in category_info.sets %}
+                                <tr>
+                                    <td>
+                                        <span class="label label-info">{{ category_info.category }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="label label-primary">#{{ set_info.set_number }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge">{{ set_info.param_count }}</span> parameters
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('.view_set', category=set_info.category, set_number=set_info.set_number) }}"
+                                               class="btn btn-default">
+                                                <i class="fa fa-eye"></i> View
+                                            </a>
+                                            <a href="{{ url_for('.edit_set', category=set_info.category, set_number=set_info.set_number) }}"
+                                               class="btn btn-primary">
+                                                <i class="fa fa-edit"></i> Edit
+                                            </a>
+                                            {% if set_info.category != "global" %}
+                                            <a href="{{ url_for('.copy_set', category=set_info.category, set_number=set_info.set_number) }}"
+                                               class="btn btn-info">
+                                                <i class="fa fa-copy"></i> Copy
+                                            </a>
+                                            <button type="button" class="btn btn-danger"
+                                                    onclick="confirmDelete('{{ set_info.category }}', {{ set_info.set_number }})">
+                                                <i class="fa fa-trash"></i> Delete
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr class="text-muted">
+                                    <td>
+                                        <span class="label label-default">{{ category_info.display_name }}</span>
+                                    </td>
+                                    <td colspan="3">
+                                        <em>No configuration sets found</em>
+                                        <a href="{{ url_for('.create_set', category=category_info.category) }}"
+                                           class="btn btn-xs btn-success">
+                                            <i class="fa fa-plus"></i> Create first set
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+
+
+        </div>
+    </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <h4 class="modal-title" id="deleteModalLabel">Confirm Delete</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete configuration set <strong id="deleteSetInfo"></strong>?</p>
+                <p class="text-danger">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                <form id="deleteForm" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block tail %}
+{{ super() }}
+<script>
+function confirmDelete(category, setNumber) {
+    // Set the text in the modal
+    document.getElementById('deleteSetInfo').textContent = category + ' #' + setNumber;
+
+    // Set the form action URL
+    var deleteForm = document.getElementById('deleteForm');
+    deleteForm.action = "{{ url_for('.delete_set', category='PLACEHOLDER_CATEGORY', set_number=999) }}"
+        .replace('PLACEHOLDER_CATEGORY', encodeURIComponent(category))
+        .replace('999', setNumber);
+
+    // Show the modal
+    $('#deleteModal').modal('show');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">
+                        Copy Configuration Set: {{ category }} #{{ set_number }}
+                    </h3>
+                </div>
+                
+                <form method="POST">
+                    <div class="panel-body">
+                        <div class="form-group">
+                            <label for="new_category">New Category:</label>
+                            <input type="text" class="form-control" name="new_category" 
+                                   value="{{ category }}" required>
+                            <p class="help-block">Category name for the copied configuration set</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="new_set_number">New Set Number:</label>
+                            <input type="number" class="form-control" name="new_set_number" 
+                                   value="{{ set_number + 1 }}" min="1" required>
+                            <p class="help-block">Set number for the copied configuration</p>
+                        </div>
+                    </div>
+                    
+                    <div class="panel-footer">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa fa-copy"></i> Copy Configuration Set
+                        </button>
+                        <a href="{{ url_for('.index') }}" class="btn btn-default">
+                            <i class="fa fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

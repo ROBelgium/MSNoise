@@ -1,0 +1,8 @@
+name,default,definition,type,possible_values
+stretching_minlag,5.0,Minimum lag time,float,
+stretching_width,30.0,Width of the time lag window,float,
+stretching_lag,static,How the lag window is defined for stretching,str,static/dynamic
+stretching_v,1.0,What velocity to use to avoid ballistic waves,float,
+stretching_sides,both,Which sides to use,str,both/left/right
+stretching_max,0.5,Maximum stretching coefficient,float,
+stretching_nsteps,1000,Number of stretching steps,int,

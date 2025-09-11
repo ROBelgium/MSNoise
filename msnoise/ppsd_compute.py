@@ -70,10 +70,10 @@ import numpy as np
 import datetime
 from obspy.core import UTCDateTime, read, Stream
 from obspy.signal import PPSD
+from obspy.core import AttribDict
 
 
-
-from .api import to_sds, get_logger, preload_instrument_responses
+from .api import to_sds, get_logger, preload_instrument_responses, is_next_job_for_step, get_next_job_for_step, get_config_set_details
 
 import logbook
 
@@ -92,23 +92,29 @@ def main(loglevel="INFO", njobs_per_worker=9999):
     logger.debug('Preloading all instrument response')
     responses = preload_instrument_responses(db, return_format="inventory")
 
-    params = get_params(db)
-    ppsd_components = params.qc_components
-    ppsd_length = params.qc_ppsd_length
-    ppsd_overlap = params.qc_ppsd_overlap
-    ppsd_period_smoothing_width_octaves = params.qc_ppsd_period_smoothing_width_octaves
-    ppsd_period_step_octaves = params.qc_ppsd_period_step_octaves
-    ppsd_period_limits = params.qc_ppsd_period_limits
-    ppsd_db_bins = params.qc_ppsd_db_bins
+    orig_params = get_params(db)
 
-    while is_next_job(db, jobtype='PSD'):
+    while is_next_job_for_step(db, step_category="qc"):
         logger.info("Getting the next job")
-        jobs = get_next_job(db, jobtype='PSD', limit=njobs_per_worker)
-        logger.debug("I will process %i jobs" % len(jobs))
+        jobs, step = get_next_job_for_step(db, step_category="qc")
+        # print(jobs)
         if len(jobs) == 0:
             # edge case, should only occur when is_next returns true, but
             # get_next receives no jobs (heavily parallelised code)
             continue
+        logger.debug("I will process %i jobs" % len(jobs))
+        step_config = get_config_set_details(db, jobs[0].config_category, jobs[0].config_set_number,
+                                             format='AttribDict')
+        params = AttribDict(**orig_params, **step_config)
+        # print(step_config)
+        ppsd_components = params.qc_components
+        ppsd_length = params.qc_ppsd_length
+        ppsd_overlap = params.qc_ppsd_overlap
+        ppsd_period_smoothing_width_octaves = params.qc_ppsd_period_smoothing_width_octaves
+        ppsd_period_step_octaves = params.qc_ppsd_period_step_octaves
+        ppsd_period_limits = params.qc_ppsd_period_limits
+        ppsd_db_bins = params.qc_ppsd_db_bins
+
         for job in jobs:
             net, sta, loc = job.pair.split('.')
             logger.debug("Processing %s"% job.pair)
@@ -176,10 +182,10 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                     os.makedirs(os.path.split(pngout)[0])
 
                 ppsd.save_npz(npzdout + ".npz")
-                update_job(db, job.day, job.pair, 'PSD', 'D', ref=job.ref)
-                if not params.hpc:
-                    for job in jobs:
-                        update_job(db, job.day, job.pair, 'PSD2HDF', 'T')
+                update_job(db, job.day, job.pair, job.jobtype, 'D', ref=job.ref)
+                # if not params.hpc:
+                #     for job in jobs:
+                #         update_job(db, job.day, job.pair, 'PSD2HDF', 'T')
                 try:
                     ppsd.plot(pngout + ".png")
                 except:
