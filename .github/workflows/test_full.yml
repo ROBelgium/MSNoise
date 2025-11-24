@@ -42,7 +42,7 @@ jobs:
             prefix: C:\Miniconda3\envs\test
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       # Modern approach for output variables - use GITHUB_OUTPUT file
       - name: Get current date
@@ -101,7 +101,7 @@ jobs:
       !contains(github.event.head_commit.message, '+ONLYDOCS') &&
       !contains(github.event.head_commit.message, '+NOFULLTEST')
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: conda-incubator/setup-miniconda@v3.2.0
         with:
