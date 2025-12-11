@@ -1,0 +1,90 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="page-header">
+                <h2>
+                    Edit Configuration Set: 
+                    <span class="label label-info">{{ category }}</span> 
+                    #{{ set_number }}
+                </h2>
+                <p class="help-block">
+                    Configure all parameters for this workflow set in a single form.
+                </p>
+            </div>
+            
+            <form method="POST" class="form-horizontal">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h3 class="panel-title">Configuration Parameters</h3>
+                    </div>
+                    <div class="panel-body">
+                        {% for config in configs %}
+                        {% set field_name = 'param_' + config.ref|string %}
+                        {% set field = form[field_name] %}
+                        
+                        <div class="form-group {% if field.errors %}has-error{% endif %}">
+                            <label class="col-sm-3 control-label" for="{{ field.id }}">
+                                {{ field.label.text }}
+                                {% if config.param_type != 'str' %}
+                                <small class="text-muted">({{ config.param_type }})</small>
+                                {% endif %}
+                            </label>
+                            <div class="col-sm-6">
+                                {% if config.param_type == 'bool' %}
+                                    <div class="checkbox">
+                                        <label>
+                                            {{ field(class="form-control") }} {{ field.label.text }}
+                                        </label>
+                                    </div>
+                                {% elif field.__class__.__name__ == 'SelectField' %}
+                                    {{ field(class="form-control") }}
+                                {% elif field.__class__.__name__ == 'TextAreaField' %}
+                                    {{ field(class="form-control", rows="3") }}
+                                {% else %}
+                                    {{ field(class="form-control") }}
+                                {% endif %}
+                                
+                                {% if field.errors %}
+                                    {% for error in field.errors %}
+                                    <span class="help-block">{{ error }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                                
+                                {% if field.description %}
+                                <p class="help-block">{{ field.description }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="col-sm-3">
+                                {% if config.default_value %}
+                                <small class="text-muted">Default: {{ config.default_value }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="panel-footer">
+                        <div class="row">
+                            <div class="col-sm-offset-3 col-sm-9">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa fa-save"></i> Save Configuration
+                                </button>
+                                <a href="{{ url_for('.index') }}" class="btn btn-default">
+                                    <i class="fa fa-arrow-left"></i> Back to List
+                                </a>
+                                <a href="{{ url_for('.copy_set', category=category, set_number=set_number) }}" 
+                                   class="btn btn-info">
+                                    <i class="fa fa-copy"></i> Copy Set
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

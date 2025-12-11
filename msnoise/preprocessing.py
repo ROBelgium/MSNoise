@@ -229,8 +229,8 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                 stream = stream.split()
                 logger.debug("%s Checking sampling rate" % stream[0].id)
                 for tr in stream:
-                    if tr.stats.sampling_rate < (params.goal_sampling_rate-1):
-                        logger.warning("Trace has a lower sampling rate than the goal_sampling_rate, removing!")
+                    if tr.stats.sampling_rate < (params.cc_sampling_rate-1):
+                        logger.warning("Trace has a lower sampling rate than the cc_sampling_rate, removing!")
                         stream.remove(tr)
                 taper_length = params.preprocess_taper_length  # seconds
                 for trace in stream:
@@ -252,23 +252,23 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                         "%s Highpass at %.2f Hz" % (trace.id, params.preprocess_highpass))
                     trace.filter("highpass", freq=params.preprocess_highpass, zerophase=True, corners=4)
 
-                    if trace.stats.sampling_rate != params.goal_sampling_rate:
+                    if trace.stats.sampling_rate != params.cc_sampling_rate:
                         logger.debug(
                             "%s Lowpass at %.2f Hz" % (trace.id, params.preprocess_lowpass))
                         trace.filter("lowpass", freq=params.preprocess_lowpass, zerophase=True, corners=8)
 
                         if params.resampling_method == "Resample":
                             logger.debug("%s Downsample to %.1f Hz" %
-                                          (trace.id, params.goal_sampling_rate))
+                                          (trace.id, params.cc_sampling_rate))
                             trace.data = resample(
-                                trace.data, params.goal_sampling_rate / trace.stats.sampling_rate, 'sinc_fastest')
+                                trace.data, params.cc_sampling_rate / trace.stats.sampling_rate, 'sinc_fastest')
 
                         elif params.resampling_method == "Decimate":
-                            decimation_factor = trace.stats.sampling_rate / params.goal_sampling_rate
+                            decimation_factor = trace.stats.sampling_rate / params.cc_sampling_rate
                             if not int(decimation_factor) == decimation_factor:
                                 logger.warning("%s CANNOT be decimated by an integer factor, consider using Resample or Lanczos methods"
                                                 " Trace sampling rate = %i ; Desired CC sampling rate = %i" %
-                                                (trace.id, trace.stats.sampling_rate, params.goal_sampling_rate))
+                                                (trace.id, trace.stats.sampling_rate, params.cc_sampling_rate))
                                 sys.stdout.flush()
                                 sys.exit()
                             logger.debug("%s Decimate by a factor of %i" %
@@ -277,11 +277,11 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
 
                         elif params.resampling_method == "Lanczos":
                             logger.debug("%s Downsample to %.1f Hz" %
-                                          (trace.id, params.goal_sampling_rate))
+                                          (trace.id, params.cc_sampling_rate))
                             trace.data = np.array(trace.data)
-                            trace.interpolate(method="lanczos", sampling_rate=params.goal_sampling_rate, a=1.0)
+                            trace.interpolate(method="lanczos", sampling_rate=params.cc_sampling_rate, a=1.0)
 
-                        trace.stats.sampling_rate = params.goal_sampling_rate
+                        trace.stats.sampling_rate = params.cc_sampling_rate
                     del trace
 
                 if params.remove_response:

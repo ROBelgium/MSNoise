@@ -1,0 +1,12 @@
+name,default,definition,type,possible_values
+wct_dtt_freqmin,,The lower frequency bound to compute the dv/v from the WCT,float,
+wct_dtt_freqmax,,The upper frequency bound to compute the dv/v from the WCT,float,
+wct_minlag,,Minimum lag time,float,
+wct_width,,Width of the time lag window,float,
+wct_lag,,How is the lag window defined for WCT,str,static/dynamic
+wct_v,,Velocity parameter used for dynamic lag calculation,float,
+wct_sides,,Which sides to use,str,both/left/right
+wct_mincoh,,Minimum coherence on dt measurement,float,
+wct_maxdt,,Maximum dt values,float,
+wct_codacycles,,Number of cycles of period,int,
+wct_min_nonzero,,Percentage of data points with non-zero weighting,float,

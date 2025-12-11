@@ -1,0 +1,91 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="page-header">
+                <h2>
+                    View Configuration Set:
+                    <span class="label label-info">{{ category }}</span>
+                    #{{ set_number }}
+                </h2>
+                <p class="help-block">
+                    Read-only view of all parameters for this workflow configuration set.
+                </p>
+            </div>
+
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">
+                        <i class="fa fa-cog"></i> Configuration Parameters
+                        <span class="badge pull-right">{{ configs|length }} parameters</span>
+                    </h3>
+                </div>
+                <div class="panel-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                            <tr>
+                                <th width="20%">Parameter</th>
+                                <th width="15%">Current Value</th>
+                                <th width="15%">Default Value</th>
+                                <th width="10%">Type</th>
+                                <th width="40%">Description</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for config in configs %}
+                            <tr>
+                                <td>
+                                    <strong>{{ config.name }}</strong>
+                                    {% if config.possible_values %}
+                                    <br><small class="text-muted">Options: {{ config.possible_values }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                        <span class="label label-{% if config.value == config.default_value %}default{% else %}success{% endif %}">
+                                            {{ config.value or '(empty)' }}
+                                        </span>
+                                </td>
+                                <td>
+                                        <span class="text-muted">
+                                            {{ config.default_value or '(none)' }}
+                                        </span>
+                                </td>
+                                <td>
+                                    <span class="label label-info">{{ config.param_type }}</span>
+                                </td>
+                                <td>
+                                    <small>{{ config.description or 'No description available' }}</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="panel-footer">
+                    <div class="btn-group">
+                        <a href="{{ url_for('.edit_set', category=category, set_number=set_number) }}"
+                           class="btn btn-primary">
+                            <i class="fa fa-edit"></i> Edit This Set
+                        </a>
+                        <a href="{{ url_for('.copy_set', category=category, set_number=set_number) }}"
+                           class="btn btn-info">
+                            <i class="fa fa-copy"></i> Copy This Set
+                        </a>
+                    </div>
+                    <div class="btn-group pull-right">
+                        <a href="{{ url_for('.index') }}" class="btn btn-default">
+                            <i class="fa fa-arrow-left"></i> Back to List
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

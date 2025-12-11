@@ -98,7 +98,7 @@ def main(loglevel="INFO"):
             tmp = os.path.split(di)
             sta = tmp[1]
             net = os.path.split(tmp[0])[1]
-            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
+            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM']
         del datalist
     elif data_structure in ["BUD", ]:
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*",)))
@@ -107,7 +107,7 @@ def main(loglevel="INFO"):
             tmp = os.path.split(di)
             sta = tmp[1]
             net = os.path.split(tmp[0])[1]
-            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
+            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM']
         del datalist
     elif data_structure in ["PDF", ]:
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*",)))
@@ -116,7 +116,7 @@ def main(loglevel="INFO"):
             tmp = os.path.split(di)
             sta = tmp[1]
             net = get_config(db, 'network')
-            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM','N/A']
+            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM']
         del datalist
     else:
         logger.warning("Can't parse the archive for format %s !" % data_structure)
@@ -132,14 +132,13 @@ def main(loglevel="INFO"):
 
     db = connect()
     for s in stationdict.keys() :
-        net,sta,lon,lat,alt,coordinates,instype=stationdict[s]
+        net,sta,lon,lat,alt,coordinates=stationdict[s]
         logging.info('Adding:', net, sta)
         X = float(lon)
         Y = float(lat)
         altitude = float(alt)
-        instrument = str(instype)
         update_station(db, net=net, sta=sta, X=X, Y=Y, altitude=altitude,
-                       coordinates=coordinates, instrument=instrument)
+                       coordinates=coordinates)
 
     return True
 

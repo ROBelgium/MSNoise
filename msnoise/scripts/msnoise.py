@@ -18,6 +18,8 @@ __version__ = get_git_version(dirty=True)
 
 from .. import MSNoiseError, DBConfigNotFoundError
 from ..api import connect, get_config, update_station, get_logger, get_job_types
+from ..api import delete_config_set, list_config_sets, get_config_set_details
+
 from ..msnoise_table_def import DataAvailability
 
 
@@ -618,6 +620,382 @@ def config_reset(names):
         db.close()
         click.echo("Successfully reset parameter %s = %s" % (key, default_value))
 
+@config.command()
+@click.argument('set_name')
+@click.pass_context
+def create_set(ctx, set_name):
+    """Create a configuration set for a workflow step.
+
+    SET_NAME: Name of the workflow step (e.g., mwcs, mwcs_dtt, etc.)
+    """
+    from ..api import connect, create_config_set
+
+    db = connect()
+
+    set_number = create_config_set(db, set_name)
+    if set_number is not None:
+        click.echo(f"Configuration set '{set_name}' created successfully with set_number: {set_number}")
+    else:
+        click.echo(f"Error: Configuration file for '{set_name}' not found.")
+
+    db.close()
+
+
+@config.command()
+@click.argument('set_name')
+@click.argument('set_number', type=int)
+@click.option('--confirm', is_flag=True,
+              help='Skip confirmation prompt')
+def delete_set(set_name, set_number, confirm):
+    """Delete a configuration set.
+
+    SET_NAME: The category name (e.g., mwcs, mwcs_dtt)
+    SET_NUMBER: The set number to delete
+    """
+    session = connect()
+
+    try:
+        # Show details of what will be deleted
+        details = get_config_set_details(session, set_name, set_number)
+
+        if not details:
+            click.echo(f"Config set '{set_name}' set_number {set_number} not found.")
+            return
+
+        click.echo(f"Config set '{set_name}' set_number {set_number} contains {len(details)} entries:")
+        for detail in details:
+            click.echo(f"  - {detail['name']}: {detail['value']}")
+
+        if not confirm:
+            if not click.confirm(f"\nAre you sure you want to delete this config set?"):
+                click.echo("Deletion cancelled.")
+                return
+
+        # Perform deletion
+        if delete_config_set(session, set_name, set_number):
+            click.echo(f"✓ Successfully deleted config set '{set_name}' set_number {set_number}")
+        else:
+            click.echo(f"✗ Failed to delete config set '{set_name}' set_number {set_number}")
+
+    except Exception as e:
+        click.echo(f"Error: {str(e)}")
+    finally:
+        session.close()
+
+
+@config.command()
+@click.option('--category', '-c', help='Filter by category name')
+def list_sets(category):
+    """List all configuration sets."""
+    session = connect()
+
+    try:
+        sets = list_config_sets(session, category)
+
+        if not sets:
+            if category:
+                click.echo(f"No config sets found for category '{category}'")
+            else:
+                click.echo("No config sets found")
+            return
+
+        click.echo("Configuration Sets:")
+        click.echo("=" * 60)
+        click.echo(f"{'Category':<20} {'Set #':<8} {'Entries':<8}")
+        click.echo("-" * 60)
+
+        for cat, set_num, count in sets:
+            click.echo(f"{cat:<20} {set_num:<8} {count:<8}")
+
+    except Exception as e:
+        click.echo(f"Error: {str(e)}")
+    finally:
+        session.close()
+
+
+@config.command()
+@click.argument('set_name')
+@click.argument('set_number', type=int)
+def show_set(set_name, set_number):
+    """Show details of a configuration set.
+
+    SET_NAME: The category name (e.g., mwcs, mwcs_dtt)
+    SET_NUMBER: The set number to show
+    """
+    session = connect()
+
+    try:
+        details = get_config_set_details(session, set_name, set_number)
+
+        if not details:
+            click.echo(f"Config set '{set_name}' set_number {set_number} not found.")
+            return
+
+        click.echo(f"Config Set: {set_name} #{set_number}")
+        click.echo("=" * 60)
+
+        for detail in details:
+            click.echo(f"Name: {detail['name']}")
+            click.echo(f"Value: {detail['value']}")
+            if detail['description']:
+                click.echo(f"Description: {detail['description']}")
+            click.echo("-" * 40)
+
+    except Exception as e:
+        click.echo(f"Error: {str(e)}")
+    finally:
+        session.close()
+
+
+@config.command()
+@click.argument('old_set_name')
+@click.argument('old_set_number', type=int)
+@click.argument('new_set_name')
+@click.argument('new_set_number', type=int)
+def copy_set(old_set_name, old_set_number, new_set_name, new_set_number):
+    """Copy a configuration set to a new set.
+
+    Useful for creating variations of existing configurations.
+    """
+    session = connect()
+
+    try:
+        from .msnoise_table_def import Config
+
+        # Get source config set
+        source_configs = session.query(Config).filter(
+            Config.category == old_set_name,
+            Config.set_number == old_set_number
+        ).all()
+
+        if not source_configs:
+            click.echo(f"Source config set '{old_set_name}' set_number {old_set_number} not found.")
+            return
+
+        # Check if destination already exists
+        existing = session.query(Config).filter(
+            Config.category == new_set_name,
+            Config.set_number == new_set_number
+        ).first()
+
+        if existing:
+            if not click.confirm(f"Config set '{new_set_name}' set_number {new_set_number} already exists. Overwrite?"):
+                click.echo("Copy cancelled.")
+                return
+
+            # Delete existing entries
+            delete_config_set(session, new_set_name, new_set_number)
+
+        # Copy configs
+        for config in source_configs:
+            new_config = Config(
+                name=config.name,
+                category=new_set_name,
+                set_number=new_set_number,
+                value=config.value,
+                param_type=config.param_type,
+                default_value=config.default_value,
+                description=config.description,
+                units=config.units,
+                possible_values=config.possible_values,
+                used_in=config.used_in,
+                used=config.used
+            )
+            session.add(new_config)
+
+        session.commit()
+        click.echo(f"✓ Successfully copied {len(source_configs)} config entries from "
+                   f"'{old_set_name}' #{old_set_number} to '{new_set_name}' #{new_set_number}")
+
+    except Exception as e:
+        session.rollback()
+        click.echo(f"Error: {str(e)}")
+    finally:
+        session.close()
+
+@config.command()
+@click.option('--force', is_flag=True,
+              help='Force creation even if config sets already exist')
+@click.option('--dry-run', is_flag=True,
+              help='Show what would be created without actually creating it')
+def create_all_sets(force, dry_run):
+    """Create one configuration set for each workflow category.
+
+    This command creates a complete set of workflow configurations for each category.
+    """
+
+    categories = [
+        # 'global',
+        'qc',
+        'preprocess',
+        'cc',
+        'filter',
+        'stack',
+        'mwcs',
+        'mwcs_dtt',
+        'stretching',
+        'wavelet',
+        'wavelet_dtt',
+    ]
+
+    from ..api import connect, create_config_set
+
+    db = connect()
+    for set_name in categories:
+        set_number = create_config_set(db, set_name)
+        if set_number is not None:
+            click.echo(f"Configuration set '{set_name}' created successfully with set_number: {set_number}")
+        else:
+            click.echo(f"Error: Configuration file for '{set_name}' not found.")
+
+    db.close()
+
+@config.command()
+@click.option('--workflow', default='default', help='Workflow ID')
+@click.pass_context
+def create_workflow_step(ctx, workflow):
+    """Create a new workflow step interactively"""
+    from ..api import create_workflow_step
+
+    session = ctx.obj['session']
+
+    step_name = click.prompt('Step name')
+    category = click.prompt('Category (preprocess, cc, filter, stack, etc.)')
+    set_number = click.prompt('Set number', type=int)
+    description = click.prompt('Description (optional)', default='')
+
+    try:
+        step = create_workflow_step(session, step_name, category, set_number, workflow, description)
+        click.echo(f'Created workflow step: {step.step_name} ({step.category}:{step.set_number})')
+    except Exception as e:
+        click.echo(f'Error: {str(e)}', err=True)
+
+@config.command()
+@click.option('--workflow-id', '-w', default='default',
+              help='Workflow ID to create steps for (default: "default")')
+@click.option('--verbose', '-v', is_flag=True, help='Show detailed output')
+def create_workflow_steps_from_configs(workflow_id, verbose):
+    """Create workflow steps automatically from all existing config sets.
+lsniose
+    This command scans all configuration sets in the database and creates
+    corresponding workflow steps, sorted by natural workflow order.
+    """
+    from ..api import connect, create_workflow_steps_from_config_sets
+
+    if verbose:
+        click.echo(f"Creating workflow steps for workflow: {workflow_id}")
+
+    try:
+        db = connect()
+        created_count, existing_count, error_message = create_workflow_steps_from_config_sets(
+            db, workflow_id
+        )
+
+        if error_message:
+            click.echo(f"Error creating workflow steps: {error_message}", err=True)
+            return 1
+
+        if created_count > 0:
+            click.echo(f"✓ Created {created_count} workflow steps from config sets", color='green')
+
+        if existing_count > 0:
+            click.echo(f"ℹ {existing_count} workflow steps already existed", color='yellow')
+
+        if created_count == 0 and existing_count == 0:
+            click.echo("⚠ No config sets found to create workflow steps from", color='yellow')
+
+        if verbose and (created_count > 0 or existing_count > 0):
+            click.echo(f"Total workflow steps processed: {created_count + existing_count}")
+
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        return 1
+
+    return 0
+
+@config.command()
+@click.option('--workflow', default='default', help='Workflow ID')
+@click.pass_context
+def list_workflow_steps(ctx, workflow):
+    """List all workflow steps"""
+    from ..api import connect, get_workflow_steps
+
+    session = connect()
+    steps = get_workflow_steps(session, workflow)
+    session.close()
+
+    if not steps:
+        click.echo(f'No workflow steps found for workflow: {workflow}')
+        return
+
+    click.echo(f'Workflow steps for "{workflow}":')
+    for step in steps:
+        click.echo(f'  {step.step_id}: {step.step_name} ({step.category}:{step.set_number})')
+
+@config.command()
+@click.option('--workflow', default='default', help='Workflow ID')
+@click.pass_context
+def show_workflow_graph(ctx, workflow):
+    """Show workflow graph"""
+    from ..api import connect, get_workflow_graph
+
+    session = connect()
+    graph = get_workflow_graph(session, workflow)
+
+    click.echo(f'Workflow "{workflow}" graph:')
+    click.echo('\nNodes:')
+    for node in graph['nodes']:
+        click.echo(f'  {node["id"]}: {node["name"]} ({node["category"]}:{node["set_number"]})')
+
+    click.echo('\nEdges:')
+    for edge in graph['edges']:
+        click.echo(f'  {edge["from"]} -> {edge["to"]} ({edge["type"]})')
+
+@config.command()
+@click.option('--workflow-id', '-w', default='default',
+              help='Workflow ID to create links for (default: "default")')
+@click.option('--verbose', '-v', is_flag=True, help='Show detailed output')
+def create_workflow_links(workflow_id, verbose):
+    """Create workflow links automatically between existing workflow steps.
+
+    This command creates links between workflow steps following the natural
+    workflow progression: preprocess -> cc -> filter -> stack -> mwcs/stretching/wavelet
+    -> mwcs_dtt/wavelet_dtt.
+
+    Links are created based on matching set numbers and workflow logic.
+    """
+    from ..api import connect, create_workflow_links_from_steps
+
+    if verbose:
+        click.echo(f"Creating workflow links for workflow: {workflow_id}")
+
+    try:
+        db = connect()
+        created_count, existing_count, error_message = create_workflow_links_from_steps(
+            db, workflow_id
+        )
+
+        if error_message:
+            click.echo(f"Error creating workflow links: {error_message}", err=True)
+            return 1
+
+        if created_count > 0:
+            click.echo(f"✓ Created {created_count} workflow links", color='green')
+
+        if existing_count > 0:
+            click.echo(f"ℹ {existing_count} workflow links already existed", color='yellow')
+
+        if created_count == 0 and existing_count == 0:
+            click.echo("⚠ No workflow steps found to create links between", color='yellow')
+
+        if verbose and (created_count > 0 or existing_count > 0):
+            click.echo(f"Total workflow links processed: {created_count + existing_count}")
+
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        return 1
+
+    return 0
 
 @cli.command()
 @click.argument('jobtype')
@@ -786,6 +1164,31 @@ def new_jobs(init, nocc, hpc=""):
 def cc():
     """Commands for the "Cross-Correlations" Workflow"""
     pass
+
+
+@cc.command()
+@click.option('--threads', default=1, help='Number of threads to use for processing')
+@click.option('-v', '--verbose', count=True, help='Increase verbosity')
+@click.pass_context
+def preprocess(ctx, threads, verbose):
+    """Run preprocessing computations on workflow jobs"""
+    from ..step_preprocessing import main
+
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    if threads == 1:
+        main(loglevel=loglevel)
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main, kwargs={"loglevel": loglevel})
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
 
 
 @cc.command(name='compute_cc')
@@ -1551,6 +1954,7 @@ def utils_test(prefix, tech, content):
 def utils_jupyter():
     """Launches an jupyter notebook in the current folder"""
     os.system("jupyter notebook --ip 0.0.0.0 --no-browser")
+
 
 
 
