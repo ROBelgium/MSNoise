@@ -26,7 +26,7 @@ jobs:
       !contains(github.event.head_commit.message, '+NOFULLTEST')
     strategy:
       matrix:
-        python-version: ['3.11', '3.12']
+        python-version: ['3.12', '3.13']
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - os: ubuntu-latest
@@ -105,14 +105,14 @@ jobs:
 
       - uses: conda-incubator/setup-miniconda@v3.2.0
         with:
-          activate-environment: test3.12
-          python-version: '3.12'
+          activate-environment: test3.13
+          python-version: '3.13'
           conda-remove-defaults: true
 
       - name: Install MSNoise
         shell: bash -l {0}
         run: |
-          conda env update -n test3.12 -f .github/environment.yml
+          conda env update -n test3.13 -f .github/environment.yml
           pip install -e .
 
       - name: Test 3C data
