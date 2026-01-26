@@ -36,12 +36,112 @@ should be run after the ``msnoise compute_cc`` step in order to create the
 ``STACK`` jobs.
 """
 
+import datetime
+
 from .api import *
 import pandas as pd
 
 
 import logbook
 logger = logbook.Logger(__name__)
+
+def create_passthrough_jobs_from_done_parent(session, parent_step, child_step, workflow_id="default"):
+    """
+    DONE parent_step jobs -> TODO child_step jobs, preserving (day, pair).
+
+    This is the "HPC passthrough" rule used from CC downstream in your setup.
+    """
+    from .msnoise_table_def import declare_tables
+
+    schema = declare_tables()
+    Job = schema.Job
+
+    now = datetime.datetime.utcnow()
+    created = 0
+
+    done_parent_jobs = (
+        session.query(Job)
+        .filter(Job.workflow_id == workflow_id)
+        .filter(Job.step_id == parent_step.step_id)
+        .filter(Job.flag == "D")
+        .all()
+    )
+
+    for pj in done_parent_jobs:
+        # Dedupe: do not create if it already exists
+        exists = (
+            session.query(Job.ref)
+            .filter(Job.workflow_id == workflow_id)
+            .filter(Job.step_id == child_step.step_id)
+            .filter(Job.day == pj.day)
+            .filter(Job.pair == pj.pair)
+            .first()
+        )
+        if exists:
+            continue
+
+        session.add(
+            Job(
+                day=pj.day,
+                pair=pj.pair,
+                flag="T",
+                workflow_id=workflow_id,
+                step_id=child_step.step_id,
+                jobtype=child_step.step_name,  # legacy compatibility
+                priority=getattr(child_step, "priority", 0) or 0,
+                lastmod=now,
+            )
+        )
+        created += 1
+
+    return created
+
+def propagate_first_runnable_from_category(session, source_category, workflow_id="default", skip_categories=None):
+    """
+    For each WorkflowStep in `source_category`:
+      - find first runnable steps per branch (skipping categories like "filter")
+      - create passthrough jobs for those runnable steps from DONE parent jobs
+
+    Returns total number of created jobs.
+    """
+    if skip_categories is None:
+        skip_categories = {"filter"}
+
+    from .msnoise_table_def import declare_tables
+    from .api import get_workflow_steps, get_first_runnable_steps_per_branch
+
+    schema = declare_tables()
+    WorkflowStep = schema.WorkflowStep
+
+    parent_steps = (
+        session.query(WorkflowStep)
+        .filter(WorkflowStep.workflow_id == workflow_id)
+        .filter(WorkflowStep.category == source_category)
+        .filter(WorkflowStep.is_active == True)
+        .all()
+    )
+
+    total_created = 0
+
+    for parent_step in parent_steps:
+        runnable_children = get_first_runnable_steps_per_branch(
+            session,
+            source_step_id=parent_step.step_id,
+            workflow_id=workflow_id,
+            skip_categories=skip_categories,
+        )
+
+        for child_step in runnable_children:
+            total_created += create_passthrough_jobs_from_done_parent(
+                session=session,
+                parent_step=parent_step,
+                child_step=child_step,
+                workflow_id=workflow_id,
+            )
+
+    session.commit()
+    return total_created
+
 
 def create_cc_jobs_from_preprocess(session, workflow_id="default"):
     """
@@ -183,11 +283,36 @@ def create_station_pairs(stations):
     return pairs
 
 
-def main(init=False, nocc=False):
+def main(init=False, nocc=False, after=False, workflow_id="default"):
     logger.info('*** Starting: New Jobs (Workflow-aware) ***')
 
     db = connect()
     # params = get_params(db)
+
+    if after:
+        source_category = str(after).strip().lower()
+
+        # Optional validation: ensure it's a known config-set type/category
+        allowed_categories = {
+            "global", "preprocess", "qc", "cc", "filter",
+            "stack", "mwcs", "mwcs_dtt", "stretching",
+            "wavelet", "wavelet_dtt",
+        }
+        if source_category not in allowed_categories:
+            raise ValueError(
+                f"Invalid --after value '{after}'. Expected a config set type/category, "
+                f"one of: {sorted(allowed_categories)}"
+            )
+
+        created = propagate_first_runnable_from_category(
+            session=db,
+            source_category=source_category,
+            workflow_id=workflow_id,
+            skip_categories={"filter"},
+        )
+        logger.info(f"HPC propagation from category \"{source_category}\" created {created} job(s)")
+        return
+
     logger.debug("Checking plugins' entry points")
     plugins = get_config(db, "plugins")
     extra_jobtypes_scan_archive = []
