@@ -3738,6 +3738,51 @@ def get_step_successors(session, step_id):
         .filter(schema.WorkflowLink.from_step_id == step_id) \
         .filter(schema.WorkflowLink.is_active == True).all()
 
+def get_first_runnable_steps_per_branch(session, source_step_id, workflow_id="default", skip_categories=None):
+    """
+    Return the first runnable step on each outgoing branch from source_step_id,
+    skipping steps in skip_categories (default: {"filter"}).
+
+    - "Branch" roots are the immediate successors of source_step_id.
+    - If skipped nodes fan out, each fan-out is treated as a separate branch.
+    - Results are deduped (set behavior) and returned in stable order.
+    """
+    if skip_categories is None:
+        skip_categories = {"filter"}
+
+    # We dedupe by step_id, but preserve stable ordering at the end
+    result_by_step_id = {}
+
+    def immediate_successors(step_id):
+        # Reuse existing helper (one-hop)
+        return [
+            s for s in get_step_successors(session, step_id)
+            if getattr(s, "workflow_id", workflow_id) == workflow_id and getattr(s, "is_active", True)
+        ]
+
+    def descend_until_runnable(start_step):
+        # Explore forward until the first non-skipped step is found for each path
+        stack = [start_step]
+        visited = set()
+
+        while stack:
+            step = stack.pop()
+            if step.step_id in visited:
+                continue
+            visited.add(step.step_id)
+
+            if step.category not in skip_categories:
+                result_by_step_id[step.step_id] = step
+                continue  # stop this path at first runnable
+
+            for nxt in immediate_successors(step.step_id):
+                stack.append(nxt)
+
+    for succ in immediate_successors(source_step_id):
+        descend_until_runnable(succ)
+
+    return [result_by_step_id[k] for k in sorted(result_by_step_id)]
+
 def create_workflow_step(session, step_name, category, set_number, workflow_id="default", description=None):
     """Create a new workflow step"""
     from .msnoise_table_def import declare_tables

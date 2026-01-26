@@ -1135,29 +1135,27 @@ def plot_station_map(ctx, show, outfile):
                                                  'the check for existing jobs.')
 @click.option('--nocc', is_flag=True, default=False, help='Disable the creation'
                                                           ' of CC jobs.')
-@click.option('--hpc', help='Format PREVIOUS:NEXT. When running on HPC, '
-                            'create the next jobs in the workflow based on the'
-                            'previous step mentioned here. Example:'
-                            '"msnoise new_jobs --hpc CC:STACK" will create '
-                            'STACK jobs based on CC jobs marked "D"one.')
-def new_jobs(init, nocc, hpc=""):
-    """Determines if new CC/QC jobs are to be defined"""
-    if not hpc:
-        from ..s02new_jobs import main
-        main(init, nocc)
-    if hpc:
-        from ..api import connect, read_db_inifile
-        dbini = read_db_inifile()
-        prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
-        left, right = hpc.split(':')
-        db = connect()
-        db.execute(text("INSERT INTO {prefix}jobs (pair, day, jobtype, flag) "
-                   "SELECT pair, day, '{right_type}', 'T' FROM {prefix}jobs "
-                   "WHERE jobtype='{left_type}' AND flag='D';"
-                   .format(prefix=prefix, right_type=right, left_type=left)))
-        db.commit()
-        db.close()
+@click.option(
+    '--after',
+    default="",
+    help=(
+        "Create the next runnable jobs in the workflow based on DONE jobs of the given "
+        "config-set type/category (e.g. 'cc', 'stack', 'mwcs'), skipping filter steps in between. "
+        "Example: 'msnoise new_jobs --after cc' will create STACK jobs from CC jobs marked D "
+        "(via CC -> filter -> stack)."
+    ),
+)
 
+@click.option(
+    '--workflow-id', '-w',
+    default='default',
+    help='Workflow ID to use (default: "default")'
+)
+def new_jobs(init, nocc, after="", workflow_id='default'):
+    """Determines if new jobs are to be defined"""
+
+    from ..s02new_jobs import main
+    main(init, nocc, after, workflow_id)
 
 
 @cli.group(cls=OrderedGroup)
