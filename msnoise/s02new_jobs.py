@@ -45,6 +45,178 @@ import pandas as pd
 import logbook
 logger = logbook.Logger(__name__)
 
+def propagate_stack_jobs_from_cc_done(session, workflow_id="default"):
+    """
+    From DONE CC jobs, create/update TODO STACK jobs:
+      - day=<cc job day>  (normal per-day stack recompute)
+      - day="REF"         (ref export job)
+    for each reachable stack lineage whose prefix matches the CC job lineage.
+
+    Jobs created are STACK jobs (jobtype = stack_step.step_name, step_id = stack_step.step_id)
+    with lineage ending at that stack step (e.g. preprocess_1/cc_1/filter_1/stack_1).
+    """
+    from .msnoise_table_def import declare_tables
+
+    schema = declare_tables()
+    Job = schema.Job
+    WorkflowStep = schema.WorkflowStep
+
+    now = datetime.datetime.utcnow()
+    created = 0
+    bumped = 0
+
+    # Be tolerant to naming (your UI shows "STACKING")
+    cc_category_names = {"cc", "crosscorrelation", "cross-correlation"}
+    stack_category_names = {"stack", "stacking"}
+
+    cc_steps = (
+        session.query(WorkflowStep)
+        .filter(WorkflowStep.workflow_id == workflow_id)
+        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.category.in_(sorted(cc_category_names)))
+        .all()
+    )
+    stack_steps = (
+        session.query(WorkflowStep)
+        .filter(WorkflowStep.workflow_id == workflow_id)
+        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.category.in_(sorted(stack_category_names)))
+        .all()
+    )
+
+    logger.info(f"[--after cc] active cc_steps={len(cc_steps)} active stack_steps={len(stack_steps)}")
+
+    if not cc_steps:
+        logger.warning("[--after cc] No active CC steps found. Check WorkflowStep.category values.")
+        return 0
+    if not stack_steps:
+        logger.warning("[--after cc] No active STACK steps found. Check WorkflowStep.category values (stack vs stacking).")
+        return 0
+
+    def _pair_is_auto(pair_str):
+        a, b = pair_str.split(":")
+        return a == b
+
+    def _lineage_allowed_for_pair(lineage_step_names, pair_str):
+        """
+        Enforce filter step applicability (CC/AC/SC) based on pair type.
+        If no filter step exists in the lineage, allow.
+        """
+        is_auto = _pair_is_auto(pair_str)
+        is_cross = not is_auto
+
+        filter_name = None
+        for name in reversed(lineage_step_names):
+            if name.startswith("filter_"):
+                filter_name = name
+                break
+        if not filter_name:
+            return True
+
+        filt_step = (
+            session.query(WorkflowStep)
+            .filter(WorkflowStep.workflow_id == workflow_id)
+            .filter(WorkflowStep.step_name == filter_name)
+            .first()
+        )
+        if filt_step is None:
+            raise ValueError(f"Lineage references filter step '{filter_name}' which cannot be resolved")
+
+        filt_cfg = get_config_set_details(session, filt_step.category, filt_step.set_number, format="AttribDict")
+        allow_cc = bool(getattr(filt_cfg, "CC", False))
+        allow_ac = bool(getattr(filt_cfg, "AC", False))
+        allow_sc = bool(getattr(filt_cfg, "SC", False))
+
+        if is_cross:
+            return allow_cc
+        return allow_ac or allow_sc
+
+    def _upsert_job(day_value, pair_value, lineage_to_stack, stack_step):
+        nonlocal created, bumped
+
+        existing = (
+            session.query(Job)
+            .filter(Job.workflow_id == workflow_id)
+            .filter(Job.step_id == stack_step.step_id)
+            .filter(Job.jobtype == stack_step.step_name)
+            .filter(Job.day == day_value)
+            .filter(Job.pair == pair_value)
+            .filter(Job.lineage == lineage_to_stack)
+            .first()
+        )
+        if existing is not None:
+            if existing.flag != "T":
+                existing.flag = "T"
+                existing.lastmod = now
+                bumped += 1
+            return
+
+        session.add(
+            Job(
+                day=day_value,
+                pair=pair_value,
+                flag="T",
+                workflow_id=workflow_id,
+                step_id=stack_step.step_id,
+                jobtype=stack_step.step_name,
+                priority=getattr(stack_step, "priority", 0) or 0,
+                lastmod=now,
+                lineage=lineage_to_stack,
+            )
+        )
+        created += 1
+
+    # For each CC step, map DONE CC jobs to all matching stack lineages
+    for cc_step in cc_steps:
+        done_cc_jobs = (
+            session.query(Job)
+            .filter(Job.workflow_id == workflow_id)
+            .filter(Job.step_id == cc_step.step_id)
+            .filter(Job.flag == "D")
+            .all()
+        )
+        logger.info(f"[--after cc] cc_step={cc_step.step_name} done_cc_jobs={len(done_cc_jobs)}")
+        if not done_cc_jobs:
+            continue
+
+        for pj in done_cc_jobs:
+            if not pj.lineage:
+                raise ValueError("DONE CC job has empty lineage (v2 assumption)")
+
+            parent_names = [n for n in lineage_str_to_step_names(pj.lineage, sep="/") if "global" not in n]
+            if not parent_names:
+                continue
+
+            for stack_step in stack_steps:
+                # enumerate full paths to this stack step (graph truth)
+                stack_paths = get_lineages_to_step_id(session, step_id=stack_step.step_id, include_self=True)
+
+                for path in stack_paths:
+                    lin_names = [s.step_name for s in path if s.step_name and "global" not in s.step_name]
+
+                    # must match the CC job lineage prefix
+                    if len(lin_names) < len(parent_names):
+                        continue
+                    if lin_names[:len(parent_names)] != parent_names:
+                        continue
+
+                    # apply filter gating (CC/AC/SC) based on pair type
+                    if not _lineage_allowed_for_pair(lin_names, pj.pair):
+                        continue
+
+                    lineage_to_stack = "/".join(lin_names)  # ends with stack_*
+
+                    # (1) normal stack day job (same day as CC job)
+                    _upsert_job(day_value=pj.day, pair_value=pj.pair, lineage_to_stack=lineage_to_stack, stack_step=stack_step)
+
+                    # (2) REF export job
+                    _upsert_job(day_value="REF", pair_value=pj.pair, lineage_to_stack=lineage_to_stack, stack_step=stack_step)
+
+    session.commit()
+    logger.info(f"[--after cc] STACK jobs: created={created}, bumped_to_T={bumped}")
+    return created + bumped
+
+
 def create_passthrough_jobs_from_done_parent(session, parent_step, child_step, workflow_id="default"):
     """
     DONE parent_step jobs -> TODO child_step jobs, preserving (day, pair).
@@ -64,6 +236,7 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step, w
         .filter(Job.workflow_id == workflow_id)
         .filter(Job.step_id == parent_step.step_id)
         .filter(Job.flag == "D")
+        .filter(Job.day != "REF")
         .all()
     )
 
@@ -405,6 +578,14 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
                 f"Invalid --after value '{after}'. Expected a config set type/category, "
                 f"one of: {sorted(allowed_categories)}"
             )
+
+        # NEW: special propagation when --after cc
+        # Instead of a separate stack_ref step/category, we queue REF work as STACK jobs
+        # with day="REF" and the lineage ending in stack_1 (or stack_N).
+        if source_category == "cc":
+            created = propagate_stack_jobs_from_cc_done(session=db, workflow_id=workflow_id)
+            logger.info(f'Propagation from category "cc" created/updated {created} STACK job(s) (daily + REF)')
+            return
 
         created = propagate_first_runnable_from_category(
             session=db,

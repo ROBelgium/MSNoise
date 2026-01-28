@@ -3163,8 +3163,8 @@ def xr_save_ccf(root, lineage, step_name, station1, station2, components, filter
         return dr
 
 
-def xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis, format="dataframe"):
-    path = os.path.join("STACKS2", "%02i" % filterid,
+def xr_get_ccf(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, format="dataframe"):
+    path = os.path.join(root, *lineage, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
 
@@ -3179,8 +3179,8 @@ def xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis, forma
         return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
 
 
-def xr_save_ref(station1, station2, components, filterid, taxis, new, overwrite=False):
-    path = os.path.join("STACKS2", "%02i" % filterid,
+def xr_save_ref(root, lineage, step_name, station1, station2, components, filterid, taxis, new, overwrite=False):
+    path = os.path.join(root, *lineage, step_name, "_output",
                         "REF", "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
     fullpath = os.path.join(path, fn)
@@ -3193,10 +3193,9 @@ def xr_save_ref(station1, station2, components, filterid, taxis, new, overwrite=
         return dr
 
 
-def xr_get_ref(station1, station2, components, filterid, taxis, ignore_network=False):
-    path = os.path.join("STACKS2", "%02i" % filterid,
+def xr_get_ref(root, lineage, step_name, station1, station2, components, filterid, taxis, ignore_network=False):
+    path = os.path.join(root, *lineage, "_output",
                         "REF", "%s" % components)
-
     # If ignore_network is True, strip the network code from the station names
     if ignore_network:
         s1_parts = station1.split('.')
@@ -3220,14 +3219,15 @@ def xr_get_ref(station1, station2, components, filterid, taxis, ignore_network=F
     return data.CCF.to_dataframe()
 
 
-def xr_save_mwcs2(station1, station2, components, filterid, mwcsid, mov_stack, taxis, dataframe):
-    fn = os.path.join("DVV/MWCS/MWCS", "f%02i" % filterid, "mwcs%02i" % mwcsid,
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s" % components,
-                      "%s_%s.nc" % (station1, station2))
+def xr_save_mwcs2(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, dataframe):
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                        "%s_%s" % (mov_stack[0], mov_stack[1]),
+                       "%s" % components,
+                       "%s_%s.nc" % (station1, station2))
+
     if not os.path.isdir(os.path.split(fn)[0]):
         os.makedirs(os.path.split(fn)[0], exist_ok=True)
-    d = dataframe.stack(future_stack=True).stack(future_stack=True)
+    d = dataframe.stack().stack()
     d.index = d.index.set_names(["times", "keys", "taxis"])
     d = d.reorder_levels(["times", "taxis", "keys"])
     d.columns = ["MWCS"]
@@ -4485,28 +4485,53 @@ def get_next_job_for_step(
     schema = declare_tables()
     Job = schema.Job
     WorkflowStep = schema.WorkflowStep
-
-    next_job = (
-        session.query(Job, WorkflowStep)
-        .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name)
-        .filter(WorkflowStep.category == step_category)
-        .filter(Job.flag == flag)
-        .filter(Job.workflow_id == workflow_id)
-        .order_by(Job.priority.desc(), Job.lastmod)
-        .first()
-    )
+    IS_REF = False
+    if step_category == "stack_ref":
+        IS_REF = True
+        step_category = "stack"
+        next_job = (
+            session.query(Job, WorkflowStep)
+            .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name)
+            .filter(WorkflowStep.category == step_category)
+            .filter(Job.flag == flag)
+            .filter(Job.workflow_id == workflow_id)
+            .filter(Job.day == "REF")
+            .order_by(Job.priority.desc(), Job.lastmod)
+            .first()
+        )
+    else:
+        next_job = (
+            session.query(Job, WorkflowStep)
+            .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name)
+            .filter(WorkflowStep.category == step_category)
+            .filter(Job.flag == flag)
+            .filter(Job.workflow_id == workflow_id)
+            .filter(Job.day != "REF")
+            .order_by(Job.priority.desc(), Job.lastmod)
+            .first()
+        )
     if not next_job:
         return [], None
 
     seed_job, step = next_job
-
-    batch_q = (
-        session.query(Job)
-        .filter(Job.workflow_id == workflow_id)
-        .filter(Job.step_id == step.step_id)
-        .filter(Job.jobtype == seed_job.jobtype)
-        .filter(Job.flag == flag)
-    )
+    if IS_REF:
+        batch_q = (
+            session.query(Job)
+            .filter(Job.workflow_id == workflow_id)
+            .filter(Job.step_id == step.step_id)
+            .filter(Job.jobtype == seed_job.jobtype)
+            .filter(Job.day == "REF")
+            .filter(Job.flag == flag)
+        )
+    else:
+        batch_q = (
+            session.query(Job)
+            .filter(Job.workflow_id == workflow_id)
+            .filter(Job.step_id == step.step_id)
+            .filter(Job.jobtype == seed_job.jobtype)
+            .filter(Job.day != "REF")
+            .filter(Job.flag == flag)
+        )
 
     if group_by == "day":
         batch_q = batch_q.filter(Job.day == seed_job.day)
@@ -4529,13 +4554,24 @@ def get_next_job_for_step(
     if not jobs:
         return [], step
 
-    upd = (
-        update(Job)
-        .where(Job.workflow_id == workflow_id)
-        .where(Job.step_id == step.step_id)
-        .where(Job.jobtype == seed_job.jobtype)
-        .where(Job.flag == flag)
-    )
+    if IS_REF:
+        upd = (
+            update(Job)
+            .where(Job.workflow_id == workflow_id)
+            .where(Job.step_id == step.step_id)
+            .where(Job.jobtype == seed_job.jobtype)
+            .where(Job.day == "REF")
+            .where(Job.flag == flag)
+        )
+    else:
+        upd = (
+            update(Job)
+            .where(Job.workflow_id == workflow_id)
+            .where(Job.step_id == step.step_id)
+            .where(Job.jobtype == seed_job.jobtype)
+            .where(Job.day != "REF")
+            .where(Job.flag == flag)
+        )
 
     if group_by == "day":
         upd = upd.where(Job.day == seed_job.day)
@@ -4578,13 +4614,24 @@ def is_next_job_for_step(session, workflow_id="default", step_category="preproce
     schema = declare_tables()
     Job = schema.Job
     WorkflowStep = schema.WorkflowStep
-
-    job = session.query(Job) \
-        .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name) \
-        .filter(WorkflowStep.category == step_category) \
-        .filter(Job.flag == flag) \
-        .filter(Job.workflow_id == workflow_id) \
-        .first()
+    IS_REF = False
+    if step_category == "stack_ref":
+        IS_REF = True
+        step_category = "stack"
+        job = session.query(Job) \
+            .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name) \
+            .filter(WorkflowStep.category == step_category) \
+            .filter(Job.flag == flag) \
+            .filter(Job.workflow_id == workflow_id)\
+            .filter(Job.day == "REF").first()
+    else:
+        job = session.query(Job) \
+            .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name) \
+            .filter(WorkflowStep.category == step_category) \
+            .filter(Job.flag == flag) \
+            .filter(Job.workflow_id == workflow_id) \
+            .filter(Job.day != "REF")\
+            .first()
 
     if job is None:
         return False
