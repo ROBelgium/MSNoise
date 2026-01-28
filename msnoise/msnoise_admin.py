@@ -57,6 +57,11 @@ schema = declare_tables()
 # Logger
 logger = get_logger('msnoise.admin', loglevel="INFO")
 
+@app.route("/")
+def root_redirect_to_admin():
+    # Flask-Admin index lives at /admin/ (note trailing slash)
+    return redirect("/admin/", code=302)
+
 @app.route('/admin/job-stats')
 def job_stats():
     """API endpoint for job statistics"""
