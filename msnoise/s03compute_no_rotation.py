@@ -212,7 +212,7 @@ import scipy.fft as sf
 from scipy.fft import next_fast_len
 from obspy.signal.filter import bandpass
 from obspy import read
-from obspy.core import AttribDict
+from obspy.core import AttribDict, Stream
 
 import logbook
 
@@ -312,26 +312,22 @@ def main(loglevel="INFO"):
         print(filter_steps)
         filters = []
         for filter in filter_steps:
-            filters.append(get_config_set_details(db, filter.category, filter.set_number, format='AttribDict'))
+            print(filter.step_name)
+            filters.append([filter.step_name, get_config_set_details(db, filter.category, filter.set_number, format='AttribDict')])
         print(filters)
-
         logger.info("New CC Job: %s (%i pairs with %i stations)" %
                      (goal_day, len(pairs), len(stations)))
         jt = time.time()
 
-        # comps = []
-        # #TODO check if comp is 3, 4 or else?
-        # for comp in params.all_components:
-        #     comps.append(comp[0])
-        #     comps.append(comp[1])
-        #
-
         #TODO LOOP OVER PREPROCESS STEP SETS
         current_process = get_step_predecessors(db, step.step_id)[0]
+        preprocess_filename = os.path.join(params.output_folder, current_process.step_name, "_output", "%s.mseed" % goal_day)
+        stream = read(preprocess_filename)
 
-
-        stream = read(r"PREPROCESSED\%s\%s.mseed" % (current_process.step_name, goal_day))
-
+        # Filter the stream for only necessary net.sta.loc
+        allowed = {tuple(s.split(".")) for s in stations}  # (net, sta, loc)
+        stream = Stream(tr for tr in stream
+                        if (tr.stats.network, tr.stats.station, tr.stats.location) in allowed)
         # TODO PREPROCESS IF THE "PREPROCESS_ON_THE_FLY" config?
         # comps = np.unique(comps)
         # with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
@@ -451,8 +447,8 @@ def main(loglevel="INFO"):
             tmptime = tmp[0].stats.endtime.datetime
             thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
 
-            for filterid, filter in enumerate(filters):
-                logger.debug("Processing filter %i" % filterid)
+            for filter_name, filter in filters:
+                logger.debug("Processing filter %s" % filter_name)
                 print(filter)
 
                 # Standard operator for CC
@@ -574,7 +570,7 @@ def main(loglevel="INFO"):
                         exit(1)
 
                     for key in corr:
-                        ccfid = key + "_%02i" % filterid + "_" + thisdate
+                        ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
                         logger.debug("CCF ID: %s" % ccfid)
                         if ccfid not in allcorr:
                             allcorr[ccfid] = {}
@@ -606,7 +602,7 @@ def main(loglevel="INFO"):
                                        normalized=params.cc_normalisation)
                         
                         for key in corr:
-                            ccfid = key + "_%02i" % filterid + "_" + thisdate
+                            ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
                             logger.debug("CCF ID - CC: %s" % ccfid)
                             if ccfid not in allcorr:
                                 allcorr[ccfid] = {}
@@ -643,7 +639,7 @@ def main(loglevel="INFO"):
                                        normalized=params.cc_normalisation)
 
                         for key in corr:
-                            ccfid = key + "_%02i" % filterid + "_" + thisdate
+                            ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
                             logger.debug("CCF ID - SC: %s" % ccfid)
                             if ccfid not in allcorr:
                                 allcorr[ccfid] = {}
@@ -656,14 +652,24 @@ def main(loglevel="INFO"):
             del psds
 
         if params.keep_all:
+            # Root folder for "all windows" output:
+            cc_all_base = os.path.join(
+                current_process.step_name,  # e.g. "preprocess_1"
+                step.step_name,  # e.g. "cc1"
+            )
             for ccfid in allcorr.keys():
-                export_allcorr2(db, ccfid, allcorr[ccfid])
+                export_allcorr2(db, ccfid, allcorr[ccfid], base_folder=cc_all_base, params=params)
 
         if params.keep_days:
+            # Root folder for "daily stacks" output:
+            cc_daily_base = os.path.join(
+                current_process.step_name,  # e.g. "preprocess_1"
+                step.step_name,  # e.g. "cc1"
+            )
             for ccfid in allcorr.keys():
                 logging.debug("Exporting %s" % ccfid)
-                station1, station2, components, filterid, date = \
-                    ccfid.split('_')
+                station1, station2, components, filter_name, date = \
+                    ccfid.split('+')
 
                 corrs = np.asarray(list(allcorr[ccfid].values()))
                 if not len(corrs):
@@ -677,12 +683,13 @@ def main(loglevel="INFO"):
                 thisdate = goal_day
                 thistime = "0_0"
                 add_corr(
-                    db, station1, station2, int(filterid),
+                    db, station1, station2, filter_name,
                     thisdate, thistime, params.corr_duration,
                     components, corr,
                     params.cc_sampling_rate, day=True,
                     ncorr=corrs.shape[0],
-                    params=params)
+                    params=params,
+                    base_folder=cc_daily_base)
 
         # THIS SHOULD BE IN THE API
         massive_update_job(db, jobs, "D")

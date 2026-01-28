@@ -1919,12 +1919,27 @@ def export_allcorr(session, ccfid, data):
     return
 
 
-def export_allcorr2(session, ccfid, data):
-    output_folder = get_config(session, 'output_folder')
-    station1, station2, components, filterid, date = ccfid.split('_')
+def export_allcorr2(session, ccfid, data, base_folder=None, params=None):
+    if base_folder is None:
+        # Legacy behaviour:
+        output_folder = get_config(session, 'output_folder')
+        base_folder = output_folder
+    else:
+        # If params.output_folder is an absolute project root you want to respect,
+        # you can anchor relative base_folder under it:
+        if params is not None and hasattr(params, "output_folder") and not os.path.isabs(base_folder):
+            base_folder = os.path.join(params.output_folder, base_folder)
 
-    path = os.path.join(output_folder, "%02i" % int(filterid),
-                        station1, station2, components)
+    station1, station2, components, filterid, date = ccfid.split('+')
+
+    path = os.path.join(
+        base_folder,
+        filterid,
+        '_output',
+        'all',
+        components,
+        station1, station2
+    )
     if not os.path.isdir(path):
         os.makedirs(path, exist_ok=True)
 
@@ -1936,7 +1951,7 @@ def export_allcorr2(session, ccfid, data):
 
 
 def add_corr(session, station1, station2, filterid, date, time, duration,
-             components, CF, sampling_rate, day=False, ncorr=0, params=None):
+             components, CF, sampling_rate, day=False, ncorr=0, params=None, base_folder=None):
     """
     Adds a CCF to the data archive on disk.
 
@@ -1982,8 +1997,26 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
         mseed = True
 
     if day:
-        path = os.path.join("STACKS", "%02i" % filterid, "001_DAYS", components,
-                            "%s_%s" % (station1, station2), str(date))
+        if base_folder is None:
+            # Legacy behaviour:
+            path = os.path.join(
+                "STACKS", "%02i" % filterid, "001_DAYS", components,
+                          "%s_%s" % (station1, station2), str(date)
+            )
+        else:
+            # Workflow-aware behaviour:
+            if params is not None and hasattr(params, "output_folder") and not os.path.isabs(base_folder):
+                base_folder = os.path.join(params.output_folder, base_folder)
+
+            path = os.path.join(
+                base_folder,
+                filterid,
+                '_output',
+                'daily',
+                components,
+                station1, station2,
+                str(date),
+            )
         pair = "%s:%s" % (station1, station2)
         if mseed:
             export_mseed(session, path, pair, components, filterid, CF,
@@ -1994,7 +2027,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
 
     else:
         file = '%s.cc' % time
-        path = os.path.join(output_folder, "%02i" % filterid, station1,
+        path = os.path.join(output_folder, filterid, station1,
                             station2, components, date)
         if not os.path.isdir(path):
             os.makedirs(path, exist_ok=True)
@@ -2296,7 +2329,7 @@ def get_mwcs(session, station1, station2, filterid, components, date,
         return pd.DataFrame()
 
 
-def get_results_all(session, station1, station2, filterid, components, dates,
+def get_results_all(session, root, lineage_names, station1, station2, filterid, components, dates,
                     format="dataframe"):
     """
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -2317,9 +2350,8 @@ def get_results_all(session, station1, station2, filterid, components, dates,
         is the time of the CCF and the columns are the times in the coda.
     """
 
-    output_folder = get_config(session, 'output_folder')
-    path = os.path.join(output_folder, "%02i" % int(filterid),
-                        station1, station2, components)
+    path = os.path.join(root, *lineage_names, "_output", "all", components,  station1, station2)
+    print("New path with lineage!:", path)
     results = []
     for date in dates:
         if isinstance(date, str):
@@ -2330,8 +2362,10 @@ def get_results_all(session, station1, station2, filterid, components, dates,
             df = pd.read_hdf(fname, 'data', parse_dates=True)
             df.index = pd.to_datetime(df.index)
             results.append(df)
-    if len(results):
+    print(results)
+    if len(results) > 0:
         result = pd.concat(results)
+        print(result)
         del results
         if format == "dataframe":
             return result
@@ -3116,8 +3150,8 @@ def get_dvv(session, filterid, components, dates,
             print('Choose median or mean')
     return tmp3, etmp3
 
-def xr_save_ccf(station1, station2, components, filterid, mov_stack, taxis, new, overwrite=False):
-    path = os.path.join("STACKS2", "%02i" % filterid,
+def xr_save_ccf(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, new, overwrite=False):
+    path = os.path.join(root, *lineage, step_name, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
     fullpath = os.path.join(path, fn)
@@ -3727,6 +3761,62 @@ def get_step_predecessors(session, step_id):
         .join(schema.WorkflowLink, schema.WorkflowStep.step_id == schema.WorkflowLink.from_step_id) \
         .filter(schema.WorkflowLink.to_step_id == step_id) \
         .filter(schema.WorkflowLink.is_active == True).all()
+
+def get_direct_predecessors(session, step_id):
+    """
+    Alias/helper for workflow graph traversal.
+
+    Returns the direct predecessor WorkflowStep nodes for the given step_id,
+    using active WorkflowLinks only (same behavior as get_step_predecessors).
+    """
+    return get_step_predecessors(session, step_id)
+
+def get_upstream_steps_for_step_id(session, step_id, topo_order=True, include_self=False):
+    """
+    Returns all upstream WorkflowStep nodes (recursive predecessors) for `step_id`.
+
+    Parameters
+    ----------
+    session : sqlalchemy.orm.session.Session
+    step_id : int
+        The step_id of the node whose upstream lineage you want.
+    topo_order : bool
+        If True (default), returns nodes in dependency order (upstream first),
+        suitable for "merge config" application.
+        If False, returns in discovery order (still de-duplicated).
+    include_self : bool
+        If True, includes the node identified by `step_id` in the returned list.
+
+    Returns
+    -------
+    list[WorkflowStep]
+        De-duplicated list of upstream steps.
+    """
+    visited = set()
+    ordered = []
+
+    def dfs(current_step_id):
+        # Direct predecessors of the current node:
+        preds = get_step_predecessors(session, current_step_id) or []
+        for p in preds:
+            if p.step_id in visited:
+                continue
+            visited.add(p.step_id)
+            dfs(p.step_id)
+            if topo_order:
+                # post-order ensures: preprocess -> cc -> filter -> ...
+                ordered.append(p)
+            else:
+                ordered.append(p)
+
+    dfs(step_id)
+
+    if include_self:
+        self_step = session.query(WorkflowStep).filter(WorkflowStep.step_id == step_id).first()
+        if self_step is not None and self_step.step_id not in visited:
+            ordered.append(self_step)
+
+    return ordered
 
 def get_step_successors(session, step_id):
     """Get all steps that this step feeds into"""
@@ -4374,54 +4464,84 @@ def get_workflow_job_counts(db, workflow_id="default"):
 
     return result
 
-def get_next_job_for_step(session, workflow_id="default", step_category="preprocess"):
+def get_next_job_for_step(
+        session,
+        workflow_id="default",
+        step_category="preprocess",
+        group_by="day",  # was "days"
+):
     """
-    Get the next set of preprocessing jobs to process.
+    Return a claimed batch of jobs for a workflow step category.
 
-    Returns jobs for the same workflow step and day that are ready to be processed.
-    This mimics the behavior of get_next_job but for preprocessing workflow steps.
-
-    :param session: Database session
-    :param workflow_id: Workflow ID to filter by
-    :return: List of jobs sharing the same workflow step and day, or empty list
+    group_by:
+      - "day": claim all jobs for the selected (step_id, jobtype, day)
+      - "pair": claim all jobs for the selected (step_id, jobtype, pair)
     """
     from .msnoise_table_def import declare_tables
-    from sqlalchemy import update
+    from sqlalchemy import update, func
 
     schema = declare_tables()
     Job = schema.Job
     WorkflowStep = schema.WorkflowStep
 
-    # First, find the next workflow step + day combination for preprocessing
-    next_job = session.query(Job, WorkflowStep) \
-        .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name) \
-        .filter(WorkflowStep.category == step_category) \
-        .filter(Job.flag == 'T') \
-        .filter(Job.workflow_id == workflow_id) \
-        .order_by(Job.priority.desc(), Job.lastmod) \
+    # 1) Pick a "seed" job to define the batch key (and get the step metadata).
+    # Keep your ordering logic.
+    next_job = (
+        session.query(Job, WorkflowStep)
+        .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name)
+        .filter(WorkflowStep.category == step_category)
+        .filter(Job.flag == "T")
+        .filter(Job.workflow_id == workflow_id)
+        .order_by(Job.priority.desc(), Job.lastmod)
         .first()
-    print(next_job)
+    )
     if not next_job:
-        return []
+        return [], None
 
-    job, step = next_job
+    seed_job, step = next_job
 
-    # Get all jobs for the same step and day
-    jobs = session.query(Job) \
-        .filter(Job.jobtype == job.jobtype) \
-        .filter(Job.day == job.day) \
-        .filter(Job.workflow_id == workflow_id) \
-        .filter(Job.step_id == step.step_id) \
-        .filter(Job.flag == 'T') \
-        .with_for_update() \
+    # 2) Build a query for the batch rows we want to claim.
+    batch_q = (
+        session.query(Job)
+        .filter(Job.workflow_id == workflow_id)
+        .filter(Job.step_id == step.step_id)
+        .filter(Job.jobtype == seed_job.jobtype)
+        .filter(Job.flag == "T")
+    )
+
+    if group_by == "day":
+        batch_q = batch_q.filter(Job.day == seed_job.day)
+    elif group_by == "pair":
+        batch_q = batch_q.filter(Job.pair == seed_job.pair)
+    else:
+        raise ValueError(f"Unsupported group_by={group_by!r}")
+
+    # 3) Lock selected rows (best-effort; some DBs ignore/limit this).
+    # Important: locking alone does not change state; we still UPDATE below.
+    jobs = (
+        batch_q
+        .with_for_update()
         .all()
+    )
+    if not jobs:
+        return [], step
 
-    # Update job status to "I" (In Progress) before returning
-    if jobs:
-        refs = [job.ref for job in jobs]
-        q = update(Job).values({"flag": "I"}).where(Job.ref.in_(refs))
-        session.execute(q)
-        session.commit()
+    # 4) Claim the batch atomically: update rows that are STILL Todo.
+    # Use the SAME predicates, plus flag=='T' in the UPDATE.
+    upd = (
+        update(Job)
+        .where(Job.workflow_id == workflow_id)
+        .where(Job.step_id == step.step_id)
+        .where(Job.jobtype == seed_job.jobtype)
+        .where(Job.flag == "T")
+    )
+    if group_by == "day":
+        upd = upd.where(Job.day == seed_job.day)
+    else:  # "pair"
+        upd = upd.where(Job.pair == seed_job.pair)
+
+    session.execute(upd.values(flag="I"))
+    session.commit()
 
     return jobs, step
 

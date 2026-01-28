@@ -1257,6 +1257,7 @@ def cc_stack(ctx, ref, mov, step):
         if ref:
             main('ref', loglevel=loglevel)
         if mov:
+            from ..s04_stack2_mov import main
             main('mov', loglevel=loglevel)
         if step:
             main('step', loglevel=loglevel)
@@ -1273,6 +1274,7 @@ def cc_stack(ctx, ref, mov, step):
         for p in processes:
             p.join()
         if mov:
+            from ..s04_stack2_mov import main
             for i in range(threads):
                 p = Process(target=main, args=["mov",],
                             kwargs={"loglevel": loglevel})

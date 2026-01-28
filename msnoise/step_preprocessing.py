@@ -33,7 +33,7 @@ def save_preprocessed_streams(stream, output_dir, step_name, goal_day):
     :return: List of saved file paths
     """
     # Create workflow-aware directory structure
-    workflow_dir = os.path.join(output_dir, step_name)
+    workflow_dir = os.path.join(output_dir, step_name, "_output")
     os.makedirs(workflow_dir, exist_ok=True)
     filename = f"{goal_day}.mseed"
     output_path = os.path.join(workflow_dir, filename)
@@ -66,18 +66,20 @@ def main(init=False, threads=1, loglevel="INFO"):
     #     responses = preload_instrument_responses(db)
 
     # Get output directory
-    output_dir = getattr(params, 'output_folder', 'PREPROCESSED')
+    output_dir = getattr(params, 'output_folder', "CROSS_CORRELATIONS")
 
     job_count = 0
 
     while True:
         # Get next set of preprocessing jobs (same step + day)
-        jobs, step = get_next_job_for_step(db, step_category="preprocess")
+
+        jobs = get_next_job_for_step(db, step_category="preprocess")
 
         if not jobs:
             logger.info("No more preprocessing jobs to process")
             break
 
+        jobs, step = jobs
 
         # All jobs in the set have the same step and day
         first_job = jobs[0]
