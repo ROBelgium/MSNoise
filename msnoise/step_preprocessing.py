@@ -66,7 +66,7 @@ def main(init=False, threads=1, loglevel="INFO"):
     #     responses = preload_instrument_responses(db)
 
     # Get output directory
-    output_dir = getattr(params, 'output_folder', "CROSS_CORRELATIONS")
+    output_dir = getattr(params, 'output_folder', "OUTPUT")
 
     job_count = 0
 
