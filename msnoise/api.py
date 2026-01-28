@@ -3238,11 +3238,11 @@ def xr_save_mwcs2(root, lineage, step_name, station1, station2, components, filt
     xr_save_and_close(rr, fn)
     del dr, rr, d
 
-def xr_get_mwcs2(station1, station2, components, filterid, mwcsid, mov_stack):
-    fn = os.path.join("DVV/MWCS/MWCS", "f%02i" % filterid, "mwcs%02i" % mwcsid,
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s" % components,
-                      "%s_%s.nc" % (station1, station2))
+def xr_get_mwcs2(root, lineage, step_name, station1, station2, components, filterid, mwcsid, mov_stack):
+    fn = os.path.join(root, *lineage, "_output",
+                        "%s_%s" % (mov_stack[0], mov_stack[1]),
+                       "%s" % components,
+                       "%s_%s.nc" % (station1, station2))
     if not os.path.isfile(fn):
         # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
         raise FileNotFoundError(fn)
@@ -3251,7 +3251,7 @@ def xr_get_mwcs2(station1, station2, components, filterid, mwcsid, mov_stack):
     return data
 
 
-def xr_save_dtt2(station1, station2, components, filterid, mwcsid, dttid, mov_stack, dataframe):
+def xr_save_dtt2(root, lineage, step_name, station1, station2, components, filterid, mwcsid, dttid, mov_stack, dataframe):
     """
     :param station1: string, name of station 1
     :param station2: string, name of station 2
@@ -3265,14 +3265,13 @@ def xr_save_dtt2(station1, station2, components, filterid, mwcsid, dttid, mov_st
     *. The data in the DataFrame is stacked, and the index is set to include "times" and "keys" as names. The column in the DataFrame is renamed to "DTT". A new or existing NetCDF file is
     * opened using the given file path, and the stacked data is inserted or updated in the file. The resulting dataset is then saved and the file is closed.
     """
-    fn = os.path.join("DVV/MWCS/DTT", "f%02i" % filterid,
-                      "mwcs%02i" % mwcsid, "dtt%02i" % dttid,
+    fn = os.path.join(root, *lineage, step_name, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
     if not os.path.isdir(os.path.split(fn)[0]):
         os.makedirs(os.path.split(fn)[0], exist_ok=True)
-    d = dataframe.stack(future_stack=True)
+    d = dataframe.stack()
     d.index = d.index.set_names(["times", "keys"])
     d.columns = ["DTT"]
     dr = xr_create_or_open(fn, taxis=[], name="DTT")
@@ -3280,7 +3279,7 @@ def xr_save_dtt2(station1, station2, components, filterid, mwcsid, dttid, mov_st
     rr = xr_insert_or_update(dr, rr)
     xr_save_and_close(rr, fn)
 
-def xr_get_dtt2(station1, station2, components, filterid, mwcsid, dttid, mov_stack):
+def xr_get_dtt2(root, lineage, step_name, station1, station2, components, filterid, mwcsid, dttid, mov_stack):
     """
     :param station1: The first station name
     :param station2: The second station name
@@ -3293,11 +3292,11 @@ def xr_get_dtt2(station1, station2, components, filterid, mwcsid, dttid, mov_sta
     * does not exist, it raises a FileNotFoundError. Otherwise, it opens the NetCDF file and extracts the DTT variable as a dataframe. The dataframe is then rearranged and returned as the
     * result.
     """
-    fn = os.path.join("DVV/MWCS/DTT", "f%02i" % filterid,
-                      "mwcs%02i" % mwcsid, "dtt%02i" % dttid,                      
+    fn = os.path.join(root, *lineage, step_name, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
+
     if not os.path.isfile(fn):
         # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
         raise FileNotFoundError(fn)
