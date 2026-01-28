@@ -46,13 +46,14 @@ def main(stype, loglevel="INFO"):
         pair = jobs[0].pair
         refs, days = zip(*[[job.ref, job.day] for job in jobs])
 
-        # 1) global + stack config (what you already do)
+        # 1) current config
         step_params = get_config_set_details(db, jobs[0].config_category, jobs[0].config_set_number, format="AttribDict")
 
         # 2) find all direct predecessors of THIS stack step instance (e.g., filter_1, filter_2, ...)
         pred_steps = get_direct_predecessors(db, step_id=step.step_id)
 
         for pred in pred_steps:
+            # 3) get the config of the previous steps, and also the directory structure (lineage names)
             lineage, lineage_names, params = get_merged_params(db, orig_params, step_params, pred)
             mov_stacks = params.mov_stack
             wiener_mlen = params.wiener_mlen
