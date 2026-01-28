@@ -4667,3 +4667,101 @@ def get_merged_params(db, orig_params, step_params, pred):
         if not isinstance(params.mov_stack[0], tuple):
             params.mov_stack = [params.mov_stack, ]
     return lineage, lineage_names, params
+
+
+def get_lineages_to_step_id(
+    session,
+    step_id,
+    include_self=True,
+    max_depth=50,
+    max_paths=5000,
+):
+    """
+    Enumerate upstream lineages (all distinct paths) ending at `step_id`.
+
+    Returns a list of paths, each path being a list[WorkflowStep] ordered
+    upstream -> downstream. This preserves branch structure (unlike
+    get_upstream_steps_for_step_id which de-duplicates nodes).
+
+    Safety:
+      - max_depth prevents infinite loops in case of bad/cyclic graphs
+      - max_paths prevents combinatorial explosion
+
+    Parameters
+    ----------
+    session : sqlalchemy.orm.session.Session
+    step_id : int
+    include_self : bool
+        If True, each path ends with the step itself.
+    max_depth : int
+    max_paths : int
+
+    Returns
+    -------
+    list[list[WorkflowStep]]
+    """
+    # Resolve node objects on demand
+    def get_step(sid):
+        return session.query(WorkflowStep).filter(WorkflowStep.step_id == sid).first()
+
+    # We assume the workflow graph is a DAG. If it isn't, we guard with max_depth
+    # and a per-path "seen" set.
+    paths = []
+
+    def dfs(current_id, suffix_path, seen_ids, depth):
+        if depth > max_depth:
+            raise RuntimeError(f"Exceeded max_depth={max_depth} while expanding lineage for step_id={step_id}")
+
+        preds = get_step_predecessors(session, current_id) or []
+
+        # Leaf: no predecessors => we have a complete path
+        if not preds:
+            # suffix_path currently holds downstream part (from current -> ... -> target)
+            final_path = list(reversed(suffix_path))
+            paths.append(final_path)
+            if len(paths) > max_paths:
+                raise RuntimeError(f"Exceeded max_paths={max_paths} while expanding lineage for step_id={step_id}")
+            return
+
+        for p in preds:
+            if p.step_id in seen_ids:
+                # cycle protection (shouldn't happen in a DAG)
+                continue
+            dfs(
+                p.step_id,
+                suffix_path + [p],
+                seen_ids | {p.step_id},
+                depth + 1,
+            )
+
+    start = get_step(step_id)
+    if start is None:
+        return []
+
+    if include_self:
+        dfs(step_id, [start], {step_id}, 0)
+    else:
+        dfs(step_id, [], set(), 0)
+
+    return paths
+
+def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
+    # lineage is upstream -> downstream, and (typically) ends with stack_1
+    lineage = [s for s in lineage if s.category in {"preprocess", "qc", "cc", "filter", "stack"}]
+
+    lineage_names = [s.step_name for s in lineage]
+    print("Lineage Names:", lineage_names)
+
+    lineage_cfgs = [load_step_config(db, s) for s in lineage]
+    print("Lineage Configs:", lineage_cfgs)
+
+    params = merge_params(orig_params, lineage_cfgs + [step_params])
+
+    params.components_to_compute = params.components_to_compute.split(',')
+    params.components_to_compute_single_station = params.components_to_compute_single_station.split(',')
+
+    if hasattr(params, "mov_stack"):
+        if not isinstance(params.mov_stack[0], tuple):
+            params.mov_stack = [params.mov_stack]
+
+    return lineage, lineage_names, params

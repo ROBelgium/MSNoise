@@ -50,11 +50,12 @@ def main(stype, loglevel="INFO"):
         step_params = get_config_set_details(db, jobs[0].config_category, jobs[0].config_set_number, format="AttribDict")
 
         # 2) find all direct predecessors of THIS stack step instance (e.g., filter_1, filter_2, ...)
-        pred_steps = get_direct_predecessors(db, step_id=step.step_id)
+        lineages = get_lineages_to_step_id(db, step_id=step.step_id, include_self=True)
 
-        for pred in pred_steps:
+        for lineage in lineages:
             # 3) get the config of the previous steps, and also the directory structure (lineage names)
-            lineage, lineage_names, params = get_merged_params(db, orig_params, step_params, pred)
+            lineage, lineage_names, params = get_merged_params_for_lineage(db, orig_params, step_params, lineage)
+            lineage_names = lineage_names[:-1]
             mov_stacks = params.mov_stack
             wiener_mlen = params.wiener_mlen
             wiener_nlen = params.wiener_nlen
