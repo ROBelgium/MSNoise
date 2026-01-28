@@ -126,36 +126,19 @@ def main(loglevel="INFO"):
 
     while is_next_job_for_step(db, step_category="mwcs"):
         logger.info("Getting the next job")
-        # NEW: claim jobs per (pair, lineage) so lineages can run in parallel
-        jobs, step = get_next_job_for_step(db, step_category="mwcs", group_by="pair_lineage")
-
-        if not len(jobs):
+        batch = get_next_lineage_batch(db, step_category="mwcs", group_by="pair_lineage", loglevel=loglevel,
+                                       drop_current_step_name=False)
+        if batch is None:
             time.sleep(np.random.random())
             continue
 
-        pair = jobs[0].pair
-        lineage_str = jobs[0].lineage
-        if not lineage_str:
-            raise ValueError("MWCS jobs must have a non-empty lineage (v2 assumption)")
-
-        refs, days = zip(*[[job.ref, job.day] for job in jobs])
-
-        # 1) current step config (mwcs_*)
-        step_params = get_config_set_details(
-            db,
-            jobs[0].config_category,
-            jobs[0].config_set_number,
-            format="AttribDict"
-        )
-
-        # 2) resolve lineage steps from the job, merge configs for THIS lineage only
-        lineage_steps = lineage_str_to_steps(db, lineage_str, workflow_id=jobs[0].workflow_id, strict=True)
-        lineage_steps, lineage_names, params = get_merged_params_for_lineage(
-            db, orig_params, step_params, lineage_steps
-        )
-
-        # If you use lineage_names for folder structure, drop the current step name (mwcs_1)
-        lineage_names = lineage_names[:-1]
+        jobs = batch["jobs"]
+        pair = batch["pair"]
+        days = batch["days"]
+        params = batch["params"]
+        lineage_names = batch["lineage_names"][:-1]
+        lineage_str = batch["lineage_str"]
+        step = batch["step"]
 
         logger.info(f"New MWCS Job: pair={pair} n_days={len(days)} lineage={lineage_str}")
 
