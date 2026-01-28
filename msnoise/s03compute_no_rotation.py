@@ -314,12 +314,14 @@ def main(loglevel="INFO"):
 
         step_params = get_config_set_details(db, jobs[0].config_category, jobs[0].config_set_number, format="AttribDict")
 
-        pred_steps = get_direct_predecessors(db, step_id=step.step_id)
-        for pred in pred_steps:
+        lineages = get_lineages_to_step_id(db, step_id=step.step_id, include_self=True)
 
-            lineage, lineage_names, params = get_merged_params(db, orig_params, step_params, pred)
+        for lineage in lineages:
+            # 3) get the config of the previous steps, and also the directory structure (lineage names)
+            lineage, lineage_names, params = get_merged_params_for_lineage(db, orig_params, step_params, lineage)
+            lineage_names = lineage_names[:-1]
 
-            preprocess_filename = os.path.join(params.output_folder, pred.step_name, "_output", "%s.mseed" % goal_day)
+            preprocess_filename = os.path.join(params.output_folder, lineage_names[-1], "_output", "%s.mseed" % goal_day)
             stream = read(preprocess_filename)
 
             # Filter the stream for only necessary net.sta.loc
