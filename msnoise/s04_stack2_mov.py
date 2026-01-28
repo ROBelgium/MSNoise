@@ -55,7 +55,9 @@ def main(stype, loglevel="INFO"):
         for lineage in lineages:
             # 3) get the config of the previous steps, and also the directory structure (lineage names)
             lineage, lineage_names, params = get_merged_params_for_lineage(db, orig_params, step_params, lineage)
+            # drop the "current step name":
             lineage_names = lineage_names[:-1]
+
             mov_stacks = params.mov_stack
             wiener_mlen = params.wiener_mlen
             wiener_nlen = params.wiener_nlen
@@ -143,7 +145,7 @@ def main(stype, loglevel="INFO"):
 
                 if params.keep_all:
                     c = get_results_all(db, params.output_folder, lineage_names,
-                                        sta1, sta2, filterid, components, all_days, format="xarray")
+                                        sta1, sta2, components, all_days, format="xarray")
                     if not len(c):
                         logger.warning("No data found for %s-%s-%i" % (sta1, sta2, filterid))
                         continue
