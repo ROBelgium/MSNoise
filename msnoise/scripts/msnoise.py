@@ -1255,6 +1255,7 @@ def cc_stack(ctx, ref, mov, step):
 
     if threads == 1:
         if ref:
+            from ..s04_stack2_ref import main
             main('ref', loglevel=loglevel)
         if mov:
             from ..s04_stack2_mov import main
@@ -1265,6 +1266,7 @@ def cc_stack(ctx, ref, mov, step):
         from multiprocessing import Process
         processes = []
         if ref:
+            from ..s04_stack2_ref import main
             for i in range(threads):
                 p = Process(target=main, args=["ref",],
                             kwargs={"loglevel": loglevel})

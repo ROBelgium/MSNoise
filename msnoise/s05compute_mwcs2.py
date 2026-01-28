@@ -118,9 +118,6 @@ def main(loglevel="INFO"):
     orig_params = get_params(db)
     taxis = get_t_axis(db)
 
-
-
-
     logger.debug('Ready to compute')
     # Then we compute the jobs
 
@@ -187,10 +184,12 @@ def main(loglevel="INFO"):
         else:
             components_to_compute = params.components_to_compute
 
-
+        # todo: remove
+        filterid = 1
         for components in components_to_compute:
             try:
-                ref = xr_get_ref(station1, station2, components, filterid, taxis)
+                ref = xr_get_ref(params.output_folder, lineage_names, step.step_name,
+                                 station1, station2, components, 1, taxis)
                 ref = ref.CCF.values
             except FileNotFoundError as fullpath:
                 logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
@@ -203,7 +202,8 @@ def main(loglevel="INFO"):
             for mov_stack in mov_stacks:
                 output = []
                 try:
-                    data = xr_get_ccf(station1, station2, components, filterid, mov_stack, taxis)
+                    data = xr_get_ccf(params.output_folder, lineage_names, step.step_name,
+                                      station1, station2, components, filterid, mov_stack, taxis)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
@@ -223,7 +223,7 @@ def main(loglevel="INFO"):
 
                 # work on 2D mwcs:
                 window_length_samples = int(
-                    mwcs_params.mwcs_wlen * goal_sampling_rate)
+                    params.mwcs_wlen * goal_sampling_rate)
 
                 padd = int(2 ** (nextpow2(window_length_samples) + 2))
 
@@ -231,10 +231,10 @@ def main(loglevel="INFO"):
                 tp = cosine_taper(window_length_samples, 0.85)
                 minind = 0
                 maxind = window_length_samples
-                step_samples = int(mwcs_params.mwcs_step * goal_sampling_rate)
-                if step_samples != (mwcs_params.mwcs_step * goal_sampling_rate):
+                step_samples = int(params.mwcs_step * goal_sampling_rate)
+                if step_samples != (params.mwcs_step * goal_sampling_rate):
                     logger.warning('mwcs_step of %g s incompatible with %i Hz sampling rate. Step size of %g s used instead' %
-                                    (mwcs_params.mwcs_step, goal_sampling_rate, step_samples/goal_sampling_rate))
+                                    (params.mwcs_step, goal_sampling_rate, step_samples/goal_sampling_rate))
 
                 freq_vec = sf.fftfreq(padd, 1. / goal_sampling_rate)[
                         :padd // 2]
@@ -337,7 +337,7 @@ def main(loglevel="INFO"):
                     sx2 = np.sum(W * v ** 2, axis=1)
                     E = np.sqrt(e * s2x2 / sx2 ** 2)
 
-                    ti = -params.maxlag + mwcs_params.mwcs_wlen / 2. + count * (step_samples/goal_sampling_rate)
+                    ti = -params.maxlag + params.mwcs_wlen / 2. + count * (step_samples/goal_sampling_rate)
                     # print("Finished processing t_center=", ti, "s")
                     S = pd.DataFrame(np.array([M, E, MCOH]).T,
                                     index=data.index,
@@ -351,7 +351,8 @@ def main(loglevel="INFO"):
                     del M, E, MCOH
                 output = pd.concat(output, axis=1)
 
-                xr_save_mwcs2(station1, station2, components, filterid, mwcsid, mov_stack, taxis, output)
+                xr_save_mwcs2(params.output_folder, lineage_names, step.step_name,
+                              station1, station2, components, filterid, mov_stack, taxis, output)
                 del data, output
 
         massive_update_job(db, jobs, "D")
