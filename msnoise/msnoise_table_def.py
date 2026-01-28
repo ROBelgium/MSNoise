@@ -279,6 +279,7 @@ def declare_tables(prefix=None):
         step_id = Column(Integer, ForeignKey(f"{prefix}workflow_steps.step_id"), nullable=False)
 
         # Enhanced fields
+        lineage = Column(String(255), nullable=True)
         jobtype = Column(String(50))  # Now derived from step info, but kept for compatibility
         priority = Column(Integer, default=0)  # Job priority
 
@@ -287,7 +288,7 @@ def declare_tables(prefix=None):
 
         __table_args__ = (
             # Updated unique constraint to include workflow context
-            Index('job_index', "day", "pair", "step_id", "workflow_id", unique=True),
+            Index('job_index', "day", "pair", "step_id", "workflow_id", "lineage", unique=True),
             Index('job_index2', "flag", "step_id", "priority", unique=False),
             Index('job_index3', "workflow_id", "step_id", unique=False),
             # Legacy index for backward compatibility

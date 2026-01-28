@@ -67,32 +67,127 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step, w
         .all()
     )
 
-    for pj in done_parent_jobs:
-        # Dedupe: do not create if it already exists
-        exists = (
-            session.query(Job.ref)
-            .filter(Job.workflow_id == workflow_id)
-            .filter(Job.step_id == child_step.step_id)
-            .filter(Job.day == pj.day)
-            .filter(Job.pair == pj.pair)
+    def _pair_is_auto(pair_str):
+        a, b = pair_str.split(":")
+        return a == b
+
+    def _lineage_allowed_for_pair(lineage_step_names, pair_str):
+        """
+        Enforce filter step applicability (CC/AC/SC) based on pair type.
+        If no filter step exists in the lineage, allow.
+        """
+        is_auto = _pair_is_auto(pair_str)
+        is_cross = not is_auto
+
+        # Find last filter_* in the lineage
+        filter_name = None
+        for name in reversed(lineage_step_names):
+            if name.startswith("filter_"):
+                filter_name = name
+                break
+        if not filter_name:
+            return True
+
+        filt_step = (
+            session.query(schema.WorkflowStep)
+            .filter(schema.WorkflowStep.workflow_id == workflow_id)
+            .filter(schema.WorkflowStep.step_name == filter_name)
             .first()
         )
-        if exists:
-            continue
+        if filt_step is None:
+            raise ValueError(f"Lineage references filter step '{filter_name}' which cannot be resolved")
 
-        session.add(
-            Job(
-                day=pj.day,
-                pair=pj.pair,
-                flag="T",
-                workflow_id=workflow_id,
-                step_id=child_step.step_id,
-                jobtype=child_step.step_name,  # legacy compatibility
-                priority=getattr(child_step, "priority", 0) or 0,
-                lastmod=now,
+        filt_cfg = get_config_set_details(session, filt_step.category, filt_step.set_number, format="AttribDict")
+
+        allow_cc = bool(getattr(filt_cfg, "CC", False))
+        allow_ac = bool(getattr(filt_cfg, "AC", False))
+        allow_sc = bool(getattr(filt_cfg, "SC", False))
+
+        if is_cross:
+            return allow_cc
+        return allow_ac or allow_sc
+
+    def build_child_lineages(parent_lineage_str, pair_str):
+        """
+        Return *all* valid child lineage strings for this parent lineage and pair,
+        including intermediate steps (e.g., filter_1) but WITHOUT duplicating nodes.
+
+        Key rule: select full graph paths to `child_step` whose prefix matches
+        the parent job lineage prefix.
+        """
+        parent_names = [
+            n for n in lineage_str_to_step_names(parent_lineage_str, sep="/")
+            if "global" not in n
+        ]
+        if not parent_names:
+            raise ValueError("Parent job has empty lineage (v2 assumption)")
+
+        # Enumerate all possible full paths to the child step (graph truth)
+        child_paths = get_lineages_to_step_id(session, step_id=child_step.step_id, include_self=True)
+
+        candidates = []
+        for path in child_paths:
+            # Convert to step_name list, drop global_* nodes
+            lin_names = [s.step_name for s in path if s.step_name and "global" not in s.step_name]
+
+            # Must start with the parent lineage (prefix match), otherwise it's a different branch
+            if len(lin_names) < len(parent_names):
+                continue
+            if lin_names[:len(parent_names)] != parent_names:
+                continue
+
+            # This is already the FULL lineage to child, so do NOT do parent + suffix
+            # (that’s how you got preprocess_1/cc_1/cc_1/...)
+            if not _lineage_allowed_for_pair(lin_names, pair_str):
+                continue
+
+            candidates.append("/".join(lin_names))
+
+        # de-dup while preserving order
+        unique = []
+        seen = set()
+        for x in candidates:
+            if x in seen:
+                continue
+            seen.add(x)
+            unique.append(x)
+
+        if not unique:
+            raise ValueError(
+                f"No valid lineage for passthrough {parent_step.step_name} -> {child_step.step_name} "
+                f"from parent_lineage='{parent_lineage_str}' pair='{pair_str}'"
             )
-        )
-        created += 1
+
+        return unique
+
+    for pj in done_parent_jobs:
+        for child_lineage in build_child_lineages(pj.lineage, pj.pair):
+            exists = (
+                session.query(Job.ref)
+                .filter(Job.workflow_id == workflow_id)
+                .filter(Job.step_id == child_step.step_id)
+                .filter(Job.day == pj.day)
+                .filter(Job.pair == pj.pair)
+                .filter(Job.lineage == child_lineage)
+                .first()
+            )
+            if exists:
+                continue
+
+            session.add(
+                Job(
+                    day=pj.day,
+                    pair=pj.pair,
+                    flag="T",
+                    workflow_id=workflow_id,
+                    step_id=child_step.step_id,
+                    jobtype=child_step.step_name,
+                    priority=getattr(child_step, "priority", 0) or 0,
+                    lastmod=now,
+                    lineage=child_lineage,
+                )
+            )
+            created += 1
 
     return created
 
@@ -122,7 +217,7 @@ def propagate_first_runnable_from_category(session, source_category, workflow_id
     )
 
     total_created = 0
-
+    print(parent_steps)
     for parent_step in parent_steps:
         runnable_children = get_first_runnable_steps_per_branch(
             session,
@@ -130,7 +225,7 @@ def propagate_first_runnable_from_category(session, source_category, workflow_id
             workflow_id=workflow_id,
             skip_categories=skip_categories,
         )
-
+        print(runnable_children)
         for child_step in runnable_children:
             total_created += create_passthrough_jobs_from_done_parent(
                 session=session,
@@ -225,6 +320,10 @@ def create_cc_jobs_from_preprocess(session, workflow_id="default"):
                     pairs = create_station_pairs(stations)
 
                     for pair in pairs:
+                        # NEW: for CC jobs created from preprocess outputs, lineage begins at preprocess step
+                        # and should include cc_step too.
+                        # We keep it aligned with your folder tree: preprocess_X/cc_Y
+                        lineage = f"{preprocess_step.step_name}/{cc_step.step_name}"
                         job_data = {
                             "day": day,
                             "pair": pair,
@@ -235,7 +334,8 @@ def create_cc_jobs_from_preprocess(session, workflow_id="default"):
                             "flag": "T",
                             "lastmod": now,
                             "category": cc_step.category,
-                            "set_number": cc_step.set_number
+                            "set_number": cc_step.set_number,
+                            "lineage": lineage,  # <-- NEW
                         }
 
                         jobtxt = ''.join(str(x) for x in job_data.values())
@@ -247,6 +347,7 @@ def create_cc_jobs_from_preprocess(session, workflow_id="default"):
                 if has_single_station:
                     # Create single-station CC jobs
                     for job in day_jobs:
+                        lineage = f"{preprocess_step.step_name}/{cc_step.step_name}"  # <-- NEW
                         job_data = {
                             "day": day,
                             "pair": f"{job.pair}:{job.pair}",  # Single station
@@ -257,7 +358,8 @@ def create_cc_jobs_from_preprocess(session, workflow_id="default"):
                             "flag": "T",
                             "lastmod": now,
                             "category": cc_step.category,
-                            "set_number": cc_step.set_number
+                            "set_number": cc_step.set_number,
+                            "lineage": lineage,  # <-- NEW
                         }
 
                         jobtxt = ''.join(str(x) for x in job_data.values())
@@ -375,6 +477,7 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
                 for step in preprocess_steps:
                     #todo add filter on component if nf.chan[-1] in step.
                     if 1:
+                        lineage = step.step_name  # <-- NEW: preprocess/qc jobs start lineage at themselves
                         job = {
                             "day": date.date().strftime("%Y-%m-%d"),
                             "pair": "%s.%s.%s" % (nf.net, nf.sta, nf.loc),
@@ -383,7 +486,8 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
                             "step_id": step.step_id,
                             "priority": 0,
                             "flag": "T",
-                            "lastmod": now
+                            "lastmod": now,
+                            "lineage": lineage,        # <-- NEW
                         }
                         jobtxt = ''.join(str(x) for x in job.values())
                         if jobtxt not in crap_all_jobs_text:
@@ -409,6 +513,7 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
                                     workflow_id=job.get('workflow_id', 'default'),
                                     step_id=job.get('step_id'),
                                     priority=job.get('priority', 0),
+                                    lineage=job.get('lineage'),  # <-- NEW
                                     commit=False)
     db.commit()
     count += len(all_jobs)
@@ -435,6 +540,7 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
                                         workflow_id=job.get('workflow_id', 'default'),
                                         step_id=job.get('step_id'),
                                         priority=job.get('priority', 0),
+                                        lineage=job.get('lineage'),  # <-- NEW
                                         commit=False)
             db.commit()
             logger.info(f"Created {cc_count} CC jobs")
@@ -443,7 +549,7 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
 
 
 def update_job_workflow(session, day, pair, jobtype, flag, workflow_id="default",
-                        step_id=None, priority=0, commit=True, returnjob=True, ref=None):
+                        step_id=None, priority=0, lineage=None, commit=True, returnjob=True, ref=None):
     """
     Updates or Inserts a new workflow-aware Job in the database.
 
@@ -463,7 +569,8 @@ def update_job_workflow(session, day, pair, jobtype, flag, workflow_id="default"
             .filter(text("pair=:pair")) \
             .filter(text("jobtype=:jobtype")) \
             .filter(text("workflow_id=:workflow_id")) \
-            .params(day=day, pair=pair, jobtype=jobtype, workflow_id=workflow_id).first()
+            .filter(text("lineage=:lineage")) \
+            .params(day=day, pair=pair, jobtype=jobtype, workflow_id=workflow_id, lineage=lineage).first()
 
     if job is None:
         # Create new job with workflow fields
@@ -476,6 +583,7 @@ def update_job_workflow(session, day, pair, jobtype, flag, workflow_id="default"
         job.priority = priority
         job.flag = flag
         job.lastmod = datetime.datetime.utcnow()
+        job.lineage = lineage  # <-- NEW
         session.add(job)
     else:
         # Update existing job
@@ -484,6 +592,7 @@ def update_job_workflow(session, day, pair, jobtype, flag, workflow_id="default"
         job.step_id = step_id
         job.priority = priority
         job.lastmod = datetime.datetime.utcnow()
+        job.lineage = lineage  # <-- NEW (keep consistent)
 
     if commit:
         session.commit()
@@ -513,7 +622,8 @@ def massive_insert_job_workflow(session, jobs):
             'step_id': job.get('step_id'),
             'priority': job.get('priority', 0),
             'flag': job['flag'],
-            'lastmod': job['lastmod']
+            'lastmod': job['lastmod'],
+            'lineage': job.get('lineage'),
         })
 
     # Use bulk insert for better performance

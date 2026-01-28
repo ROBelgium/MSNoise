@@ -4466,7 +4466,9 @@ def get_next_job_for_step(
         session,
         workflow_id="default",
         step_category="preprocess",
-        group_by="day",  # was "days"
+        flag="T",
+        group_by="day",
+        limit_days=None,
 ):
     """
     Return a claimed batch of jobs for a workflow step category.
@@ -4474,21 +4476,21 @@ def get_next_job_for_step(
     group_by:
       - "day": claim all jobs for the selected (step_id, jobtype, day)
       - "pair": claim all jobs for the selected (step_id, jobtype, pair)
+      - "pair_lineage": claim all jobs for the selected (step_id, jobtype, pair, lineage)
+      - "day_lineage": claim all jobs for the selected (step_id, jobtype, day, lineage)
     """
     from .msnoise_table_def import declare_tables
-    from sqlalchemy import update, func
+    from sqlalchemy import update
 
     schema = declare_tables()
     Job = schema.Job
     WorkflowStep = schema.WorkflowStep
 
-    # 1) Pick a "seed" job to define the batch key (and get the step metadata).
-    # Keep your ordering logic.
     next_job = (
         session.query(Job, WorkflowStep)
         .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name)
         .filter(WorkflowStep.category == step_category)
-        .filter(Job.flag == "T")
+        .filter(Job.flag == flag)
         .filter(Job.workflow_id == workflow_id)
         .order_by(Job.priority.desc(), Job.lastmod)
         .first()
@@ -4498,51 +4500,60 @@ def get_next_job_for_step(
 
     seed_job, step = next_job
 
-    # 2) Build a query for the batch rows we want to claim.
     batch_q = (
         session.query(Job)
         .filter(Job.workflow_id == workflow_id)
         .filter(Job.step_id == step.step_id)
         .filter(Job.jobtype == seed_job.jobtype)
-        .filter(Job.flag == "T")
+        .filter(Job.flag == flag)
     )
 
     if group_by == "day":
         batch_q = batch_q.filter(Job.day == seed_job.day)
+        batch_q = batch_q.order_by(Job.pair.asc(), Job.lineage.asc())
     elif group_by == "pair":
         batch_q = batch_q.filter(Job.pair == seed_job.pair)
+        batch_q = batch_q.order_by(Job.day.asc(), Job.lineage.asc())
+    elif group_by == "pair_lineage":
+        batch_q = batch_q.filter(Job.pair == seed_job.pair).filter(Job.lineage == seed_job.lineage)
+        batch_q = batch_q.order_by(Job.day.asc())
+        if limit_days is not None:
+            batch_q = batch_q.limit(int(limit_days))
+    elif group_by == "day_lineage":
+        batch_q = batch_q.filter(Job.day == seed_job.day).filter(Job.lineage == seed_job.lineage)
+        batch_q = batch_q.order_by(Job.pair.asc())
     else:
         raise ValueError(f"Unsupported group_by={group_by!r}")
 
-    # 3) Lock selected rows (best-effort; some DBs ignore/limit this).
-    # Important: locking alone does not change state; we still UPDATE below.
-    jobs = (
-        batch_q
-        .with_for_update()
-        .all()
-    )
+    jobs = batch_q.with_for_update().all()
     if not jobs:
         return [], step
 
-    # 4) Claim the batch atomically: update rows that are STILL Todo.
-    # Use the SAME predicates, plus flag=='T' in the UPDATE.
     upd = (
         update(Job)
         .where(Job.workflow_id == workflow_id)
         .where(Job.step_id == step.step_id)
         .where(Job.jobtype == seed_job.jobtype)
-        .where(Job.flag == "T")
+        .where(Job.flag == flag)
     )
+
     if group_by == "day":
         upd = upd.where(Job.day == seed_job.day)
-    else:  # "pair"
+    elif group_by == "pair":
         upd = upd.where(Job.pair == seed_job.pair)
+    elif group_by == "pair_lineage":
+        upd = upd.where(Job.pair == seed_job.pair).where(Job.lineage == seed_job.lineage)
+        if limit_days is not None:
+            # Note: SQL UPDATE with LIMIT is not portable. Keep limit_days for SELECT batching only.
+            # The UPDATE still claims the whole (pair, lineage) batch.
+            pass
+    else:  # "day_lineage"
+        upd = upd.where(Job.day == seed_job.day).where(Job.lineage == seed_job.lineage)
 
     session.execute(upd.values(flag="I"))
     session.commit()
 
     return jobs, step
-
 
 def is_next_job_for_step(session, workflow_id="default", step_category="preprocess", flag='T'):
     """
@@ -4763,3 +4774,70 @@ def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
             params.mov_stack = [params.mov_stack]
 
     return lineage, lineage_names, params
+
+def lineage_to_string(lineage_steps):
+    return "/".join(s.step_name for s in lineage_steps if s.step_name)
+
+def lineage_str_to_step_names(lineage_str, sep="/"):
+    """
+    Convert a lineage string like "preprocess_1/cc_1/filter_1" into a list of
+    step_name strings, preserving order.
+    """
+    if lineage_str is None:
+        raise ValueError("lineage_str is None")
+    lineage_str = str(lineage_str).strip()
+    if not lineage_str:
+        return []
+    return [p.strip() for p in lineage_str.split(sep) if p.strip()]
+
+def lineage_str_to_steps(session, lineage_str, workflow_id="default", sep="/", strict=True):
+    """
+    Resolve a lineage string to a list of WorkflowStep ORM objects (ordered).
+
+    Parameters
+    ----------
+    session : sqlalchemy.orm.session.Session
+    lineage_str : str
+        e.g. "preprocess_1/cc_1/filter_1"
+    workflow_id : str
+        Workflow namespace to resolve step names in.
+    sep : str
+        Separator used in lineage strings.
+    strict : bool
+        If True, raises if any step_name can't be resolved.
+        If False, silently skips missing steps.
+
+    Returns
+    -------
+    list[WorkflowStep]
+    """
+    names = lineage_str_to_step_names(lineage_str, sep=sep)
+    if not names:
+        return []
+
+    rows = (
+        session.query(WorkflowStep)
+        .filter(WorkflowStep.workflow_id == workflow_id)
+        .filter(WorkflowStep.step_name.in_(names))
+        .all()
+    )
+    by_name = {s.step_name: s for s in rows}
+
+    steps = []
+    missing = []
+    for name in names:
+        s = by_name.get(name)
+        if s is None:
+            missing.append(name)
+            if not strict:
+                continue
+        else:
+            steps.append(s)
+
+    if missing and strict:
+        raise ValueError(
+            "Could not resolve lineage steps in workflow_id=%r: %s"
+            % (workflow_id, ", ".join(missing))
+        )
+
+    return steps
