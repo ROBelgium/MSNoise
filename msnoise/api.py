@@ -4887,3 +4887,89 @@ def lineage_str_to_steps(session, lineage_str, workflow_id="default", sep="/", s
         )
 
     return steps
+
+def get_next_lineage_batch(
+        db,
+        step_category,
+        workflow_id="default",
+        group_by="pair_lineage",
+        loglevel="INFO",
+        day_value=None,
+        drop_current_step_name=True,
+):
+    """
+    Standard worker prolog for lineage-aware steps.
+
+    - Claims the next batch of jobs for `step_category` using `get_next_job_for_step`.
+    - Extracts (pair, lineage_str, refs, days).
+    - Loads current step config (from the job row).
+    - Resolves lineage_str -> WorkflowStep objects.
+    - Merges params for that lineage + current step config.
+    - Optionally drops the current step name from lineage_names (useful for folder paths).
+
+    Returns
+    -------
+    dict with keys:
+      - jobs, step
+      - pair, lineage_str, lineage_steps, lineage_names
+      - refs, days
+      - step_params, params
+    or None if no jobs were claimed (caller should continue/sleep).
+    """
+    # Important: keep logging policy consistent with your scripts
+    logger = get_logger(f"msnoise.worker.{step_category}", loglevel)
+
+    # Ensure there is work (fast check)
+    if not is_next_job_for_step(db, workflow_id=workflow_id, step_category=step_category, flag="T"):
+        return None
+
+    jobs, step = get_next_job_for_step(
+        db,
+        workflow_id=workflow_id,
+        step_category=step_category,
+        group_by=group_by,
+        flag="T",
+        # day_value=day_value,  # enable once you add day filtering to scheduler
+    )
+
+    if not jobs:
+        return None
+
+    pair = jobs[0].pair
+    lineage_str = getattr(jobs[0], "lineage", None)
+    if not lineage_str:
+        raise ValueError(f"{step_category.upper()} jobs must have a non-empty lineage (v2 assumption)")
+
+    refs = [job.ref for job in jobs]
+    days = [job.day for job in jobs]
+
+    # Load current step config from job row (job carries config_category & config_set_number)
+    step_params = get_config_set_details(
+        db,
+        jobs[0].config_category,
+        jobs[0].config_set_number,
+        format="AttribDict",
+    )
+
+    # Merge params for THIS lineage only
+    orig_params = get_params(db)
+    lineage_steps = lineage_str_to_steps(db, lineage_str, workflow_id=getattr(jobs[0], "workflow_id", workflow_id), strict=True)
+    lineage_steps, lineage_names, params = get_merged_params_for_lineage(db, orig_params, step_params, lineage_steps)
+
+    if drop_current_step_name and lineage_names:
+        lineage_names = lineage_names[:-1]
+
+    logger.info(f"New {step_category.upper()} batch: pair={pair} n={len(jobs)} group_by={group_by} lineage={lineage_str}")
+
+    return {
+        "jobs": jobs,
+        "step": step,
+        "pair": pair,
+        "lineage_str": lineage_str,
+        "lineage_steps": lineage_steps,
+        "lineage_names": lineage_names,
+        "refs": refs,
+        "days": days,
+        "step_params": step_params,
+        "params": params,
+    }

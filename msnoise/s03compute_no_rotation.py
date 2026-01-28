@@ -282,34 +282,18 @@ def main(loglevel="INFO"):
     #     responses = None
     logger.info("Checking if there are jobs to do")
     while is_next_job_for_step(db, step_category="cc"):
-        logger.info("Getting the next job")
-        jobs, step = get_next_job_for_step(db, step_category="cc")
-        print(jobs)
-
-        if not len(jobs):
+        batch = get_next_lineage_batch(db, step_category="cc", group_by="day_lineage", loglevel=loglevel,
+                                       drop_current_step_name=False)
+        if batch is None:
             time.sleep(np.random.random())
             continue
 
-        # NEW: lineage is carried by the job
-        lineage_str = jobs[0].lineage
-        if not lineage_str:
-            raise ValueError("CC jobs must have a non-empty lineage (v2 assumption)")
-
-        # Resolve lineage steps (preprocess_*/cc_* etc.) and merge configs
-        lineage_steps = lineage_str_to_steps(db, lineage_str, workflow_id=jobs[0].workflow_id, strict=True)
-
-        # Current step config (cc_*) is still on the job
-        step_params = get_config_set_details(
-            db,
-            jobs[0].config_category,
-            jobs[0].config_set_number,
-            format="AttribDict"
-        )
-
-        # Merge configs for THIS lineage only (no for-loop over lineages anymore)
-        lineage_steps, lineage_names, params = get_merged_params_for_lineage(
-            db, orig_params, step_params, lineage_steps
-        )
+        jobs = batch["jobs"]
+        pair = batch["pair"]
+        days = batch["days"]
+        params = batch["params"]
+        lineage_names = batch["lineage_names"][:-1]
+        step = batch["step"]
 
         stations = []
         pairs = []
@@ -338,7 +322,7 @@ def main(loglevel="INFO"):
         jt = time.time()
 
 
-        preprocess_filename = os.path.join(params.output_folder, *lineage_names[:-1], "_output", "%s.mseed" % goal_day)
+        preprocess_filename = os.path.join(params.output_folder, *lineage_names, "_output", "%s.mseed" % goal_day)
         stream = read(preprocess_filename)
 
         # Filter the stream for only necessary net.sta.loc

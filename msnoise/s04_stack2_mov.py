@@ -36,37 +36,19 @@ def main(stype, loglevel="INFO"):
 
     while is_next_job_for_step(db, step_category="stack"):
         logger.info("Getting the next job")
-        jobs, step = get_next_job_for_step(db, step_category="stack", group_by="pair_lineage")
-
-        if not len(jobs):
-            # edge case, should only occur when is_next returns true, but
-            # get_next receives no jobs (heavily parallelised calls).
+        batch = get_next_lineage_batch(db, step_category="stack", group_by="pair_lineage", loglevel=loglevel,
+                                       drop_current_step_name=False)
+        if batch is None:
             time.sleep(np.random.random())
             continue
-        pair = jobs[0].pair
-        lineage_str = jobs[0].lineage
-        if not lineage_str:
-            raise ValueError("STACK jobs must have a non-empty lineage (v2 assumption)")
 
-        refs, days = zip(*[[job.ref, job.day] for job in jobs])
-
-        # 1) current step config (stack_*)
-        step_params = get_config_set_details(
-            db,
-            jobs[0].config_category,
-            jobs[0].config_set_number,
-            format="AttribDict"
-        )
-
-        # 2) resolve lineage steps from the job, and merge params for THIS lineage only
-        lineage_steps = lineage_str_to_steps(db, lineage_str, workflow_id=jobs[0].workflow_id, strict=True)
-
-        lineage_steps, lineage_names, params = get_merged_params_for_lineage(
-            db, orig_params, step_params, lineage_steps
-        )
-
-        # drop the "current step name" if you use lineage_names as folder segments upstream of stack output
-        lineage_names = lineage_names[:-1]
+        jobs = batch["jobs"]
+        pair = batch["pair"]
+        days = batch["days"]
+        params = batch["params"]
+        lineage_names = batch["lineage_names"][:-1]
+        lineage_str = batch["lineage_str"]
+        step = batch["step"]
 
         logger.info(f"New STACK Job: pair={pair} n_days={len(days)} lineage={lineage_str}")
 
