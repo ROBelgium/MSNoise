@@ -2330,7 +2330,7 @@ def get_mwcs(session, station1, station2, filterid, components, date,
         return pd.DataFrame()
 
 
-def get_results_all(session, root, lineage_names, station1, station2, filterid, components, dates,
+def get_results_all(session, root, lineage_names, station1, station2, components, dates,
                     format="dataframe"):
     """
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -2340,8 +2340,6 @@ def get_results_all(session, root, lineage_names, station1, station2, filterid, 
     :param station1: The name of station 1 (formatted NET.STA.LOC)
     :type station2: str
     :param station2: The name of station 2 (formatted NET.STA.LOC)
-    :type filterid: int
-    :param filterid: The ID (ref) of the filter
     :type components: str
     :param components: The name of the components used (ZZ, ZR, ...)
     :type dates: list
@@ -2366,7 +2364,6 @@ def get_results_all(session, root, lineage_names, station1, station2, filterid, 
 
     if len(results) > 0:
         result = pd.concat(results)
-        print(result)
         del results
         if format == "dataframe":
             return result
@@ -4746,8 +4743,8 @@ def get_lineages_to_step_id(
     return paths
 
 def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
-    # lineage is upstream -> downstream, and (typically) ends with stack_1
-    lineage = [s for s in lineage if s.category in {"preprocess", "qc", "cc", "filter", "stack"}]
+    # lineage is upstream -> downstream
+    lineage = [s for s in lineage if s.category not in {"global"}]
 
     lineage_names = [s.step_name for s in lineage]
     print("Lineage Names:", lineage_names)
@@ -4755,6 +4752,7 @@ def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
     lineage_cfgs = [load_step_config(db, s) for s in lineage]
     print("Lineage Configs:", lineage_cfgs)
 
+    # TODO: gather all those into a "sanitize params" def?
     params = merge_params(orig_params, lineage_cfgs + [step_params])
 
     params.components_to_compute = params.components_to_compute.split(',')
