@@ -13,20 +13,6 @@ from obspy.core import AttribDict
 import logbook
 import matplotlib.pyplot as plt
 
-def merge_params(orig_params, configs_in_order):
-    merged = dict(orig_params)
-    for cfg in configs_in_order:
-        merged.update(cfg)  # later overrides earlier
-    return AttribDict(merged)
-
-def load_step_config(db, step):
-    # step must contain config_category + config_set_number (or equivalent)
-    return get_config_set_details(
-        db,
-        step.category,
-        step.set_number,
-        format="AttribDict",
-    )
 
 def main(stype, loglevel="INFO"):
     """Computes the REF/MOV stacks.
@@ -41,16 +27,12 @@ def main(stype, loglevel="INFO"):
     """
     # logger = logbook.Logger(__name__)
     # Reconfigure logger to show the pid number in log records
-    logger = get_logger('msnoise.stack_child', loglevel,
-                        with_pid=True)
+    logger = get_logger('msnoise.stack_child', loglevel, with_pid=True)
     logger.debug('Starting the %s stack' % stype)
     db = connect()
 
     orig_params = get_params(db)
     taxis = get_t_axis(db)
-
-    filters = get_filters(db, all=False)
-
 
     while is_next_job_for_step(db, step_category="stack"):
         logger.info("Getting the next job")
@@ -65,29 +47,13 @@ def main(stype, loglevel="INFO"):
         refs, days = zip(*[[job.ref, job.day] for job in jobs])
 
         # 1) global + stack config (what you already do)
-        stack_cfg = get_config_set_details(db, jobs[0].config_category, jobs[0].config_set_number, format="AttribDict")
+        step_params = get_config_set_details(db, jobs[0].config_category, jobs[0].config_set_number, format="AttribDict")
 
         # 2) find all direct predecessors of THIS stack step instance (e.g., filter_1, filter_2, ...)
         pred_steps = get_direct_predecessors(db, step_id=step.step_id)
 
         for pred in pred_steps:
-            # 3) for each predecessor, get its full upstream lineage (preprocess/qc/cc/filter/etc), ordered
-            lineage = get_upstream_steps_for_step_id(db, step_id=pred.step_id, topo_order=True, include_self=True)
-
-            # optionally keep only relevant categories:
-            lineage = [s for s in lineage if s.category in {"preprocess", "cc", "filter"}]
-            lineage_names = [s.step_name for s in lineage]
-            print("Lineage Names:", lineage_names, "")
-            lineage_cfgs = [load_step_config(db, s) for s in lineage]
-            print("Lineage Configs:", lineage_cfgs)
-
-            # 4) build branch-specific params, then apply stack last
-            params = merge_params(orig_params, lineage_cfgs + [stack_cfg])
-            params.components_to_compute = params.components_to_compute.split(',')
-            params.components_to_compute_single_station = params.components_to_compute_single_station.split(',')
-            print("Branch Params:", params)
-            if not isinstance(params.mov_stack[0], tuple):
-                params.mov_stack = [params.mov_stack, ]
+            lineage, lineage_names, params = get_merged_params(db, orig_params, step_params, pred)
 
             print("mov stack", params.mov_stack)
 

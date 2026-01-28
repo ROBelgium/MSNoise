@@ -11,3 +11,4 @@ enddate,2100-01-01,End Date to process: [2100-01-01]='No end',str,,"[scan_archiv
 crondays,1,"Number of days to monitor with scan_archive, typically used in cron (should be a float representing a number of days, or a string designating weeks, days, and/or hours using the format 'Xw Xd Xh')",str,,"[scan_archive]"
 plugins,,Comma separated list of plugin names. Plugins names should be importable Python modules.,str,,"[misc]"
 hpc,N,Is MSNoise going to run on an HPC?,bool,Y/N,"[misc]"
+output_folder,OUTPUT,Where the folder structure will be output,str,,""

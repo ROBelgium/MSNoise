@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from obspy.core import AttribDict
 
 from . import DBConfigNotFoundError
 from .msnoise_table_def import Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink
@@ -2362,7 +2363,7 @@ def get_results_all(session, root, lineage_names, station1, station2, filterid, 
             df = pd.read_hdf(fname, 'data', parse_dates=True)
             df.index = pd.to_datetime(df.index)
             results.append(df)
-    print(results)
+
     if len(results) > 0:
         result = pd.concat(results)
         print(result)
@@ -4630,3 +4631,39 @@ def get_filter_steps_for_cc_step_name(session, cc_step_name, workflow_id="defaul
     filter_steps = [step for step in successor_steps if step.category == "filter"]
 
     return filter_steps
+
+def merge_params(orig_params, configs_in_order):
+    merged = dict(orig_params)
+    for cfg in configs_in_order:
+        merged.update(cfg)  # later overrides earlier
+    return AttribDict(merged)
+
+def load_step_config(db, step):
+    # step must contain config_category + config_set_number (or equivalent)
+    return get_config_set_details(
+        db,
+        step.category,
+        step.set_number,
+        format="AttribDict",
+    )
+
+def get_merged_params(db, orig_params, step_params, pred):
+    # 3) for each predecessor, get its full upstream lineage (preprocess/qc/cc/filter/etc), ordered
+    lineage = get_upstream_steps_for_step_id(db, step_id=pred.step_id, topo_order=True, include_self=True)
+
+    # optionally keep only relevant categories:
+    lineage = [s for s in lineage if s.category in {"preprocess", "cc", "filter", "stack"}]
+    lineage_names = [s.step_name for s in lineage]
+    print("Lineage Names:", lineage_names, "")
+    lineage_cfgs = [load_step_config(db, s) for s in lineage]
+    print("Lineage Configs:", lineage_cfgs)
+
+    # 4) build branch-specific params, then apply stack last
+    params = merge_params(orig_params, lineage_cfgs + [step_params])
+    params.components_to_compute = params.components_to_compute.split(',')
+    params.components_to_compute_single_station = params.components_to_compute_single_station.split(',')
+    print("Branch Params:", params)
+    if hasattr(params, "mov_stack"):
+        if not isinstance(params.mov_stack[0], tuple):
+            params.mov_stack = [params.mov_stack, ]
+    return lineage, lineage_names, params

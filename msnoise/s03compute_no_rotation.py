@@ -261,6 +261,8 @@ def main(loglevel="INFO"):
 
     # Get Configuration
     orig_params = get_params(db)
+    print(orig_params)
+    print(orig_params.output_folder)
     # filters = get_filters(db, all=False)
     # logger.info("Will compute [%s] for different stations" % " ".join(params.components_to_compute))
     # logger.info("Will compute [%s] for single stations" % " ".join(params.components_to_compute_single_station))
@@ -298,15 +300,6 @@ def main(loglevel="INFO"):
 
         stations = np.unique(stations)
 
-        step_config = get_config_set_details(db, job.config_category, job.config_set_number,
-                                             format='AttribDict')
-        params = AttribDict(**orig_params, **step_config)
-        print(step_config)
-        params.components_to_compute =  params.components_to_compute.split(',')
-        params.components_to_compute_single_station = params.components_to_compute_single_station.split(',')
-
-        print(params)
-
         # Filters:
         filter_steps = get_filter_steps_for_cc_step(db, step.step_id, workflow_id='default')
         print(filter_steps)
@@ -319,387 +312,386 @@ def main(loglevel="INFO"):
                      (goal_day, len(pairs), len(stations)))
         jt = time.time()
 
-        #TODO LOOP OVER PREPROCESS STEP SETS
-        current_process = get_step_predecessors(db, step.step_id)[0]
-        preprocess_filename = os.path.join(params.output_folder, current_process.step_name, "_output", "%s.mseed" % goal_day)
-        stream = read(preprocess_filename)
+        step_params = get_config_set_details(db, jobs[0].config_category, jobs[0].config_set_number, format="AttribDict")
 
-        # Filter the stream for only necessary net.sta.loc
-        allowed = {tuple(s.split(".")) for s in stations}  # (net, sta, loc)
-        stream = Stream(tr for tr in stream
-                        if (tr.stats.network, tr.stats.station, tr.stats.location) in allowed)
-        # TODO PREPROCESS IF THE "PREPROCESS_ON_THE_FLY" config?
-        # comps = np.unique(comps)
-        # with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
-        #     stream = executor.submit(preprocess, stations, comps, goal_day, params, responses, loglevel).result()
-        # logger.info("Received preprocessed traces")
+        pred_steps = get_direct_predecessors(db, step_id=step.step_id)
+        for pred in pred_steps:
 
-        print(stream)
+            lineage, lineage_names, params = get_merged_params(db, orig_params, step_params, pred)
 
-        # stream = preprocess(db, stations, comps, goal_day, params, responses)
-        if not len(stream):
-            logger.debug("Not enough data for this day !")
-            logger.debug("Marking jobs 'Fail' and continuing with next !")
-            for job in jobs:
-                update_job(db, job.day, job.pair, job.jobtype, 'F', ref=job.ref)
-            continue
-        # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
-        dt = 1. / params.cc_sampling_rate
-        logger.debug("Starting slides")
-        start_processing = time.time()
-        allcorr = {}
-        for tmp in stream.slide(params.corr_duration,
-                                params.corr_duration * (1 - params.overlap)):
-            logger.debug("Processing %s - %s" % (tmp[0].stats.starttime,
-                                                 tmp[0].stats.endtime))
-            tmp = tmp.copy().sort()
+            preprocess_filename = os.path.join(params.output_folder, pred.step_name, "_output", "%s.mseed" % goal_day)
+            stream = read(preprocess_filename)
 
-            channels_to_remove = []
-            for gap in tmp.get_gaps(min_gap=0):
-                if gap[-2] > 0:
-                    channels_to_remove.append(
-                        ".".join([gap[0], gap[1], gap[2], gap[3]]))
+            # Filter the stream for only necessary net.sta.loc
+            allowed = {tuple(s.split(".")) for s in stations}  # (net, sta, loc)
+            stream = Stream(tr for tr in stream
+                            if (tr.stats.network, tr.stats.station, tr.stats.location) in allowed)
+            # TODO PREPROCESS IF THE "PREPROCESS_ON_THE_FLY" config?
+            # comps = np.unique(comps)
+            # with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+            #     stream = executor.submit(preprocess, stations, comps, goal_day, params, responses, loglevel).result()
+            # logger.info("Received preprocessed traces")
 
-            for chan in np.unique(channels_to_remove):
-                logger.debug("%s contains gap(s), removing it" % chan)
-                net, sta, loc, chan = chan.split(".")
-                for tr in tmp.select(network=net,
-                                     station=sta,
-                                     location=loc,
-                                     channel=chan):
-                    tmp.remove(tr)
-            if len(tmp) == 0:
-                logger.debug("No traces without gaps")
+            print(stream)
+
+            # stream = preprocess(db, stations, comps, goal_day, params, responses)
+            if not len(stream):
+                logger.debug("Not enough data for this day !")
+                logger.debug("Marking jobs 'Fail' and continuing with next !")
+                for job in jobs:
+                    update_job(db, job.day, job.pair, job.jobtype, 'F', ref=job.ref)
                 continue
+            # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
+            dt = 1. / params.cc_sampling_rate
+            logger.debug("Starting slides")
+            start_processing = time.time()
+            allcorr = {}
+            for tmp in stream.slide(params.corr_duration,
+                                    params.corr_duration * (1 - params.overlap)):
+                logger.debug("Processing %s - %s" % (tmp[0].stats.starttime,
+                                                     tmp[0].stats.endtime))
+                tmp = tmp.copy().sort()
 
-            base = np.amax([tr.stats.npts for tr in tmp])
-            if base <= (params.maxlag*params.cc_sampling_rate*2+1):
-                logger.debug("All traces shorter are too short to export"
-                              " +-maxlag")
-                continue
+                channels_to_remove = []
+                for gap in tmp.get_gaps(min_gap=0):
+                    if gap[-2] > 0:
+                        channels_to_remove.append(
+                            ".".join([gap[0], gap[1], gap[2], gap[3]]))
 
-            for tr in tmp:
-                if tr.stats.npts != base:
-                    tmp.remove(tr)
-                    logger.debug("%s trace is too short, removing it" % tr.id)
+                for chan in np.unique(channels_to_remove):
+                    logger.debug("%s contains gap(s), removing it" % chan)
+                    net, sta, loc, chan = chan.split(".")
+                    for tr in tmp.select(network=net,
+                                         station=sta,
+                                         location=loc,
+                                         channel=chan):
+                        tmp.remove(tr)
+                if len(tmp) == 0:
+                    logger.debug("No traces without gaps")
+                    continue
 
-            if len(tmp) == 0:
-                logger.debug("No traces left in slice")
-                continue
+                base = np.amax([tr.stats.npts for tr in tmp])
+                if base <= (params.maxlag*params.cc_sampling_rate*2+1):
+                    logger.debug("All traces shorter are too short to export"
+                                  " +-maxlag")
+                    continue
 
-            nfft = next_fast_len(tmp[0].stats.npts)
-            tmp.detrend("demean")
+                for tr in tmp:
+                    if tr.stats.npts != base:
+                        tmp.remove(tr)
+                        logger.debug("%s trace is too short, removing it" % tr.id)
 
-            # TODO should not hardcode 100 taper points in spectrum
-            napod = 100
+                if len(tmp) == 0:
+                    logger.debug("No traces left in slice")
+                    continue
 
-            data = np.asarray([tr.data for tr in tmp])
-            names = [tr.id.split(".") for tr in tmp]
+                nfft = next_fast_len(tmp[0].stats.npts)
+                tmp.detrend("demean")
 
-            if not params.clip_after_whiten:
-                # logger.debug("Winsorizing (clipping) data before whiten")
-                data = winsorizing(data, params) #inplace
+                # TODO should not hardcode 100 taper points in spectrum
+                napod = 100
 
-            # TODO should not hardcode 4 percent!
-            wlen = int(0.04 * data.shape[1])
-            taper_sides = scipy.signal.windows.hann(2 * wlen + 1)
-            taper = np.hstack(
-                (taper_sides[:wlen], np.ones(data.shape[1] - 2 * wlen),
-                 taper_sides[len(taper_sides) - wlen:]))
-            for i in range(data.shape[0]):
-                data[i] *= taper
-            # index net.sta comps for energy later
-            channel_index = {}
-            if params.whitening != "N" and params.whitening_type == "PSD":
-                psds = []
-                for i, name in enumerate(names):
-                    n1, s1, l1, c1 = name
-                    netsta = "%s.%s.%s" % (n1, s1, l1)
-                    if netsta not in channel_index:
-                        channel_index[netsta] = {}
-                    channel_index[netsta][c1[-1]] = i
-    
-                    pxx, freqs = mlab.psd(tmp[i].data,
-                                          Fs=tmp[i].stats.sampling_rate,
-                                          NFFT=nfft,
-                                          detrend='mean')
-                    psds.append(np.sqrt(pxx))
-                psds = np.asarray(psds)
-            else:
-                psds = np.zeros(1)
+                data = np.asarray([tr.data for tr in tmp])
+                names = [tr.id.split(".") for tr in tmp]
 
-            for chan in channel_index:
-                comps = channel_index[chan].keys()
-                if "E" in comps and "N" in comps:
-                    i_e = channel_index[chan]["E"]
-                    i_n = channel_index[chan]["N"]
-                    # iZ = channel_index[chan]["Z"]
-                    mm = psds[[i_e,i_n]].mean(axis=0)
-                    psds[i_e] = mm
-                    psds[i_n] = mm
-                    # psds[iZ] = mm
+                if not params.clip_after_whiten:
+                    # logger.debug("Winsorizing (clipping) data before whiten")
+                    data = winsorizing(data, params) #inplace
 
-            # define pairwise CCs
-            # TODO document that MASSIVE change !!
+                # TODO should not hardcode 4 percent!
+                wlen = int(0.04 * data.shape[1])
+                taper_sides = scipy.signal.windows.hann(2 * wlen + 1)
+                taper = np.hstack(
+                    (taper_sides[:wlen], np.ones(data.shape[1] - 2 * wlen),
+                     taper_sides[len(taper_sides) - wlen:]))
+                for i in range(data.shape[0]):
+                    data[i] *= taper
+                # index net.sta comps for energy later
+                channel_index = {}
+                if params.whitening != "N" and params.whitening_type == "PSD":
+                    psds = []
+                    for i, name in enumerate(names):
+                        n1, s1, l1, c1 = name
+                        netsta = "%s.%s.%s" % (n1, s1, l1)
+                        if netsta not in channel_index:
+                            channel_index[netsta] = {}
+                        channel_index[netsta][c1[-1]] = i
 
-            tmptime = tmp[0].stats.starttime.datetime
-            thisdate = tmptime.strftime("%Y-%m-%d")
-            tmptime = tmp[0].stats.endtime.datetime
-            thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
+                        pxx, freqs = mlab.psd(tmp[i].data,
+                                              Fs=tmp[i].stats.sampling_rate,
+                                              NFFT=nfft,
+                                              detrend='mean')
+                        psds.append(np.sqrt(pxx))
+                    psds = np.asarray(psds)
+                else:
+                    psds = np.zeros(1)
 
-            for filter_name, filter in filters:
-                logger.debug("Processing filter %s" % filter_name)
-                print(filter)
+                for chan in channel_index:
+                    comps = channel_index[chan].keys()
+                    if "E" in comps and "N" in comps:
+                        i_e = channel_index[chan]["E"]
+                        i_n = channel_index[chan]["N"]
+                        # iZ = channel_index[chan]["Z"]
+                        mm = psds[[i_e,i_n]].mean(axis=0)
+                        psds[i_e] = mm
+                        psds[i_n] = mm
+                        # psds[iZ] = mm
 
-                # Standard operator for CC
-                cc_index = []
-                if filter.CC:
-                    if len(params.components_to_compute):
-                        for sta1, sta2 in itertools.combinations(names, 2):
+                # define pairwise CCs
+                # TODO document that MASSIVE change !!
+
+                tmptime = tmp[0].stats.starttime.datetime
+                thisdate = tmptime.strftime("%Y-%m-%d")
+                tmptime = tmp[0].stats.endtime.datetime
+                thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
+
+                for filter_name, filter in filters:
+                    logger.debug("Processing filter %s" % filter_name)
+                    print(filter)
+
+                    # Standard operator for CC
+                    cc_index = []
+                    if filter.CC:
+                        if len(params.components_to_compute):
+                            for sta1, sta2 in itertools.combinations(names, 2):
+                                n1, s1, l1, c1 = sta1
+                                n2, s2, l2, c2 = sta2
+                                if n1 == n2 and s1 == s2 and l1 == l2:
+                                    continue
+                                pair = "%s.%s.%s:%s.%s.%s" % (n1, s1, l1, n2, s2, l2)
+                                if pair not in pairs:
+                                    continue
+                                comp = "%s%s" % (c1[-1], c2[-1])
+                                if comp in params.components_to_compute:
+                                    cc_index.append(
+                                        ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
+                                        names.index(sta1), names.index(sta2)])
+
+                    # Different iterator func for single station AC or SC:
+                    single_station_pair_index_sc = []
+                    single_station_pair_index_ac = []
+
+                    if len(params.components_to_compute_single_station):
+                        for sta1, sta2 in itertools.combinations_with_replacement(names, 2):
                             n1, s1, l1, c1 = sta1
                             n2, s2, l2, c2 = sta2
-                            if n1 == n2 and s1 == s2 and l1 == l2:
+                            if n1 != n2 or s1 != s2:
                                 continue
                             pair = "%s.%s.%s:%s.%s.%s" % (n1, s1, l1, n2, s2, l2)
                             if pair not in pairs:
                                 continue
                             comp = "%s%s" % (c1[-1], c2[-1])
-                            if comp in params.components_to_compute:
-                                cc_index.append(
-                                    ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
-                                    names.index(sta1), names.index(sta2)])
-
-                # Different iterator func for single station AC or SC:
-                single_station_pair_index_sc = []
-                single_station_pair_index_ac = []
-
-                if len(params.components_to_compute_single_station):
-                    for sta1, sta2 in itertools.combinations_with_replacement(names, 2):
-                        n1, s1, l1, c1 = sta1
-                        n2, s2, l2, c2 = sta2
-                        if n1 != n2 or s1 != s2:
-                            continue
-                        pair = "%s.%s.%s:%s.%s.%s" % (n1, s1, l1, n2, s2, l2)
-                        if pair not in pairs:
-                            continue
-                        comp = "%s%s" % (c1[-1], c2[-1])
-                        if comp in params.components_to_compute_single_station:
-                            if filter.AC and c1[-1] == c2[-1]:
-                                single_station_pair_index_ac.append(
-                                    ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
-                                    names.index(sta1), names.index(sta2)])
-                            elif filter.SC:
-                            # If the components are different, we can just
-                            # process them using the default CC code (should warn)
-                                single_station_pair_index_sc.append(
-                                    ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
-                                    names.index(sta1), names.index(sta2)])
-                        if comp[::-1] in params.components_to_compute_single_station:
-                            if filter.SC and c1[-1] != c2[-1]:
+                            if comp in params.components_to_compute_single_station:
+                                if filter.AC and c1[-1] == c2[-1]:
+                                    single_station_pair_index_ac.append(
+                                        ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
+                                        names.index(sta1), names.index(sta2)])
+                                elif filter.SC:
                                 # If the components are different, we can just
                                 # process them using the default CC code (should warn)
-                                single_station_pair_index_sc.append(
-                                    ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp[::-1]),
-                                    names.index(sta2), names.index(sta1)])
+                                    single_station_pair_index_sc.append(
+                                        ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
+                                        names.index(sta1), names.index(sta2)])
+                            if comp[::-1] in params.components_to_compute_single_station:
+                                if filter.SC and c1[-1] != c2[-1]:
+                                    # If the components are different, we can just
+                                    # process them using the default CC code (should warn)
+                                    single_station_pair_index_sc.append(
+                                        ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp[::-1]),
+                                        names.index(sta2), names.index(sta1)])
 
-                logger.debug("CC index: %s" % cc_index)
-                logger.debug("single station AC: ", single_station_pair_index_ac)
-                logger.debug("single station SC: ", single_station_pair_index_sc)
+                    logger.debug("CC index: %s" % cc_index)
+                    logger.debug("single station AC: ", single_station_pair_index_ac)
+                    logger.debug("single station SC: ", single_station_pair_index_sc)
 
-                filterlow = float(filter.freqmin)
-                filterhigh = float(filter.freqmax)
-                logger.debug("Filter: %s - %s Hz" % (filterlow, filterhigh))
-                freq_vec = sf.fftfreq(nfft, d=dt)[:nfft // 2]
-                freq_sel = np.where((freq_vec >= filterlow) & (freq_vec <= filterhigh))[0]
-                low = freq_sel[0] - napod
-                if low <= 0:
-                    low = 0
-                p1 = freq_sel[0]
-                p2 = freq_sel[-1]
-                high = freq_sel[-1] + napod
-                if high > nfft / 2:
-                    high = int(nfft // 2)
+                    filterlow = float(filter.freqmin)
+                    filterhigh = float(filter.freqmax)
+                    logger.debug("Filter: %s - %s Hz" % (filterlow, filterhigh))
+                    freq_vec = sf.fftfreq(nfft, d=dt)[:nfft // 2]
+                    freq_sel = np.where((freq_vec >= filterlow) & (freq_vec <= filterhigh))[0]
+                    low = freq_sel[0] - napod
+                    if low <= 0:
+                        low = 0
+                    p1 = freq_sel[0]
+                    p2 = freq_sel[-1]
+                    high = freq_sel[-1] + napod
+                    if high > nfft / 2:
+                        high = int(nfft // 2)
 
-                # Make a copy of the original data to prevent modifying it
-                _data = data.copy()
-                if params.whitening == "N":
-                    # if the data doesn't need to be whitened, we can simply
-                    # band-pass filter the traces now:
-                    for i, _ in enumerate(_data):
-                        _data[i] = bandpass(_, freqmin=filterlow,
-                                            freqmax=filterhigh,
-                                            df=params.cc_sampling_rate,
-                                            corners=8)
+                    # Make a copy of the original data to prevent modifying it
+                    _data = data.copy()
+                    if params.whitening == "N":
+                        # if the data doesn't need to be whitened, we can simply
+                        # band-pass filter the traces now:
+                        for i, _ in enumerate(_data):
+                            _data[i] = bandpass(_, freqmin=filterlow,
+                                                freqmax=filterhigh,
+                                                df=params.cc_sampling_rate,
+                                                corners=8)
 
-                # First let's compute the AC and SC
-                if len(single_station_pair_index_ac):
-                    tmp = _data.copy()
-                    if params.whitening == "A":
-                        # if the data isn't already filtered, we still need to
-                        # do it for the AutoCorrelation:
-                        for i, _ in enumerate(tmp):
-                            tmp[i] = bandpass(_, freqmin=filterlow,
-                                              freqmax=filterhigh,
-                                              df=params.cc_sampling_rate,
-                                              corners=8)
-                    if params.clip_after_whiten:
-                        # logger.debug("Winsorizing (clipping) data after bandpass (AC)")
-                        tmp = winsorizing(tmp, params, input="timeseries")
-
-
-                    if params.cc_type_single_station_AC == "CC":
-                        ffts = sf.fftn(tmp, [nfft, ], axes=[1, ])
-                        energy = np.real(np.sqrt(np.mean(
-                            sf.ifft(ffts, n=nfft, axis=1) ** 2,
-                            axis=1)))
-                        # Computing standard CC
-                        corr = myCorr2(ffts,
-                                       np.ceil(params.maxlag / dt),
-                                       energy,
-                                       single_station_pair_index_ac,
-                                       plot=False,
-                                       nfft=nfft,
-                                       normalized=params.cc_normalisation)
-
-                    elif params.cc_type_single_station_AC == "PCC":
-                        corr = pcc_xcorr(tmp, np.ceil(params.maxlag / dt),
-                                         None, single_station_pair_index_ac)
-                    else:
-                        logging.error("cc_type_single_station_AC = %s not implemented, "
-                              "exiting")
-                        exit(1)
-
-                    for key in corr:
-                        ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
-                        logger.debug("CCF ID: %s" % ccfid)
-                        if ccfid not in allcorr:
-                            allcorr[ccfid] = {}
-                        allcorr[ccfid][thistime] = corr[key]
-                    del corr, energy
-
-                if len(cc_index):
-                    if params.cc_type == "CC":
-                        ffts = sf.fftn(_data, [nfft, ], axes=[1, ])
-                        if params.whitening != "N":
-                            whiten2(ffts, nfft, low, high, p1, p2, psds,
-                                    params.whitening_type)  # inplace
+                    # First let's compute the AC and SC
+                    if len(single_station_pair_index_ac):
+                        tmp = _data.copy()
+                        if params.whitening == "A":
+                            # if the data isn't already filtered, we still need to
+                            # do it for the AutoCorrelation:
+                            for i, _ in enumerate(tmp):
+                                tmp[i] = bandpass(_, freqmin=filterlow,
+                                                  freqmax=filterhigh,
+                                                  df=params.cc_sampling_rate,
+                                                  corners=8)
                         if params.clip_after_whiten:
-                            # logger.debug(
-                            #     "Winsorizing (clipping) data after whiten")
-                            ffts = winsorizing(ffts, params, input="fft", nfft=nfft)
+                            # logger.debug("Winsorizing (clipping) data after bandpass (AC)")
+                            tmp = winsorizing(tmp, params, input="timeseries")
 
-                        # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
-                        energy = np.real(np.sqrt( np.mean(sf.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
-        
-                        # logger.info("Pre-whitened %i traces"%(i+1))
-                        # Computing standard CC
-                        corr = myCorr2(ffts,
-                                       np.ceil(params.maxlag / dt),
-                                       energy,
-                                       cc_index,
-                                       plot=False,
-                                       nfft=nfft,
-                                       normalized=params.cc_normalisation)
-                        
-                        for key in corr:
-                            ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
-                            logger.debug("CCF ID - CC: %s" % ccfid)
-                            if ccfid not in allcorr:
-                                allcorr[ccfid] = {}
-                            allcorr[ccfid][thistime] = corr[key]
-                        del corr, energy, ffts
-                    else:
-                        logging.error("cc_type = %s not implemented, "
-                              "exiting")
-                        exit(1)
 
-                if len(single_station_pair_index_sc):
-                    if params.cc_type_single_station_SC == "CC":
-                        # logger.debug("Compute SC using %s" % params.cc_type)
-                        ffts = sf.fftn(_data, [nfft, ], axes=[1, ])
-                        if params.whitening != "N":
-                            whiten2(ffts, nfft, low, high, p1, p2, psds,
-                                    params.whitening_type)  # inplace
-                        if params.clip_after_whiten:
-                            ffts = winsorizing(ffts, params, input="fft",
-                                               nfft=nfft)
-                        # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
-                        energy = np.real(np.sqrt(np.mean(
-                            sf.ifft(ffts, n=nfft, axis=1) ** 2,
-                            axis=1)))
+                        if params.cc_type_single_station_AC == "CC":
+                            ffts = sf.fftn(tmp, [nfft, ], axes=[1, ])
+                            energy = np.real(np.sqrt(np.mean(
+                                sf.ifft(ffts, n=nfft, axis=1) ** 2,
+                                axis=1)))
+                            # Computing standard CC
+                            corr = myCorr2(ffts,
+                                           np.ceil(params.maxlag / dt),
+                                           energy,
+                                           single_station_pair_index_ac,
+                                           plot=False,
+                                           nfft=nfft,
+                                           normalized=params.cc_normalisation)
 
-                        # logger.info("Pre-whitened %i traces"%(i+1))
-                        # Computing standard CC
-                        corr = myCorr2(ffts,
-                                       np.ceil(params.maxlag / dt),
-                                       energy,
-                                       single_station_pair_index_sc,
-                                       plot=False,
-                                       nfft=nfft,
-                                       normalized=params.cc_normalisation)
+                        elif params.cc_type_single_station_AC == "PCC":
+                            corr = pcc_xcorr(tmp, np.ceil(params.maxlag / dt),
+                                             None, single_station_pair_index_ac)
+                        else:
+                            logging.error("cc_type_single_station_AC = %s not implemented, "
+                                  "exiting")
+                            exit(1)
 
                         for key in corr:
                             ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
-                            logger.debug("CCF ID - SC: %s" % ccfid)
+                            logger.debug("CCF ID: %s" % ccfid)
                             if ccfid not in allcorr:
                                 allcorr[ccfid] = {}
                             allcorr[ccfid][thistime] = corr[key]
-                        del corr, energy, ffts
-                    else:
-                        logging.error("cc_type_single_station_SC = %s not implemented, "
-                              "exiting")
-                        exit(1)
-            del psds
+                        del corr, energy
 
-        if params.keep_all:
-            # Root folder for "all windows" output:
-            cc_all_base = os.path.join(
-                current_process.step_name,  # e.g. "preprocess_1"
-                step.step_name,  # e.g. "cc1"
-            )
-            for ccfid in allcorr.keys():
-                export_allcorr2(db, ccfid, allcorr[ccfid], base_folder=cc_all_base, params=params)
+                    if len(cc_index):
+                        if params.cc_type == "CC":
+                            ffts = sf.fftn(_data, [nfft, ], axes=[1, ])
+                            if params.whitening != "N":
+                                whiten2(ffts, nfft, low, high, p1, p2, psds,
+                                        params.whitening_type)  # inplace
+                            if params.clip_after_whiten:
+                                # logger.debug(
+                                #     "Winsorizing (clipping) data after whiten")
+                                ffts = winsorizing(ffts, params, input="fft", nfft=nfft)
 
-        if params.keep_days:
-            # Root folder for "daily stacks" output:
-            cc_daily_base = os.path.join(
-                current_process.step_name,  # e.g. "preprocess_1"
-                step.step_name,  # e.g. "cc1"
-            )
-            for ccfid in allcorr.keys():
-                logging.debug("Exporting %s" % ccfid)
-                station1, station2, components, filter_name, date = \
-                    ccfid.split('+')
+                            # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
+                            energy = np.real(np.sqrt( np.mean(sf.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
 
-                corrs = np.asarray(list(allcorr[ccfid].values()))
-                if not len(corrs):
-                    logger.debug("No data to stack.")
-                    continue
-                corr = stack(corrs, params.stack_method, params.pws_timegate,
-                             params.pws_power, params.cc_sampling_rate)
-                if not len(corr):
-                    logger.debug("No data to save.")
-                    continue
-                thisdate = goal_day
-                thistime = "0_0"
-                add_corr(
-                    db, station1, station2, filter_name,
-                    thisdate, thistime, params.corr_duration,
-                    components, corr,
-                    params.cc_sampling_rate, day=True,
-                    ncorr=corrs.shape[0],
-                    params=params,
-                    base_folder=cc_daily_base)
+                            # logger.info("Pre-whitened %i traces"%(i+1))
+                            # Computing standard CC
+                            corr = myCorr2(ffts,
+                                           np.ceil(params.maxlag / dt),
+                                           energy,
+                                           cc_index,
+                                           plot=False,
+                                           nfft=nfft,
+                                           normalized=params.cc_normalisation)
 
-        # THIS SHOULD BE IN THE API
-        massive_update_job(db, jobs, "D")
-        # if not params.hpc:
-        #     for job in jobs:
-        #         update_job(db, job.day, job.pair, 'STACK', 'T')
+                            for key in corr:
+                                ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
+                                logger.debug("CCF ID - CC: %s" % ccfid)
+                                if ccfid not in allcorr:
+                                    allcorr[ccfid] = {}
+                                allcorr[ccfid][thistime] = corr[key]
+                            del corr, energy, ffts
+                        else:
+                            logging.error("cc_type = %s not implemented, "
+                                  "exiting")
+                            exit(1)
 
-        logger.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & "
-                     "process %.2f s)" % ((time.time() - jt),
-                                          start_processing - jt,
-                                          time.time() - start_processing))
-        del stream, allcorr
+                    if len(single_station_pair_index_sc):
+                        if params.cc_type_single_station_SC == "CC":
+                            # logger.debug("Compute SC using %s" % params.cc_type)
+                            ffts = sf.fftn(_data, [nfft, ], axes=[1, ])
+                            if params.whitening != "N":
+                                whiten2(ffts, nfft, low, high, p1, p2, psds,
+                                        params.whitening_type)  # inplace
+                            if params.clip_after_whiten:
+                                ffts = winsorizing(ffts, params, input="fft",
+                                                   nfft=nfft)
+                            # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
+                            energy = np.real(np.sqrt(np.mean(
+                                sf.ifft(ffts, n=nfft, axis=1) ** 2,
+                                axis=1)))
+
+                            # logger.info("Pre-whitened %i traces"%(i+1))
+                            # Computing standard CC
+                            corr = myCorr2(ffts,
+                                           np.ceil(params.maxlag / dt),
+                                           energy,
+                                           single_station_pair_index_sc,
+                                           plot=False,
+                                           nfft=nfft,
+                                           normalized=params.cc_normalisation)
+
+                            for key in corr:
+                                ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
+                                logger.debug("CCF ID - SC: %s" % ccfid)
+                                if ccfid not in allcorr:
+                                    allcorr[ccfid] = {}
+                                allcorr[ccfid][thistime] = corr[key]
+                            del corr, energy, ffts
+                        else:
+                            logging.error("cc_type_single_station_SC = %s not implemented, "
+                                  "exiting")
+                            exit(1)
+                del psds
+
+            if params.keep_all:
+                # Root folder for "all windows" output:
+                cc_all_base = os.path.join(*lineage_names, step.step_name)
+                for ccfid in allcorr.keys():
+                    export_allcorr2(db, ccfid, allcorr[ccfid], base_folder=cc_all_base, params=params)
+
+            if params.keep_days:
+                # Root folder for "daily stacks" output:
+                cc_daily_base = os.path.join(*lineage_names, step.step_name)
+                for ccfid in allcorr.keys():
+                    logging.debug("Exporting %s" % ccfid)
+                    station1, station2, components, filter_name, date = \
+                        ccfid.split('+')
+
+                    corrs = np.asarray(list(allcorr[ccfid].values()))
+                    if not len(corrs):
+                        logger.debug("No data to stack.")
+                        continue
+                    corr = stack(corrs, params.stack_method, params.pws_timegate,
+                                 params.pws_power, params.cc_sampling_rate)
+                    if not len(corr):
+                        logger.debug("No data to save.")
+                        continue
+                    thisdate = goal_day
+                    thistime = "0_0"
+                    add_corr(
+                        db, station1, station2, filter_name,
+                        thisdate, thistime, params.corr_duration,
+                        components, corr,
+                        params.cc_sampling_rate, day=True,
+                        ncorr=corrs.shape[0],
+                        params=params,
+                        base_folder=cc_daily_base)
+
+            # THIS SHOULD BE IN THE API
+            massive_update_job(db, jobs, "D")
+            # if not params.hpc:
+            #     for job in jobs:
+            #         update_job(db, job.day, job.pair, 'STACK', 'T')
+
+            logger.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & "
+                         "process %.2f s)" % ((time.time() - jt),
+                                              start_processing - jt,
+                                              time.time() - start_processing))
+            del stream, allcorr
     logger.info('*** Finished: Compute CC ***')
