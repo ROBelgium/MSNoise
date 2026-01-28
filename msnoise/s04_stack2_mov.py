@@ -54,9 +54,6 @@ def main(stype, loglevel="INFO"):
 
         for pred in pred_steps:
             lineage, lineage_names, params = get_merged_params(db, orig_params, step_params, pred)
-
-            print("mov stack", params.mov_stack)
-
             mov_stacks = params.mov_stack
             wiener_mlen = params.wiener_mlen
             wiener_nlen = params.wiener_nlen
@@ -152,6 +149,7 @@ def main(stype, loglevel="INFO"):
                     dr = c.resample(times="%is" % params.corr_duration).mean()
 
                 else:
+                    # TODO this is not yet compatible with the lineage folder structure:
                     logger.warning("keep_all=N used, sampling interval will be 1-day")
                     c = get_results(db, lineage_names, sta1, sta2, filterid, components, all_days,  mov_stack=1, format="xarray",
                         params=params).sortby('times')
