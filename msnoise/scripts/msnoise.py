@@ -12,9 +12,11 @@ import click
 # from click_plugins import with_plugins
 # import importlib.metadata
 
+try:
+    from .._version import version as __version__
+except ImportError:
+    __version__ = "0.0.0.dev0"
 
-from .._version import get_git_version
-__version__ = get_git_version(dirty=True)
 
 from .. import MSNoiseError, DBConfigNotFoundError
 from ..api import connect, get_config, update_station, get_logger, get_job_types
