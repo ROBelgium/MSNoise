@@ -4,7 +4,6 @@ recursive-include msnoise/templates *
 recursive-include msnoise/static *
 
 recursive-include msnoise/config *.csv
-include msnoise/RELEASE-VERSION
 
 include msnoise/_version.py
 include msnoise/default.csv
