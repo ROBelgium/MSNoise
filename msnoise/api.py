@@ -19,8 +19,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from obspy.core import AttribDict
-
 from . import DBConfigNotFoundError
 from .msnoise_table_def import Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink
 
@@ -4687,6 +4685,7 @@ def get_filter_steps_for_cc_step_name(session, cc_step_name, workflow_id="defaul
     return filter_steps
 
 def merge_params(orig_params, configs_in_order):
+    from obspy.core import AttribDict
     merged = dict(orig_params)
     for cfg in configs_in_order:
         merged.update(cfg)  # later overrides earlier

@@ -1,10 +1,9 @@
 import os
 import pydoc
 import pandas as pd
-from obspy.core.util import AttribDict
-
 
 def get_defaults():
+    from obspy.core.util import AttribDict
     df = pd.read_csv(os.path.join(os.path.dirname(os.path.realpath(__file__)), "config", "config_global.csv"),
                      delimiter=",", encoding="latin-1", index_col=0)
     df["type"] = [pydoc.locate(t) for t in df["type"].values]
