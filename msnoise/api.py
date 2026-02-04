@@ -3996,6 +3996,7 @@ def get_workflow_graph(session, workflow_id="default"):
 
 def get_config_sets_summary(session):
     """Get summary of all configuration sets for workflow creation"""
+    from sqlalchemy.sql.expression import func
     from .msnoise_table_def import declare_tables
     schema = declare_tables()
 
