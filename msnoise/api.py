@@ -1582,7 +1582,7 @@ def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
         session.add(job)
     else:
         job.flag = flag
-        job.lastmod = datetime.datetime.utcnow()
+        job.lastmod = datetime.datetime.now(datetime.timezone.utc)
     if commit:
         session.commit()
     if returnjob:
