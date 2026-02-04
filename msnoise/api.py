@@ -3757,15 +3757,6 @@ def get_step_predecessors(session, step_id):
         .filter(schema.WorkflowLink.to_step_id == step_id) \
         .filter(schema.WorkflowLink.is_active == True).all()
 
-def get_direct_predecessors(session, step_id):
-    """
-    Alias/helper for workflow graph traversal.
-
-    Returns the direct predecessor WorkflowStep nodes for the given step_id,
-    using active WorkflowLinks only (same behavior as get_step_predecessors).
-    """
-    return get_step_predecessors(session, step_id)
-
 def get_upstream_steps_for_step_id(session, step_id, topo_order=True, include_self=False):
     """
     Returns all upstream WorkflowStep nodes (recursive predecessors) for `step_id`.
