@@ -582,7 +582,6 @@ def test_034_instrument_response(setup_environment):
     db = connect()
     response_path = setup_environment['response_path']
     update_config(db, 'response_path', response_path)
-    update_config(db, 'response_format', "dataless")
     update_config(db, 'remove_response', "Y")
     db.close()
     test_013_s03compute_cc()
