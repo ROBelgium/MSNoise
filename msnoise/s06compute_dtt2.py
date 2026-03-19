@@ -73,16 +73,12 @@ def main(interval=1, loglevel="INFO"):
         dist = interstations[dpair] if dpair in interstations else 0.0
         logger.info(
             "There are DTT jobs for some days to recompute for %s" % pair)
-        # todo: remove
-        filterid = 1
-        mwcsid =1
-        dttid = 1
         for components in components_to_compute:
             for mov_stack in mov_stacks:
                 output = []
                 try:
-                    mwcs = xr_get_mwcs2(params.output_folder, lineage_names, step.step_name,
-                                        station1, station2, components, filterid, mwcsid, mov_stack)
+                    mwcs = xr_get_mwcs2(params.output_folder, lineage_names,
+                                        station1, station2, components, mov_stack)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
@@ -165,7 +161,7 @@ def main(interval=1, loglevel="INFO"):
                                     columns=["m", "em", "a", "ea", "m0", "em0"])
 
                 xr_save_dtt2(params.output_folder, lineage_names, step.step_name,
-                             station1, station2, components, filterid, mwcsid, dttid, mov_stack, output)
+                             station1, station2, components, mov_stack, output)
 
         massive_update_job(db, jobs, "D")
 
