@@ -167,30 +167,26 @@ def main(loglevel="INFO"):
         else:
             components_to_compute = params.components_to_compute
 
-        # todo: remove
-        filterid = 1
         for components in components_to_compute:
             try:
-                ref = xr_get_ref(params.output_folder, lineage_names, step.step_name,
-                                 station1, station2, components, 1, taxis)
+                ref = xr_get_ref(params.output_folder, lineage_names,
+                                 station1, station2, components, None, taxis)
                 ref = ref.CCF.values
             except FileNotFoundError as fullpath:
                 logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                 continue
             if not len(ref):
                 continue
-            # print("Whitening ref")
-            # ref = ww(ref)
 
             for mov_stack in mov_stacks:
                 output = []
                 try:
-                    data = xr_get_ccf(params.output_folder, lineage_names, step.step_name,
-                                      station1, station2, components, filterid, mov_stack, taxis)
+                    data = xr_get_ccf(params.output_folder, lineage_names,
+                                      station1, station2, components, None, mov_stack, taxis)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
-                logger.debug("Processing %s:%s f%i m%s %s" % (station1, station2, filterid, mov_stack, components))
+                logger.debug("Processing %s:%s m%s %s" % (station1, station2, mov_stack, components))
                 # todo = data.index.intersection()
                 # data = data.loc[todo]
 
@@ -335,7 +331,7 @@ def main(loglevel="INFO"):
                 output = pd.concat(output, axis=1)
 
                 xr_save_mwcs2(params.output_folder, lineage_names, step.step_name,
-                              station1, station2, components, filterid, mov_stack, taxis, output)
+                              station1, station2, components, None, mov_stack, taxis, output)
                 del data, output
 
         massive_update_job(db, jobs, "D")

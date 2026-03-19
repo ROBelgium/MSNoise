@@ -3158,7 +3158,7 @@ def xr_save_ccf(root, lineage, step_name, station1, station2, components, filter
         return dr
 
 
-def xr_get_ccf(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, format="dataframe"):
+def xr_get_ccf(root, lineage, station1, station2, components, filterid, mov_stack, taxis, format="dataframe"):
     path = os.path.join(root, *lineage, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
@@ -3188,7 +3188,7 @@ def xr_save_ref(root, lineage, step_name, station1, station2, components, filter
         return dr
 
 
-def xr_get_ref(root, lineage, step_name, station1, station2, components, filterid, taxis, ignore_network=False):
+def xr_get_ref(root, lineage, station1, station2, components, filterid, taxis, ignore_network=False):
     path = os.path.join(root, *lineage, "_output",
                         "REF", "%s" % components)
     # If ignore_network is True, strip the network code from the station names
@@ -3233,7 +3233,7 @@ def xr_save_mwcs2(root, lineage, step_name, station1, station2, components, filt
     xr_save_and_close(rr, fn)
     del dr, rr, d
 
-def xr_get_mwcs2(root, lineage, step_name, station1, station2, components, filterid, mwcsid, mov_stack):
+def xr_get_mwcs2(root, lineage, station1, station2, components, mov_stack):
     fn = os.path.join(root, *lineage, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]),
                        "%s" % components,
@@ -3246,19 +3246,16 @@ def xr_get_mwcs2(root, lineage, step_name, station1, station2, components, filte
     return data
 
 
-def xr_save_dtt2(root, lineage, step_name, station1, station2, components, filterid, mwcsid, dttid, mov_stack, dataframe):
+def xr_save_dtt2(root, lineage, step_name, station1, station2, components, mov_stack, dataframe):
     """
     :param station1: string, name of station 1
     :param station2: string, name of station 2
     :param components: string, name of the components
-    :param filterid: int, filter id
     :param mov_stack: int, number of days in the moving stack
     :param dataframe: pandas DataFrame containing the data
     :return: None
 
-    This method saves the given data in a NetCDF file using the specified parameters. The file path is constructed based on the station names, components, filter id, and moving stack number
-    *. The data in the DataFrame is stacked, and the index is set to include "times" and "keys" as names. The column in the DataFrame is renamed to "DTT". A new or existing NetCDF file is
-    * opened using the given file path, and the stacked data is inserted or updated in the file. The resulting dataset is then saved and the file is closed.
+    Saves DTT data to a NetCDF file using lineage-aware path.
     """
     fn = os.path.join(root, *lineage, step_name, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
@@ -3274,7 +3271,7 @@ def xr_save_dtt2(root, lineage, step_name, station1, station2, components, filte
     rr = xr_insert_or_update(dr, rr)
     xr_save_and_close(rr, fn)
 
-def xr_get_dtt2(root, lineage, step_name, station1, station2, components, filterid, mwcsid, dttid, mov_stack):
+def xr_get_dtt2(root, lineage, station1, station2, components, mov_stack):
     """
     :param station1: The first station name
     :param station2: The second station name
@@ -3287,7 +3284,7 @@ def xr_get_dtt2(root, lineage, step_name, station1, station2, components, filter
     * does not exist, it raises a FileNotFoundError. Otherwise, it opens the NetCDF file and extracts the DTT variable as a dataframe. The dataframe is then rearranged and returned as the
     * result.
     """
-    fn = os.path.join(root, *lineage, step_name, "_output",
+    fn = os.path.join(root, *lineage, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
@@ -3299,9 +3296,8 @@ def xr_get_dtt2(root, lineage, step_name, station1, station2, components, filter
     data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
     return data
 
-def xr_save_dvv2(components, filterid, mwcsid, dttid, mov_stack, dataframe):
-    fn = os.path.join("DVV/MWCS/DVV", "f%02i" % filterid,
-                      "mwcs%02i" % mwcsid, "dtt%02i" % dttid,
+def xr_save_dvv2(root, lineage, step_name, components, mov_stack, dataframe):
+    fn = os.path.join(root, *lineage, step_name, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s.nc" % components)
     if not os.path.isdir(os.path.split(fn)[0]):
@@ -3327,9 +3323,8 @@ def xr_save_dvv2(components, filterid, mwcsid, dttid, mov_stack, dataframe):
     del dr, rr, d
 
 
-def xr_get_dvv2(components, filterid, mwcsid, dttid, mov_stack):
-    fn = os.path.join("DVV/MWCS/DVV", "f%02i" % filterid,
-                      "mwcs%02i" % mwcsid, "dtt%02i" % dttid,
+def xr_get_dvv2(root, lineage, components, mov_stack):
+    fn = os.path.join(root, *lineage, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s.nc" % components)
     if not os.path.isfile(fn):
@@ -3503,15 +3498,17 @@ def compute_dvv(session, filterid, mov_stack, pairs=None, components=None, param
 
     return stats.sort_index(axis=1)
 
-def compute_dvv2(session, filterid, mwcsid, dttid, mov_stack, pairs=None, components=None, params=None, method=None, **kwargs):
+def compute_dvv2(session, root, lineage, mov_stack, pairs=None, components=None, params=None, method=None, **kwargs):
     """
     Compute DVV statistics for a given seismic session, filter ID, and movement stack. The method calculates various
     statistical measures for DVV values based on the provided parameters.
 
     :param session: Seismic session object.
     :type session: object
-    :param filterid: ID of the filter.
-    :type filterid: str
+    :param root: Root output folder path.
+    :type root: str
+    :param lineage: List of lineage path components (upstream DTT step lineage).
+    :type lineage: list
     :param mov_stack: Movement stack object.
     :type mov_stack: object
     :param pairs: List of station pairs. Defaults to None.
@@ -3557,7 +3554,7 @@ def compute_dvv2(session, filterid, mwcsid, dttid, mov_stack, pairs=None, compon
                 continue
 
             try:
-                dtt = xr_get_dtt2(s1, s2, comp, filterid, mwcsid, dttid, mov_stack)
+                dtt = xr_get_dtt2(root, lineage, s1, s2, comp, mov_stack)
                 all.append(dtt)
             except FileNotFoundError:
                 traceback.print_exc()
@@ -3575,18 +3572,19 @@ def compute_dvv2(session, filterid, mwcsid, dttid, mov_stack, pairs=None, compon
 
     return stats.sort_index(axis=1)
 
-def xr_save_wct2(station1, station2, components, filterid, wctid, mov_stack, taxis, freqs, WXamp_list, WXcoh_list, WXdt_list, dates_list, output_dir="WCT"):
+def xr_save_wct2(root, lineage, step_name, station1, station2, components, mov_stack, taxis, freqs, WXamp_list, WXcoh_list, WXdt_list, dates_list):
     """
     Save WCT results into an xarray Dataset and store it as a NetCDF file.
 
     Parameters:
+    - root: str, Root output folder path
+    - lineage: list, Lineage path components
+    - step_name: str, Step name for output path
     - station1, station2: str, Station pair
     - components: str, Seismic component (e.g., ZZ)
-    - filterid: int, Filter reference ID
-    - wctid: int, WCT parameter ID
     - mov_stack: tuple, Moving stack window (e.g., ('1d', '1d'))
     - taxis, freqs: np.array, Time axis and frequency axis
-    - WXamp_list, Wcoh_list, WXdt_list: list of np.array, WCT outputs
+    - WXamp_list, WXcoh_list, WXdt_list: list of np.array, WCT outputs
     - dates_list: list of datetime, Timestamps for each WCT calculation
     """
 
@@ -3616,9 +3614,9 @@ def xr_save_wct2(station1, station2, components, filterid, wctid, mov_stack, tax
     ds = xr.Dataset({"WXamp": WXamp_da, "Wcoh": Wcoh_da, "WXdt": WXdt_da})
 
     # Define output directory
-    fn = os.path.join("DVV/WCT/", output_dir, "f%02i" % filterid, "wct%02i" % wctid, 
-                            "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components, 
-                            f"{station1}_{station2}.nc")
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
+                      components, f"{station1}_{station2}.nc")
     
     os.makedirs(os.path.dirname(fn), exist_ok=True)
 
@@ -3630,15 +3628,15 @@ def xr_save_wct2(station1, station2, components, filterid, wctid, mov_stack, tax
     # Cleanup memory
     del ds, WXamp_da, Wcoh_da, WXdt_da
 
-def xr_load_wct(station1, station2, components, filterid, wctid, mov_stack):
+def xr_load_wct(root, lineage, station1, station2, components, mov_stack):
     """
     Load WCT results from an xarray Dataset stored in a NetCDF file.
 
     Parameters:
+    - root: str, Root output folder path
+    - lineage: list, Lineage path components
     - station1, station2: str, Station pair
     - components: str, Seismic component (e.g., ZZ)
-    - filterid: int, Filter reference ID
-    - wctid: int, WCT parameter ID
     - mov_stack: tuple, Moving stack window (e.g., ('1d', '1d'))
 
     Returns:
@@ -3646,11 +3644,9 @@ def xr_load_wct(station1, station2, components, filterid, wctid, mov_stack):
     """
 
     # Construct the file path
-    fn = os.path.join(
-        "DVV/WCT/WCT", f"f{filterid:02d}", f"wct{wctid:02d}",
-        f"{mov_stack[0]}_{mov_stack[1]}", components,
-        f"{station1}_{station2}.nc"
-    )
+    fn = os.path.join(root, *lineage, "_output",
+                      f"{mov_stack[0]}_{mov_stack[1]}", components,
+                      f"{station1}_{station2}.nc")
 
     # Check if the file exists
     if not os.path.exists(fn):
@@ -3660,18 +3656,22 @@ def xr_load_wct(station1, station2, components, filterid, wctid, mov_stack):
     ds = xr.load_dataset(fn)
     return ds
 
-def xr_save_wct_dtt2(station1, station2, components, filterid, wctid, dttid, mov_stack, taxis, dvv_df, err_df, coh_df):
+def xr_save_wct_dtt2(root, lineage, step_name, station1, station2, components, mov_stack, taxis, dvv_df, err_df, coh_df):
     """
     Save the Wavelet Coherence Transform (WCT) results as a NetCDF file.
 
+    :param root: Root output folder path.
+    :type root: str
+    :param lineage: List of lineage path components.
+    :type lineage: list
+    :param step_name: Step name for output path.
+    :type step_name: str
     :param station1: The first station in the pair.
     :type station1: str
     :param station2: The second station in the pair.
     :type station2: str
     :param components: The components (e.g., Z, N, E) being analyzed.
     :type components: str
-    :param filterid: Filter ID used in the analysis.
-    :type filterid: int
     :param mov_stack: Tuple of (start, end) representing the moving stack window.
     :type mov_stack: tuple
     :param taxis: Time axis corresponding to the WCT data.
@@ -3686,11 +3686,9 @@ def xr_save_wct_dtt2(station1, station2, components, filterid, wctid, dttid, mov
     """
 
     # Construct the file path
-    fn = os.path.join(
-        "DVV/WCT/DTT", f"f{filterid:02d}", f"wct{wctid:02d}", f"dtt{dttid:02d}",
-        f"{mov_stack[0]}_{mov_stack[1]}", components,
-        f"{station1}_{station2}.nc"
-    )
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                      f"{mov_stack[0]}_{mov_stack[1]}", components,
+                      f"{station1}_{station2}.nc")
 
     # Ensure the directory exists
     os.makedirs(os.path.dirname(fn), exist_ok=True)
@@ -3716,9 +3714,109 @@ def xr_save_wct_dtt2(station1, station2, components, filterid, wctid, dttid, mov
     # Clean up
     del dvv_da, err_da, coh_da, ds
 
+
+def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20,
+                    mincoh=0.5, maxdt=0.2, min_nonzero=0.25, freqmin=0.1, freqmax=2.0):
+    """
+    Compute dv/v and associated errors from wavelet coherence transform results.
+
+    :param freqs: Frequency values from the WCT.
+    :param tvec: Time axis.
+    :param WXamp: Cross-wavelet amplitude array (freqs × taxis).
+    :param Wcoh: Wavelet coherence array (freqs × taxis).
+    :param delta_t: Time delay array (freqs × taxis).
+    :param lag_min: Minimum coda lag in seconds.
+    :param coda_cycles: Number of periods to use as coda window width.
+    :param mincoh: Minimum coherence threshold.
+    :param maxdt: Maximum allowed time delay.
+    :param min_nonzero: Minimum fraction of valid (non-zero weight) samples required.
+    :param freqmin: Lower frequency bound for regression.
+    :param freqmax: Upper frequency bound for regression.
+    :returns: Tuple of (dvv [%], err [%], weighting_function).
+    """
+    import warnings
+    from scipy.optimize import OptimizeWarning
+    from obspy.signal.regression import linear_regression
+
+    inx = np.where((freqs >= freqmin) & (freqs <= freqmax))
+    dvv = np.zeros(len(inx[0]))
+    err = np.zeros(len(inx[0]))
+
+    weight_func = np.log(np.abs(WXamp)) / np.log(np.abs(WXamp)).max()
+    zero_idx = np.where((Wcoh < mincoh) | (delta_t > maxdt))
+    wf = (weight_func + abs(np.nanmin(weight_func))) / weight_func.max()
+    wf[zero_idx] = 0
+
+    problematic_freqs = []
+    for ii, ifreq in enumerate(inx[0]):
+        period = 1.0 / freqs[ifreq]
+        lag_max = lag_min + (period * coda_cycles)
+        tindex = np.where(
+            ((tvec >= -lag_max) & (tvec <= -lag_min)) |
+            ((tvec >= lag_min) & (tvec <= lag_max))
+        )[0]
+        if len(tvec) > 2:
+            if not np.any(delta_t[ifreq]):
+                continue
+            delta_t[ifreq][tindex] = np.nan_to_num(delta_t[ifreq][tindex])
+            w = wf[ifreq]
+            nzc_perc = np.count_nonzero(w[tindex] > 0) / len(tindex)
+            if nzc_perc >= min_nonzero:
+                with warnings.catch_warnings(record=True) as w_catcher:
+                    warnings.simplefilter("always", OptimizeWarning)
+                    m, em = linear_regression(tvec[tindex], delta_t[ifreq][tindex],
+                                              w[tindex], intercept_origin=True)
+                    if any(issubclass(warning.category, OptimizeWarning)
+                           for warning in w_catcher):
+                        problematic_freqs.append(freqs[ifreq])
+                dvv[ii], err[ii] = -m, em
+            else:
+                dvv[ii], err[ii] = np.nan, np.nan
+    if problematic_freqs:
+        logging.warning(
+            f"Covariance issues at {min(problematic_freqs):.2f}-{max(problematic_freqs):.2f} Hz: "
+            f"consider adjusting min_nonzero={min_nonzero}, mincoh={mincoh}, "
+            f"maxdt={maxdt}, coda_cycles={coda_cycles}"
+        )
+    return dvv * 100, err * 100, wf
+
+
+def get_wct_avgcoh(freqs, tvec, wcoh, freqmin, freqmax, lag_min=5, coda_cycles=20):
+    """
+    Calculate average wavelet coherence over a frequency range and coda window.
+
+    :param freqs: Frequency array.
+    :param tvec: Time axis.
+    :param wcoh: Wavelet coherence array (freqs × taxis).
+    :param freqmin: Lower frequency bound.
+    :param freqmax: Upper frequency bound.
+    :param lag_min: Minimum coda lag in seconds.
+    :param coda_cycles: Number of periods to use as coda window width.
+    :returns: Average coherence per frequency bin within [freqmin, freqmax].
+    """
+    inx = np.where((freqs >= freqmin) & (freqs <= freqmax))
+    coh = np.zeros(inx[0].shape)
+    for ii, ifreq in enumerate(inx[0]):
+        period = 1.0 / freqs[ifreq]
+        lag_max = lag_min + (period * coda_cycles)
+        tindex = np.where(
+            ((tvec >= -lag_max) & (tvec <= -lag_min)) |
+            ((tvec >= lag_min) & (tvec <= lag_max))
+        )[0]
+        if len(tvec) > 2:
+            if not np.any(wcoh[ifreq]) or wcoh[ifreq][tindex].size == 0:
+                coh[ii] = np.nan
+                continue
+            coh[ii] = np.nanmean(np.abs(wcoh[ifreq][tindex]))
+        else:
+            coh[ii] = np.nan
+    return coh
+
+
 def filter_within_daterange(date, start_date, end_date):
     """Check if a date falls within the configured range"""
     return start_date <= date <= end_date
+
 
 # ============================================================================
 # Workflow Management Functions

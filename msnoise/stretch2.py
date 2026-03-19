@@ -131,31 +131,10 @@ def main(loglevel="INFO"):
         extension = ".MSEED"
     else:
         extension = "." + export_format
-    mov_stacks = params.mov_stack
 
-    goal_sampling_rate = params.cc_sampling_rate
-    maxlag = params.maxlag
-
-    # First we reset all DTT jobs to "T"odo if the REF is new for a given pair
-    # for station1, station2 in get_station_pairs(db, used=True):
-    #     sta1 = "%s.%s" % (station1.net, station1.sta)
-    #     sta2 = "%s.%s" % (station2.net, station2.sta)
-    #     pair = "%s:%s" % (sta1, sta2)
-    #     if is_dtt_next_job(db, jobtype='DTT', ref=pair):
-    #         logger.info(
-    #             "We will recompute all MWCS based on the new REF for %s" % pair)
-    #         reset_dtt_jobs(db, pair)
-    #         update_job(db, "REF", pair, jobtype='DTT', flag='D')
-    # 
-    logger.debug('Ready to compute')
-    # Then we compute the jobs
-    outfolders = []
-    #filters = get_filters(db, all=False)
-    dvv_stretching_params = get_dvv_stretching_jobs(db, all=False)
     time.sleep(np.random.random() * 5)
     taxis = get_t_axis(db)
-    smoothing_half_win= 5
-    # hanningwindow = get_window("hanning", smoothing_half_win)
+    smoothing_half_win = 5
     while is_next_job_for_step(db, step_category="stretching"):
         logger.info("Getting the next job")
         batch = get_next_lineage_batch(db, step_category="stretching", group_by="pair_lineage", loglevel=loglevel,
@@ -172,11 +151,12 @@ def main(loglevel="INFO"):
         lineage_str = batch["lineage_str"]
         step = batch["step"]
 
-        logger.info(f"New MWCS-DTT Job: pair={pair} n_days={len(days)} lineage={lineage_str}")
-        
-        # todo remove
-        filterid = 1
-        strid = 1
+        logger.info(f"New Stretching Job: pair={pair} n_days={len(days)} lineage={lineage_str}")
+
+        root = params.output_folder
+        mov_stacks = params.mov_stack
+        goal_sampling_rate = params.cc_sampling_rate
+        maxlag = params.maxlag
 
         netsta1, netsta2 = pair.split(':')
         station1, station2 = pair.split(":")
@@ -189,14 +169,12 @@ def main(loglevel="INFO"):
             ref_name = pair.replace(':', '_')
             station1, station2 = pair.split(":")
             try:
-                ref = xr_get_ref(params.output_folder, lineage_names, step.step_name,
-                                 station1, station2, components, filterid, taxis)
+                ref = xr_get_ref(root, lineage_names,
+                                 station1, station2, components, None, taxis)
                 ref = ref.CCF.values
             except FileNotFoundError as fullpath:
                 logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                 continue
-            # print("Whitening ref")
-            # ref = ww(ref)
 
             # zero the data outside of the minlag-maxlag timing
             if params.stretching_lag == "static":
@@ -229,12 +207,12 @@ def main(loglevel="INFO"):
                 #allerrs = []
 
                 try:
-                    data = xr_get_ccf(params.output_folder, lineage_names, step.step_name,
-                                      station1, station2, components, filterid, mov_stack, taxis)
+                    data = xr_get_ccf(root, lineage_names,
+                                      station1, station2, components, None, mov_stack, taxis)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
-                logger.debug("Processing %s:%s f%i m%s %s" % (station1, station2, filterid, mov_stack, components))
+                logger.debug("Processing %s:%s m%s %s" % (station1, station2, mov_stack, components))
 
                 to_search = pd.to_datetime(days)
                 data = data[data.index.floor('d').isin(to_search)]
@@ -297,12 +275,12 @@ def main(loglevel="INFO"):
                         error = np.nan  # gaussian fit failed
 
                     allerrs.append(error)
-                # TODO make the following lines into the API xr_save_stretching !
+                # TODO: migrate to xr_save_dvv_stretching using NetCDF format
                 df = pd.DataFrame(
                     np.array([alldeltas, allcoefs, allerrs]).T,
                     index=alldays, columns=["Delta", "Coeff", "Error"], )
-                output = os.path.join('DVV/STR', "f%02i" % filterid, "str%02i" % strid,
-                                    "%s_%s" % (mov_stack[0],mov_stack[1]), components)
+                output = os.path.join(root, *lineage_names, step.step_name, "_output",
+                                      "%s_%s" % (mov_stack[0], mov_stack[1]), components)
                 # print(df.head())
                 if not os.path.isdir(output):
                     os.makedirs(output)
