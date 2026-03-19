@@ -570,6 +570,23 @@ def main(init=False, nocc=False, after=False):
             logger.info(f'Propagation from category "cc" created/updated {created} STACK job(s) (daily + REF)')
             return
 
+        # preprocess→cc is a fan-out: one single-station job → many station-pair jobs.
+        # propagate_first_runnable_from_category can't handle that (it assumes pair format
+        # is preserved), so we use the dedicated function instead.
+        if source_category == "preprocess":
+            cc_jobs, created = create_cc_jobs_from_preprocess(session=db)
+            if cc_jobs:
+                for job in cc_jobs:
+                    update_job_workflow(db, job['day'], job['pair'],
+                                        job['jobtype'], job['flag'],
+                                        step_id=job.get('step_id'),
+                                        priority=job.get('priority', 0),
+                                        lineage=job.get('lineage'),
+                                        commit=False)
+                db.commit()
+            logger.info(f'Propagation from category "preprocess" created {created} CC job(s)')
+            return
+
         created = propagate_first_runnable_from_category(
             session=db,
             source_category=source_category,

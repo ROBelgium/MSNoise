@@ -375,17 +375,15 @@ def test_023_stack():
     db.close()
     new_jobs_main(after='cc')
     db = connect()
-    interval = 1.
-    stack_main('ref', interval)
+
+    stack_main('ref')
     reset_jobs(db, "stack_1", alljobs=True)
-    stack_main('mov', interval)
-    reset_jobs(db, "stack_1", alljobs=True)
-    stack_main('step', interval)
+    stack_main('mov')
 
     update_config(db, 'wienerfilt', 'Y')
     reset_jobs(db, "stack_1", alljobs=True)
-    stack_main('mov', interval)
-    stack_main('ref', interval)
+    stack_main('mov')
+    stack_main('ref')
 
     db.close()
 
