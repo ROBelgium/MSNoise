@@ -438,6 +438,11 @@ def get_config_set_details(session, set_name, set_number, format="list"):
             import pydoc
             attrib_dict = AttribDict()
             for c in configs:
+                if c.value is None or c.value == '':
+                    if c.param_type == 'str':
+                        attrib_dict[c.name] = ''
+                    # else: skip — can't convert empty string to int/float/eval
+                    continue
                 itemtype = pydoc.locate(c.param_type)
                 if itemtype is bool:
                     if c.value in [True, 'True', 'true', 'Y', 'y', '1', 1]:
@@ -450,8 +455,9 @@ def get_config_set_details(session, set_name, set_number, format="list"):
 
 
     except Exception as e:
-        get_logger("msnoise").error(f"Failed to get config set details: {str(e)}")
-        return []
+        from obspy.core import AttribDict
+        get_logger("msnoise", loglevel="ERROR").error(f"Failed to get config set details: {str(e)}")
+        return AttribDict() if format == "AttribDict" else []
 
 def get_config_categories_definition():
     """Get the standard configuration categories with their display names and order"""
@@ -559,6 +565,104 @@ def get_params(session):
     # else:
     #     params.mov_stack = params.mov_stack
     return params
+
+
+def get_stack_lineage_for_filter(session, filterid):
+    """Get the full lineage path through a specific filter step to its downstream stack.
+
+    Traverses the workflow graph upstream from ``filter_{filterid}`` to the root
+    preprocess step, then appends the stack step that is immediately downstream of
+    the filter.  Returns a list of step names suitable for use as the *lineage*
+    argument to :func:`xr_get_ref`, :func:`xr_get_ccf`, etc.
+
+    Example for the default single-pipeline::
+
+        get_stack_lineage_for_filter(db, 1)
+        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1']
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :type filterid: int
+    :param filterid: The filter set_number (e.g. 1 for filter_1).
+    :rtype: list of str
+    """
+    steps = get_workflow_steps(session)
+    links = get_workflow_links(session)
+    step_map = {s.step_id: s for s in steps}
+
+    filter_step = next(
+        (s for s in steps if s.category == 'filter' and s.set_number == filterid),
+        None,
+    )
+    if filter_step is None:
+        return []
+
+    # Walk upstream from filter to the root step
+    parent_map = {link.to_step_id: link.from_step_id for link in links}
+    path = [filter_step.step_name]
+    current_id = filter_step.step_id
+    visited = set()
+    while current_id in parent_map:
+        if current_id in visited:
+            break  # guard against cycles
+        visited.add(current_id)
+        parent_id = parent_map[current_id]
+        path.insert(0, step_map[parent_id].step_name)
+        current_id = parent_id
+
+    # Append the stack step immediately downstream of this filter (if any)
+    for link in links:
+        if link.from_step_id == filter_step.step_id:
+            child = step_map.get(link.to_step_id)
+            if child and child.category == 'stack':
+                path.append(child.step_name)
+                break
+
+    return path
+
+
+def get_lineage_for_step(session, category, set_number=1):
+    """Get the lineage path (list of step names) from the root to a given step.
+
+    Traverses the workflow graph *upstream* from the step identified by
+    *category* and *set_number*, returning a list of step names from the
+    root step (no parent) to (and including) the requested step.
+
+    Example for the default single-pipeline::
+
+        get_lineage_for_step(db, 'mwcs_dtt', 1)
+        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'mwcs_1', 'mwcs_dtt_1']
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :type category: str
+    :type set_number: int
+    :rtype: list of str
+    """
+    steps = get_workflow_steps(session)
+    links = get_workflow_links(session)
+
+    target_step = next(
+        (s for s in steps if s.category == category and s.set_number == set_number),
+        None,
+    )
+    if target_step is None:
+        return []
+
+    step_map = {s.step_id: s for s in steps}
+    parent_map = {link.to_step_id: link.from_step_id for link in links}
+
+    path = [target_step.step_name]
+    current_id = target_step.step_id
+    visited = set()
+    while current_id in parent_map:
+        if current_id in visited:
+            break  # guard against cycles
+        visited.add(current_id)
+        parent_id = parent_map[current_id]
+        path.insert(0, step_map[parent_id].step_name)
+        current_id = parent_id
+
+    return path
+
 
 # FILTERS PART
 
@@ -3588,23 +3692,24 @@ def xr_save_wct2(root, lineage, step_name, station1, station2, components, mov_s
     - dates_list: list of datetime, Timestamps for each WCT calculation
     """
 
-    # Convert lists to xarray DataArrays
+    # Convert lists to xarray DataArrays (all WCT outputs are real-valued;
+    # cast explicitly in case intermediate complex dtype was inherited)
     WXamp_da = xr.DataArray(
-        data=np.array(WXamp_list),
+        data=np.array(WXamp_list).real,
         dims=["times", "freqs", "taxis"],
         coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
         name="WXamp"
     )
 
     Wcoh_da = xr.DataArray(
-        data=np.array(WXcoh_list),
+        data=np.array(WXcoh_list).real,
         dims=["times", "freqs", "taxis"],
         coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
         name="Wcoh"
     )
 
     WXdt_da = xr.DataArray(
-        data=np.array(WXdt_list),
+        data=np.array(WXdt_list).real,
         dims=["times", "freqs", "taxis"],
         coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
         name="WXdt"

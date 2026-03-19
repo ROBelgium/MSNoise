@@ -29,6 +29,9 @@ def main(loglevel="INFO", njobs_per_worker=9999):
     responses = preload_instrument_responses(db, return_format="inventory")
 
     params = get_params(db)
+    qc_params = get_config_set_details(db, 'qc', 1, format='AttribDict')
+    if qc_params:
+        params.update(qc_params)
     ppsd_components = params.qc_components
 
     while is_dtt_next_job(db, jobtype='PSD2HDF'):

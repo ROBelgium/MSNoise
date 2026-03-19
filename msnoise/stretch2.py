@@ -126,12 +126,6 @@ def main(loglevel="INFO"):
 
     db = connect()
     params = get_params(db)
-    export_format = params.export_format
-    if export_format == "BOTH":
-        extension = ".MSEED"
-    else:
-        extension = "." + export_format
-
     time.sleep(np.random.random() * 5)
     taxis = get_t_axis(db)
     smoothing_half_win = 5
@@ -188,7 +182,7 @@ def main(loglevel="INFO"):
                 minlag = get_interstation_distance(SS1, SS2,
                                                 SS1.coordinates) / params.stretching_v
             maxlag2 = minlag + params.stretching_width
-            mid = int(params.goal_sampling_rate * params.maxlag)
+            mid = int(params.cc_sampling_rate * params.maxlag)
             print("betweeen", minlag, "and", maxlag2    )
             ref[mid - int(minlag * goal_sampling_rate):mid + int(
                 minlag * goal_sampling_rate)] *= 0.
@@ -222,10 +216,10 @@ def main(loglevel="INFO"):
                 # data = pd.DataFrame(data)
                 # data = data.apply(ww, axis=1, result_type="broadcast")
 
-                data.iloc[:,mid - int(minlag * params.goal_sampling_rate):mid + int(
-                    minlag * params.goal_sampling_rate)] *= 0.
-                data.iloc[:,mid - int(maxlag2 * params.goal_sampling_rate)] *= 0.
-                data.iloc[:,mid + int(maxlag2 * params.goal_sampling_rate):] *= 0.
+                data.iloc[:,mid - int(minlag * params.cc_sampling_rate):mid + int(
+                    minlag * params.cc_sampling_rate)] *= 0.
+                data.iloc[:,mid - int(maxlag2 * params.cc_sampling_rate)] *= 0.
+                data.iloc[:,mid + int(maxlag2 * params.cc_sampling_rate):] *= 0.
 
                 data_values = data.values
                 num_days = data_values.shape[0]

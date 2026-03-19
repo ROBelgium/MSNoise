@@ -52,15 +52,22 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, show=True,
     pair = "%s:%s" % (sta1, sta2)
 
     params = get_params(db)
+    lineage = get_stack_lineage_for_filter(db, filterid)
+    if lineage:
+        stack_set = int(lineage[-1].rsplit('_', 1)[-1])
+        stack_params = get_config_set_details(db, 'stack', stack_set, format='AttribDict')
+        if stack_params:
+            params.update(stack_params)
     mov_stack = params.mov_stack[mov_stackid - 1]
     # print(mov_stack)
+    output_folder = get_config(db, 'output_folder') or 'OUTPUT'
 
     logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filterid,
                                         mov_stack))
 
 
     try:
-        data = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
+        data = xr_get_ccf(output_folder, lineage, sta1, sta2, components, filterid, mov_stack, taxis)
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
         sys.exit(1)
@@ -86,9 +93,12 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, show=True,
     # ax.xaxis.set_minor_locator(DayLocator())
     # ax.xaxis.set_minor_formatter(DateFormatter('%Y-%m-%d %H:%M'))
 
-    filter = get_filters(db, ref=filterid)
-    low = float(filter.freqmin)
-    high = float(filter.freqmax)
+    filter_params = get_config_set_details(db, 'filter', filterid, format='AttribDict')
+    if filter_params:
+        low = float(filter_params.freqmin)
+        high = float(filter_params.freqmax)
+    else:
+        low = high = 0.0
 
     if "ylim" in kwargs:
         plt.ylim(kwargs["ylim"][0],kwargs["ylim"][1])

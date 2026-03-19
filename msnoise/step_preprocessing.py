@@ -80,6 +80,8 @@ def main(init=False, threads=1, loglevel="INFO"):
             break
 
         jobs, step = jobs
+        if not jobs:
+            break
 
         # All jobs in the set have the same step and day
         first_job = jobs[0]

@@ -1606,15 +1606,13 @@ def dvv_compute_wct(ctx, batch_size):
         for p in processes:
             p.join()
 
-@dvv.command(name='merge_wct')
+@dvv.command(name='compute_wct_dtt')
 @click.pass_context
-@click.option('--wct-dir', default='WCT', help='Directory containing WCT results')
-@click.option('--output-dir', default='WCT_MERGED', help='Directory to save merged results')
-def dvv_merge_wct(ctx, wct_dir, output_dir):
-    """Merges daily WCT files into consolidated files with hierarchical structure"""
-    from ..s09merge_wct import main
+def dvv_compute_wct_dtt(ctx):
+    """Computes dv/v from WCT results (wavelet_dtt step, lineage-based)"""
+    from ..s09compute_wct_dtt import main
     loglevel = ctx.obj['MSNOISE_verbosity']
-    main(wct_dir=wct_dir, output_dir=output_dir, loglevel=loglevel)
+    main(loglevel=loglevel)
 
 @dvv.group(name="plot")
 def dvv_plot():

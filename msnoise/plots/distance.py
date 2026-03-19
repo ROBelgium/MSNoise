@@ -44,6 +44,8 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
 
     plt.figure()
     dists = []
+    output_folder = get_config(db, 'output_folder') or 'OUTPUT'
+    lineage = get_stack_lineage_for_filter(db, filterid)
     for pair in pairs:
         station1, station2 = pair
         # TODO get distance for LOCids!!
@@ -62,7 +64,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
                         continue
 
                 try:
-                    ref = xr_get_ref(sta1, sta2, components, filterid, taxis)
+                    ref = xr_get_ref(output_folder, lineage, sta1, sta2, components, filterid, taxis)
                     ref = Trace(data=ref.CCF.values)
                     ref.stats.sampling_rate = cc_sampling_rate
                 except FileNotFoundError as fullpath:

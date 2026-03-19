@@ -76,10 +76,17 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
 
     pair = "%s:%s" % (sta1, sta2)
     params = get_params(db)
+    lineage = get_stack_lineage_for_filter(db, filterid)
+    if lineage:
+        stack_set = int(lineage[-1].rsplit('_', 1)[-1])
+        stack_params = get_config_set_details(db, 'stack', stack_set, format='AttribDict')
+        if stack_params:
+            params.update(stack_params)
     mov_stack = params.mov_stack[mov_stackid-1]
+    output_folder = get_config(db, 'output_folder') or 'OUTPUT'
     logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filterid,
                                         mov_stack))
-    stack_total = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
+    stack_total = xr_get_ccf(output_folder, lineage, sta1, sta2, components, filterid, mov_stack, taxis)
 
     # convert index to mdates
     stack_total.index = mdates.date2num(stack_total.index.to_pydatetime())
@@ -101,9 +108,12 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
 
         ax.plot(freq, line * ampli + i, c='k', lw=1)
 
-    filter = get_filters(db, ref=filterid)
-    low = float(filter.freqmin)
-    high = float(filter.freqmax)
+    filter_params = get_config_set_details(db, 'filter', filterid, format='AttribDict')
+    if filter_params:
+        low = float(filter_params.freqmin)
+        high = float(filter_params.freqmax)
+    else:
+        low = high = 0.0
 
 
     ax.set_ylim(start-datetime.timedelta(days=ampli),

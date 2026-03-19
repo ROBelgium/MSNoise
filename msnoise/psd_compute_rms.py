@@ -68,6 +68,9 @@ def main(loglevel="INFO", njobs_per_worker=9999):
     logger.debug('Preloading all instrument response')
 
     params = get_params(db)
+    qc_params = get_config_set_details(db, 'qc', 1, format='AttribDict')
+    if qc_params:
+        params.update(qc_params)
     ppsd_components = params.qc_components
     if not os.path.isdir(os.path.join("PSD", "RMS", params.qc_rms_type)):
         os.makedirs(os.path.join("PSD", "RMS", params.qc_rms_type))
