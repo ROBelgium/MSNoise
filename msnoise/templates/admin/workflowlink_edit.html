@@ -1,0 +1,45 @@
+{% extends 'admin/model/edit.html' %}
+
+{% block tail %}
+{{ super() }}
+<script>
+(function () {
+    "use strict";
+
+    var CHAINS    = {{ workflow_chains | tojson }};
+    var STEP_CATS = {{ step_categories | tojson }};
+
+    var fromSel = document.getElementById("from_step_id");
+    var toSel   = document.getElementById("to_step_id");
+
+    // Snapshot ALL to-step options once at page load (before any filtering)
+    var allToOptions = Array.from(toSel.options).map(function (o) {
+        return { value: o.value, text: o.text };
+    });
+
+    function filterToSteps() {
+        var fromCategory = STEP_CATS[fromSel.value] || null;
+        var allowed      = fromCategory ? (CHAINS[fromCategory] || []) : [];
+        var currentValue = toSel.value;
+
+        toSel.innerHTML = "";
+        var matched = false;
+        allToOptions.forEach(function (o) {
+            if (allowed.indexOf(STEP_CATS[o.value]) !== -1) {
+                var opt = document.createElement("option");
+                opt.value = o.value;
+                opt.text  = o.text;
+                if (o.value === currentValue) { opt.selected = true; matched = true; }
+                toSel.appendChild(opt);
+            }
+        });
+        if (!matched && toSel.options.length > 0) {
+            toSel.options[0].selected = true;
+        }
+    }
+
+    fromSel.addEventListener("change", filterToSteps);
+    filterToSteps();
+}());
+</script>
+{% endblock %}
