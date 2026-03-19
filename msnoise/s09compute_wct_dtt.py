@@ -162,9 +162,13 @@ def main(loglevel="INFO", batch_size=None):
                     continue
                 freqs_subset = freqs[freq_inx]
 
-                to_search = pd.to_datetime(days)
                 times_dt = pd.DatetimeIndex(times)
-                valid_mask = times_dt.floor('d').isin(to_search)
+                to_search = pd.to_datetime(days)
+
+                start = to_search.min().normalize()
+                end = (to_search.max() + pd.Timedelta(days=1)).normalize()
+
+                valid_mask = (times_dt >= start) & (times_dt <= end)
 
                 dates_out = []
                 dvv_rows = []
