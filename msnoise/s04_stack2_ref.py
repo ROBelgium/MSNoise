@@ -59,7 +59,7 @@ def main(stype, loglevel="INFO"):
         )
 
         # 2) resolve lineage steps from the job, and merge params for THIS lineage only
-        lineage_steps = lineage_str_to_steps(db, lineage_str, workflow_id=jobs[0].workflow_id, strict=True)
+        lineage_steps = lineage_str_to_steps(db, lineage_str, strict=True)
 
         lineage_steps, lineage_names, params = get_merged_params_for_lineage(
             db, orig_params, step_params, lineage_steps

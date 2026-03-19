@@ -82,7 +82,6 @@ def main(system=False, modules=False, env=False, all=False, show=True):
         output += "\n" + ispresent('psutil')
         output += "\n" + ispresent('reportlab')
         output += "\n" + ispresent('configobj')
-        output += "\n" + ispresent('pkg_resources')
         output += "\n" + ispresent('paramiko')
         output += "\n" + ispresent('ctypes')
         output += "\n" + ispresent('pyparsing')

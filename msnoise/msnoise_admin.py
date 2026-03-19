@@ -69,13 +69,7 @@ def job_stats():
         from .api import get_workflow_job_counts
         db = connect()
 
-        # Get all workflows
-        workflows = db.query(Job.workflow_id).distinct().all()
-        stats = {}
-
-        for workflow in workflows:
-            workflow_id = workflow[0]
-            stats[workflow_id] = get_workflow_job_counts(db, workflow_id)
+        stats = get_workflow_job_counts(db)
 
         return jsonify(stats)
     except Exception as e:
@@ -104,7 +98,6 @@ def job_dependencies(job_id):
                         Job.day == job.day,
                         Job.pair == job.pair,
                         Job.step_id == link.from_step_id,
-                        Job.workflow_id == job.workflow_id
                     ).all()
 
                     for pred_job in pred_jobs:
@@ -121,7 +114,6 @@ def job_dependencies(job_id):
                         Job.day == job.day,
                         Job.pair == job.pair,
                         Job.step_id == link.to_step_id,
-                        Job.workflow_id == job.workflow_id
                     ).all()
 
                     for succ_job in succ_jobs:
@@ -344,13 +336,13 @@ class JobView(BaseModelView):
         super(JobView, self).__init__(Job, session, *args, **kwargs)
 
     # Update column list to include new workflow fields
-    column_list = ['ref', 'day', 'pair', 'workflow_id', 'step_name', 'priority', 'jobtype', 'flag', 'lastmod']
+    column_list = ['ref', 'day', 'pair', 'step_name', 'priority', 'jobtype', 'flag', 'lastmod']
 
     # Add searchable columns
-    column_searchable_list = ['day', 'pair', 'workflow_id', 'jobtype']
+    column_searchable_list = ['day', 'pair', 'jobtype']
 
     # Add filters for better navigation
-    column_filters = ['flag', 'workflow_id', 'jobtype', 'day', 'priority']
+    column_filters = ['flag', 'jobtype', 'day', 'priority']
 
     # Sort by priority and last modified by default
     column_default_sort = [('priority', True), ('lastmod', False)]
@@ -360,7 +352,6 @@ class JobView(BaseModelView):
         'ref': 'Job ID',
         'day': 'Date',
         'pair': 'Station Pair',
-        'workflow_id': 'Workflow',
         'step_name': 'Step',
         'priority': 'Priority',
         'jobtype': 'Job Type',
@@ -370,7 +361,6 @@ class JobView(BaseModelView):
 
     # Add descriptions for columns
     column_descriptions = {
-        'workflow_id': 'Workflow identifier this job belongs to',
         'step_name': 'Workflow step name',
         'priority': 'Job priority (higher = more important)',
         'flag': 'T=Todo, I=In Progress, D=Done'
@@ -389,7 +379,7 @@ class JobView(BaseModelView):
     }
 
     # Form configuration
-    form_columns = ['day', 'pair', 'workflow_id', 'step_id', 'priority', 'jobtype', 'flag']
+    form_columns = ['day', 'pair', 'step_id', 'priority', 'jobtype', 'flag']
 
     # Custom query to join with WorkflowStep
     def get_query(self):
@@ -461,25 +451,16 @@ class JobView(BaseModelView):
 
     # Add workflow statistics to context
     def get_list_stats(self):
-        """Get job statistics for the current workflow"""
+        """Get job statistics"""
         from sqlalchemy import func
-        stats = {}
-        workflows = self.session.query(self.model.workflow_id).distinct().all()
+        counts = self.session.query(
+            self.model.flag,
+            func.count(self.model.ref).label('count')
+        ).group_by(self.model.flag).all()
 
-        for workflow in workflows:
-            workflow_id = workflow[0]
-            counts = self.session.query(
-                self.model.flag,
-                func.count(self.model.ref).label('count')
-            ).filter(
-                self.model.workflow_id == workflow_id
-            ).group_by(self.model.flag).all()
-
-            stats[workflow_id] = {
-                'T': 0, 'I': 0, 'D': 0
-            }
-            for flag, count in counts:
-                stats[workflow_id][flag] = count
+        stats = {'T': 0, 'I': 0, 'D': 0}
+        for flag, count in counts:
+            stats[flag] = count
 
         return stats
 
@@ -870,25 +851,23 @@ class ConfigSetView(BaseView):
 class WorkflowStepView(BaseModelView):
     """Workflow step management"""
 
-    column_list = ['step_id', 'step_name', 'category', 'set_number', 'workflow_id', 'is_active', 'created_at']
-    column_searchable_list = ['step_name', 'category', 'workflow_id']
-    column_filters = ['category', 'workflow_id', 'is_active']
-    column_sortable_list = ['step_id', 'step_name', 'category', 'set_number', 'workflow_id', 'created_at']
+    column_list = ['step_id', 'step_name', 'category', 'set_number', 'is_active', 'created_at']
+    column_searchable_list = ['step_name', 'category']
+    column_filters = ['category', 'is_active']
+    column_sortable_list = ['step_id', 'step_name', 'category', 'set_number', 'created_at']
 
-    form_columns = ['step_name', 'category', 'set_number', 'workflow_id', 'description', 'is_active']
+    form_columns = ['step_name', 'category', 'set_number', 'description', 'is_active']
 
     column_descriptions = {
         'step_name': 'Unique name for this workflow step',
         'category': 'Configuration category (preprocess, cc, filter, stack, etc.)',
         'set_number': 'Configuration set number',
-        'workflow_id': 'Workflow identifier',
         'description': 'Optional description of what this step does',
     }
 
     # Custom column formatters
     column_formatters = dict(BaseModelView.column_formatters, **{
         'category': lambda view, context, model, name: SafeMarkup(f'<span class="label label-info">{model.category}</span>'),
-        'workflow_id': lambda view, context, model, name: SafeMarkup(f'<span class="label label-primary">{model.workflow_id}</span>'),
         'is_active': lambda view, context, model, name: SafeMarkup('✓' if model.is_active else '✗'),
     })
 
@@ -1028,19 +1007,10 @@ class WorkflowBuilderView(BaseView):
         """Display workflow builder interface"""
         from .api import get_workflow_graph
 
-        # Get available workflows
-        workflows = self.session.query(schema.WorkflowStep.workflow_id).distinct().all()
-        workflow_ids = [w[0] for w in workflows]
-
-        # Get current workflow (default to 'default')
-        current_workflow = request.args.get('workflow', 'default')
-
         # Get workflow graph data
-        graph_data = get_workflow_graph(self.session, current_workflow)
+        graph_data = get_workflow_graph(self.session)
 
         return self.render('admin/workflow_builder.html',
-                           workflows=workflow_ids,
-                           current_workflow=current_workflow,
                            graph_data=graph_data)
 
     @expose('/create_step', methods=['POST'])
@@ -1051,16 +1021,15 @@ class WorkflowBuilderView(BaseView):
         step_name = request.form.get('step_name')
         category = request.form.get('category')
         set_number = int(request.form.get('set_number'))
-        workflow_id = request.form.get('workflow_id', 'default')
         description = request.form.get('description')
 
         try:
-            step = create_workflow_step(self.session, step_name, category, set_number, workflow_id, description)
+            step = create_workflow_step(self.session, step_name, category, set_number, description)
             flash(f'Workflow step "{step_name}" created successfully', 'success')
         except Exception as e:
             flash(f'Error creating workflow step: {str(e)}', 'error')
 
-        return redirect(url_for('.index', workflow=workflow_id))
+        return redirect(url_for('.index'))
 
     @expose('/create_link', methods=['POST'])
     def create_link(self):
@@ -1084,10 +1053,8 @@ class WorkflowBuilderView(BaseView):
         """Create workflow steps automatically from all existing config sets"""
         from .api import create_workflow_steps_from_config_sets
 
-        workflow_id = request.form.get('workflow_id', 'default')
-
         created_count, existing_count, error_message = create_workflow_steps_from_config_sets(
-            self.session, workflow_id
+            self.session
         )
 
         if error_message:
@@ -1100,17 +1067,15 @@ class WorkflowBuilderView(BaseView):
             if created_count == 0 and existing_count == 0:
                 flash('No config sets found to create workflow steps from', 'warning')
 
-        return redirect(url_for('.index', workflow=workflow_id))
+        return redirect(url_for('.index'))
 
     @expose('/create_links_from_steps', methods=['POST'])
     def create_links_from_steps(self):
         """Create workflow links automatically from existing workflow steps"""
         from .api import create_workflow_links_from_steps
 
-        workflow_id = request.form.get('workflow_id', 'default')
-
         created_count, existing_count, error_message = create_workflow_links_from_steps(
-            self.session, workflow_id
+            self.session
         )
 
         if error_message:
@@ -1123,7 +1088,7 @@ class WorkflowBuilderView(BaseView):
             if created_count == 0 and existing_count == 0:
                 flash('No workflow steps found to create links between', 'warning')
 
-        return redirect(url_for('.index', workflow=workflow_id))
+        return redirect(url_for('.index'))
 
 CONFIG_BULK_UPDATE_TEMPLATE = """
 {% extends 'admin/base.html' %}

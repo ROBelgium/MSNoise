@@ -256,8 +256,6 @@ def declare_tables(prefix=None):
         :param pair: the name of the pair (STATION1:STATION2)
         :type flag: str
         :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
-        :type workflow_id: str
-        :param workflow_id: Identifier for the workflow (default: "default")
         :type step_id: int
         :param step_id: Foreign key to WorkflowStep table
         :type jobtype: str
@@ -275,7 +273,6 @@ def declare_tables(prefix=None):
                          server_default=text("CURRENT_TIMESTAMP"))
 
         # New workflow-aware fields
-        workflow_id = Column(String(50), nullable=False, default="default")
         step_id = Column(Integer, ForeignKey(f"{prefix}workflow_steps.step_id"), nullable=False)
 
         # Enhanced fields
@@ -288,20 +285,18 @@ def declare_tables(prefix=None):
 
         __table_args__ = (
             # Updated unique constraint to include workflow context
-            Index('job_index', "day", "pair", "step_id", "workflow_id", "lineage", unique=True),
+            Index('job_index', "day", "pair", "step_id", "lineage", unique=True),
             Index('job_index2', "flag", "step_id", "priority", unique=False),
-            Index('job_index3', "workflow_id", "step_id", unique=False),
             # Legacy index for backward compatibility
             Index('job_legacy_index', "day", "pair", "jobtype", unique=False),
         )
 
-        def __init__(self, day=None, pair=None, flag=None, workflow_id="default",
+        def __init__(self, day=None, pair=None, flag=None,
                      step_id=None, jobtype=None, priority=0, lastmod=None, **kwargs):
             """Initialize job with workflow support"""
             self.day = day
             self.pair = pair
             self.flag = flag
-            self.workflow_id = workflow_id
             self.step_id = step_id
             self.priority = priority
             self.lastmod = lastmod or datetime.datetime.utcnow()
@@ -351,8 +346,7 @@ def declare_tables(prefix=None):
 
         def __repr__(self):
             return f"<Job(day='{self.day}', pair='{self.pair}', " \
-                   f"step_id={self.step_id}, workflow_id='{self.workflow_id}', " \
-                   f"flag='{self.flag}')>"
+                   f"step_id={self.step_id}, flag='{self.flag}')>"
 
     ########################################################################
 
@@ -519,9 +513,6 @@ def declare_tables(prefix=None):
         category = Column(String(20), nullable=False)
         set_number = Column(Integer, nullable=False)
 
-        # Workflow organization
-        workflow_id = Column(String(50), nullable=False, default="default")
-
         # Metadata
         description = Column(String(200), nullable=True)
         is_active = Column(Boolean, default=True)
@@ -530,8 +521,8 @@ def declare_tables(prefix=None):
 
         # Constraints
         __table_args__ = (
-            UniqueConstraint('step_name', 'workflow_id', name='unique_step_name_per_workflow'),
-            UniqueConstraint('category', 'set_number', 'workflow_id', name='unique_config_per_workflow'),
+            UniqueConstraint('step_name', name='unique_step_name'),
+            UniqueConstraint('category', 'set_number', name='unique_config_per_category'),
         )
 
         def __repr__(self):
