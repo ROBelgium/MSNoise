@@ -596,7 +596,7 @@ def get_stack_lineage_for_filter(session, filterid):
     if filter_step is None:
         return []
 
-    # Walk upstream from filter to the root step
+    # Walk upstream from filter to the root step, skipping global config steps
     parent_map = {link.to_step_id: link.from_step_id for link in links}
     path = [filter_step.step_name]
     current_id = filter_step.step_id
@@ -606,7 +606,9 @@ def get_stack_lineage_for_filter(session, filterid):
             break  # guard against cycles
         visited.add(current_id)
         parent_id = parent_map[current_id]
-        path.insert(0, step_map[parent_id].step_name)
+        parent_step = step_map[parent_id]
+        if parent_step.category != 'global':
+            path.insert(0, parent_step.step_name)
         current_id = parent_id
 
     # Append the stack step immediately downstream of this filter (if any)
@@ -658,7 +660,9 @@ def get_lineage_for_step(session, category, set_number=1):
             break  # guard against cycles
         visited.add(current_id)
         parent_id = parent_map[current_id]
-        path.insert(0, step_map[parent_id].step_name)
+        parent_step = step_map[parent_id]
+        if parent_step.category != 'global':
+            path.insert(0, parent_step.step_name)
         current_id = parent_id
 
     return path
