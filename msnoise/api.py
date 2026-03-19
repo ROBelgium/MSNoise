@@ -2865,7 +2865,6 @@ def preload_instrument_responses(session, return_format="dataframe"):
     from obspy.core.inventory import Inventory
     from obspy import read_inventory, UTCDateTime
     logging.debug('Preloading instrument response')
-    response_format = get_config(session, 'response_format')
     files = glob.glob(os.path.join(get_config(session, 'response_path'), "*"))
     channels = []
     all_inv = Inventory()

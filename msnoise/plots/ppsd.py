@@ -28,7 +28,6 @@ def main(net, sta, loc, chan, time_of_weekday=None, period_lim=None, show=False,
                         with_pid=True)
     db = connect()
     logging.debug('Preloading all instrument response')
-    response_format = get_config(db, 'response_format')
     response_files = glob.glob(os.path.join(get_config(db, 'response_path'),"%s.%s.*.*"%(net, sta)))
 
     start, end, datelist = build_movstack_datelist(db)

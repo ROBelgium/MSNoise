@@ -54,7 +54,6 @@ this step:
 * |winsorizing|
 * |resampling_method|
 * |remove_response|
-* |response_format|
 * |response_path|
 * |response_prefilt|
 * |preprocess_lowpass|
