@@ -45,7 +45,7 @@ import pandas as pd
 import logbook
 logger = logbook.Logger(__name__)
 
-def propagate_stack_jobs_from_cc_done(session, workflow_id="default"):
+def propagate_stack_jobs_from_cc_done(session):
     """
     From DONE CC jobs, create/update TODO STACK jobs:
       - day=<cc job day>  (normal per-day stack recompute)
@@ -71,14 +71,12 @@ def propagate_stack_jobs_from_cc_done(session, workflow_id="default"):
 
     cc_steps = (
         session.query(WorkflowStep)
-        .filter(WorkflowStep.workflow_id == workflow_id)
         .filter(WorkflowStep.is_active == True)
         .filter(WorkflowStep.category.in_(sorted(cc_category_names)))
         .all()
     )
     stack_steps = (
         session.query(WorkflowStep)
-        .filter(WorkflowStep.workflow_id == workflow_id)
         .filter(WorkflowStep.is_active == True)
         .filter(WorkflowStep.category.in_(sorted(stack_category_names)))
         .all()
@@ -115,7 +113,6 @@ def propagate_stack_jobs_from_cc_done(session, workflow_id="default"):
 
         filt_step = (
             session.query(WorkflowStep)
-            .filter(WorkflowStep.workflow_id == workflow_id)
             .filter(WorkflowStep.step_name == filter_name)
             .first()
         )
@@ -136,7 +133,6 @@ def propagate_stack_jobs_from_cc_done(session, workflow_id="default"):
 
         existing = (
             session.query(Job)
-            .filter(Job.workflow_id == workflow_id)
             .filter(Job.step_id == stack_step.step_id)
             .filter(Job.jobtype == stack_step.step_name)
             .filter(Job.day == day_value)
@@ -156,7 +152,6 @@ def propagate_stack_jobs_from_cc_done(session, workflow_id="default"):
                 day=day_value,
                 pair=pair_value,
                 flag="T",
-                workflow_id=workflow_id,
                 step_id=stack_step.step_id,
                 jobtype=stack_step.step_name,
                 priority=getattr(stack_step, "priority", 0) or 0,
@@ -170,7 +165,6 @@ def propagate_stack_jobs_from_cc_done(session, workflow_id="default"):
     for cc_step in cc_steps:
         done_cc_jobs = (
             session.query(Job)
-            .filter(Job.workflow_id == workflow_id)
             .filter(Job.step_id == cc_step.step_id)
             .filter(Job.flag == "D")
             .all()
@@ -217,7 +211,7 @@ def propagate_stack_jobs_from_cc_done(session, workflow_id="default"):
     return created + bumped
 
 
-def create_passthrough_jobs_from_done_parent(session, parent_step, child_step, workflow_id="default"):
+def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
     """
     DONE parent_step jobs -> TODO child_step jobs, preserving (day, pair).
 
@@ -233,7 +227,6 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step, w
 
     done_parent_jobs = (
         session.query(Job)
-        .filter(Job.workflow_id == workflow_id)
         .filter(Job.step_id == parent_step.step_id)
         .filter(Job.flag == "D")
         .filter(Job.day != "REF")
@@ -263,7 +256,6 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step, w
 
         filt_step = (
             session.query(schema.WorkflowStep)
-            .filter(schema.WorkflowStep.workflow_id == workflow_id)
             .filter(schema.WorkflowStep.step_name == filter_name)
             .first()
         )
@@ -337,7 +329,6 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step, w
         for child_lineage in build_child_lineages(pj.lineage, pj.pair):
             exists = (
                 session.query(Job.ref)
-                .filter(Job.workflow_id == workflow_id)
                 .filter(Job.step_id == child_step.step_id)
                 .filter(Job.day == pj.day)
                 .filter(Job.pair == pj.pair)
@@ -352,7 +343,6 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step, w
                     day=pj.day,
                     pair=pj.pair,
                     flag="T",
-                    workflow_id=workflow_id,
                     step_id=child_step.step_id,
                     jobtype=child_step.step_name,
                     priority=getattr(child_step, "priority", 0) or 0,
@@ -364,7 +354,7 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step, w
 
     return created
 
-def propagate_first_runnable_from_category(session, source_category, workflow_id="default", skip_categories=None):
+def propagate_first_runnable_from_category(session, source_category, skip_categories=None):
     """
     For each WorkflowStep in `source_category`:
       - find first runnable steps per branch (skipping categories like "filter")
@@ -383,7 +373,6 @@ def propagate_first_runnable_from_category(session, source_category, workflow_id
 
     parent_steps = (
         session.query(WorkflowStep)
-        .filter(WorkflowStep.workflow_id == workflow_id)
         .filter(WorkflowStep.category == source_category)
         .filter(WorkflowStep.is_active == True)
         .all()
@@ -395,7 +384,6 @@ def propagate_first_runnable_from_category(session, source_category, workflow_id
         runnable_children = get_first_runnable_steps_per_branch(
             session,
             source_step_id=parent_step.step_id,
-            workflow_id=workflow_id,
             skip_categories=skip_categories,
         )
         print(runnable_children)
@@ -404,14 +392,13 @@ def propagate_first_runnable_from_category(session, source_category, workflow_id
                 session=session,
                 parent_step=parent_step,
                 child_step=child_step,
-                workflow_id=workflow_id,
             )
 
     session.commit()
     return total_created
 
 
-def create_cc_jobs_from_preprocess(session, workflow_id="default"):
+def create_cc_jobs_from_preprocess(session):
     """
     Create CC jobs based on completed preprocess jobs.
 
@@ -429,7 +416,6 @@ def create_cc_jobs_from_preprocess(session, workflow_id="default"):
 
     # Get all preprocess steps
     preprocess_steps = session.query(WorkflowStep) \
-        .filter(WorkflowStep.workflow_id == workflow_id) \
         .filter(WorkflowStep.category == "preprocess") \
         .filter(WorkflowStep.is_active == True) \
         .all()
@@ -453,7 +439,6 @@ def create_cc_jobs_from_preprocess(session, workflow_id="default"):
         # Get all completed preprocess jobs for this step
         completed_jobs = session.query(Job) \
             .filter(Job.jobtype == preprocess_step.step_name) \
-            .filter(Job.workflow_id == workflow_id) \
             .filter(Job.step_id == preprocess_step.step_id) \
             .filter(Job.flag == 'D') \
             .all()
@@ -501,7 +486,6 @@ def create_cc_jobs_from_preprocess(session, workflow_id="default"):
                             "day": day,
                             "pair": pair,
                             "jobtype": cc_step.step_name,
-                            "workflow_id": cc_step.workflow_id,
                             "step_id": cc_step.step_id,
                             "priority": getattr(cc_step, 'priority', 0),
                             "flag": "T",
@@ -525,7 +509,6 @@ def create_cc_jobs_from_preprocess(session, workflow_id="default"):
                             "day": day,
                             "pair": f"{job.pair}:{job.pair}",  # Single station
                             "jobtype": cc_step.step_name,
-                            "workflow_id": cc_step.workflow_id,
                             "step_id": cc_step.step_id,
                             "priority": getattr(cc_step, 'priority', 0),
                             "flag": "T",
@@ -558,7 +541,7 @@ def create_station_pairs(stations):
     return pairs
 
 
-def main(init=False, nocc=False, after=False, workflow_id="default"):
+def main(init=False, nocc=False, after=False):
     logger.info('*** Starting: New Jobs (Workflow-aware) ***')
 
     db = connect()
@@ -583,14 +566,13 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
         # Instead of a separate stack_ref step/category, we queue REF work as STACK jobs
         # with day="REF" and the lineage ending in stack_1 (or stack_N).
         if source_category == "cc":
-            created = propagate_stack_jobs_from_cc_done(session=db, workflow_id=workflow_id)
+            created = propagate_stack_jobs_from_cc_done(session=db)
             logger.info(f'Propagation from category "cc" created/updated {created} STACK job(s) (daily + REF)')
             return
 
         created = propagate_first_runnable_from_category(
             session=db,
             source_category=source_category,
-            workflow_id=workflow_id,
             skip_categories={"filter"},
         )
         logger.info(f"HPC propagation from category \"{source_category}\" created {created} job(s)")
@@ -601,10 +583,10 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
     extra_jobtypes_scan_archive = []
     extra_jobtypes_new_files = ["PSD"]
     if plugins:
-        import pkg_resources
+        from importlib.metadata import entry_points
         plugins = plugins.split(",")
-        for ep in pkg_resources.iter_entry_points(group='msnoise.plugins.jobtypes'):
-            module_name = ep.module_name.split(".")[0]
+        for ep in entry_points(group='msnoise.plugins.jobtypes'):
+            module_name = ep.value.split(":")[0].split(".")[0]
             if module_name in plugins:
                 jobtypes = ep.load()()
                 for jobtype in jobtypes:
@@ -614,7 +596,7 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
                         extra_jobtypes_new_files.append(jobtype["name"])
 
     # Get all workflow steps with category "preprocess"
-    workflow_steps = get_workflow_steps(db, workflow_id="default")
+    workflow_steps = get_workflow_steps(db)
     preprocess_steps = [step for step in workflow_steps if step.category in ["preprocess", "qc"]]
 
     logger.info(f'Found {len(preprocess_steps)} preprocess workflow steps')
@@ -663,7 +645,6 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
                             "day": date.date().strftime("%Y-%m-%d"),
                             "pair": "%s.%s.%s" % (nf.net, nf.sta, nf.loc),
                             "jobtype": step.step_name,  # Use step name as jobtype
-                            "workflow_id": step.workflow_id,
                             "step_id": step.step_id,
                             "priority": 0,
                             "flag": "T",
@@ -691,7 +672,6 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
             for job in all_jobs:
                 update_job_workflow(db, job['day'], job['pair'],
                                     job['jobtype'], job['flag'],
-                                    workflow_id=job.get('workflow_id', 'default'),
                                     step_id=job.get('step_id'),
                                     priority=job.get('priority', 0),
                                     lineage=job.get('lineage'),  # <-- NEW
@@ -718,7 +698,6 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
                 for job in cc_jobs:
                     update_job_workflow(db, job['day'], job['pair'],
                                         job['jobtype'], job['flag'],
-                                        workflow_id=job.get('workflow_id', 'default'),
                                         step_id=job.get('step_id'),
                                         priority=job.get('priority', 0),
                                         lineage=job.get('lineage'),  # <-- NEW
@@ -729,7 +708,7 @@ def main(init=False, nocc=False, after=False, workflow_id="default"):
     return count
 
 
-def update_job_workflow(session, day, pair, jobtype, flag, workflow_id="default",
+def update_job_workflow(session, day, pair, jobtype, flag,
                         step_id=None, priority=0, lineage=None, commit=True, returnjob=True, ref=None):
     """
     Updates or Inserts a new workflow-aware Job in the database.
@@ -749,9 +728,8 @@ def update_job_workflow(session, day, pair, jobtype, flag, workflow_id="default"
             .filter(text("day=:day")) \
             .filter(text("pair=:pair")) \
             .filter(text("jobtype=:jobtype")) \
-            .filter(text("workflow_id=:workflow_id")) \
             .filter(text("lineage=:lineage")) \
-            .params(day=day, pair=pair, jobtype=jobtype, workflow_id=workflow_id, lineage=lineage).first()
+            .params(day=day, pair=pair, jobtype=jobtype, lineage=lineage).first()
 
     if job is None:
         # Create new job with workflow fields
@@ -759,7 +737,6 @@ def update_job_workflow(session, day, pair, jobtype, flag, workflow_id="default"
         job.day = day
         job.pair = pair
         job.jobtype = jobtype
-        job.workflow_id = workflow_id
         job.step_id = step_id
         job.priority = priority
         job.flag = flag
@@ -769,7 +746,6 @@ def update_job_workflow(session, day, pair, jobtype, flag, workflow_id="default"
     else:
         # Update existing job
         job.flag = flag
-        job.workflow_id = workflow_id
         job.step_id = step_id
         job.priority = priority
         job.lastmod = datetime.datetime.utcnow()
@@ -799,7 +775,6 @@ def massive_insert_job_workflow(session, jobs):
             'day': job['day'],
             'pair': job['pair'],
             'jobtype': job['jobtype'],
-            'workflow_id': job.get('workflow_id', 'default'),
             'step_id': job.get('step_id'),
             'priority': job.get('priority', 0),
             'flag': job['flag'],

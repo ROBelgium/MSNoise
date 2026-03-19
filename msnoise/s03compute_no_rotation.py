@@ -310,7 +310,7 @@ def main(loglevel="INFO"):
         stations = np.unique(stations)
 
         # Filters:
-        filter_steps = get_filter_steps_for_cc_step(db, step.step_id, workflow_id='default')
+        filter_steps = get_filter_steps_for_cc_step(db, step.step_id)
         print(filter_steps)
         filters = []
         for filter in filter_steps:

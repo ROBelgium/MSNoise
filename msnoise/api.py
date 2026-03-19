@@ -194,9 +194,8 @@ def get_config(session, name=None, isbool=False, plugin=None):
     :returns: the value for `name` or a dict of all config values
     """
     if plugin:
-        import pkg_resources
-        for ep in pkg_resources.iter_entry_points(
-                group='msnoise.plugins.table_def'):
+        from importlib.metadata import entry_points
+        for ep in entry_points(group='msnoise.plugins.table_def'):
             if ep.name.replace("Config", "") == plugin:
                 table = ep.load()
     else:
@@ -242,9 +241,8 @@ def update_config(session, name, value, plugin=None):
 
     """
     if plugin:
-        import pkg_resources
-        for ep in pkg_resources.iter_entry_points(
-                group='msnoise.plugins.table_def'):
+        from importlib.metadata import entry_points
+        for ep in entry_points(group='msnoise.plugins.table_def'):
             if ep.name.replace("Config", "") == plugin:
                 table = ep.load()
     else:
@@ -3727,24 +3725,21 @@ def filter_within_daterange(date, start_date, end_date):
 # Workflow Management Functions
 # ============================================================================
 
-def get_workflow_steps(session, workflow_id="default"):
+def get_workflow_steps(session):
     """Get all steps in a workflow"""
     from .msnoise_table_def import declare_tables
     schema = declare_tables()
 
     return session.query(schema.WorkflowStep) \
-        .filter(schema.WorkflowStep.workflow_id == workflow_id) \
         .filter(schema.WorkflowStep.is_active == True) \
         .order_by(schema.WorkflowStep.step_name).all()
 
-def get_workflow_links(session, workflow_id="default"):
+def get_workflow_links(session):
     """Get all links in a workflow"""
     from .msnoise_table_def import declare_tables
     schema = declare_tables()
 
     return session.query(schema.WorkflowLink) \
-        .join(schema.WorkflowStep, schema.WorkflowLink.from_step_id == schema.WorkflowStep.step_id) \
-        .filter(schema.WorkflowStep.workflow_id == workflow_id) \
         .filter(schema.WorkflowLink.is_active == True).all()
 
 def get_step_predecessors(session, step_id):
@@ -3814,7 +3809,7 @@ def get_step_successors(session, step_id):
         .filter(schema.WorkflowLink.from_step_id == step_id) \
         .filter(schema.WorkflowLink.is_active == True).all()
 
-def get_first_runnable_steps_per_branch(session, source_step_id, workflow_id="default", skip_categories=None):
+def get_first_runnable_steps_per_branch(session, source_step_id, skip_categories=None):
     """
     Return the first runnable step on each outgoing branch from source_step_id,
     skipping steps in skip_categories (default: {"filter"}).
@@ -3833,7 +3828,7 @@ def get_first_runnable_steps_per_branch(session, source_step_id, workflow_id="de
         # Reuse existing helper (one-hop)
         return [
             s for s in get_step_successors(session, step_id)
-            if getattr(s, "workflow_id", workflow_id) == workflow_id and getattr(s, "is_active", True)
+            if getattr(s, "is_active", True)
         ]
 
     def descend_until_runnable(start_step):
@@ -3859,7 +3854,7 @@ def get_first_runnable_steps_per_branch(session, source_step_id, workflow_id="de
 
     return [result_by_step_id[k] for k in sorted(result_by_step_id)]
 
-def create_workflow_step(session, step_name, category, set_number, workflow_id="default", description=None):
+def create_workflow_step(session, step_name, category, set_number, description=None):
     """Create a new workflow step"""
     from .msnoise_table_def import declare_tables
     schema = declare_tables()
@@ -3868,7 +3863,6 @@ def create_workflow_step(session, step_name, category, set_number, workflow_id="
         step_name=step_name,
         category=category,
         set_number=set_number,
-        workflow_id=workflow_id,
         description=description
     )
 
@@ -3900,10 +3894,10 @@ def create_workflow_link(session, from_step_id, to_step_id, link_type="default")
     session.commit()
     return link
 
-def get_workflow_execution_order(session, workflow_id="default"):
+def get_workflow_execution_order(session):
     """Get workflow steps in execution order using topological sort"""
-    steps = get_workflow_steps(session, workflow_id)
-    links = get_workflow_links(session, workflow_id)
+    steps = get_workflow_steps(session)
+    links = get_workflow_links(session)
 
     # Build dependency graph
     dependencies = {}
@@ -3932,10 +3926,10 @@ def get_workflow_execution_order(session, workflow_id="default"):
 
     return ordered
 
-def get_workflow_graph(session, workflow_id="default"):
+def get_workflow_graph(session):
     """Return workflow as nodes and edges for visualization, sorted by workflow order"""
-    steps = get_workflow_steps(session, workflow_id)
-    links = get_workflow_links(session, workflow_id)
+    steps = get_workflow_steps(session)
+    links = get_workflow_links(session)
 
     # Define the natural workflow order
     WORKFLOW_ORDER = [
@@ -4016,7 +4010,7 @@ def get_config_sets_summary(session):
         for cs in config_sets
     ]
 
-def create_workflow_steps_from_config_sets(session, workflow_id='default'):
+def create_workflow_steps_from_config_sets(session):
     """
     Create workflow steps automatically from all existing config sets,
     sorted by natural workflow order.
@@ -4071,7 +4065,6 @@ def create_workflow_steps_from_config_sets(session, workflow_id='default'):
             existing_step = session.query(schema.WorkflowStep).filter(
                 schema.WorkflowStep.category == category,
                 schema.WorkflowStep.set_number == set_number,
-                schema.WorkflowStep.workflow_id == workflow_id
             ).first()
 
             if not existing_step:
@@ -4083,7 +4076,6 @@ def create_workflow_steps_from_config_sets(session, workflow_id='default'):
                     step_name,
                     category,
                     set_number,
-                    workflow_id,
                     description
                 )
                 created_count += 1
@@ -4095,7 +4087,7 @@ def create_workflow_steps_from_config_sets(session, workflow_id='default'):
     except Exception as e:
         return 0, 0, str(e)
 
-def create_workflow_links_from_steps(session, workflow_id='default'):
+def create_workflow_links_from_steps(session):
     """
     Create workflow links automatically between existing workflow steps,
     following natural workflow progression.
@@ -4123,10 +4115,8 @@ def create_workflow_links_from_steps(session, workflow_id='default'):
     }
 
     try:
-        # Get all workflow steps for this workflow
-        steps = session.query(schema.WorkflowStep).filter(
-            schema.WorkflowStep.workflow_id == workflow_id
-        ).all()
+        # Get all workflow steps
+        steps = session.query(schema.WorkflowStep).all()
 
         # Group steps by category and set_number
         steps_by_category = {}
@@ -4198,7 +4188,7 @@ def create_workflow_links_from_steps(session, workflow_id='default'):
 
 # Job management functions for workflow-aware jobs
 
-def create_job_for_step(db, step_id, day, pair, workflow_id="default", priority=0, flag='T'):
+def create_job_for_step(db, step_id, day, pair, priority=0, flag='T'):
     """
     Create a job for a specific workflow step
 
@@ -4206,7 +4196,6 @@ def create_job_for_step(db, step_id, day, pair, workflow_id="default", priority=
     :param step_id: WorkflowStep ID
     :param day: Day in YYYY-MM-DD format
     :param pair: Station pair
-    :param workflow_id: Workflow identifier
     :param priority: Job priority
     :param flag: Job status flag
     :return: Created Job instance
@@ -4225,7 +4214,6 @@ def create_job_for_step(db, step_id, day, pair, workflow_id="default", priority=
         day=day,
         pair=pair,
         flag=flag,
-        workflow_id=workflow_id,
         step_id=step_id,
         jobtype=jobtype,
         priority=priority
@@ -4235,19 +4223,17 @@ def create_job_for_step(db, step_id, day, pair, workflow_id="default", priority=
     db.commit()
     return job
 
-def get_jobs_for_step(db, step_id, workflow_id="default", flag=None):
+def get_jobs_for_step(db, step_id, flag=None):
     """
     Get all jobs for a specific workflow step
 
     :param db: Database connection
     :param step_id: WorkflowStep ID
-    :param workflow_id: Workflow identifier
     :param flag: Optional job status filter
     :return: List of Job instances
     """
     query = db.query(Job).filter(
-        Job.step_id == step_id,
-        Job.workflow_id == workflow_id
+        Job.step_id == step_id
     )
 
     if flag:
@@ -4255,19 +4241,17 @@ def get_jobs_for_step(db, step_id, workflow_id="default", flag=None):
 
     return query.all()
 
-def get_ready_jobs(db, workflow_id="default", step_name=None, limit=None):
+def get_ready_jobs(db, step_name=None, limit=None):
     """
     Get jobs that are ready to run based on workflow dependencies
 
     :param db: Database connection
-    :param workflow_id: Workflow identifier
     :param step_name: Optional step name filter
     :param limit: Maximum number of jobs to return
     :return: List of ready Job instances
     """
     query = db.query(Job).filter(
-        Job.flag == 'T',
-        Job.workflow_id == workflow_id
+        Job.flag == 'T'
     )
 
     if step_name:
@@ -4310,7 +4294,6 @@ def is_job_ready_to_run(db, job):
                     Job.day == job.day,
                     Job.pair == job.pair,
                     Job.step_id == link.from_step_id,
-                    Job.workflow_id == job.workflow_id,
                     Job.flag == 'D'
                 ).count()
 
@@ -4319,13 +4302,12 @@ def is_job_ready_to_run(db, job):
 
     return True
 
-def create_workflow_jobs(db, current_step_name, workflow_id="default", days=None, pairs=None):
+def create_workflow_jobs(db, current_step_name, days=None, pairs=None):
     """
     Create jobs for the next workflow step(s) after completing a step
 
     :param db: Database connection
     :param current_step_name: Name of the completed step
-    :param workflow_id: Workflow identifier
     :param days: List of days to create jobs for
     :param pairs: List of station pairs to create jobs for
     :return: List of created Job instances
@@ -4333,11 +4315,10 @@ def create_workflow_jobs(db, current_step_name, workflow_id="default", days=None
     # Find current step
     current_step = db.query(WorkflowStep).filter(
         WorkflowStep.step_name == current_step_name,
-        WorkflowStep.workflow_id == workflow_id
     ).first()
 
     if not current_step:
-        raise ValueError(f"WorkflowStep '{current_step_name}' not found in workflow '{workflow_id}'")
+        raise ValueError(f"WorkflowStep '{current_step_name}' not found")
 
     # Find next steps via WorkflowLink
     next_steps = db.query(WorkflowStep).join(
@@ -4364,12 +4345,11 @@ def create_workflow_jobs(db, current_step_name, workflow_id="default", days=None
                     Job.day == day,
                     Job.pair == pair,
                     Job.step_id == next_step.step_id,
-                    Job.workflow_id == workflow_id
                 ).first()
 
                 if not existing_job:
                     job = create_job_for_step(
-                        db, next_step.step_id, day, pair, workflow_id
+                        db, next_step.step_id, day, pair
                     )
                     created_jobs.append(job)
 
@@ -4428,12 +4408,11 @@ def update_job_status(db, job_id, flag, commit=True):
             db.commit()
     return job
 
-def get_workflow_job_counts(db, workflow_id="default"):
+def get_workflow_job_counts(db):
     """
-    Get job counts by status for a workflow
+    Get job counts by status for the workflow
 
     :param db: Database connection
-    :param workflow_id: Workflow identifier
     :return: Dictionary with job counts by status
     """
     from sqlalchemy import func
@@ -4441,8 +4420,6 @@ def get_workflow_job_counts(db, workflow_id="default"):
     counts = db.query(
         Job.flag,
         func.count(Job.ref).label('count')
-    ).filter(
-        Job.workflow_id == workflow_id
     ).group_by(Job.flag).all()
 
     result = {'T': 0, 'I': 0, 'D': 0}
@@ -4453,7 +4430,6 @@ def get_workflow_job_counts(db, workflow_id="default"):
 
 def get_next_job_for_step(
         session,
-        workflow_id="default",
         step_category="preprocess",
         flag="T",
         group_by="day",
@@ -4483,7 +4459,6 @@ def get_next_job_for_step(
             .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name)
             .filter(WorkflowStep.category == step_category)
             .filter(Job.flag == flag)
-            .filter(Job.workflow_id == workflow_id)
             .filter(Job.day == "REF")
             .order_by(Job.priority.desc(), Job.lastmod)
             .first()
@@ -4494,7 +4469,6 @@ def get_next_job_for_step(
             .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name)
             .filter(WorkflowStep.category == step_category)
             .filter(Job.flag == flag)
-            .filter(Job.workflow_id == workflow_id)
             .filter(Job.day != "REF")
             .order_by(Job.priority.desc(), Job.lastmod)
             .first()
@@ -4506,7 +4480,6 @@ def get_next_job_for_step(
     if IS_REF:
         batch_q = (
             session.query(Job)
-            .filter(Job.workflow_id == workflow_id)
             .filter(Job.step_id == step.step_id)
             .filter(Job.jobtype == seed_job.jobtype)
             .filter(Job.day == "REF")
@@ -4515,7 +4488,6 @@ def get_next_job_for_step(
     else:
         batch_q = (
             session.query(Job)
-            .filter(Job.workflow_id == workflow_id)
             .filter(Job.step_id == step.step_id)
             .filter(Job.jobtype == seed_job.jobtype)
             .filter(Job.day != "REF")
@@ -4546,7 +4518,6 @@ def get_next_job_for_step(
     if IS_REF:
         upd = (
             update(Job)
-            .where(Job.workflow_id == workflow_id)
             .where(Job.step_id == step.step_id)
             .where(Job.jobtype == seed_job.jobtype)
             .where(Job.day == "REF")
@@ -4555,7 +4526,6 @@ def get_next_job_for_step(
     else:
         upd = (
             update(Job)
-            .where(Job.workflow_id == workflow_id)
             .where(Job.step_id == step.step_id)
             .where(Job.jobtype == seed_job.jobtype)
             .where(Job.day != "REF")
@@ -4580,7 +4550,7 @@ def get_next_job_for_step(
 
     return jobs, step
 
-def is_next_job_for_step(session, workflow_id="default", step_category="preprocess", flag='T'):
+def is_next_job_for_step(session, step_category="preprocess", flag='T'):
     """
     Are there any workflow-aware Jobs in the database with the specified
     flag and step category?
@@ -4588,8 +4558,6 @@ def is_next_job_for_step(session, workflow_id="default", step_category="preproce
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
-    :type workflow_id: str
-    :param workflow_id: Workflow ID to filter by
     :type step_category: str
     :param step_category: Workflow step category (e.g., "preprocess", "qc")
     :type flag: str
@@ -4611,14 +4579,12 @@ def is_next_job_for_step(session, workflow_id="default", step_category="preproce
             .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name) \
             .filter(WorkflowStep.category == step_category) \
             .filter(Job.flag == flag) \
-            .filter(Job.workflow_id == workflow_id)\
             .filter(Job.day == "REF").first()
     else:
         job = session.query(Job) \
             .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name) \
             .filter(WorkflowStep.category == step_category) \
             .filter(Job.flag == flag) \
-            .filter(Job.workflow_id == workflow_id) \
             .filter(Job.day != "REF")\
             .first()
 
@@ -4627,13 +4593,12 @@ def is_next_job_for_step(session, workflow_id="default", step_category="preproce
     else:
         return True
 
-def get_filter_steps_for_cc_step(session, cc_step_id, workflow_id="default"):
+def get_filter_steps_for_cc_step(session, cc_step_id):
     """
     Get all filter steps that are children of a specific CC step.
 
     :param session: Database session
     :param cc_step_id: The step_id of the CC step
-    :param workflow_id: Workflow ID to filter by (default: "default")
     :return: List of filter workflow steps that are successors of the CC step
     """
     from .api import get_step_successors
@@ -4646,20 +4611,19 @@ def get_filter_steps_for_cc_step(session, cc_step_id, workflow_id="default"):
 
     return filter_steps
 
-def get_filter_steps_for_cc_step_name(session, cc_step_name, workflow_id="default"):
+def get_filter_steps_for_cc_step_name(session, cc_step_name):
     """
     Get all filter steps that are children of a specific CC step by step name.
 
     :param session: Database session
     :param cc_step_name: The step name of the CC step (e.g., "CC_01")
-    :param workflow_id: Workflow ID to filter by (default: "default")
     :return: List of filter workflow steps that are successors of the CC step
     """
     from .api import get_workflow_steps, get_step_successors
 
     # First, find the CC step by name
     cc_step = None
-    workflow_steps = get_workflow_steps(session, workflow_id)
+    workflow_steps = get_workflow_steps(session)
     for step in workflow_steps:
         if step.step_name == cc_step_name and step.category == "cc":
             cc_step = step
@@ -4827,7 +4791,7 @@ def lineage_str_to_step_names(lineage_str, sep="/"):
         return []
     return [p.strip() for p in lineage_str.split(sep) if p.strip()]
 
-def lineage_str_to_steps(session, lineage_str, workflow_id="default", sep="/", strict=True):
+def lineage_str_to_steps(session, lineage_str, sep="/", strict=True):
     """
     Resolve a lineage string to a list of WorkflowStep ORM objects (ordered).
 
@@ -4836,8 +4800,6 @@ def lineage_str_to_steps(session, lineage_str, workflow_id="default", sep="/", s
     session : sqlalchemy.orm.session.Session
     lineage_str : str
         e.g. "preprocess_1/cc_1/filter_1"
-    workflow_id : str
-        Workflow namespace to resolve step names in.
     sep : str
         Separator used in lineage strings.
     strict : bool
@@ -4854,7 +4816,6 @@ def lineage_str_to_steps(session, lineage_str, workflow_id="default", sep="/", s
 
     rows = (
         session.query(WorkflowStep)
-        .filter(WorkflowStep.workflow_id == workflow_id)
         .filter(WorkflowStep.step_name.in_(names))
         .all()
     )
@@ -4873,8 +4834,8 @@ def lineage_str_to_steps(session, lineage_str, workflow_id="default", sep="/", s
 
     if missing and strict:
         raise ValueError(
-            "Could not resolve lineage steps in workflow_id=%r: %s"
-            % (workflow_id, ", ".join(missing))
+            "Could not resolve lineage steps: %s"
+            % ", ".join(missing)
         )
 
     return steps
@@ -4882,7 +4843,6 @@ def lineage_str_to_steps(session, lineage_str, workflow_id="default", sep="/", s
 def get_next_lineage_batch(
         db,
         step_category,
-        workflow_id="default",
         group_by="pair_lineage",
         loglevel="INFO",
         day_value=None,
@@ -4911,12 +4871,11 @@ def get_next_lineage_batch(
     logger = get_logger(f"msnoise.worker.{step_category}", loglevel)
 
     # Ensure there is work (fast check)
-    if not is_next_job_for_step(db, workflow_id=workflow_id, step_category=step_category, flag="T"):
+    if not is_next_job_for_step(db, step_category=step_category, flag="T"):
         return None
 
     jobs, step = get_next_job_for_step(
         db,
-        workflow_id=workflow_id,
         step_category=step_category,
         group_by=group_by,
         flag="T",
@@ -4944,7 +4903,7 @@ def get_next_lineage_batch(
 
     # Merge params for THIS lineage only
     orig_params = get_params(db)
-    lineage_steps = lineage_str_to_steps(db, lineage_str, workflow_id=getattr(jobs[0], "workflow_id", workflow_id), strict=True)
+    lineage_steps = lineage_str_to_steps(db, lineage_str, strict=True)
     lineage_steps, lineage_names, params = get_merged_params_for_lineage(db, orig_params, step_params, lineage_steps)
 
     if drop_current_step_name and lineage_names:

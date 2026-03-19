@@ -853,9 +853,8 @@ def create_all_sets(force, dry_run):
     db.close()
 
 @config.command()
-@click.option('--workflow', default='default', help='Workflow ID')
 @click.pass_context
-def create_workflow_step(ctx, workflow):
+def create_workflow_step(ctx):
     """Create a new workflow step interactively"""
     from ..api import create_workflow_step
 
@@ -867,30 +866,28 @@ def create_workflow_step(ctx, workflow):
     description = click.prompt('Description (optional)', default='')
 
     try:
-        step = create_workflow_step(session, step_name, category, set_number, workflow, description)
+        step = create_workflow_step(session, step_name, category, set_number, description)
         click.echo(f'Created workflow step: {step.step_name} ({step.category}:{step.set_number})')
     except Exception as e:
         click.echo(f'Error: {str(e)}', err=True)
 
 @config.command()
-@click.option('--workflow-id', '-w', default='default',
-              help='Workflow ID to create steps for (default: "default")')
 @click.option('--verbose', '-v', is_flag=True, help='Show detailed output')
-def create_workflow_steps_from_configs(workflow_id, verbose):
+def create_workflow_steps_from_configs(verbose):
     """Create workflow steps automatically from all existing config sets.
-lsniose
+
     This command scans all configuration sets in the database and creates
     corresponding workflow steps, sorted by natural workflow order.
     """
     from ..api import connect, create_workflow_steps_from_config_sets
 
     if verbose:
-        click.echo(f"Creating workflow steps for workflow: {workflow_id}")
+        click.echo("Creating workflow steps")
 
     try:
         db = connect()
         created_count, existing_count, error_message = create_workflow_steps_from_config_sets(
-            db, workflow_id
+            db
         )
 
         if error_message:
@@ -916,35 +913,33 @@ lsniose
     return 0
 
 @config.command()
-@click.option('--workflow', default='default', help='Workflow ID')
 @click.pass_context
-def list_workflow_steps(ctx, workflow):
+def list_workflow_steps(ctx):
     """List all workflow steps"""
     from ..api import connect, get_workflow_steps
 
     session = connect()
-    steps = get_workflow_steps(session, workflow)
+    steps = get_workflow_steps(session)
     session.close()
 
     if not steps:
-        click.echo(f'No workflow steps found for workflow: {workflow}')
+        click.echo('No workflow steps found.')
         return
 
-    click.echo(f'Workflow steps for "{workflow}":')
+    click.echo('Workflow steps:')
     for step in steps:
         click.echo(f'  {step.step_id}: {step.step_name} ({step.category}:{step.set_number})')
 
 @config.command()
-@click.option('--workflow', default='default', help='Workflow ID')
 @click.pass_context
-def show_workflow_graph(ctx, workflow):
+def show_workflow_graph(ctx):
     """Show workflow graph"""
     from ..api import connect, get_workflow_graph
 
     session = connect()
-    graph = get_workflow_graph(session, workflow)
+    graph = get_workflow_graph(session)
 
-    click.echo(f'Workflow "{workflow}" graph:')
+    click.echo('Workflow graph:')
     click.echo('\nNodes:')
     for node in graph['nodes']:
         click.echo(f'  {node["id"]}: {node["name"]} ({node["category"]}:{node["set_number"]})')
@@ -954,10 +949,8 @@ def show_workflow_graph(ctx, workflow):
         click.echo(f'  {edge["from"]} -> {edge["to"]} ({edge["type"]})')
 
 @config.command()
-@click.option('--workflow-id', '-w', default='default',
-              help='Workflow ID to create links for (default: "default")')
 @click.option('--verbose', '-v', is_flag=True, help='Show detailed output')
-def create_workflow_links(workflow_id, verbose):
+def create_workflow_links(verbose):
     """Create workflow links automatically between existing workflow steps.
 
     This command creates links between workflow steps following the natural
@@ -969,12 +962,12 @@ def create_workflow_links(workflow_id, verbose):
     from ..api import connect, create_workflow_links_from_steps
 
     if verbose:
-        click.echo(f"Creating workflow links for workflow: {workflow_id}")
+        click.echo("Creating workflow links")
 
     try:
         db = connect()
         created_count, existing_count, error_message = create_workflow_links_from_steps(
-            db, workflow_id
+            db
         )
 
         if error_message:
@@ -1148,16 +1141,11 @@ def plot_station_map(ctx, show, outfile):
     ),
 )
 
-@click.option(
-    '--workflow-id', '-w',
-    default='default',
-    help='Workflow ID to use (default: "default")'
-)
-def new_jobs(init, nocc, after="", workflow_id='default'):
+def new_jobs(init, nocc, after=""):
     """Determines if new jobs are to be defined"""
 
     from ..s02new_jobs import main
-    main(init, nocc, after, workflow_id)
+    main(init, nocc, after)
 
 
 @cli.group(cls=OrderedGroup)
