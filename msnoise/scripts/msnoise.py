@@ -294,12 +294,70 @@ def db():
 @db.command(name="init")
 @click.option('--tech', help='Database technology: 1=SQLite 2=MySQL/MariaDB 3=PostgreSQL',
               default=None)
-def db_init(tech):
+@click.option('--auto-workflow', is_flag=True, default=False,
+              help='Automatically create all default config sets, workflow steps and links '
+                   'without prompting.')
+def db_init(tech, auto_workflow):
     """This command initializes the current folder to be a MSNoise Project
     by creating a database and a db.ini file."""
     click.echo('Launching the init')
     from ..s000installer import main
-    main(tech)
+    result = main(tech)
+    if result != 0:
+        return
+
+    if auto_workflow or click.confirm(
+        '\nWould you like to automatically create all default config sets, '
+        'workflow steps and links?',
+        default=True
+    ):
+        _create_default_workflow()
+
+
+def _create_default_workflow():
+    """Create default config sets, workflow steps and links after db init."""
+    from ..api import connect, create_config_set, \
+        create_workflow_steps_from_config_sets, create_workflow_links_from_steps
+
+    ALL_CATEGORIES = [
+        'preprocess', 'cc', 'filter', 'stack',
+        'mwcs', 'mwcs_dtt', 'stretching',
+        'wavelet', 'wavelet_dtt', 'qc',
+    ]
+
+    db = connect()
+
+    # 1. Config sets
+    click.echo('\n[1/3] Creating default config sets...')
+    created_sets = []
+    for cat in ALL_CATEGORIES:
+        set_number = create_config_set(db, cat)
+        if set_number is not None:
+            created_sets.append(f'{cat}_{set_number}')
+    db.commit()
+    if created_sets:
+        click.echo(f'      Created: {", ".join(created_sets)}')
+    else:
+        click.echo('      All config sets already exist.')
+
+    # 2. Workflow steps
+    click.echo('[2/3] Creating workflow steps from config sets...')
+    created, existing, err = create_workflow_steps_from_config_sets(db)
+    if err:
+        click.echo(f'      Error: {err}', err=True)
+    else:
+        click.echo(f'      Created {created} step(s), {existing} already existed.')
+
+    # 3. Workflow links
+    click.echo('[3/3] Creating workflow links between steps...')
+    created, existing, err = create_workflow_links_from_steps(db)
+    if err:
+        click.echo(f'      Error: {err}', err=True)
+    else:
+        click.echo(f'      Created {created} link(s), {existing} already existed.')
+
+    db.close()
+    click.echo('\nSetup complete! Your workflow is ready to use.')
 
 
 @db.command(name="update_loc_chan")
