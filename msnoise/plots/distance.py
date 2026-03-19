@@ -16,7 +16,7 @@ Example:
 """
 
 import matplotlib.pyplot as plt
-from obspy import read, Trace
+from obspy import Trace
 from ..api import *
 
 
@@ -26,17 +26,25 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
                         with_pid=True)
     db = connect()
 
+    # Build merged params from all configsets in the lineage — same approach
+    # as batch["params"] in the processing steps.
+    # global_1 is excluded from the lineage by get_stack_lineage_for_filter;
+    # global params are already in get_params(db).
+    lineage = get_stack_lineage_for_filter(db, filterid)
+    params = get_params(db)
+    for step_name in lineage:
+        category, set_num = step_name.rsplit('_', 1)
+        cfg = get_config_set_details(db, category, int(set_num), format='AttribDict')
+        if cfg:
+            params.update(cfg)
+
+    cc_sampling_rate = float(params.cc_sampling_rate)
+    maxlag = float(params.maxlag)
+    output_folder = params.output_folder or 'OUTPUT'
+    taxis = np.linspace(-maxlag, maxlag, int(2 * maxlag * cc_sampling_rate) + 1)
+
     pairs = get_station_pairs(db, used=1)
-    cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
-    export_format = get_config(db, 'export_format')
-    if export_format == "BOTH":
-        extension = ".MSEED"
-    else:
-        extension = "."+export_format
-    maxlag = float(get_config(db, 'maxlag'))
-    maxlagsamples = get_maxlag_samples(db)
-    t = np.linspace(-maxlag, maxlag, maxlagsamples)
-    taxis = get_t_axis(db)
+
     if refilter:
         freqmin, freqmax = refilter.split(':')
         freqmin = float(freqmin)
@@ -44,8 +52,6 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
 
     plt.figure()
     dists = []
-    output_folder = get_config(db, 'output_folder') or 'OUTPUT'
-    lineage = get_stack_lineage_for_filter(db, filterid)
     for pair in pairs:
         station1, station2 = pair
         # TODO get distance for LOCids!!
@@ -78,13 +84,12 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
                                zerophase=True)
                 ref.normalize()
                 ref = ref.data * ampli
-                plt.plot(t, ref+dist, c='k', lw=0.4)
-        
+                plt.plot(taxis, ref + dist, c='k', lw=0.4)
+
     plt.ylabel("Interstation Distance in km")
     plt.xlabel("Lag Time")
-    filter = get_filters(db, ref=filterid)
-    low = float(filter.freqmin)
-    high = float(filter.freqmax)
+    low = float(params.freqmin)
+    high = float(params.freqmax)
     title = '%s, Filter %d (%.2f - %.2f Hz)' % \
             (components, filterid, low, high,)
     if refilter:
