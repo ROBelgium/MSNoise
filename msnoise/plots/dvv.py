@@ -27,6 +27,13 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1, mwcsid=1, d
     db = connect()
     params = get_params(db)
     start, end, datelist = build_movstack_datelist(db)
+    # Load stack configset params for this filter's pipeline
+    stack_lineage = get_stack_lineage_for_filter(db, filterid)
+    if stack_lineage:
+        stack_set = int(stack_lineage[-1].rsplit('_', 1)[-1])
+        stack_params = get_config_set_details(db, 'stack', stack_set, format='AttribDict')
+        if stack_params:
+            params.update(stack_params)
 
     if mov_stackid and mov_stackid != "":
         mov_stack = params.mov_stack[mov_stackid - 1]
@@ -41,13 +48,15 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1, mwcsid=1, d
         components = [components, ]
     print(mov_stacks)
     low = high = 0.0
-    filter = get_filters(db, ref=filterid)
-    low = float(filter.freqmin)
-    high = float(filter.freqmax)
+    filter_params = get_config_set_details(db, 'filter', filterid, format='AttribDict')
+    if filter_params:
+        low = float(filter_params.freqmin)
+        high = float(filter_params.freqmax)
 
     fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
 
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
+    output_folder = get_config(db, 'output_folder') or 'OUTPUT'
     for i, mov_stack in enumerate(mov_stacks):
         current = start
         try:
@@ -57,7 +66,8 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1, mwcsid=1, d
         # plt.title('%s Moving Window' % mov_stack)
         for comps in components:
             try:
-                dvv = xr_get_dvv2(comps, filterid, mwcsid, dttid, mov_stack)
+                dvv_lineage = get_lineage_for_step(db, 'mwcs_dtt', dttid)
+                dvv = xr_get_dvv2(output_folder, dvv_lineage, comps, mov_stack)
             except FileNotFoundError as fullpath:
                 logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                 continue

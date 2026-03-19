@@ -263,7 +263,7 @@ def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12, freqmin=0.1, freqma
 
 
 
-def main(loglevel="INFO"):
+def main(loglevel="INFO", batch_size=None):
     """
     Main function to process WCT jobs using lineage-based approach
     """
@@ -321,7 +321,7 @@ def main(loglevel="INFO"):
         vpo = getattr(params, 'wct_vpo', 20)
         nptsfreq = getattr(params, 'wct_nptsfreq', 300)
         wct_norm = getattr(params, 'wct_norm', "Y")
-        wavelet_type = eval(getattr(params, 'wavelet_type', "('Morlet',6.)"))
+        wavelet_type = eval(getattr(params, 'wavelet_type', '') or "('Morlet',6.)")
 
         logger.info(f"WCT params: freqmin={freqmin} freqmax={freqmax} ns={ns} nt={nt} vpo={vpo}")
 

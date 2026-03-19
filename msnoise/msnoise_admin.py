@@ -45,6 +45,11 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'msnoise-admin-secret-key')
 app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'
 
+
+def get_app():
+    """Return the Flask application instance for testing."""
+    return app
+
 # Babel for internationalization
 babel = Babel(app)
 

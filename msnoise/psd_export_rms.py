@@ -28,6 +28,9 @@ def main(loglevel="INFO", njobs_per_worker=9999):
     logger.info('*** Starting: HDF to RMS ***')
     db = connect()
     params = get_params(db)
+    qc_params = get_config_set_details(db, 'qc', 1, format='AttribDict')
+    if qc_params:
+        params.update(qc_params)
     files = glob.glob(os.path.join("PSD", "RMS", params.qc_rms_type, '*.h5'))
     for file in sorted(files):
         logger.debug(file)

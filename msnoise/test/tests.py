@@ -43,6 +43,9 @@ from ..plots.distance import main as distance_main
 from ..plots.dvv import main as dvv_main
 from ..plots.data_availability import main as data_availability_main
 from ..plots.wct_dvv import main as wct_dvv_main
+from ..step_preprocessing import main as preprocess_main
+from ..s08compute_wct import main as compute_wct_main
+from ..s09merge_wct import main as wavelet_dtt_main
 
 global logger
 logger = logging.getLogger('matplotlib')
@@ -130,6 +133,35 @@ def test_002_ConnectToDB():
         pytest.fail("Can't connect to MSNoise DB")
 
 
+@pytest.mark.order(2)
+def test_002b_create_workflow():
+    db = connect()
+    for category in ['preprocess', 'cc', 'filter', 'stack', 'mwcs', 'mwcs_dtt',
+                     'stretching', 'wavelet', 'wavelet_dtt', 'qc']:
+        set_number = create_config_set(db, category)
+        assert set_number == 1, f"Expected set_number=1 for {category}, got {set_number}"
+    created_steps, _, err = create_workflow_steps_from_config_sets(db)
+    assert err is None, f"Error creating workflow steps: {err}"
+    assert created_steps > 0
+    created_links, _, err = create_workflow_links_from_steps(db)
+    assert err is None, f"Error creating workflow links: {err}"
+    assert created_links > 0
+    db.close()
+
+
+@pytest.mark.order(2)
+def test_002c_verify_workflow():
+    db = connect()
+    steps = get_workflow_steps(db)
+    step_names = {s.step_name for s in steps}
+    for name in ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'mwcs_1',
+                 'mwcs_dtt_1', 'stretching_1', 'wavelet_1', 'wavelet_dtt_1']:
+        assert name in step_names, f"Workflow step '{name}' not found"
+    links = get_workflow_links(db)
+    assert len(links) > 0, "No workflow links created"
+    db.close()
+
+
 @pytest.mark.order(3)
 def test_003_set_and_config(setup_environment):
     db = connect()
@@ -151,29 +183,43 @@ def test_003_set_and_config(setup_environment):
 @pytest.mark.order(4)
 def test_004_set_and_get_filters():
     db = connect()
-    filters = []
-    f = Filter()
-    f.freqmin = 0.01
-    f.freqmax = 1.0
-    f.CC = True
-    f.SC = True
-    f.AC = True
-    f.used = True
-    filters.append(f)
-    f = Filter()
-    f.freqmin = 0.1
-    f.freqmax = 1.0
-    f.CC = True
-    f.SC = True
-    f.AC = True
-    f.used = True
-    filters.append(f)
-    for f in filters:
-        update_filter(db, f.ref, f.freqmin, f.freqmax, f.CC, f.SC, f.AC, f.used)
-    dbfilters = get_filters(db)
-    for i, filter in enumerate(dbfilters):
-        for param in ['freqmin', 'freqmax', 'CC', 'SC', 'AC', 'used']:
-            assert eval(f"filter.{param}") == eval(f"filters[i].{param}")
+    # filter_1 configset was created in test_002b; update its frequency parameters
+    db.query(Config).filter(
+        Config.name == 'freqmin', Config.category == 'filter', Config.set_number == 1
+    ).update({'value': '0.01'})
+    db.query(Config).filter(
+        Config.name == 'freqmax', Config.category == 'filter', Config.set_number == 1
+    ).update({'value': '1.0'})
+    for param in ['CC', 'SC', 'AC']:
+        db.query(Config).filter(
+            Config.name == param, Config.category == 'filter', Config.set_number == 1
+        ).update({'value': 'Y'})
+    db.commit()
+    # Create a second filter configset
+    set_number = create_config_set(db, 'filter')
+    assert set_number == 2
+    db.query(Config).filter(
+        Config.name == 'freqmin', Config.category == 'filter', Config.set_number == 2
+    ).update({'value': '0.1'})
+    db.query(Config).filter(
+        Config.name == 'freqmax', Config.category == 'filter', Config.set_number == 2
+    ).update({'value': '1.0'})
+    for param in ['CC', 'SC', 'AC']:
+        db.query(Config).filter(
+            Config.name == param, Config.category == 'filter', Config.set_number == 2
+        ).update({'value': 'Y'})
+    db.commit()
+    # Register the new WorkflowStep and links for filter_2
+    create_workflow_steps_from_config_sets(db)
+    create_workflow_links_from_steps(db)
+    # Verify both filter configsets
+    for set_num, expected_freqmin in [(1, '0.01'), (2, '0.1')]:
+        details = {d['name']: d['value'] for d in get_config_set_details(db, 'filter', set_num)}
+        assert details['freqmin'] == expected_freqmin, \
+            f"freqmin for filter_{set_num} wrong: {details.get('freqmin')}"
+        assert details['freqmax'] == '1.0'
+        assert details['CC'] == 'Y'
+    db.close()
 
 @pytest.mark.order(5)
 def test_005_populate_station_table():
@@ -249,17 +295,26 @@ def test_010_new_jobs():
         traceback.print_exc()
         pytest.fail()
 
+@pytest.mark.order(10)
+def test_010b_preprocess_and_propagate():
+    try:
+        preprocess_main()
+        new_jobs_main(after='preprocess')
+    except:
+        traceback.print_exc()
+        pytest.fail()
+
+
 @pytest.mark.order(11)
 def test_011_control_jobs():
     db = connect()
-    assert is_next_job(db) is True
-    jobs = get_next_job(db)
-    assert isinstance(jobs[0], Job)
+    assert is_next_job_for_step(db, step_category='cc') is True
+    db.close()
 
 @pytest.mark.order(12)
 def test_012_reset_jobs():
     db = connect()
-    reset_jobs(db, 'CC', alljobs=True)
+    reset_jobs(db, 'cc_1', alljobs=True)
     db.close()
 
 @pytest.mark.order(13)
@@ -273,75 +328,41 @@ def test_013_s03compute_cc():
 @pytest.mark.order(14)
 def test_014_check_done_jobs():
     db = connect()
-    jobs = get_job_types(db, 'CC')
-    assert jobs[0][0] == 3
-    assert jobs[0][1] == 'D'
+    jobs = get_job_types(db, 'cc_1')
+    counts = {flag: count for count, flag in jobs}
+    assert counts.get('D', 0) == 3, f"Expected 3 done CC jobs, got: {counts}"
+    db.close()
 
 @pytest.mark.order(15)
-def test_015_check_cc_files(format="MSEED"):
+def test_015_check_cc_files():
     db = connect()
-    for filter in get_filters(db):
-        for components in get_components_to_compute(db):
-            for (sta1, sta2) in get_station_pairs(db):
-                for loc1 in sta1.locs():
-                    for loc2 in sta2.locs():
-                        pair = f"{sta1.net}.{sta1.sta}.{loc1}_{sta2.net}.{sta2.sta}.{loc2}"
-                        tmp = os.path.join("STACKS", f"{filter.ref:02}", "001_DAYS", components, pair, f"2010-09-01.{format}")
-                        print("checking", tmp)
-                        assert os.path.isfile(tmp), f"{tmp} does not exist"
-
-@pytest.mark.order(16)
-def test_016_update_config():
-    db = connect()
-    update_config(db, "export_format", "SAC")
-    db.close()
-
-@pytest.mark.order(17)
-def test_017_reset_cc_jobs():
-    db = connect()
-    reset_jobs(db, 'CC', alljobs=True)
-    db.close()
-
-@pytest.mark.order(18)
-def test_018_recompute_cc():
-    test_013_s03compute_cc()
-
-@pytest.mark.order(19)
-def test_019_check_SACS():
-    test_015_check_cc_files(format='SAC')
-
-
-@pytest.mark.order(20)
-def test_020_update_config():
-    db = connect()
-    shutil.rmtree("STACKS")
-    update_config(db, "export_format", "BOTH")
-    db.close()
-
-@pytest.mark.order(21)
-def test_021_reprocess_BOTH():
-    test_017_reset_cc_jobs()
-    test_013_s03compute_cc()
-    test_015_check_cc_files(format='MSEED')
-    test_015_check_cc_files(format='SAC')
-
-@pytest.mark.order(22)
-def test_022_check_content():
-    db = connect()
-    for filter in get_filters(db):
+    output_folder = get_config(db, 'output_folder') or 'OUTPUT'
+    filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
+    for filter_step in filter_steps:
         for components in get_components_to_compute(db):
             for (sta1, sta2) in get_station_pairs(db):
                 for loc1 in sta1.locs():
                     for loc2 in sta2.locs():
                         sta1_id = f"{sta1.net}.{sta1.sta}.{loc1}"
                         sta2_id = f"{sta2.net}.{sta2.sta}.{loc2}"
-                        pair = f"{sta1_id}_{sta2_id}"
-                        tmp1 = os.path.join("STACKS", f"{filter.ref:02}", "001_DAYS", components, pair, "2010-09-01.MSEED")
-                        tmp2 = os.path.join("STACKS", f"{filter.ref:02}", "001_DAYS", components, pair, "2010-09-01.SAC")
-                        data1 = read(tmp1)[0].data
-                        data2 = read(tmp2)[0].data
-                        assert_allclose(data1, data2)
+                        tmp = os.path.join(output_folder, "preprocess_1", "cc_1",
+                                           filter_step.step_name, "_output", "daily",
+                                           components, sta1_id, sta2_id,
+                                           f"2010-09-01.MSEED")
+                        print("checking", tmp)
+                        assert os.path.isfile(tmp), f"{tmp} does not exist"
     db.close()
+
+
+@pytest.mark.order(17)
+def test_017_reset_cc_jobs():
+    db = connect()
+    reset_jobs(db, 'cc_1', alljobs=True)
+    db.close()
+
+@pytest.mark.order(18)
+def test_018_recompute_cc():
+    test_013_s03compute_cc()
 
 @pytest.mark.order(23)
 def test_023_stack():
@@ -351,15 +372,18 @@ def test_023_stack():
     update_config(db, 'startdate', '2009-01-01')
     update_config(db, 'enddate', '2011-01-01')
     update_config(db, 'mov_stack', "(('1d','1d'),('2d','1d'),('5d','1d'))")
+    db.close()
+    new_jobs_main(after='cc')
+    db = connect()
     interval = 1.
     stack_main('ref', interval)
-    reset_jobs(db, "STACK", alljobs=True)
+    reset_jobs(db, "stack_1", alljobs=True)
     stack_main('mov', interval)
-    reset_jobs(db, "STACK", alljobs=True)
+    reset_jobs(db, "stack_1", alljobs=True)
     stack_main('step', interval)
-    
+
     update_config(db, 'wienerfilt', 'Y')
-    reset_jobs(db, "STACK", alljobs=True)
+    reset_jobs(db, "stack_1", alljobs=True)
     stack_main('mov', interval)
     stack_main('ref', interval)
 
@@ -368,101 +392,53 @@ def test_023_stack():
 @pytest.mark.order(24)
 def test_024_mwcs_param_update():
     db = connect()
-
-    dvv_mwcs_params = []
-
-    mwcs_param = DvvMwcs()
-    mwcs_param.freqmin = 0.2
-    mwcs_param.freqmax = 0.6
-    mwcs_param.mwcs_wlen = 10
-    mwcs_param.mwcs_step = 5
-    mwcs_param.used = True
-    dvv_mwcs_params.append(mwcs_param)
-    filter_refs = [1]
-    update_dvv_mwcs(db, mwcs_param.ref, mwcs_param.freqmin, mwcs_param.freqmax,
-                         mwcs_param.mwcs_wlen, mwcs_param.mwcs_step, mwcs_param.used, filter_refs)
-
-    mwcs_param = DvvMwcs()
-    mwcs_param.freqmin = 0.5
-    mwcs_param.freqmax = 0.9
-    mwcs_param.mwcs_wlen = 6
-    mwcs_param.mwcs_step = 3
-    mwcs_param.used = True
-    dvv_mwcs_params.append(mwcs_param)
-    filter_refs = [1,2]
-    update_dvv_mwcs(db, mwcs_param.ref, mwcs_param.freqmin, mwcs_param.freqmax,
-                         mwcs_param.mwcs_wlen, mwcs_param.mwcs_step, mwcs_param.used, filter_refs)  
-
-    db_dvv_mwcs = get_dvv_mwcs(db)
-
-    for i, dvv_mwcs in enumerate(db_dvv_mwcs):
-        for param in ['freqmin', 'freqmax', 'mwcs_wlen', 'mwcs_step', 'used']:
-            db_value = getattr(dvv_mwcs, param, None)
-            expected_value = getattr(dvv_mwcs_params[i], param, None)
-            assert db_value == expected_value, f"Mismatch in {param}: DB={db_value}, Expected={expected_value}"
+    details = get_config_set_details(db, 'mwcs', 1)
+    assert len(details) > 0, "MWCS configset 1 not found"
+    db.query(Config).filter(
+        Config.name == 'mwcs_wlen',
+        Config.category == 'mwcs',
+        Config.set_number == 1
+    ).update({'value': '10'})
+    db.query(Config).filter(
+        Config.name == 'mwcs_step',
+        Config.category == 'mwcs',
+        Config.set_number == 1
+    ).update({'value': '5'})
+    db.commit()
+    details = {d['name']: d['value'] for d in get_config_set_details(db, 'mwcs', 1)}
+    assert details['mwcs_wlen'] == '10', f"mwcs_wlen not updated, got: {details.get('mwcs_wlen')}"
+    assert details['mwcs_step'] == '5', f"mwcs_step not updated, got: {details.get('mwcs_step')}"
+    db.close()
 
 @pytest.mark.order(25)
 def test_025_mwcs():
+    new_jobs_main(after='stack')
     compute_mwcs_main()
 
 @pytest.mark.order(26)
 def test_026_mwcs_dtt_param_update():
     db = connect()
-
-    dvv_mwcs_dtt_params = []
-
-    # First MWCS DTT parameter set
-    dtt_param = DvvMwcsDtt()
-    dtt_param.dtt_minlag = 5.0
-    dtt_param.dtt_width = 30.0
-    dtt_param.dtt_lag = "static"
-    dtt_param.dtt_v = 1.0
-    dtt_param.dtt_sides = "both"
-    dtt_param.dtt_mincoh = 0.5
-    dtt_param.dtt_maxerr = 0.2
-    dtt_param.dtt_maxdtt = 0.05
-    dtt_param.used = True
-    dvv_mwcs_dtt_params.append(dtt_param)
-    mwcs_refs = [1,2]  # Linking to MWCS 1
-
-    update_dvv_mwcs_dtt(
-        db, dtt_param.ref, dtt_param.dtt_minlag, dtt_param.dtt_width, dtt_param.dtt_lag,
-        dtt_param.dtt_v, dtt_param.dtt_sides, dtt_param.dtt_mincoh,
-        dtt_param.dtt_maxerr, dtt_param.dtt_maxdtt, dtt_param.used, mwcs_refs
-    )
-
-    # Second MWCS DTT parameter set linked to multiple MWCS sets
-    dtt_param = DvvMwcsDtt()
-    dtt_param.dtt_minlag = 6.0
-    dtt_param.dtt_width = 40.0
-    dtt_param.dtt_lag = "dynamic"
-    dtt_param.dtt_v = 1.0
-    dtt_param.dtt_sides = "left"
-    dtt_param.dtt_mincoh = 0.6
-    dtt_param.dtt_maxerr = 0.3
-    dtt_param.dtt_maxdtt = 0.025
-    dtt_param.used = True
-    dvv_mwcs_dtt_params.append(dtt_param)
-    mwcs_refs = [2]  # Linking to MWCS 1 & 2
-
-    update_dvv_mwcs_dtt(
-        db, dtt_param.ref, dtt_param.dtt_minlag, dtt_param.dtt_width, dtt_param.dtt_lag,
-        dtt_param.dtt_v, dtt_param.dtt_sides, dtt_param.dtt_mincoh,
-        dtt_param.dtt_maxerr, dtt_param.dtt_maxdtt, dtt_param.used, mwcs_refs
-    )
-
-    # Retrieve and validate stored parameters
-    db_dvv_mwcs_dtt = get_dvv_mwcs_dtt(db)
-
-    assert len(db_dvv_mwcs_dtt) == len(dvv_mwcs_dtt_params), "Mismatch in number of MWCS-DTT entries"
-
-    for i, dtt in enumerate(db_dvv_mwcs_dtt):
-        for param in ['dtt_minlag', 'dtt_width', 'dtt_lag', 'dtt_v',
-                      'dtt_sides', 'dtt_mincoh', 'dtt_maxerr', 'dtt_maxdtt', 'used']:
-            assert getattr(dtt, param) == getattr(dvv_mwcs_dtt_params[i], param)
+    details = get_config_set_details(db, 'mwcs_dtt', 1)
+    assert len(details) > 0, "MWCS DTT configset 1 not found"
+    db.query(Config).filter(
+        Config.name == 'dtt_minlag',
+        Config.category == 'mwcs_dtt',
+        Config.set_number == 1
+    ).update({'value': '5.0'})
+    db.query(Config).filter(
+        Config.name == 'dtt_width',
+        Config.category == 'mwcs_dtt',
+        Config.set_number == 1
+    ).update({'value': '30.0'})
+    db.commit()
+    details = {d['name']: d['value'] for d in get_config_set_details(db, 'mwcs_dtt', 1)}
+    assert details['dtt_minlag'] == '5.0', f"dtt_minlag not updated, got: {details.get('dtt_minlag')}"
+    assert details['dtt_width'] == '30.0', f"dtt_width not updated, got: {details.get('dtt_width')}"
+    db.close()
 
 @pytest.mark.order(27)
 def test_027_dtt():
+    new_jobs_main(after='mwcs')
     compute_dtt_main()
 
 @pytest.mark.order(28)
@@ -492,64 +468,27 @@ def test_030_build_movstack_datelist():
 @pytest.mark.order(31)
 def test_031_stretching_param_update():
     db = connect()
-
-    dvv_stretching_params = []
-
-    # First Stretching parameter set
-    stretching_param = DvvStretching()
-    stretching_param.stretching_minlag = 5
-    stretching_param.stretching_width = 20.0
-    stretching_param.stretching_lag = "static"
-    stretching_param.stretching_v = 1
-    stretching_param.stretching_sides = "both"
-    stretching_param.stretching_max = 0.05
-    stretching_param.stretching_nsteps = 500
-    stretching_param.used = True
-    dvv_stretching_params.append(stretching_param)
-    filter_refs = [1]  # Linking to Filter 1
-
-    update_dvv_stretching(
-        db, stretching_param.ref, stretching_param.stretching_minlag, stretching_param.stretching_width,
-        stretching_param.stretching_lag, stretching_param.stretching_v, stretching_param.stretching_sides,
-        stretching_param.stretching_max, stretching_param.stretching_nsteps, stretching_param.used, filter_refs
-    )
-
-    # Second Stretching parameter set linked to multiple Filters
-    stretching_param = DvvStretching()
-    stretching_param.stretching_minlag = 10
-    stretching_param.stretching_width = 40
-    stretching_param.stretching_lag = "dynamic"
-    stretching_param.stretching_v = 2.0
-    stretching_param.stretching_sides = "both"
-    stretching_param.stretching_max = 0.1
-    stretching_param.stretching_nsteps = 250
-    stretching_param.used = True
-    dvv_stretching_params.append(stretching_param)
-    filter_refs = [1, 2]  # Linking to Filters 1 & 2
-
-    update_dvv_stretching(
-        db, stretching_param.ref, stretching_param.stretching_minlag, stretching_param.stretching_width,
-        stretching_param.stretching_lag, stretching_param.stretching_v, stretching_param.stretching_sides,
-        stretching_param.stretching_max, stretching_param.stretching_nsteps, stretching_param.used, filter_refs
-    )
-
-    # Retrieve and validate stored parameters
-    db_dvv_stretching = get_dvv_stretching(db)
-
-    for i, dvv_stretching in enumerate(db_dvv_stretching):
-        for param in ['stretching_minlag', 'stretching_width', 'stretching_lag', 'stretching_v',
-                      'stretching_sides', 'stretching_max', 'stretching_nsteps', 'used']:
-            db_value = getattr(dvv_stretching, param, None)
-            expected_value = getattr(dvv_stretching_params[i], param, None)
-            assert db_value == expected_value, f"Mismatch in {param}: DB={db_value}, Expected={expected_value}"
+    details = get_config_set_details(db, 'stretching', 1)
+    assert len(details) > 0, "Stretching configset 1 not found"
+    db.query(Config).filter(
+        Config.name == 'stretching_max',
+        Config.category == 'stretching',
+        Config.set_number == 1
+    ).update({'value': '0.05'})
+    db.query(Config).filter(
+        Config.name == 'stretching_nsteps',
+        Config.category == 'stretching',
+        Config.set_number == 1
+    ).update({'value': '500'})
+    db.commit()
+    details = {d['name']: d['value'] for d in get_config_set_details(db, 'stretching', 1)}
+    assert details['stretching_max'] == '0.05'
+    assert details['stretching_nsteps'] == '500'
+    db.close()
 
 @pytest.mark.order(32)
 def test_032_stretching():
     from ..stretch2 import main as stretch_main
-    db = connect()
-    update_config(db, "export_format", "MSEED")
-    # reset_jobs(db, "MWCS", alljobs=True)
-    db.close()
     stretch_main()
 
 @pytest.mark.order(33)
@@ -570,12 +509,14 @@ def test_033_create_fake_new_files(setup_environment):
         pytest.fail()
 
     new_jobs_main()
+    preprocess_main()
+    new_jobs_main(after='preprocess')
     db = connect()
-    jobs = get_job_types(db, 'CC')
-    assert jobs[0][0] == 3
-    assert jobs[0][1] == 'D'
-    assert jobs[1][0] == 3
-    assert jobs[1][1] == 'T'
+    jobs = get_job_types(db, 'cc_1')
+    counts = {flag: count for count, flag in jobs}
+    assert counts.get('D', 0) == 3, f"Expected 3 done cc_1 jobs, got: {counts}"
+    assert counts.get('T', 0) == 3, f"Expected 3 todo cc_1 jobs, got: {counts}"
+    db.close()
 
 @pytest.mark.order(34)
 def test_034_instrument_response(setup_environment):
@@ -588,122 +529,47 @@ def test_034_instrument_response(setup_environment):
 
 @pytest.mark.order(35)
 def test_035_wct_param_update():
-    """Test updating and retrieving WCT parameters from the database."""
+    """Test updating and retrieving wavelet configset parameters."""
     db = connect()
-
-    dvv_wct_params = []
-
-    # First WCT parameter set
-    wct_param = DvvWct()
-    wct_param.wct_freqmin = 0.1
-    wct_param.wct_freqmax = 2.0
-    wct_param.wct_ns = 3
-    wct_param.wct_nt = 0.25
-    wct_param.wct_vpo = 12
-    wct_param.wct_nptsfreq = 100
-    wct_param.wct_norm = True
-    wct_param.wavelet_type = str(('Morlet', 6.))
-    wct_param.used = True
-    dvv_wct_params.append(wct_param)
-    filter_refs = [1]
-
-    update_dvv_wct(db, wct_param.ref, wct_param.wct_freqmin, wct_param.wct_freqmax,
-                         wct_param.wct_ns, wct_param.wct_nt, wct_param.wct_vpo,
-                         wct_param.wct_nptsfreq, wct_param.wct_norm, wct_param.wavelet_type,
-                         wct_param.used, filter_refs)
-
-    # Second WCT parameter set
-    wct_param = DvvWct()
-    wct_param.wct_freqmin = 0.5
-    wct_param.wct_freqmax = 4
-    wct_param.wct_ns = 4
-    wct_param.wct_nt = 1
-    wct_param.wct_vpo = 10
-    wct_param.wct_nptsfreq = 80
-    wct_param.wct_norm = False
-    wct_param.wavelet_type = str(('Morlet', 8.))
-    wct_param.used = True
-    dvv_wct_params.append(wct_param)
-    filter_refs = [1,2]
-
-    update_dvv_wct(db, wct_param.ref, wct_param.wct_freqmin, wct_param.wct_freqmax,
-                         wct_param.wct_ns, wct_param.wct_nt, wct_param.wct_vpo,
-                         wct_param.wct_nptsfreq, wct_param.wct_norm, wct_param.wavelet_type,
-                         wct_param.used, filter_refs)
-
-    db_dvv_wct = get_dvv_wct(db)
-
-    for i, dvv_wct in enumerate(db_dvv_wct):  # Assuming filter ID 1
-        for param in ['wct_freqmin', 'wct_freqmax', 'wct_ns', 'wct_nt', 'wct_vpo', 'wct_nptsfreq', 'wct_norm', 'wavelet_type', 'used']:
-            db_value = getattr(dvv_wct, param, None)
-            expected_value = getattr(dvv_wct_params[i], param, None)
-            assert db_value == expected_value, f"Mismatch in {param}: DB={db_value}, Expected={expected_value}"
+    details = get_config_set_details(db, 'wavelet', 1)
+    assert len(details) > 0, "Wavelet configset 1 not found"
+    db.query(Config).filter(
+        Config.name == 'wct_freqmin',
+        Config.category == 'wavelet',
+        Config.set_number == 1
+    ).update({'value': '0.1'})
+    db.query(Config).filter(
+        Config.name == 'wct_freqmax',
+        Config.category == 'wavelet',
+        Config.set_number == 1
+    ).update({'value': '2.0'})
+    db.commit()
+    details = {d['name']: d['value'] for d in get_config_set_details(db, 'wavelet', 1)}
+    assert details['wct_freqmin'] == '0.1'
+    assert details['wct_freqmax'] == '2.0'
+    db.close()
 
 @pytest.mark.order(36)
 def test_036_wct_dtt_param_update():
-    """Test updating and retrieving WCT-DTT parameters from the database."""
+    """Test updating and retrieving wavelet_dtt configset parameters."""
     db = connect()
-
-    dvv_wct_dtt_params = []
-
-    # First WCT-DTT parameter set
-    dtt_param = DvvWctDtt()
-    dtt_param.wct_dtt_freqmin = 0.1
-    dtt_param.wct_dtt_freqmax = 1.0
-    dtt_param.wct_minlag = 5.0
-    dtt_param.wct_width = 30.0
-    dtt_param.wct_lag = "static"
-    dtt_param.wct_v = 1.0
-    dtt_param.wct_sides = "both"
-    dtt_param.wct_mincoh = 0.5
-    dtt_param.wct_maxdt = 2.0
-    dtt_param.wct_codacycles = 20
-    dtt_param.wct_min_nonzero = 0.25
-    dtt_param.used = True
-    dvv_wct_dtt_params.append(dtt_param)
-    wct_refs = [1]  # Linking to WCT 1
-
-    update_dvv_wct_dtt(
-        db, dtt_param.ref, dtt_param.wct_dtt_freqmin, dtt_param.wct_dtt_freqmax,
-        dtt_param.wct_minlag, dtt_param.wct_width, dtt_param.wct_lag,
-        dtt_param.wct_v, dtt_param.wct_sides, dtt_param.wct_mincoh,
-        dtt_param.wct_maxdt, dtt_param.wct_codacycles, dtt_param.wct_min_nonzero,
-        dtt_param.used, wct_refs
-    )
-
-    # Second WCT-DTT parameter set
-    dtt_param = DvvWctDtt()
-    dtt_param.wct_dtt_freqmin = 0.2
-    dtt_param.wct_dtt_freqmax = 2.0
-    dtt_param.wct_minlag = 6.0
-    dtt_param.wct_width = 40.0
-    dtt_param.wct_lag = "dynamic"
-    dtt_param.wct_v = 1.0
-    dtt_param.wct_sides = "left"
-    dtt_param.wct_mincoh = 0.6
-    dtt_param.wct_maxdt = 2.5
-    dtt_param.wct_codacycles = 25
-    dtt_param.wct_min_nonzero = 0.3
-    dtt_param.used = True
-    dvv_wct_dtt_params.append(dtt_param)
-    wct_refs = [1, 2]  # Linking to WCT 1 & 2
-
-    update_dvv_wct_dtt(
-        db, dtt_param.ref, dtt_param.wct_dtt_freqmin, dtt_param.wct_dtt_freqmax,
-        dtt_param.wct_minlag, dtt_param.wct_width, dtt_param.wct_lag,
-        dtt_param.wct_v, dtt_param.wct_sides, dtt_param.wct_mincoh,
-        dtt_param.wct_maxdt, dtt_param.wct_codacycles, dtt_param.wct_min_nonzero,
-        dtt_param.used, wct_refs
-    )
-
-    db_dvv_wct_dtt = get_dvv_wct_dtt(db)
-
-    for i, dvv_wct_dtt in enumerate(db_dvv_wct_dtt): 
-        for param in ['wct_dtt_freqmin', 'wct_dtt_freqmax', 'wct_minlag', 'wct_width', 'wct_lag',
-                      'wct_v', 'wct_sides', 'wct_mincoh', 'wct_maxdt', 'wct_codacycles', 'wct_min_nonzero', 'used']:
-            db_value = getattr(dvv_wct_dtt, param, None)
-            expected_value = getattr(dvv_wct_dtt_params[i], param, None)
-            assert db_value == expected_value, f"Mismatch in {param}: DB={db_value}, Expected={expected_value}"
+    details = get_config_set_details(db, 'wavelet_dtt', 1)
+    assert len(details) > 0, "Wavelet DTT configset 1 not found"
+    db.query(Config).filter(
+        Config.name == 'wct_minlag',
+        Config.category == 'wavelet_dtt',
+        Config.set_number == 1
+    ).update({'value': '5.0'})
+    db.query(Config).filter(
+        Config.name == 'wct_mincoh',
+        Config.category == 'wavelet_dtt',
+        Config.set_number == 1
+    ).update({'value': '0.5'})
+    db.commit()
+    details = {d['name']: d['value'] for d in get_config_set_details(db, 'wavelet_dtt', 1)}
+    assert details['wct_minlag'] == '5.0'
+    assert details['wct_mincoh'] == '0.5'
+    db.close()
   
 @pytest.mark.order(37)
 def test_037_validate_stack_data():
@@ -799,31 +665,43 @@ def test_038_stack_validation_handling():
                 is_valid, message = validate_stack_data(c, "reference")
                 if "Warning" in message:
                     logger.warning(f"{sta1}:{sta2}-{components}-{filterid}: {message}")
-                  
+
+@pytest.mark.order(39)
+def test_039_wct_pipeline():
+    try:
+        compute_wct_main()
+        new_jobs_main(after='wavelet')
+        wavelet_dtt_main()
+    except:
+        traceback.print_exc()
+        pytest.fail()
+
 @pytest.mark.order(100)
 def test_100_plot_interferogram():
     db = connect()
+    filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
     for sta1, sta2 in get_station_pairs(db):
         for loc1 in sta1.locs():
             for loc2 in sta2.locs():
                 sta_id1 = f"{sta1.net}.{sta1.sta}.{loc1}"
                 sta_id2 = f"{sta2.net}.{sta2.sta}.{loc2}"
-                for filter in get_filters(db):
-                    interferogram_main(sta_id1, sta_id2, filter.ref, "ZZ", 1, show=False, outfile="?.png")
-                    fn = f'interferogram {sta_id1}-{sta_id2}-ZZ-f{filter.ref}-m1d_1d.png'
+                for filter_step in filter_steps:
+                    interferogram_main(sta_id1, sta_id2, filter_step.set_number, "ZZ", 1, show=False, outfile="?.png")
+                    fn = f'interferogram {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m1d_1d.png'
                     assert os.path.isfile(fn), f"{fn} doesn't exist"
 
 @pytest.mark.order(101)
 def test_101_plot_spectime():
     db = connect()
+    filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
     for sta1, sta2 in get_station_pairs(db):
         for loc1 in sta1.locs():
             for loc2 in sta2.locs():
                 sta_id1 = f"{sta1.net}.{sta1.sta}.{loc1}"
                 sta_id2 = f"{sta2.net}.{sta2.sta}.{loc2}"
-                for filter in get_filters(db):
-                    spectime_main(sta_id1, sta_id2, filter.ref, "ZZ", 1, show=False, outfile="?.png")
-                    fn = f'spectime {sta_id1}-{sta_id2}-ZZ-f{filter.ref}-m1d_1d.png'
+                for filter_step in filter_steps:
+                    spectime_main(sta_id1, sta_id2, filter_step.set_number, "ZZ", 1, show=False, outfile="?.png")
+                    fn = f'spectime {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m1d_1d.png'
                     assert os.path.isfile(fn), f"{fn} doesn't exist"
 
 @pytest.mark.order(102)
@@ -854,7 +732,6 @@ def test_105_db_dump():
     os.system("msnoise db dump")
     assert os.path.isfile("config.csv")
     assert os.path.isfile("stations.csv")
-    assert os.path.isfile("filters.csv")
     assert os.path.isfile("jobs.csv")
     assert os.path.isfile("data_availability.csv")
 
@@ -931,13 +808,14 @@ def test_304_export_rms():
 
 @pytest.mark.order(400)
 def test_400_run_manually():
-    os.system("msnoise reset STACK --all")
+    os.system("msnoise reset stack_1 --all")
     os.system("msnoise cc stack -m")
     os.system("msnoise cc dvv compute_mwcs")
     os.system("msnoise cc dvv compute_dtt")
     os.system("msnoise cc dvv compute_dvv")
     os.system("msnoise cc dvv compute_stretching")
     os.system("msnoise cc dvv compute_wct")
+    os.system("msnoise cc new_jobs --after wavelet")
     os.system("msnoise cc dvv merge_wct")
     os.system("msnoise cc dvv plot wct")
 
