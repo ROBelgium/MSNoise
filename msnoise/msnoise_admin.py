@@ -875,6 +875,21 @@ class WorkflowStepView(BaseModelView):
         super(WorkflowStepView, self).__init__(schema.WorkflowStep, session, *args, **kwargs)
 
 
+WORKFLOW_CHAINS = {
+    'global':      ['preprocess', 'qc'],
+    'preprocess':  ['cc'],
+    'cc':          ['filter'],
+    'qc':          [],
+    'filter':      ['stack'],
+    'stack':       ['mwcs', 'stretching', 'wavelet'],
+    'mwcs':        ['mwcs_dtt'],
+    'stretching':  [],
+    'wavelet':     ['wavelet_dtt'],
+    'wavelet_dtt': [],
+    'mwcs_dtt':    [],
+}
+
+
 class WorkflowLinkView(BaseModelView):
     """Workflow link management with smart step selection"""
 
@@ -885,11 +900,24 @@ class WorkflowLinkView(BaseModelView):
 
     form_columns = ['from_step_id', 'to_step_id', 'link_type', 'is_active']
 
+    # Render FK integer columns as select dropdowns instead of plain integer inputs
+    form_overrides = {
+        'from_step_id': SelectField,
+        'to_step_id': SelectField,
+    }
+    form_args = {
+        'from_step_id': {'label': 'From Step', 'coerce': int},
+        'to_step_id': {'label': 'To Step', 'coerce': int},
+    }
+
     column_descriptions = {
         'from_step_id': 'Source workflow step',
-        'to_step_id': 'Target workflow step (filtered based on workflow logic)',
+        'to_step_id': 'Target workflow step',
         'link_type': 'Type of connection (default, conditional, etc.)',
     }
+
+    create_template = 'admin/workflowlink_create.html'
+    edit_template   = 'admin/workflowlink_edit.html'
 
     # Custom column formatters
     column_formatters = dict(BaseModelView.column_formatters, **{
@@ -902,96 +930,81 @@ class WorkflowLinkView(BaseModelView):
     def __init__(self, session, *args, **kwargs):
         super(WorkflowLinkView, self).__init__(schema.WorkflowLink, session, *args, **kwargs)
 
-    def create_form(self, obj=None):
-        """Override create form to provide smart step selection"""
-        form = super().create_form(obj)
-
-        # Get all workflow steps for from_step selection
-        from_steps = self.session.query(schema.WorkflowStep).filter(
+    def _step_choices(self):
+        steps = self.session.query(schema.WorkflowStep).filter(
             schema.WorkflowStep.is_active == True
         ).order_by(schema.WorkflowStep.step_name).all()
+        return steps
 
-        form.from_step_id.choices = [
-            (step.step_id, f"{step.step_name} ({step.category}:{step.set_number})")
-            for step in from_steps
-        ]
+    def _build_choices(self, steps):
+        return [(s.step_id, f"{s.step_name}  ({s.category}:{s.set_number})") for s in steps]
 
-        # Initially populate to_step with all steps (will be filtered via JavaScript)
-        to_steps = self.session.query(schema.WorkflowStep).filter(
-            schema.WorkflowStep.is_active == True
-        ).order_by(schema.WorkflowStep.step_name).all()
-
-        form.to_step_id.choices = [
-            (step.step_id, f"{step.step_name} ({step.category}:{step.set_number})")
-            for step in to_steps
-        ]
-
+    def _prepare_form(self, form):
+        steps = self._step_choices()
+        choices = self._build_choices(steps)
+        form.from_step_id.choices = choices
+        form.to_step_id.choices = choices
         return form
+
+    def create_form(self, obj=None):
+        return self._prepare_form(super().create_form(obj))
 
     def edit_form(self, obj=None):
-        """Override edit form to provide smart step selection"""
-        form = super().edit_form(obj)
+        return self._prepare_form(super().edit_form(obj))
 
-        # Get all workflow steps
-        from_steps = self.session.query(schema.WorkflowStep).filter(
-            schema.WorkflowStep.is_active == True
-        ).order_by(schema.WorkflowStep.step_name).all()
-
-        form.from_step_id.choices = [
-            (step.step_id, f"{step.step_name} ({step.category}:{step.set_number})")
-            for step in from_steps
-        ]
-
-        to_steps = self.session.query(schema.WorkflowStep).filter(
-            schema.WorkflowStep.is_active == True
-        ).order_by(schema.WorkflowStep.step_name).all()
-
-        form.to_step_id.choices = [
-            (step.step_id, f"{step.step_name} ({step.category}:{step.set_number})")
-            for step in to_steps
-        ]
-
-        return form
-
-    @expose('/get_valid_targets/<int:from_step_id>')
-    def get_valid_targets(self, from_step_id):
-        """AJAX endpoint to get valid target steps for a given source step"""
-        from_step = self.session.query(schema.WorkflowStep).get(from_step_id)
-        if not from_step:
-            return jsonify([])
-
-        # Define workflow logic - what steps can follow what
-        WORKFLOW_CHAINS = {
-            'global': ['preprocess', 'qc'],
-            'preprocess': ['cc'],
-            'cc': ['filter'],
-            'filter': ['stack'],
-            'stack': ['mwcs', 'stretching', 'wavelet'],
-            'mwcs': ['mwcs_dtt'],
-            'stretching': [],  # Terminal step
-            'wavelet': ['wavelet_dtt'],
-            'wavelet_dtt': [],  # Terminal step
-            'mwcs_dtt': [],  # Terminal step
-            'qc': []  # Terminal step
+    def _extra_template_args(self):
+        steps = self._step_choices()
+        step_categories = {s.step_id: s.category for s in steps}
+        return {
+            'workflow_chains': WORKFLOW_CHAINS,
+            'step_categories': step_categories,
         }
 
-        # Get possible next categories for this step's category
-        next_categories = WORKFLOW_CHAINS.get(from_step.category, [])
+    def render(self, template, **kwargs):
+        kwargs.update(self._extra_template_args())
+        return super().render(template, **kwargs)
 
-        # Get all steps in those categories
-        valid_targets = self.session.query(schema.WorkflowStep).filter(
-            schema.WorkflowStep.category.in_(next_categories),
-            schema.WorkflowStep.is_active == True,
-            schema.WorkflowStep.step_id != from_step_id  # Don't allow self-links
-        ).order_by(schema.WorkflowStep.step_name).all()
+    def create_model(self, form):
+        from_id = form.from_step_id.data
+        to_id   = form.to_step_id.data
+        existing = self.session.query(schema.WorkflowLink).filter_by(
+            from_step_id=from_id, to_step_id=to_id
+        ).first()
+        if existing:
+            from_step = self.session.query(schema.WorkflowStep).get(from_id)
+            to_step   = self.session.query(schema.WorkflowStep).get(to_id)
+            flash(
+                f'A link from "{from_step.step_name}" to "{to_step.step_name}" already exists.',
+                'error'
+            )
+            return False
+        return super().create_model(form)
 
-        return jsonify([
-            {
-                'id': step.step_id,
-                'name': f"{step.step_name} ({step.category}:{step.set_number})"
-            }
-            for step in valid_targets
-        ])
+    def validate_form(self, form):
+        if not super().validate_form(form):
+            return False
+        from_id = getattr(form, 'from_step_id', None)
+        to_id   = getattr(form, 'to_step_id',   None)
+        if from_id is None or to_id is None:
+            return True
+        from_step = self.session.query(schema.WorkflowStep).get(from_id.data)
+        to_step   = self.session.query(schema.WorkflowStep).get(to_id.data)
+        if from_step is None or to_step is None:
+            return True
+        if from_step.step_id == to_step.step_id:
+            to_id.errors.append("A step cannot link to itself.")
+            return False
+        allowed = WORKFLOW_CHAINS.get(from_step.category, [])
+        if to_step.category not in allowed:
+            terminal = not allowed
+            hint = ("This is a terminal step — no outgoing links allowed."
+                    if terminal else
+                    f"Allowed targets for '{from_step.category}': {', '.join(allowed)}.")
+            to_id.errors.append(
+                f"Invalid link: {from_step.category} → {to_step.category} is not permitted. {hint}"
+            )
+            return False
+        return True
 
 class WorkflowBuilderView(BaseView):
     """
