@@ -232,7 +232,7 @@ def main(loglevel="INFO", batch_size=None):
                     )
                     logger.info(
                         f"Saved WCT DTT for {pair}/{component}/{mov_stack} "
-                        f"({len(dates_out)} days)"
+                        f"({len(dates_out)} time steps)"
                     )
                 except Exception as e:
                     logger.error(
