@@ -167,7 +167,7 @@ def main(loglevel="INFO"):
             try:
                 ref = xr_get_ref(root, lineage_names,
                                  station1, station2, components, None, taxis)
-                ref = ref.CCF.values
+                ref = ref.CCF.values.copy()
             except FileNotFoundError as fullpath:
                 logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                 continue
@@ -186,9 +186,9 @@ def main(loglevel="INFO"):
             maxlag2 = minlag + params.stretching_width
             mid = int(params.cc_sampling_rate * params.maxlag)
             print("betweeen", minlag, "and", maxlag2    )
-            ref.iloc[mid - int(minlag * goal_sampling_rate):mid + int(minlag * goal_sampling_rate)] = 0.
-            ref.iloc[:mid - int(maxlag2 * goal_sampling_rate)] = 0.
-            ref.iloc[mid + int(maxlag2 * goal_sampling_rate):] = 0.
+            ref[mid - int(minlag * goal_sampling_rate):mid + int(minlag * goal_sampling_rate)] = 0.
+            ref[:mid - int(maxlag2 * goal_sampling_rate)] = 0.
+            ref[mid + int(maxlag2 * goal_sampling_rate):] = 0.
 
             # TODO ADD the def here or in the API
             str_range = params.stretching_max
