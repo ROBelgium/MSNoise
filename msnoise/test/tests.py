@@ -367,12 +367,21 @@ def test_018_recompute_cc():
 @pytest.mark.order(23)
 def test_023_stack():
     db = connect()
-    update_config(db, 'ref_begin', '2009-01-01')
-    update_config(db, 'ref_end', '2011-01-01')
-    update_config(db, 'startdate', '2009-01-01')
-    update_config(db, 'enddate', '2011-01-01')
-    update_config(db, 'mov_stack', "(('1d','1d'),('2d','1d'),('5d','1d'))")
-    db.close()
+    # Update stack_1 configset (category='stack', set_number=1)
+    for name, value in [
+        ('ref_begin', '2009-01-01'),
+        ('ref_end', '2011-01-01'),
+        ('startdate', '2009-01-01'),
+        ('enddate', '2011-01-01'),
+        ('mov_stack', "(('1d','1d'),('2d','1d'),('5d','1d'))"),
+    ]:
+        db.query(Config).filter(
+            Config.name == name,
+            Config.category == 'stack',
+            Config.set_number == 1
+        ).update({'value': value})
+    db.commit()
+
     new_jobs_main(after='cc')
     db = connect()
 
@@ -380,7 +389,13 @@ def test_023_stack():
     reset_jobs(db, "stack_1", alljobs=True)
     stack_main('mov')
 
-    update_config(db, 'wienerfilt', 'Y')
+    db.query(Config).filter(
+        Config.name == 'wienerfilt',
+        Config.category == 'stack',
+        Config.set_number == 1
+    ).update({'value': 'Y'})
+    db.commit()
+
     reset_jobs(db, "stack_1", alljobs=True)
     stack_main('mov')
     stack_main('ref')
