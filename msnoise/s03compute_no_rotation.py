@@ -446,8 +446,8 @@ def main(loglevel="INFO"):
             thistime = tmptime.strftime("%Y-%m-%d %H:%M:%S")
 
             for filter_name, filter in filters:
-                logger.debug("Processing filter %s" % filter_name)
-                print(filter)
+                # logger.debug("Processing filter %s" % filter_name)
+                # print(filter)
 
                 # Standard operator for CC
                 cc_index = []
@@ -500,13 +500,13 @@ def main(loglevel="INFO"):
                                     ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp[::-1]),
                                     names.index(sta2), names.index(sta1)])
 
-                logger.debug("CC index: %s" % cc_index)
-                logger.debug("single station AC: ", single_station_pair_index_ac)
-                logger.debug("single station SC: ", single_station_pair_index_sc)
+                # logger.debug("CC index: %s" % cc_index)
+                # logger.debug("single station AC: ", single_station_pair_index_ac)
+                # logger.debug("single station SC: ", single_station_pair_index_sc)
 
                 filterlow = float(filter.freqmin)
                 filterhigh = float(filter.freqmax)
-                logger.debug("Filter: %s - %s Hz" % (filterlow, filterhigh))
+                # logger.debug("Filter: %s - %s Hz" % (filterlow, filterhigh))
                 freq_vec = sf.fftfreq(nfft, d=dt)[:nfft // 2]
                 freq_sel = np.where((freq_vec >= filterlow) & (freq_vec <= filterhigh))[0]
                 low = freq_sel[0] - napod
@@ -601,7 +601,7 @@ def main(loglevel="INFO"):
 
                         for key in corr:
                             ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
-                            logger.debug("CCF ID - CC: %s" % ccfid)
+                            # logger.debug("CCF ID - CC: %s" % ccfid)
                             if ccfid not in allcorr:
                                 allcorr[ccfid] = {}
                             allcorr[ccfid][thistime] = corr[key]
