@@ -401,6 +401,3 @@ def main(loglevel="INFO", batch_size=None):
         db.close()
 
     logger.info('*** Finished: Compute WCT ***')
-
-if __name__ == "__main__":
-    main()
