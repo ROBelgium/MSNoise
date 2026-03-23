@@ -311,12 +311,9 @@ def main(loglevel="INFO"):
 
         # Filters:
         filter_steps = get_filter_steps_for_cc_step(db, step.step_id)
-        print(filter_steps)
         filters = []
         for filter in filter_steps:
-            print(filter.step_name)
             filters.append([filter.step_name, get_config_set_details(db, filter.category, filter.set_number, format='AttribDict')])
-        print(filters)
         logger.info("New CC Job: %s (%i pairs with %i stations)" %
                      (goal_day, len(pairs), len(stations)))
         jt = time.time()
