@@ -3252,9 +3252,9 @@ def get_dvv(session, filterid, components, dates,
         allbut = alldf[alldf['Pairs'] != 'ALL'].copy()
 
         for pair in pairs:
-            print(pair)
+            # print(pair)
             pair1 = alldf[alldf['Pairs'] == pair].copy()
-            print(pair1.head())
+            # print(pair1.head())
 
             pair1.to_csv('%s-m%i-f%i.csv' % (pair, mov_stack, filterid))
 
@@ -4887,15 +4887,15 @@ def get_merged_params(db, orig_params, step_params, pred):
     # optionally keep only relevant categories:
     lineage = [s for s in lineage if s.category in {"preprocess", "cc", "filter", "stack"}]
     lineage_names = [s.step_name for s in lineage]
-    print("Lineage Names:", lineage_names, "")
+    # print("Lineage Names:", lineage_names, "")
     lineage_cfgs = [load_step_config(db, s) for s in lineage]
-    print("Lineage Configs:", lineage_cfgs)
+    # print("Lineage Configs:", lineage_cfgs)
 
     # 4) build branch-specific params, then apply stack last
     params = merge_params(orig_params, lineage_cfgs + [step_params])
     params.components_to_compute = params.components_to_compute.split(',')
     params.components_to_compute_single_station = params.components_to_compute_single_station.split(',')
-    print("Branch Params:", params)
+    # print("Branch Params:", params)
     if hasattr(params, "mov_stack"):
         if not isinstance(params.mov_stack[0], tuple):
             params.mov_stack = [params.mov_stack, ]
@@ -4983,10 +4983,10 @@ def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
     lineage = [s for s in lineage if s.category not in {"global"}]
 
     lineage_names = [s.step_name for s in lineage]
-    print("Lineage Names:", lineage_names)
+    # print("Lineage Names:", lineage_names)
 
     lineage_cfgs = [load_step_config(db, s) for s in lineage]
-    print("Lineage Configs:", lineage_cfgs)
+    # print("Lineage Configs:", lineage_cfgs)
 
     # TODO: gather all those into a "sanitize params" def?
     params = merge_params(orig_params, lineage_cfgs + [step_params])
