@@ -57,11 +57,8 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
     lineage_str = "/".join(lineage_names)
     steps = lineage_str_to_steps(db, lineage_str, "/")
     paralineage, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
-    print(params)
     mov_stack = params.mov_stack[stack_item-1]
     start, end, datelist = build_movstack_datelist(db)
-    # base = mdates.date2num(start)
-    plt.figure(figsize=(12, 9))
 
     if refilter:
         freqmin, freqmax = refilter.split(':')
@@ -93,7 +90,9 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
 
     if normalize == "common":
         stack_total /= np.nanmax(stack_total)
-    ax = plt.subplot(111)
+
+    fig, ax = plt.subplots(1, 1,figsize=(12, 9))
+    plt.subplots_adjust(bottom=0.06, hspace=0.3)
     for i, line in stack_total.iterrows():
         if np.all(np.isnan(line)):
             continue
@@ -111,7 +110,6 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
             plt.fill_between(t, y1, y2, where=y2 >= y1, facecolor='k',
                              interpolate=True)
 
-    # filter = get_filters(db, ref=filter_id)
     low = float(params.freqmin)
     high = float(params.freqmax)
 
