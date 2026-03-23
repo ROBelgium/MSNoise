@@ -1,14 +1,13 @@
 name: test
 channels:
   - conda-forge
-  - nodefaults
 dependencies:
   - numpy
   - scipy
   - obspy>=1.4.1
   - sqlalchemy
   - flask
-  - flask-admin
+  - flask-admin<2
   - flask-wtf
   - markdown
   - wtforms<3.2
