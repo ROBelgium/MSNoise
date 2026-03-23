@@ -46,7 +46,7 @@ from ..plots.data_availability import main as data_availability_main
 from ..plots.wct_dvv import main as wct_dvv_main
 from ..step_preprocessing import main as preprocess_main
 from ..s08compute_wct import main as compute_wct_main
-from ..s09merge_wct import main as wavelet_dtt_main
+from ..s09compute_wct_dtt import main as wavelet_dtt_main
 
 global logger
 logger = logging.getLogger('matplotlib')
@@ -737,13 +737,17 @@ def test_304_export_rms():
 def test_400_run_manually():
     os.system("msnoise reset stack_1 --all")
     os.system("msnoise cc stack -m")
+    os.system("msnoise reset mwcs_1 --all")
     os.system("msnoise cc dvv compute_mwcs")
+    os.system("msnoise reset mwcs_dtt_1 --all")
     os.system("msnoise cc dvv compute_dtt")
     os.system("msnoise cc dvv compute_dvv")
+    os.system("msnoise reset stretching_1 --all")
     os.system("msnoise cc dvv compute_stretching")
+    os.system("msnoise reset wavelet_1 --all")
     os.system("msnoise cc dvv compute_wct")
     os.system("msnoise cc new_jobs --after wavelet")
-    os.system("msnoise cc dvv merge_wct")
+    os.system("msnoise cc dvv compute_wct_dtt")
     os.system("msnoise cc dvv plot wct")
 
 def test_99210_crondays_positive_float():
