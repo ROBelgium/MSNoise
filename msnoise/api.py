@@ -220,7 +220,7 @@ def get_config(session, name=None, isbool=False, plugin=None):
     return config
 
 
-def update_config(session, name, value, plugin=None):
+def update_config(session, name, value, plugin=None, category='global', set_number=None):
     """Update one config bit in the database.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -239,6 +239,14 @@ def update_config(session, name, value, plugin=None):
         if "Amazing" is provided, MSNoise will try to load the "AmazingConfig"
         entry point. See :doc:`plugins` for details.
 
+    :type category: str
+    :param category: The config category (default 'global'). Use e.g. 'stack',
+        'filter', 'mwcs' to target a specific config set.
+
+    :type set_number: int or None
+    :param set_number: The config set number within the category (default None
+        for global config). Use e.g. 1 for stack_1.
+
     """
     if plugin:
         from importlib.metadata import entry_points
@@ -247,8 +255,15 @@ def update_config(session, name, value, plugin=None):
                 table = ep.load()
     else:
         table = Config
-    config = session.query(table).filter(table.name == name).first()
-    if "NULL" in value:
+    query = session.query(table).filter(table.name == name)
+    if hasattr(table, 'category'):
+        query = query.filter(table.category == category)
+    if hasattr(table, 'set_number'):
+        query = query.filter(table.set_number == set_number)
+    config = query.first()
+    if config is None:
+        return
+    if "NULL" in str(value):
         config.value = None
     else:
         config.value = value

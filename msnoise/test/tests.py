@@ -180,35 +180,22 @@ def test_003_set_and_config(setup_environment):
         assert config_value == value, f"Configuration parameter {key} did not set correctly."
     db.close()
 
+
 @pytest.mark.order(4)
 def test_004_set_and_get_filters():
     db = connect()
     # filter_1 configset was created in test_002b; update its frequency parameters
-    db.query(Config).filter(
-        Config.name == 'freqmin', Config.category == 'filter', Config.set_number == 1
-    ).update({'value': '0.01'})
-    db.query(Config).filter(
-        Config.name == 'freqmax', Config.category == 'filter', Config.set_number == 1
-    ).update({'value': '1.0'})
+    update_config(db, 'freqmin', '0.01', category='filter', set_number=1)
+    update_config(db, 'freqmax', '1.0', category='filter', set_number=1)
     for param in ['CC', 'SC', 'AC']:
-        db.query(Config).filter(
-            Config.name == param, Config.category == 'filter', Config.set_number == 1
-        ).update({'value': 'Y'})
-    db.commit()
+        update_config(db, param, 'Y', category='filter', set_number=1)
     # Create a second filter configset
     set_number = create_config_set(db, 'filter')
     assert set_number == 2
-    db.query(Config).filter(
-        Config.name == 'freqmin', Config.category == 'filter', Config.set_number == 2
-    ).update({'value': '0.1'})
-    db.query(Config).filter(
-        Config.name == 'freqmax', Config.category == 'filter', Config.set_number == 2
-    ).update({'value': '1.0'})
+    update_config(db, 'freqmin', '0.1', category='filter', set_number=2)
+    update_config(db, 'freqmax', '1.0', category='filter', set_number=2)
     for param in ['CC', 'SC', 'AC']:
-        db.query(Config).filter(
-            Config.name == param, Config.category == 'filter', Config.set_number == 2
-        ).update({'value': 'Y'})
-    db.commit()
+        update_config(db, param, 'Y', category='filter', set_number=2)
     # Register the new WorkflowStep and links for filter_2
     create_workflow_steps_from_config_sets(db)
     create_workflow_links_from_steps(db)
@@ -220,6 +207,7 @@ def test_004_set_and_get_filters():
         assert details['freqmax'] == '1.0'
         assert details['CC'] == 'Y'
     db.close()
+
 
 @pytest.mark.order(5)
 def test_005_populate_station_table():
@@ -367,21 +355,12 @@ def test_018_recompute_cc():
 @pytest.mark.order(23)
 def test_023_stack():
     db = connect()
-    # Update stack_1 configset (category='stack', set_number=1)
-    for name, value in [
-        ('ref_begin', '2009-01-01'),
-        ('ref_end', '2011-01-01'),
-        ('startdate', '2009-01-01'),
-        ('enddate', '2011-01-01'),
-        ('mov_stack', "(('1d','1d'),('2d','1d'),('5d','1d'))"),
-    ]:
-        db.query(Config).filter(
-            Config.name == name,
-            Config.category == 'stack',
-            Config.set_number == 1
-        ).update({'value': value})
-    db.commit()
-
+    update_config(db, 'ref_begin', '2009-01-01', category='stack', set_number=1)
+    update_config(db, 'ref_end', '2011-01-01', category='stack', set_number=1)
+    update_config(db, 'startdate', '2009-01-01', category='stack', set_number=1)
+    update_config(db, 'enddate', '2011-01-01', category='stack', set_number=1)
+    update_config(db, 'mov_stack', "(('1d','1d'),('2d','1d'),('5d','1d'))", category='stack', set_number=1)
+    db.close()
     new_jobs_main(after='cc')
     db = connect()
 
@@ -389,35 +368,21 @@ def test_023_stack():
     reset_jobs(db, "stack_1", alljobs=True)
     stack_main('mov')
 
-    db.query(Config).filter(
-        Config.name == 'wienerfilt',
-        Config.category == 'stack',
-        Config.set_number == 1
-    ).update({'value': 'Y'})
-    db.commit()
-
+    update_config(db, 'wienerfilt', 'Y', category='stack', set_number=1)
     reset_jobs(db, "stack_1", alljobs=True)
     stack_main('mov')
     stack_main('ref')
 
     db.close()
 
+
 @pytest.mark.order(24)
 def test_024_mwcs_param_update():
     db = connect()
     details = get_config_set_details(db, 'mwcs', 1)
     assert len(details) > 0, "MWCS configset 1 not found"
-    db.query(Config).filter(
-        Config.name == 'mwcs_wlen',
-        Config.category == 'mwcs',
-        Config.set_number == 1
-    ).update({'value': '10'})
-    db.query(Config).filter(
-        Config.name == 'mwcs_step',
-        Config.category == 'mwcs',
-        Config.set_number == 1
-    ).update({'value': '5'})
-    db.commit()
+    update_config(db, 'mwcs_wlen', '10', category='mwcs', set_number=1)
+    update_config(db, 'mwcs_step', '5', category='mwcs', set_number=1)
     details = {d['name']: d['value'] for d in get_config_set_details(db, 'mwcs', 1)}
     assert details['mwcs_wlen'] == '10', f"mwcs_wlen not updated, got: {details.get('mwcs_wlen')}"
     assert details['mwcs_step'] == '5', f"mwcs_step not updated, got: {details.get('mwcs_step')}"
@@ -433,17 +398,8 @@ def test_026_mwcs_dtt_param_update():
     db = connect()
     details = get_config_set_details(db, 'mwcs_dtt', 1)
     assert len(details) > 0, "MWCS DTT configset 1 not found"
-    db.query(Config).filter(
-        Config.name == 'dtt_minlag',
-        Config.category == 'mwcs_dtt',
-        Config.set_number == 1
-    ).update({'value': '5.0'})
-    db.query(Config).filter(
-        Config.name == 'dtt_width',
-        Config.category == 'mwcs_dtt',
-        Config.set_number == 1
-    ).update({'value': '30.0'})
-    db.commit()
+    update_config(db, 'dtt_minlag', '5.0', category='mwcs_dtt', set_number=1)
+    update_config(db, 'dtt_width', '30.0', category='mwcs_dtt', set_number=1)
     details = {d['name']: d['value'] for d in get_config_set_details(db, 'mwcs_dtt', 1)}
     assert details['dtt_minlag'] == '5.0', f"dtt_minlag not updated, got: {details.get('dtt_minlag')}"
     assert details['dtt_width'] == '30.0', f"dtt_width not updated, got: {details.get('dtt_width')}"
@@ -483,17 +439,8 @@ def test_031_stretching_param_update():
     db = connect()
     details = get_config_set_details(db, 'stretching', 1)
     assert len(details) > 0, "Stretching configset 1 not found"
-    db.query(Config).filter(
-        Config.name == 'stretching_max',
-        Config.category == 'stretching',
-        Config.set_number == 1
-    ).update({'value': '0.05'})
-    db.query(Config).filter(
-        Config.name == 'stretching_nsteps',
-        Config.category == 'stretching',
-        Config.set_number == 1
-    ).update({'value': '500'})
-    db.commit()
+    update_config(db, 'stretching_max', '0.05', category='stretching', set_number=1)
+    update_config(db, 'stretching_nsteps', '500', category='stretching', set_number=1)
     details = {d['name']: d['value'] for d in get_config_set_details(db, 'stretching', 1)}
     assert details['stretching_max'] == '0.05'
     assert details['stretching_nsteps'] == '500'
@@ -540,23 +487,15 @@ def test_034_instrument_response(setup_environment):
     db.close()
     test_013_s03compute_cc()
 
+
 @pytest.mark.order(35)
 def test_035_wct_param_update():
     """Test updating and retrieving wavelet configset parameters."""
     db = connect()
     details = get_config_set_details(db, 'wavelet', 1)
     assert len(details) > 0, "Wavelet configset 1 not found"
-    db.query(Config).filter(
-        Config.name == 'wct_freqmin',
-        Config.category == 'wavelet',
-        Config.set_number == 1
-    ).update({'value': '0.1'})
-    db.query(Config).filter(
-        Config.name == 'wct_freqmax',
-        Config.category == 'wavelet',
-        Config.set_number == 1
-    ).update({'value': '2.0'})
-    db.commit()
+    update_config(db, 'wct_freqmin', '0.1', category='wavelet', set_number=1)
+    update_config(db, 'wct_freqmax', '2.0', category='wavelet', set_number=1)
     details = {d['name']: d['value'] for d in get_config_set_details(db, 'wavelet', 1)}
     assert details['wct_freqmin'] == '0.1'
     assert details['wct_freqmax'] == '2.0'
@@ -568,17 +507,8 @@ def test_036_wct_dtt_param_update():
     db = connect()
     details = get_config_set_details(db, 'wavelet_dtt', 1)
     assert len(details) > 0, "Wavelet DTT configset 1 not found"
-    db.query(Config).filter(
-        Config.name == 'wct_minlag',
-        Config.category == 'wavelet_dtt',
-        Config.set_number == 1
-    ).update({'value': '5.0'})
-    db.query(Config).filter(
-        Config.name == 'wct_mincoh',
-        Config.category == 'wavelet_dtt',
-        Config.set_number == 1
-    ).update({'value': '0.5'})
-    db.commit()
+    update_config(db, 'wct_minlag', '5.0', category='wavelet_dtt', set_number=1)
+    update_config(db, 'wct_mincoh', '0.5', category='wavelet_dtt', set_number=1)
     details = {d['name']: d['value'] for d in get_config_set_details(db, 'wavelet_dtt', 1)}
     assert details['wct_minlag'] == '5.0'
     assert details['wct_mincoh'] == '0.5'
