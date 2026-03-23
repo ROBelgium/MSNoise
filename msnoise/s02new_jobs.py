@@ -596,7 +596,7 @@ def main(init=False, nocc=False, after=False):
         return
 
     logger.debug("Checking plugins' entry points")
-    plugins = get_config(db, "plugins")
+    plugins = get_config(db, "plugins", category='global', set_number=1)
     extra_jobtypes_scan_archive = []
     extra_jobtypes_new_files = ["PSD"]
     if plugins:

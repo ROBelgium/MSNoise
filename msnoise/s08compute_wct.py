@@ -272,7 +272,7 @@ def main(loglevel="INFO", batch_size=None):
     logger.info('*** Starting: Compute WCT ***')
 
     db = connect()
-    taxis = get_t_axis(db)
+
 
     db.close()
 
@@ -300,6 +300,8 @@ def main(loglevel="INFO", batch_size=None):
         root = params.output_folder
 
         logger.info(f"New WCT Job: pair={pair} n_days={len(days)} lineage={lineage_str}")
+
+        taxis = get_t_axis(params)
 
         station1, station2 = pair.split(":")
 

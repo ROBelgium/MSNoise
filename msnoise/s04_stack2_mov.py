@@ -32,7 +32,7 @@ def main(stype, loglevel="INFO"):
     db = connect()
 
     orig_params = get_params(db)
-    taxis = get_t_axis(db)
+
 
     while is_next_job_for_step(db, step_category="stack"):
         logger.info("Getting the next job")
@@ -52,7 +52,7 @@ def main(stype, loglevel="INFO"):
 
         logger.info(f"New STACK Job: pair={pair} n_days={len(days)} lineage={lineage_str}")
 
-
+        taxis = get_t_axis(params)
 
         mov_stacks = params.mov_stack
         wiener_mlen = params.wiener_mlen
@@ -141,7 +141,8 @@ def main(stype, loglevel="INFO"):
 
             if params.keep_all:
                 c = get_results_all(db, params.output_folder, lineage_names,
-                                    sta1, sta2, components, all_days, format="xarray")
+                                    sta1, sta2, components, all_days, format="xarray",
+                                    params=params)
                 if not len(c):
                     logger.warning("No data found for %s-%s-%i" % (sta1, sta2, filterid))
                     continue
