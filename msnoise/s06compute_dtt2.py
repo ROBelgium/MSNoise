@@ -130,8 +130,9 @@ def main(interval=1, loglevel="INFO"):
                 invalid_dtt_indices = np.where(dtt_values > params.dtt_maxdtt)
                 row_indices, col_indices = invalid_dtt_indices
 
-                EM.values[row_indices, col_indices] = 1.0
-                MCOH.values[row_indices, col_indices] = 0.0
+                for r, c in zip(row_indices, col_indices):
+                    EM.iloc[r, c] = 1.0
+                    MCOH.iloc[r, c] = 0.0
 
                 values = []
                 dates = []
