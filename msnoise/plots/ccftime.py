@@ -45,24 +45,23 @@ from obspy.signal.filter import bandpass
 from ..api import *
 
 
-def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, seismic=False,
+def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=1,
+         components="ZZ", ampli=5, seismic=False,
          show=False, outfile=None, envelope=False, refilter=None,
          normalize=None, loglevel="INFO", **kwargs):
     logger = get_logger('msnoise.cc_plot_ccftime', loglevel,
                         with_pid=True)
     db = connect()
     params = get_params(db)
-    mov_stack = params.mov_stack[mov_stackid-1]
-    maxlag = float(get_config(db, 'maxlag'))
-    samples = get_maxlag_samples(db)
-    cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
+    lineage_names = [f"preprocess_{preprocess_id}",f"cc_{cc_id}",f"filter_{filter_id}", f"stack_{stack_id}"]
+    lineage_str = "/".join(lineage_names)
+    steps = lineage_str_to_steps(db, lineage_str, "/")
+    paralineage, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
+    print(params)
+    mov_stack = params.mov_stack[stack_item-1]
     start, end, datelist = build_movstack_datelist(db)
-    base = mdates.date2num(start) 
+    # base = mdates.date2num(start)
     plt.figure(figsize=(12, 9))
-    sta1 = sta1 #.replace('.', '_')
-    sta2 = sta2 #.replace('.', '_')
-    t = np.arange(samples)/cc_sampling_rate - maxlag
-    taxis = get_t_axis(db)
 
     if refilter:
         freqmin, freqmax = refilter.split(':')
@@ -76,12 +75,11 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, seismic=False
     sta1 = check_stations_uniqueness(db, sta1)
     sta2 = check_stations_uniqueness(db, sta2)
 
-    pair = "%s:%s" % (sta1, sta2)
-
-    logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filterid,
-                                                 str(mov_stack)))
+    pair = "_".join([sta1, sta2])
     try:
-        stack_total = xr_get_ccf(sta1, sta2, components, filterid, mov_stack, taxis)
+        stack_total = xr_get_ccf(params.output_folder, lineage_names,
+               sta1, sta2, components, None, ('1D',"1D"),None)
+        t = stack_total.columns.values
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
         sys.exit(1)
@@ -100,7 +98,7 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, seismic=False
         if np.all(np.isnan(line)):
             continue
         if refilter:
-            line = bandpass(line, freqmin, freqmax, cc_sampling_rate,
+            line = bandpass(line, freqmin, freqmax, params.cc_sampling_rate,
                             zerophase=True)
         if envelope:
             line = obspy_envelope(line)
@@ -113,16 +111,16 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, seismic=False
             plt.fill_between(t, y1, y2, where=y2 >= y1, facecolor='k',
                              interpolate=True)
 
-    filter = get_filters(db, ref=filterid)
-    low = float(filter.freqmin)
-    high = float(filter.freqmax)
+    # filter = get_filters(db, ref=filter_id)
+    low = float(params.freqmin)
+    high = float(params.freqmax)
 
     plt.xlabel("Lag Time (s)")
     plt.axhline(0, lw=0.5, c='k')
     plt.grid()
-    title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %i (%s_%s)' %\
-            (sta1, sta2, components,
-             filterid, low, high, mov_stackid, mov_stack[0], mov_stack[1])
+    title = '%s : %s, %s\n Preprocess %i - CC %i - Filter %d (%.2f - %.2f Hz) - Stack %i (%s_%s)' %\
+            (sta1, sta2, components, preprocess_id, cc_id,
+             filter_id, low, high, stack_id, mov_stack[0], mov_stack[1])
     if refilter:
         title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
     plt.title(title)
@@ -133,16 +131,17 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, seismic=False
     if "xlim" in kwargs:
         plt.xlim(kwargs["xlim"][0],kwargs["xlim"][1])
     else:
-        plt.xlim(-maxlag, maxlag)
+        plt.xlim(-params.maxlag, params.maxlag)
     ax.fmt_ydata = mdates.DateFormatter('%Y-%m-%d')
     cursor = Cursor(ax, useblit=True, color='red', linewidth=1.2)
     plt.tight_layout()
     if outfile:
         if outfile.startswith("?"):
             pair = pair.replace(':', '-')
+            # TODO outfile naming -> make it a helper based on lineage??
             outfile = outfile.replace('?', '%s-%s-f%i-m%s_%s' % (pair,
                                                               components,
-                                                              filterid,
+                                                              filter_id,
                                                               mov_stack[0],
                                                               mov_stack[1]))
         outfile = "ccftime " + outfile

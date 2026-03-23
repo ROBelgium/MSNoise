@@ -1419,10 +1419,14 @@ def cc_plot_interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show,
                  context_settings=dict(ignore_unknown_options=True, ))
 @click.argument('sta1')
 @click.argument('sta2')
+@click.option('-p', '--preprocessid', default=1, help='Preprocessing step ID')
+@click.option('-cc', '--ccid', default=1, help='CC step ID')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-m', '--stackid', default=1,
+              help='Stack step ID')
+@click.option('-mi', '--stackid_item', default=1,
+              help='Mov Stack item within that Stack step ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
-@click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk. Defaults to 1.')
 @click.option('-a', '--ampli', default=5.0, help='Amplification of the individual lines on the vertical axis ('
                                                  'default=1)')
 @click.option('-S', '--seismic', is_flag=True, help='Seismic style: fill the space between the zero and the positive '
@@ -1441,7 +1445,8 @@ def cc_plot_interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show,
 @click.argument('extra_args', nargs=-1, type=click.UNPROCESSED,
                 callback=parse_extra_args)
 @click.pass_context
-def cc_plot_ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
+def cc_plot_ccftime(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid, stackid_item,
+                    comp,
                     ampli, seismic, show, outfile, envelope, refilter,
                     normalize, extra_args):
     """Plots the ccf vs time between sta1 and sta2
@@ -1454,7 +1459,8 @@ def cc_plot_ccftime(ctx, sta1, sta2, filterid, comp, mov_stack,
         from ccftime import main # NOQA
     else:
         from ..plots.ccftime import main
-    main(sta1, sta2, filterid, comp, mov_stack, ampli, seismic, show, outfile,
+    main(sta1, sta2, preprocessid, ccid, filterid, stackid, stackid_item, comp,
+         ampli, seismic, show, outfile,
          envelope, refilter, normalize, loglevel=loglevel, **extra_args)
 
 
