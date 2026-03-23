@@ -1349,6 +1349,27 @@ def cc_plot():
     """Commands to trigger different plots"""
     pass
 
+# Define reusable option groups as decorator lists
+def common_options(*decorators):
+    """Combine multiple decorators into one."""
+    def decorator(f):
+        for dec in reversed(decorators):
+            f = dec(f)
+        return f
+    return decorator
+
+# Define individual options as reusable decorators
+preprocessid_option = click.option('-p', '--preprocessid', default=1, help='Preprocessing step ID')
+ccid_option = click.option('-cc', '--ccid', default=1, help='CC step ID')
+filterid_option = click.option('-f', '--filterid', default=1, help='Filter ID')
+stackid_option = click.option('-m', '--stackid', default=1, help='Stack step ID')
+stackid_item_option = click.option('-mi', '--stackid_item', default=1, help='Mov Stack item within that Stack step ID')
+comp_option = click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
+
+# Build incremental option bundles
+base_options = common_options(preprocessid_option, ccid_option, filterid_option)
+stack_options = common_options(base_options, stackid_option, stackid_item_option)
+full_options  = common_options(stack_options, comp_option)
 
 @cc_plot.command(name="distance",
                  context_settings=dict(ignore_unknown_options=True, ))
@@ -1386,10 +1407,7 @@ def cc_plot_distance(ctx, filterid, comp, ampli, show, outfile, refilter,
                  context_settings=dict(ignore_unknown_options=True, ))
 @click.argument('sta1')
 @click.argument('sta2')
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
-@click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk. Defaults to 1.')
+@full_options
 @click.option('-s', '--show', help='Show interactively?',
               default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
@@ -1401,7 +1419,8 @@ def cc_plot_distance(ctx, filterid, comp, ampli, show, outfile, refilter,
 @click.argument('extra_args', nargs=-1, type=click.UNPROCESSED,
                 callback=parse_extra_args)
 @click.pass_context
-def cc_plot_interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show,
+def cc_plot_interferogram(ctx, sta1, sta2,  preprocessid, ccid, filterid, stackid, stackid_item,
+                    comp, show,
                           outfile,
                           refilter, extra_args):
     """Plots the interferogram between sta1 and sta2 (parses the CCFs)
@@ -1411,7 +1430,8 @@ def cc_plot_interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show,
         from interferogram import main # NOQA
     else:
         from ..plots.interferogram import main
-    main(sta1, sta2, filterid, comp, mov_stack, show, outfile, refilter,
+    main(sta1, sta2,  preprocessid, ccid, filterid, stackid, stackid_item,
+                    comp, show, outfile, refilter,
          loglevel=loglevel, **extra_args)
 
 
@@ -1419,14 +1439,7 @@ def cc_plot_interferogram(ctx, sta1, sta2, filterid, comp, mov_stack, show,
                  context_settings=dict(ignore_unknown_options=True, ))
 @click.argument('sta1')
 @click.argument('sta2')
-@click.option('-p', '--preprocessid', default=1, help='Preprocessing step ID')
-@click.option('-cc', '--ccid', default=1, help='CC step ID')
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-m', '--stackid', default=1,
-              help='Stack step ID')
-@click.option('-mi', '--stackid_item', default=1,
-              help='Mov Stack item within that Stack step ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
+@full_options
 @click.option('-a', '--ampli', default=5.0, help='Amplification of the individual lines on the vertical axis ('
                                                  'default=1)')
 @click.option('-S', '--seismic', is_flag=True, help='Seismic style: fill the space between the zero and the positive '
