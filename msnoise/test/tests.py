@@ -27,7 +27,8 @@ from ..api import *
 from ..s01scan_archive import parse_crondays
 from ..s02new_jobs import main as new_jobs_main
 from ..s03compute_no_rotation import main as compute_cc_main
-from ..s04_stack2 import main as stack_main
+from ..s04_stack2_mov import main as stack_mov
+from ..s04_stack2_ref import main as stack_ref
 from ..s05compute_mwcs2 import main as compute_mwcs_main
 from ..s06compute_dtt2 import main as compute_dtt_main
 from ..s07_compute_dvv import main as compute_dvv_main
@@ -364,14 +365,14 @@ def test_023_stack():
     new_jobs_main(after='cc')
     db = connect()
 
-    stack_main('ref')
+    stack_ref('ref')
     reset_jobs(db, "stack_1", alljobs=True)
-    stack_main('mov')
+    stack_mov('mov')
 
     update_config(db, 'wienerfilt', 'Y', category='stack', set_number=1)
     reset_jobs(db, "stack_1", alljobs=True)
-    stack_main('mov')
-    stack_main('ref')
+    stack_mov('mov')
+    stack_ref('ref')
 
     db.close()
 
