@@ -75,7 +75,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
     pair = "_".join([sta1, sta2])
     try:
         stack_total = xr_get_ccf(params.output_folder, lineage_names,
-               sta1, sta2, components, None, ('1D',"1D"),None)
+               sta1, sta2, components, None, mov_stack,None)
         t = stack_total.columns.values
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)

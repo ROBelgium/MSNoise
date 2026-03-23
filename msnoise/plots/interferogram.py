@@ -26,14 +26,20 @@ from obspy.signal.filter import bandpass
 from ..api import *
 
 
-def main(sta1, sta2, filterid, components, mov_stackid=1, show=True,
+def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=1,
+         components="ZZ", show=True,
          outfile=None, refilter=None, loglevel="INFO", **kwargs):
     logger = get_logger('msnoise.cc_plot_interferogram', loglevel,
                         with_pid=True)
     db = connect()
-    maxlag = float(get_config(db, 'maxlag'))
-    cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
-    taxis = get_t_axis(db)
+    params = get_params(db)
+    lineage_names = [f"preprocess_{preprocess_id}", f"cc_{cc_id}", f"filter_{filter_id}", f"stack_{stack_id}"]
+    lineage_str = "/".join(lineage_names)
+    steps = lineage_str_to_steps(db, lineage_str, "/")
+    paralineage, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
+    mov_stack = params.mov_stack[stack_item - 1]
+    start, end, datelist = build_movstack_datelist(db)
+
 
     start, end, datelist = build_movstack_datelist(db)
     if refilter:
@@ -51,33 +57,26 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, show=True,
 
     pair = "%s:%s" % (sta1, sta2)
 
-    params = get_params(db)
-    lineage = get_stack_lineage_for_filter(db, filterid)
-    if lineage:
-        stack_set = int(lineage[-1].rsplit('_', 1)[-1])
-        stack_params = get_config_set_details(db, 'stack', stack_set, format='AttribDict')
-        if stack_params:
-            params.update(stack_params)
-    mov_stack = params.mov_stack[mov_stackid - 1]
     # print(mov_stack)
     output_folder = get_config(db, 'output_folder') or 'OUTPUT'
 
-    logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filterid,
+    logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filter_id,
                                         mov_stack))
 
 
     try:
-        data = xr_get_ccf(output_folder, lineage, sta1, sta2, components, filterid, mov_stack, taxis)
+        data = xr_get_ccf(params.output_folder, lineage_names,
+               sta1, sta2, components, None, mov_stack,None)
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
         sys.exit(1)
-
-    xextent = (date2num(data.index[0]), date2num(data.index[-1]), -maxlag, maxlag)
+    print(data)
+    xextent = (date2num(data.index[0]), date2num(data.index[-1]), -params.maxlag, params.maxlag)
     ax = plt.subplot(111)
     # data = stack_total
     if refilter:
         for i, d in enumerate(data):
-            data.iloc[i] = bandpass(data.iloc[i], freqmin, freqmax, cc_sampling_rate,
+            data.iloc[i] = bandpass(data.iloc[i], freqmin, freqmax, params.cc_sampling_rate,
                                zerophase=True)
     vmax = np.nanmax(data) * 0.9
     plt.imshow(data.T, extent=xextent, aspect="auto",
@@ -93,7 +92,7 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, show=True,
     # ax.xaxis.set_minor_locator(DayLocator())
     # ax.xaxis.set_minor_formatter(DateFormatter('%Y-%m-%d %H:%M'))
 
-    filter_params = get_config_set_details(db, 'filter', filterid, format='AttribDict')
+    filter_params = get_config_set_details(db, 'filter', filter_id, format='AttribDict')
     if filter_params:
         low = float(filter_params.freqmin)
         high = float(filter_params.freqmax)
@@ -103,11 +102,11 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, show=True,
     if "ylim" in kwargs:
         plt.ylim(kwargs["ylim"][0],kwargs["ylim"][1])
     else:
-        plt.ylim(-maxlag, maxlag)
+        plt.ylim(-params.maxlag, params.maxlag)
 
     title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %i (%s_%s)' % \
             (sta1, sta2, components,
-             filterid, low, high, mov_stackid, mov_stack[0], mov_stack[1])
+             filter_id, low, high, stack_id, mov_stack[0], mov_stack[1])
     if refilter:
         title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
     plt.title(title)
@@ -119,7 +118,7 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, show=True,
             pair = pair.replace(':', '-')
             outfile = outfile.replace('?', '%s-%s-f%i-m%s_%s' % (pair,
                                                               components,
-                                                              filterid,
+                                                              filter_id,
                                                               mov_stack[0],
                                                               mov_stack[1]))
         outfile = "interferogram " + outfile
