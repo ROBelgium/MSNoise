@@ -116,7 +116,7 @@ def main(loglevel="INFO"):
 
     db = connect()
     orig_params = get_params(db)
-    taxis = get_t_axis(db)
+
 
     logger.debug('Ready to compute')
     # Then we compute the jobs
@@ -139,6 +139,8 @@ def main(loglevel="INFO"):
         lineage_names = batch["lineage_names"][:-1]
         lineage_str = batch["lineage_str"]
         step = batch["step"]
+
+        taxis = get_t_axis(params)
 
         logger.info(f"New MWCS Job: pair={pair} n_days={len(days)} lineage={lineage_str}")
 

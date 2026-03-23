@@ -547,11 +547,14 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
                     ' modified {} ago or less.'.format(modification_delta))
 
     startdate = datetime.datetime.strptime(
-            api.get_config(db, 'startdate'),'%Y-%m-%d').date()
+            api.get_config(db, 'startdate', category='global', set_number=1),'%Y-%m-%d').date()
     enddate = datetime.datetime.strptime(
-            api.get_config(db, 'enddate'), '%Y-%m-%d').date()
-    archive_format = api.get_config(db, 'archive_format')
-    goal_sampling_rate = float(api.get_config(db, 'cc_sampling_rate'))
+            api.get_config(db, 'enddate', category='global', set_number=1), '%Y-%m-%d').date()
+    archive_format = api.get_config(db, 'archive_format', category='global', set_number=1)
+
+    # TODO ! this comes from the preprocessing step now, so probably should avoid filtering it here!
+    goal_sampling_rate = float(api.get_config(db, 'cc_sampling_rate', category='preprocess', set_number=1))
+
     search_info_log = 'Will search for files between {} and {}'\
                       .format(startdate, enddate)
     if archive_format:
@@ -569,15 +572,19 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
                    - datetime.datetime(1970, 1, 1, 0, 0)).total_seconds()
     stations = []
     if forced_path is None:
-        data_folder = os.path.realpath(api.get_config(db, 'data_folder'))
-        channels = api.get_config(db, 'channels').split(',')
+        data_folder = os.path.realpath(api.get_config(db, 'data_folder', category='global', set_number=1))
+        logger.debug('Will search for files in folder: %s' % data_folder)
+        logger.debug('Will search for channels: %s' % (
+            api.get_config(db, 'channels', category='global', set_number=1).split(',')
+        ))
+        channels = api.get_config(db, 'channels', category='global', set_number=1).split(',')
         logger.debug('Will search for channels: %s' % channels)
         stations = api.get_stations(db, all=False)
-        rawpath = get_data_structure(api.get_config(db, 'data_structure'))
+        rawpath = get_data_structure(api.get_config(db, 'data_structure', category='global', set_number=1))
         if rawpath is None:
             raise FatalError("Cannot read configured data_structure '%s'"
                              "anywhere (tried file custom.py in folder '%s')."
-                             % (api.get_config(db, 'data_structure'),
+                             % (api.get_config(db, 'data_structure', category='global', set_number=1),
                                 os.getcwd()))
 
         if not os.path.isdir(data_folder):

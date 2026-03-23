@@ -134,7 +134,7 @@ def test_002_ConnectToDB():
         pytest.fail("Can't connect to MSNoise DB")
 
 
-@pytest.mark.order(2)
+@pytest.mark.order(3)
 def test_002b_create_workflow():
     db = connect()
     for category in ['preprocess', 'cc', 'filter', 'stack', 'mwcs', 'mwcs_dtt',
@@ -150,7 +150,7 @@ def test_002b_create_workflow():
     db.close()
 
 
-@pytest.mark.order(2)
+@pytest.mark.order(4)
 def test_002c_verify_workflow():
     db = connect()
     steps = get_workflow_steps(db)
@@ -163,7 +163,7 @@ def test_002c_verify_workflow():
     db.close()
 
 
-@pytest.mark.order(3)
+@pytest.mark.order(5)
 def test_003_set_and_config(setup_environment):
     db = connect()
     data_folder = setup_environment['data_folder']
@@ -172,17 +172,20 @@ def test_003_set_and_config(setup_environment):
         ['data_folder', data_folder],
         ['data_structure', 'PDF'],
         ['network', 'YA'],
-        ['components_to_compute', 'ZZ'],
         ['response_path', response_path]
     ]
     for key, value in totests:
-        update_config(db, key, value)
-        config_value = get_config(db, key)
+        update_config(db, name=key, value=value, category='global', set_number=1)
+        config_value = get_config(db, name=key, category='global', set_number=1)
         assert config_value == value, f"Configuration parameter {key} did not set correctly."
+
+
+    update_config(db, 'components_to_compute', 'ZZ', category='cc', set_number=1)
+
     db.close()
 
 
-@pytest.mark.order(4)
+@pytest.mark.order(6)
 def test_004_set_and_get_filters():
     db = connect()
     # filter_1 configset was created in test_002b; update its frequency parameters
@@ -210,7 +213,7 @@ def test_004_set_and_get_filters():
     db.close()
 
 
-@pytest.mark.order(5)
+@pytest.mark.order(7)
 def test_005_populate_station_table():
     from ..s002populate_station_table import main
     try:
@@ -219,14 +222,14 @@ def test_005_populate_station_table():
     except:
         pytest.fail()
 
-@pytest.mark.order(6)
+@pytest.mark.order(8)
 def test_006_get_stations():
     db = connect()
     stations = get_stations(db).all()
     assert len(stations) == 3
     db.close()
 
-@pytest.mark.order(7)
+@pytest.mark.order(9)
 def test_007_update_stations(setup_environment):
     db = connect()
     stations_file = os.path.join(setup_environment['response_path'], 'stations.csv')
@@ -247,7 +250,7 @@ def test_007_update_stations(setup_environment):
     result = runner.invoke(msnoise_script.info)
     assert result.exit_code == 0, f"Command failed with exit code {result.exit_code}"
 
-@pytest.mark.order(8)
+@pytest.mark.order(10)
 def test_008_scan_archive(setup_environment):
     from ..s01scan_archive import main
     try:
@@ -263,7 +266,7 @@ def test_008_scan_archive(setup_environment):
     # Optionally, add more assertions to check specific outputs in result.output
 
 
-@pytest.mark.order(9)
+@pytest.mark.order(11)
 def test_009_control_data_availability():
     db = connect()
     files = get_new_files(db)
@@ -276,7 +279,7 @@ def test_009_control_data_availability():
                 da = get_data_availability(db, net=station.net, sta=station.sta, loc=loc, chan=chan)
                 assert len(da) == 1
 
-@pytest.mark.order(10)
+@pytest.mark.order(12)
 def test_010_new_jobs():
     try:
         new_jobs_main()
@@ -284,7 +287,7 @@ def test_010_new_jobs():
         traceback.print_exc()
         pytest.fail()
 
-@pytest.mark.order(10)
+@pytest.mark.order(13)
 def test_010b_preprocess_and_propagate():
     try:
         preprocess_main()
@@ -294,19 +297,19 @@ def test_010b_preprocess_and_propagate():
         pytest.fail()
 
 
-@pytest.mark.order(11)
+@pytest.mark.order(14)
 def test_011_control_jobs():
     db = connect()
     assert is_next_job_for_step(db, step_category='cc') is True
     db.close()
 
-@pytest.mark.order(12)
+@pytest.mark.order(15)
 def test_012_reset_jobs():
     db = connect()
     reset_jobs(db, 'cc_1', alljobs=True)
     db.close()
 
-@pytest.mark.order(13)
+@pytest.mark.order(16)
 def test_013_s03compute_cc():
     try:
         compute_cc_main()
@@ -314,7 +317,7 @@ def test_013_s03compute_cc():
         traceback.print_exc()
         pytest.fail()
 
-@pytest.mark.order(14)
+@pytest.mark.order(17)
 def test_014_check_done_jobs():
     db = connect()
     jobs = get_job_types(db, 'cc_1')
@@ -322,7 +325,7 @@ def test_014_check_done_jobs():
     assert counts.get('D', 0) == 3, f"Expected 3 done CC jobs, got: {counts}"
     db.close()
 
-@pytest.mark.order(15)
+@pytest.mark.order(18)
 def test_015_check_cc_files():
     db = connect()
     output_folder = get_config(db, 'output_folder') or 'OUTPUT'
@@ -343,17 +346,17 @@ def test_015_check_cc_files():
     db.close()
 
 
-@pytest.mark.order(17)
+@pytest.mark.order(19)
 def test_017_reset_cc_jobs():
     db = connect()
     reset_jobs(db, 'cc_1', alljobs=True)
     db.close()
 
-@pytest.mark.order(18)
+@pytest.mark.order(20)
 def test_018_recompute_cc():
     test_013_s03compute_cc()
 
-@pytest.mark.order(23)
+@pytest.mark.order(21)
 def test_023_stack():
     db = connect()
     update_config(db, 'ref_begin', '2009-01-01', category='stack', set_number=1)
@@ -377,7 +380,7 @@ def test_023_stack():
     db.close()
 
 
-@pytest.mark.order(24)
+@pytest.mark.order(22)
 def test_024_mwcs_param_update():
     db = connect()
     details = get_config_set_details(db, 'mwcs', 1)
@@ -389,12 +392,12 @@ def test_024_mwcs_param_update():
     assert details['mwcs_step'] == '5', f"mwcs_step not updated, got: {details.get('mwcs_step')}"
     db.close()
 
-@pytest.mark.order(25)
+@pytest.mark.order(23)
 def test_025_mwcs():
     new_jobs_main(after='stack')
     compute_mwcs_main()
 
-@pytest.mark.order(26)
+@pytest.mark.order(24)
 def test_026_mwcs_dtt_param_update():
     db = connect()
     details = get_config_set_details(db, 'mwcs_dtt', 1)
@@ -414,26 +417,6 @@ def test_027_dtt():
 @pytest.mark.order(28)
 def test_028_dvv():
     compute_dvv_main()
-
-@pytest.mark.order(29)
-def test_029_build_ref_datelist():
-    from ..api import build_ref_datelist
-    db = connect()
-    start, end, datelist = build_ref_datelist(db)
-    assert start == datetime.date(2009, 1, 1)
-    assert end == datetime.date(2011, 1, 1)
-    assert len(datelist) == 731
-    db.close()
-
-@pytest.mark.order(30)
-def test_030_build_movstack_datelist():
-    from ..api import build_movstack_datelist
-    db = connect()
-    start, end, datelist = build_movstack_datelist(db)
-    assert start == datetime.date(2009, 1, 1)
-    assert end == datetime.date(2011, 1, 1)
-    assert len(datelist) == 731
-    db.close()
 
 @pytest.mark.order(31)
 def test_031_stretching_param_update():

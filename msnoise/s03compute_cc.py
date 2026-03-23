@@ -422,7 +422,7 @@ def main(loglevel="INFO"):
 
                 if params.keep_all:
                     for ccfid in allcorr.keys():
-                        export_allcorr(db, ccfid, allcorr[ccfid])
+                        export_allcorr(db, ccfid, allcorr[ccfid], t_axis=t_axis)
 
                 if params.keep_days:
                     for ccfid in allcorr.keys():

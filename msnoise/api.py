@@ -173,7 +173,7 @@ def read_db_inifile(inifile=None):
 # CONFIG
 
 
-def get_config(session, name=None, isbool=False, plugin=None):
+def get_config(session, name=None, isbool=False, plugin=None, category='global', set_number=None):
     """Get the value of one or all config bits from the database.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
@@ -201,7 +201,14 @@ def get_config(session, name=None, isbool=False, plugin=None):
     else:
         table = Config
     if name:
-        config = session.query(table).filter(table.name == name).first()
+        query = session.query(table).filter(table.name == name)
+        if hasattr(table, 'category') and category is not None:
+            query = query.filter(table.category == category)
+            if category == 'global':
+                set_number = 1
+        if hasattr(table, 'set_number') and set_number is not None:
+            query = query.filter(table.set_number == set_number)
+        config = query.first()
         if config is not None:
             if isbool:
                 if config.value in [True, 'True', 'true', 'Y', 'y', '1', 1]:
@@ -256,9 +263,9 @@ def update_config(session, name, value, plugin=None, category='global', set_numb
     else:
         table = Config
     query = session.query(table).filter(table.name == name)
-    if hasattr(table, 'category'):
+    if hasattr(table, 'category') and category is not None:
         query = query.filter(table.category == category)
-    if hasattr(table, 'set_number'):
+    if hasattr(table, 'set_number') and set_number is not None:
         query = query.filter(table.set_number == set_number)
     config = query.first()
     if config is None:
@@ -2023,7 +2030,7 @@ def get_jobs_by_lastmod(session, jobtype='CC', lastmod=datetime.datetime.now()):
 # CORRELATIONS
 
 
-def export_allcorr(session, ccfid, data):
+def export_allcorr(session, ccfid, data, t_axis):
     output_folder = get_config(session, 'output_folder')
     station1, station2, filterid, components, date = ccfid.split('_')
 
@@ -2033,13 +2040,13 @@ def export_allcorr(session, ccfid, data):
         os.makedirs(path, exist_ok=True)
 
     df = pd.DataFrame().from_dict(data).T
-    df.columns = get_t_axis(session)
+    df.columns = t_axis
     df.to_hdf(os.path.join(path, date+'.h5'), key='data')
     del df
     return
 
 
-def export_allcorr2(session, ccfid, data, base_folder=None, params=None):
+def export_allcorr2(session, ccfid, data, base_folder=None, params=None, t_axis=None):
     if base_folder is None:
         # Legacy behaviour:
         output_folder = get_config(session, 'output_folder')
@@ -2064,7 +2071,7 @@ def export_allcorr2(session, ccfid, data, base_folder=None, params=None):
         os.makedirs(path, exist_ok=True)
 
     df = pd.DataFrame().from_dict(data).T
-    df.columns = get_t_axis(session)
+    df.columns = t_axis
     df.to_hdf(os.path.join(path, date+'.h5'), key='data')
     del df
     return
@@ -2450,7 +2457,7 @@ def get_mwcs(session, station1, station2, filterid, components, date,
 
 
 def get_results_all(session, root, lineage_names, station1, station2, components, dates,
-                    format="dataframe"):
+                    format="dataframe", params=None):
     """
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
@@ -2487,7 +2494,7 @@ def get_results_all(session, root, lineage_names, station1, station2, components
         if format == "dataframe":
             return result
         elif format == "xarray":
-            taxis = get_t_axis(session)
+            taxis = get_t_axis(params)
             times = result.index
             dr = xr.DataArray(result, coords=[times, taxis],
                               dims=["times", "taxis"]).dropna("times", how="all")
@@ -2503,7 +2510,7 @@ def get_results_all(session, root, lineage_names, station1, station2, components
 # Some helper functions
 
 
-def get_maxlag_samples(session):
+def get_maxlag_samples(maxlag, cc_sampling_rate):
     """
     Returns the length of the CC functions. Gets the maxlag and sampling rate
     from the database.
@@ -2517,12 +2524,10 @@ def get_maxlag_samples(session):
     :returns: the length of the CCF in samples
     """
 
-    maxlag = float(get_config(session, 'maxlag'))
-    cc_sampling_rate = float(get_config(session, 'cc_sampling_rate'))
     return int(2*maxlag*cc_sampling_rate)+1
 
 
-def get_t_axis(session):
+def get_t_axis(params):
     """
     Returns the time axis (in seconds) of the CC functions.
     Gets the maxlag from the database and uses `get_maxlag_samples` function.
@@ -2534,10 +2539,8 @@ def get_t_axis(session):
     :rtype: :class:`numpy.array`
     :returns: the time axis in seconds
     """
-
-    maxlag = float(get_config(session, 'maxlag'))
-    samples = get_maxlag_samples(session)
-    return np.linspace(-maxlag, maxlag, samples)
+    samples = get_maxlag_samples(params.maxlag, params.cc_sampling_rate)
+    return np.linspace(-params.maxlag, params.maxlag, samples)
 
 
 def get_components_to_compute(session, plugin=None):
@@ -2634,7 +2637,7 @@ def get_filter_components_to_compute(session, filterid, params):
 
     return filt_components, filt_components_single_station
 
-def build_ref_datelist(session):
+def build_ref_datelist(params):
     """
     Creates a date array for the REF.
     The returned tuple contains a start and an end date, and a list of
@@ -2647,8 +2650,8 @@ def build_ref_datelist(session):
     :rtype: tuple
     :returns: (start, end, datelist)
     """
-    begin = get_config(session, "ref_begin")
-    end = get_config(session, "ref_end")
+    begin = params.ref_begin
+    end = params.ref_end
     if begin[0] == '-':
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
         end = datetime.date.today() + datetime.timedelta(days=int(end))
@@ -2707,8 +2710,8 @@ def build_movstack_datelist(session):
     :rtype: tuple
     :returns: (start, end, datelist)
     """
-    begin = get_config(session, "startdate")
-    end = get_config(session, "enddate")
+    begin = get_config(session, "startdate", category='global', set_number=1)
+    end = get_config(session, "enddate", category='global', set_number=1)
     if begin[0] == '-':
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
         end = datetime.date.today() + datetime.timedelta(days=int(end))

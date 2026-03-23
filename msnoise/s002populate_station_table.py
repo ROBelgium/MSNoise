@@ -88,8 +88,9 @@ def main(loglevel="INFO"):
                         with_pid=True)
     db = connect()
     logger.info("Populating the Station table")
-    data_folder = get_config(db, 'data_folder')
-    data_structure = get_config(db, 'data_structure')
+    data_folder = get_config(db, 'data_folder', category="global", set_number=1)
+    data_structure = get_config(db, 'data_structure', category="global", set_number=1)
+    network_override = get_config(db, 'network', category="global", set_number=1)
 
     if data_structure in ["SDS", "IDDS"]:
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*", "*")))
@@ -115,8 +116,7 @@ def main(loglevel="INFO"):
         for di in datalist:
             tmp = os.path.split(di)
             sta = tmp[1]
-            net = get_config(db, 'network')
-            stationdict[net+"_"+sta]=[net,sta,0.0,0.0,0.0,'UTM']
+            stationdict[network_override+"_"+sta]=[network_override,sta,0.0,0.0,0.0,'UTM']
         del datalist
     else:
         logger.warning("Can't parse the archive for format %s !" % data_structure)

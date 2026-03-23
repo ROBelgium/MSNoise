@@ -127,7 +127,7 @@ def main(loglevel="INFO"):
     db = connect()
     params = get_params(db)
     time.sleep(np.random.random() * 5)
-    taxis = get_t_axis(db)
+
     smoothing_half_win = 5
     while is_next_job_for_step(db, step_category="stretching"):
         logger.info("Getting the next job")
@@ -144,6 +144,8 @@ def main(loglevel="INFO"):
         lineage_names = batch["lineage_names"][:-1]
         lineage_str = batch["lineage_str"]
         step = batch["step"]
+
+        taxis = get_t_axis(params)
 
         logger.info(f"New Stretching Job: pair={pair} n_days={len(days)} lineage={lineage_str}")
 
