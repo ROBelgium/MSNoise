@@ -186,10 +186,10 @@ def main(loglevel="INFO"):
             maxlag2 = minlag + params.stretching_width
             mid = int(params.cc_sampling_rate * params.maxlag)
             print("betweeen", minlag, "and", maxlag2    )
-            ref[mid - int(minlag * goal_sampling_rate):mid + int(
-                minlag * goal_sampling_rate)] *= 0.
-            ref[:mid - int(maxlag2 * goal_sampling_rate)] *= 0.
-            ref[mid + int(maxlag2 * goal_sampling_rate):] *= 0.
+            ref.iloc[mid - int(minlag * goal_sampling_rate):mid + int(minlag * goal_sampling_rate)] = 0.
+            ref.iloc[:mid - int(maxlag2 * goal_sampling_rate)] = 0.
+            ref.iloc[mid + int(maxlag2 * goal_sampling_rate):] = 0.
+
             # TODO ADD the def here or in the API
             str_range = params.stretching_max
             nstr = params.stretching_nsteps
