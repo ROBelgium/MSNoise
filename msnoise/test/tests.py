@@ -1,4 +1,4 @@
-import datetime
+cc import datetime
 import glob
 import logging
 import os
@@ -62,6 +62,7 @@ def setup_environment():
     # Create a temporary directory for tests
     test_dir = tempfile.mkdtemp(prefix="msnoise_")
     os.chdir(test_dir)
+    print(f"Tests will be running in the {test_dir} folder")
 
     # Set environment variables
     os.environ["PREFIX"] = ""
@@ -363,7 +364,7 @@ def test_023_stack():
     update_config(db, 'ref_end', '2011-01-01', category='stack', set_number=1)
     update_config(db, 'startdate', '2009-01-01', category='stack', set_number=1)
     update_config(db, 'enddate', '2011-01-01', category='stack', set_number=1)
-    update_config(db, 'mov_stack', "(('1d','1d'),('2d','1d'),('5d','1d'))", category='stack', set_number=1)
+    update_config(db, 'mov_stack', "(('1D','1D'),('2D','1D'),('5D','1D'))", category='stack', set_number=1)
     db.close()
     new_jobs_main(after='cc')
     db = connect()
@@ -614,7 +615,7 @@ def test_100_plot_interferogram():
                 sta_id2 = f"{sta2.net}.{sta2.sta}.{loc2}"
                 for filter_step in filter_steps:
                     interferogram_main(sta_id1, sta_id2, filter_step.set_number, "ZZ", 1, show=False, outfile="?.png")
-                    fn = f'interferogram {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m1d_1d.png'
+                    fn = f'interferogram {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m1D_1D.png'
                     assert os.path.isfile(fn), f"{fn} doesn't exist"
 
 @pytest.mark.order(101)
@@ -628,7 +629,7 @@ def test_101_plot_spectime():
                 sta_id2 = f"{sta2.net}.{sta2.sta}.{loc2}"
                 for filter_step in filter_steps:
                     spectime_main(sta_id1, sta_id2, filter_step.set_number, "ZZ", 1, show=False, outfile="?.png")
-                    fn = f'spectime {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m1d_1d.png'
+                    fn = f'spectime {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m1D_1D.png'
                     assert os.path.isfile(fn), f"{fn} doesn't exist"
 
 @pytest.mark.order(102)
