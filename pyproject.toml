@@ -39,7 +39,7 @@ dependencies = [
     "scipy",
     "pandas",
     "matplotlib",
-    "sqlalchemy<2",
+    "sqlalchemy",
     "sqlalchemy-utils",
     "obspy",
     "click",
