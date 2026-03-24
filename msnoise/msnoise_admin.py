@@ -47,7 +47,13 @@ app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'
 
 
 def get_app():
-    """Return the Flask application instance for testing."""
+    """Return the Flask application instance for testing.
+    Ensures admin routes are registered before the app is returned.
+    """
+    try:
+        create_admin_app()
+    except Exception:
+        pass  # already registered
     return app
 
 # Babel for internationalization

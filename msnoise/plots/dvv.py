@@ -57,6 +57,7 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1, mwcsid=1, d
 
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
     output_folder = get_config(db, 'output_folder') or 'OUTPUT'
+    left = right = None  # set from first successfully loaded dvv
     for i, mov_stack in enumerate(mov_stacks):
         current = start
         try:
@@ -82,12 +83,13 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1, mwcsid=1, d
                        ncol=2, borderaxespad=0.)
             if 'dvv' not in dir() or dvv is None:
                 logger.error("No dvv data found for any pair/component, skipping axis limits")
-                continue
-            left, right = dvv.index[0], dvv.index[-1]
+            else:
+                left, right = dvv.index[0], dvv.index[-1]
             plt.title("Stack %i (%s_%s)"% (mov_stackid or i+1, mov_stack[0], mov_stack[1]))
         else:
             plt.title("Stack %i (%s_%s)"% (i+1, mov_stack[0], mov_stack[1]))
-            plt.xlim(left, right)
+            if left is not None and right is not None:
+                plt.xlim(left, right)
 
         plt.grid(True)
         plt.gca().xaxis.set_major_formatter(DateFormatter("%Y-%m-%d %H:%M"))
