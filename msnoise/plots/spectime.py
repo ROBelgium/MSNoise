@@ -54,7 +54,7 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
     logger = get_logger('msnoise.cc_plot_spectime', loglevel,
                         with_pid=True)
     db = connect()
-    cc_sampling_rate = float(get_config(db, 'cc_sampling_rate'))
+    cc_sampling_rate = float(get_config(db, 'cc_sampling_rate', category='cc', set_number=1))
     start, end, datelist = build_movstack_datelist(db)
     base = mdates.date2num(start)
     taxis = get_t_axis(db)

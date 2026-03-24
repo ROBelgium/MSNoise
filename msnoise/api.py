@@ -645,6 +645,60 @@ def get_stack_lineage_for_filter(session, filterid):
     return path
 
 
+def get_refstack_lineage_for_filter(session, filterid, refstack_set_number=1):
+    """Get the full lineage path through a filter step down to its refstack.
+
+    Extends :func:`get_stack_lineage_for_filter` by also appending the
+    ``refstack_M`` step that is immediately downstream of the stack step.
+    This is the correct lineage to pass to :func:`xr_get_ref`, since REF
+    files now live under the refstack step folder.
+
+    Example for the default single-pipeline::
+
+        get_refstack_lineage_for_filter(db, 1)
+        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :type filterid: int
+    :param filterid: The filter set_number (e.g. 1 for filter_1).
+    :type refstack_set_number: int
+    :param refstack_set_number: Which refstack set to use (default 1).
+    :rtype: list of str
+    """
+    path = get_stack_lineage_for_filter(session, filterid)
+    if not path:
+        return path
+
+    steps = get_workflow_steps(session)
+    links = get_workflow_links(session)
+
+    # Find the stack step at the end of the path
+    stack_step_name = path[-1]
+    stack_step = next(
+        (s for s in steps if s.step_name == stack_step_name), None
+    )
+    if stack_step is None:
+        return path
+
+    # Find the refstack step downstream of this stack step
+    # Prefer the requested refstack_set_number; fall back to the first available
+    refstack_steps = [
+        s for s in steps
+        if s.category == 'refstack'
+        and any(lk.from_step_id == stack_step.step_id and lk.to_step_id == s.step_id
+                for lk in links)
+    ]
+    if not refstack_steps:
+        return path  # no refstack in this workflow, return stack-level lineage
+
+    # Pick requested set_number if available, else first
+    refstack_step = next(
+        (s for s in refstack_steps if s.set_number == refstack_set_number),
+        refstack_steps[0]
+    )
+    return path + [refstack_step.step_name]
+
+
 def get_lineage_for_step(session, category, set_number=1):
     """Get the lineage path (list of step names) from the root to a given step.
 

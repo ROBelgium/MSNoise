@@ -982,8 +982,9 @@ def update_job_workflow(session, day, pair, jobtype, flag,
         job.lineage = lineage  # <-- NEW
         session.add(job)
     else:
-        # Update existing job
-        job.flag = flag
+        # Update existing job — but never bump a Done job back to Todo
+        if not (job.flag == "D" and flag == "T"):
+            job.flag = flag
         job.step_id = step_id
         job.priority = priority
         job.lastmod = datetime.datetime.utcnow()

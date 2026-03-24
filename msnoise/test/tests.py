@@ -648,7 +648,10 @@ def test_100_plot_interferogram():
                 sta_id1 = f"{sta1.net}.{sta1.sta}.{loc1}"
                 sta_id2 = f"{sta2.net}.{sta2.sta}.{loc2}"
                 for filter_step in filter_steps:
-                    interferogram_main(sta_id1, sta_id2, filter_step.set_number, "ZZ", 1, show=False, outfile="?.png")
+                    interferogram_main(sta_id1, sta_id2,
+                                      filter_id=filter_step.set_number,
+                                      components="ZZ", stack_item=1,
+                                      show=False, outfile="?.png")
                     fn = f'interferogram {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m1D_1D.png'
                     assert os.path.isfile(fn), f"{fn} doesn't exist"
 
@@ -850,7 +853,7 @@ def test_100000_msnoise_admin():
     # Create a test client using the Flask application configured for testing
     with flask_app.test_client() as test_client:
         response = test_client.get('admin/')
-        assert response.status_code == 200, f"Error following route {route}"
+        assert response.status_code == 200, "Error following route admin/"
         assert b"MSNoise Dashboard" in response.data
         for route in ["admin/config/","admin/stations/", "admin/filters/",
                       "admin/data_availability/", "admin/jobs/",
