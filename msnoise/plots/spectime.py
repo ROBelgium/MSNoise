@@ -36,7 +36,7 @@ And refiltering to enhance high frequency content:
 
 
 import datetime
-
+import sys
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
@@ -46,22 +46,27 @@ from obspy.signal.filter import bandpass
 from msnoise.api import build_movstack_datelist, connect, get_config, \
     get_filters, get_results, check_stations_uniqueness, xr_get_ccf,\
     get_t_axis, get_logger, get_params, get_stack_lineage_for_filter,\
-    get_config_set_details
+    get_config_set_details, lineage_to_string, lineage_str_to_steps,\
+    get_merged_params_for_lineage
 
 
-def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
-         outfile=False, refilter=None, startdate=None, enddate=None,
-         loglevel="INFO", **kwargs):
+def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=1,
+         components="ZZ", ampli=5, seismic=False,
+         show=False, outfile=None, envelope=False, refilter=None,
+         normalize=None, loglevel="INFO", **kwargs):
     logger = get_logger('msnoise.cc_plot_spectime', loglevel,
                         with_pid=True)
+
+    logger = get_logger('msnoise.cc_plot_ccftime', loglevel,
+                        with_pid=True)
     db = connect()
-    cc_sampling_rate = float(get_config(db, 'cc_sampling_rate', category='cc', set_number=1))
+    params = get_params(db)
+    lineage_names = [f"preprocess_{preprocess_id}", f"cc_{cc_id}", f"filter_{filter_id}", f"stack_{stack_id}"]
+    lineage_str = "/".join(lineage_names)
+    steps = lineage_str_to_steps(db, lineage_str, "/")
+    paralineage, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
+    mov_stack = params.mov_stack[stack_item - 1]
     start, end, datelist = build_movstack_datelist(db)
-    base = mdates.date2num(start)
-    # taxis is built after params is resolved below
-    # TODO: Height adjustment of the plot for large number of stacks.
-    # Preferably interactive
-    fig = plt.figure(figsize=(12, 9))
 
     if refilter:
         freqmin, freqmax = refilter.split(':')
@@ -75,20 +80,15 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
     sta1 = check_stations_uniqueness(db, sta1)
     sta2 = check_stations_uniqueness(db, sta2)
 
-    pair = "%s:%s" % (sta1, sta2)
-    params = get_params(db)
-    lineage = get_stack_lineage_for_filter(db, filterid)
-    if lineage:
-        stack_set = int(lineage[-1].rsplit('_', 1)[-1])
-        stack_params = get_config_set_details(db, 'stack', stack_set, format='AttribDict')
-        if stack_params:
-            params.update(stack_params)
-    mov_stack = params.mov_stack[mov_stackid-1]
-    taxis = get_t_axis(params)
-    output_folder = get_config(db, 'output_folder') or 'OUTPUT'
-    logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filterid,
-                                        mov_stack))
-    stack_total = xr_get_ccf(output_folder, lineage, sta1, sta2, components, filterid, mov_stack, taxis)
+    pair = "_".join([sta1, sta2])
+    try:
+        stack_total = xr_get_ccf(params.output_folder, lineage_names,
+                                 sta1, sta2, components, None, mov_stack, None)
+        t = stack_total.columns.values
+    except FileNotFoundError as fullpath:
+        logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
+        sys.exit(1)
+
 
     # convert index to mdates
     stack_total.index = mdates.date2num(stack_total.index.to_pydatetime())
@@ -96,26 +96,26 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
     if len(stack_total) == 0:
         logger.error("No CCF found for this request")
         return
-    ax = plt.subplot(111)
+
+    fig, ax = plt.subplots(1, 1, figsize=(12, 9))
+    plt.subplots_adjust(bottom=0.06, hspace=0.3)
+
     for i, line in stack_total.iterrows():
         if np.all(np.isnan(line)):
             continue
 
         if refilter:
-            line = bandpass(line, freqmin, freqmax, cc_sampling_rate,
+            line = bandpass(line, freqmin, freqmax, params.cc_sampling_rate,
                             zerophase=True)
 
-        freq, line = prepare_abs_postitive_fft(line, cc_sampling_rate)
+        freq, line = prepare_abs_postitive_fft(line, params.cc_sampling_rate)
         line /= line.max()
 
         ax.plot(freq, line * ampli + i, c='k', lw=1)
 
-    filter_params = get_config_set_details(db, 'filter', filterid, format='AttribDict')
-    if filter_params:
-        low = float(filter_params.freqmin)
-        high = float(filter_params.freqmax)
-    else:
-        low = high = 0.0
+
+    low = float(params.freqmin)
+    high = float(params.freqmax)
 
 
     ax.set_ylim(start-datetime.timedelta(days=ampli),
@@ -129,9 +129,9 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
     ax.set_xscale('log')
     ax.grid()
 
-    title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %i (%s_%s)' % \
-            (sta1, sta2, components,
-             filterid, low, high, mov_stackid, mov_stack[0], mov_stack[1])
+    title = '%s : %s, %s\n Preprocess %i - CC %i - Filter %d (%.2f - %.2f Hz) - Stack %i (%s_%s)' %\
+            (sta1, sta2, components, preprocess_id, cc_id,
+             filter_id, low, high, stack_id, mov_stack[0], mov_stack[1])
     if refilter:
         title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
     ax.set_title(title)
@@ -140,9 +140,10 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
     if outfile:
         if outfile.startswith("?"):
             pair = pair.replace(':', '-')
+            # TODO outfile naming -> make it a helper based on lineage??
             outfile = outfile.replace('?', '%s-%s-f%i-m%s_%s' % (pair,
                                                               components,
-                                                              filterid,
+                                                              filter_id,
                                                               mov_stack[0],
                                                               mov_stack[1]))
         outfile = "spectime " + outfile

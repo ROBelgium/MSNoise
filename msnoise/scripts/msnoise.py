@@ -1513,10 +1513,7 @@ def cc_plot_ccftime(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid, stac
                  context_settings=dict(ignore_unknown_options=True, ))
 @click.argument('sta1')
 @click.argument('sta2')
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
-@click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk. Defaults to 1.')
+@full_options
 @click.option('-a', '--ampli', default=5.0, help='Amplification of the individual lines on the vertical axis ('
                                                  'default=1)')
 @click.option('-s', '--show', help='Show interactively?',
@@ -1530,8 +1527,8 @@ def cc_plot_ccftime(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid, stac
 @click.argument('extra_args', nargs=-1, type=click.UNPROCESSED,
                 callback=parse_extra_args)
 @click.pass_context
-def cc_plot_spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
-                     ampli, show, outfile, refilter, extra_args):
+def cc_plot_spectime(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid, stackid_item,
+                    comp, ampli, show, outfile, refilter, extra_args):
     """Plots the ccf's spectrum vs time between sta1 and sta2
     STA1 and STA2 must be provided with this format: NET.STA.LOC !"""
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1539,8 +1536,9 @@ def cc_plot_spectime(ctx, sta1, sta2, filterid, comp, mov_stack,
         from spectime import main # NOQA
     else:
         from ..plots.spectime import main
-    main(sta1, sta2, filterid, comp, mov_stack, ampli, show, outfile,
-         refilter, loglevel=loglevel, **extra_args)
+    main(sta1, sta2, preprocessid, ccid, filterid, stackid, stackid_item, comp,
+         ampli, seismic, show, outfile,
+         envelope, refilter, normalize, loglevel=loglevel, **extra_args)
 
 
 @cc.group(cls=OrderedGroup)
