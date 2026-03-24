@@ -14,12 +14,12 @@ from sqlalchemy.sql import func, text
 
 WORKFLOW_CHAINS = {
     'global': {
-        'next_steps': ['preprocess'],
+        'next_steps': ['preprocess', 'qc'],
         'is_entry_point': True,
         'is_terminal': False
     },
     'preprocess': {
-        'next_steps': ['qc', 'cc'],
+        'next_steps': ['cc'],
         'is_entry_point': False,
         'is_terminal': False
     },
