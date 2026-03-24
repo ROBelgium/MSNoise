@@ -51,14 +51,11 @@ from msnoise.api import build_movstack_datelist, connect, get_config, \
 
 
 def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=1,
-         components="ZZ", ampli=5, seismic=False,
-         show=False, outfile=None, envelope=False, refilter=None,
-         normalize=None, loglevel="INFO", **kwargs):
+         components="ZZ", ampli=5, show=True, outfile=None,  refilter=None,
+         loglevel="INFO", **kwargs):
     logger = get_logger('msnoise.cc_plot_spectime', loglevel,
                         with_pid=True)
 
-    logger = get_logger('msnoise.cc_plot_ccftime', loglevel,
-                        with_pid=True)
     db = connect()
     params = get_params(db)
     lineage_names = [f"preprocess_{preprocess_id}", f"cc_{cc_id}", f"filter_{filter_id}", f"stack_{stack_id}"]

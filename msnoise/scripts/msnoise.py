@@ -1537,8 +1537,8 @@ def cc_plot_spectime(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid, sta
     else:
         from ..plots.spectime import main
     main(sta1, sta2, preprocessid, ccid, filterid, stackid, stackid_item, comp,
-         ampli, seismic, show, outfile,
-         envelope, refilter, normalize, loglevel=loglevel, **extra_args)
+         ampli,  show=show, outfile=outfile,
+         refilter=refilter, loglevel=loglevel, **extra_args)
 
 
 @cc.group(cls=OrderedGroup)
