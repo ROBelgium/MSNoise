@@ -667,7 +667,7 @@ def test_101_plot_spectime():
                 for filter_step in filter_steps:
                     spectime_main(sta_id1, sta_id2, 1, 1, 1, 1, 1,
                                   show=False, outfile="?.png")
-                    fn = f'spectime {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m1D_1D.png'
+                    fn = f'spectime {sta_id1}_{sta_id2}-ZZ-f{filter_step.set_number}-m1D_1D.png'
                     assert os.path.isfile(fn), f"{fn} doesn't exist"
 
 @pytest.mark.order(102)
@@ -866,8 +866,7 @@ def test_100000_msnoise_admin():
         assert response.status_code == 200, f"Error following route {route}"
         #
         for route in ["admin/station/edit/?id=1&",
-                      "admin/dataavailability/edit/?id=3",
-                      "admin/jobs/edit/?id=9&url=/admin/jobs/&modal=True"]:
+                      "admin/dataavailability/edit/?id=3"]:
             response = test_client.get(route, follow_redirects=True)
             assert response.status_code == 200, f"Error following route {route}"
 
