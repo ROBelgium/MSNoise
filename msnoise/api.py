@@ -3311,6 +3311,11 @@ def xr_create_or_open(fn, taxis=[], name="CCF"):
         data = np.random.random((len(times), len(taxis), len(keys)))
         dr = xr.DataArray(data, coords=[times, taxis, keys],
                           dims=["times", "taxis", "keys"])
+    elif name == "STR":
+        keys = ["Delta", "Coeff", "Error"]
+        data = np.random.random((len(times), len(keys)))
+        dr = xr.DataArray(data, coords=[times, keys],
+                          dims=["times", "keys"])
     elif name == "DTT":
         keys = ["m", "em", "a", "ea", "m0", "em0"]
         data = np.random.random((len(times), len(keys)))
@@ -5255,3 +5260,381 @@ def get_next_lineage_batch(
         "step_params": step_params,
         "params": params,
     }
+
+# ============================================================
+# Lineage enumeration helpers
+# ============================================================
+
+def get_done_lineages_for_category(session, category):
+    """Return all distinct computed lineages for a given workflow step category.
+
+    Queries ``Job`` rows whose associated ``WorkflowStep.category`` matches
+    *category* and whose flag is ``'D'`` (done), then de-duplicates and
+    resolves each ``lineage`` string into an ordered list of step-name
+    strings (upstream → downstream, including the step itself).
+
+    This is the correct way to enumerate output folders for a step that may
+    be reached via multiple upstream paths (e.g. multiple filters, multiple
+    MWCS configs), because it reflects what was *actually computed* rather
+    than what the DAG topology suggests.
+
+    Example::
+
+        lineages = get_done_lineages_for_category(db, 'stretching')
+        # → [
+        #     ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'stretching_1'],
+        #     ['preprocess_1', 'cc_1', 'filter_2', 'stack_1', 'stretching_1'],
+        # ]
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param category: Workflow step category, e.g. ``'stretching'``,
+        ``'mwcs_dtt'``, ``'wavelet_dtt'``.
+    :type category: str
+    :rtype: list[list[str]]
+    :returns: Sorted list of unique lineage-name lists.
+    """
+    rows = (
+        session.query(Job.lineage)
+        .join(Job.workflow_step)
+        .filter(WorkflowStep.category == category)
+        .filter(Job.flag == "D")
+        .filter(Job.lineage.isnot(None))
+        .distinct()
+        .all()
+    )
+    seen = set()
+    result = []
+    for (lineage_str,) in rows:
+        if not lineage_str or lineage_str in seen:
+            continue
+        seen.add(lineage_str)
+        names = lineage_str_to_step_names(lineage_str)
+        if names:
+            result.append(names)
+    result.sort()
+    return result
+
+
+# ============================================================
+# Stretching xarray I/O
+# ============================================================
+
+def xr_save_stretching(root, lineage, step_name, station1, station2,
+                        components, mov_stack, dataframe):
+    """Save per-pair stretching results to a NetCDF file.
+
+    The DataFrame must have columns ``['Delta', 'Coeff', 'Error']`` and a
+    :class:`~pandas.DatetimeIndex`.  ``Delta`` is the raw stretch factor
+    returned by :func:`stretch_mat_creation` (values ≈ 1 ± str_range).
+    ``Coeff`` is the cross-correlation coefficient and ``Error`` is the
+    half-width at full maximum of the Gaussian fit.
+
+    Path layout::
+
+        <root>/<lineage>/<step_name>/_output/<mov_stack[0]>_<mov_stack[1]>/<components>/<sta1>_<sta2>.nc
+
+    :param root: Output folder root (``params.output_folder``).
+    :param lineage: List of step-name strings (upstream → downstream,
+        *excluding* the current step name; step_name is added here).
+    :param step_name: Current step name (e.g. ``'stretching_1'``).
+    :param station1: Station 1 SEED id (``NET.STA.LOC``).
+    :param station2: Station 2 SEED id.
+    :param components: Component pair string (e.g. ``'ZZ'``).
+    :param mov_stack: Tuple ``(window, step)`` e.g. ``('1d', '1d')``.
+    :param dataframe: :class:`~pandas.DataFrame` with columns
+        ``Delta``, ``Coeff``, ``Error`` and a :class:`~pandas.DatetimeIndex`.
+    """
+    fn = os.path.join(
+        root, *lineage, step_name, "_output",
+        "%s_%s" % (mov_stack[0], mov_stack[1]),
+        components,
+        "%s_%s.nc" % (station1, station2),
+    )
+    os.makedirs(os.path.dirname(fn), exist_ok=True)
+
+    # Stack to long form: index = (times, keys)
+    d = dataframe.stack()
+    d.index = d.index.set_names(["times", "keys"])
+    d = d.rename("STR")
+
+    dr = xr_create_or_open(fn, taxis=[], name="STR")
+    rr = d.to_xarray().to_dataset(name="STR")
+    rr = xr_insert_or_update(dr, rr)
+    xr_save_and_close(rr, fn)
+
+
+def xr_get_stretching(root, lineage, station1, station2, components, mov_stack):
+    """Load per-pair stretching results from a NetCDF file.
+
+    Returns a :class:`~pandas.DataFrame` with columns ``Delta``, ``Coeff``,
+    ``Error`` and a :class:`~pandas.DatetimeIndex`, mirroring the structure
+    written by :func:`xr_save_stretching`.
+
+    :raises FileNotFoundError: if the NetCDF file does not exist.
+    :rtype: :class:`~pandas.DataFrame`
+    """
+    fn = os.path.join(
+        root, *lineage, "_output",
+        "%s_%s" % (mov_stack[0], mov_stack[1]),
+        components,
+        "%s_%s.nc" % (station1, station2),
+    )
+    if not os.path.isfile(fn):
+        raise FileNotFoundError(fn)
+    dr = xr_create_or_open(fn, taxis=[], name="STR")
+    data = (
+        dr.STR.to_dataframe()
+        .reorder_levels(["times", "keys"])
+        .unstack()
+        .droplevel(0, axis=1)
+    )
+    return data
+
+
+# ============================================================
+# Stretching aggregate (all pairs → stats DataFrame)
+# ============================================================
+
+def compute_dtt_stretching(session, root, lineage, mov_stack,
+                            pairs=None, components=None, params=None,
+                            percentiles=None):
+    """Aggregate per-pair stretching results into network-level statistics.
+
+    Loads ``Delta``, ``Coeff`` and ``Error`` for every station pair and
+    component, then computes descriptive statistics across pairs for each
+    time step, mirroring the output of :func:`compute_dvv2`.
+
+    The returned DataFrame has a two-level column index:
+    ``('Delta', stat)`` where ``stat`` is one of ``mean``, ``std``,
+    ``median`` (= ``50%``), ``weighted_mean``, ``weighted_std``,
+    ``trimmed_mean``, ``trimmed_std``, plus the requested percentiles.
+
+    ``Delta`` is the raw stretch factor (≈ 1 ± ε).  Convert to dv/v (%) via
+    ``(stats[('Delta','weighted_mean')] - 1) * 100``.
+
+    :param session: DB session.
+    :param root: Output folder root.
+    :param lineage: List of step-name strings for this pipeline branch
+        (as returned by :func:`get_done_lineages_for_category`).
+    :param mov_stack: Moving-stack tuple, e.g. ``('1d', '1d')``.
+    :param pairs: List of ``(sta1, sta2)`` tuples to include.  ``None``
+        means all used station pairs.
+    :param components: Component string or comma-separated list.  ``None``
+        means all configured components.
+    :param params: Params object (from :func:`get_params`).  Required when
+        *pairs* or *components* is ``None``.
+    :param percentiles: Percentile list for :meth:`~pandas.DataFrame.describe`.
+        Defaults to ``[.05, .10, .25, .5, .75, .90, .95]``.
+    :rtype: :class:`~pandas.DataFrame`
+    :raises ValueError: if no data files are found.
+    """
+    if percentiles is None:
+        percentiles = [.05, .10, .25, .5, .75, .90, .95]
+
+    if pairs is None:
+        pairs = []
+        for sta1, sta2 in get_station_pairs(session):
+            for loc1 in sta1.locs():
+                s1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
+                for loc2 in sta2.locs():
+                    s2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
+                    pairs.append((s1, s2))
+
+    if components is None:
+        comps_cc = params.components_to_compute if params else []
+        comps_sc = params.components_to_compute_single_station if params else []
+    else:
+        comps_cc = [c.strip() for c in components.split(",")]
+        comps_sc = comps_cc
+
+    all_frames = []
+    for (s1, s2) in pairs:
+        comps = comps_sc if s1 == s2 else comps_cc
+        for comp in comps:
+            try:
+                df = xr_get_stretching(root, lineage, s1, s2, comp, mov_stack)
+                df["_pair"] = "%s:%s" % (s1, s2)
+                df["_comp"] = comp
+                all_frames.append(df)
+            except FileNotFoundError:
+                continue
+
+    if not all_frames:
+        raise ValueError(
+            "No stretching data found for lineage=%s mov_stack=%s" % (lineage, mov_stack)
+        )
+
+    combined = pd.concat(all_frames)
+    # Descriptive stats across pairs at each timestamp
+    stats = combined.groupby(combined.index)["Delta"].describe(
+        percentiles=percentiles
+    )
+    stats.columns = pd.MultiIndex.from_tuples(
+        [("Delta", c) for c in stats.columns]
+    )
+
+    # Weighted mean/std using Error as inverse-variance weight
+    # (re-use the existing wavg/wstd machinery via a temporary flat frame)
+    flat = combined[["Delta", "Error"]].copy()
+    flat.index.name = "times"
+    flat.columns = ["m", "em"]  # wavg/wstd expect these names
+    wm, ws = get_wavgwstd(flat, "m", "em")
+    stats[("Delta", "weighted_mean")] = wm
+    stats[("Delta", "weighted_std")] = ws
+
+    # Trimmed mean/std
+    tm, ts = trim(flat, "m")
+    stats[("Delta", "trimmed_mean")] = tm
+    stats[("Delta", "trimmed_std")] = ts
+
+    return stats.sort_index(axis=1)
+
+
+# ============================================================
+# WCT-DTT xarray I/O
+# ============================================================
+
+def xr_get_wct_dtt(root, lineage, station1, station2, components, mov_stack):
+    """Load per-pair WCT dt/t results from a NetCDF file.
+
+    Returns an :class:`xarray.Dataset` with variables ``dvv``, ``err``,
+    ``coh`` each of shape ``(times, frequency)``, as written by
+    :func:`xr_save_wct_dtt2`.
+
+    Note: despite the variable name ``dvv`` in the file, the values are
+    *dt/t* (fractional time delay × 100 in percent) at each frequency bin,
+    not yet network-aggregated dv/v.
+
+    :raises FileNotFoundError: if the NetCDF file does not exist.
+    :rtype: :class:`xarray.Dataset`
+    """
+    fn = os.path.join(
+        root, *lineage, "_output",
+        "%s_%s" % (mov_stack[0], mov_stack[1]),
+        components,
+        "%s_%s.nc" % (station1, station2),
+    )
+    if not os.path.isfile(fn):
+        raise FileNotFoundError(fn)
+    return xr.load_dataset(fn)
+
+
+# ============================================================
+# WCT-DTT aggregate (all pairs → frequency-band stats DataFrame)
+# ============================================================
+
+def compute_dtt_wct(session, root, lineage, mov_stack,
+                    pairs=None, components=None, params=None,
+                    freqmin=None, freqmax=None, percentiles=None):
+    """Aggregate per-pair WCT dt/t results into network-level statistics.
+
+    For each station pair and component, loads the ``dvv`` (dt/t × 100%)
+    DataArray from the WCT-DTT NetCDF file and optionally averages it over
+    a frequency band ``[freqmin, freqmax]``.  The resulting time series
+    across all pairs are then aggregated into descriptive statistics at each
+    time step.
+
+    The returned DataFrame has a two-level column index
+    ``('dvv', stat)`` and ``('err', stat)`` where ``stat`` is one of
+    ``mean``, ``std``, ``median``, ``weighted_mean``, ``weighted_std``,
+    ``trimmed_mean``, ``trimmed_std``, plus the requested percentiles.
+
+    Values are already in percent (as stored by :func:`xr_save_wct_dtt2`).
+    No sign flip is needed for dv/v (WCT measures dt/t directly from the
+    phase delay, so ``dv/v ≈ -dt/t``; the calling code should negate if
+    needed, matching the MWCS convention).
+
+    :param freqmin: Lower frequency bound for band averaging (Hz).  ``None``
+        means use all frequencies.
+    :param freqmax: Upper frequency bound for band averaging (Hz).  ``None``
+        means use all frequencies.
+    :rtype: :class:`~pandas.DataFrame`
+    :raises ValueError: if no data files are found.
+    """
+    if percentiles is None:
+        percentiles = [.05, .10, .25, .5, .75, .90, .95]
+
+    if pairs is None:
+        pairs = []
+        for sta1, sta2 in get_station_pairs(session):
+            for loc1 in sta1.locs():
+                s1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
+                for loc2 in sta2.locs():
+                    s2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
+                    pairs.append((s1, s2))
+
+    if components is None:
+        comps_cc = params.components_to_compute if params else []
+        comps_sc = params.components_to_compute_single_station if params else []
+    else:
+        comps_cc = [c.strip() for c in components.split(",")]
+        comps_sc = comps_cc
+
+    dvv_frames = []
+    err_frames = []
+
+    for (s1, s2) in pairs:
+        comps = comps_sc if s1 == s2 else comps_cc
+        for comp in comps:
+            try:
+                ds = xr_get_wct_dtt(root, lineage, s1, s2, comp, mov_stack)
+            except FileNotFoundError:
+                continue
+
+            dvv_da = ds["dvv"]
+            err_da = ds["err"]
+
+            # Frequency band selection
+            freqs = dvv_da.coords["frequency"].values
+            if freqmin is not None or freqmax is not None:
+                lo = freqmin if freqmin is not None else freqs.min()
+                hi = freqmax if freqmax is not None else freqs.max()
+                mask = (freqs >= lo) & (freqs <= hi)
+                dvv_da = dvv_da.isel(frequency=mask)
+                err_da = err_da.isel(frequency=mask)
+
+            # Average over frequency → 1D time series
+            dvv_ts = dvv_da.mean(dim="frequency").to_series()
+            err_ts = err_da.mean(dim="frequency").to_series()
+
+            dvv_frames.append(dvv_ts)
+            err_frames.append(err_ts)
+
+    if not dvv_frames:
+        raise ValueError(
+            "No WCT-DTT data found for lineage=%s mov_stack=%s" % (lineage, mov_stack)
+        )
+
+    dvv_all = pd.concat(dvv_frames, axis=1)
+    err_all = pd.concat(err_frames, axis=1)
+
+    # Stack to long form for per-timestamp statistics
+    dvv_long = dvv_all.stack()
+    dvv_long.index = dvv_long.index.droplevel(1)
+    dvv_long.index.name = "times"
+
+    err_long = err_all.stack()
+    err_long.index = err_long.index.droplevel(1)
+    err_long.index.name = "times"
+
+    flat = pd.DataFrame({"m": dvv_long.values, "em": err_long.values},
+                        index=dvv_long.index)
+
+    stats = dvv_long.groupby(level=0).describe(percentiles=percentiles)
+    stats.columns = pd.MultiIndex.from_tuples(
+        [("dvv", c) for c in stats.columns]
+    )
+
+    wm, ws = get_wavgwstd(flat, "m", "em")
+    stats[("dvv", "weighted_mean")] = wm
+    stats[("dvv", "weighted_std")] = ws
+
+    tm, ts = trim(flat, "m")
+    stats[("dvv", "trimmed_mean")] = tm
+    stats[("dvv", "trimmed_std")] = ts
+
+    # Error stats
+    err_stats = err_long.groupby(level=0).mean()
+    stats[("err", "mean")] = err_stats
+
+    return stats.sort_index(axis=1)

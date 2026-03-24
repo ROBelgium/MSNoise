@@ -1695,31 +1695,26 @@ def dtt_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
 
 @dtt_plot.command(name="dvv")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-w', '--mwcsid', default=1, help='MWCS config set number')
+@click.option('-d', '--dttid', default=1, help='MWCS-DTT config set number')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
-@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
-@click.option('-p', '--pair', default=None, help='Plot a specific pair',
-              multiple=True)
-@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
-@click.option('-M', '--dttname', default="M", help='Plot M or M0?')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
-                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
+@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stack (1-based index, 0=all)')
+@click.option('-M', '--dttname', default="m", help='DTT column: m (slope) or m0 (zero-intercept slope)')
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format.',
               default=None, type=str)
 @click.pass_context
-def dtt_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
-    """Plots the dv/v (parses the dt/t results)
-    Individual pairs can be plotted extra using the -p flag one or more times.
-    Example: msnoise plot dvv -p ID_KWUI_ID_POSI
-    Example: msnoise plot dvv -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
-    Remember to order stations alphabetically !
-    """
+def dtt_plot_dvv(ctx, mov_stack, comp, dttname, filterid, mwcsid, dttid, show, outfile):
+    """Plots the dv/v from MWCS-DTT results."""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from dvv import main # NOQA
+        from dvv import main  # NOQA
     else:
         from ..plots.dvv import main
-    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile, loglevel=loglevel)
+    main(mov_stackid=mov_stack, dttname=dttname, components=comp,
+         filterid=filterid, mwcsid=mwcsid, dttid=dttid,
+         show=show, outfile=outfile, loglevel=loglevel)
+
 
 
 @dtt_plot.command(name="dtt")
@@ -1747,66 +1742,53 @@ def dtt_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
         from ..plots.dtt import main
     main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile, loglevel=loglevel)
 
-@dtt_plot.command(name="wct",
-                 context_settings=dict(ignore_unknown_options=True, ))
+@dtt_plot.command(name="wct")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
-@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
-@click.option('-w', '--wctid', default=1, help='WCT parameter ID')
-@click.option('-d', '--dttid', default=1, help='DTT parameter ID')
-@click.option('-p', '--pair', default=None, help='Plot a specific pair', multiple=True)
-@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
-@click.option('-e', '--end', default="2100-01-01", help='Plot until which date?')
-@click.option('-b', '--begin', default="1970-01-01", help="Plot from which date?")
-@click.option('-v', '--visualize', default="dvv", help="Which plot type?", type=str)
-@click.option('-r', '--ranges', default="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]", help="Frequency ranges?", type=str)
+@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stack (1-based index, 0=all)')
+@click.option('-w', '--wctid', default=1, help='WCT config set number')
+@click.option('-d', '--dttid', default=1, help='WCT-DTT config set number')
+@click.option('-v', '--visualize', default="timeseries",
+              type=click.Choice(["timeseries", "heatmap"]),
+              help='Plot style: timeseries or heatmap')
+@click.option('-r', '--ranges', default="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]",
+              help='Frequency ranges for band averaging (first range used for timeseries)')
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)', default=None, type=str)
 @click.pass_context
-def dtt_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, pair, all, begin, end, 
+def dtt_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid,
                  visualize, ranges, show, outfile):
-    """Plots the dv/v from WCT results"""
+    """Plots dt/t and dv/v from WCT results.
+
+    Use -v timeseries (default) for weighted-mean dv/v vs time,
+    or -v heatmap for a 2-D time x frequency heatmap.
+    """
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from wct_dvv2 import main
+        from wct_dvv2 import main  # NOQA
     else:
         from ..plots.wct_dvv2 import main
-    
-    # Convert parameters to match function signature
-    pairs = list(pair) if pair else []
-    showALL = all
-    start = begin
-    components = comp
-    mov_stackid = mov_stack
-    
-    main(mov_stackid=mov_stackid, components=components, filterid=filterid, 
-         wctid=wctid, dttid=dttid, pairs=pairs, showALL=showALL, 
-         start=start, end=end, visualize=visualize, ranges=ranges, 
+    main(mov_stackid=mov_stack, components=comp, filterid=filterid,
+         wctid=wctid, dttid=dttid, visualize=visualize, ranges=ranges,
          show=show, outfile=outfile, loglevel=loglevel)
 
 @dtt_plot.command(name="dvvs")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
+@click.option('-S', '--stretchingid', default=1, help='Stretching config set number')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
-@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
-@click.option('-p', '--pair', default=None, help='Plot a specific pair',
-              multiple=True)
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)',
-              default=None, type=str)
+@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stack (1-based index, 0=all)')
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto)', default=None, type=str)
 @click.pass_context
-def dtt_plot_dvvs(ctx, mov_stack, comp, filterid, pair, show, outfile):
-    """Plots the dv/v obtained by stretching\n
-    Individual pairs can be plotted extra using the -p flag one or more times.\n
-    Example: msnoise plot dvvs -p ID_KWUI_ID_POSI\n
-    Example: msnoise plot dvvs -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI\n
-    Remember to order stations alphabetically !
-    """
+def dtt_plot_dvvs(ctx, mov_stack, comp, filterid, stretchingid, show, outfile):
+    """Plots the dv/v obtained by stretching."""
+    loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from dvvs import main # NOQA
+        from dvvs import main  # NOQA
     else:
         from ..plots.dvvs import main
-    main(mov_stack, comp, filterid, pair, show, outfile)
+    main(mov_stackid=mov_stack, components=comp, filterid=filterid,
+         stretchingid=stretchingid, show=show, outfile=outfile, loglevel=loglevel)
 
 
 @dtt_plot.command(name='timing')

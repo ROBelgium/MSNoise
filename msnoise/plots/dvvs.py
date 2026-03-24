@@ -1,129 +1,160 @@
 """
-This plot shows the final output of MSNoise for the stretching method.
+Plot dv/v from the Stretching method.
+
+Reads per-pair stretching results (stored as NetCDF by the stretching step)
+and plots network-aggregated statistics using :func:`msnoise.api.compute_dtt_stretching`.
 
 Example:
 
-``msnoise plot dvvs`` will plot all defaults.
+``msnoise cc dtt plot dvvs`` will plot all defaults.
 
+``msnoise cc dtt plot dvvs -f 2 -m 1 -c ZZ`` will plot filter 2, mov_stack 1,
+component ZZ.
 """
 
-import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
-
 from matplotlib.dates import DateFormatter
-from matplotlib.dates import MonthLocator
 
-from msnoise.api import *
+from ..api import (
+    connect, get_params, get_logger, build_movstack_datelist,
+    get_done_lineages_for_category, compute_dtt_stretching,
+    get_config, get_config_set_details,
+)
 
 
+def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
+         pairs=None, show=False, outfile=None, loglevel="INFO"):
+    """Plot network-level dv/v from the stretching method.
 
-def main(mov_stackid=None, components='ZZ', filterid=1, pairs=[],
-         show=False, outfile=None):
-
+    :param mov_stackid: 1-based index into ``params.mov_stack`` to plot a
+        single moving-stack window.  ``None`` or ``0`` plots all.
+    :param components: Component pair string, comma-separated for multiple.
+    :param filterid: Filter set number (used to select the lineage).
+    :param stretchingid: Stretching config set number.
+    :param pairs: Unused (kept for CLI signature compatibility).
+    :param show: Display the figure interactively.
+    :param outfile: Save figure to this path (``?`` triggers auto-naming).
+    :param loglevel: Logging verbosity.
+    """
+    logger = get_logger("msnoise.cc_dtt_plot_dvvs", loglevel, with_pid=True)
     db = connect()
     params = get_params(db)
-    start, end, datelist = build_movstack_datelist(db)
+    root = get_config(db, "output_folder") or "OUTPUT"
 
-    if mov_stackid and mov_stackid != "":
-        mov_stack = params.mov_stack[mov_stackid - 1]
-        mov_stacks = [mov_stack, ]
-        print(mov_stack)
+    # ------------------------------------------------------------------ #
+    # Resolve lineage                                                      #
+    # ------------------------------------------------------------------ #
+    all_lineages = get_done_lineages_for_category(db, "stretching")
+    if not all_lineages:
+        logger.error("No completed stretching jobs found in the database.")
+        return
+
+    filter_step = "filter_%i" % filterid
+    stretching_step = "stretching_%i" % stretchingid
+    lineage = None
+    for lin in all_lineages:
+        if filter_step in lin and lin[-1] == stretching_step:
+            lineage = lin
+            break
+
+    if lineage is None:
+        logger.error(
+            "No completed stretching lineage found for filter_%i / stretching_%i. "
+            "Available: %s", filterid, stretchingid,
+            ["/".join(l) for l in all_lineages],
+        )
+        return
+
+    logger.info("Using lineage: %s", "/".join(lineage))
+
+    # ------------------------------------------------------------------ #
+    # Moving stacks                                                        #
+    # ------------------------------------------------------------------ #
+    build_movstack_datelist(db)
+    stack_params = get_config_set_details(db, "stack", 1, format="AttribDict")
+    if stack_params:
+        params.update(stack_params)
+
+    if mov_stackid and mov_stackid != 0:
+        mov_stacks = [params.mov_stack[mov_stackid - 1]]
     else:
         mov_stacks = params.mov_stack
 
-    if components.count(","):
-        components = components.split(",")
-    else:
-        components = [components, ]
+    # ------------------------------------------------------------------ #
+    # Component list and filter bounds                                     #
+    # ------------------------------------------------------------------ #
+    comp_list = [c.strip() for c in components.split(",")]
 
     low = high = 0.0
-    low = high = 0.0
-    filter = get_filters(db, ref=filterid)
-    low = float(filter.freqmin)
-    high = float(filter.freqmax)
+    filter_params = get_config_set_details(db, "filter", filterid, format="AttribDict")
+    if filter_params:
+        low = float(filter_params.freqmin)
+        high = float(filter_params.freqmax)
 
-    gs = gridspec.GridSpec(len(mov_stacks), 1)
-    fig = plt.figure(figsize=(12, 9))
+    # ------------------------------------------------------------------ #
+    # Plot                                                                 #
+    # ------------------------------------------------------------------ #
+    fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
-    first_plot = True
+    left = right = None
+
     for i, mov_stack in enumerate(mov_stacks):
-        alldf = []
-        for comp in components:
-            filedir = os.path.join("STR2","%02i" % filterid,
-                               "%s_%s" % (mov_stack[0], mov_stack[1]), comp)
+        ax = axes[i] if len(mov_stacks) > 1 else axes
+        plt.sca(ax)
 
-            listfiles = os.listdir(path=filedir)
-            for file in listfiles:
-                rf = os.path.join("STR2","%02i" % filterid,
-                                  "%s_%s" % (mov_stack[0], mov_stack[1]), comp, file)
+        for comp in comp_list:
+            try:
+                stats = compute_dtt_stretching(
+                    db, root, lineage, mov_stack,
+                    components=comp, params=params,
+                )
+            except ValueError:
+                logger.warning(
+                    "No stretching data for mov_stack=%s comp=%s", mov_stack, comp
+                )
+                continue
 
-                # Append all series and give them the pair names
-                s = pd.read_csv(rf, index_col=0, parse_dates=True).iloc[:,0]
-                s = pd.Series(s, name=file[:-4])
+            # dv/v (%) = (Delta - 1) * 100
+            t = stats.index
+            ax.plot(t, (stats[("Delta", "weighted_mean")] - 1) * 100,
+                    label="%s: weighted mean" % comp)
+            ax.plot(t, (stats[("Delta", "mean")] - 1) * 100,
+                    label="%s: mean" % comp, alpha=0.6)
+            ax.plot(t, (stats[("Delta", "50%")] - 1) * 100,
+                    label="%s: median" % comp, alpha=0.6)
+            ax.plot(t, (stats[("Delta", "trimmed_mean")] - 1) * 100,
+                    label="%s: trimmed mean" % comp, alpha=0.6)
 
-                alldf.append(s)
+            if left is None and len(t):
+                left, right = t[0], t[-1]
 
-        if len(alldf) == 0:
-            print("No Data for %s m%s f%i" % (components, mov_stack, filterid))
-            continue
+        ax.set_ylabel("dv/v (%)")
+        ax.grid(True)
+        ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d %H:%M"))
+        stack_label = "%s_%s" % (mov_stack[0], mov_stack[1])
+        if i == 0:
+            ax.legend(bbox_to_anchor=(0.0, 1.02, 1.0, 0.102), loc=4,
+                      ncol=2, borderaxespad=0.0)
+            ax.set_title("Stack %i (%s)" % (mov_stackid or 1, stack_label))
+        else:
+            ax.set_title("Stack %i (%s)" % (i + 1, stack_label))
+            if left is not None:
+                ax.set_xlim(left, right)
 
-        alldf = pd.concat(alldf, axis=1)
-
-        if 'alldf' in locals():
-            # Plot dvv mean and median or multiple dvv
-            if first_plot == 1:
-                ax = plt.subplot(gs[i])
-            else:
-                plt.subplot(gs[i], sharex=ax)
-
-            alldf_mean = (alldf.groupby(axis=1, level=0).mean()-1)*100
-            for pair in pairs:
-                print(pair)
-                pair1 = alldf_mean[pair].copy()
-                print(pair1.head())
-                plt.plot(pair1.index, pair1, label=pair)
-
-            tmp2 = (alldf.mean(axis=1)-1)*100
-            print(mov_stack, tmp2.head())
-            plt.plot(tmp2.index, tmp2, label="mean")
-            tmp3 = (alldf.median(axis=1)-1)*100
-            plt.plot(tmp3.index, tmp3, label="median")
-            plt.ylabel('dv/v (%)')
-
-            if first_plot == 1:
-                plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=4,
-                           ncol=2, borderaxespad=0.)
-                left, right = tmp2.index[0], tmp2.index[-1]
-                if mov_stack == 1:
-                    plt.title('1 Day')
-                else:
-                    plt.title('%s Moving Window' % str(mov_stack))
-                first_plot = False
-            else:
-                plt.xlim(left, right)
-                plt.title('%s Moving Window' % str(mov_stack))
-
-            plt.grid(True)
-            plt.gca().xaxis.set_major_formatter(DateFormatter("%Y-%m-%d %H:%M"))
-            fig.autofmt_xdate()
-            title = '%s, Filter %d (%.2f - %.2f Hz)' % \
-                    (",".join(components), filterid, low, high)
-            plt.suptitle(title)
-            del alldf, alldf_mean
+    fig.autofmt_xdate()
+    plt.suptitle(
+        "%s  |  Filter %d (%.2f – %.2f Hz)  |  Stretching"
+        % (",".join(comp_list), filterid, low, high)
+    )
 
     if outfile:
         if outfile.startswith("?"):
+            tag = "%s-f%i-s%i" % (",".join(comp_list), filterid, stretchingid)
             if len(mov_stacks) == 1:
-                outfile = outfile.replace('?', '%s-f%i-m%i-M%s' % (components,
-                                                                   filterid,
-                                                                   mov_stack,
-                                                                   "STR"))
-            else:
-                outfile = outfile.replace('?', '%s-f%i-M%s' % (components,
-                                                               filterid,
-                                                               "STR"))
-        outfile = "dvv_" + outfile
-        print("output to:", outfile)
+                tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
+            outfile = outfile.replace("?", tag)
+        outfile = "dvvs_" + outfile
+        logger.info("Saving to: %s", outfile)
         plt.savefig(outfile)
     if show:
         plt.show()

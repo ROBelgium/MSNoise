@@ -280,26 +280,15 @@ def main(loglevel="INFO"):
                         error = np.nan  # gaussian fit failed
 
                     allerrs.append(error)
-                # TODO: migrate to xr_save_dvv_stretching using NetCDF format
+                # Migrate from CSV to xarray NetCDF format
                 df = pd.DataFrame(
                     np.array([alldeltas, allcoefs, allerrs]).T,
-                    index=alldays, columns=["Delta", "Coeff", "Error"], )
-                output = os.path.join(root, *lineage_names, step.step_name, "_output",
-                                      "%s_%s" % (mov_stack[0], mov_stack[1]), components)
-                # print(df.head())
-                if not os.path.isdir(output):
-                    os.makedirs(output)
-                fn = os.path.join(output, "%s.csv" % ref_name)
-                if not os.path.isfile(fn):
-                    df.to_csv(fn, index_label="Date")
-                else:
-                    dest = pd.read_csv(fn, index_col=0,
-                                    parse_dates=True)
-                    final = pd.concat([dest, df])
-                    final = final[~final.index.duplicated(keep='last')]
-                    final = final.sort_index()
-                    final.to_csv(fn, index_label="Date")
-                ### TODO END
+                    index=alldays, columns=["Delta", "Coeff", "Error"],
+                )
+                xr_save_stretching(
+                    root, lineage_names, step.step_name,
+                    station1, station2, components, mov_stack, df,
+                )
 
         massive_update_job(db, jobs, "D")
     #    if not params.hpc:
