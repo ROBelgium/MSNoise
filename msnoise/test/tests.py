@@ -28,7 +28,8 @@ from ..s01scan_archive import parse_crondays
 from ..s02new_jobs import main as new_jobs_main
 from ..s03compute_no_rotation import main as compute_cc_main
 from ..s04_stack2_mov import main as stack_mov
-from ..s04_stack2_ref import main as stack_ref
+from ..s04_stack2_ref import main as stack_ref  # deprecated
+from ..s04_stack2_refstack import main as stack_refstack_main
 from ..s05compute_mwcs2 import main as compute_mwcs_main
 from ..s06compute_dtt2 import main as compute_dtt_main
 from ..s07_compute_dvv import main as compute_dvv_main
@@ -138,8 +139,8 @@ def test_002_ConnectToDB():
 @pytest.mark.order(3)
 def test_002b_create_workflow():
     db = connect()
-    for category in ['preprocess', 'cc', 'filter', 'stack', 'mwcs', 'mwcs_dtt',
-                     'stretching', 'wavelet', 'wavelet_dtt', 'qc']:
+    for category in ['preprocess', 'cc', 'filter', 'stack', 'refstack',
+                     'mwcs', 'mwcs_dtt', 'stretching', 'wavelet', 'wavelet_dtt', 'qc']:
         set_number = create_config_set(db, category)
         assert set_number == 1, f"Expected set_number=1 for {category}, got {set_number}"
     created_steps, _, err = create_workflow_steps_from_config_sets(db)
@@ -156,11 +157,18 @@ def test_002c_verify_workflow():
     db = connect()
     steps = get_workflow_steps(db)
     step_names = {s.step_name for s in steps}
-    for name in ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'mwcs_1',
-                 'mwcs_dtt_1', 'stretching_1', 'wavelet_1', 'wavelet_dtt_1']:
+    for name in ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1',
+                 'mwcs_1', 'mwcs_dtt_1', 'stretching_1', 'wavelet_1', 'wavelet_dtt_1']:
         assert name in step_names, f"Workflow step '{name}' not found"
     links = get_workflow_links(db)
     assert len(links) > 0, "No workflow links created"
+    # Verify key refstack links: stack_1→refstack_1, refstack_1→mwcs_1
+    step_map = {s.step_name: s.step_id for s in steps}
+    link_pairs = {(lk.from_step_id, lk.to_step_id) for lk in links}
+    assert (step_map['stack_1'], step_map['refstack_1']) in link_pairs, \
+        "Missing link stack_1 → refstack_1"
+    assert (step_map['refstack_1'], step_map['mwcs_1']) in link_pairs, \
+        "Missing link refstack_1 → mwcs_1"
     db.close()
 
 
@@ -360,23 +368,40 @@ def test_018_recompute_cc():
 @pytest.mark.order(21)
 def test_023_stack():
     db = connect()
-    update_config(db, 'ref_begin', '2009-01-01', category='stack', set_number=1)
-    update_config(db, 'ref_end', '2011-01-01', category='stack', set_number=1)
-    update_config(db, 'startdate', '2009-01-01', category='stack', set_number=1)
-    update_config(db, 'enddate', '2011-01-01', category='stack', set_number=1)
+    # Configure MOV stack (no more ref_begin/ref_end here — moved to refstack)
     update_config(db, 'mov_stack', "(('1D','1D'),('2D','1D'),('5D','1D'))", category='stack', set_number=1)
+    # startdate/enddate belong to global configset
+    update_config(db, 'startdate', '2009-01-01', category='global', set_number=1)
+    update_config(db, 'enddate', '2011-01-01', category='global', set_number=1)
+
+    # Configure the refstack_1 configset (ref_begin/ref_end now live here)
+    update_config(db, 'ref_begin', '2009-01-01', category='refstack', set_number=1)
+    update_config(db, 'ref_end', '2011-01-01', category='refstack', set_number=1)
     db.close()
+
+    # Propagate CC→stack (MOV day jobs)
     new_jobs_main(after='cc')
     db = connect()
 
-    stack_ref('ref')
-    reset_jobs(db, "stack_1", alljobs=True)
+    # Run MOV stack
     stack_mov('mov')
 
+    # Propagate stack→refstack (REF jobs) then run refstack
+    new_jobs_main(after='stack')
+    stack_refstack_main()
+
+    # Verify refstack_1 REF job is done
+    jobs_ref = get_job_types(db, 'refstack_1')
+    counts_ref = {flag: count for count, flag in jobs_ref}
+    assert counts_ref.get('D', 0) >= 1, \
+        f"Expected at least 1 done refstack_1 job, got: {counts_ref}"
+
+    # Re-run with wiener filter enabled
     update_config(db, 'wienerfilt', 'Y', category='stack', set_number=1)
     reset_jobs(db, "stack_1", alljobs=True)
     stack_mov('mov')
-    stack_ref('ref')
+    reset_jobs(db, "refstack_1", alljobs=True)
+    stack_refstack_main()
 
     db.close()
 
@@ -395,7 +420,13 @@ def test_024_mwcs_param_update():
 
 @pytest.mark.order(23)
 def test_025_mwcs():
-    new_jobs_main(after='stack')
+    # after='refstack' creates mwcs/stretching/wavelet day jobs
+    # (stack jobs trigger refstack jobs; refstack completion triggers dvv jobs)
+    new_jobs_main(after='refstack')
+    db = connect()
+    assert is_next_job_for_step(db, step_category='mwcs'), \
+        "No mwcs jobs created after refstack propagation"
+    db.close()
     compute_mwcs_main()
 
 @pytest.mark.order(24)
@@ -433,6 +464,7 @@ def test_031_stretching_param_update():
 
 @pytest.mark.order(32)
 def test_032_stretching():
+    # stretching jobs were created by new_jobs_main(after='refstack') in test_025
     from ..stretch2 import main as stretch_main
     stretch_main()
 
@@ -597,6 +629,8 @@ def test_038_stack_validation_handling():
 @pytest.mark.order(39)
 def test_039_wct_pipeline():
     try:
+        # WCT jobs were created by new_jobs_main(after='refstack') in test_025
+        # (stretching already has its own test_032)
         compute_wct_main()
         new_jobs_main(after='wavelet')
         wavelet_dtt_main()
@@ -736,18 +770,28 @@ def test_304_export_rms():
 
 @pytest.mark.order(400)
 def test_400_run_manually():
+    # MOV stack
     os.system("msnoise reset stack_1 --all")
     os.system("msnoise cc stack -m")
+    # Refstack (REF jobs triggered by stack completion)
+    os.system("msnoise new_jobs --after stack")
+    os.system("msnoise reset refstack_1 --all")
+    os.system("msnoise cc stack_refstack")
+    # DVV jobs triggered by refstack completion
+    os.system("msnoise new_jobs --after refstack")
+    # MWCS
     os.system("msnoise reset mwcs_1 --all")
     os.system("msnoise cc dvv compute_mwcs")
     os.system("msnoise reset mwcs_dtt_1 --all")
     os.system("msnoise cc dvv compute_dtt")
     os.system("msnoise cc dvv compute_dvv")
+    # Stretching
     os.system("msnoise reset stretching_1 --all")
     os.system("msnoise cc dvv compute_stretching")
+    # Wavelet
     os.system("msnoise reset wavelet_1 --all")
     os.system("msnoise cc dvv compute_wct")
-    os.system("msnoise cc new_jobs --after wavelet")
+    os.system("msnoise new_jobs --after wavelet")
     os.system("msnoise cc dvv compute_wct_dtt")
     os.system("msnoise cc dvv plot wct")
 

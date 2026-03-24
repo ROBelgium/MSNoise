@@ -91,8 +91,12 @@ def main(loglevel="INFO"):
         pair        = batch["pair"]
         params      = batch["params"]
         # lineage_names has refstack_M dropped (drop_current_step_name=True),
-        # so it ends with stack_N — exactly where the CCF data lives.
+        # so it ends with stack_N.
         lineage_names = batch["lineage_names"]
+        # lineage_names_cc strips stack_N too, so it ends at filter_N.
+        # The raw daily CC h5 files live at filter_N/_output/all/...
+        # (same source that stack_mov reads via its own [:-1] strip).
+        lineage_names_cc = lineage_names[:-1]
         step          = batch["step"]
         lineage_str   = batch["lineage_str"]
 
@@ -147,7 +151,7 @@ def main(loglevel="INFO"):
 
             if params.keep_all:
                 c = get_results_all(
-                    db, params.output_folder, lineage_names,
+                    db, params.output_folder, lineage_names_cc,
                     sta1, sta2, components, datelist,
                     format="xarray", params=params,
                 )
