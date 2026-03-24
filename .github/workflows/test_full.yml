@@ -104,14 +104,13 @@ jobs:
 
       - uses: conda-incubator/setup-miniconda@v3.3.0
         with:
-          activate-environment: test3.13
-          python-version: '3.13'
-          conda-remove-defaults: true
+          activate-environment: test3.14
+          python-version: '3.14'
 
       - name: Install MSNoise
         shell: bash -l {0}
         run: |
-          conda env update -n test3.13 -f .github/environment.yml
+          conda env update -n test3.14 -f .github/environment.yml
           pip install -e .
 
       - name: Test 3C data
