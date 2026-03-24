@@ -19,6 +19,7 @@ from ..api import (
     connect, get_params, get_logger, build_movstack_datelist,
     get_config, get_config_set_details,
     get_done_lineages_for_category, get_station_pairs, xr_get_dtt2,
+    resolve_lineage_params,
 )
 
 
@@ -77,9 +78,7 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
     # Moving stacks                                                        #
     # ------------------------------------------------------------------ #
     build_movstack_datelist(db)
-    stack_params = get_config_set_details(db, "stack", 1, format="AttribDict")
-    if stack_params:
-        params.update(stack_params)
+    _, _, params = resolve_lineage_params(db, lineage)
 
     if mov_stackid and mov_stackid != 0:
         mov_stacks = [params.mov_stack[mov_stackid - 1]]

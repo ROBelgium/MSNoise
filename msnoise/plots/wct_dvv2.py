@@ -28,6 +28,7 @@ from matplotlib.dates import DateFormatter
 from ..api import (
     connect, get_params, get_logger, build_movstack_datelist,
     get_done_lineages_for_category, compute_dtt_wct, xr_get_wct_dtt,
+    resolve_lineage_params,
     get_config, get_config_set_details, get_station_pairs,
 )
 
@@ -224,9 +225,7 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
     # Moving stacks                                                        #
     # ------------------------------------------------------------------ #
     build_movstack_datelist(db)
-    stack_params = get_config_set_details(db, "stack", 1, format="AttribDict")
-    if stack_params:
-        params.update(stack_params)
+    _, _, params = resolve_lineage_params(db, lineage)
 
     if mov_stackid and mov_stackid != 0:
         mov_stacks = [params.mov_stack[mov_stackid - 1]]

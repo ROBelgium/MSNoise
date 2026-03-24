@@ -3790,6 +3790,10 @@ def compute_dvv2(session, root, lineage, mov_stack, pairs=None, components=None,
     :rtype: DataFrame
     :raises ValueError: If no DVV values are computed.
     """
+    # Ensure params has components_to_compute; fall back to a full merge if not.
+    if params is None or not hasattr(params, "components_to_compute"):
+        _, _, params = resolve_lineage_params(session, lineage)
+
     if pairs == None:
         pairs = []
         for sta1, sta2 in get_station_pairs(session):
@@ -5309,10 +5313,41 @@ def get_done_lineages_for_category(session, category):
             continue
         seen.add(lineage_str)
         names = lineage_str_to_step_names(lineage_str)
-        if names:
+        # Guard: skip empty or single-entry lineages (global-only, no real steps)
+        if len(names) >= 2:
             result.append(names)
     result.sort()
     return result
+
+
+def resolve_lineage_params(session, lineage_names):
+    """Resolve a lineage name-list into a fully merged params object.
+
+    Given a list of step-name strings (as returned by
+    :func:`get_done_lineages_for_category`), resolves them to
+    :class:`~msnoise.msnoise_table_def.WorkflowStep` ORM objects and merges
+    every step's configuration into the global params, exactly as the
+    processing steps themselves do via :func:`get_next_lineage_batch`.
+
+    Returns ``(lineage_steps, lineage_names, params)`` — the same tuple as
+    :func:`get_merged_params_for_lineage` — so callers can use ``params``
+    directly (it will have ``components_to_compute``, ``mov_stack``, etc.).
+
+    Example::
+
+        lineage_names = get_done_lineages_for_category(db, 'mwcs_dtt')[0]
+        _, _, params = resolve_lineage_params(db, lineage_names)
+        mov_stack = params.mov_stack[0]
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param lineage_names: Ordered list of step-name strings, e.g.
+        ``['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'mwcs_1', 'mwcs_dtt_1']``.
+    :rtype: tuple(list, list[str], AttribDict)
+    """
+    orig_params = get_params(session)
+    lineage_str = "/".join(lineage_names)
+    steps = lineage_str_to_steps(session, lineage_str, sep="/", strict=False)
+    return get_merged_params_for_lineage(session, orig_params, {}, steps)
 
 
 # ============================================================
@@ -5431,6 +5466,9 @@ def compute_dtt_stretching(session, root, lineage, mov_stack,
     if percentiles is None:
         percentiles = [.05, .10, .25, .5, .75, .90, .95]
 
+    if params is None or not hasattr(params, "components_to_compute"):
+        _, _, params = resolve_lineage_params(session, lineage)
+
     if pairs is None:
         pairs = []
         for sta1, sta2 in get_station_pairs(session):
@@ -5441,8 +5479,8 @@ def compute_dtt_stretching(session, root, lineage, mov_stack,
                     pairs.append((s1, s2))
 
     if components is None:
-        comps_cc = params.components_to_compute if params else []
-        comps_sc = params.components_to_compute_single_station if params else []
+        comps_cc = params.components_to_compute
+        comps_sc = params.components_to_compute_single_station
     else:
         comps_cc = [c.strip() for c in components.split(",")]
         comps_sc = comps_cc
@@ -5554,6 +5592,9 @@ def compute_dtt_wct(session, root, lineage, mov_stack,
     if percentiles is None:
         percentiles = [.05, .10, .25, .5, .75, .90, .95]
 
+    if params is None or not hasattr(params, "components_to_compute"):
+        _, _, params = resolve_lineage_params(session, lineage)
+
     if pairs is None:
         pairs = []
         for sta1, sta2 in get_station_pairs(session):
@@ -5564,8 +5605,8 @@ def compute_dtt_wct(session, root, lineage, mov_stack,
                     pairs.append((s1, s2))
 
     if components is None:
-        comps_cc = params.components_to_compute if params else []
-        comps_sc = params.components_to_compute_single_station if params else []
+        comps_cc = params.components_to_compute
+        comps_sc = params.components_to_compute_single_station
     else:
         comps_cc = [c.strip() for c in components.split(",")]
         comps_sc = comps_cc
