@@ -665,7 +665,8 @@ def test_101_plot_spectime():
                 sta_id1 = f"{sta1.net}.{sta1.sta}.{loc1}"
                 sta_id2 = f"{sta2.net}.{sta2.sta}.{loc2}"
                 for filter_step in filter_steps:
-                    spectime_main(sta_id1, sta_id2, filter_step.set_number, "ZZ", 1, show=False, outfile="?.png")
+                    spectime_main(sta_id1, sta_id2, 1, 1, 1, 1, 1,
+                                  show=False, outfile="?.png")
                     fn = f'spectime {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m1D_1D.png'
                     assert os.path.isfile(fn), f"{fn} doesn't exist"
 
