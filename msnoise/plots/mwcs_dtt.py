@@ -22,13 +22,13 @@ from ..api import (
     connect, get_params, get_logger, build_movstack_datelist,
     get_done_lineages_for_category, compute_dvv2,
     resolve_lineage_params,
-    get_config, get_config_set_details,
+    get_config, get_config_set_details, lineage_str_to_steps, get_merged_params_for_lineage
 )
 
 
-def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1,
-         mwcsid=1, dttid=1, pairs=None, showALL=False,
-         show=False, outfile=None, loglevel="INFO"):
+def main(preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=None, refstack_id=1,
+         mwcs_id=1, mwcs_dtt_id=1,
+         dttname="M", components='ZZ', show=False, outfile=None, loglevel="INFO"):
     """Plot network-level dv/v from the MWCS-DTT method.
 
     :param mov_stackid: 1-based index into ``params.mov_stack``.
@@ -46,49 +46,30 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1,
     :param loglevel: Logging verbosity.
     """
     logger = get_logger('msnoise.cc_dtt_plot_dvv', loglevel, with_pid=True)
+
     db = connect()
     params = get_params(db)
-    root = get_config(db, 'output_folder') or 'OUTPUT'
+    lineage_names = [f"preprocess_{preprocess_id}", f"cc_{cc_id}",
+                     f"filter_{filter_id}", f"stack_{stack_id}", f"refstack_{refstack_id}",
+                     f"mwcs_{mwcs_id}", f"mwcs_dtt_{mwcs_dtt_id}"]
+    lineage_str = "/".join(lineage_names)
+    print(lineage_str)
+    steps = lineage_str_to_steps(db, lineage_str, "/")
+    paralineage, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
 
+    print(params)
     # Normalise dttname: legacy 'M' → 'm'
     col = dttname.lower() if dttname else 'm'
 
-    # ------------------------------------------------------------------ #
-    # Resolve lineage                                                      #
-    # ------------------------------------------------------------------ #
-    all_lineages = get_done_lineages_for_category(db, 'mwcs_dtt')
-    if not all_lineages:
-        logger.error("No completed mwcs_dtt jobs found in the database.")
-        return
-
-    filter_step = "filter_%i" % filterid
-    mwcs_step = "mwcs_%i" % mwcsid
-    dtt_step = "mwcs_dtt_%i" % dttid
-    lineage = None
-    for lin in all_lineages:
-        if filter_step in lin and mwcs_step in lin and lin[-1] == dtt_step:
-            lineage = lin
-            break
-
-    if lineage is None:
-        logger.error(
-            "No completed mwcs_dtt lineage found for filter_%i / mwcs_%i / "
-            "mwcs_dtt_%i.  Available: %s",
-            filterid, mwcsid, dttid,
-            ["/".join(l) for l in all_lineages],
-        )
-        return
-
-    logger.info("Using lineage: %s", "/".join(lineage))
+    logger.info("Using lineage: %s" % "/".join(lineage_names))
 
     # ------------------------------------------------------------------ #
     # Moving stacks                                                        #
     # ------------------------------------------------------------------ #
-    build_movstack_datelist(db)
-    _, _, params = resolve_lineage_params(db, lineage)
 
-    if mov_stackid and mov_stackid != 0:
-        mov_stacks = [params.mov_stack[mov_stackid - 1]]
+
+    if stack_item and stack_item != 0:
+        mov_stacks = [params.mov_stack[stack_item - 1]]
     else:
         mov_stacks = params.mov_stack
 
@@ -97,12 +78,8 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1,
     # ------------------------------------------------------------------ #
     comp_list = [c.strip() for c in components.split(",")]
 
-    low = high = 0.0
-    filter_params = get_config_set_details(db, 'filter', filterid,
-                                           format='AttribDict')
-    if filter_params:
-        low = float(filter_params.freqmin)
-        high = float(filter_params.freqmax)
+    low = float(params.freqmin)
+    high = float(params.freqmax)
 
     # ------------------------------------------------------------------ #
     # Plot                                                                 #
@@ -118,12 +95,12 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1,
         for comp in comp_list:
             try:
                 stats = compute_dvv2(
-                    db, root, lineage, mov_stack,
+                    db, params.output_folder, lineage_names, mov_stack,
                     components=comp, params=params,
                 )
             except ValueError:
                 logger.warning(
-                    "No mwcs_dtt data for mov_stack=%s comp=%s", mov_stack, comp
+                    "No mwcs_dtt data for mov_stack=%s comp=%s" % (mov_stack, comp)
                 )
                 continue
             except Exception:
@@ -154,7 +131,7 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1,
         if i == 0:
             ax.legend(bbox_to_anchor=(0.0, 1.02, 1.0, 0.102), loc=4,
                       ncol=2, borderaxespad=0.0)
-            ax.set_title("Stack %i (%s)" % (mov_stackid or 1, stack_label))
+            ax.set_title("Stack %i (%s)" % (stack_item or 1, stack_label))
         else:
             ax.set_title("Stack %i (%s)" % (i + 1, stack_label))
             if left is not None:
@@ -163,14 +140,14 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1,
     fig.autofmt_xdate()
     plt.suptitle(
         "%s  |  Filter %d (%.2f – %.2f Hz)  |  MWCS-DTT"
-        % (",".join(comp_list), filterid, low, high)
+        % (",".join(comp_list), filter_id, low, high)
     )
 
     if outfile:
         if outfile.startswith("?"):
             # Use str(comp_list) to match original naming convention
             # e.g. ['ZZ']-f1-MM.png  so tests can assert the filename
-            tag = "%s-f%i-M%s" % (str(comp_list), filterid, dttname)
+            tag = "%s-f%i-M%s" % (str(comp_list), filter_id, dttname)
             if len(mov_stacks) == 1:
                 tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
             outfile = outfile.replace("?", tag)

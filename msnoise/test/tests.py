@@ -42,7 +42,7 @@ from ..plots.ccftime import main as ccftime_main
 from ..plots.interferogram import main as interferogram_main
 from ..plots.spectime import main as spectime_main
 from ..plots.distance import main as distance_main
-from ..plots.dvv import main as dvv_main
+from ..plots.mwcs_dtt import main as dvv_main
 from ..plots.data_availability import main as data_availability_main
 from ..plots.wct_dvv import main as wct_dvv_main
 from ..s02_preprocessing import main as preprocess_main

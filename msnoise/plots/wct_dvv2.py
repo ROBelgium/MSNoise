@@ -271,7 +271,3 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
         plt.show()
     else:
         plt.close(fig)
-
-
-if __name__ == "__main__":
-    main()

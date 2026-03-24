@@ -300,6 +300,3 @@ def main(mov_stackid=None, components='ZZ', filterid=1, wctid=1, dttid=1,
             else:
                 logger.error("Figure was not created. Skipping save.")
 
-if __name__ == "__main__":
-    main()
-

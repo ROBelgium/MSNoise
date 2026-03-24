@@ -517,7 +517,7 @@ def get_config_sets_organized(session):
             sets_by_category[category] = []
         sets_by_category[category].append({
             'category': category,
-            'set_number': set_number,
+            'set_number': set_number or 0,
             'param_count': param_count
         })
 
@@ -691,55 +691,6 @@ def get_refstack_lineage_for_filter(session, filterid, refstack_set_number=1):
         refstack_steps[0]
     )
     return path + [refstack_step.step_name]
-
-
-def get_lineage_for_step(session, category, set_number=1):
-    """Get the lineage path (list of step names) from the root to a given step.
-
-    Traverses the workflow graph *upstream* from the step identified by
-    *category* and *set_number*, returning a list of step names from the
-    root step (no parent) to (and including) the requested step.
-
-    Example for the default single-pipeline::
-
-        get_lineage_for_step(db, 'mwcs_dtt', 1)
-        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'mwcs_1', 'mwcs_dtt_1']
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :type category: str
-    :type set_number: int
-    :rtype: list of str
-    """
-    steps = get_workflow_steps(session)
-    links = get_workflow_links(session)
-
-    target_step = next(
-        (s for s in steps if s.category == category and s.set_number == set_number),
-        None,
-    )
-    if target_step is None:
-        return []
-
-    step_map = {s.step_id: s for s in steps}
-    parent_map = {link.to_step_id: link.from_step_id for link in links}
-
-    path = [target_step.step_name]
-    current_id = target_step.step_id
-    visited = set()
-    while current_id in parent_map:
-        if current_id in visited:
-            break  # guard against cycles
-        visited.add(current_id)
-        parent_id = parent_map[current_id]
-        parent_step = step_map[parent_id]
-        if parent_step.category != 'global':
-            path.insert(0, parent_step.step_name)
-        current_id = parent_id
-
-    return path
-
-
-# FILTERS PART
 
 
 def get_filters(session, all=False, ref=None):
@@ -2935,6 +2886,7 @@ def xr_get_dtt2(root, lineage, station1, station2, components, mov_stack):
     if not os.path.isfile(fn):
         # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
         raise FileNotFoundError(fn)
+    print(fn)
     dr = xr_create_or_open(fn, taxis=[], name="DTT")
     data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
     return data

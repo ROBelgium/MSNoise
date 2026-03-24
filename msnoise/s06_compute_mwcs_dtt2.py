@@ -82,7 +82,6 @@ def main(interval=1, loglevel="INFO"):
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
-
                 # todo = mwcs.index.intersection(pd.to_datetime(days))
                 # mwcs = mwcs.loc[todo]
                 # mwcs = mwcs.dropna()
@@ -91,7 +90,6 @@ def main(interval=1, loglevel="INFO"):
                 to_search = to_search.append(pd.DatetimeIndex([to_search[-1] + pd.Timedelta("1d"), ]))
                 mwcs = mwcs[mwcs.index.floor('d').isin(to_search)]
                 mwcs = mwcs.dropna()
-
 
                 M = mwcs.xs("M", level=0, axis=1).copy()
                 EM = mwcs.xs("EM", level=0, axis=1).copy()

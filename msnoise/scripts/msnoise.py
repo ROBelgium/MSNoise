@@ -1392,13 +1392,21 @@ preprocessid_option = click.option('-p', '--preprocessid', default=1, help='Prep
 ccid_option = click.option('-cc', '--ccid', default=1, help='CC step ID')
 filterid_option = click.option('-f', '--filterid', default=1, help='Filter ID')
 stackid_option = click.option('-m', '--stackid', default=1, help='Stack step ID')
-stackid_item_option = click.option('-mi', '--stackid_item', default=1, help='Mov Stack item within that Stack step ID')
+stackid_item_option = click.option('-mi', '--stackid_item', default=None, help='Mov Stack item within that Stack step ID')
+refstackid_option = click.option('-rs', '--refstackid', default=1, help='REF Stack step ID')
 comp_option = click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
+
+mwcsid_option = click.option('-w', '--mwcsid', default=1, help='MWCS config set number')
+mwcsdttid_option = click.option('-wi', '--mwcsdttid', default=1, help='MWCS-DTT config set number')
 
 # Build incremental option bundles (CC side)
 base_options = common_options(preprocessid_option, ccid_option, filterid_option)
-stack_options = common_options(base_options, stackid_option, stackid_item_option)
+stack_options = common_options(base_options, stackid_option, stackid_item_option, refstackid_option)
 full_options  = common_options(stack_options, comp_option)
+
+mwcs_options = common_options(stack_options, mwcsid_option, comp_option)
+mwcsdtt_options = common_options(mwcs_options, mwcsdttid_option, comp_option)
+
 
 # DTT-side lineage options (preprocess → cc → filter → stack → mwcs → mwcs_dtt)
 mwcsid_option  = click.option('-w', '--mwcsid',  default=1, help='MWCS step set number')
@@ -1697,27 +1705,25 @@ def dtt_plot_mwcs(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid,
          preprocess_id=preprocessid, cc_id=ccid, filter_id=filterid,
          stack_id=stackid, stack_item=stackid_item, mwcs_id=mwcsid,
          components=comp, show=show, outfile=outfile, loglevel=loglevel)
+
+
 @dtt_plot.command(name="dvv")
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-w', '--mwcsid', default=1, help='MWCS config set number')
-@click.option('-d', '--dttid', default=1, help='MWCS-DTT config set number')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
-@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stack (1-based index, 0=all)')
+@mwcsdtt_options
 @click.option('-M', '--dttname', default="m", help='DTT column: m (slope) or m0 (zero-intercept slope)')
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format.',
               default=None, type=str)
 @click.pass_context
-def dtt_plot_dvv(ctx, mov_stack, comp, dttname, filterid, mwcsid, dttid, show, outfile):
+def dtt_plot_dvv(ctx, preprocessid, ccid, filterid, stackid, stackid_item, refstackid, mwcsid, mwcsdttid, comp, dttname, show, outfile):
     """Plots the dv/v from MWCS-DTT results."""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
         from dvv import main  # NOQA
     else:
-        from ..plots.dvv import main
-    main(mov_stackid=mov_stack, dttname=dttname, components=comp,
-         filterid=filterid, mwcsid=mwcsid, dttid=dttid,
-         show=show, outfile=outfile, loglevel=loglevel)
+        from ..plots.mwcs_dtt import main
+    main(preprocessid, ccid, filterid, stackid, stackid_item, refstackid,
+         mwcsid, mwcsdttid, components=comp,
+         dttname=dttname, show=show, outfile=outfile, loglevel=loglevel)
 
 
 
