@@ -80,6 +80,9 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1, mwcsid=1, d
         if i == 0:
             plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=4,
                        ncol=2, borderaxespad=0.)
+            if 'dvv' not in dir() or dvv is None:
+                logger.error("No dvv data found for any pair/component, skipping axis limits")
+                continue
             left, right = dvv.index[0], dvv.index[-1]
             plt.title("Stack %i (%s_%s)"% (mov_stackid or i+1, mov_stack[0], mov_stack[1]))
         else:

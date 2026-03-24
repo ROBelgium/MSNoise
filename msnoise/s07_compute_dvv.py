@@ -57,7 +57,7 @@ def main(interval=1, loglevel="INFO"):
                 dvv = compute_dvv2(db, root, lineage_names, mov_stack,
                                    pairs=None, components=None, params=params)
             except ValueError:
-                logger.error("No data for any component: m%s" % mov_stack)
+                logger.error("No data for any component: m%s" % str(mov_stack))
                 continue
             xr_save_dvv2(root, lineage_names, step.step_name, "ALL", mov_stack, dvv)
             del dvv

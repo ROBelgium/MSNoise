@@ -30,7 +30,10 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
     # as batch["params"] in the processing steps.
     # global_1 is excluded from the lineage by get_stack_lineage_for_filter;
     # global params are already in get_params(db).
-    lineage = get_stack_lineage_for_filter(db, filterid)
+    # Use get_refstack_lineage_for_filter so xr_get_ref finds files under
+    # the refstack step folder (.../stack_1/refstack_1/_output/REF/...).
+    lineage = get_refstack_lineage_for_filter(db, filterid)
+    stack_lineage = get_stack_lineage_for_filter(db, filterid)
     params = get_params(db)
     for step_name in lineage:
         category, set_num = step_name.rsplit('_', 1)
