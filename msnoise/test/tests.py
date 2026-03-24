@@ -855,9 +855,8 @@ def test_100000_msnoise_admin():
         response = test_client.get('admin/')
         assert response.status_code == 200, "Error following route admin/"
         assert b"MSNoise Admin" in response.data
-        for route in ["admin/config/","admin/stations/", "admin/filters/",
-                      "admin/data_availability/", "admin/jobs/",
-                      "admin/bugreport/"]:
+        for route in ["admin/config/","admin/station/",
+                      "admin/dataavailability/", "admin/job/"]:
             response = test_client.get(route)
             assert response.status_code == 200, f"Error following route {route}"
 
@@ -865,16 +864,13 @@ def test_100000_msnoise_admin():
         response = test_client.get(route)
         assert response.status_code == 200, f"Error following route {route}"
         #
-        for route in ["admin/filters/edit/?id=1",
-                      "admin/stations/edit/?id=1&",
-                      "admin/config/edit/?id=network",
-                      "admin/data_availability/edit/?id=3",
+        for route in ["admin/station/edit/?id=1&",
+                      "admin/dataavailability/edit/?id=3",
                       "admin/jobs/edit/?id=9&url=/admin/jobs/&modal=True"]:
             response = test_client.get(route, follow_redirects=True)
             assert response.status_code == 200, f"Error following route {route}"
 
         for route in ["admin/pairs.json",
-                      "admin/bugreport.json",
                       "admin/data_availability_flags.json",
                       ]:
             response = test_client.get(route, follow_redirects=True)

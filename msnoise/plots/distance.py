@@ -74,7 +74,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
 
                 try:
                     ref = xr_get_ref(output_folder, lineage, sta1, sta2, components, filterid, taxis)
-                    ref = Trace(data=ref.CCF.values)
+                    ref = Trace(data=ref.CCF.values.copy())
                     ref.stats.sampling_rate = cc_sampling_rate
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
