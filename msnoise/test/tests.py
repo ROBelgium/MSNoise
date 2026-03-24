@@ -369,7 +369,7 @@ def test_018_recompute_cc():
 def test_023_stack():
     db = connect()
     # Configure MOV stack (no more ref_begin/ref_end here — moved to refstack)
-    update_config(db, 'mov_stack', "(('1D','1D'),('2D','1D'),('5D','1D'))", category='stack', set_number=1)
+    update_config(db, 'mov_stack', "(('6h','6h'),('1D','1D'))", category='stack', set_number=1)
     # startdate/enddate belong to global configset
     update_config(db, 'startdate', '2009-01-01', category='global', set_number=1)
     update_config(db, 'enddate', '2011-01-01', category='global', set_number=1)
@@ -683,7 +683,7 @@ def test_102_plot_distance():
 
 @pytest.mark.order(103)
 def test_103_plot_dvv():
-    dvv_main(filterid=1, components="ZZ", show=False, outfile="?.png")
+    dvv_main(components="ZZ", show=False, outfile="?.png")
     fn = "dvv ['ZZ']-f1-MM.png"
     assert os.path.isfile(fn), f"{fn} doesn't exist"
 
