@@ -321,6 +321,7 @@ def _create_default_workflow():
 
     ALL_CATEGORIES = [
         'preprocess', 'cc', 'filter', 'stack',
+        'refstack',
         'mwcs', 'mwcs_dtt', 'stretching',
         'wavelet', 'wavelet_dtt', 'qc',
     ]
@@ -1340,6 +1341,37 @@ def cc_stack(ctx, ref, mov, step):
                 p.start()
                 processes.append(p)
                 time.sleep(delay)
+        for p in processes:
+            p.join()
+
+
+@cc.command(name="stack_refstack")
+@click.pass_context
+def cc_stack_refstack(ctx):
+    """Compute REF stacks for all pending refstack configset jobs.
+
+    Reads ref_begin/ref_end from the refstack configset:
+
+    - Absolute date / 1970-01-01  → Mode A: writes a mean REF file to disk.
+
+    - Negative integer (e.g. -5)  → Mode B: no file written; rolling reference
+      computed on-the-fly inside the MWCS/stretching/WCT workers.
+    """
+    from ..s04_stack2_refstack import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay   = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    if threads == 1:
+        main(loglevel=loglevel)
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main, kwargs={"loglevel": loglevel})
+            p.start()
+            processes.append(p)
+            import time as _time
+            _time.sleep(delay)
         for p in processes:
             p.join()
 

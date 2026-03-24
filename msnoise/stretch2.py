@@ -142,6 +142,7 @@ def main(loglevel="INFO"):
         days = batch["days"]
         params = batch["params"]
         lineage_names = batch["lineage_names"][:-1]
+        lineage_names_mov = strip_refstack_from_lineage(lineage_names)
         lineage_str = batch["lineage_str"]
         step = batch["step"]
 
@@ -164,13 +165,16 @@ def main(loglevel="INFO"):
         for components in components_to_compute:
             ref_name = pair.replace(':', '_')
             station1, station2 = pair.split(":")
-            try:
-                ref = xr_get_ref(root, lineage_names,
-                                 station1, station2, components, None, taxis)
-                ref = ref.CCF.values.copy()
-            except FileNotFoundError as fullpath:
-                logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-                continue
+            rolling_mode = refstack_is_rolling(params)
+            if not rolling_mode:
+                # Mode A: load fixed REF from disk
+                try:
+                    ref = xr_get_ref(root, lineage_names,
+                                     station1, station2, components, None, taxis)
+                    ref = ref.CCF.values.copy()
+                except FileNotFoundError as fullpath:
+                    logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+                    continue
 
             # zero the data outside of the minlag-maxlag timing
             if params.stretching_lag == "static":
@@ -203,7 +207,7 @@ def main(loglevel="INFO"):
                 #allerrs = []
 
                 try:
-                    data = xr_get_ccf(root, lineage_names,
+                    data = xr_get_ccf(root, lineage_names_mov,
                                       station1, station2, components, None, mov_stack, taxis)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
@@ -213,6 +217,11 @@ def main(loglevel="INFO"):
                 to_search = pd.to_datetime(days)
                 data = data[data.index.floor('d').isin(to_search)]
                 data = data.dropna()
+
+                if rolling_mode:
+                    ref_rolling = compute_rolling_ref(
+                        data, int(params.ref_begin), int(params.ref_end)
+                    )
 
                 # print("Whitening %s" % fn)
                 # data = pd.DataFrame(data)

@@ -39,6 +39,11 @@ WORKFLOW_CHAINS = {
         'is_terminal': False
     },
     'stack': {
+        'next_steps': ['refstack'],
+        'is_entry_point': False,
+        'is_terminal': False
+    },
+    'refstack': {
         'next_steps': ['mwcs', 'stretching', 'wavelet'],
         'is_entry_point': False,
         'is_terminal': False

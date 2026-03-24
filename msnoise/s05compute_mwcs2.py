@@ -137,6 +137,8 @@ def main(loglevel="INFO"):
         days = batch["days"]
         params = batch["params"]
         lineage_names = batch["lineage_names"][:-1]
+        # lineage_names ends with refstack_M; MOV CCFs live under stack_N:
+        lineage_names_mov = strip_refstack_from_lineage(lineage_names)
         lineage_str = batch["lineage_str"]
         step = batch["step"]
 
@@ -170,20 +172,24 @@ def main(loglevel="INFO"):
             components_to_compute = params.components_to_compute
 
         for components in components_to_compute:
-            try:
-                ref = xr_get_ref(params.output_folder, lineage_names,
-                                 station1, station2, components, None, taxis)
-                ref = ref.CCF.values
-            except FileNotFoundError as fullpath:
-                logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-                continue
-            if not len(ref):
-                continue
+            rolling_mode = refstack_is_rolling(params)
+            if not rolling_mode:
+                # Mode A: load fixed REF from disk (under refstack_M folder)
+                try:
+                    ref = xr_get_ref(params.output_folder, lineage_names,
+                                     station1, station2, components, None, taxis)
+                    ref = ref.CCF.values
+                except FileNotFoundError as fullpath:
+                    logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+                    continue
+                if not len(ref):
+                    continue
+            # Mode B: ref computed per time-step below after data is loaded
 
             for mov_stack in mov_stacks:
                 output = []
                 try:
-                    data = xr_get_ccf(params.output_folder, lineage_names,
+                    data = xr_get_ccf(params.output_folder, lineage_names_mov,
                                       station1, station2, components, None, mov_stack, taxis)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
@@ -197,6 +203,13 @@ def main(loglevel="INFO"):
                 # data = data[(data.index.floor('d').isin(to_search) or data.index.ceil('d').isin(to_search))]
                 data = data[data.index.floor('d').isin(to_search)]
                 data = data.dropna()
+
+                if rolling_mode:
+                    # Mode B: compute per-index rolling reference from MOV data
+                    ref_rolling = compute_rolling_ref(
+                        data, int(params.ref_begin), int(params.ref_end)
+                    )
+                    # ref_rolling shape: (n_times, n_lag_samples)
 
                 # print("Whitening %s" % fn)
                 # data = pd.DataFrame(data)
@@ -232,17 +245,28 @@ def main(loglevel="INFO"):
                     for i in range(cci.shape[0]):
                         cci[i] *= tp
 
-                    cri = ref[
-                        minind:(minind + window_length_samples)].copy()
-                    scipy.signal.detrend(cri, type='linear',
-                                        overwrite_data=True)
-                    cri *= tp
+                    if rolling_mode:
+                        # Mode B: per-row reference (n_times, window_length_samples)
+                        cri = ref_rolling[:, minind:(minind + window_length_samples)].copy()
+                        scipy.signal.detrend(cri, type='linear', axis=1, overwrite_data=True)
+                        for _i in range(cri.shape[0]):
+                            cri[_i] *= tp
+                    else:
+                        cri = ref[
+                            minind:(minind + window_length_samples)].copy()
+                        scipy.signal.detrend(cri, type='linear',
+                                            overwrite_data=True)
+                        cri *= tp
 
                     minind += step_samples
                     maxind += step_samples
 
                     fcur = sf.fft(cci, axis=1, n=padd)[:, :padd // 2]
-                    fref = sf.fft(cri, n=padd)[:padd // 2]
+                    if rolling_mode:
+                        # cri is 2D (n_times, window); fref shape: (n_times, padd//2)
+                        fref = sf.fft(cri, axis=1, n=padd)[:, :padd // 2]
+                    else:
+                        fref = sf.fft(cri, n=padd)[:padd // 2]
 
                     fcur2 = np.real(fcur) ** 2 + np.imag(fcur) ** 2
                     fcur2 = fcur2.astype(float)
