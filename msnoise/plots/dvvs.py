@@ -157,6 +157,8 @@ def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
         plt.savefig(outfile)
     if show:
         plt.show()
+    else:
+        plt.close()
 
 
 if __name__ == "__main__":

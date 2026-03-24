@@ -295,6 +295,8 @@ def main(mov_stackid=None, components='ZZ', filterid=1, wctid=1, dttid=1,
                 save_figure(fig, savename, logger, mov_stacks, comps, filterid, visualize, plot_all_period=False, start=start, end=end, outfile=outfile)
                 if show:
                     plt.show()
+                else:
+                    plt.close(fig)
             else:
                 logger.error("Figure was not created. Skipping save.")
 

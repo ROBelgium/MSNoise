@@ -189,6 +189,8 @@ def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
         plt.savefig(outfile)
     if show:
         plt.show()
+    else:
+        plt.close()
 
 
 if __name__ == "__main__":

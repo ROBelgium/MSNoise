@@ -126,3 +126,5 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
         plt.savefig(outfile)
     if show:
         plt.show()
+    else:
+        plt.close()

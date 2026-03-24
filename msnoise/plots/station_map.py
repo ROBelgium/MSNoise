@@ -113,6 +113,8 @@ def main(show=True, outfile=None):
         plt.savefig(outfile)
     if show:
         plt.show()
+    else:
+        plt.close()
 
 if __name__ == "__main__":
     main()

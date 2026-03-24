@@ -110,3 +110,5 @@ def main(chan, show=False, outfile=None, loglevel="INFO"):
         plt.savefig(outfile)
     if show:
         plt.show()
+    else:
+        plt.close()

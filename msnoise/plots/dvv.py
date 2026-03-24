@@ -168,15 +168,19 @@ def main(mov_stackid=None, dttname="M", components='ZZ', filterid=1,
 
     if outfile:
         if outfile.startswith("?"):
-            tag = "%s-f%i-M%s" % (",".join(comp_list), filterid, dttname)
+            # Use str(comp_list) to match original naming convention
+            # e.g. ['ZZ']-f1-MM.png  so tests can assert the filename
+            tag = "%s-f%i-M%s" % (str(comp_list), filterid, dttname)
             if len(mov_stacks) == 1:
                 tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
             outfile = outfile.replace("?", tag)
-        outfile = "dvv_" + outfile
+        outfile = "dvv " + outfile
         logger.info("Saving to: %s", outfile)
         plt.savefig(outfile)
     if show:
         plt.show()
+    else:
+        plt.close()
 
 
 if __name__ == "__main__":
