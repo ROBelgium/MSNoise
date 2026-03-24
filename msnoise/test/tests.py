@@ -652,7 +652,7 @@ def test_100_plot_interferogram():
                                       filter_id=filter_step.set_number,
                                       components="ZZ", stack_item=1,
                                       show=False, outfile="?.png")
-                    fn = f'interferogram {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m1D_1D.png'
+                    fn = f'interferogram {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m6h_6h.png'
                     assert os.path.isfile(fn), f"{fn} doesn't exist"
 
 @pytest.mark.order(101)
@@ -668,7 +668,7 @@ def test_101_plot_spectime():
                     spectime_main(sta_id1, sta_id2, 1, 1,
                                   filter_step.set_number, 1, 1,
                                   show=False, outfile="?.png")
-                    fn = f'spectime {sta_id1}_{sta_id2}-ZZ-f{filter_step.set_number}-m1D_1D.png'
+                    fn = f'spectime {sta_id1}_{sta_id2}-ZZ-f{filter_step.set_number}-m6h_6h.png'
                     assert os.path.isfile(fn), f"{fn} doesn't exist"
 
 @pytest.mark.order(102)
@@ -789,16 +789,17 @@ def test_400_run_manually():
     os.system("msnoise cc dtt compute_mwcs")
     os.system("msnoise reset mwcs_dtt_1 --all")
     os.system("msnoise cc dtt compute_dtt")
-    os.system("msnoise cc dtt compute_dvv")
+    os.system("msnoise cc dtt plot dvv -s 0 -o ?.png")
     # Stretching
     os.system("msnoise reset stretching_1 --all")
     os.system("msnoise cc dtt compute_stretching")
+    os.system("msnoise cc dtt plot dvvs -s 0 -o ?.png")
     # Wavelet
     os.system("msnoise reset wavelet_1 --all")
     os.system("msnoise cc dtt compute_wct")
     os.system("msnoise new_jobs --after wavelet")
     os.system("msnoise cc dtt compute_wct_dtt")
-    os.system("msnoise cc dtt plot wct")
+    os.system("msnoise cc dtt plot wct -s 0 -o ?.png")
 
 def test_99210_crondays_positive_float():
     parsed_crondays = parse_crondays('2.5')
