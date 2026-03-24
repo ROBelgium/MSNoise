@@ -6,10 +6,7 @@ import logging
 import os
 import glob
 import traceback
-try:
-    import cPickle
-except:
-    import pickle as cPickle
+import pickle
 import math
 
 from logbook import Logger, StreamHandler
@@ -98,7 +95,7 @@ def connect(inifile=None):
         db.ini
 
     :rtype: :class:`sqlalchemy.orm.session.Session`
-    :returns: A :class:`~sqlalchemy.orm.session.Session` object, needed for
+    :returns: :class:`~sqlalchemy.orm.session.Session` object, needed for
         many of the other API methods.
     """
     from sqlalchemy.orm import sessionmaker
@@ -106,8 +103,8 @@ def connect(inifile=None):
         inifile = os.path.join(os.getcwd(), 'db.ini')
 
     engine = get_engine(inifile)
-    Session = sessionmaker(bind=engine)
-    return Session()
+    session = sessionmaker(bind=engine)
+    return session()
 
 
 def create_database_inifile(tech, hostname, database, username, password,
@@ -131,7 +128,7 @@ def create_database_inifile(tech, hostname, database, username, password,
     :return: None
     """
     f = open(os.path.join(os.getcwd(), 'db.ini'), 'wb')
-    cPickle.dump([tech, hostname, database, username, password, prefix], f,
+    pickle.dump([tech, hostname, database, username, password, prefix], f,
                  protocol=2)
     f.close()
 
@@ -161,16 +158,13 @@ def read_db_inifile(inifile=None):
                 "an MSNoise project folder.")
     try:
         # New ini file with prefix support
-        tech, hostname, database, username, password, prefix = cPickle.load(f)
+        tech, hostname, database, username, password, prefix = pickle.load(f)
     except:
         # Old ini file without prefix
-        tech, hostname, database, username, password = cPickle.load(f)
+        tech, hostname, database, username, password = pickle.load(f)
         prefix = ""
     f.close()
     return IniFile(tech, hostname, database, username, password, prefix)
-
-
-# CONFIG
 
 
 def get_config(session, name=None, isbool=False, plugin=None, category='global', set_number=None):
@@ -180,7 +174,7 @@ def get_config(session, name=None, isbool=False, plugin=None, category='global',
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
     :type name: str
-    :param name: The name of the config bit to get. If omitted, a dictionnary
+    :param name: The name of the config bit to get. If omitted, a dictionary
         with all config items will be returned
     :type isbool: bool
     :param isbool: if True, returns True/False for config `name`. Defaults to
@@ -1940,24 +1934,6 @@ def get_results(session, station1, station2, filterid, components, dates,
             return i, corr
         else:
             return 0, None
-
-
-
-def get_mwcs(session, station1, station2, filterid, components, date,
-                mov_stack=1):
-    """
-    TODO
-    """
-    file = os.path.join('MWCS', "%02i" % filterid, "%s_%s" % (mov_stack[0], mov_stack[1]),
-                        components, "%s_%s" % (station1, station2),
-                        '%s.txt' % date)
-    if os.path.isfile(file):
-        df = pd.read_csv(
-            file, delimiter=' ', header=None, index_col=0,
-            names=['t', 'dt', 'err', 'coh'])
-        return df
-    else:
-        return pd.DataFrame()
 
 
 def get_results_all(session, root, lineage_names, station1, station2, components, dates,
