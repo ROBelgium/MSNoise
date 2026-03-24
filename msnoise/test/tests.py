@@ -860,7 +860,7 @@ def test_100000_msnoise_admin():
             response = test_client.get(route)
             assert response.status_code == 200, f"Error following route {route}"
 
-        route = "admin/stations/new/?url=/admin/stations/"
+        route = "admin/station/new/?url=/admin/station/"
         response = test_client.get(route)
         assert response.status_code == 200, f"Error following route {route}"
         #
