@@ -158,11 +158,11 @@ import sys
 import time
 import scipy.fft as sf
 from scipy.fft import next_fast_len
-from .api import *
-from .move2obspy import myCorr
-from .move2obspy import whiten
+from msnoise.api import *
+from msnoise.move2obspy import myCorr
+from msnoise.move2obspy import whiten
 
-from .preprocessing import preprocess
+from msnoise.preprocessing import preprocess
 
 
 import logbook

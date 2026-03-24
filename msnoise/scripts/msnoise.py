@@ -301,7 +301,7 @@ def db_init(tech, auto_workflow):
     """This command initializes the current folder to be a MSNoise Project
     by creating a database and a db.ini file."""
     click.echo('Launching the init')
-    from ..s000installer import main
+    from ..s00_installer import main
     result = main(tech)
     if result != 0:
         return
@@ -503,7 +503,7 @@ def db_clean_duplicates():
 def db_dump(format):
     """Dumps the complete database in formatted files, defaults to CSV.
     """
-    from ..api import connect, get_engine
+    from ..api import get_engine
     from sqlalchemy import MetaData
     import pandas as pd
 
@@ -531,8 +531,7 @@ def db_import(table, format, force):
     """
     Imports msnoise tables from formatted files (CSV).
     """
-    from ..api import connect, get_engine, read_db_inifile
-    from sqlalchemy import MetaData
+    from ..api import get_engine, read_db_inifile
     import pandas as pd
     dbini = read_db_inifile(inifile=os.path.join(os.getcwd(), 'db.ini'))
 
@@ -596,8 +595,7 @@ def config_sync():
     """
     Synchronise station metadata from inventory/dataless.
     """
-    import glob
-    from ..api import connect, get_config, get_stations, update_station,\
+    from ..api import connect, get_stations, update_station,\
         preload_instrument_responses
 
     db = connect()
@@ -659,7 +657,7 @@ def config_get(names):
     """
     Display the value of the given configuration variable(s).
     """
-    from ..api import connect, get_config
+    from ..api import connect
     db = connect()
     show_config_values(db, names)
     db.close()
@@ -1109,7 +1107,7 @@ def populate(ctx, fromda):
         logger.info("Checking the available loc ids and chans...")
         ctx.invoke(db_da_stations_update_loc_chan)
     else:
-        from ..s002populate_station_table import main
+        from ..s00_populate_station_table import main
         main(loglevel=loglevel)
 
 
@@ -1127,7 +1125,6 @@ def populate(ctx, fromda):
 @click.pass_context
 def scan_archive(ctx, init, crondays, path, recursively):
     """Scan the archive and insert into the Data Availability table."""
-    from .. import s01scan_archive
     nthreads = ctx.obj['MSNOISE_threads']
     if path:
         if not os.path.isdir(path):
@@ -1203,7 +1200,7 @@ def plot_station_map(ctx, show, outfile):
 def new_jobs(init, nocc, after=""):
     """Determines if new jobs are to be defined"""
 
-    from ..s02new_jobs import main
+    from ..s02_new_jobs import main
     main(init, nocc, after)
 
 
@@ -1219,7 +1216,7 @@ def cc():
 @click.pass_context
 def preprocess(ctx, threads, verbose):
     """Run preprocessing computations on workflow jobs"""
-    from ..step_preprocessing import main
+    from ..s02_preprocessing import main
 
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
@@ -1242,7 +1239,7 @@ def preprocess(ctx, threads, verbose):
 @click.pass_context
 def cc_compute_cc(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
-    from ..s03compute_no_rotation import main
+    from ..s03_compute_no_rotation import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1264,7 +1261,7 @@ def cc_compute_cc(ctx):
 @click.pass_context
 def cc_compute_cc_rot(ctx):
     """Computes the CC jobs too (allows for R or T components)"""
-    from ..s03compute_cc import main
+    from msnoise.unused.s03compute_cc import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1292,7 +1289,7 @@ def cc_stack(ctx, ref, mov, step):
     Computes the STACK jobs.
     """
     click.secho('Lets STACK !', fg='green')
-    from ..s04_stack2 import main
+    from msnoise.unused.s04_stack2 import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1561,7 +1558,7 @@ def dtt():
 @click.pass_context
 def dtt_compute_mwcs(ctx):
     """Computes the MWCS jobs"""
-    from ..s05compute_mwcs2 import main
+    from ..s05_compute_mwcs2 import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1583,7 +1580,7 @@ def dtt_compute_mwcs(ctx):
 @click.pass_context
 def dtt_compute_stretching2(ctx):
     """Computes the stretching based on the new stacked data"""
-    from ..stretch2 import main
+    from ..s10_stretching import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1605,7 +1602,7 @@ def dtt_compute_stretching2(ctx):
 @click.pass_context
 def dtt_compute_dtt(ctx):
     """Computes the dt/t jobs based on the new MWCS data"""
-    from ..s06compute_dtt2 import main
+    from ..s06_compute_mwcs_dtt2 import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1648,7 +1645,7 @@ def dtt_compute_dvv(ctx):
 @click.option('-b', '--batch-size', default=5, help='Number of jobs to process in each batch', type=int)
 def dtt_compute_wct(ctx, batch_size):
     """Computes the wavelet jobs based on the new STACK data"""
-    from ..s08compute_wct import main
+    from ..s08_compute_wct import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1669,7 +1666,7 @@ def dtt_compute_wct(ctx, batch_size):
 @click.pass_context
 def dtt_compute_wct_dtt(ctx):
     """Computes dv/v from WCT results (wavelet_dtt step, lineage-based)"""
-    from ..s09compute_wct_dtt import main
+    from ..s09_compute_wct_dtt import main
     loglevel = ctx.obj['MSNOISE_verbosity']
     main(loglevel=loglevel)
 

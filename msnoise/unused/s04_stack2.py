@@ -140,8 +140,8 @@ import argparse
 
 import scipy.signal
 
-from .api import *
-from .wiener import *
+from msnoise.api import *
+from msnoise.wiener import *
 
 
 import logbook

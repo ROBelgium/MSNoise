@@ -1,18 +1,7 @@
-import datetime
-import glob
-import logging
-import os
-import shutil
-import traceback
 from click.testing import CliRunner
-from obspy import read
-from numpy.testing import assert_allclose
-from sqlalchemy import text
 import tempfile
-import pandas as pd
 import pooch
 import pytest
-from .. import s01scan_archive, FatalError
 from ..scripts import msnoise as msnoise_script
 from ..api import *
 #(connect, get_config, update_config, get_job_types,
@@ -22,25 +11,16 @@ from ..api import *
 #                   count_data_availability_flags, is_next_job, get_next_job,
 #                   Job, reset_jobs, build_ref_datelist, build_movstack_datelist,
 #                   read_db_inifile)
-from ..s01scan_archive import parse_crondays
-from ..s02new_jobs import main as new_jobs_main
-from ..s03compute_no_rotation import main as compute_cc_main
-from ..s04_stack2 import main as stack_main
-from ..s05compute_mwcs2 import main as compute_mwcs_main
-from ..s06compute_dtt2 import main as compute_dtt_main
+from ..s02_new_jobs import main as new_jobs_main
+from ..s03_compute_no_rotation import main as compute_cc_main
+from msnoise.unused.s04_stack2 import main as stack_main
+from ..s05_compute_mwcs2 import main as compute_mwcs_main
+from ..s06_compute_mwcs_dtt2 import main as compute_dtt_main
 from ..s07_compute_dvv import main as compute_dvv_main
-from ..psd_compute_rms import main as compute_rms_main
-from ..psd_export_rms import main as export_rms_main
-from ..ppsd_compute import main as ppsd_compute_main
-from ..psd_to_hdf import main as psd_to_hdf_main
 
-from ..plots.ccftime import main as ccftime_main
 from ..plots.interferogram import main as interferogram_main
 from ..plots.spectime import main as spectime_main
 from ..plots.distance import main as distance_main
-from ..plots.dvv import main as dvv_main
-from ..plots.data_availability import main as data_availability_main
-from ..plots.wct_dvv import main as wct_dvv_main
 
 global logger
 logger = logging.getLogger('matplotlib')
@@ -123,7 +103,7 @@ def setup_environment():
 
 @pytest.mark.order(1)
 def test_001_S01installer(setup_environment):
-    from ..s000installer import main
+    from ..s00_installer import main
     prefix = os.environ.get("PREFIX", "")
 
     try:
@@ -184,7 +164,7 @@ def test_004_set_and_get_filters():
 
 @pytest.mark.order(5)
 def test_005_populate_station_table():
-    from ..s002populate_station_table import main
+    from ..s00_populate_station_table import main
     try:
         ret = main()
         assert ret is True
@@ -209,7 +189,7 @@ def test_007_update_stations(setup_environment):
 
 @pytest.mark.order(8)
 def test_008_scan_archive(setup_environment):
-    from ..s01scan_archive import main
+    from ..s01_scan_archive import main
     try:
         main(init=True, threads=1)
     except:
@@ -422,7 +402,7 @@ def test_029_stretching_param_update():
 
 @pytest.mark.order(30)
 def test_030_stretching():
-    from ..stretch2 import main as stretch_main
+    from ..s10_stretching import main as stretch_main
     db = connect()
     reset_jobs(db, "MWCS", alljobs=True)
     db.close()

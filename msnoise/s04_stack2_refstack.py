@@ -112,7 +112,7 @@ def main(loglevel="INFO"):
             )
             massive_update_job(db, jobs, "D")
             # Downstream mwcs/stretching/wavelet jobs are triggered by
-            # `msnoise new_jobs --after refstack` — see s02new_jobs.py
+            # `msnoise new_jobs --after refstack` — see s02_new_jobs.py
             continue
 
         # ── Mode A: fixed-date REF ──

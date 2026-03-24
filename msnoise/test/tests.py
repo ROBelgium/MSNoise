@@ -12,7 +12,7 @@ import tempfile
 import pandas as pd
 import pooch
 import pytest
-from .. import s01scan_archive, FatalError
+from .. import s01_scan_archive, FatalError
 from ..scripts import msnoise as msnoise_script
 from ..api import *
                 #(connect, get_config, update_config, get_job_types,
@@ -24,14 +24,14 @@ from ..api import *
                 #   read_db_inifile, DvvMwcs, update_dvv_mwcs, get_dvv_mwcs,
                 #   DvvMwcsDtt, update_dvv_mwcs_dtt, get_dvv_mwcs_dtt,
                 #   DvvStretching)
-from ..s01scan_archive import parse_crondays
-from ..s02new_jobs import main as new_jobs_main
-from ..s03compute_no_rotation import main as compute_cc_main
+from ..s01_scan_archive import parse_crondays
+from ..s02_new_jobs import main as new_jobs_main
+from ..s03_compute_no_rotation import main as compute_cc_main
 from ..s04_stack2_mov import main as stack_mov
 from ..s04_stack2_ref import main as stack_ref  # deprecated
 from ..s04_stack2_refstack import main as stack_refstack_main
-from ..s05compute_mwcs2 import main as compute_mwcs_main
-from ..s06compute_dtt2 import main as compute_dtt_main
+from ..s05_compute_mwcs2 import main as compute_mwcs_main
+from ..s06_compute_mwcs_dtt2 import main as compute_dtt_main
 from ..s07_compute_dvv import main as compute_dvv_main
 from ..psd_compute_rms import main as compute_rms_main
 from ..psd_export_rms import main as export_rms_main
@@ -45,9 +45,9 @@ from ..plots.distance import main as distance_main
 from ..plots.dvv import main as dvv_main
 from ..plots.data_availability import main as data_availability_main
 from ..plots.wct_dvv import main as wct_dvv_main
-from ..step_preprocessing import main as preprocess_main
-from ..s08compute_wct import main as compute_wct_main
-from ..s09compute_wct_dtt import main as wavelet_dtt_main
+from ..s02_preprocessing import main as preprocess_main
+from ..s08_compute_wct import main as compute_wct_main
+from ..s09_compute_wct_dtt import main as wavelet_dtt_main
 
 global logger
 logger = logging.getLogger('matplotlib')
@@ -109,7 +109,7 @@ def setup_environment():
     }
 @pytest.mark.order(1)
 def test_001_S01installer(setup_environment):
-    from ..s000installer import main
+    from ..s00_installer import main
     prefix = os.environ.get("PREFIX", "")
 
     try:
@@ -224,7 +224,7 @@ def test_004_set_and_get_filters():
 
 @pytest.mark.order(7)
 def test_005_populate_station_table():
-    from ..s002populate_station_table import main
+    from ..s00_populate_station_table import main
     try:
         ret = main()
         assert ret is True
@@ -261,7 +261,7 @@ def test_007_update_stations(setup_environment):
 
 @pytest.mark.order(10)
 def test_008_scan_archive(setup_environment):
-    from ..s01scan_archive import main
+    from ..s01_scan_archive import main
     try:
         main(init=True, threads=1)
     except:
@@ -465,7 +465,7 @@ def test_031_stretching_param_update():
 @pytest.mark.order(32)
 def test_032_stretching():
     # stretching jobs were created by new_jobs_main(after='refstack') in test_025
-    from ..stretch2 import main as stretch_main
+    from ..s10_stretching import main as stretch_main
     stretch_main()
 
 @pytest.mark.order(33)
@@ -478,7 +478,7 @@ def test_033_create_fake_new_files(setup_environment):
         out = f.replace("244", "245")
         st.write(out, format="MSEED")
 
-    from ..s01scan_archive import main
+    from ..s01_scan_archive import main
     try:
         main(init=False, threads=1)
     except:
