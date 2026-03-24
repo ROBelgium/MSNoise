@@ -403,7 +403,7 @@ def main(loglevel="INFO", batch_size=None):
 
                 if dates_list:
                     try:
-                        xr_save_wct2(root, lineage_names_mov, step.step_name,
+                        xr_save_wct2(root, lineage_names, step.step_name,
                                      station1, station2, component, mov_stack,
                                      taxis, freqs, WXamp_list, WXcoh_list,
                                      WXdt_list, dates_list)
