@@ -1,15 +1,14 @@
 """
-This plots dt (delay time) against t (time lag). It shows the results
-from the MWCS step, plus the calculated regression lines M0 and M.
-The errors in the regression lines are also plotted as fainter lines.
-The time lags used to calculate the regression are shown in blue.
+This plots dt (delay time) against t (time lag) for a single day. It shows
+the raw MWCS measurements as a scatter plot plus the M and M0 regression lines
+computed by the MWCS-DTT step.
 
+.. include:: ../clickhelp/msnoise-cc-dtt-plot-dtt.rst
 
-.. include:: ../clickhelp/msnoise-cc-dvv-plot-dtt.rst
+Example:
 
-Example
-
-``msnoise cc dtt plot dtt Z7.HRIM Z7.LIND 2014-08-10 -f 14 -m 20`` will plot:
+``msnoise cc dtt plot dtt BE.UCC.-- BE.MEM.-- 2023-06-15 -f 1 -w 1 -d 1``
+will plot MWCS scatter + DTT regression for that day:
 
 .. image:: .static/dtt.png
 
@@ -17,116 +16,180 @@ Example
 """
 
 import matplotlib.pyplot as plt
+import numpy as np
 
-from ..api import *
+from ..api import (
+    connect, get_params, get_logger,
+    get_station, get_interstation_distance, check_stations_uniqueness,
+    get_config_set_details, xr_get_mwcs2, xr_get_dtt2,
+    lineage_str_to_steps, get_merged_params_for_lineage,
+)
 
 
-def main(sta1, sta2, filterid, components, day, mov_stack=1, show=True,
-         outfile=None, loglevel="INFO"):
-    logger = get_logger('msnoise.cc_dvv_plot_dtt', loglevel,
-                        with_pid=True)
+def _resolve_mwcs_lineage(db, params, preprocess_id, cc_id, filter_id,
+                           stack_id, mwcs_id):
+    lineage_str = "/".join([
+        f"preprocess_{preprocess_id}", f"cc_{cc_id}",
+        f"filter_{filter_id}", f"stack_{stack_id}", f"mwcs_{mwcs_id}",
+    ])
+    steps = lineage_str_to_steps(db, lineage_str, "/")
+    _, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
+    return lineage_names, params
+
+
+def _resolve_dtt_lineage(db, params, preprocess_id, cc_id, filter_id,
+                          stack_id, mwcs_id, dtt_id):
+    lineage_str = "/".join([
+        f"preprocess_{preprocess_id}", f"cc_{cc_id}",
+        f"filter_{filter_id}", f"stack_{stack_id}",
+        f"mwcs_{mwcs_id}", f"mwcs_dtt_{dtt_id}",
+    ])
+    steps = lineage_str_to_steps(db, lineage_str, "/")
+    _, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
+    return lineage_names, params
+
+
+def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
+         preprocess_id=1, cc_id=1, stack_id=1, stack_item=1,
+         mwcs_id=1, dtt_id=1,
+         show=True, outfile=None, loglevel="INFO"):
+    """Plot dt vs t scatter and regression lines for a single day.
+
+    :param sta1: Station 1 (NET.STA.LOC).
+    :param sta2: Station 2 (NET.STA.LOC, ≥ sta1 alphabetically).
+    :param filter_id: Filter set number.
+    :param components: Component pair string.
+    :param day: Date string in ``YYYY-MM-DD`` format.
+    :param preprocess_id: Preprocessing step set number.
+    :param cc_id: CC step set number.
+    :param stack_id: Stack step set number.
+    :param stack_item: 1-based index into ``params.mov_stack``.
+    :param mwcs_id: MWCS step set number.
+    :param dtt_id: MWCS-DTT step set number.
+    :param show: Display interactively.
+    :param outfile: Save path (``?`` = auto-name).
+    :param loglevel: Logging verbosity.
+    """
+    logger = get_logger("msnoise.cc_dtt_plot_dtt", loglevel, with_pid=True)
     db = connect()
-    dtt_lag = get_config(db, "mwcs_dtt_lag")
-    dtt_v = float(get_config(db, "dtt_v"))
-    dtt_minlag = float(get_config(db, "dtt_minlag"))
-    dtt_width = float(get_config(db, "dtt_width"))
-    dbmaxlag = int(float(get_config(db, "maxlag")))
+    params = get_params(db)
+
     if sta2 < sta1:
         logger.error("Stations STA1 STA2 should be sorted alphabetically")
         return
 
     sta1 = check_stations_uniqueness(db, sta1)
     sta2 = check_stations_uniqueness(db, sta2)
-    pair = "%s_%s" % (sta1, sta2)
-    station1 = sta1.split(".")
-    station2 = sta2.split(".")
 
-    station1 = get_station(db, station1[0], station1[1])
-    station2 = get_station(db, station2[0], station2[1])
+    # Resolve MWCS lineage (for raw scatter points)
+    mwcs_lineage, params = _resolve_mwcs_lineage(
+        db, params, preprocess_id, cc_id, filter_id, stack_id, mwcs_id
+    )
+    mov_stack = params.mov_stack[stack_item - 1]
 
-    if dtt_lag == "static":
-        minlag = dtt_minlag
-        maxlag = minlag + dtt_width
+    # Resolve DTT lineage (for regression lines)
+    dtt_lineage, _ = _resolve_dtt_lineage(
+        db, params, preprocess_id, cc_id, filter_id, stack_id, mwcs_id, dtt_id
+    )
+
+    # DTT lag window params
+    dtt_lag    = getattr(params, "dtt_lag",    "static")
+    dtt_v      = float(getattr(params, "dtt_v",     1.0))
+    dtt_minlag = float(getattr(params, "dtt_minlag", 5.0))
+    dtt_width  = float(getattr(params, "dtt_width",  30.0))
+    maxlag     = float(getattr(params, "maxlag",     120.0))
+
+    if dtt_lag == "dynamic":
+        st1 = get_station(db, *sta1.split(".")[:2])
+        st2 = get_station(db, *sta2.split(".")[:2])
+        minlag = get_interstation_distance(st1, st2, st1.coordinates) / dtt_v
     else:
-        minlag = get_interstation_distance(station1, station2,
-                                           station1.coordinates) / dtt_v
-        maxlag = minlag + dtt_width
+        minlag = dtt_minlag
+    maxlag2 = minlag + dtt_width
 
-    fname = os.path.join('MWCS', "%02i" % filterid, "%03i_DAYS" % mov_stack,
-                         components, pair, '%s.txt' % day)
-
-    t = []
-    dt = []
-    err = []
-    if os.path.isfile(fname):
-        df = pd.read_csv(fname, delimiter=' ', header=None,
-                         names=['t', 'dt', 'err', 'coh'])
-        t = df["t"].tolist()
-        dt = df["dt"].tolist()
-        err = df["err"].tolist()
-        del df
-
-    alldf = []
-    fname = os.path.join('DTT', "%02i" % filterid, "%03i_DAYS" % mov_stack,
-                         components, '%s.txt' % day)
-    if not os.path.isfile(fname):
+    # --- Load MWCS for the requested day ---
+    logger.info("Loading MWCS for %s-%s comp=%s day=%s mov=%s",
+                sta1, sta2, components, day, mov_stack)
+    try:
+        mwcs_all = xr_get_mwcs2(params.output_folder, mwcs_lineage,
+                                  sta1, sta2, components, mov_stack)
+    except FileNotFoundError as fp:
+        logger.error("MWCS FILE DOES NOT EXIST: %s", fp)
         return
-    df = pd.read_csv(fname, delimiter=',')
-    alldf.append(df)
-    alldf = pd.concat(alldf)
-    line = alldf[alldf['Pairs'] == pair].copy()
 
-    M = float(line["M"])
-    M0 = float(line["M0"])
-    A = float(line["A"])
-    EA = float(line["EA"])
-    EM = float(line["EM"])
-    EM0 = float(line["EM0"])
+    import pandas as pd
+    day_ts = pd.Timestamp(day)
+    day_data = mwcs_all[mwcs_all.index.floor("D") == day_ts]
+    if day_data.empty:
+        logger.error("No MWCS data found for day %s", day)
+        return
 
-    plt.scatter(t, dt)
-    plt.errorbar(t, dt, yerr=err, linestyle="None")
-    plt.xlabel("Time (s)")
-    plt.ylabel("Delay time (s)")
-    plt.axvspan(-maxlag, -minlag, 0, 1, color='b', alpha=0.5)
-    plt.axvspan(minlag, maxlag, 0, 1, color='b', alpha=0.5)
-    xlineM0 = range(-dbmaxlag, dbmaxlag + 1, 5)
-    ylineM0 = []
-    ylineEM0min = []
-    ylineEM0max = []
-    for i in range(-dbmaxlag, dbmaxlag + 1, 5):
-        ylineM0.append(M0 * i)
-        ylineEM0min.append((M0-EM0) * i)
-        ylineEM0max.append((M0+EM0) * i)
-    plt.plot(xlineM0, ylineM0, 'r', label='M0')
-    plt.plot(xlineM0, ylineEM0min, 'r', alpha=0.3)
-    plt.plot(xlineM0, ylineEM0max, 'r', alpha=0.3)
-    xlineM = range(-dbmaxlag, dbmaxlag + 1, 5)
-    ylineM = []
-    ylineEMmax = []
-    ylineEMmin = []
-    for i in range(-dbmaxlag, dbmaxlag + 1, 5):
-        ylineM.append((M * i) + A)
-        ylineEMmin.append(((M-EM) * i) + A)
-        ylineEMmax.append(((M+EM) * i) + A)
-    plt.plot(xlineM, ylineM, 'k', label='M')
-    plt.plot(xlineM, ylineEMmin, 'k', alpha=0.3)
-    plt.plot(xlineM, ylineEMmax, 'k', alpha=0.3)
-    name = '%s-%s f%i m%i %s' % (sta1, sta2, filterid, mov_stack, day)
-    name = name.replace('_', '.')
-    plt.suptitle(name)
-    plt.legend()
-    plt.grid(True, ls="-", lw=0.2)
+    t   = day_data.columns.get_level_values("taxis").astype(float)
+    dt  = day_data["M"].values.squeeze()
+    err = day_data["EM"].values.squeeze()
 
-    ax = plt.gca()
-    ax.set_xlim((-dbmaxlag, dbmaxlag))
+    # --- Load DTT regression for the requested day ---
+    try:
+        dtt_all = xr_get_dtt2(params.output_folder, dtt_lineage,
+                               sta1, sta2, components, mov_stack)
+    except FileNotFoundError as fp:
+        logger.error("DTT FILE DOES NOT EXIST: %s", fp)
+        dtt_all = None
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.scatter(t, dt, zorder=3, label="MWCS dt")
+    ax.errorbar(t, dt, yerr=err, linestyle="None", alpha=0.5)
+
+    ax.axvspan(-maxlag2, -minlag, alpha=0.15, color="b", label="regression window")
+    ax.axvspan( minlag,  maxlag2, alpha=0.15, color="b")
+
+    xline = np.linspace(-maxlag, maxlag, 200)
+    if dtt_all is not None:
+        day_dtt = dtt_all[dtt_all.index.floor("D") == day_ts]
+        if not day_dtt.empty:
+            M   = float(day_dtt["m"].iloc[0])
+            M0  = float(day_dtt["m0"].iloc[0])
+            A   = float(day_dtt["a"].iloc[0])
+            EM  = float(day_dtt["em"].iloc[0])
+            EM0 = float(day_dtt["em0"].iloc[0])
+
+            ax.plot(xline, M0 * xline,             "r",   label="M0=%.4f" % M0)
+            ax.plot(xline, (M0-EM0) * xline,       "r",   alpha=0.3)
+            ax.plot(xline, (M0+EM0) * xline,       "r",   alpha=0.3)
+            ax.plot(xline, M * xline + A,           "k",   label="M=%.4f" % M)
+            ax.plot(xline, (M-EM) * xline + A,     "k",   alpha=0.3)
+            ax.plot(xline, (M+EM) * xline + A,     "k",   alpha=0.3)
+
+    ax.set_xlim(-maxlag, maxlag)
+    ax.set_xlabel("Time lag (s)")
+    ax.set_ylabel("Delay time dt (s)")
+    ax.legend()
+    ax.grid(True, ls="-", lw=0.2)
+
+    title = ("%s – %s  |  comp=%s  |  day=%s\n"
+             "Preprocess %i – CC %i – Filter %i – Stack %i item %i"
+             " – MWCS %i – DTT %i") % (
+        sta1, sta2, components, day,
+        preprocess_id, cc_id, filter_id, stack_id, stack_item,
+        mwcs_id, dtt_id,
+    )
+    ax.set_title(title)
+    plt.tight_layout()
+
     if outfile:
         if outfile.startswith("?"):
-            basename = '%s-%s-f%i-m%i-%s' % (sta1, sta2, filterid,
-                                             mov_stack, day)
-            outfile = outfile.replace('?', basename)
+            outfile = outfile.replace(
+                "?", "%s-%s-%s-f%i-w%i-d%i-%s" % (
+                    sta1.replace(".", "-"), sta2.replace(".", "-"),
+                    components, filter_id, mwcs_id, dtt_id, day,
+                )
+            )
         outfile = "dtt_" + outfile
-        logger.info("output to: %s" % outfile)
+        logger.info("Saving to: %s", outfile)
         plt.savefig(outfile)
-
     if show:
         plt.show()
+
+
+if __name__ == "__main__":
+    main("", "")

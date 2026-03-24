@@ -1,115 +1,202 @@
 """
-This plot shows the final output of MSNoise.
-
+This plot shows the per-pair and network-mean dt/t timeseries from the
+MWCS-DTT step, equivalent to the old ``timing`` plot but reading from the
+lineage-aware NetCDF store.
 
 .. include:: ../clickhelp/msnoise-cc-dtt-plot-timing.rst
-
 
 Example:
 
 ``msnoise cc dtt plot timing`` will plot all defaults:
 
 .. image:: .static/dvv.png
-
 """
 
-import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+from matplotlib.dates import DateFormatter
 
-from ..api import *
+from ..api import (
+    connect, get_params, get_logger, build_movstack_datelist,
+    get_config, get_config_set_details,
+    get_done_lineages_for_category, get_station_pairs, xr_get_dtt2,
+)
 
 
-def main(mov_stack=None, dttname="A", components='ZZ', filterid=1,
-         pairs=[], showALL=False, show=False, outfile=None):
+def main(mov_stackid=None, dttname="m", components="ZZ",
+         filterid=1, mwcsid=1, dttid=1,
+         pairs=None, showALL=False,
+         show=False, outfile=None, loglevel="INFO"):
+    """Plot per-pair and network-mean dt/t timeseries.
+
+    :param mov_stackid: 1-based index into ``params.mov_stack`` (0/None = all).
+    :param dttname: DTT column to display: ``'m'`` (slope = dt/t) or
+        ``'m0'`` (zero-intercept slope).
+    :param components: Component pair string.
+    :param filterid: Filter set number.
+    :param mwcsid: MWCS set number.
+    :param dttid: MWCS-DTT set number.
+    :param pairs: List of ``'NET.STA.LOC:NET.STA.LOC'`` strings to highlight.
+    :param showALL: Unused (kept for signature compatibility).
+    :param show: Display interactively.
+    :param outfile: Save path (``?`` = auto-name).
+    :param loglevel: Logging verbosity.
+    """
+    logger = get_logger("msnoise.cc_dtt_plot_timing", loglevel, with_pid=True)
     db = connect()
     params = get_params(db)
-    start, end, datelist = build_movstack_datelist(db)
+    root = get_config(db, "output_folder") or "OUTPUT"
 
-    if mov_stack != 0:
-        mov_stacks = [mov_stack, ]
+    # ------------------------------------------------------------------ #
+    # Resolve lineage                                                      #
+    # ------------------------------------------------------------------ #
+    all_lineages = get_done_lineages_for_category(db, "mwcs_dtt")
+    if not all_lineages:
+        logger.error("No completed mwcs_dtt jobs found in the database.")
+        return
+
+    filter_step   = "filter_%i"   % filterid
+    mwcs_step     = "mwcs_%i"     % mwcsid
+    dtt_step      = "mwcs_dtt_%i" % dttid
+    lineage = None
+    for lin in all_lineages:
+        if filter_step in lin and mwcs_step in lin and lin[-1] == dtt_step:
+            lineage = lin
+            break
+
+    if lineage is None:
+        logger.error(
+            "No completed mwcs_dtt lineage for filter_%i/mwcs_%i/mwcs_dtt_%i. "
+            "Available: %s", filterid, mwcsid, dttid,
+            ["/".join(l) for l in all_lineages],
+        )
+        return
+
+    logger.info("Using lineage: %s", "/".join(lineage))
+
+    # ------------------------------------------------------------------ #
+    # Moving stacks                                                        #
+    # ------------------------------------------------------------------ #
+    build_movstack_datelist(db)
+    stack_params = get_config_set_details(db, "stack", 1, format="AttribDict")
+    if stack_params:
+        params.update(stack_params)
+
+    if mov_stackid and mov_stackid != 0:
+        mov_stacks = [params.mov_stack[mov_stackid - 1]]
     else:
         mov_stacks = params.mov_stack
 
-    gs = gridspec.GridSpec(len(mov_stacks), 1)
-    plt.figure(figsize=(12, 9))
+    # ------------------------------------------------------------------ #
+    # Filter frequency bounds for title                                    #
+    # ------------------------------------------------------------------ #
+    low = high = 0.0
+    filter_params = get_config_set_details(db, "filter", filterid,
+                                           format="AttribDict")
+    if filter_params:
+        low  = float(filter_params.freqmin)
+        high = float(filter_params.freqmax)
+
+    # ------------------------------------------------------------------ #
+    # Build pair list                                                      #
+    # ------------------------------------------------------------------ #
+    all_pairs = []
+    for sta1, sta2 in get_station_pairs(db):
+        for loc1 in sta1.locs():
+            s1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
+            for loc2 in sta2.locs():
+                s2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
+                all_pairs.append((s1, s2))
+
+    highlight = set(pairs) if pairs else set()
+
+    # ------------------------------------------------------------------ #
+    # Plot                                                                 #
+    # ------------------------------------------------------------------ #
+    fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
-    first_plot = True
+    left = right = None
+
+    col       = dttname.lower()   # 'm' or 'm0'
+    err_col   = "e" + col         # 'em' or 'em0'
+
     for i, mov_stack in enumerate(mov_stacks):
-        current = start
-        first = True
-        alldf = []
-        while current <= end:
-            day = os.path.join('DTT', "%02i" % filterid, "%03i_DAYS" %
-                               mov_stack, components, '%s.txt' % current)
-            if os.path.isfile(day):
-                df = pd.read_csv(day, header=0, index_col=0, parse_dates=True)
-                alldf.append(df)
-            current += datetime.timedelta(days=1)
-        if len(alldf) == 0:
-            print("No Data for %s m%i f%i" % (components, mov_stack, filterid))
+        ax = axes[i] if len(mov_stacks) > 1 else axes
+        plt.sca(ax)
+
+        pair_series = []
+        err_series  = []
+
+        for (s1, s2) in all_pairs:
+            try:
+                df = xr_get_dtt2(root, lineage, s1, s2, components, mov_stack)
+            except FileNotFoundError:
+                continue
+
+            if col not in df.columns:
+                continue
+
+            ts = df[col]
+            pair_series.append(ts)
+
+            # Highlighted pairs
+            pair_key = "%s:%s" % (s1, s2)
+            if pair_key in highlight:
+                es = df.get(err_col)
+                ax.plot(ts.index, ts.values * -100,
+                        label=pair_key, alpha=0.8)
+                if es is not None:
+                    ax.fill_between(ts.index,
+                                    (ts - es) * -100,
+                                    (ts + es) * -100,
+                                    alpha=0.2)
+
+        if not pair_series:
+            logger.warning("No data for mov_stack=%s comp=%s", mov_stack, components)
             continue
 
-        alldf = pd.concat(alldf)
-        if 'alldf' in locals():
-            errname = "E" + dttname
+        import pandas as pd
+        all_df = pd.concat(pair_series, axis=1)
+        t = all_df.index
+        mean_ts   = all_df.mean(axis=1) * -100
+        median_ts = all_df.median(axis=1) * -100
 
-            ALL = alldf[alldf['Pairs'] == 'ALL'].copy()
-            allbut = alldf[alldf['Pairs'] != 'ALL'].copy()
+        ax.plot(t, mean_ts,   label="mean",   lw=1.5)
+        ax.plot(t, median_ts, label="median", lw=1.5, linestyle="--")
 
-            plt.subplot(gs[i])
+        ax.set_ylabel("dv/v (%)")
+        ax.grid(True)
+        ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))
+        stack_label = "%s_%s" % (mov_stack[0], mov_stack[1])
 
-            for pair in pairs:
-                print(pair)
-                pair1 = alldf[alldf['Pairs'] == pair].copy()
-                print(pair1.head())
-                plt.plot(pair1.index, pair1[dttname], label=pair)
-                plt.fill_between(pair1.index, pair1[dttname]-pair1[errname],
-                                 pair1[dttname]+pair1[errname], zorder=-1,
-                                 alpha=0.5)
-                pair1.to_csv('%s-m%i-f%i.csv'%(pair, mov_stack, filterid))
+        if i == 0:
+            ax.legend(bbox_to_anchor=(0.0, 1.02, 1.0, 0.102), loc=4,
+                      ncol=3, borderaxespad=0.0)
+            ax.set_title("Stack 1 (%s)" % stack_label)
+            if len(t):
+                left, right = t[0], t[-1]
+        else:
+            ax.set_title("Stack %i (%s)" % (i + 1, stack_label))
+            if left is not None:
+                ax.set_xlim(left, right)
 
-            if showALL:
-                plt.plot(ALL.index, ALL[dttname], c='r',
-                         label='ALL: $\delta v/v$ of the mean network')
+    fig.autofmt_xdate()
+    plt.suptitle(
+        "%s  |  Filter %d (%.2f – %.2f Hz)  |  MWCS %i – DTT %i  |  col=%s"
+        % (components, filterid, low, high, mwcsid, dttid, col)
+    )
 
-            tmp2 = allbut[dttname].resample('D').mean()
-            tmp2.plot(label='mean')
-
-            tmp3 = allbut[dttname].resample('D').median()
-            tmp3.plot(label='median')
-
-            if first_plot == 1:
-                plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=4,
-                           ncol=2, borderaxespad=0.)
-                left, right = plt.xlim()
-                if mov_stack == 1:
-                    plt.title('1 Day')
-                else:
-                    plt.title('%i Days Moving Window' % mov_stack)
-                first_plot = False
-            else:
-                plt.xlim(left, right)
-                plt.title('%i Days Moving Window' % mov_stack)
-
-            plt.grid(True)
-            del alldf
     if outfile:
         if outfile.startswith("?"):
+            tag = "%s-f%i-w%i-d%i-%s" % (components, filterid, mwcsid, dttid, col)
             if len(mov_stacks) == 1:
-                outfile = outfile.replace('?', '%s-f%i-m%i-M%s' % (components,
-                                                                   filterid,
-                                                                   mov_stack,
-                                                                   dttname))
-            else:
-                outfile = outfile.replace('?', '%s-f%i-M%s' % (components,
-                                                               filterid,
-                                                               dttname))
-        outfile = "timing " + outfile
-        print("output to: %s" % outfile)
+                tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
+            outfile = outfile.replace("?", tag)
+        outfile = "timing_" + outfile
+        logger.info("Saving to: %s", outfile)
         plt.savefig(outfile)
     if show:
         plt.show()
-        
+
 
 if __name__ == "__main__":
     main()

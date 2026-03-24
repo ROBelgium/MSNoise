@@ -1398,10 +1398,20 @@ stackid_option = click.option('-m', '--stackid', default=1, help='Stack step ID'
 stackid_item_option = click.option('-mi', '--stackid_item', default=1, help='Mov Stack item within that Stack step ID')
 comp_option = click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 
-# Build incremental option bundles
+# Build incremental option bundles (CC side)
 base_options = common_options(preprocessid_option, ccid_option, filterid_option)
 stack_options = common_options(base_options, stackid_option, stackid_item_option)
 full_options  = common_options(stack_options, comp_option)
+
+# DTT-side lineage options (preprocess → cc → filter → stack → mwcs → mwcs_dtt)
+mwcsid_option  = click.option('-w', '--mwcsid',  default=1, help='MWCS step set number')
+dttid_option   = click.option('-d', '--dttid',   default=1, help='MWCS-DTT step set number')
+# Full DTT lineage bundle: preprocess / cc / filter / stack / stack_item / mwcs / dtt / comp
+dtt_lineage_options = common_options(
+    preprocessid_option, ccid_option, filterid_option,
+    stackid_option, stackid_item_option,
+    mwcsid_option, dttid_option, comp_option,
+)
 
 @cc_plot.command(name="distance",
                  context_settings=dict(ignore_unknown_options=True, ))
@@ -1672,27 +1682,24 @@ def dtt_plot():
 @dtt_plot.command(name='mwcs')
 @click.argument('sta1')
 @click.argument('sta2')
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
-@click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk. Defaults to 1.')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
-                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
-              default=None, type=str)
+@dtt_lineage_options
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto).', default=None, type=str)
 @click.pass_context
-def dtt_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
-    """Plots the mwcs results between sta1 and sta2 (parses the CCFs)
-    STA1 and STA2 must be provided with this format: NET.STA.LOC !"""
+def dtt_plot_mwcs(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid,
+                  stackid_item, mwcsid, dttid, comp, show, outfile):
+    """Plots the MWCS dt and coherence images for a station pair.
+    STA1 and STA2 must be provided as NET.STA.LOC.
+    Lineage: -p preprocess, -cc cc, -f filter, -m stack, -mi stack_item, -w mwcs."""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from mwcs import main # NOQA
+        from mwcs import main  # NOQA
     else:
         from ..plots.mwcs import main
-    main(sta1, sta2, filterid, comp, mov_stack, show, outfile, loglevel=loglevel)
-
-
+    main(sta1, sta2,
+         preprocess_id=preprocessid, cc_id=ccid, filter_id=filterid,
+         stack_id=stackid, stack_item=stackid_item, mwcs_id=mwcsid,
+         components=comp, show=show, outfile=outfile, loglevel=loglevel)
 @dtt_plot.command(name="dvv")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-w', '--mwcsid', default=1, help='MWCS config set number')
@@ -1721,27 +1728,24 @@ def dtt_plot_dvv(ctx, mov_stack, comp, dttname, filterid, mwcsid, dttid, show, o
 @click.argument('sta1')
 @click.argument('sta2')
 @click.argument('day')
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
-@click.option('-m', '--mov_stack', default=1,
-              help='Mov Stack to read from disk. Defaults to 1.')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
-                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
-              default=None, type=str)
+@dtt_lineage_options
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto).', default=None, type=str)
 @click.pass_context
-def dtt_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
-    """Plots a graph of dt against t
-    STA1 and STA2 must be provided with this format: NET.STA.LOC !
-    DAY must be provided in the ISO format: YYYY-MM-DD"""
+def dtt_plot_dtt(ctx, sta1, sta2, day, preprocessid, ccid, filterid,
+                 stackid, stackid_item, mwcsid, dttid, comp, show, outfile):
+    """Plots dt against t (scatter + regression) for a single day.
+    STA1, STA2: NET.STA.LOC. DAY: YYYY-MM-DD.
+    Lineage: -p preprocess, -cc cc, -f filter, -m stack, -mi stack_item, -w mwcs, -d dtt."""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from dtt import main # NOQA
+        from dtt import main  # NOQA
     else:
         from ..plots.dtt import main
-    main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile, loglevel=loglevel)
-
+    main(sta1, sta2, filter_id=filterid, components=comp, day=day,
+         preprocess_id=preprocessid, cc_id=ccid, stack_id=stackid,
+         stack_item=stackid_item, mwcs_id=mwcsid, dtt_id=dttid,
+         show=show, outfile=outfile, loglevel=loglevel)
 @dtt_plot.command(name="wct")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
@@ -1793,35 +1797,31 @@ def dtt_plot_dvvs(ctx, mov_stack, comp, filterid, stretchingid, show, outfile):
 
 @dtt_plot.command(name='timing')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
-@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
-@click.option('-p', '--pair', default=None, help='Plot a specific pair',
-              multiple=True)
-@click.option('-A', '--all', help='Show the ALL line?', is_flag=True)
-@click.option('-M', '--dttname', default="A", help='Plot M or M0?')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
-                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
-              default=None, type=str)
+@click.option('-w', '--mwcsid', default=1, help='MWCS step set number')
+@click.option('-d', '--dttid', default=1, help='MWCS-DTT step set number')
+@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...). Defaults to ZZ')
+@click.option('-m', '--mov_stack', default=0, help='Plot specific mov stack (1-based index, 0=all)')
+@click.option('-p', '--pair', default=None,
+              help='Highlight a specific pair (NET.STA.LOC:NET.STA.LOC)', multiple=True)
+@click.option('-M', '--dttname', default="m",
+              help='DTT column: m (slope=dt/t) or m0 (zero-intercept)')
+@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
+@click.option('-o', '--outfile', help='Output filename (?=auto).', default=None, type=str)
 @click.pass_context
-def dtt_plot_timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
-    """Plots the timing (parses the dt/t results)
-    Individual pairs can be plotted extra using the -p flag one or more times.
-    Example: msnoise cc dtt plot timing -p ID_KWUI_ID_POSI
-    Example: msnoise cc dtt plot timing -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
-    Remember to order stations alphabetically !
-    """
+def dtt_plot_timing(ctx, mov_stack, comp, dttname, filterid, mwcsid, dttid,
+                    pair, show, outfile):
+    """Plots network-mean dt/t timeseries from MWCS-DTT results.
+    Optionally highlight specific pairs with -p NET.STA.LOC:NET.STA.LOC."""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from timing import main # NOQA
+        from timing import main  # NOQA
     else:
         from ..plots.timing import main
-    main(mov_stack, dttname, comp, filterid, pair, all, show, outfile, loglevel=loglevel)
+    main(mov_stackid=mov_stack, dttname=dttname, components=comp,
+         filterid=filterid, mwcsid=mwcsid, dttid=dttid,
+         pairs=list(pair), show=show, outfile=outfile, loglevel=loglevel)
 
 
-
-#
 # PLOT GROUP
 #
 
