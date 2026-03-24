@@ -45,7 +45,8 @@ from obspy.signal.filter import bandpass
 
 from msnoise.api import build_movstack_datelist, connect, get_config, \
     get_filters, get_results, check_stations_uniqueness, xr_get_ccf,\
-    get_t_axis, get_logger, get_params
+    get_t_axis, get_logger, get_params, get_stack_lineage_for_filter,\
+    get_config_set_details
 
 
 def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
@@ -57,7 +58,7 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
     cc_sampling_rate = float(get_config(db, 'cc_sampling_rate', category='cc', set_number=1))
     start, end, datelist = build_movstack_datelist(db)
     base = mdates.date2num(start)
-    taxis = get_t_axis(db)
+    # taxis is built after params is resolved below
     # TODO: Height adjustment of the plot for large number of stacks.
     # Preferably interactive
     fig = plt.figure(figsize=(12, 9))
@@ -83,6 +84,7 @@ def main(sta1, sta2, filterid, components, mov_stackid=1, ampli=5, show=False,
         if stack_params:
             params.update(stack_params)
     mov_stack = params.mov_stack[mov_stackid-1]
+    taxis = get_t_axis(params)
     output_folder = get_config(db, 'output_folder') or 'OUTPUT'
     logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filterid,
                                         mov_stack))

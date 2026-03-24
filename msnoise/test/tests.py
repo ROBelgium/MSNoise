@@ -854,7 +854,7 @@ def test_100000_msnoise_admin():
     with flask_app.test_client() as test_client:
         response = test_client.get('admin/')
         assert response.status_code == 200, "Error following route admin/"
-        assert b"MSNoise Dashboard" in response.data
+        assert b"MSNoise Admin" in response.data
         for route in ["admin/config/","admin/stations/", "admin/filters/",
                       "admin/data_availability/", "admin/jobs/",
                       "admin/bugreport/"]:
