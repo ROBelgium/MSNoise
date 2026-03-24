@@ -54,10 +54,10 @@ This recipe is a kind of "let's check this data rapidly":
     msnoise cc stack -r
     msnoise reset STACK
     msnoise cc stack -m
-    msnoise cc dvv compute_mwcs
-    msnoise cc dvv compute_dtt
-    msnoise cc dvv compute_dvv
-    msnoise cc dvv plot dvv
+    msnoise cc dtt compute_mwcs
+    msnoise cc dtt compute_dtt
+    msnoise cc dtt compute_dvv
+    msnoise cc dtt plot dvv
 
 
 Run MSNoise using lots of cores on a HPC
@@ -228,7 +228,7 @@ recompute daily correlations against this new ref:
 .. code-block:: sh
 
     msnoise reset MWCS --all
-    msnoise cc dvv compute_mwcs
+    msnoise cc dtt compute_mwcs
 
 
 When changing the MWCS parameters
@@ -240,7 +240,7 @@ reprocessed:
 .. code-block:: sh
 
     msnoise reset MWCS --all
-    msnoise cc dvv compute_mwcs
+    msnoise cc dtt compute_mwcs
 
 shoud do the trick.
 
@@ -251,7 +251,7 @@ When changing the dt/t parameters
 .. code-block:: sh
 
     msnoise reset DTT --all
-    msnoise cc dvv compute_dtt
+    msnoise cc dtt compute_dtt
 
 
 Recompute only the specific days

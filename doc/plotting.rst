@@ -11,13 +11,13 @@ generate the filename automatically (using the `?` question mark), for example:
 .. code-block:: sh
 
     # automatic naming, save to PNG
-    msnoise plot dvv -o ?.png
+    msnoise cc dtt plot dvv -o ?.png
 
     # automatic naming, save to PDF
-    msnoise plot dvv -o ?.pdf
+    msnoise cc dtt plot dvv -o ?.pdf
 
     # explicit naming, save to JPG
-    msnoise plot dvv -o mydvv.jpg
+    msnoise cc dtt plot dvv -o mydvv.jpg
 
 .. contents::
     :local:

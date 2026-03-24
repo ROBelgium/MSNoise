@@ -51,13 +51,13 @@ To run this step:
 
 .. code-block:: sh
 
-    $ msnoise cc dvv compute_stretching
+    $ msnoise cc dtt compute_stretching
 
 This step also supports parallel processing/threading:
 
 .. code-block:: sh
 
-    $ msnoise -t 4 cc dvv compute_stretching
+    $ msnoise -t 4 cc dtt compute_stretching
 
 will start 4 instances of the code (after 1 second delay to avoid database
 conflicts). This works both with SQLite and MySQL but be aware problems

@@ -786,19 +786,19 @@ def test_400_run_manually():
     os.system("msnoise new_jobs --after refstack")
     # MWCS
     os.system("msnoise reset mwcs_1 --all")
-    os.system("msnoise cc dvv compute_mwcs")
+    os.system("msnoise cc dtt compute_mwcs")
     os.system("msnoise reset mwcs_dtt_1 --all")
-    os.system("msnoise cc dvv compute_dtt")
-    os.system("msnoise cc dvv compute_dvv")
+    os.system("msnoise cc dtt compute_dtt")
+    os.system("msnoise cc dtt compute_dvv")
     # Stretching
     os.system("msnoise reset stretching_1 --all")
-    os.system("msnoise cc dvv compute_stretching")
+    os.system("msnoise cc dtt compute_stretching")
     # Wavelet
     os.system("msnoise reset wavelet_1 --all")
-    os.system("msnoise cc dvv compute_wct")
+    os.system("msnoise cc dtt compute_wct")
     os.system("msnoise new_jobs --after wavelet")
-    os.system("msnoise cc dvv compute_wct_dtt")
-    os.system("msnoise cc dvv plot wct")
+    os.system("msnoise cc dtt compute_wct_dtt")
+    os.system("msnoise cc dtt plot wct")
 
 def test_99210_crondays_positive_float():
     parsed_crondays = parse_crondays('2.5')

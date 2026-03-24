@@ -1542,14 +1542,14 @@ def cc_plot_spectime(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid, sta
 
 
 @cc.group(cls=OrderedGroup)
-def dvv():
-    """Commands for the "Relative Velocity Variations" Workflow"""
+def dtt():
+    """Commands for the "Delay Time / dt/t" Workflow"""
     pass
 
 
-@dvv.command(name='compute_mwcs')
+@dtt.command(name='compute_mwcs')
 @click.pass_context
-def dvv_compute_mwcs(ctx):
+def dtt_compute_mwcs(ctx):
     """Computes the MWCS jobs"""
     from ..s05compute_mwcs2 import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1569,9 +1569,9 @@ def dvv_compute_mwcs(ctx):
             p.join()
 
 
-@dvv.command(name='compute_stretching')
+@dtt.command(name='compute_stretching')
 @click.pass_context
-def dvv_compute_stretching2(ctx):
+def dtt_compute_stretching2(ctx):
     """Computes the stretching based on the new stacked data"""
     from ..stretch2 import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1591,9 +1591,9 @@ def dvv_compute_stretching2(ctx):
             p.join()
 
 
-@dvv.command(name='compute_dtt')
+@dtt.command(name='compute_dtt')
 @click.pass_context
-def dvv_compute_dtt(ctx):
+def dtt_compute_dtt(ctx):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06compute_dtt2 import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1612,9 +1612,9 @@ def dvv_compute_dtt(ctx):
         for p in processes:
             p.join()
 
-@dvv.command(name='compute_dvv')
+@dtt.command(name='compute_dvv')
 @click.pass_context
-def dvv_compute_dvv(ctx):
+def dtt_compute_dvv(ctx):
     """Computes the dt/t jobs based on the new DTT data"""
     from ..s07_compute_dvv import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1633,10 +1633,10 @@ def dvv_compute_dvv(ctx):
         for p in processes:
             p.join()
 
-@dvv.command(name='compute_wct')
+@dtt.command(name='compute_wct')
 @click.pass_context
 @click.option('-b', '--batch-size', default=5, help='Number of jobs to process in each batch', type=int)
-def dvv_compute_wct(ctx, batch_size):
+def dtt_compute_wct(ctx, batch_size):
     """Computes the wavelet jobs based on the new STACK data"""
     from ..s08compute_wct import main
     threads = ctx.obj['MSNOISE_threads']
@@ -1655,21 +1655,21 @@ def dvv_compute_wct(ctx, batch_size):
         for p in processes:
             p.join()
 
-@dvv.command(name='compute_wct_dtt')
+@dtt.command(name='compute_wct_dtt')
 @click.pass_context
-def dvv_compute_wct_dtt(ctx):
+def dtt_compute_wct_dtt(ctx):
     """Computes dv/v from WCT results (wavelet_dtt step, lineage-based)"""
     from ..s09compute_wct_dtt import main
     loglevel = ctx.obj['MSNOISE_verbosity']
     main(loglevel=loglevel)
 
-@dvv.group(name="plot")
-def dvv_plot():
+@dtt.group(name="plot")
+def dtt_plot():
     """Commands to trigger different plots"""
     pass
 
 
-@dvv_plot.command(name='mwcs')
+@dtt_plot.command(name='mwcs')
 @click.argument('sta1')
 @click.argument('sta2')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
@@ -1682,7 +1682,7 @@ def dvv_plot():
                                       'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
-def dvv_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
+def dtt_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
     """Plots the mwcs results between sta1 and sta2 (parses the CCFs)
     STA1 and STA2 must be provided with this format: NET.STA.LOC !"""
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1693,7 +1693,7 @@ def dvv_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
     main(sta1, sta2, filterid, comp, mov_stack, show, outfile, loglevel=loglevel)
 
 
-@dvv_plot.command(name="dvv")
+@dtt_plot.command(name="dvv")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
@@ -1707,7 +1707,7 @@ def dvv_plot_mwcs(ctx, sta1, sta2, filterid, comp, mov_stack, show, outfile):
                                       'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
-def dvv_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
+def dtt_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
     """Plots the dv/v (parses the dt/t results)
     Individual pairs can be plotted extra using the -p flag one or more times.
     Example: msnoise plot dvv -p ID_KWUI_ID_POSI
@@ -1722,7 +1722,7 @@ def dvv_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfi
     main(mov_stack, dttname, comp, filterid, pair, all, show, outfile, loglevel=loglevel)
 
 
-@dvv_plot.command(name="dtt")
+@dtt_plot.command(name="dtt")
 @click.argument('sta1')
 @click.argument('sta2')
 @click.argument('day')
@@ -1736,7 +1736,7 @@ def dvv_plot_dvv(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfi
                                       'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
-def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
+def dtt_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile):
     """Plots a graph of dt against t
     STA1 and STA2 must be provided with this format: NET.STA.LOC !
     DAY must be provided in the ISO format: YYYY-MM-DD"""
@@ -1747,7 +1747,7 @@ def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
         from ..plots.dtt import main
     main(sta1, sta2, filterid, comp, day, mov_stack, show, outfile, loglevel=loglevel)
 
-@dvv_plot.command(name="wct",
+@dtt_plot.command(name="wct",
                  context_settings=dict(ignore_unknown_options=True, ))
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
@@ -1763,7 +1763,7 @@ def dvv_plot_dtt(ctx, sta1, sta2, filterid, day, comp, mov_stack, show, outfile)
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)', default=None, type=str)
 @click.pass_context
-def dvv_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, pair, all, begin, end, 
+def dtt_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, pair, all, begin, end, 
                  visualize, ranges, show, outfile):
     """Plots the dv/v from WCT results"""
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1784,7 +1784,7 @@ def dvv_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, pair, all, begin,
          start=start, end=end, visualize=visualize, ranges=ranges, 
          show=show, outfile=outfile, loglevel=loglevel)
 
-@dvv_plot.command(name="dvvs")
+@dtt_plot.command(name="dvvs")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
@@ -1795,7 +1795,7 @@ def dvv_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, pair, all, begin,
 @click.option('-o', '--outfile', help='Output filename (?=auto)',
               default=None, type=str)
 @click.pass_context
-def dvvs(ctx, mov_stack, comp, filterid, pair, show, outfile):
+def dtt_plot_dvvs(ctx, mov_stack, comp, filterid, pair, show, outfile):
     """Plots the dv/v obtained by stretching\n
     Individual pairs can be plotted extra using the -p flag one or more times.\n
     Example: msnoise plot dvvs -p ID_KWUI_ID_POSI\n
@@ -1809,7 +1809,7 @@ def dvvs(ctx, mov_stack, comp, filterid, pair, show, outfile):
     main(mov_stack, comp, filterid, pair, show, outfile)
 
 
-@plot.command()
+@dtt_plot.command(name='timing')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZR,...)')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stacks')
@@ -1823,11 +1823,11 @@ def dvvs(ctx, mov_stack, comp, filterid, pair, show, outfile):
                                       'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
               default=None, type=str)
 @click.pass_context
-def dvv_plot_timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
+def dtt_plot_timing(ctx, mov_stack, comp, dttname, filterid, pair, all, show, outfile):
     """Plots the timing (parses the dt/t results)
     Individual pairs can be plotted extra using the -p flag one or more times.
-    Example: msnoise plot timing -p ID_KWUI_ID_POSI
-    Example: msnoise plot timing -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
+    Example: msnoise cc dtt plot timing -p ID_KWUI_ID_POSI
+    Example: msnoise cc dtt plot timing -p ID_KWUI_ID_POSI -p ID_KWUI_ID_TRWI
     Remember to order stations alphabetically !
     """
     loglevel = ctx.obj['MSNOISE_verbosity']

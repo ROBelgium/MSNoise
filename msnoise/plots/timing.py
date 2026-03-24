@@ -2,12 +2,12 @@
 This plot shows the final output of MSNoise.
 
 
-.. include:: ../clickhelp/msnoise-cc-dvv-plot-dvv.rst
+.. include:: ../clickhelp/msnoise-cc-dtt-plot-timing.rst
 
 
 Example:
 
-``msnoise cc dvv plot timing`` will plot all defaults:
+``msnoise cc dtt plot timing`` will plot all defaults:
 
 .. image:: .static/dvv.png
 

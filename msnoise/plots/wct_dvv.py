@@ -4,7 +4,7 @@ This plot shows the final output of MSNoise using the wavelet.
 
 Example:
 
-``msnoise cc dvv plot wct``
+``msnoise cc dtt plot wct``
 
 """
 import matplotlib as mpl

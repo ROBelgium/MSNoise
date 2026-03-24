@@ -19,7 +19,7 @@ To run this step:
 
 .. code-block:: sh
 
-    msnoise cc dvv compute_wct_dtt
+    msnoise cc dtt compute_wct_dtt
 """
 
 import time

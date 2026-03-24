@@ -63,7 +63,7 @@ Commands in this workflow have the ``msnoise cc <command>`` form.
 
 Computing Relative Velocity Variations
 --------------------------------------
-Commands in this workflow have the ``msnoise cc dvv <command>`` form.
+Commands in this workflow have the ``msnoise cc dtt <command>`` form.
 
 .. toctree::
     :maxdepth: 2
