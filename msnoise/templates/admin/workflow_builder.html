@@ -231,6 +231,7 @@
                                     <option value="qc">Quality Control</option>
                                     <option value="filter">Filter</option>
                                     <option value="stack">Stack</option>
+                                    <option value="refstack">REF Stack</option>
                                     <option value="mwcs">MWCS</option>
                                     <option value="mwcs_dtt">MWCS DTT</option>
                                     <option value="stretching">Stretching</option>
@@ -333,7 +334,7 @@
                             <div class="form-group col-md-10">
                                 <p class="text-muted">
                                     This will automatically create workflow links between existing steps following the natural workflow progression:
-                                    <strong>preprocess → cc → filter → stack → mwcs/stretching/wavelet → mwcs_dtt/wavelet_dtt</strong>
+                                    <strong>preprocess → cc → filter → stack → refstack → mwcs/stretching/wavelet → mwcs_dtt/wavelet_dtt</strong>
                                 </p>
                             </div>
                             <div class="form-group col-md-2">
@@ -366,6 +367,7 @@
         'qc': '#fd7e14',
         'filter': '#e83e8c',
         'stack': '#20c997',
+        'refstack': '#20c997',
         'mwcs': '#ffc107',
         'mwcs_dtt': '#dc3545',
         'stretching': '#6c757d',
@@ -381,6 +383,7 @@
         'qc': 'Quality Control',
         'filter': 'Filtering',
         'stack': 'Stacking',
+        'refstack': 'REF Stacking',
         'mwcs': 'MWCS Analysis',
         'mwcs_dtt': 'MWCS dt/t',
         'stretching': 'Stretching',
@@ -641,11 +644,12 @@
             'qc': 1,
             'filter': 3,
             'stack': 4,
-            'mwcs': 5,
-            'stretching': 5,
-            'wavelet': 5,
-            'mwcs_dtt': 6,
-            'wavelet_dtt': 6
+            'refstack': 5,
+            'mwcs': 6,
+            'stretching': 6,
+            'wavelet': 6,
+            'mwcs_dtt': 7,
+            'wavelet_dtt': 7
         };
 
         const levelCounts = {};
@@ -706,7 +710,7 @@
         if (!workflowData.nodes) return;
 
         const categories = [...new Set(workflowData.nodes.map(n => n.category))];
-        const expectedCategories = ['global', 'preprocess', 'cc', 'filter', 'stack'];
+        const expectedCategories = ['global', 'preprocess', 'cc', 'filter', 'stack', 'refstack'];
         const completeness = Math.round((categories.filter(c => expectedCategories.includes(c)).length / expectedCategories.length) * 100);
 
         const statCategories = document.getElementById('stat-categories');
@@ -741,7 +745,8 @@
                         'cc': ['filter'],
                         'qc': [],
                         'filter': ['stack'],
-                        'stack': ['mwcs', 'stretching', 'wavelet'],
+                        'stack': ['refstack'],
+                        'refstack': ['mwcs', 'stretching', 'wavelet'],
                         'mwcs': ['mwcs_dtt'],
                         'stretching': [],
                         'wavelet': ['wavelet_dtt'],

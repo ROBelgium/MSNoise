@@ -295,6 +295,7 @@ def main(loglevel="INFO", batch_size=None):
         days = batch["days"]
         params = batch["params"]
         lineage_names = batch["lineage_names"][:-1]
+        lineage_names_mov = strip_refstack_from_lineage(lineage_names)
         lineage_str = batch["lineage_str"]
         step = batch["step"]
         root = params.output_folder
@@ -328,23 +329,27 @@ def main(loglevel="INFO", batch_size=None):
         logger.info(f"WCT params: freqmin={freqmin} freqmax={freqmax} ns={ns} nt={nt} vpo={vpo}")
 
         for component in components_to_compute:
-            try:
-                ref_data = xr_get_ref(root, lineage_names, station1, station2,
-                                      component, None, taxis, ignore_network=True)
-                ref = ref_data.CCF.values
-                if wct_norm:
-                    ori_waveform = ref / ref.max()
-                else:
-                    ori_waveform = ref
-            except FileNotFoundError as fp:
-                logger.error(f"FILE DOES NOT EXIST: {fp}, skipping")
-                continue
-            except Exception as e:
-                logger.error(f"Error getting reference waveform: {str(e)}")
-                continue
+            rolling_mode = refstack_is_rolling(params)
+            if not rolling_mode:
+                # Mode A: load fixed REF from disk
+                try:
+                    ref_data = xr_get_ref(root, lineage_names, station1, station2,
+                                          component, None, taxis, ignore_network=True)
+                    ref = ref_data.CCF.values
+                    if wct_norm:
+                        ori_waveform = ref / ref.max()
+                    else:
+                        ori_waveform = ref
+                except FileNotFoundError as fp:
+                    logger.error(f"FILE DOES NOT EXIST: {fp}, skipping")
+                    continue
+                except Exception as e:
+                    logger.error(f"Error getting reference waveform: {str(e)}")
+                    continue
 
-            if not len(ref):
-                continue
+                if not len(ref):
+                    continue
+            # Mode B: ori_waveform set per time-step below after data is loaded
 
             for mov_stack in mov_stacks:
                 WXamp_list = []
@@ -353,7 +358,7 @@ def main(loglevel="INFO", batch_size=None):
                 dates_list = []
 
                 try:
-                    data = xr_get_ccf(root, lineage_names, station1, station2,
+                    data = xr_get_ccf(root, lineage_names_mov, station1, station2,
                                       component, None, mov_stack, taxis)
                 except FileNotFoundError as fp:
                     logger.error(f"FILE DOES NOT EXIST: {fp}, skipping")
@@ -366,12 +371,21 @@ def main(loglevel="INFO", batch_size=None):
                 data = data[data.index.floor('d').isin(to_search)]
                 data = data.dropna()
 
-                for date, row in data.iterrows():
+                if rolling_mode:
+                    ref_rolling = compute_rolling_ref(
+                        data, int(params.ref_begin), int(params.ref_end)
+                    )
+
+                for _i_row, (date, row) in enumerate(data.iterrows()):
                     waveform = row.values
                     if wct_norm:
                         new_waveform = waveform / waveform.max()
                     else:
                         new_waveform = waveform
+
+                    if rolling_mode:
+                        _rr = ref_rolling[_i_row]
+                        ori_waveform = _rr / _rr.max() if wct_norm else _rr
 
                     try:
                         WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi = xwt(
@@ -389,7 +403,7 @@ def main(loglevel="INFO", batch_size=None):
 
                 if dates_list:
                     try:
-                        xr_save_wct2(root, lineage_names, step.step_name,
+                        xr_save_wct2(root, lineage_names_mov, step.step_name,
                                      station1, station2, component, mov_stack,
                                      taxis, freqs, WXamp_list, WXcoh_list,
                                      WXdt_list, dates_list)

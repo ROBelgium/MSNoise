@@ -488,7 +488,8 @@ def get_config_categories_definition():
         ('preprocess', 'Preprocessing'),
         ('cc', 'Cross-Correlation'),
         ('filter', 'Filters'),
-        ('stack', 'Stacks'),
+        ('stack', 'Moving Stacks'),
+        ('refstack', 'Reference Stacks'),
         ('mwcs', 'MWCS'),
         ('mwcs_dtt', 'MWCS dt/t'),
         ('stretching', 'Stretching'),
@@ -2666,6 +2667,86 @@ def build_ref_datelist(params):
     datelist = pd.date_range(start, end).map(lambda x: x.date())
     return start, end, datelist.tolist()
 
+def refstack_is_rolling(params):
+    """
+    Return True if the refstack configset uses rolling-index mode.
+
+    Rolling mode is indicated by ``ref_begin`` being a negative integer string
+    (e.g. ``"-5"``). In this mode no REF file is written to disk; the reference
+    is computed on-the-fly at MWCS/stretching/WCT time via
+    :func:`compute_rolling_ref`.
+
+    :type params: :class:`obspy.core.AttribDict`
+    :param params: Merged parameter set containing ``ref_begin``.
+    :rtype: bool
+    """
+    val = str(getattr(params, "ref_begin", "1970-01-01")).strip()
+    return val.startswith("-")
+
+
+def compute_rolling_ref(data, ref_begin, ref_end):
+    """
+    Compute a per-index rolling reference from a MOV CCF DataFrame.
+
+    For each time index ``i``, the reference is::
+
+        mean(data[i + ref_begin : i + ref_end])
+
+    Both ``ref_begin`` and ``ref_end`` must be negative integers with
+    ``ref_begin < ref_end <= -1``.  Use ``ref_end=-1`` to exclude the current
+    window (compare to the previous N windows).
+
+    Uses ``min_periods=1`` semantics: the first few steps receive whatever
+    partial window is available rather than NaN.
+
+    :type data: :class:`pandas.DataFrame`
+        Shape ``(n_times, n_lag_samples)``.
+    :type ref_begin: int
+        Negative offset for the start of the rolling window (e.g. ``-5``).
+    :type ref_end: int
+        Negative offset for the end of the rolling window (e.g. ``-1``).
+        Must satisfy ``ref_begin < ref_end <= 0``.
+    :rtype: :class:`numpy.ndarray`
+        Shape ``(n_times, n_lag_samples)``.  Row ``i`` is the reference for
+        time step ``i``.
+    """
+    n = len(data)
+    arr = data.values  # (n_times, n_lag_samples)
+    refs = np.full_like(arr, np.nan, dtype=float)
+
+    for i in range(n):
+        start_idx = i + ref_begin   # e.g. i - 5
+        end_idx   = i + ref_end     # e.g. i - 1  (exclusive in slice)
+        if end_idx <= 0:
+            continue                # not enough history yet
+        start_idx = max(0, start_idx)
+        if start_idx >= end_idx:
+            continue
+        refs[i] = np.nanmean(arr[start_idx:end_idx], axis=0)
+
+    return refs
+
+
+def strip_refstack_from_lineage(lineage_names):
+    """
+    Return a copy of ``lineage_names`` with any ``refstack_*`` entries removed.
+
+    Used by mwcs/stretching/wavelet workers to build the path for
+    :func:`xr_get_ccf`, which lives under the ``stack_N`` step folder rather
+    than under ``refstack_M``.
+
+    Example::
+
+        strip_refstack_from_lineage(
+            ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']
+        )
+        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1']
+
+    :type lineage_names: list of str
+    :rtype: list of str
+    """
+    return [n for n in lineage_names if not n.startswith("refstack_")]
+
 def validate_stack_data(dataset, stack_type="reference"):
     """Validates stack data before processing
     
@@ -4163,6 +4244,7 @@ def get_workflow_graph(session):
         'qc',
         'filter',
         'stack',
+        'refstack',
         'mwcs',
         'mwcs_dtt',
         'stretching',
@@ -4254,6 +4336,7 @@ def create_workflow_steps_from_config_sets(session):
         'qc',
         'filter',
         'stack',
+        'refstack',
         'mwcs',
         'mwcs_dtt',
         'stretching',
@@ -4280,7 +4363,6 @@ def create_workflow_steps_from_config_sets(session):
                 return len(WORKFLOW_ORDER)
 
         config_sets = sorted(config_sets, key=get_workflow_order)
-
         created_count = 0
         existing_count = 0
 
@@ -4330,7 +4412,8 @@ def create_workflow_links_from_steps(session):
         'cc': ['filter'],
         'qc': [],
         'filter': ['stack'],
-        'stack': ['mwcs', 'stretching', 'wavelet'],
+        'stack': ['refstack'],
+        'refstack': ['mwcs', 'stretching', 'wavelet'],
         'mwcs': ['mwcs_dtt'],
         'stretching': [],
         'wavelet': ['wavelet_dtt'],
@@ -4373,7 +4456,7 @@ def create_workflow_links_from_steps(session):
                         # Global steps link to all steps in target categories
                         target_steps_to_link = list(steps_by_category[target_category].values())
 
-                    elif target_category in ['filter', 'mwcs', 'stretching', 'wavelet', 'mwcs_dtt', 'wavelet_dtt']:
+                    elif target_category in ['filter', 'refstack', 'mwcs', 'stretching', 'wavelet', 'mwcs_dtt', 'wavelet_dtt']:
                         # For all processing steps that can have multiple instances,
                         # link to all target steps in the category
                         # This includes DTT steps which can process results from multiple MWCS/wavelet sets
@@ -4674,49 +4757,33 @@ def get_next_job_for_step(
     schema = declare_tables()
     Job = schema.Job
     WorkflowStep = schema.WorkflowStep
-    IS_REF = False
-    if step_category == "stack_ref":
-        IS_REF = True
-        step_category = "stack"
-        next_job = (
-            session.query(Job, WorkflowStep)
-            .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name)
-            .filter(WorkflowStep.category == step_category)
-            .filter(Job.flag == flag)
-            .filter(Job.day == "REF")
-            .order_by(Job.priority.desc(), Job.lastmod)
-            .first()
-        )
+
+    # refstack jobs always have day="REF"; all other categories never do.
+    if step_category == "refstack":
+        day_filter = (Job.day == "REF")
     else:
-        next_job = (
-            session.query(Job, WorkflowStep)
-            .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name)
-            .filter(WorkflowStep.category == step_category)
-            .filter(Job.flag == flag)
-            .filter(Job.day != "REF")
-            .order_by(Job.priority.desc(), Job.lastmod)
-            .first()
-        )
+        day_filter = (Job.day != "REF")
+
+    next_job = (
+        session.query(Job, WorkflowStep)
+        .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name)
+        .filter(WorkflowStep.category == step_category)
+        .filter(Job.flag == flag)
+        .filter(day_filter)
+        .order_by(Job.priority.desc(), Job.lastmod)
+        .first()
+    )
     if not next_job:
         return [], None
 
     seed_job, step = next_job
-    if IS_REF:
-        batch_q = (
-            session.query(Job)
-            .filter(Job.step_id == step.step_id)
-            .filter(Job.jobtype == seed_job.jobtype)
-            .filter(Job.day == "REF")
-            .filter(Job.flag == flag)
-        )
-    else:
-        batch_q = (
-            session.query(Job)
-            .filter(Job.step_id == step.step_id)
-            .filter(Job.jobtype == seed_job.jobtype)
-            .filter(Job.day != "REF")
-            .filter(Job.flag == flag)
-        )
+    batch_q = (
+        session.query(Job)
+        .filter(Job.step_id == step.step_id)
+        .filter(Job.jobtype == seed_job.jobtype)
+        .filter(day_filter)
+        .filter(Job.flag == flag)
+    )
 
     if group_by == "day":
         batch_q = batch_q.filter(Job.day == seed_job.day)
@@ -4739,22 +4806,13 @@ def get_next_job_for_step(
     if not jobs:
         return [], step
 
-    if IS_REF:
-        upd = (
-            update(Job)
-            .where(Job.step_id == step.step_id)
-            .where(Job.jobtype == seed_job.jobtype)
-            .where(Job.day == "REF")
-            .where(Job.flag == flag)
-        )
-    else:
-        upd = (
-            update(Job)
-            .where(Job.step_id == step.step_id)
-            .where(Job.jobtype == seed_job.jobtype)
-            .where(Job.day != "REF")
-            .where(Job.flag == flag)
-        )
+    upd = (
+        update(Job)
+        .where(Job.step_id == step.step_id)
+        .where(Job.jobtype == seed_job.jobtype)
+        .where(day_filter)
+        .where(Job.flag == flag)
+    )
 
     if group_by == "day":
         upd = upd.where(Job.day == seed_job.day)
@@ -4795,22 +4853,18 @@ def is_next_job_for_step(session, step_category="preprocess", flag='T'):
     schema = declare_tables()
     Job = schema.Job
     WorkflowStep = schema.WorkflowStep
-    IS_REF = False
-    if step_category == "stack_ref":
-        IS_REF = True
-        step_category = "stack"
-        job = session.query(Job) \
-            .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name) \
-            .filter(WorkflowStep.category == step_category) \
-            .filter(Job.flag == flag) \
-            .filter(Job.day == "REF").first()
+
+    if step_category == "refstack":
+        day_filter = (Job.day == "REF")
     else:
-        job = session.query(Job) \
-            .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name) \
-            .filter(WorkflowStep.category == step_category) \
-            .filter(Job.flag == flag) \
-            .filter(Job.day != "REF")\
-            .first()
+        day_filter = (Job.day != "REF")
+
+    job = session.query(Job) \
+        .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name) \
+        .filter(WorkflowStep.category == step_category) \
+        .filter(Job.flag == flag) \
+        .filter(day_filter) \
+        .first()
 
     if job is None:
         return False
@@ -4885,7 +4939,7 @@ def get_merged_params(db, orig_params, step_params, pred):
     lineage = get_upstream_steps_for_step_id(db, step_id=pred.step_id, topo_order=True, include_self=True)
 
     # optionally keep only relevant categories:
-    lineage = [s for s in lineage if s.category in {"preprocess", "cc", "filter", "stack"}]
+    lineage = [s for s in lineage if s.category in {"preprocess", "cc", "filter", "stack", "refstack"}]
     lineage_names = [s.step_name for s in lineage]
     # print("Lineage Names:", lineage_names, "")
     lineage_cfgs = [load_step_config(db, s) for s in lineage]

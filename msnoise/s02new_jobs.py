@@ -47,13 +47,15 @@ logger = logbook.Logger(__name__)
 
 def propagate_stack_jobs_from_cc_done(session):
     """
-    From DONE CC jobs, create/update TODO STACK jobs:
-      - day=<cc job day>  (normal per-day stack recompute)
-      - day="REF"         (ref export job)
-    for each reachable stack lineage whose prefix matches the CC job lineage.
+    From DONE CC jobs, create/update TODO MOV STACK jobs only:
+      - day=<cc job day>  (normal per-day MOV stack recompute)
 
-    Jobs created are STACK jobs (jobtype = stack_step.step_name, step_id = stack_step.step_id)
-    with lineage ending at that stack step (e.g. preprocess_1/cc_1/filter_1/stack_1).
+    REF jobs are now handled by ``refstack`` steps, triggered separately via
+    :func:`propagate_refstack_jobs_from_stack_done` (``--after stack``).
+
+    Jobs created are STACK jobs (jobtype = stack_step.step_name,
+    step_id = stack_step.step_id) with lineage ending at that stack step
+    (e.g. ``preprocess_1/cc_1/filter_1/stack_1``).
     """
     from .msnoise_table_def import declare_tables
 
@@ -200,15 +202,227 @@ def propagate_stack_jobs_from_cc_done(session):
 
                     lineage_to_stack = "/".join(lin_names)  # ends with stack_*
 
-                    # (1) normal stack day job (same day as CC job)
+                    # MOV stack day job (same day as CC job)
+                    # Note: REF jobs are now created by propagate_refstack_jobs_from_stack_done
                     _upsert_job(day_value=pj.day, pair_value=pj.pair, lineage_to_stack=lineage_to_stack, stack_step=stack_step)
 
-                    # (2) REF export job
-                    _upsert_job(day_value="REF", pair_value=pj.pair, lineage_to_stack=lineage_to_stack, stack_step=stack_step)
+    session.commit()
+    logger.info(f"[--after cc] MOV STACK jobs: created={created}, bumped_to_T={bumped}")
+    return created + bumped
+
+
+def propagate_refstack_jobs_from_stack_done(session):
+    """
+    From DONE MOV stack jobs, create TODO refstack jobs with day="REF".
+
+    For each DONE stack_N job (any day, any pair), find all refstack_M
+    steps that are direct successors of stack_N in the workflow graph and
+    create a single day="REF" job per (pair, refstack_M, lineage) if one
+    does not already exist.
+
+    Called via msnoise new_jobs --after stack.
+    """
+    from .msnoise_table_def import declare_tables
+
+    schema = declare_tables()
+    Job = schema.Job
+    WorkflowStep = schema.WorkflowStep
+
+    now = datetime.datetime.utcnow()
+    created = 0
+    bumped = 0
+
+    stack_steps = (
+        session.query(WorkflowStep)
+        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.category == "stack")
+        .all()
+    )
+
+    if not stack_steps:
+        logger.warning("[--after stack] No active stack steps found.")
+        return 0
+
+    for stack_step in stack_steps:
+        refstack_successors = (
+            session.query(WorkflowStep)
+            .join(schema.WorkflowLink, schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
+            .filter(schema.WorkflowLink.from_step_id == stack_step.step_id)
+            .filter(schema.WorkflowLink.is_active == True)
+            .filter(WorkflowStep.category == "refstack")
+            .all()
+        )
+        if not refstack_successors:
+            continue
+
+        done_pairs = (
+            session.query(Job.pair)
+            .filter(Job.step_id == stack_step.step_id)
+            .filter(Job.flag == "D")
+            .filter(Job.day != "REF")
+            .distinct()
+            .all()
+        )
+        if not done_pairs:
+            continue
+
+        for (pair,) in done_pairs:
+            sample_stack_job = (
+                session.query(Job)
+                .filter(Job.step_id == stack_step.step_id)
+                .filter(Job.pair == pair)
+                .filter(Job.flag == "D")
+                .filter(Job.day != "REF")
+                .first()
+            )
+            if not sample_stack_job or not sample_stack_job.lineage:
+                continue
+
+            stack_lineage = sample_stack_job.lineage
+
+            for ref_step in refstack_successors:
+                refstack_lineage = stack_lineage + "/" + ref_step.step_name
+
+                existing = (
+                    session.query(Job)
+                    .filter(Job.step_id == ref_step.step_id)
+                    .filter(Job.day == "REF")
+                    .filter(Job.pair == pair)
+                    .filter(Job.lineage == refstack_lineage)
+                    .first()
+                )
+                if existing is not None:
+                    if existing.flag != "T":
+                        existing.flag = "T"
+                        existing.lastmod = now
+                        bumped += 1
+                    continue
+
+                session.add(Job(
+                    day="REF",
+                    pair=pair,
+                    flag="T",
+                    step_id=ref_step.step_id,
+                    jobtype=ref_step.step_name,
+                    priority=0,
+                    lastmod=now,
+                    lineage=refstack_lineage,
+                ))
+                created += 1
 
     session.commit()
-    logger.info(f"[--after cc] STACK jobs: created={created}, bumped_to_T={bumped}")
+    logger.info(f"[--after stack] REFSTACK jobs: created={created}, bumped_to_T={bumped}")
     return created + bumped
+
+
+def propagate_mwcs_jobs_from_refstack_done(session):
+    """
+    From DONE refstack jobs (day="REF"), create TODO mwcs/stretching/wavelet jobs.
+
+    For each DONE refstack_M REF job, find all downstream dv/v steps
+    (mwcs, stretching, wavelet) and create one job per (pair, day) found among
+    the completed MOV stack jobs that are upstream of this refstack.
+
+    Called via msnoise new_jobs --after refstack.
+    """
+    from .msnoise_table_def import declare_tables
+
+    schema = declare_tables()
+    Job = schema.Job
+    WorkflowStep = schema.WorkflowStep
+
+    now = datetime.datetime.utcnow()
+    created = 0
+
+    refstack_steps = (
+        session.query(WorkflowStep)
+        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.category == "refstack")
+        .all()
+    )
+
+    if not refstack_steps:
+        logger.warning("[--after refstack] No active refstack steps found.")
+        return 0
+
+    for ref_step in refstack_steps:
+        dvv_successors = (
+            session.query(WorkflowStep)
+            .join(schema.WorkflowLink, schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
+            .filter(schema.WorkflowLink.from_step_id == ref_step.step_id)
+            .filter(schema.WorkflowLink.is_active == True)
+            .filter(WorkflowStep.category.in_(["mwcs", "stretching", "wavelet"]))
+            .all()
+        )
+        if not dvv_successors:
+            continue
+
+        stack_predecessors = (
+            session.query(WorkflowStep)
+            .join(schema.WorkflowLink, schema.WorkflowLink.from_step_id == WorkflowStep.step_id)
+            .filter(schema.WorkflowLink.to_step_id == ref_step.step_id)
+            .filter(schema.WorkflowLink.is_active == True)
+            .filter(WorkflowStep.category == "stack")
+            .all()
+        )
+        if not stack_predecessors:
+            continue
+
+        for stack_step in stack_predecessors:
+            done_ref_jobs = (
+                session.query(Job)
+                .filter(Job.step_id == ref_step.step_id)
+                .filter(Job.flag == "D")
+                .filter(Job.day == "REF")
+                .all()
+            )
+            if not done_ref_jobs:
+                continue
+
+            for ref_job in done_ref_jobs:
+                pair = ref_job.pair
+                refstack_lineage = ref_job.lineage
+
+                done_stack_days = (
+                    session.query(Job.day)
+                    .filter(Job.step_id == stack_step.step_id)
+                    .filter(Job.pair == pair)
+                    .filter(Job.flag == "D")
+                    .filter(Job.day != "REF")
+                    .distinct()
+                    .all()
+                )
+
+                for (day,) in done_stack_days:
+                    for dvv_step in dvv_successors:
+                        dvv_lineage = refstack_lineage + "/" + dvv_step.step_name
+
+                        existing = (
+                            session.query(Job.ref)
+                            .filter(Job.step_id == dvv_step.step_id)
+                            .filter(Job.day == day)
+                            .filter(Job.pair == pair)
+                            .filter(Job.lineage == dvv_lineage)
+                            .first()
+                        )
+                        if existing:
+                            continue
+
+                        session.add(Job(
+                            day=day,
+                            pair=pair,
+                            flag="T",
+                            step_id=dvv_step.step_id,
+                            jobtype=dvv_step.step_name,
+                            priority=0,
+                            lastmod=now,
+                            lineage=dvv_lineage,
+                        ))
+                        created += 1
+
+    session.commit()
+    logger.info(f"[--after refstack] DVV jobs created: {created}")
+    return created
 
 
 def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
@@ -553,7 +767,7 @@ def main(init=False, nocc=False, after=False):
         # Optional validation: ensure it's a known config-set type/category
         allowed_categories = {
             "global", "preprocess", "qc", "cc", "filter",
-            "stack", "mwcs", "mwcs_dtt", "stretching",
+            "stack", "refstack", "mwcs", "mwcs_dtt", "stretching",
             "wavelet", "wavelet_dtt",
         }
         if source_category not in allowed_categories:
@@ -562,12 +776,9 @@ def main(init=False, nocc=False, after=False):
                 f"one of: {sorted(allowed_categories)}"
             )
 
-        # NEW: special propagation when --after cc
-        # Instead of a separate stack_ref step/category, we queue REF work as STACK jobs
-        # with day="REF" and the lineage ending in stack_1 (or stack_N).
         if source_category == "cc":
             created = propagate_stack_jobs_from_cc_done(session=db)
-            logger.info(f'Propagation from category "cc" created/updated {created} STACK job(s) (daily + REF)')
+            logger.info(f'Propagation from category "cc" created/updated {created} MOV STACK job(s)')
             return
 
         # preprocess→cc is a fan-out: one single-station job → many station-pair jobs.
@@ -585,6 +796,16 @@ def main(init=False, nocc=False, after=False):
                                         commit=False)
                 db.commit()
             logger.info(f'Propagation from category "preprocess" created {created} CC job(s)')
+            return
+
+        if source_category == "stack":
+            created = propagate_refstack_jobs_from_stack_done(session=db)
+            logger.info(f'Propagation from category "stack" created/updated {created} REFSTACK job(s)')
+            return
+
+        if source_category == "refstack":
+            created = propagate_mwcs_jobs_from_refstack_done(session=db)
+            logger.info(f'Propagation from category "refstack" created {created} DVV job(s)')
             return
 
         created = propagate_first_runnable_from_category(
