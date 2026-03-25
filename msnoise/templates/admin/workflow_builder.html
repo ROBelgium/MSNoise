@@ -456,9 +456,10 @@
                 const targetNode = workflowData.nodes.find(n => n.id === edge.to);
 
                 if (sourceNode && targetNode) {
+                    // Store node objects directly so edgePath can access .x/.y
                     validEdges.push({
-                        source: edge.from,
-                        target: edge.to,
+                        source: sourceNode,
+                        target: targetNode,
                         from: edge.from,
                         to: edge.to,
                         type: edge.type || 'default'
@@ -521,7 +522,7 @@
             .text(d => `Set ${d.set_number}`);
 
         // Add hover effects
-        node.on("mouseover", function(event, d) {
+        node.on("mouseenter", function(event, d) {
             const categoryName = categoryNames[d.category] || d.category;
             tooltip.style("opacity", 1)
                 .html(`
@@ -565,7 +566,7 @@
                 return (sourceId === d.id || targetId === d.id) ? 3 : 2;
             });
         })
-            .on("mouseout", function() {
+            .on("mouseleave", function() {
                 tooltip.style("opacity", 0);
                 node.classed("node-highlighted", false)
                     .classed("node-dimmed", false);
