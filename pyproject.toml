@@ -59,9 +59,9 @@ dependencies = [
     "xarray",
     "pooch",
     "pycwt",
-    "pytables",
     "pytest",
-    "pytest-order"
+    "pytest-order",
+    "tables",
 ]
 
 [project.optional-dependencies]
