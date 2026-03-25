@@ -33,10 +33,8 @@ from ..s04_stack_refstack import main as stack_refstack_main
 from ..s05_compute_mwcs import main as compute_mwcs_main
 from ..s06_compute_mwcs_dtt import main as compute_dtt_main
 from ..s07_compute_dvv import main as compute_dvv_main
+from ..psd_compute import main as psd_compute_main
 from ..psd_compute_rms import main as compute_rms_main
-from ..psd_export_rms import main as export_rms_main
-from ..ppsd_compute import main as ppsd_compute_main
-from ..psd_to_hdf import main as psd_to_hdf_main
 
 from ..plots.ccftime import main as ccftime_main
 from ..plots.interferogram import main as interferogram_main
@@ -749,34 +747,18 @@ def test_203_config_set_param(setup_environment):
 @pytest.mark.order(301)
 def test_301_compute_psd():
     try:
-        ppsd_compute_main()
+        psd_compute_main()
     except:
         traceback.print_exc()
         pytest.fail("PSD Compute failed")
 
 @pytest.mark.order(302)
-def test_302_psd2hdf():
-    try:
-        psd_to_hdf_main()
-    except:
-        traceback.print_exc()
-        pytest.fail("PSD to HDF conversion failed")
-
-@pytest.mark.order(303)
-def test_303_hdf2rms():
+def test_302_compute_rms():
     try:
         compute_rms_main()
     except:
         traceback.print_exc()
-        pytest.fail("HDF to RMS computation failed")
-
-@pytest.mark.order(304)
-def test_304_export_rms():
-    try:
-        export_rms_main()
-    except:
-        traceback.print_exc()
-        pytest.fail("RMS export failed")
+        pytest.fail("PSD RMS computation failed")
 
 @pytest.mark.order(400)
 def test_400_run_manually():

@@ -203,7 +203,7 @@ def info_jobs(db):
     from ..api import get_job_types
 
     jobtypes = {}
-    jobtypes["QC"] = ["PSD", "PSD2HDF", "HDF2RMS"]
+    jobtypes["QC"] = ["PSD", "PSD_RMS"]
     jobtypes["CC"] = ["CC", "STACK", "MWCS", "DTT", "DVV", "WCT", "STR"]
 
     click.echo("Jobs:")
@@ -1840,9 +1840,9 @@ def qc():
                    'but a large number of stations')
 @click.pass_context
 def qc_compute_psd(ctx, njobs_per_worker):
-    """Computes the PSD jobs, based on New or Modified files identified by
-       the new_jobs step"""
-    from ..ppsd_compute import main
+    """Computes the PSD jobs, saves results as NetCDF files.
+       Based on New or Modified files identified by the new_jobs step."""
+    from ..psd_compute import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1862,31 +1862,6 @@ def qc_compute_psd(ctx, njobs_per_worker):
             p.join()
 
 
-@qc.command(name='psd_to_hdf')
-@click.option('-n', '--njobs_per_worker', default=9999,
-              help='Reduce this number when processing a small number of days '
-                   'but a large number of stations')
-@click.pass_context
-def qc_psd_to_hdf(ctx, njobs_per_worker):
-    """Groups the PSD calculated as NPZ to HDF"""
-    from ..psd_to_hdf import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-
-    if threads == 1:
-        main(loglevel=loglevel, njobs_per_worker=njobs_per_worker)
-    else:
-        from multiprocessing import Process
-        processes = []
-        kwargs = {"loglevel": loglevel, "njobs_per_worker": njobs_per_worker}
-        for i in range(threads):
-            p = Process(target=main, kwargs=kwargs)
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
 
 
 @qc.command(name='plot_psd')
@@ -1901,10 +1876,10 @@ def qc_plot_psd(ctx, seed_id):
          color_lim=None, show=True)
 
 
-@qc.command(name='hdf_to_rms')
+@qc.command(name='compute_rms')
 @click.pass_context
 def qc_compute_rms(ctx):
-    """Computes the RMS based on HDFs"""
+    """Computes the RMS from PSD NetCDF files."""
     from ..psd_compute_rms import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
@@ -1925,39 +1900,8 @@ def qc_compute_rms(ctx):
             p.join()
 
 
-@qc.command(name='export_rms')
-@click.pass_context
-def qc_export_rms(ctx):
-    """Exports the RMS dataframes as CSV files"""
-    from ..psd_export_rms import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        kwargs = {"loglevel": loglevel}
-        for i in range(threads):
-            p = Process(target=main, kwargs=kwargs)
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
 
 
-@qc.command(name='optimize')
-@click.pass_context
-def qc_psd_optimize(ctx):
-    """Optimizes the HDFs using ptrepack (should be used periodically)"""
-    import os, glob
-    for file in sorted(glob.glob("PSD/HDF/*")):
-        logger.info("Optimizing %s" % file)
-        os.system("ptrepack --chunkshape=auto --propindexes --complevel=9 --complib=blosc %s %s" % (file, file.replace(".h5", '_r.h5')))
-        os.system("mv %s %s " % ( file.replace(".h5", '_r.h5'), file,) )
 
 
 # @with_plugins(iter_entry_points('msnoise.plugins'))
