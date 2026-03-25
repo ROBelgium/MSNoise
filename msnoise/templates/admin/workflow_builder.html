@@ -563,7 +563,10 @@
             });
 
             node.style("opacity", n => connectedNodes.has(n.id) ? 1 : 0.3)
-                .style("transform", n => connectedNodes.has(n.id) ? "scale(1.05)" : "scale(1)");
+                .attr("transform", n => {
+                    const s = connectedNodes.has(n.id) ? 1.05 : 1;
+                    return `translate(${n.x || 0},${n.y || 0}) scale(${s})`;
+                });
 
             link.style("opacity", l => {
                 const sourceId = l.source.id || l.source;
@@ -577,7 +580,8 @@
         })
             .on("mouseout", function() {
                 tooltip.style("opacity", 0);
-                node.style("opacity", 1).style("transform", "scale(1)");
+                node.style("opacity", 1)
+                    .attr("transform", n => `translate(${n.x || 0},${n.y || 0})`);
                 link.style("opacity", 1).style("stroke-width", 2);
             });
 
