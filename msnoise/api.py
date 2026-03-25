@@ -4585,8 +4585,6 @@ def compute_dtt_stretching(session, root, lineage, mov_stack,
         for comp in comps:
             try:
                 df = _xr_get_stretching(root, lineage, s1, s2, comp, mov_stack)
-                df["_pair"] = "%s:%s" % (s1, s2)
-                df["_comp"] = comp
                 all_frames.append(df)
             except FileNotFoundError:
                 continue
@@ -4597,10 +4595,9 @@ def compute_dtt_stretching(session, root, lineage, mov_stack,
         )
 
     combined = pd.concat(all_frames)
-    # Drop internal tracking columns before aggregation
-    combined_data = combined.drop(columns=["_pair", "_comp"])
+    combined_data = combined[["Delta", "Coeff", "Error"]].rename_axis(None, axis=1)
     # Descriptive stats across pairs at each timestamp
-    # Use combined[col].groupby() (Series path) for pandas 2.x/3.x compatibility
+    # Use Series groupby path for pandas 1.x/2.x/3.x compatibility
     stats = combined_data["Delta"].groupby(combined_data.index).describe(
         percentiles=percentiles
     )

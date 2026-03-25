@@ -37,12 +37,8 @@ def _plot_timeseries(db, root, lineage, mov_stacks, comp_list,
                      filterid, wctid, dttid, freqmin, freqmax,
                      params, logger):
     """Weighted-mean dv/v timeseries, one subplot per moving stack."""
-    low = high = 0.0
-    filter_params = get_config_set_details(db, "filter", filterid,
-                                           format="AttribDict")
-    if filter_params:
-        low = float(filter_params.freqmin)
-        high = float(filter_params.freqmax)
+    low = params.freqmin
+    high = params.freqmax
 
     fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
@@ -93,11 +89,8 @@ def _plot_timeseries(db, root, lineage, mov_stacks, comp_list,
                 ax.set_xlim(left, right)
 
     fig.autofmt_xdate()
-    freq_label = ""
-    if freqmin is not None or freqmax is not None:
-        lo = freqmin if freqmin is not None else low
-        hi = freqmax if freqmax is not None else high
-        freq_label = " [%.2f–%.2f Hz band]" % (lo, hi)
+
+    freq_label = " [%.2f–%.2f Hz band]" % (params.wct_dtt_freqmin, params.wct_dtt_freqmax)
     plt.suptitle(
         "%s  |  Filter %d (%.2f–%.2f Hz)  |  WCT%s"
         % (",".join(comp_list), filterid, low, high, freq_label)
@@ -219,7 +212,7 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
         )
         return
 
-    logger.info("Using lineage: %s", "/".join(lineage))
+    logger.info("Using lineage: %s" % "/".join(lineage))
 
     # ------------------------------------------------------------------ #
     # Moving stacks                                                        #

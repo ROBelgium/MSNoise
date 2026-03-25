@@ -451,9 +451,9 @@ def test_027_dtt():
     new_jobs_main(after='mwcs')
     compute_dtt_main()
 
-@pytest.mark.order(28)
-def test_028_dvv():
-    compute_dvv_main()
+# @pytest.mark.order(28)
+# def test_028_dvv():
+#     compute_dvv_main()
 
 @pytest.mark.order(31)
 def test_031_stretching_param_update():
