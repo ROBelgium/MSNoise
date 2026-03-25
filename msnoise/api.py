@@ -5048,39 +5048,6 @@ def xr_load_rms(root, lineage, step_name, seed_id):
     return df
 
 
-def hdf_open_store_from_fn(fn, mode="a"):
-    store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
-    return store
-
-
-def hdf_open_store(filename, location=os.path.join("PSD", "HDF"), mode="a",
-                   format='table'):
-    if ".h5" in filename:
-        filename = filename.replace(".h5", "")
-    pd.set_option('io.hdf.default_format', format)
-    if not os.path.isdir(location):
-        os.makedirs(location, exist_ok=True)
-    fn = os.path.join(location, filename + ".h5")
-    store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
-    return store
-
-
-def hdf_insert_or_update(store, key, new):
-    if key in store:
-        filter = store[key].index.intersection(new.index)
-        if len(filter):
-            coordinates = store.select_as_coordinates(key, "index=filter")
-            store.remove(key, where=coordinates)
-            store.append(key, new, format='t', data_columns=True, append=True)
-    else:
-        store.append(key, new)
-
-
-def hdf_close_store(store):
-    store.close()
-    del store
-
-
 # ============================================================
 # Section 15 — Filters (legacy)
 # ============================================================
