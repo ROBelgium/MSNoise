@@ -644,8 +644,8 @@ def test_039_wct_pipeline():
         traceback.print_exc()
         pytest.fail()
 
-@pytest.mark.order(100)
-def test_100_plot_interferogram():
+@pytest.mark.order(99)
+def test_099_plot_interferogram():
     db = connect()
     filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
     for sta1, sta2 in get_station_pairs(db):
@@ -660,6 +660,23 @@ def test_100_plot_interferogram():
                                       show=False, outfile="?.png")
                     fn = f'interferogram {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m6h_6h.png'
                     assert os.path.isfile(fn), f"{fn} doesn't exist"
+
+@pytest.mark.order(100)
+def test_100_plot_ccftime():
+    db = connect()
+    filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
+    for sta1, sta2 in get_station_pairs(db):
+        for loc1 in sta1.locs():
+            for loc2 in sta2.locs():
+                sta_id1 = f"{sta1.net}.{sta1.sta}.{loc1}"
+                sta_id2 = f"{sta2.net}.{sta2.sta}.{loc2}"
+                for filter_step in filter_steps:
+                    ccftime_main(sta_id1, sta_id2, 1, 1,
+                                 filter_step.set_number, 1, 1,
+                                 show=False, outfile="?.png")
+                    fn = f'ccftime {sta_id1}_{sta_id2}-ZZ-f{filter_step.set_number}-m6h_6h.png'
+                    assert os.path.isfile(fn), f"{fn} doesn't exist"
+
 
 @pytest.mark.order(101)
 def test_101_plot_spectime():
