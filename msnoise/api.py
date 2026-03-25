@@ -487,21 +487,27 @@ def get_config_set_details(session, set_name, set_number, format="list"):
 
 
 def get_config_categories_definition():
-    """Get the standard configuration categories with their display names and order"""
+    """Get the standard configuration categories with display names, order, and indent level.
+
+    Each entry is ``(category_key, display_name, level)`` where *level* is the depth
+    relative to ``global`` (0).  Used by the config-sets admin page for visual
+    indentation that mirrors the workflow graph.
+    """
     return [
-        ('global', 'Global Parameters'),
-        ('preprocess', 'Preprocessing'),
-        ('cc', 'Cross-Correlation'),
-        ('filter', 'Filters'),
-        ('stack', 'Moving Stacks'),
-        ('refstack', 'Reference Stacks'),
-        ('mwcs', 'MWCS'),
-        ('mwcs_dtt', 'MWCS dt/t'),
-        ('stretching', 'Stretching'),
-        ('wavelet', 'Wavelet'),
-        ('wavelet_dtt', 'Wavelet dt/t'),
-        ('psd', 'PSD'),
-        ('psd_rms', 'PSD RMS')
+        # Tree order: children immediately follow their parent
+        ('global',      'Global Parameters',  0),
+        ('preprocess',  'Preprocessing',       1),
+        ('cc',          'Cross-Correlation',   2),
+        ('filter',      'Filters',             3),
+        ('stack',       'Moving Stacks',       4),
+        ('refstack',    'Reference Stacks',    5),
+        ('mwcs',        'MWCS',                6),
+        ('mwcs_dtt',    'MWCS dt/t',           7),
+        ('stretching',  'Stretching',          6),
+        ('wavelet',     'Wavelet',             6),
+        ('wavelet_dtt', 'Wavelet dt/t',        7),
+        ('psd',         'PSD',                 1),
+        ('psd_rms',     'PSD RMS',             2),
     ]
 
 
@@ -540,11 +546,12 @@ def get_config_sets_organized(session):
 
     # Create ordered list of categories with their sets
     ordered_categories = []
-    for category_key, display_name in category_order:
+    for category_key, display_name, level in category_order:
         if category_key in sets_by_category:
             ordered_categories.append({
                 'category': category_key,
                 'display_name': display_name,
+                'level': level,
                 'sets': sets_by_category[category_key]
             })
 
@@ -554,6 +561,7 @@ def get_config_sets_organized(session):
             ordered_categories.append({
                 'category': category,
                 'display_name': category.title(),
+                'level': 0,
                 'sets': sets_by_category[category]
             })
 

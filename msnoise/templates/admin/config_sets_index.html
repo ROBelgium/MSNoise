@@ -38,6 +38,19 @@
                     </div>
                 </div>
             </div>
+            <style>
+                .cfg-level-0 { padding-left: 0px; }
+                .cfg-level-1 { padding-left: 20px; border-left: 3px solid #17a2b8; }
+                .cfg-level-2 { padding-left: 40px; border-left: 3px solid #6f42c1; }
+                .cfg-level-3 { padding-left: 60px; border-left: 3px solid #e83e8c; }
+                .cfg-level-4 { padding-left: 80px; border-left: 3px solid #20c997; }
+                .cfg-level-5 { padding-left: 100px; border-left: 3px solid #28a745; }
+                .cfg-level-6 { padding-left: 120px; border-left: 3px solid #ffc107; }
+                .cfg-level-7 { padding-left: 140px; border-left: 3px solid #dc3545; }
+                .cfg-section-header td { background-color: #f8f9fa; }
+                .cfg-section-header h4 { margin: 4px 0; font-size: 14px; }
+                .cfg-level-0 h4 { font-size: 16px; font-weight: bold; }
+            </style>
             <table class="table table-striped table-hover">
                     <thead>
                         <tr>
@@ -49,11 +62,16 @@
                     </thead>
                     <tbody>
                         {% for category_info in categories %}
-                        <tr><td colspan=4><h4>{{ category_info.display_name }}</h4></td> </tr>
+                        {% set lvl = category_info.level | default(0) %}
+                        <tr class="cfg-section-header">
+                            <td colspan="4" class="cfg-level-{{ lvl }}">
+                                <h4>{{ category_info.display_name }}</h4>
+                            </td>
+                        </tr>
                             {% if category_info.sets %}
                                 {% for set_info in category_info.sets %}
                                 <tr>
-                                    <td>
+                                    <td class="cfg-level-{{ lvl }}">
                                         <span class="label label-info">{{ category_info.category }}</span>
                                     </td>
                                     <td>
@@ -89,7 +107,7 @@
                                 {% endfor %}
                             {% else %}
                                 <tr class="text-muted">
-                                    <td>
+                                    <td class="cfg-level-{{ lvl }}">
                                         <span class="label label-default">{{ category_info.display_name }}</span>
                                     </td>
                                     <td colspan="3">
