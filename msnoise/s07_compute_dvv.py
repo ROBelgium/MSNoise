@@ -45,21 +45,21 @@ def main(interval=1, loglevel="INFO"):
             for components in filt_all_components:
                 logger.debug("Processing m%s %s" % (mov_stack, components))
                 try:
-                    dvv = compute_dvv2(db, root, lineage_names, mov_stack,
+                    dvv = compute_dvv(db, root, lineage_names, mov_stack,
                                        pairs=None, components=components, params=params)
                 except ValueError:
                     traceback.print_exc()
                     logger.error("No data for m%s: %s" % (mov_stack, components))
                     continue
-                xr_save_dvv2(root, lineage_names, step.step_name, components, mov_stack, dvv)
+                xr_save_dvv(root, lineage_names, step.step_name, components, mov_stack, dvv)
                 del dvv
             try:
-                dvv = compute_dvv2(db, root, lineage_names, mov_stack,
+                dvv = compute_dvv(db, root, lineage_names, mov_stack,
                                    pairs=None, components=None, params=params)
             except ValueError:
                 logger.error("No data for any component: m%s" % str(mov_stack))
                 continue
-            xr_save_dvv2(root, lineage_names, step.step_name, "ALL", mov_stack, dvv)
+            xr_save_dvv(root, lineage_names, step.step_name, "ALL", mov_stack, dvv)
             del dvv
 
         massive_update_job(db, jobs, "D")

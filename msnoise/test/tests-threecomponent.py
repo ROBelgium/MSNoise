@@ -14,8 +14,8 @@ from ..api import *
 from ..s02_new_jobs import main as new_jobs_main
 from ..s03_compute_no_rotation import main as compute_cc_main
 from msnoise.unused.s04_stack2 import main as stack_main
-from ..s05_compute_mwcs2 import main as compute_mwcs_main
-from ..s06_compute_mwcs_dtt2 import main as compute_dtt_main
+from ..s05_compute_mwcs import main as compute_mwcs_main
+from ..s06_compute_mwcs_dtt import main as compute_dtt_main
 from ..s07_compute_dvv import main as compute_dvv_main
 
 from ..plots.interferogram import main as interferogram_main

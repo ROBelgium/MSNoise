@@ -3,17 +3,6 @@ from .api import *
 
 import logbook
 
-
-def wavg_wstd(data, errors):
-    d = data
-    errors[errors == 0] = 1e-6
-    w = 1. / errors
-    wavg = (d * w).sum() / w.sum()
-    N = len(np.nonzero(w)[0])
-    wstd = np.sqrt(np.sum(w * (d - wavg) ** 2) / ((N - 1) * np.sum(w) / N))
-    return wavg, wstd
-
-
 def main(interval=1, loglevel="INFO"):
     logger = logbook.Logger(__name__)
     # Reconfigure logger to show the pid number in log records
@@ -77,7 +66,7 @@ def main(interval=1, loglevel="INFO"):
             for mov_stack in mov_stacks:
                 output = []
                 try:
-                    mwcs = xr_get_mwcs2(params.output_folder, lineage_names,
+                    mwcs = xr_get_mwcs(params.output_folder, lineage_names,
                                         station1, station2, components, mov_stack)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
@@ -121,7 +110,8 @@ def main(interval=1, loglevel="INFO"):
                 MCOH.iloc[:, tmp] *= 0.0
 
                 MCOH[MCOH < params.dtt_mincoh] = 0.0
-                EM[EM > params.dtt_maxerr] = 1.0
+                if params.dtt_maxerr > 0:
+                    EM[EM > params.dtt_maxerr] = 1.0
 
                 #compute dt/t and exclude values exceeding dtt_maxdtt
                 dtt_values = np.abs(M / tArray)
@@ -159,7 +149,7 @@ def main(interval=1, loglevel="INFO"):
                 output = pd.DataFrame(values, index=dates,
                                     columns=["m", "em", "a", "ea", "m0", "em0"])
 
-                xr_save_dtt2(params.output_folder, lineage_names, step.step_name,
+                xr_save_dtt(params.output_folder, lineage_names, step.step_name,
                              station1, station2, components, mov_stack, output)
 
         massive_update_job(db, jobs, "D")

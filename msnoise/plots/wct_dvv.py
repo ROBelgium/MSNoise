@@ -1,302 +1,273 @@
 """
-This plot shows the final output of MSNoise using the wavelet.
+Plot dt/t (and dv/v) from the Wavelet Coherence Transform method.
 
+Reads per-pair WCT dt/t results (stored as NetCDF by the ``wavelet_dtt``
+step) and plots network-aggregated statistics using
+:func:`msnoise.api.compute_dtt_wct`.
+
+Two plot styles are available via the ``--visualize`` option:
+
+* ``"timeseries"`` (default): weighted-mean dv/v vs time, one subplot per
+  moving-stack window.
+* ``"heatmap"``: 2-D time × frequency heatmap of the first available pair's
+  ``dvv`` DataArray (useful for inspecting frequency dependence).
 
 Example:
 
-``msnoise cc dtt plot wct``
+``msnoise cc dtt plot wct`` will plot all defaults (timeseries).
 
+``msnoise cc dtt plot wct -v heatmap -f 1 -w 1 -d 1`` plots a heatmap for
+filter 1, WCT set 1, DTT set 1.
 """
-import matplotlib as mpl
+
+import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
-from matplotlib.lines import Line2D
 import matplotlib.dates as mdates
-import pandas as pd
-from ..api import *
-from datetime import datetime, timedelta
+from matplotlib.dates import DateFormatter
 
-def plot_dvv_heatmap(data_type, dvv_df, pair, rolling, start, end, low, high, logger, mincoh=0.5):
-    # Extracting relevant data from dvv_df
-    dvv_df = dvv_df.loc[start:end]
-    if dvv_df is None or dvv_df.empty:
-        logger.error(f"No data available for {pair} between {start} and {end}. Exiting function.")
-        return None, None
-    rolling_window = int(rolling)
-    
-    dvv_freq = dvv_df['dvv']
-    coh_freq = dvv_df['coh']
+from ..api import (
+    connect, get_params, get_logger, build_movstack_datelist,
+    get_done_lineages_for_category, compute_dtt_wct, xr_get_wct_dtt,
+    resolve_lineage_params,
+    get_config, get_config_set_details, get_station_pairs,
+)
 
-    dvv_freq = dvv_freq.rolling(window=rolling_window, min_periods=1).mean()
-    coh_freq = coh_freq.rolling(window=rolling_window, min_periods=1).mean()
 
-    fig, ax = plt.subplots(figsize=(16, 10))   
-    # Scatter plot of dv/v data
-    #norm1 = plt.Normalize(vmin=np.min(dvv_freq.T), vmax=np.max(dvv_freq.T))
+def _plot_timeseries(db, root, lineage, mov_stacks, comp_list,
+                     filterid, wctid, dttid, freqmin, freqmax,
+                     params, logger):
+    """Weighted-mean dv/v timeseries, one subplot per moving stack."""
+    low = high = 0.0
+    filter_params = get_config_set_details(db, "filter", filterid,
+                                           format="AttribDict")
+    if filter_params:
+        low = float(filter_params.freqmin)
+        high = float(filter_params.freqmax)
 
-    if data_type == 'dvv':
-        low_per = np.nanpercentile(dvv_freq, 1)
-        high_per = np.nanpercentile(dvv_freq, 99)
-        
-        ax.pcolormesh(np.asarray(dvv_freq.index), np.asarray(dvv_freq.columns), dvv_freq.T,
-            cmap=mpl.cm.seismic, edgecolors='none', vmin=low_per, vmax=high_per)
-        save_name = f"{pair[0]}_{low}_{high}_Hz_m{rolling_window}_dvv_heatmap"
-        color_bar_label = 'dv/v (%)'
-        
-    elif data_type == 'coh':
-        ax.pcolormesh(np.asarray(coh_freq.index), np.asarray(coh_freq.columns), coh_freq.T,
-                cmap='RdYlGn', edgecolors='none', vmin=mincoh, vmax=1)
-        save_name = f"{pair[0]}_{low}_{high}_Hz_m{rolling_window}_coh_heatmap"
-        color_bar_label = 'Coherence value'
+    fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
+    plt.subplots_adjust(bottom=0.06, hspace=0.3)
+    left = right = None
+
+    for i, mov_stack in enumerate(mov_stacks):
+        ax = axes[i] if len(mov_stacks) > 1 else axes
+        plt.sca(ax)
+
+        for comp in comp_list:
+            try:
+                stats = compute_dtt_wct(
+                    db, root, lineage, mov_stack,
+                    components=comp, params=params,
+                    freqmin=freqmin, freqmax=freqmax,
+                )
+            except ValueError:
+                logger.warning(
+                    "No WCT-DTT data for mov_stack=%s comp=%s", mov_stack, comp
+                )
+                continue
+
+            t = stats.index
+            # WCT stores dt/t; dv/v = -dt/t (same sign convention as MWCS)
+            ax.plot(t, -stats[("dvv", "weighted_mean")],
+                    label="%s: weighted mean" % comp)
+            ax.plot(t, -stats[("dvv", "mean")],
+                    label="%s: mean" % comp, alpha=0.6)
+            ax.plot(t, -stats[("dvv", "50%")],
+                    label="%s: median" % comp, alpha=0.6)
+            ax.plot(t, -stats[("dvv", "trimmed_mean")],
+                    label="%s: trimmed mean" % comp, alpha=0.6)
+
+            if left is None and len(t):
+                left, right = t[0], t[-1]
+
+        ax.set_ylabel("dv/v (%)")
+        ax.grid(True)
+        ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d %H:%M"))
+        stack_label = "%s_%s" % (mov_stack[0], mov_stack[1])
+        if i == 0:
+            ax.legend(bbox_to_anchor=(0.0, 1.02, 1.0, 0.102), loc=4,
+                      ncol=2, borderaxespad=0.0)
+            ax.set_title("Stack 1 (%s)" % stack_label)
+        else:
+            ax.set_title("Stack %i (%s)" % (i + 1, stack_label))
+            if left is not None:
+                ax.set_xlim(left, right)
+
+    fig.autofmt_xdate()
+    freq_label = ""
+    if freqmin is not None or freqmax is not None:
+        lo = freqmin if freqmin is not None else low
+        hi = freqmax if freqmax is not None else high
+        freq_label = " [%.2f–%.2f Hz band]" % (lo, hi)
+    plt.suptitle(
+        "%s  |  Filter %d (%.2f–%.2f Hz)  |  WCT%s"
+        % (",".join(comp_list), filterid, low, high, freq_label)
+    )
+    return fig
+
+
+def _plot_heatmap(db, root, lineage, mov_stack, comp, logger):
+    """2-D time × frequency heatmap for the first available pair."""
+    # Find first pair that has data
+    ds = None
+    pair_label = ""
+    for sta1, sta2 in get_station_pairs(db):
+        for loc1 in sta1.locs():
+            s1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
+            for loc2 in sta2.locs():
+                s2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
+                try:
+                    ds = xr_get_wct_dtt(root, lineage, s1, s2, comp, mov_stack)
+                    pair_label = "%s – %s" % (s1, s2)
+                    break
+                except FileNotFoundError:
+                    continue
+            if ds is not None:
+                break
+        if ds is not None:
+            break
+
+    if ds is None:
+        logger.error("No WCT-DTT data found for heatmap.")
+        return None
+
+    dvv_df = (ds["dvv"].to_dataframe()
+              .unstack(level="frequency")
+              .droplevel(0, axis=1))
+    full_idx = dvv_df.index
+    freqs = dvv_df.columns.astype(float)
+    data = np.ma.masked_invalid(dvv_df.values)
+
+    fig, axes = plt.subplots(3, 1, figsize=(14, 10), sharex=True)
+    variables = [("dvv", "dt/t (%)", "RdBu_r", None, None),
+                 ("err", "Error (%)", "viridis", 0, None),
+                 ("coh", "Coherence", "RdYlGn", 0, 1)]
+
+    for ax, (var, label, cmap, vmin, vmax) in zip(axes, variables):
+        vdf = (ds[var].to_dataframe()
+               .unstack(level="frequency")
+               .droplevel(0, axis=1))
+        vdata = np.ma.masked_invalid(vdf.values)
+        if vmin is None:
+            vmin = np.nanpercentile(vdf.values, 2)
+        if vmax is None:
+            vmax = np.nanpercentile(vdf.values, 98)
+        mesh = ax.pcolormesh(full_idx, freqs, vdata.T,
+                             cmap=cmap, vmin=vmin, vmax=vmax)
+        cb = fig.colorbar(mesh, ax=ax, shrink=0.8)
+        cb.set_label(label, rotation=270, labelpad=15)
+        ax.set_ylabel("Frequency (Hz)")
+        ax.set_title(var.upper())
+
+    axes[-1].set_xlabel("Date")
+    axes[-1].xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    axes[-1].xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+    plt.setp(axes[-1].get_xticklabels(), rotation=45)
+
+    stack_label = "%s_%s" % (mov_stack[0], mov_stack[1])
+    fig.suptitle("WCT dt/t – %s  %s  stack=%s" % (pair_label, comp, stack_label),
+                 fontsize=13)
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.93)
+    return fig
+
+
+def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
+         pairs=None, showALL=False, start="1970-01-01", end="2100-01-01",
+         visualize="timeseries", ranges="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]",
+         show=True, outfile=None, loglevel="INFO"):
+    """Plot dt/t / dv/v from WCT results.
+
+    :param mov_stackid: 1-based moving-stack index (0 = all).
+    :param components: Component pair string.
+    :param filterid: Filter set number.
+    :param wctid: WCT config set number.
+    :param dttid: WCT-DTT config set number.
+    :param visualize: ``'timeseries'`` or ``'heatmap'``.
+    :param show: Display the figure interactively.
+    :param outfile: Save path (``?`` = auto-name).
+    :param loglevel: Logging verbosity.
+    """
+    logger = get_logger("msnoise.cc_dtt_plot_wct", loglevel, with_pid=True)
+    db = connect()
+    params = get_params(db)
+    root = get_config(db, "output_folder") or "OUTPUT"
+
+    # ------------------------------------------------------------------ #
+    # Resolve lineage                                                      #
+    # ------------------------------------------------------------------ #
+    all_lineages = get_done_lineages_for_category(db, "wavelet_dtt")
+    if not all_lineages:
+        logger.error("No completed wavelet_dtt jobs found in the database.")
+        return
+
+    filter_step = "filter_%i" % filterid
+    wct_step = "wavelet_%i" % wctid
+    wct_dtt_step = "wavelet_dtt_%i" % dttid
+    lineage = None
+    for lin in all_lineages:
+        if (filter_step in lin and wct_step in lin
+                and lin[-1] == wct_dtt_step):
+            lineage = lin
+            break
+
+    if lineage is None:
+        logger.error(
+            "No completed wavelet_dtt lineage found for "
+            "filter_%i / wavelet_%i / wavelet_dtt_%i. Available: %s",
+            filterid, wctid, dttid,
+            ["/".join(l) for l in all_lineages],
+        )
+        return
+
+    logger.info("Using lineage: %s", "/".join(lineage))
+
+    # ------------------------------------------------------------------ #
+    # Moving stacks                                                        #
+    # ------------------------------------------------------------------ #
+    build_movstack_datelist(db)
+    _, _, params = resolve_lineage_params(db, lineage)
+
+    if mov_stackid and mov_stackid != 0:
+        mov_stacks = [params.mov_stack[mov_stackid - 1]]
     else:
-        logger.error("Unknown data type: %s, write 'dvv' or 'coh'? " % data_type)
-        return None, None
+        mov_stacks = params.mov_stack
 
-    #if current_config.get('plot_event', False):
-    #    plot_events(ax, current_config['event_list'], start, end)
-                
-    ax.set_xlim(pd.to_datetime(start), pd.to_datetime(end))
-        
-    ax.set_ylabel('Frequency (Hz)', fontsize=18)
-    ax.set_title(save_name, fontsize=22)
+    comp_list = [c.strip() for c in components.split(",")]
 
-    cbar1 = plt.colorbar(ax.collections[0], ax=ax, pad=0.02)
-    cbar1.set_label(color_bar_label, fontsize=18)
-    #norm1 = Normalize(vmin=0, vmax=1)
+    # Parse optional frequency band from ranges string (first range used)
+    freqmin = freqmax = None
+    try:
+        import ast
+        parsed = ast.literal_eval("[%s]" % ranges.strip("[]"))
+        if parsed and isinstance(parsed[0], (list, tuple)):
+            freqmin, freqmax = float(parsed[0][0]), float(parsed[0][1])
+    except Exception:
+        pass
 
-    ax.tick_params(axis='both', which='both', labelsize=16, width=2, length=5)
-    ax.xaxis.set_minor_locator(mdates.MonthLocator())
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    fig.autofmt_xdate()
-    
-    # Adjust the layout if necessary
-    fig.subplots_adjust(right=0.85)
-    fig.tight_layout()
-    return fig, save_name
+    # ------------------------------------------------------------------ #
+    # Dispatch to plot style                                               #
+    # ------------------------------------------------------------------ #
+    if visualize == "heatmap":
+        fig = _plot_heatmap(db, root, lineage, mov_stacks[0],
+                            comp_list[0], logger)
+    else:
+        fig = _plot_timeseries(db, root, lineage, mov_stacks, comp_list,
+                               filterid, wctid, dttid,
+                               freqmin, freqmax, params, logger)
 
-def plot_dvv_scatter(dvv_df, pair, rolling, start, end, ranges, logger):
-    # Extracting relevant data from dvv_df
-    dvv_df = dvv_df.loc[start:end]
-    if dvv_df is None or dvv_df.empty:
-        logger.error(f"No data available for {pair} between {start} and {end}. Exiting function.")
-        return None, None
-    rolling_window = int(rolling)
-
-    color = ['Blues', 'Reds','Greens','Greys'] #'Purples'
-    color2 = ['blue', 'red', 'green', 'grey']  # Colors for different frequency ranges
-    freq_names = []
-    legend_handles = []
-    ranges_list  = [list(map(float, r.strip().strip('[]').split(','))) for r in ranges.split('], [')]
-
-    fig, ax = plt.subplots(figsize=(16, 10))
-    # Loop through the frequency ranges specified in current_config
-    for i, freqrange in enumerate(ranges_list):#[[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]]):#, [0.5, 2.0]]):
-        freq_name = f"{freqrange[0]}-{freqrange[1]} Hz"
-        freq_names.append(freq_name)
-
-        freqs = np.asarray(dvv_df['dvv'].columns)
-        filtered_freqs = freqs[(freqs >= freqrange[0]) & (freqs <= freqrange[1])].tolist()
-        dvv_freq = dvv_df['dvv'][filtered_freqs]        
-        coh_freq = dvv_df['coh'][filtered_freqs]
-
-        dvv_freq = dvv_freq.rolling(window=rolling_window, min_periods=1).mean()
-        coh_freq = coh_freq.rolling(window=rolling_window, min_periods=1).mean()
-
-        # Scatter plot of dv/v data
-        norm1 = plt.Normalize(vmin=0, vmax=1)
-        ax.scatter([0,1], [0,1], c=[0,1], cmap=color[-1])
-
-        sc = ax.scatter(dvv_freq.index, dvv_freq.mean(axis=1), c=coh_freq.mean(axis=1), cmap=color[i], norm=norm1, label=freq_name)
-        legend_handles.append(Line2D([0], [0], marker='o', color=color2[i], markerfacecolor=color2[i], markersize=10, label=freq_name))
-
-    #if current_config.get('plot_event', False):
-    #    plot_events(ax, current_config['event_list'], start, end)
-                
-    ax.set_xlim(pd.to_datetime(start), pd.to_datetime(end))
-    #if current_config.get('same_dvv_scale', False):
-    #    ax.set_ylim(current_config['dvv_min'], current_config['dvv_max'])
-        
-    ax.set_ylabel('dv/v (%)', fontsize=18)
-    ax.set_title(f"{pair[0]} dv/v scatter plot", fontsize=22)
-
-    legend1 = ax.legend(handles=legend_handles, fontsize=22, loc='upper left')
-    ax.add_artist(legend1)
-
-    cbar1 = plt.colorbar(ax.collections[0], ax=ax, pad=0.02)
-    cbar1.set_label('Coherence value \n(darkness of the point)', fontsize=18)
-    norm1 = Normalize(vmin=0, vmax=1)
-
-    ax.tick_params(axis='both', which='both', labelsize=16, width=2, length=5)
-    ax.xaxis.set_minor_locator(mdates.MonthLocator())
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    fig.autofmt_xdate()
-    
-    # Adjust the layout if necessary
-    fig.subplots_adjust(right=0.85)
-    fig.tight_layout()
-    
-    return fig, f"{pair[0]}_{ np.min(ranges_list)}_{np.max(ranges_list)}_Hz_m{rolling_window}_wctscatter"
-    
-
-def save_figure(fig, filename, logger, mov_stack, components,filterid, visualize, plot_all_period=False, start=None, end=None, outfile=None):
-    fig_path = os.path.join('Figures' if plot_all_period else 'Figures/Zooms')
-    create_folder(fig_path, logger)
-    mov_stack= mov_stack[0]
-    if start and end:
-        filename = f'{filename}_{str(start)[:10]}_{str(end)[:10]}'
-    filepath = os.path.join(fig_path, f'{filename}.png')
+    if fig is None:
+        return
 
     if outfile:
         if outfile.startswith("?"):
-            if len(mov_stack) == 1:
-                outfile = outfile.replace('?', '%s-f%i-m%s_%s-%s' % (components,
-                                                                   filterid,
-                                                                   mov_stack[0],
-                                                                   mov_stack[1],
-                                                                   visualize))
-            else:
-                outfile = outfile.replace('?', '%s-f%i-%s' % (components,
-                                                               filterid,
-                                                               visualize))
-        filepath = "wct " + outfile
-        logger.info("output to: %s" % outfile)
-
-    fig.savefig(filepath, dpi=300, bbox_inches='tight', transparent=True)
-    
-def create_folder(folder_path, logger):
-    try:
-        os.makedirs(folder_path)
-        logger.info(f"Folder '{folder_path}' created successfully.")
-    except FileExistsError:
-        pass
-
-def xr_get_wct_pair(pair, components, filterid, wctid, dttid, mov_stack, logger):
-    fn = os.path.join("DVV/WCT/DTT", "f%02i" % filterid,
-                      "wct%02i" % wctid, "dtt%02i" % dttid,
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s" % components, "%s.nc" % (pair))
-    if not os.path.isfile(fn):
-        logger.error("FILE DOES NOT EXIST: %s, skipping" % fn)
-    
-    data = xr_create_or_open(fn, name="WCT")
-    if data is None:
-        logger.error(f"Empty file for pair {pair}.")
-        return None
-    data = data.to_dataframe().unstack(level='frequency')
-    return data
-
-def xr_get_wct(components, filterid, wctid, dttid, mov_stack, logger):
-    fn = os.path.join("DVV/WCT/DTT", "f%02i" % filterid,
-                      "wct%02i" % wctid, "dtt%02i" % dttid,
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s" % components, "*.nc" )
-    matching_files = glob.glob(fn)
-    if not matching_files:
-       logger.error(f"No files found matching pattern: {fn}")
-
-    all_wct = []
-    for fil in matching_files:
-        data = xr_create_or_open(fil, name="WCT")
-        data = data.to_dataframe().unstack(level='frequency')
-        all_wct.append(data)
-    combined = pd.concat(all_wct, axis=0)
-    dvv = combined.groupby(combined.index).mean()
-    return dvv
-
-def validate_and_adjust_date(date_string, end_date, logger):
-    try:
-        start_date = datetime.strptime(date_string, '%Y-%m-%d')
-    except ValueError:
-        try:
-            days_delta = int(date_string)
-            start_date = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=days_delta)
-        except ValueError:
-            logger.error(f"Invalid start string: {date_string}")
-            return None
-    return start_date
-
-def main(mov_stackid=None, components='ZZ', filterid=1, wctid=1, dttid=1,
-        pairs=[], showALL=False, start="1970-01-01", end="2100-01-01", visualize='dvv', ranges="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]", show=True,outfile=None, loglevel="INFO"):
-    logger = get_logger('msnoise.cc_dvv_plot_dvv', loglevel,
-                        with_pid=True)
-    db = connect()
-    params = get_params(db)
-
-    session = connect()
-    dvv_wct_dtt = session.query(DvvWctDtt).filter(DvvWctDtt.ref == dttid).first()
-
-    if dvv_wct_dtt is None:
-        raise ValueError(f"No WCT-DTT parameters found for dttid={dttid}")
-
-    mincoh = dvv_wct_dtt.wct_mincoh 
-
-    # Check start and end dates
-    if start == "1970-01-01":
-         start= params.startdate
+            tag = "%s-f%i-w%i-d%i" % (",".join(comp_list), filterid, wctid, dttid)
+            if len(mov_stacks) == 1:
+                tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
+            outfile = outfile.replace("?", tag)
+        outfile = "wct_%s_%s" % (visualize, outfile)
+        logger.info("Saving to: %s", outfile)
+        fig.savefig(outfile)
+    if show:
+        plt.show()
     else:
-        start = validate_and_adjust_date(start, end, logger)
-    if end == "2100-01-01":
-        end = params.enddate
-
-    # TODO clearer  mov_stackid to additionnal rolling
-    if mov_stackid and mov_stackid != "": #if mov_stackid given
-        try:
-            mov_stack = params.mov_stack[mov_stackid - 1]
-            if mov_stack in params.mov_stack:  # Check if mov_stack is in params.mov_stack
-                mov_stacks = [mov_stack, ]
-                rolling = 1
-            else:
-                rolling = mov_stackid  # Assign  mov_stack to rolling
-        except:
-            mov_stack = params.mov_stack[0]
-            if mov_stack in params.mov_stack:  # Check if mov_stack is in params.mov_stack new format
-                mov_stacks = [mov_stack, ]
-                rolling = 1  # Keeping the mov_stack result
-            else:
-                rolling = mov_stack  # Assign mov_stack to rolling
-    else:
-        mov_stacks = params.mov_stack
-        rolling = int(params.mov_stack[0][0][0])
-
-    if components.count(","):
-        components = components.split(",")
-    else:
-        components = [components, ]
-
-    low = float(dvv_wct_dtt.wct_dtt_freqmin)
-    high = float(dvv_wct_dtt.wct_dtt_freqmax)
-
-    for i, mov_stack in enumerate(mov_stacks):
-        for comps in components:
-            # Get the data
-            if not pairs:
-                dvv = xr_get_wct(comps, filterid, wctid, dttid, mov_stack, logger)
-                pairs = ["all stations",]
-            else:
-                try:
-                    dvv = xr_get_wct_pair(pairs, comps, filterid, wctid, dttid, mov_stack, logger)    
-                except FileNotFoundError as fullpath:
-                    logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-                    continue
-            # Plotting
-            if dvv is None:
-                logger.error(f"No data available for {pairs}. Skipping plot.")
-                continue
-            if visualize == 'dvv':
-                fig, savename = plot_dvv_heatmap('dvv', dvv, pairs, rolling, start, end, low, high, logger, mincoh)
-            elif visualize == 'coh':
-                fig, savename = plot_dvv_heatmap('coh', dvv, pairs, rolling, start, end, low, high, logger, mincoh)
-            elif visualize == 'curve':
-                fig, savename = plot_dvv_scatter(dvv, pairs, rolling, start, end, ranges, logger)
-            else:
-                logger.error("PLOT TYPE DOES NOT EXIST: %s" % visualize)
-            # Save and show the figure
-            if fig is not None :
-                save_figure(fig, savename, logger, mov_stacks, comps, filterid, visualize, plot_all_period=False, start=start, end=end, outfile=outfile)
-                if show:
-                    plt.show()
-                else:
-                    plt.close(fig)
-            else:
-                logger.error("Figure was not created. Skipping save.")
-
+        plt.close(fig)

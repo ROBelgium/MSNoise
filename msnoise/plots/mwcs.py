@@ -26,7 +26,7 @@ from ..api import (
     connect, get_params, get_logger, build_movstack_datelist,
     get_station, get_interstation_distance, check_stations_uniqueness,
     get_config_set_details, get_done_lineages_for_category,
-    xr_get_mwcs2, lineage_str_to_steps, get_merged_params_for_lineage,
+    xr_get_mwcs, lineage_str_to_steps, get_merged_params_for_lineage,
 )
 
 
@@ -105,7 +105,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
                 sta1, sta2, components, mov_stack, "/".join(lineage_names))
 
     try:
-        mwcs = xr_get_mwcs2(params.output_folder, lineage_names,
+        mwcs = xr_get_mwcs(params.output_folder, lineage_names,
                              sta1, sta2, components, mov_stack)
     except FileNotFoundError as fp:
         logger.error("FILE DOES NOT EXIST: %s", fp)

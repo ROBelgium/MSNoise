@@ -2,7 +2,7 @@
 Plot dv/v from the MWCS → dt/t method.
 
 Reads per-pair MWCS-DTT results and plots network-aggregated statistics
-using :func:`msnoise.api.compute_dvv2`.
+using :func:`msnoise.api.compute_dvv`.
 
 Example:
 
@@ -20,7 +20,7 @@ from matplotlib.dates import DateFormatter
 
 from ..api import (
     connect, get_params, get_logger, build_movstack_datelist,
-    get_done_lineages_for_category, compute_dvv2,
+    get_done_lineages_for_category, compute_dvv,
     resolve_lineage_params,
     get_config, get_config_set_details, lineage_str_to_steps, get_merged_params_for_lineage
 )
@@ -94,7 +94,7 @@ def main(preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=None, ref
 
         for comp in comp_list:
             try:
-                stats = compute_dvv2(
+                stats = compute_dvv(
                     db, params.output_folder, lineage_names, mov_stack,
                     components=comp, params=params,
                 )

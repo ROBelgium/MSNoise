@@ -18,7 +18,7 @@ from matplotlib.dates import DateFormatter
 from ..api import (
     connect, get_params, get_logger, build_movstack_datelist,
     get_config, get_config_set_details,
-    get_done_lineages_for_category, get_station_pairs, xr_get_dtt2,
+    get_done_lineages_for_category, get_station_pairs, xr_get_dtt,
     resolve_lineage_params,
 )
 
@@ -127,7 +127,7 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
 
         for (s1, s2) in all_pairs:
             try:
-                df = xr_get_dtt2(root, lineage, s1, s2, components, mov_stack)
+                df = xr_get_dtt(root, lineage, s1, s2, components, mov_stack)
             except FileNotFoundError:
                 continue
 

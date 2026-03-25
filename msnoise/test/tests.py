@@ -27,11 +27,11 @@ from ..api import *
 from ..s01_scan_archive import parse_crondays
 from ..s02_new_jobs import main as new_jobs_main
 from ..s03_compute_no_rotation import main as compute_cc_main
-from ..s04_stack2_mov import main as stack_mov
-from ..s04_stack2_ref import main as stack_ref  # deprecated
-from ..s04_stack2_refstack import main as stack_refstack_main
-from ..s05_compute_mwcs2 import main as compute_mwcs_main
-from ..s06_compute_mwcs_dtt2 import main as compute_dtt_main
+from ..s04_stack_mov import main as stack_mov
+from ..s04_stack_ref import main as stack_ref  # deprecated
+from ..s04_stack_refstack import main as stack_refstack_main
+from ..s05_compute_mwcs import main as compute_mwcs_main
+from ..s06_compute_mwcs_dtt import main as compute_dtt_main
 from ..s07_compute_dvv import main as compute_dvv_main
 from ..psd_compute_rms import main as compute_rms_main
 from ..psd_export_rms import main as export_rms_main

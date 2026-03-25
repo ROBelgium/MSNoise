@@ -7,7 +7,6 @@ to study the relative dephasing between Moving-Window stacks ("Current") and a
 Reference using Moving-Window Cross-Spectral analysis. The *jobs* "T"o do have
 been inserted in the datavase during the stack procedure.
 
-
 Filter Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -85,27 +84,6 @@ import scipy.signal
 
 from .api import *
 
-def get_window(window="boxcar", half_win=3):
-    window_len = 2 * half_win + 1
-    if window == "boxcar":
-        w = scipy.signal.windows.boxcar(window_len).astype('complex')
-    else:
-        w = scipy.signal.windows.hann(window_len).astype('complex')
-    return w / window_len
-
-
-def getCoherence(dcs, ds1, ds2):
-    # TODO: docsting
-    n = len(dcs)
-    coh = np.zeros(n).astype('complex')
-    valids = np.argwhere(np.logical_and(np.abs(ds1) > 0,
-                                        np.abs(
-                                            ds2 > 0)))
-    coh[valids] = dcs[valids] / (
-            ds1[valids] * ds2[valids])
-    coh[coh > (1.0 + 0j)] = 1.0 + 0j
-    return coh
-
 def main(loglevel="INFO"):
 
     # Reconfigure logger to show the pid number in log records
@@ -116,7 +94,6 @@ def main(loglevel="INFO"):
 
     db = connect()
     orig_params = get_params(db)
-
 
     logger.debug('Ready to compute')
     # Then we compute the jobs
@@ -356,7 +333,7 @@ def main(loglevel="INFO"):
                     del M, E, MCOH
                 output = pd.concat(output, axis=1)
 
-                xr_save_mwcs2(params.output_folder, lineage_names, step.step_name,
+                xr_save_mwcs(params.output_folder, lineage_names, step.step_name,
                               station1, station2, components, None, mov_stack, taxis, output)
                 del data, output
 

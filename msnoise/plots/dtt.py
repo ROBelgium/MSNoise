@@ -21,7 +21,7 @@ import numpy as np
 from ..api import (
     connect, get_params, get_logger,
     get_station, get_interstation_distance, check_stations_uniqueness,
-    get_config_set_details, xr_get_mwcs2, xr_get_dtt2,
+    get_config_set_details, xr_get_mwcs, xr_get_dtt,
     lineage_str_to_steps, get_merged_params_for_lineage,
 )
 
@@ -111,7 +111,7 @@ def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
     logger.info("Loading MWCS for %s-%s comp=%s day=%s mov=%s",
                 sta1, sta2, components, day, mov_stack)
     try:
-        mwcs_all = xr_get_mwcs2(params.output_folder, mwcs_lineage,
+        mwcs_all = xr_get_mwcs(params.output_folder, mwcs_lineage,
                                   sta1, sta2, components, mov_stack)
     except FileNotFoundError as fp:
         logger.error("MWCS FILE DOES NOT EXIST: %s", fp)
@@ -130,7 +130,7 @@ def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
 
     # --- Load DTT regression for the requested day ---
     try:
-        dtt_all = xr_get_dtt2(params.output_folder, dtt_lineage,
+        dtt_all = xr_get_dtt(params.output_folder, dtt_lineage,
                                sta1, sta2, components, mov_stack)
     except FileNotFoundError as fp:
         logger.error("DTT FILE DOES NOT EXIST: %s", fp)

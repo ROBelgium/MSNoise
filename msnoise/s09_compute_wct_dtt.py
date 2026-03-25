@@ -30,7 +30,7 @@ import pandas as pd
 from .api import (
     connect, get_logger, is_next_job_for_step, get_next_lineage_batch,
     get_station_pairs, get_interstation_distance,
-    xr_load_wct, xr_save_wct_dtt2, massive_update_job,
+    xr_load_wct, xr_save_wct_dtt, massive_update_job,
     compute_wct_dvv, get_wct_avgcoh,
 )
 
@@ -87,7 +87,7 @@ def main(loglevel="INFO", batch_size=None):
         # lineage_names[:-1] ends with the upstream "wavelet" step name, used
         # for xr_load_wct (read).  The full lineage (including wavelet_dtt step)
         # is reconstructed via  lineage_names[:-1] + step.step_name  inside
-        # xr_save_wct_dtt2, yielding:  <lineage>/wavelet_dtt_N/_output/...
+        # xr_save_wct_dtt, yielding:  <lineage>/wavelet_dtt_N/_output/...
         lineage_names = batch["lineage_names"][:-1]
         lineage_str = batch["lineage_str"]
         step = batch["step"]
@@ -225,7 +225,7 @@ def main(loglevel="INFO", batch_size=None):
                 try:
                     # Output path: root/<lineage_names>/<step.step_name>/_output/...
                     # e.g. root/preprocess_1/cc_1/filter_1/stack_1/wavelet_1/wavelet_dtt_1/_output/...
-                    xr_save_wct_dtt2(
+                    xr_save_wct_dtt(
                         root, lineage_names, step.step_name,
                         station1, station2, component, mov_stack,
                         taxis, dvv_df, err_df, coh_df,

@@ -18,14 +18,14 @@ def main(stype, loglevel="INFO"):
     """Computes the REF/MOV stacks.
 
     .. deprecated::
-        Use :mod:`msnoise.s04_stack2_refstack` and ``step_category="refstack"``
+        Use :mod:`msnoise.s04_stack_refstack` and ``step_category="refstack"``
         instead.  The ``stack_ref`` / ``IS_REF`` mechanism is superseded by the
         ``refstack`` configset category in the ``msnoise2_configsets`` workflow.
     """  # noqa: D401
     import warnings
     warnings.warn(
-        "s04_stack2_ref / step_category='stack_ref' is deprecated. "
-        "Use s04_stack2_refstack / step_category='refstack' instead.",
+        "s04_stack_ref / step_category='stack_ref' is deprecated. "
+        "Use s04_stack_refstack / step_category='refstack' instead.",
         DeprecationWarning,
         stacklevel=2,
     )

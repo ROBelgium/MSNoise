@@ -717,27 +717,6 @@ def get_filters(session, all=False, ref=None):
         filters = session.query(Filter).filter(Filter.used == True).all()
     return filters
 
-def get_networks(session, all=False):
-    """Get Networks from the database.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type all: bool
-    :param all: Returns all networks from the database if True, or only
-        networks at least one station has `used` = 1 if False (default)
-
-    :rtype: list of str
-    :returns: a list of network codes
-    """
-    if all:
-        networks = session.query(Station).group_by(Station.net).all()
-    else:
-        networks = session.query(Station).filter(Station.used == True).\
-            group_by(Station.net)
-    return [net.net for net in networks]
-
-
 def get_stations(session, all=False, net=None, format="raw"):
     """Get Stations from the database.
 
@@ -1100,27 +1079,6 @@ def mark_data_availability(session, net, sta, flag):
     session.commit()
 
 
-def count_data_availability_flags(session):
-    """
-    Count the number of :class:`~msnoise.msnoise_table_def.declare_tables.DataAvailability`,
-    grouped by `flag`
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-
-    :rtype: list
-    :returns: list of [count, flag] pairs
-    """
-    from sqlalchemy.sql.expression import func
-    return session.query(func.count(DataAvailability.flag),
-                         DataAvailability.flag).\
-        group_by(DataAvailability.flag).all()
-
-
-# Jobs
-# TODO bad doing this here!
-import time
 def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
                ref=None):
     """
@@ -1273,23 +1231,6 @@ def get_next_job(session, flag='T', jobtype='CC', limit=99999):
     return tmp
 
 
-def get_dvv_jobs(session, flag='T', jobtype='DVV', limit=99999):
-    from sqlalchemy import update
-    tmp = []
-    while not len(tmp):
-        jobs = session.query(Job).filter(Job.jobtype == jobtype). \
-            filter(Job.flag == flag). \
-            limit(limit).with_for_update()
-
-        tmp = jobs.all()
-        refs = [_.ref for _ in tmp]
-        q = update(Job).values({"flag": "I"}).where(Job.ref.in_(refs))
-        session.execute(q)
-        # jobs.update({Job.flag: 'I'})
-        session.commit()
-    return tmp
-
-
 def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
     """
     Are there any DTT :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
@@ -1421,23 +1362,6 @@ def reset_jobs(session, jobtype, alljobs=False, rule=None, reset_i=True, reset_e
     session.commit()
 
 
-def reset_dtt_jobs(session, pair):
-    """
-    Sets the flag of all DTT Jobs of one `pair` to "T"odo.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type pair: str
-    :param pair: The pair to update
-    """
-
-    jobs = session.query(Job).filter(Job.pair == pair).\
-        filter(Job.jobtype == "DTT")
-    jobs.update({Job.flag: 'T'})
-    session.commit()
-
-
 def get_job_types(session, jobtype='CC'):
     """
     Count the number of Jobs of a specific `type`,
@@ -1457,45 +1381,7 @@ def get_job_types(session, jobtype='CC'):
         filter(Job.jobtype == jobtype).group_by(Job.flag).all()
 
 
-def get_jobs_by_lastmod(session, jobtype='CC', lastmod=datetime.datetime.now()):
-    """
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type lastmod: datetime.datetime
-    :param lastmod: Jobs' modification time
-
-    :rtype: list
-    :return: list of Job objects.
-    """
-    jobs = session.query(Job).filter(Job.jobtype == jobtype).\
-        filter(Job.lastmod >= lastmod).all()
-    return jobs
-
-
-# CORRELATIONS
-
-
-def export_allcorr(session, ccfid, data, t_axis):
-    output_folder = get_config(session, 'output_folder')
-    station1, station2, filterid, components, date = ccfid.split('_')
-
-    path = os.path.join(output_folder, "%02i" % int(filterid),
-                        station1, station2, components)
-    if not os.path.isdir(path):
-        os.makedirs(path, exist_ok=True)
-
-    df = pd.DataFrame().from_dict(data).T
-    df.columns = t_axis
-    df.to_hdf(os.path.join(path, date+'.h5'), key='data')
-    del df
-    return
-
-
-def export_allcorr2(session, ccfid, data, base_folder=None, params=None, t_axis=None):
+def export_allcorr(session, ccfid, data, base_folder=None, params=None, t_axis=None):
     if base_folder is None:
         # Legacy behaviour:
         output_folder = get_config(session, 'output_folder')
@@ -1595,10 +1481,10 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
             )
         pair = "%s:%s" % (station1, station2)
         if mseed:
-            export_mseed(session, path, pair, components, filterid, CF,
+            _export_mseed(session, path, pair, components, filterid, CF,
                          ncorr, params=params)
         if sac:
-            export_sac(session, path, pair, components, filterid, CF,
+            _export_sac(session, path, pair, components, filterid, CF,
                        ncorr, params=params)
 
     else:
@@ -1620,7 +1506,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
         del t, st
 
 
-def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
+def _export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
                sac_format=None, maxlag=None, cc_sampling_rate=None,
                params=None):
     from obspy.core.util.attribdict import AttribDict
@@ -1657,7 +1543,7 @@ def export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
     return
 
 
-def export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
+def _export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
                  maxlag=None, cc_sampling_rate=None, params=None):
     from obspy import Trace, Stream
     try:
@@ -1761,263 +1647,15 @@ def get_extension(export_format):
         return ".MSEED"
 
 
-def get_ref(session, station1, station2, filterid, components, params=None):
-    """
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA.LOC)
-    :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA.LOC)
-    :type filterid: int
-    :param filterid: The ID (ref) of the filter
-    :type components: str
-    :param components: The name of the components used (ZZ, ZR, ...)
-    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
-    :param params: A dictionnary of MSNoise config parameters as returned by
-        :func:`get_params`.
-    :rtype: :class:`obspy.trace`
-    :return: A Trace object containing the ref
-    """
-    from obspy import Trace, read
-    if not params:
-        export_format = get_config(session, 'export_format')
-        extension = get_extension(export_format)
-    else:
-        extension = get_extension(params.export_format)
-
-    ref_name = "%s_%s" % (station1, station2)
-    ref_name = ref_name
-    rf = os.path.join("STACKS", "%02i" %
-                      filterid, "REF", components,
-                      ref_name + extension)
-    if not os.path.isfile(rf):
-        logging.debug("No REF file named %s, skipping." % rf)
-        return Trace()
-
-    return read(rf)[0]
-
-
-def get_results(session, station1, station2, filterid, components, dates,
-                mov_stack=1, format="stack", params=None):
-    """
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA.LOC)
-    :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA.LOC)
-    :type filterid: int
-    :param filterid: The ID (ref) of the filter
-    :type components: str
-    :param components: The name of the components used (ZZ, ZR, ...)
-    :type dates: list
-    :param dates: List of TODO datetime.datetime
-    :type mov_stack: int
-    :param mov_stack: Moving window stack.
-    :type format: str
-    :param format: Either ``stack``: the data will be stacked according to
-        the parameters passed with ``params`` or ``matrix``: to get a 2D
-        array of CCF.
-    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
-    :param params: A dictionnary of MSNoise config parameters as returned by
-        :func:`get_params`.
-    :rtype: :class:`numpy.ndarray`
-    :return: Either a 1D CCF (if format is ``stack`` or a 2D array (if format=
-        ``matrix``).
-    """
-    from obspy import read
-    if not params:
-        export_format = get_config(session, 'export_format')
-        extension = get_extension(export_format)
-    else:
-        export_format = params.export_format
-        extension = get_extension(params.export_format)
-    if export_format == "BOTH":
-        export_format = "MSEED"
-
-    stack_data = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
-    i = 0
-    base = os.path.join("STACKS", "%02i" % filterid,
-                        "%03i_DAYS" % mov_stack, components,
-                        "%s_%s" % (station1, station2), "%s") + extension
-    logging.debug("Reading files... in %s" % base)
-    lastday = dates[0]
-    for j, date in enumerate(dates):
-
-        if isinstance(date, str):
-            daystack = base % str(date)
-        else:
-            daystack = base % date.strftime('%Y-%m-%d')
-
-        try:
-            stack_data[j, :] = read(daystack, format=export_format)[0].data[:]
-            lastday = str(date)
-            i += 1
-        except:
-            # traceback.print_exc()
-            pass
-
-    if format == "matrix":
-        return i, stack_data
-
-    elif format == "dataframe":
-        taxis = get_t_axis(session)
-        return pd.DataFrame(stack_data, index=pd.DatetimeIndex(dates),
-                            columns=taxis).loc[:lastday]
-    elif format == "xarray":
-        taxis = get_t_axis(session)
-        times = pd.DatetimeIndex(dates)
-        dr = xr.DataArray(stack_data, coords=[times, taxis],
-                          dims=["times", "taxis"]).dropna("times", how="all")
-        dr.name = "CCF"
-        return dr.to_dataset()
-
-    elif format == "stack":
-        logging.debug("Stacking...")
-
-        corr = stack(stack_data, params.stack_method, params.pws_timegate,
-                     params.pws_power, params.goal_sampling_rate)
-
-        if i > 0:
-            return i, corr
-        else:
-            return 0, None
-
-
-def get_results_all(session, root, lineage_names, station1, station2, components, dates,
-                    format="dataframe", params=None):
-    """
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA.LOC)
-    :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA.LOC)
-    :type components: str
-    :param components: The name of the components used (ZZ, ZR, ...)
-    :type dates: list
-    :param dates: List of TODO datetime.datetime
-    :rtype: :class:`pandas.DataFrame`
-    :return: All CCF results in a :class:`pandas.DataFrame`, where the index
-        is the time of the CCF and the columns are the times in the coda.
-    """
-
-    path = os.path.join(root, *lineage_names, "_output", "all", components,  station1, station2)
-    print("New path with lineage!:", path)
-    results = []
-    for date in dates:
-        if isinstance(date, str):
-            fname = os.path.join(path, date+".h5")
-        else:
-            fname = os.path.join(path, date.strftime('%Y-%m-%d.h5'))
-        if os.path.isfile(fname):
-            df = pd.read_hdf(fname, 'data', parse_dates=True)
-            df.index = pd.to_datetime(df.index)
-            results.append(df)
-
-    if len(results) > 0:
-        result = pd.concat(results)
-        del results
-        if format == "dataframe":
-            return result
-        elif format == "xarray":
-            taxis = get_t_axis(params)
-            times = result.index
-            dr = xr.DataArray(result, coords=[times, taxis],
-                              dims=["times", "taxis"]).dropna("times", how="all")
-            dr.name = "CCF"
-            dr = dr.sortby('times')
-            return dr.to_dataset()
-    else:
-        if format == "xarray":
-            return xr.Dataset()
-        else:
-            return pd.DataFrame()
-
-# Some helper functions
-
-
-def get_maxlag_samples(maxlag, cc_sampling_rate):
-    """
-    Returns the length of the CC functions. Gets the maxlag and sampling rate
-    from the database.
-
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-
-    :rtype: int
-    :returns: the length of the CCF in samples
-    """
-
-    return int(2*maxlag*cc_sampling_rate)+1
-
-
 def get_t_axis(params):
     """
     Returns the time axis (in seconds) of the CC functions.
-    Gets the maxlag from the database and uses `get_maxlag_samples` function.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
 
     :rtype: :class:`numpy.array`
     :returns: the time axis in seconds
     """
-    samples = get_maxlag_samples(params.maxlag, params.cc_sampling_rate)
+    samples = int(2 * params.maxlag * params.cc_sampling_rate) + 1
     return np.linspace(-params.maxlag, params.maxlag, samples)
-
-
-def get_components_to_compute(session, plugin=None):
-    """
-    Returns the components configured in the database.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-
-    :rtype: list of str
-    :returns: a list of components to compute
-    """
-
-    components_to_compute = get_config(session, "components_to_compute",
-                                       plugin=plugin)
-    if len(components_to_compute) == 0:
-        return []
-    elif components_to_compute.count(",") == 0:
-        components_to_compute = [components_to_compute,]
-    else:
-        components_to_compute = components_to_compute.split(",")
-    return components_to_compute
-
-
-def get_components_to_compute_single_station(session, plugin=None):
-    """
-    Returns the components configured in the database.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-
-    :rtype: list of str
-    :returns: a list of components to compute
-    """
-
-    components_to_compute = get_config(session, "components_to_compute_single_station",
-                                       plugin=plugin)
-    if len(components_to_compute) == 0:
-        return []
-    elif components_to_compute.count(",") == 0:
-        components_to_compute = [components_to_compute,]
-    else:
-        components_to_compute = components_to_compute.split(",")
-    return list(np.unique([''.join(sorted(a)) for a in components_to_compute]))
 
 
 def build_ref_datelist(params):
@@ -2194,97 +1832,6 @@ def build_movstack_datelist(session):
     return start, end, datelist.tolist()
 
 
-def updated_days_for_dates(session, date1, date2, pair, jobtype='CC',
-                           interval=datetime.timedelta(days=1),
-                           returndays=False):
-    """
-    Determines if any Job of jobtype=`jobtype` and for pair=`pair`,
-    concerning a date between `date1` and `date2` has been modified in the last
-    interval=`interval`.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type date1: datetime.datetime
-    :param date1: Beginning of the period of interest
-    :type date2: datetime.datetime
-    :param date2: End of the period of interest
-    :type pair: str
-    :param pair: Pair of interest
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type interval: datetime.timedelta
-    :param interval: Interval of time before now to search for updated days
-    :type returndays: bool
-    :param returndays: Whether to return a list of days (True) or not (False,
-        default)
-
-    :rtype: list or bool
-    :returns: List of days if returndays is True, only "True" if not.
-        (not clear!)
-    """
-    from sqlalchemy import text
-    lastmod = datetime.datetime.now() - interval
-    if pair == '%':
-        days = session.query(Job).\
-            filter(text("day>=:date1")).\
-            filter(text("day<=:date2")).\
-            filter(Job.jobtype == jobtype).\
-            filter(Job.lastmod >= lastmod).group_by(Job.day).\
-            order_by(Job.day).params(date1=date1.strftime("%Y-%m-%d"),
-                                     date2=date2.strftime("%Y-%m-%d")).all()
-    else:
-        days = session.query(Job).filter(Job.pair == pair).\
-            filter(Job.day >= date1.strftime("%Y-%m-%d")). \
-            filter(Job.day <= date2.strftime("%Y-%m-%d")). \
-            filter(Job.jobtype == jobtype).filter(Job.lastmod >= lastmod).\
-            group_by(Job.day).order_by(Job.day).with_entities("day").all()
-    logging.debug('Found %03i updated days' % len(days))
-    if returndays and len(days) != 0:
-        return [datetime.datetime.strptime(day.day,'%Y-%m-%d').date() for day
-                in days] ## RETURN DATE LIST !!!
-    elif returndays and len(days) == 0:
-        return []
-    else:
-        return True
-
-# MISC
-
-
-def azimuth(coordinates, x0, y0, x1, y1):
-    """
-    Returns the azimuth between two coordinate sets.
-
-    :type coordinates: str
-    :param coordinates: {'DEG', 'UTM', 'MIX'}
-    :type x0: float
-    :param x0: X coordinate of station 1
-    :type y0: float
-    :param y0: Y coordinate of station 1
-    :type x1: float
-    :param x1: X coordinate of station 2
-    :type y1: float
-    :param y1: Y coordinate of station 2
-
-    :rtype: float
-    :returns: The azimuth in degrees
-    """
-    from obspy.geodetics import gps2dist_azimuth
-    if coordinates == "DEG":
-        dist, azim, bazim = gps2dist_azimuth(y0, x0, y1, x1)
-        return azim
-    elif coordinates == 'UTM':
-        if (np.isclose(y0, y1) & np.isclose(x0, x1)):
-            return 0
-        else:
-            azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
-            return azim % 360
-    else:
-        logging.warning("Please consider having a single coordinate system for"
-                        " all stations")
-        return 0
-
-
 def nextpow2(x):
     """
     Returns the next power of 2 of `x`.
@@ -2386,51 +1933,6 @@ def getGaps(stream, min_gap=None, max_gap=None):
     del copied_traces
     return gap_list
 
-
-def make_same_length(st):
-    """
-    This function takes a stream of equal sampling rate and makes sure that all
-    channels have the same length and the same gaps.
-    """
-    from obspy import Stream
-    # Merge traces
-    st.merge()
-
-    # Initialize arrays to be filled with start+endtimes of all traces
-    starttimes = []
-    endtimes = []
-
-    # Loop over all traces of the stream
-    for tr in st:
-        # Force conversion to masked arrays
-        if not np.ma.count_masked(tr.data):
-            tr.data = np.ma.array(tr.data, mask=False)
-        # Read out start+endtimes of traces to trim
-        starttimes.append(tr.stats.starttime)
-        endtimes.append(tr.stats.endtime)
-
-    # trim stream to common starttimes
-    if max(starttimes) >= min(endtimes):
-        return Stream()
-    st.trim(max(starttimes), min(endtimes))
-
-    # get the mask of all traces, i.e. the parts where at least one trace has
-    # a gap
-
-    if len(st) < 2:
-        return st
-
-    masks=[]
-    for tr in st:
-        masks.append(tr.data.mask)
-    mask =  np.any(masks,axis=0)
-
-    # apply the mask to all traces
-    for tr in st:
-        tr.data.mask = mask
-
-    st = st.split()
-    return st
 
 def preload_instrument_responses(session, return_format="dataframe"):
     """
@@ -2689,54 +2191,6 @@ def xr_save_and_close(dataset, fn):
     del dataset
 
 
-def get_dvv(session, filterid, components, dates,
-            mov_stack=1, aggregation="median", dttname="M"):
-    pairs = []
-
-    current = dates[0]
-    end = dates[-1]
-
-    alldf = []
-    while current <= end:
-        for comp in components:
-            day = os.path.join('DTT', "%02i" % filterid, "%03i_DAYS" %
-                               mov_stack, components, '%s.txt' % current)
-            if os.path.isfile(day):
-                df = pd.read_csv(day, header=0, index_col=0,
-                                 parse_dates=True)
-                alldf.append(df)
-        current += datetime.timedelta(days=1)
-    if len(alldf) == 0:
-        print("No Data for %s m%i f%i" % (components, mov_stack, filterid))
-
-    alldf = pd.concat(alldf)
-    # print(mov_stack, alldf.head())
-    if 'alldf' in locals():
-        errname = "E" + dttname
-        alldf.to_csv("tt.csv")
-        alldf[dttname] *= -100
-        alldf[errname] *= -100
-
-        allbut = alldf[alldf['Pairs'] != 'ALL'].copy()
-
-        for pair in pairs:
-            # print(pair)
-            pair1 = alldf[alldf['Pairs'] == pair].copy()
-            # print(pair1.head())
-
-            pair1.to_csv('%s-m%i-f%i.csv' % (pair, mov_stack, filterid))
-
-        if aggregation == "median":
-            tmp3 = allbut[dttname].resample('D').median()
-            etmp3 = allbut[errname].resample('D').median()
-
-        elif aggregation == "mean":
-            tmp3 = allbut[dttname].resample('D').mean()
-            etmp3 = allbut[errname].resample('D').mean()
-        else:
-            print('Choose median or mean')
-    return tmp3, etmp3
-
 def xr_save_ccf(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, new, overwrite=False):
     path = os.path.join(root, *lineage, step_name, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
@@ -2808,7 +2262,7 @@ def xr_get_ref(root, lineage, station1, station2, components, filterid, taxis, i
     return data.CCF.to_dataframe()
 
 
-def xr_save_mwcs2(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, dataframe):
+def xr_save_mwcs(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, dataframe):
     fn = os.path.join(root, *lineage, step_name, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]),
                        "%s" % components,
@@ -2827,7 +2281,7 @@ def xr_save_mwcs2(root, lineage, step_name, station1, station2, components, filt
     xr_save_and_close(rr, fn)
     del dr, rr, d
 
-def xr_get_mwcs2(root, lineage, station1, station2, components, mov_stack):
+def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack):
     fn = os.path.join(root, *lineage, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]),
                        "%s" % components,
@@ -2840,7 +2294,7 @@ def xr_get_mwcs2(root, lineage, station1, station2, components, mov_stack):
     return data
 
 
-def xr_save_dtt2(root, lineage, step_name, station1, station2, components, mov_stack, dataframe):
+def xr_save_dtt(root, lineage, step_name, station1, station2, components, mov_stack, dataframe):
     """
     :param station1: string, name of station 1
     :param station2: string, name of station 2
@@ -2865,7 +2319,7 @@ def xr_save_dtt2(root, lineage, step_name, station1, station2, components, mov_s
     rr = xr_insert_or_update(dr, rr)
     xr_save_and_close(rr, fn)
 
-def xr_get_dtt2(root, lineage, station1, station2, components, mov_stack):
+def xr_get_dtt(root, lineage, station1, station2, components, mov_stack):
     """
     :param station1: The first station name
     :param station2: The second station name
@@ -2891,7 +2345,7 @@ def xr_get_dtt2(root, lineage, station1, station2, components, mov_stack):
     data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
     return data
 
-def xr_save_dvv2(root, lineage, step_name, components, mov_stack, dataframe):
+def xr_save_dvv(root, lineage, step_name, components, mov_stack, dataframe):
     fn = os.path.join(root, *lineage, step_name, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s.nc" % components)
@@ -2917,17 +2371,6 @@ def xr_save_dvv2(root, lineage, step_name, components, mov_stack, dataframe):
     xr_save_and_close(rr, fn)
     del dr, rr, d
 
-
-def xr_get_dvv2(root, lineage, components, mov_stack):
-    fn = os.path.join(root, *lineage, "_output",
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s.nc" % components)
-    if not os.path.isfile(fn):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
-        raise FileNotFoundError(fn)
-    data = xr_create_or_open(fn, name="DVV")
-    data = data.DVV.to_dataframe().reorder_levels(['times', 'level1', 'level0']).unstack().droplevel(0, axis=1).unstack()
-    return data
 
 def wavg(group, dttname, errname):
     """
@@ -2978,7 +2421,7 @@ def wstd(group, dttname, errname):
     return wstd
 
 
-def get_wavgwstd(data, dttname, errname):
+def _get_wavgwstd(data, dttname, errname):
     """
     Calculate the weighted average and weighted standard deviation for a given data.
 
@@ -3000,7 +2443,7 @@ def get_wavgwstd(data, dttname, errname):
     return g, h
 
 
-def trim(data, dttname, limits=0.1):
+def _trim(data, dttname, limits=0.1):
     """
     Trimmed mean and standard deviation calculation.
 
@@ -3020,80 +2463,7 @@ def trim(data, dttname, limits=0.1):
     return g, h
 
 
-def compute_dvv(session, filterid, mov_stack, pairs=None, components=None, params=None, method=None, **kwargs):
-    """
-    Compute DVV statistics for a given seismic session, filter ID, and movement stack. The method calculates various
-    statistical measures for DVV values based on the provided parameters.
-
-    :param session: Seismic session object.
-    :type session: object
-    :param filterid: ID of the filter.
-    :type filterid: str
-    :param mov_stack: Movement stack object.
-    :type mov_stack: object
-    :param pairs: List of station pairs. Defaults to None.
-    :type pairs: list, optional
-    :param components: Component(s) to compute DVV for. Defaults to None.
-    :type components: str, optional
-    :param params: Parameters object containing configuration settings. Defaults to None.
-    :type params: object, optional
-    :param method: Method to use for computation. Defaults to None.
-    :type method: str, optional
-    :param **kwargs: Additional keyword arguments
-    :return: DataFrame containing the computed statistical measures for DVV values.
-    :rtype: DataFrame
-    :raises ValueError: If no DVV values are computed.
-    """
-   
-    if pairs == None:
-        pairs = []
-        for sta1, sta2 in get_station_pairs(session):
-            for loc1 in sta1.locs():
-                s1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
-                for loc2 in sta2.locs():
-                    s2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
-                    pairs.append((s1, s2))
-    all = []
-    for (s1, s2) in pairs:
-        if components == None:
-            if s1 == s2:
-                # if not provided, we'll load all:
-                comps = params.components_to_compute_single_station
-            else:
-                comps = params.components_to_compute
-        else:
-            if components.count(',') == 0:
-                comps = [components, ]
-            else:
-                comps = components.split(',')
-
-        for comp in comps:
-
-            if (s1 == s2) and (comp not in params.components_to_compute_single_station):
-                continue
-            if (s1 != s2) and (comp not in params.components_to_compute):
-                continue
-
-            try:
-                dtt = xr_get_dtt(s1, s2, comp, filterid, mov_stack)
-                all.append(dtt)
-            except FileNotFoundError:
-                traceback.print_exc()
-                continue
-    if not len(all):
-        raise ValueError
-    if len(all) == 1:
-        return all[0]
-    all = pd.concat(all)
-    percentiles = kwargs.get("percentiles", [.05, .10, .25, .5, .75, .90, .95])
-    stats = all.groupby(level=0).describe(percentiles=percentiles)
-    for c in ["m", "m0", "a"]:
-        stats[(c, "weighted_mean")], stats[(c, "weighted_std")] = get_wavgwstd(all, c, 'e'+c)
-        stats[(c, "trimmed_mean")], stats[(c, "trimmed_std")] = trim(all, c, kwargs.get("limits", None))
-
-    return stats.sort_index(axis=1)
-
-def compute_dvv2(session, root, lineage, mov_stack, pairs=None, components=None, params=None, method=None, **kwargs):
+def compute_dvv(session, root, lineage, mov_stack, pairs=None, components=None, params=None, method=None, **kwargs):
     """
     Compute DVV statistics for a given seismic session, filter ID, and movement stack. The method calculates various
     statistical measures for DVV values based on the provided parameters.
@@ -3153,7 +2523,7 @@ def compute_dvv2(session, root, lineage, mov_stack, pairs=None, components=None,
                 continue
 
             try:
-                dtt = xr_get_dtt2(root, lineage, s1, s2, comp, mov_stack)
+                dtt = xr_get_dtt(root, lineage, s1, s2, comp, mov_stack)
                 all.append(dtt)
             except FileNotFoundError:
                 traceback.print_exc()
@@ -3166,12 +2536,12 @@ def compute_dvv2(session, root, lineage, mov_stack, pairs=None, components=None,
     percentiles = kwargs.get("percentiles", [.05, .10, .25, .5, .75, .90, .95])
     stats = all.groupby(level=0).describe(percentiles=percentiles)
     for c in ["m", "m0", "a"]:
-        stats[(c, "weighted_mean")], stats[(c, "weighted_std")] = get_wavgwstd(all, c, 'e'+c)
-        stats[(c, "trimmed_mean")], stats[(c, "trimmed_std")] = trim(all, c, kwargs.get("limits", None))
+        stats[(c, "weighted_mean")], stats[(c, "weighted_std")] = _get_wavgwstd(all, c, 'e'+c)
+        stats[(c, "trimmed_mean")], stats[(c, "trimmed_std")] = _trim(all, c, kwargs.get("limits", None))
 
     return stats.sort_index(axis=1)
 
-def xr_save_wct2(root, lineage, step_name, station1, station2, components, mov_stack, taxis, freqs, WXamp_list, WXcoh_list, WXdt_list, dates_list):
+def xr_save_wct(root, lineage, step_name, station1, station2, components, mov_stack, taxis, freqs, WXamp_list, WXcoh_list, WXdt_list, dates_list):
     """
     Save WCT results into an xarray Dataset and store it as a NetCDF file.
 
@@ -3256,7 +2626,7 @@ def xr_load_wct(root, lineage, station1, station2, components, mov_stack):
     ds = xr.load_dataset(fn)
     return ds
 
-def xr_save_wct_dtt2(root, lineage, step_name, station1, station2, components, mov_stack, taxis, dvv_df, err_df, coh_df):
+def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mov_stack, taxis, dvv_df, err_df, coh_df):
     """
     Save the Wavelet Coherence Transform (WCT) results as a NetCDF file.
 
@@ -3439,7 +2809,7 @@ def get_workflow_links(session):
     return session.query(schema.WorkflowLink) \
         .filter(schema.WorkflowLink.is_active == True).all()
 
-def get_step_predecessors(session, step_id):
+def _get_step_predecessors(session, step_id):
     """Get all steps that feed into this step"""
     from .msnoise_table_def import declare_tables
     schema = declare_tables()
@@ -3475,7 +2845,7 @@ def get_upstream_steps_for_step_id(session, step_id, topo_order=True, include_se
 
     def dfs(current_step_id):
         # Direct predecessors of the current node:
-        preds = get_step_predecessors(session, current_step_id) or []
+        preds = _get_step_predecessors(session, current_step_id) or []
         for p in preds:
             if p.step_id in visited:
                 continue
@@ -3591,38 +2961,6 @@ def create_workflow_link(session, from_step_id, to_step_id, link_type="default")
     session.commit()
     return link
 
-def get_workflow_execution_order(session):
-    """Get workflow steps in execution order using topological sort"""
-    steps = get_workflow_steps(session)
-    links = get_workflow_links(session)
-
-    # Build dependency graph
-    dependencies = {}
-    for link in links:
-        if link.to_step_id not in dependencies:
-            dependencies[link.to_step_id] = []
-        dependencies[link.to_step_id].append(link.from_step_id)
-
-    # Topological sort
-    ordered = []
-    visited = set()
-
-    def visit(step_id):
-        if step_id in visited:
-            return
-        visited.add(step_id)
-
-        # Visit dependencies first
-        for dep_id in dependencies.get(step_id, []):
-            visit(dep_id)
-
-        ordered.append(step_id)
-
-    for step in steps:
-        visit(step.step_id)
-
-    return ordered
-
 def get_workflow_graph(session):
     """Return workflow as nodes and edges for visualization, sorted by workflow order"""
     steps = get_workflow_steps(session)
@@ -3676,37 +3014,6 @@ def get_workflow_graph(session):
         })
 
     return {"nodes": nodes, "edges": edges}
-
-def get_config_sets_summary(session):
-    """Get summary of all configuration sets for workflow creation"""
-    from sqlalchemy.sql.expression import func
-    from .msnoise_table_def import declare_tables
-    schema = declare_tables()
-
-    # Get all unique category+set_number combinations
-    config_sets = session.query(
-        schema.Config.category,
-        schema.Config.set_number,
-        func.count(schema.Config.ref).label('param_count')
-    ).filter(
-        schema.Config.set_number.isnot(None)  # Exclude global configs
-    ).group_by(
-        schema.Config.category,
-        schema.Config.set_number
-    ).order_by(
-        schema.Config.category,
-        schema.Config.set_number
-    ).all()
-
-    return [
-        {
-            'category': cs.category,
-            'set_number': cs.set_number,
-            'param_count': cs.param_count,
-            'display_name': f"{cs.category}_{cs.set_number}"
-        }
-        for cs in config_sets
-    ]
 
 def create_workflow_steps_from_config_sets(session):
     """
@@ -3940,67 +3247,6 @@ def get_jobs_for_step(db, step_id, flag=None):
 
     return query.all()
 
-def get_ready_jobs(db, step_name=None, limit=None):
-    """
-    Get jobs that are ready to run based on workflow dependencies
-
-    :param db: Database connection
-    :param step_name: Optional step name filter
-    :param limit: Maximum number of jobs to return
-    :return: List of ready Job instances
-    """
-    query = db.query(Job).filter(
-        Job.flag == 'T'
-    )
-
-    if step_name:
-        query = query.join(WorkflowStep).filter(
-            WorkflowStep.step_name == step_name
-        )
-
-    query = query.order_by(Job.priority.desc(), Job.lastmod.asc())
-
-    if limit:
-        query = query.limit(limit)
-
-    jobs = query.all()
-
-    # Filter by workflow dependencies
-    ready_jobs = []
-    for job in jobs:
-        if is_job_ready_to_run(db, job):
-            ready_jobs.append(job)
-
-    return ready_jobs
-
-def is_job_ready_to_run(db, job):
-    """
-    Check if a job is ready to run based on workflow dependencies
-
-    :param db: Database connection
-    :param job: Job instance
-    :return: Boolean indicating if job is ready
-    """
-    if job.flag != 'T':
-        return False
-
-    # Check if predecessor steps are completed
-    if job.workflow_step and job.workflow_step.incoming_links:
-        for link in job.workflow_step.incoming_links:
-            if link.is_active:
-                # Check if there are completed jobs for the predecessor step
-                predecessor_jobs = db.query(Job).filter(
-                    Job.day == job.day,
-                    Job.pair == job.pair,
-                    Job.step_id == link.from_step_id,
-                    Job.flag == 'D'
-                ).count()
-
-                if predecessor_jobs == 0:
-                    return False
-
-    return True
-
 def create_workflow_jobs(db, current_step_name, days=None, pairs=None):
     """
     Create jobs for the next workflow step(s) after completing a step
@@ -4033,9 +3279,9 @@ def create_workflow_jobs(db, current_step_name, days=None, pairs=None):
     for next_step in next_steps:
         # Get appropriate pairs/days based on step type or use provided ones
         if pairs is None:
-            pairs = get_pairs_for_step(db, next_step)
+            pairs = _get_pairs_for_step(db, next_step)
         if days is None:
-            days = get_days_for_step(db, next_step)
+            days = _get_days_for_step(db, next_step)
 
         for pair in pairs:
             for day in days:
@@ -4054,7 +3300,7 @@ def create_workflow_jobs(db, current_step_name, days=None, pairs=None):
 
     return created_jobs
 
-def get_pairs_for_step(db, step):
+def _get_pairs_for_step(db, step):
     """
     Get appropriate station pairs for a workflow step
 
@@ -4066,7 +3312,7 @@ def get_pairs_for_step(db, step):
     # For now, return all active station pairs
     return get_station_pairs(db, used=True)
 
-def get_days_for_step(db, step):
+def _get_days_for_step(db, step):
     """
     Get appropriate days for a workflow step
 
@@ -4089,23 +3335,6 @@ def get_days_for_step(db, step):
         current_date += timedelta(days=1)
 
     return days
-
-def update_job_status(db, job_id, flag, commit=True):
-    """
-    Update job status with timestamp
-
-    :param db: Database connection
-    :param job_id: Job ID
-    :param flag: New status flag
-    :param commit: Whether to commit the transaction
-    """
-    job = db.query(Job).filter(Job.ref == job_id).first()
-    if job:
-        job.flag = flag
-        job.lastmod = datetime.datetime.utcnow()
-        if commit:
-            db.commit()
-    return job
 
 def get_workflow_job_counts(db):
     """
@@ -4281,43 +3510,14 @@ def get_filter_steps_for_cc_step(session, cc_step_id):
 
     return filter_steps
 
-def get_filter_steps_for_cc_step_name(session, cc_step_name):
-    """
-    Get all filter steps that are children of a specific CC step by step name.
-
-    :param session: Database session
-    :param cc_step_name: The step name of the CC step (e.g., "CC_01")
-    :return: List of filter workflow steps that are successors of the CC step
-    """
-    from .api import get_workflow_steps, get_step_successors
-
-    # First, find the CC step by name
-    cc_step = None
-    workflow_steps = get_workflow_steps(session)
-    for step in workflow_steps:
-        if step.step_name == cc_step_name and step.category == "cc":
-            cc_step = step
-            break
-
-    if not cc_step:
-        return []
-
-    # Get all steps that are successors of the CC step
-    successor_steps = get_step_successors(session, cc_step.step_id)
-
-    # Filter to only include steps with category "filter"
-    filter_steps = [step for step in successor_steps if step.category == "filter"]
-
-    return filter_steps
-
-def merge_params(orig_params, configs_in_order):
+def _merge_params(orig_params, configs_in_order):
     from obspy.core import AttribDict
     merged = dict(orig_params)
     for cfg in configs_in_order:
         merged.update(cfg)  # later overrides earlier
     return AttribDict(merged)
 
-def load_step_config(db, step):
+def _load_step_config(db, step):
     # step must contain config_category + config_set_number (or equivalent)
     return get_config_set_details(
         db,
@@ -4325,28 +3525,6 @@ def load_step_config(db, step):
         step.set_number,
         format="AttribDict",
     )
-
-def get_merged_params(db, orig_params, step_params, pred):
-    # 3) for each predecessor, get its full upstream lineage (preprocess/qc/cc/filter/etc), ordered
-    lineage = get_upstream_steps_for_step_id(db, step_id=pred.step_id, topo_order=True, include_self=True)
-
-    # optionally keep only relevant categories:
-    lineage = [s for s in lineage if s.category in {"preprocess", "cc", "filter", "stack", "refstack"}]
-    lineage_names = [s.step_name for s in lineage]
-    # print("Lineage Names:", lineage_names, "")
-    lineage_cfgs = [load_step_config(db, s) for s in lineage]
-    # print("Lineage Configs:", lineage_cfgs)
-
-    # 4) build branch-specific params, then apply stack last
-    params = merge_params(orig_params, lineage_cfgs + [step_params])
-    params.components_to_compute = params.components_to_compute.split(',')
-    params.components_to_compute_single_station = params.components_to_compute_single_station.split(',')
-    # print("Branch Params:", params)
-    if hasattr(params, "mov_stack"):
-        if not isinstance(params.mov_stack[0], tuple):
-            params.mov_stack = [params.mov_stack, ]
-    return lineage, lineage_names, params
-
 
 def get_lineages_to_step_id(
     session,
@@ -4391,7 +3569,7 @@ def get_lineages_to_step_id(
         if depth > max_depth:
             raise RuntimeError(f"Exceeded max_depth={max_depth} while expanding lineage for step_id={step_id}")
 
-        preds = get_step_predecessors(session, current_id) or []
+        preds = _get_step_predecessors(session, current_id) or []
 
         # Leaf: no predecessors => we have a complete path
         if not preds:
@@ -4431,11 +3609,11 @@ def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
     lineage_names = [s.step_name for s in lineage]
     # print("Lineage Names:", lineage_names)
 
-    lineage_cfgs = [load_step_config(db, s) for s in lineage]
+    lineage_cfgs = [_load_step_config(db, s) for s in lineage]
     # print("Lineage Configs:", lineage_cfgs)
 
     # TODO: gather all those into a "sanitize params" def?
-    params = merge_params(orig_params, lineage_cfgs + [step_params])
+    params = _merge_params(orig_params, lineage_cfgs + [step_params])
 
     params.components_to_compute = params.components_to_compute.split(',')
     params.components_to_compute_single_station = params.components_to_compute_single_station.split(',')
@@ -4727,7 +3905,7 @@ def xr_save_stretching(root, lineage, step_name, station1, station2,
     xr_save_and_close(rr, fn)
 
 
-def xr_get_stretching(root, lineage, station1, station2, components, mov_stack):
+def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack):
     """Load per-pair stretching results from a NetCDF file.
 
     Returns a :class:`~pandas.DataFrame` with columns ``Delta``, ``Coeff``,
@@ -4766,7 +3944,7 @@ def compute_dtt_stretching(session, root, lineage, mov_stack,
 
     Loads ``Delta``, ``Coeff`` and ``Error`` for every station pair and
     component, then computes descriptive statistics across pairs for each
-    time step, mirroring the output of :func:`compute_dvv2`.
+    time step, mirroring the output of :func:`compute_dvv`.
 
     The returned DataFrame has a two-level column index:
     ``('Delta', stat)`` where ``stat`` is one of ``mean``, ``std``,
@@ -4819,7 +3997,7 @@ def compute_dtt_stretching(session, root, lineage, mov_stack,
         comps = comps_sc if s1 == s2 else comps_cc
         for comp in comps:
             try:
-                df = xr_get_stretching(root, lineage, s1, s2, comp, mov_stack)
+                df = _xr_get_stretching(root, lineage, s1, s2, comp, mov_stack)
                 df["_pair"] = "%s:%s" % (s1, s2)
                 df["_comp"] = comp
                 all_frames.append(df)
@@ -4845,12 +4023,12 @@ def compute_dtt_stretching(session, root, lineage, mov_stack,
     flat = combined[["Delta", "Error"]].copy()
     flat.index.name = "times"
     flat.columns = ["m", "em"]  # wavg/wstd expect these names
-    wm, ws = get_wavgwstd(flat, "m", "em")
+    wm, ws = _get_wavgwstd(flat, "m", "em")
     stats[("Delta", "weighted_mean")] = wm
     stats[("Delta", "weighted_std")] = ws
 
     # Trimmed mean/std
-    tm, ts = trim(flat, "m")
+    tm, ts = _trim(flat, "m")
     stats[("Delta", "trimmed_mean")] = tm
     stats[("Delta", "trimmed_std")] = ts
 
@@ -4866,7 +4044,7 @@ def xr_get_wct_dtt(root, lineage, station1, station2, components, mov_stack):
 
     Returns an :class:`xarray.Dataset` with variables ``dvv``, ``err``,
     ``coh`` each of shape ``(times, frequency)``, as written by
-    :func:`xr_save_wct_dtt2`.
+    :func:`xr_save_wct_dtt`.
 
     Note: despite the variable name ``dvv`` in the file, the values are
     *dt/t* (fractional time delay × 100 in percent) at each frequency bin,
@@ -4906,7 +4084,7 @@ def compute_dtt_wct(session, root, lineage, mov_stack,
     ``mean``, ``std``, ``median``, ``weighted_mean``, ``weighted_std``,
     ``trimmed_mean``, ``trimmed_std``, plus the requested percentiles.
 
-    Values are already in percent (as stored by :func:`xr_save_wct_dtt2`).
+    Values are already in percent (as stored by :func:`xr_save_wct_dtt`).
     No sign flip is needed for dv/v (WCT measures dt/t directly from the
     phase delay, so ``dv/v ≈ -dt/t``; the calling code should negate if
     needed, matching the MWCS convention).
@@ -4995,11 +4173,11 @@ def compute_dtt_wct(session, root, lineage, mov_stack,
         [("dvv", c) for c in stats.columns]
     )
 
-    wm, ws = get_wavgwstd(flat, "m", "em")
+    wm, ws = _get_wavgwstd(flat, "m", "em")
     stats[("dvv", "weighted_mean")] = wm
     stats[("dvv", "weighted_std")] = ws
 
-    tm, ts = trim(flat, "m")
+    tm, ts = _trim(flat, "m")
     stats[("dvv", "trimmed_mean")] = tm
     stats[("dvv", "trimmed_std")] = ts
 

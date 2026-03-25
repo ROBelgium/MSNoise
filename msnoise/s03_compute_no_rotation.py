@@ -653,7 +653,7 @@ def main(loglevel="INFO"):
             # Root folder for "all windows" output:
             cc_all_base = os.path.join(*lineage_names, step.step_name)
             for ccfid in allcorr.keys():
-                export_allcorr2(db, ccfid, allcorr[ccfid], base_folder=cc_all_base, params=params, t_axis=t_axis)
+                export_allcorr(db, ccfid, allcorr[ccfid], base_folder=cc_all_base, params=params, t_axis=t_axis)
 
         if params.keep_days:
             # Root folder for "daily stacks" output:

@@ -73,13 +73,12 @@ from obspy.signal import PPSD
 from obspy.core import AttribDict
 
 
-from .api import to_sds, get_logger, preload_instrument_responses, is_next_job_for_step, get_next_job_for_step, get_config_set_details
+from .api import (connect, get_logger, get_params, get_config,
+                  get_data_availability, get_config_set_details,
+                  is_next_job_for_step, get_next_job_for_step,
+                  preload_instrument_responses, to_sds, update_job)
 
 import logbook
-
-
-from msnoise.api import connect, is_next_job, get_next_job, \
-    get_data_availability, get_config, update_job, to_sds, get_params
 
 
 def main(loglevel="INFO", njobs_per_worker=9999):

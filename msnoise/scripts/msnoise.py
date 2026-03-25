@@ -1301,10 +1301,10 @@ def cc_stack(ctx, ref, mov, step):
 
     if threads == 1:
         if ref:
-            from ..s04_stack2_ref import main
+            from ..s04_stack_ref import main
             main('ref', loglevel=loglevel)
         if mov:
-            from ..s04_stack2_mov import main
+            from ..s04_stack_mov import main
             main('mov', loglevel=loglevel)
         if step:
             main('step', loglevel=loglevel)
@@ -1312,7 +1312,7 @@ def cc_stack(ctx, ref, mov, step):
         from multiprocessing import Process
         processes = []
         if ref:
-            from ..s04_stack2_ref import main
+            from ..s04_stack_ref import main
             for i in range(threads):
                 p = Process(target=main, args=["ref",],
                             kwargs={"loglevel": loglevel})
@@ -1322,7 +1322,7 @@ def cc_stack(ctx, ref, mov, step):
         for p in processes:
             p.join()
         if mov:
-            from ..s04_stack2_mov import main
+            from ..s04_stack_mov import main
             for i in range(threads):
                 p = Process(target=main, args=["mov",],
                             kwargs={"loglevel": loglevel})
@@ -1354,7 +1354,7 @@ def cc_stack_refstack(ctx):
     - Negative integer (e.g. -5)  → Mode B: no file written; rolling reference
       computed on-the-fly inside the MWCS/stretching/WCT workers.
     """
-    from ..s04_stack2_refstack import main
+    from ..s04_stack_refstack import main
     threads = ctx.obj['MSNOISE_threads']
     delay   = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1566,7 +1566,7 @@ def dtt():
 @click.pass_context
 def dtt_compute_mwcs(ctx):
     """Computes the MWCS jobs"""
-    from ..s05_compute_mwcs2 import main
+    from ..s05_compute_mwcs import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1610,7 +1610,7 @@ def dtt_compute_stretching2(ctx):
 @click.pass_context
 def dtt_compute_dtt(ctx):
     """Computes the dt/t jobs based on the new MWCS data"""
-    from ..s06_compute_mwcs_dtt2 import main
+    from ..s06_compute_mwcs_dtt import main
     threads = ctx.obj['MSNOISE_threads']
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1772,9 +1772,9 @@ def dtt_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid,
     """
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from wct_dvv2 import main  # NOQA
+        from wct_dvv import main  # NOQA
     else:
-        from ..plots.wct_dvv2 import main
+        from ..plots.wct_dvv import main
     main(mov_stackid=mov_stack, components=comp, filterid=filterid,
          wctid=wctid, dttid=dttid, visualize=visualize, ranges=ranges,
          show=show, outfile=outfile, loglevel=loglevel)
