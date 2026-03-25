@@ -803,6 +803,7 @@ def test_400_run_manually():
     os.system("msnoise reset wavelet_1 --all")
     os.system("msnoise cc dtt compute_wct")
     os.system("msnoise new_jobs --after wavelet")
+    os.system("msnoise reset wavelet_dtt_1 --all")
     os.system("msnoise cc dtt compute_wct_dtt")
     os.system("msnoise cc dtt plot wct -s 0 -o ?.png")
 
