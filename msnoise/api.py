@@ -4875,7 +4875,6 @@ def psd_ppsd_to_dataframe(ppsd):
     return pd.DataFrame(data, index=ind_times, columns=ppsd.period_bin_centers)
 
 
-
 def xr_save_psd(root, lineage, step_name, seed_id, day, dataframe):
     """Save a daily PSD result DataFrame to a NetCDF file.
 
@@ -4943,6 +4942,73 @@ def xr_load_psd(root, lineage, step_name, seed_id, day):
         da.values,
         index=pd.DatetimeIndex(da.coords["times"].values),
         columns=da.coords["periods"].values.astype(float),
+    )
+    ds.close()
+    return df
+
+def xr_save_rms(root, lineage, step_name, seed_id, dataframe):
+    """Save per-station PSD RMS results to a NetCDF file.
+
+    The output lives hierarchically under the upstream PSD step::
+
+        <root>/<*lineage>/<step_name>/_output/<seed_id>/RMS.nc
+
+    The DataFrame must have a :class:`~pandas.DatetimeIndex` and columns
+    that are frequency-band label strings (e.g. ``"1.0-20.0"``), as
+    returned by :func:`psd_df_rms`.
+
+    When the file already exists its contents are merged: existing rows
+    that share a timestamp with *dataframe* are overwritten, other rows
+    are preserved.
+
+    :param root: Output folder root (``params.output_folder``).
+    :param lineage: Upstream step-name list, e.g. ``["psd_1"]``.
+    :param step_name: Current psd_rms step name, e.g. ``"psd_rms_1"``.
+    :param seed_id: SEED identifier string ``"NET.STA.LOC.CHAN"``.
+    :param dataframe: :class:`~pandas.DataFrame` of RMS values
+        (index = window datetimes, columns = band labels).
+    """
+    fn = os.path.join(root, *lineage, step_name, "_output", seed_id, "RMS.nc")
+    os.makedirs(os.path.dirname(fn), exist_ok=True)
+
+    bands = list(dataframe.columns.astype(str))
+    times = pd.DatetimeIndex(dataframe.index)
+
+    if os.path.isfile(fn):
+        existing = xr_load_rms(root, lineage, step_name, seed_id)
+        if existing is not None:
+            existing = existing[~existing.index.isin(times)]
+            dataframe = pd.concat([existing, dataframe]).sort_index()
+            bands = list(dataframe.columns.astype(str))
+            times = pd.DatetimeIndex(dataframe.index)
+
+    da = xr.DataArray(
+        dataframe.values.astype(float),
+        coords=[times, bands],
+        dims=["times", "bands"],
+        name="RMS",
+    )
+    da.to_dataset().to_netcdf(fn, mode="w")
+
+
+def xr_load_rms(root, lineage, step_name, seed_id):
+    """Load per-station PSD RMS results from a NetCDF file.
+
+    :param root: Output folder root.
+    :param lineage: Upstream step-name list, e.g. ``["psd_1"]``.
+    :param step_name: PSD_RMS step name, e.g. ``"psd_rms_1"``.
+    :param seed_id: SEED identifier string ``"NET.STA.LOC.CHAN"``.
+    :returns: :class:`~pandas.DataFrame` or ``None`` if file not found.
+    :rtype: :class:`~pandas.DataFrame` or None
+    """
+    fn = os.path.join(root, *lineage, step_name, "_output", seed_id, "RMS.nc")
+    if not os.path.isfile(fn):
+        return None
+    ds = xr.load_dataset(fn)
+    df = pd.DataFrame(
+        ds.RMS.values,
+        index=pd.DatetimeIndex(ds.RMS.coords["times"].values),
+        columns=list(ds.RMS.coords["bands"].values),
     )
     ds.close()
     return df
