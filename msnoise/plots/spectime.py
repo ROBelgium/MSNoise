@@ -77,7 +77,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
         t = stack_total.columns.values
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
-        sys.exit(1)
+        return
 
     # convert index to mdates
     stack_total.index = mdates.date2num(stack_total.index.to_pydatetime())
