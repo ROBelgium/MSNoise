@@ -568,6 +568,102 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
 
     return created
 
+
+def propagate_psd_rms_jobs_from_psd_done(session):
+    """Create TODO psd_rms jobs from DONE psd jobs.
+
+    For each DONE ``psd_N`` job (station, day), find all active ``psd_rms``
+    successor steps linked to that psd step and create a matching
+    ``psd_rms_M`` job for the same (station, day) if one does not already
+    exist.
+
+    The job ``lineage`` field is set to the upstream psd step name
+    (e.g. ``"psd_1"``), so that :func:`~msnoise.psd_compute_rms.main`
+    knows where to look for NC files.
+
+    Called via ``msnoise new_jobs --after psd``.
+
+    :returns: Number of jobs created.
+    :rtype: int
+    """
+    from .msnoise_table_def import declare_tables
+
+    schema = declare_tables()
+    Job = schema.Job
+    WorkflowStep = schema.WorkflowStep
+
+    now = datetime.datetime.utcnow()
+    created = 0
+
+    psd_steps = (
+        session.query(WorkflowStep)
+        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.category == "psd")
+        .all()
+    )
+
+    if not psd_steps:
+        logger.warning("[--after psd] No active psd steps found.")
+        return 0
+
+    for psd_step in psd_steps:
+        # Find all psd_rms steps directly downstream of this psd step
+        psd_rms_steps = (
+            session.query(WorkflowStep)
+            .join(schema.WorkflowLink,
+                  schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
+            .filter(schema.WorkflowLink.from_step_id == psd_step.step_id)
+            .filter(schema.WorkflowLink.is_active == True)
+            .filter(WorkflowStep.category == "psd_rms")
+            .all()
+        )
+        if not psd_rms_steps:
+            continue
+
+        # All DONE psd jobs for this psd step
+        done_psd_jobs = (
+            session.query(Job)
+            .filter(Job.step_id == psd_step.step_id)
+            .filter(Job.flag == "D")
+            .all()
+        )
+        if not done_psd_jobs:
+            continue
+
+        for psd_job in done_psd_jobs:
+            for psd_rms_step in psd_rms_steps:
+                # Lineage encodes the upstream psd step name so that
+                # psd_compute_rms knows which NC output folder to read.
+                lineage = psd_step.step_name
+
+                existing = (
+                    session.query(Job.ref)
+                    .filter(Job.step_id == psd_rms_step.step_id)
+                    .filter(Job.day == psd_job.day)
+                    .filter(Job.pair == psd_job.pair)
+                    .filter(Job.lineage == lineage)
+                    .first()
+                )
+                if existing:
+                    continue
+
+                session.add(Job(
+                    day=psd_job.day,
+                    pair=psd_job.pair,
+                    flag="T",
+                    step_id=psd_rms_step.step_id,
+                    jobtype=psd_rms_step.step_name,
+                    priority=0,
+                    lastmod=now,
+                    lineage=lineage,
+                ))
+                created += 1
+
+    session.commit()
+    logger.info(f"[--after psd] PSD_RMS jobs created: {created}")
+    return created
+
+
 def propagate_first_runnable_from_category(session, source_category, skip_categories=None):
     """
     For each WorkflowStep in `source_category`:
@@ -794,6 +890,11 @@ def main(init=False, nocc=False, after=False):
                                         commit=False)
                 db.commit()
             logger.info(f'Propagation from category "preprocess" created {created} CC job(s)')
+            return
+
+        if source_category == "psd":
+            created = propagate_psd_rms_jobs_from_psd_done(session=db)
+            logger.info(f'Propagation from category "psd" created {created} PSD_RMS job(s)')
             return
 
         if source_category == "stack":
