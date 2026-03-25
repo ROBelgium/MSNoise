@@ -4875,6 +4875,79 @@ def psd_ppsd_to_dataframe(ppsd):
     return pd.DataFrame(data, index=ind_times, columns=ppsd.period_bin_centers)
 
 
+
+def xr_save_psd(root, lineage, step_name, seed_id, day, dataframe):
+    """Save a daily PSD result DataFrame to a NetCDF file.
+
+    The DataFrame must have shape ``(n_windows, n_period_bins)`` with a
+    :class:`~pandas.DatetimeIndex` and period-bin-centre float columns, as
+    returned by :func:`psd_ppsd_to_dataframe`.
+
+    Path layout::
+
+        <root>/<lineage>/<step_name>/_output/daily/<seed_id>/<YYYY-MM-DD>.nc
+
+    :param root: Output folder root (``params.output_folder``).
+    :param lineage: List of step-name strings (upstream → current, same
+        convention as :func:`xr_save_ccf`).
+    :param step_name: Current PSD step name (e.g. ``'psd_1'``).
+    :param seed_id: SEED identifier string ``'NET.STA.LOC.CHAN'``.
+    :param day: Processing date (``'YYYY-MM-DD'`` string or
+        :class:`datetime.date`).
+    :param dataframe: :class:`~pandas.DataFrame` of PSD values
+        (index = window datetimes, columns = period bin centres).
+    """
+    day_str = day if isinstance(day, str) else day.strftime("%Y-%m-%d")
+    fn = os.path.join(
+        root, *lineage, step_name, "_output", "daily",
+        seed_id, f"{day_str}.nc",
+    )
+    os.makedirs(os.path.dirname(fn), exist_ok=True)
+
+    periods = np.array(dataframe.columns, dtype=float)
+    times   = pd.DatetimeIndex(dataframe.index)
+    da = xr.DataArray(
+        dataframe.values.astype(float),
+        coords=[times, periods],
+        dims=["times", "periods"],
+        name="PSD",
+    )
+    ds = da.to_dataset()
+    ds.to_netcdf(fn, mode="w")
+    ds.close()
+
+
+def xr_load_psd(root, lineage, step_name, seed_id, day):
+    """Load a daily PSD NetCDF written by :func:`xr_save_psd`.
+
+    :param root: Output folder root.
+    :param lineage: List of step-name strings.
+    :param step_name: PSD step name (e.g. ``'psd_1'``).
+    :param seed_id: SEED identifier string ``'NET.STA.LOC.CHAN'``.
+    :param day: Date to load (``'YYYY-MM-DD'`` string or
+        :class:`datetime.date`).
+    :returns: :class:`~pandas.DataFrame` with index = window datetimes and
+        columns = period bin centres, or ``None`` if the file does not exist.
+    :rtype: :class:`~pandas.DataFrame` or None
+    """
+    day_str = day if isinstance(day, str) else day.strftime("%Y-%m-%d")
+    fn = os.path.join(
+        root, *lineage, step_name, "_output", "daily",
+        seed_id, f"{day_str}.nc",
+    )
+    if not os.path.isfile(fn):
+        return None
+    ds  = xr.load_dataset(fn)
+    da  = ds.PSD
+    df  = pd.DataFrame(
+        da.values,
+        index=pd.DatetimeIndex(da.coords["times"].values),
+        columns=da.coords["periods"].values.astype(float),
+    )
+    ds.close()
+    return df
+
+
 def hdf_open_store_from_fn(fn, mode="a"):
     store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
     return store
