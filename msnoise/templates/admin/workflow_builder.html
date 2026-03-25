@@ -140,31 +140,10 @@
         <div class="col-md-12">
             <h1>Workflow Builder</h1>
 
-            <!-- Workflow Selection -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5>Select Workflow</h5>
-                </div>
-                <div class="card-body">
-                    <form method="GET" class="form-inline">
-                        <div class="form-group mr-3">
-                            <label for="workflow_select" class="mr-2">Workflow:</label>
-                            <select name="workflow" id="workflow_select" class="form-control" onchange="this.form.submit()">
-                                {% for workflow in workflows %}
-                                <option value="{{ workflow }}" {% if workflow == current_workflow %}selected{% endif %}>
-                                    {{ workflow }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
             <!-- Workflow Graph Visualization -->
             <div class="card mb-4">
                 <div class="card-header">
-                    <h5>Workflow Graph - {{ current_workflow }}</h5>
+                    <h5>Workflow Graph</h5>
                 </div>
                 <div class="card-body">
                     {% if graph_data.nodes %}
