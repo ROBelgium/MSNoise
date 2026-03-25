@@ -1392,7 +1392,7 @@ preprocessid_option = click.option('-p', '--preprocessid', default=1, help='Prep
 ccid_option = click.option('-cc', '--ccid', default=1, help='CC step ID')
 filterid_option = click.option('-f', '--filterid', default=1, help='Filter ID')
 stackid_option = click.option('-m', '--stackid', default=1, help='Stack step ID')
-stackid_item_option = click.option('-mi', '--stackid_item', default=None, help='Mov Stack item within that Stack step ID')
+stackid_item_option = click.option('-mi', '--stackid_item', default=None, type=int, help='Mov Stack item within that Stack step ID')
 refstackid_option = click.option('-rs', '--refstackid', default=1, help='REF Stack step ID')
 comp_option = click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 
@@ -1414,7 +1414,7 @@ dttid_option   = click.option('-d', '--dttid',   default=1, help='MWCS-DTT step 
 # Full DTT lineage bundle: preprocess / cc / filter / stack / stack_item / mwcs / dtt / comp
 dtt_lineage_options = common_options(
     preprocessid_option, ccid_option, filterid_option,
-    stackid_option, stackid_item_option,
+    stackid_option, stackid_item_option, refstackid_option,
     mwcsid_option, dttid_option, comp_option,
 )
 
@@ -1584,6 +1584,28 @@ def dtt_compute_mwcs(ctx):
             p.join()
 
 
+@dtt.command(name='compute_mwcs_dtt')
+@click.pass_context
+def dtt_compute_dtt(ctx):
+    """Computes the dt/t jobs based on the new MWCS data"""
+    from ..s06_compute_mwcs_dtt import main
+    threads = ctx.obj['MSNOISE_threads']
+    delay = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    if threads == 1:
+        main(loglevel=loglevel)
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main, kwargs={"loglevel": loglevel})
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
+
 @dtt.command(name='compute_stretching')
 @click.pass_context
 def dtt_compute_stretching2(ctx):
@@ -1606,47 +1628,26 @@ def dtt_compute_stretching2(ctx):
             p.join()
 
 
-@dtt.command(name='compute_dtt')
-@click.pass_context
-def dtt_compute_dtt(ctx):
-    """Computes the dt/t jobs based on the new MWCS data"""
-    from ..s06_compute_mwcs_dtt import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel})
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
-
-@dtt.command(name='compute_dvv')
-@click.pass_context
-def dtt_compute_dvv(ctx):
-    """Computes the dt/t jobs based on the new DTT data"""
-    from ..s07_compute_dvv import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel})
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+# @dtt.command(name='compute_mwcs_dvv')
+# @click.pass_context
+# def dtt_compute_dvv(ctx):
+#     """Computes the dt/t jobs based on the new DTT data"""
+#     from ..s07_compute_dvv import main
+#     threads = ctx.obj['MSNOISE_threads']
+#     delay = ctx.obj['MSNOISE_threadsdelay']
+#     loglevel = ctx.obj['MSNOISE_verbosity']
+#     if threads == 1:
+#         main(loglevel=loglevel)
+#     else:
+#         from multiprocessing import Process
+#         processes = []
+#         for i in range(threads):
+#             p = Process(target=main, kwargs={"loglevel": loglevel})
+#             p.start()
+#             processes.append(p)
+#             time.sleep(delay)
+#         for p in processes:
+#             p.join()
 
 @dtt.command(name='compute_wct')
 @click.pass_context
@@ -1692,7 +1693,7 @@ def dtt_plot():
 @click.option('-o', '--outfile', help='Output filename (?=auto).', default=None, type=str)
 @click.pass_context
 def dtt_plot_mwcs(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid,
-                  stackid_item, mwcsid, dttid, comp, show, outfile):
+                  stackid_item, refstackid, mwcsid, dttid, comp, show, outfile):
     """Plots the MWCS dt and coherence images for a station pair.
     STA1 and STA2 must be provided as NET.STA.LOC.
     Lineage: -p preprocess, -cc cc, -f filter, -m stack, -mi stack_item, -w mwcs."""
@@ -1703,7 +1704,8 @@ def dtt_plot_mwcs(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid,
         from ..plots.mwcs import main
     main(sta1, sta2,
          preprocess_id=preprocessid, cc_id=ccid, filter_id=filterid,
-         stack_id=stackid, stack_item=stackid_item, mwcs_id=mwcsid,
+         stack_id=stackid, stack_item=stackid_item or 1, refstack_id=refstackid,
+         mwcs_id=mwcsid, mwcs_dtt_id=dttid,
          components=comp, show=show, outfile=outfile, loglevel=loglevel)
 
 
@@ -1727,7 +1729,7 @@ def dtt_plot_mwcs_dtt(ctx, preprocessid, ccid, filterid, stackid, stackid_item, 
 
 
 
-@dtt_plot.command(name="dtt_TODO")
+@dtt_plot.command(name="mwcs_dtt_day")
 @click.argument('sta1')
 @click.argument('sta2')
 @click.argument('day')
@@ -1800,7 +1802,7 @@ def dtt_plot_stretching_dtt(ctx, mov_stack, comp, filterid, stretchingid, show, 
          stretchingid=stretchingid, show=show, outfile=outfile, loglevel=loglevel)
 
 
-@dtt_plot.command(name='mwcs_timing_TODO')
+@dtt_plot.command(name='mwcs_dtt_timing')
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-w', '--mwcsid', default=1, help='MWCS step set number')
 @click.option('-d', '--dttid', default=1, help='MWCS-DTT step set number')

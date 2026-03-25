@@ -30,7 +30,7 @@ from ..api import (
 )
 
 def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
-         stack_item=1, mwcs_id=1,
+         stack_item=1, refstack_id=1, mwcs_id=1, mwcs_dtt_id=1,
          components="ZZ", show=True, outfile=None, loglevel="INFO"):
     """Plot MWCS dt and coherence images for a station pair.
 
@@ -51,8 +51,14 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
     db = connect()
     params = get_params(db)
 
-    lineage_names, params = resolve_lineage_from_ids(db, params, preprocess_id=preprocess_id, cc_id=cc_id, filter_id=filter_id, stack_id=stack_id, mwcs_id=mwcs_id)
-    mov_stack = params.mov_stack[stack_item - 1]
+    lineage_steps, lineage_names, dtt_params = resolve_lineage_from_ids(db, params, preprocess_id=preprocess_id,
+                                                                    cc_id=cc_id, filter_id=filter_id, stack_id=stack_id,
+                                                                    refstack_id=refstack_id, mwcs_id=mwcs_id, mwcs_dtt_id=mwcs_dtt_id)
+
+    lineage_steps, lineage_names, params = resolve_lineage_from_ids(db, params, preprocess_id=preprocess_id, cc_id=cc_id, filter_id=filter_id, stack_id=stack_id, refstack_id=refstack_id, mwcs_id=mwcs_id)
+
+    print(type(stack_item), stack_item)
+    mov_stack = params.mov_stack[stack_item-1]
 
     if sta2 < sta1:
         logger.error("Stations STA1 STA2 should be sorted alphabetically")
@@ -62,14 +68,14 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
     sta2 = check_stations_uniqueness(db, sta2)
 
     # DTT lag window parameters (from merged params or defaults)
-    dtt_lag   = getattr(params, "dtt_lag",    "static")
-    dtt_v     = float(getattr(params, "dtt_v",     1.0))
-    dtt_minlag= float(getattr(params, "dtt_minlag", 5.0))
-    dtt_width = float(getattr(params, "dtt_width",  30.0))
-    minCoh    = float(getattr(params, "dtt_mincoh", 0.0))
-    maxErr    = float(getattr(params, "dtt_maxerr", 0.0))
-    maxDt     = float(getattr(params, "dtt_maxdtt", 1.0))
-    maxlag    = float(getattr(params, "maxlag",     120.0))
+    dtt_lag   = dtt_params.dtt_lag
+    dtt_v     = dtt_params.dtt_v
+    dtt_minlag= dtt_params.dtt_minlag
+    dtt_width = dtt_params.dtt_width
+    minCoh    = dtt_params.dtt_mincoh
+    maxErr    = dtt_params.dtt_maxerr
+    maxDt     = dtt_params.dtt_maxdtt
+    maxlag    = dtt_params.maxlag
 
     if dtt_lag == "dynamic":
         st1 = get_station(db, *sta1.split(".")[:2])
@@ -111,14 +117,14 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
     plt.ylabel("Lag Time (s)")
     plt.axhline(0, lw=0.5, c="k")
     plt.grid()
-    title = ("%s : %s  |  comp=%s  |  "
-             "Preprocess %i – CC %i – Filter %i – Stack %i – MWCS %i  |  "
-             "mov_stack=%s_%s") % (
+    title = ("%s : %s  |  %s\n"
+             "Preprocess %i – CC %i – Filter %i – Stack %i – REF Stack %i - MWCS %i  |  "
+             "mov_stack=%s_%s\n Reference lines from (future) MWCS-DTT %i") % (
         sta1, sta2, components,
-        preprocess_id, cc_id, filter_id, stack_id, mwcs_id,
-        mov_stack[0], mov_stack[1],
+        preprocess_id, cc_id, filter_id, stack_id, refstack_id, mwcs_id,
+        mov_stack[0], mov_stack[1], mwcs_dtt_id
     )
-    plt.title(title)
+    plt.suptitle(title)
     plot_lags(minlag, maxlag2)
     plt.setp(ax1.get_xticklabels(), visible=False)
 
