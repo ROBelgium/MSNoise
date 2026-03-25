@@ -1187,6 +1187,7 @@ from flask import request, redirect, url_for, flash, render_template_string, ren
 from flask_admin import BaseView, expose
 from wtforms import Form, SelectField, StringField, TextAreaField, IntegerField, validators
 
+
 # ============================================================================
 # Main Application Setup
 # ============================================================================
@@ -1199,8 +1200,8 @@ def create_admin_app():
         app,
         name='MSNoise Admin',
         template_mode='bootstrap3',
+        base_template='admin/base.html',
         index_view=MSNoiseAdminIndexView(),
-        base_template='admin/base.html'
     )
 
     # Add model views

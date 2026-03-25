@@ -47,7 +47,7 @@ dependencies = [
     "click-command-tree",
     "pymysql",
     "flask",
-    "flask-admin",
+    "flask-admin<2",
     "flask_babel",
     "flask-wtf",
     "markdown",
