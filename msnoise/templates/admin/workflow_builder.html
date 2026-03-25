@@ -228,7 +228,8 @@
                                     <option value="global">Global</option>
                                     <option value="preprocess">Preprocess</option>
                                     <option value="cc">Cross-Correlation</option>
-                                    <option value="qc">Quality Control</option>
+                                    <option value="psd">PSD</option>
+                                    <option value="psd_rms">PSD RMS</option>
                                     <option value="filter">Filter</option>
                                     <option value="stack">Stack</option>
                                     <option value="refstack">REF Stack</option>
@@ -364,7 +365,8 @@
         'global': '#28a745',
         'preprocess': '#17a2b8',
         'cc': '#6f42c1',
-        'qc': '#fd7e14',
+        'psd': '#fd7e14',
+        'psd_rms': '#e67e22',
         'filter': '#e83e8c',
         'stack': '#20c997',
         'refstack': '#20c997',
@@ -380,7 +382,8 @@
         'global': 'Global Config',
         'preprocess': 'Preprocessing',
         'cc': 'Cross-Correlation',
-        'qc': 'Quality Control',
+        'psd': 'PSD',
+        'psd_rms': 'PSD RMS',
         'filter': 'Filtering',
         'stack': 'Stacking',
         'refstack': 'REF Stacking',
@@ -641,7 +644,8 @@
             'global': 0,
             'preprocess': 1,
             'cc': 2,
-            'qc': 1,
+            'psd': 1,
+            'psd_rms': 2,
             'filter': 3,
             'stack': 4,
             'refstack': 5,
@@ -740,10 +744,11 @@
 
                 if (fromNode) {
                     const WORKFLOW_CHAINS = {
-                        'global': ['preprocess',' qc'],
+                        'global': ['preprocess', 'psd'],
                         'preprocess': ['cc'],
                         'cc': ['filter'],
-                        'qc': [],
+                        'psd': ['psd_rms'],
+                        'psd_rms': [],
                         'filter': ['stack'],
                         'stack': ['refstack'],
                         'refstack': ['mwcs', 'stretching', 'wavelet'],

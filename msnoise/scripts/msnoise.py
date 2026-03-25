@@ -323,7 +323,7 @@ def _create_default_workflow():
         'preprocess', 'cc', 'filter', 'stack',
         'refstack',
         'mwcs', 'mwcs_dtt', 'stretching',
-        'wavelet', 'wavelet_dtt', 'qc',
+        'wavelet', 'wavelet_dtt', 'psd', 'psd_rms',
     ]
 
     db = connect()
@@ -884,7 +884,8 @@ def create_all_sets(force, dry_run):
 
     categories = [
         # 'global',
-        'qc',
+        'psd',
+        'psd_rms',
         'preprocess',
         'cc',
         'filter',

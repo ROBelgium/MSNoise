@@ -72,8 +72,7 @@ function resetjobs(jobtype, all, consolename) {
 function update_all() {
 
     get_num_jobs('PSD', generic_update_jobs);
-    get_num_jobs('PSD2HDF', generic_update_jobs);
-    get_num_jobs('HDF2RMS', generic_update_jobs);
+    get_num_jobs('PSD_RMS', generic_update_jobs);
     get_num_jobs('CC', generic_update_jobs);
     get_num_jobs('STACK', generic_update_jobs);
     get_num_jobs('MWCS', generic_update_jobs);
@@ -152,8 +151,7 @@ function update_all() {
     });
 
     get_num_jobs('PSD', generic_update_jobs);
-    get_num_jobs('PSD2HDF', generic_update_jobs);
-    get_num_jobs('HDF2RMS', generic_update_jobs);
+    get_num_jobs('PSD_RMS', generic_update_jobs);
     get_num_jobs('CC', generic_update_jobs);
     get_num_jobs('STACK', generic_update_jobs);
     get_num_jobs('MWCS', generic_update_jobs);
@@ -215,32 +213,19 @@ function update_all() {
      <div class="progress">
       <div id='PSD' class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
     </div>
-<h3>PSD to HDF</h3>
-     <button id='reset_PSD2HDF' value='Reset PSD2HDF: ALL' class="btn btn-success btn-xs">Reset PSD2HDF jobs "in progress"</button>
-     <button id='reset_PSD2HDF_all' value='Reset PSD2HDF' class="btn btn-warning btn-xs">Reset <b>all</b> PSD2HDF jobs</button>
-     <button id='delete_PSD2HDF_all' value='Reset STACK' class="btn btn-danger btn-xs">Delete <b>all</b> PSD2HDF jobs</button>
-      <div class="alert fade in" id="reset_PSD2HDF_console_div" style="display:none;width:300px;">
-        <button type="button" class="close">x</button>
-        <div id='reset_PSD2HDF_console'></div>
-      </div>
-        <br>
-    <span id='jobs_PSD2HDF'></span>
-     <div class="progress">
-      <div id='PSD2HDF' class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
-    </div>
 
-<h3>HDF to RMS</h3>
-     <button id='reset_HDF2RMS' value='Reset HDF2RMS: ALL' class="btn btn-success btn-xs btn-xs">Reset HDF2RMS jobs "in progress"</button>
-     <button id='reset_HDF2RMS_all' value='Reset HDF2RMS' class="btn btn-warning btn-xs">Reset <b>all</b> HDF2RMS jobs</button>
-     <button id='delete_HDF2RMS_all' value='Reset STACK' class="btn btn-danger btn-xs">Delete <b>all</b> HDF2RMS jobs</button>
-      <div class="alert fade in" id="reset_HDF2RMS_console_div" style="display:none;width:300px;">
+<h3>PSD RMS Jobs</h3>
+     <button id='reset_PSD_RMS' value='Reset PSD_RMS: ALL' class="btn btn-success btn-xs">Reset PSD_RMS jobs "in progress"</button>
+     <button id='reset_PSD_RMS_all' value='Reset PSD_RMS' class="btn btn-warning btn-xs">Reset <b>all</b> PSD_RMS jobs</button>
+     <button id='delete_PSD_RMS_all' value='Reset PSD_RMS' class="btn btn-danger btn-xs">Delete <b>all</b> PSD_RMS jobs</button>
+      <div class="alert fade in" id="reset_PSD_RMS_console_div" style="display:none;width:300px;">
         <button type="button" class="close">x</button>
-        <div id='reset_HDF2RMS_console'></div>
+        <div id='reset_PSD_RMS_console'></div>
       </div>
         <br>
-    <span id='jobs_HDF2RMS'></span>
+    <span id='jobs_PSD_RMS'></span>
      <div class="progress">
-      <div id='HDF2RMS' class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
+      <div id='PSD_RMS' class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">0%</div>
     </div>
   </div>
 
