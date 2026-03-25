@@ -3939,7 +3939,9 @@ def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack)
         .reorder_levels(["times", "keys"])
         .unstack()
         .droplevel(0, axis=1)
+        .rename_axis(None, axis=1)  # clear 'keys' axis name for pandas compat
     )
+    data.index.name = None
     return data
 
 
@@ -4595,8 +4597,11 @@ def compute_dtt_stretching(session, root, lineage, mov_stack,
         )
 
     combined = pd.concat(all_frames)
+    # Drop internal tracking columns before aggregation
+    combined_data = combined.drop(columns=["_pair", "_comp"])
     # Descriptive stats across pairs at each timestamp
-    stats = combined.groupby(combined.index)["Delta"].describe(
+    # Use combined[col].groupby() (Series path) for pandas 2.x/3.x compatibility
+    stats = combined_data["Delta"].groupby(combined_data.index).describe(
         percentiles=percentiles
     )
     stats.columns = pd.MultiIndex.from_tuples(
@@ -4605,7 +4610,7 @@ def compute_dtt_stretching(session, root, lineage, mov_stack,
 
     # Weighted mean/std using Error as inverse-variance weight
     # (re-use the existing wavg/wstd machinery via a temporary flat frame)
-    flat = combined[["Delta", "Error"]].copy()
+    flat = combined_data[["Delta", "Error"]].copy()
     flat.index.name = "times"
     flat.columns = ["m", "em"]  # wavg/wstd expect these names
     wm, ws = _get_wavgwstd(flat, "m", "em")
