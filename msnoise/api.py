@@ -1,3 +1,29 @@
+import collections
+import copy
+import datetime
+import itertools
+import logging
+import os
+import glob
+import traceback
+import pickle
+import math
+
+from logbook import Logger, StreamHandler
+import sys
+
+import numpy as np
+import pandas as pd
+import xarray as xr
+
+from . import DBConfigNotFoundError
+from .msnoise_table_def import Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink
+
+
+# ============================================================
+# Section 1 — Infrastructure: Logging, DB, Configuration
+# ============================================================
+
 
 def get_logger(name, loglevel=None, with_pid=False):
     """
@@ -32,6 +58,7 @@ def get_logger(name, loglevel=None, with_pid=False):
 
     return logger
 
+
 def get_engine(inifile=None):
     """Returns the a SQLAlchemy Engine
 
@@ -64,6 +91,7 @@ def get_engine(inifile=None):
         raise ValueError("tech value must be 1, 2 or 3")
     return engine
 
+
 def connect(inifile=None):
     """Establishes a connection to the database and returns a Session object.
 
@@ -82,6 +110,7 @@ def connect(inifile=None):
     engine = get_engine(inifile)
     session = sessionmaker(bind=engine)
     return session()
+
 
 def create_database_inifile(tech, hostname, database, username, password,
                             prefix=""):
@@ -107,6 +136,7 @@ def create_database_inifile(tech, hostname, database, username, password,
     pickle.dump([tech, hostname, database, username, password, prefix], f,
                  protocol=2)
     f.close()
+
 
 def read_db_inifile(inifile=None):
     """Reads the parameters from the db.ini file.
@@ -142,6 +172,7 @@ def read_db_inifile(inifile=None):
     return IniFile(tech, hostname, database, username, password, prefix)
 
 # ── Configuration ──────────────────────────────────────────
+
 
 def get_config(session, name=None, isbool=False, plugin=None, category='global', set_number=None):
     """Get the value of one or all config bits from the database.
@@ -196,6 +227,7 @@ def get_config(session, name=None, isbool=False, plugin=None, category='global',
             config[c.name] = c.value
     return config
 
+
 def update_config(session, name, value, plugin=None, category='global', set_number=None):
     """Update one config bit in the database.
 
@@ -245,6 +277,7 @@ def update_config(session, name, value, plugin=None, category='global', set_numb
         config.value = value
     session.commit()
     return
+
 
 def create_config_set(session, set_name):
     """
@@ -303,6 +336,7 @@ def create_config_set(session, set_name):
     session.commit()
     return next_set_number
 
+
 def delete_config_set(session, set_name, set_number):
     """
     Delete a configuration set for a workflow step.
@@ -356,6 +390,7 @@ def delete_config_set(session, set_name, set_number):
         get_logger("msnoise").error(f"Failed to delete config set '{set_name}' set_number {set_number}: {str(e)}")
         return False
 
+
 def list_config_sets(session, set_name=None):
     """
     List all configuration sets, optionally filtered by category.
@@ -397,6 +432,7 @@ def list_config_sets(session, set_name=None):
         get_logger("msnoise").error(f"Failed to list config sets: {str(e)}")
 
         return []
+
 
 def get_config_set_details(session, set_name, set_number, format="list"):
     """
@@ -448,6 +484,7 @@ def get_config_set_details(session, set_name, set_number, format="list"):
         get_logger("msnoise", loglevel="ERROR").error(f"Failed to get config set details: {str(e)}")
         return AttribDict() if format == "AttribDict" else []
 
+
 def get_config_categories_definition():
     """Get the standard configuration categories with their display names and order"""
     return [
@@ -464,6 +501,7 @@ def get_config_categories_definition():
         ('wavelet_dtt', 'Wavelet dt/t'),
         ('qc', 'QC')
     ]
+
 
 def get_config_sets_organized(session):
     """Get configuration sets organized by category in the standard order"""
@@ -521,6 +559,7 @@ def get_config_sets_organized(session):
 
 # ── Parameters ─────────────────────────────────────────────
 
+
 def get_params(session):
     """Get config parameters from the database.
 
@@ -563,141 +602,6 @@ def get_params(session):
 # Section 2 — Network / Station
 # ============================================================
 
-def get_stack_lineage_for_filter(session, filterid):
-    """Get the full lineage path through a specific filter step to its downstream stack.
-
-    Traverses the workflow graph upstream from ``filter_{filterid}`` to the root
-    preprocess step, then appends the stack step that is immediately downstream of
-    the filter.  Returns a list of step names suitable for use as the *lineage*
-    argument to :func:`xr_get_ref`, :func:`xr_get_ccf`, etc.
-
-    Example for the default single-pipeline::
-
-        get_stack_lineage_for_filter(db, 1)
-        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1']
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :type filterid: int
-    :param filterid: The filter set_number (e.g. 1 for filter_1).
-    :rtype: list of str
-    """
-    steps = get_workflow_steps(session)
-    links = get_workflow_links(session)
-    step_map = {s.step_id: s for s in steps}
-
-    filter_step = next(
-        (s for s in steps if s.category == 'filter' and s.set_number == filterid),
-        None,
-    )
-    if filter_step is None:
-        return []
-
-    # Walk upstream from filter to the root step, skipping global config steps
-    parent_map = {link.to_step_id: link.from_step_id for link in links}
-    path = [filter_step.step_name]
-    current_id = filter_step.step_id
-    visited = set()
-    while current_id in parent_map:
-        if current_id in visited:
-            break  # guard against cycles
-        visited.add(current_id)
-        parent_id = parent_map[current_id]
-        parent_step = step_map[parent_id]
-        if parent_step.category != 'global':
-            path.insert(0, parent_step.step_name)
-        current_id = parent_id
-
-    # Append the stack step immediately downstream of this filter (if any)
-    for link in links:
-        if link.from_step_id == filter_step.step_id:
-            child = step_map.get(link.to_step_id)
-            if child and child.category == 'stack':
-                path.append(child.step_name)
-                break
-
-    return path
-
-def get_refstack_lineage_for_filter(session, filterid, refstack_set_number=1):
-    """Get the full lineage path through a filter step down to its refstack.
-
-    Extends :func:`get_stack_lineage_for_filter` by also appending the
-    ``refstack_M`` step that is immediately downstream of the stack step.
-    This is the correct lineage to pass to :func:`xr_get_ref`, since REF
-    files now live under the refstack step folder.
-
-    Example for the default single-pipeline::
-
-        get_refstack_lineage_for_filter(db, 1)
-        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :type filterid: int
-    :param filterid: The filter set_number (e.g. 1 for filter_1).
-    :type refstack_set_number: int
-    :param refstack_set_number: Which refstack set to use (default 1).
-    :rtype: list of str
-    """
-    path = get_stack_lineage_for_filter(session, filterid)
-    if not path:
-        return path
-
-    steps = get_workflow_steps(session)
-    links = get_workflow_links(session)
-
-    # Find the stack step at the end of the path
-    stack_step_name = path[-1]
-    stack_step = next(
-        (s for s in steps if s.step_name == stack_step_name), None
-    )
-    if stack_step is None:
-        return path
-
-    # Find the refstack step downstream of this stack step
-    # Prefer the requested refstack_set_number; fall back to the first available
-    refstack_steps = [
-        s for s in steps
-        if s.category == 'refstack'
-        and any(lk.from_step_id == stack_step.step_id and lk.to_step_id == s.step_id
-                for lk in links)
-    ]
-    if not refstack_steps:
-        return path  # no refstack in this workflow, return stack-level lineage
-
-    # Pick requested set_number if available, else first
-    refstack_step = next(
-        (s for s in refstack_steps if s.set_number == refstack_set_number),
-        refstack_steps[0]
-    )
-    return path + [refstack_step.step_name]
-
-
-# ============================================================
-# Section 7 — Time and Date Utilities
-# ============================================================
-
-def get_filters(session, all=False, ref=None):
-    """Get Filters from the database.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-
-    :type all: bool
-    :param all: Returns all filters from the database if True, or only filters
-        where `used` = 1 if False (default)
-
-    :rtype: list of :class:`~msnoise.msnoise_table_def.declare_tables.Filter`
-    :returns: a list of Filter
-    """
-    return [] #TODOOOOOOOO
-    if ref:
-        filter = session.query(Filter).filter(Filter.ref == ref).first()
-        return filter
-    if all:
-        filters = session.query(Filter).all()
-    else:
-        filters = session.query(Filter).filter(Filter.used == True).all()
-    return filters
 
 def get_stations(session, all=False, net=None, format="raw"):
     """Get Stations from the database.
@@ -752,6 +656,7 @@ def get_stations(session, all=False, net=None, format="raw"):
                     output.append("%s.%s.%s.%s" % (sta.net, sta.sta, loc, chan))
         return output
 
+
 def get_station(session, net, sta):
     """Get one Station from the database.
 
@@ -770,6 +675,7 @@ def get_station(session, net, sta):
     station = session.query(Station).filter(Station.net == net).\
         filter(Station.sta == sta).first()
     return station
+
 
 def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
                    instrument='N/A', used=1):
@@ -816,6 +722,7 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
     session.commit()
     return True
 
+
 def get_station_pairs(session, used=None, net=None):
     """Returns an iterator over all possible station pairs.
     If auto-correlation is configured in the database, returns N*N pairs,
@@ -840,6 +747,7 @@ def get_station_pairs(session, used=None, net=None):
     else:
         return itertools.combinations(stations, 2)
 
+
 def check_stations_uniqueness(session, station):
     """
 
@@ -863,6 +771,7 @@ def check_stations_uniqueness(session, station):
     station += ".%s" % locs[0]
     logging.info("Found %s to be the unique solution for this station" % station)
     return station
+
 
 def get_interstation_distance(station1, station2, coordinates="DEG"):
     """Returns the distance in km between `station1` and `station2`.
@@ -892,6 +801,46 @@ def get_interstation_distance(station1, station2, coordinates="DEG"):
 
 
 # DATA AVAILABILITY
+
+
+def azimuth(coordinates, x0, y0, x1, y1):
+    """
+    Returns the azimuth between two coordinate sets.
+
+    :type coordinates: str
+    :param coordinates: {'DEG', 'UTM', 'MIX'}
+    :type x0: float
+    :param x0: X coordinate of station 1
+    :type y0: float
+    :param y0: Y coordinate of station 1
+    :type x1: float
+    :param x1: X coordinate of station 2
+    :type y1: float
+    :param y1: Y coordinate of station 2
+
+    :rtype: float
+    :returns: The azimuth in degrees
+    """
+    from obspy.geodetics import gps2dist_azimuth
+    if coordinates == "DEG":
+        dist, azim, bazim = gps2dist_azimuth(y0, x0, y1, x1)
+        return azim
+    elif coordinates == 'UTM':
+        if (np.isclose(y0, y1) & np.isclose(x0, x1)):
+            return 0
+        else:
+            azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
+            return azim % 360
+    else:
+        logging.warning("Please consider having a single coordinate system for"
+                        " all stations")
+        return 0
+
+
+# ============================================================
+# Section 3 — Data Availability
+# ============================================================
+
 
 def update_data_availability(session, net, sta, loc, chan, path, file, starttime,
                              endtime, data_duration, gaps_duration,
@@ -962,6 +911,7 @@ def update_data_availability(session, net, sta, loc, chan, path, file, starttime
     session.commit()
     return toreturn
 
+
 def get_new_files(session):
     """
     Returns the files marked "N"ew or "M"odified in the database
@@ -978,6 +928,7 @@ def get_new_files(session):
         filter(DataAvailability.flag != 'A').\
         order_by(DataAvailability.starttime).all()
     return files
+
 
 def get_data_availability(session, net=None, sta=None, loc=None, chan=None,
                           starttime=None, endtime=None):
@@ -1026,6 +977,7 @@ def get_data_availability(session, net=None, sta=None, loc=None, chan=None,
                 func.DATE(DataAvailability.endtime) >= starttime.date()).all()
     return data
 
+
 def mark_data_availability(session, net, sta, flag):
     """
     Updates the flag of all
@@ -1055,1705 +1007,6 @@ def mark_data_availability(session, net, sta, flag):
 # Section 4 — Workflow Structure
 # ============================================================
 
-def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
-               ref=None):
-    """
-    Updates or Inserts a new :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the
-    database.
-
-    :type day: str
-    :param day: The day in YYYY-MM-DD format
-    :type pair: str
-    :param pair: the name of the pair (EXAMPLE?)
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type flag: str
-    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
-    :type commit: bool
-    :param commit: Whether to directly commit (True, default) or not (False)
-    :type returnjob: bool
-    :param returnjob: Return the modified/inserted Job (True, default) or not
-        (False)
-
-
-    :rtype: :class:`~msnoise.msnoise_table_def.declare_tables.Job` or None
-    :returns: If returnjob is True, returns the modified/inserted Job.
-    """
-    from sqlalchemy import text
-    if ref:
-        job = session.query(Job).filter(text("ref=:ref")).params(ref=ref).first()
-    else:
-        job = session.query(Job)\
-            .filter(text("day=:day"))\
-            .filter(text("pair=:pair"))\
-            .filter(text("jobtype=:jobtype"))\
-            .params(day=day, pair=pair, jobtype=jobtype).first()
-    if job is None:
-        job = Job(day, pair, jobtype, 'T')
-        session.add(job)
-    else:
-        job.flag = flag
-        job.lastmod = datetime.datetime.now(datetime.timezone.utc)
-    if commit:
-        session.commit()
-    if returnjob:
-        return job
-
-def massive_insert_job(jobs):
-    """
-    Routine to use a low level function to insert much faster a list of
-    :class:`~msnoise.msnoise_table_def.declare_tables.Job`. This method uses the Engine
-    directly, no need to pass a Session object.
-
-    :type jobs: list
-    :param jobs: a list of :class:`~msnoise.msnoise_table_def.declare_tables.Job` to insert.
-    """
-    engine = get_engine()
-    with engine.connect() as conn:
-        conn.execute(
-            Job.__table__.insert(),
-            jobs)
-        try:
-            conn.commit()
-        except:
-            pass
-
-def massive_update_job(session, jobs, flag="D"):
-    """
-    Routine to use a low level function to update much faster a list of
-    :class:`~msnoise.msnoise_table_def.declare_tables.Job`. This method uses the Job.ref
-    which is unique.
-    :type session: Session
-    :param session: the database connection object
-    :type jobs: list or tuple
-    :param jobs: a list of :class:`~msnoise.msnoise_table_def.declare_tables.Job` to update.
-    :type flag: str
-    :param flag: The destination flag.
-    """
-    updated = False
-    mappings = [{'ref': job.ref, 'flag': flag} for job in jobs]
-    while not updated:
-        try:
-            session.bulk_update_mappings(Job, mappings)
-            session.commit()
-            updated = True
-        except:
-            time.sleep(np.random.random())
-            pass
-    return
-
-def is_next_job(session, flag='T', jobtype='CC'):
-    """
-    Are there any :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
-    with flag=`flag` and jobtype=`type`
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type flag: str
-    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
-
-    :rtype: bool
-    :returns: True if at least one :class:`~msnoise.msnoise_table_def.declare_tables.Job`
-        matches, False otherwise.
-    """
-    job = session.query(Job).\
-        filter(Job.jobtype == jobtype).\
-        filter(Job.flag == flag).first()
-    if job is None:
-        return False
-    else:
-        return True
-
-def get_next_job(session, flag='T', jobtype='CC', limit=99999):
-    """
-    Get the next :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
-    with flag=`flag` and jobtype=`jobtype`. Jobs of the same `type` are grouped
-    per day. This function also sets the flag of all selected Jobs to "I"n
-    progress.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type flag: str
-    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
-
-    :rtype: list
-    :returns: list of :class:`~msnoise.msnoise_table_def.declare_tables.Job`
-    """
-    from sqlalchemy import update
-    tmp = []
-    while not len(tmp):
-        jobs = session.query(Job).filter(Job.jobtype == jobtype).\
-            filter(Job.flag == flag).\
-            filter(Job.day == session.query(Job).
-                   filter(Job.jobtype == jobtype).
-                   filter(Job.flag == flag).first().day).\
-            limit(limit).with_for_update()
-
-        tmp = jobs.all()
-        refs = [_.ref for _ in tmp]
-        q = update(Job).values({"flag":"I"}).where(Job.ref.in_(refs))
-        session.execute(q)
-        # jobs.update({Job.flag: 'I'})
-        session.commit()
-    return tmp
-
-def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
-    """
-    Are there any DTT :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
-    with flag=`flag` and jobtype=`jobtype`. If `ref` is provided, checks if a
-    DTT "REF" job is present.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type flag: str
-    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
-    :type ref: bool
-    :param ref: Whether to check for a REF job (True) or not (False, default)
-
-    :rtype: bool
-    :returns: True if at least one Job matches, False otherwise.
-    """
-    q = session.query(Job.ref).\
-        filter(Job.flag == flag).\
-        filter(Job.jobtype == jobtype)
-    if ref:
-        job = q.filter(Job.pair == ref).filter(Job.day == 'REF').count()
-    else:
-        job = q.filter(Job.day != 'REF').count()
-    if job == 0:
-        return False
-    else:
-        return True
-
-def get_dtt_next_job(session, flag='T', jobtype='DTT'):
-    """
-    Get the next DTT :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
-    with flag=`flag` and jobtype=`jobtype`. Jobs are then grouped per station
-    pair. This function also sets the flag of all selected Jobs to "I"n
-    progress.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type flag: str
-    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
-
-    :rtype: tuple
-    :returns: (pairs, days, refs):
-        List of station pair names -
-        Days of the next DTT jobs -
-        Job IDs (for later being able to update their flag).
-    """
-    from sqlalchemy.sql.expression import func
-    if read_db_inifile().tech == 2:
-        rand = func.rand
-    else:
-        rand = func.random
-    try:
-        jobs = session.query(Job.ref, Job.day, Job.pair, Job.flag).filter(Job.flag == flag).\
-            filter(Job.jobtype == jobtype).filter(Job.day != 'REF').\
-            filter(Job.pair == session.query(Job).
-                   filter(Job.flag == flag).
-                   filter(Job.jobtype == jobtype).
-                   filter(Job.day != 'REF').
-                   order_by(rand()).first().pair).\
-            with_for_update()
-        tmp = jobs.all()
-        mappings = [{'ref': job.ref, 'flag': "I"} for job in tmp]
-        updated = False
-        while not updated:
-            try:
-                session.bulk_update_mappings(Job, mappings)
-                session.commit()
-                updated=True
-            except:
-                traceback.print_exc()
-                time.sleep(np.random.random())
-                pass
-        return tmp
-    except:
-        traceback.print_exc()
-        return []
-
-def reset_jobs(session, jobtype, alljobs=False, rule=None, reset_i=True, reset_e=True):
-    """
-    Sets the flag of all `jobtype` Jobs to "T"odo.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type alljobs: bool
-    :param alljobs: If True, resets all jobsregardless of flag. If False (default),
-        only resets jobs with flags specified by reset_i and reset_e.
-    :type rule: str
-    :param rule: Optional custom SQL clause for filtering jobs to reset
-    :type reset_i: bool
-    :param reset_i: If True (default), reset jobs with 'I' flag
-    :type reset_e: bool
-    :param reset_e: If True (default), reset jobs with 'E' flag
-    """
-    dbini = read_db_inifile()
-    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
-     # If a custom rule is provided, use direct SQL
-    if rule:
-        session.execute("UPDATE %sjobs set flag='T' where jobtype='%s' and %s"
-                        % (prefix, jobtype, rule))
-        session.commit()
-        return
-
-    # Get all jobs of the specified jobtype
-    base_query = session.query(Job).filter(Job.jobtype == jobtype)
-
-    if alljobs:
-        # If alljobs is True, reset all jobs regardless of flag
-        base_query.update({Job.flag: 'T'})
-    else:
-        # Reset only jobs with specified flags
-        if reset_i:
-            jobs_i = base_query.filter(Job.flag == "I")
-            jobs_i.update({Job.flag: 'T'})
-
-        if reset_e:
-            jobs_e = base_query.filter(Job.flag == "E")
-            jobs_e.update({Job.flag: 'T'})
-    session.commit()
-
-def get_job_types(session, jobtype='CC'):
-    """
-    Count the number of Jobs of a specific `type`,
-    grouped by `flag`.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-
-    :rtype: list
-    :returns: list of [count, flag] pairs
-    """
-    from sqlalchemy.sql.expression import func
-    return session.query(func.count(Job.flag), Job.flag).\
-        filter(Job.jobtype == jobtype).group_by(Job.flag).all()
-
-# ── Workflow-aware job API ──────────────────────────────────
-
-def export_allcorr(session, ccfid, data, base_folder=None, params=None, t_axis=None):
-    if base_folder is None:
-        # Legacy behaviour:
-        output_folder = get_config(session, 'output_folder')
-        base_folder = output_folder
-    else:
-        # If params.output_folder is an absolute project root you want to respect,
-        # you can anchor relative base_folder under it:
-        if params is not None and hasattr(params, "output_folder") and not os.path.isabs(base_folder):
-            base_folder = os.path.join(params.output_folder, base_folder)
-
-    station1, station2, components, filterid, date = ccfid.split('+')
-
-    path = os.path.join(
-        base_folder,
-        filterid,
-        '_output',
-        'all',
-        components,
-        station1, station2
-    )
-    if not os.path.isdir(path):
-        os.makedirs(path, exist_ok=True)
-
-    df = pd.DataFrame().from_dict(data).T
-    df.columns = t_axis
-    df.to_hdf(os.path.join(path, date+'.h5'), key='data')
-    del df
-    return
-
-def add_corr(session, station1, station2, filterid, date, time, duration,
-             components, CF, sampling_rate, day=False, ncorr=0, params=None, base_folder=None):
-    """
-    Adds a CCF to the data archive on disk.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA.LOC)
-    :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA.LOC)
-    :type filterid: int
-    :param filterid: The ID (ref) of the filter
-    :type date: datetime.date or str
-    :param date: The date of the CCF
-    :type time: datetime.time or str
-    :param time: The time of the CCF
-    :type duration: float
-    :param duration: The total duration of the exported CCF
-    :type components: str
-    :param components: The name of the components used (ZZ, ZR, ...)
-    :type sampling_rate: float
-    :param sampling_rate: The sampling rate of the exported CCF
-    :type day: bool
-    :param day: Whether this function is called to export a daily stack (True)
-        or each CCF (when keep_all parameter is set to True in the
-        configuration). Defaults to True.
-    :type ncorr: int
-    :param ncorr: Number of CCF that have been stacked for this CCF.
-    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
-    :param params: A dictionnary of MSNoise config parameters as returned by
-        :func:`get_params`.
-    """
-    from obspy import Stream, Trace
-    output_folder = params.output_folder
-    export_format = params.export_format
-    sac, mseed = False, False
-    if export_format == "BOTH":
-        mseed = True
-        sac = True
-    elif export_format == "SAC":
-        sac = True
-    elif export_format == "MSEED":
-        mseed = True
-
-    if day:
-        if base_folder is None:
-            # Legacy behaviour:
-            path = os.path.join(
-                "STACKS", "%02i" % filterid, "001_DAYS", components,
-                          "%s_%s" % (station1, station2), str(date)
-            )
-        else:
-            # Workflow-aware behaviour:
-            if params is not None and hasattr(params, "output_folder") and not os.path.isabs(base_folder):
-                base_folder = os.path.join(params.output_folder, base_folder)
-
-            path = os.path.join(
-                base_folder,
-                filterid,
-                '_output',
-                'daily',
-                components,
-                station1, station2,
-                str(date),
-            )
-        pair = "%s:%s" % (station1, station2)
-        if mseed:
-            _export_mseed(session, path, pair, components, filterid, CF,
-                         ncorr, params=params)
-        if sac:
-            _export_sac(session, path, pair, components, filterid, CF,
-                       ncorr, params=params)
-
-    else:
-        file = '%s.cc' % time
-        path = os.path.join(output_folder, filterid, station1,
-                            station2, components, date)
-        if not os.path.isdir(path):
-            os.makedirs(path, exist_ok=True)
-
-        t = Trace()
-        t.data = CF
-        t.stats.sampling_rate = sampling_rate
-        t.stats.starttime = -float(get_config(session, 'maxlag'))
-        t.stats.components = components
-        # if ncorr != 0:
-            # t.stats.location = "%02i"%ncorr
-        st = Stream(traces=[t, ])
-        st.write(os.path.join(path, file), format='mseed')
-        del t, st
-
-def _export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
-               sac_format=None, maxlag=None, cc_sampling_rate=None,
-               params=None):
-    from obspy.core.util.attribdict import AttribDict
-    from obspy import Stream, Trace
-    maxlag = params.maxlag
-    cc_sampling_rate = params.goal_sampling_rate
-    sac_format = params.sac_format
-    if sac_format is None:
-        sac_format = get_config(db, "sac_format")
-    if maxlag is None:
-        maxlag = float(get_config(db, "maxlag"))
-    if cc_sampling_rate is None:
-        cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-    try:
-        os.makedirs(os.path.split(filename)[0], exist_ok=True)
-    except:
-        pass
-    filename += ".SAC"
-    mytrace = Trace(data=corr)
-    mytrace.stats['station'] = pair
-    mytrace.stats['sampling_rate'] = cc_sampling_rate
-    if maxlag:
-        mytrace.stats.starttime = -maxlag
-    mytrace.stats.sac = AttribDict()
-    mytrace.stats.sac.depmin = np.min(corr)
-    mytrace.stats.sac.depmax = np.max(corr)
-    mytrace.stats.sac.depmen = np.mean(corr)
-    mytrace.stats.sac.scale = 1
-    mytrace.stats.sac.npts = len(corr)
-
-    st = Stream(traces=[mytrace, ])
-    st.write(filename, format='SAC')
-    del st
-    return
-
-def _export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
-                 maxlag=None, cc_sampling_rate=None, params=None):
-    from obspy import Trace, Stream
-    try:
-        os.makedirs(os.path.split(filename)[0], exist_ok=True)
-    except:
-        pass
-    filename += ".MSEED"
-    maxlag = params.maxlag
-    cc_sampling_rate = params.cc_sampling_rate
-    if maxlag is None:
-        maxlag = float(get_config(db, "maxlag"))
-    if cc_sampling_rate is None:
-        cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-
-    mytrace = Trace(data=corr)
-    mytrace.stats['station'] = pair[:11]
-    mytrace.stats['sampling_rate'] = cc_sampling_rate
-    mytrace.stats['start_time'] = -maxlag
-    mytrace.stats['location'] = "%02i" % ncorr
-
-    st = Stream(traces=[mytrace, ])
-    st.write(filename, format='MSEED')
-    del st
-    return
-
-
-# ============================================================
-# Section 13 — DVV / DTT Aggregation
-# ============================================================
-
-def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
-          goal_sampling_rate=20.0):
-    """
-    :type data: :class:`numpy.ndarray`
-    :param data: the data to stack, each row being one CCF
-    :type stack_method: str
-    :param stack_method: either ``linear``: average of all CCF or ``pws`` to
-        compute the phase weigthed stack. If ``pws`` is selected,
-        the function expects the ``pws_timegate`` and ``pws_power``.
-    :type pws_timegate: float
-    :param pws_timegate: PWS time gate in seconds. Width of the smoothing
-         window to convolve with the PWS spectrum.
-    :type pws_power: float
-    :param pws_power: Power of the PWS weights to be applied to the CCF stack.
-    :type goal_sampling_rate: float
-    :param goal_sampling_rate: Sampling rate of the CCF array submitted
-    :rtype: :class:`numpy.array`
-    :return: the stacked CCF.
-    """
-    if len(data) == 0:
-        logging.debug("No data to stack.")
-        return []
-    data = data[~np.isnan(data).any(axis=1)]
-    sanitize = False
-    # TODO clean sanitize function, add param to config and make sure not to
-    # kill the data[i] if all data are corrcoeff >0.9 (either very stable
-    # corr or autocorr, then this sanitize should not occur.
-    if len(data) != 1 and sanitize:
-        threshold = 0.99
-        npts = data.shape[1]
-        corr = data.mean(axis=0)
-        corrcoefs = np.array([np.corrcoef(di, corr)[1][0] for di in data])
-        toolarge = np.where(corrcoefs >= threshold)[0]
-        if len(toolarge):
-            data = data[np.where(corrcoefs <= threshold)[0]]
-
-    if len(data) == 0:
-        return []
-    if stack_method == "linear":
-        # logging.debug("Doing a linear stack")
-        corr = data.mean(axis=0)
-
-    elif stack_method == "pws":
-        import scipy.signal as ss
-        # logging.debug("Doing a PWS stack")
-        corr = np.zeros(data.shape[1], dtype='f8')
-        phasestack = np.zeros(data.shape[1], dtype='c8')
-        for i in range(data.shape[0]):
-            data[i] -= data[i].mean()
-        for c in data:
-            phase = np.angle(ss.hilbert(c))
-            phasestack.real += np.cos(phase)
-            phasestack.imag += np.sin(phase)
-        coh = 1. / data.shape[0] * np.abs(phasestack)
-
-        timegate_samples = int(pws_timegate * goal_sampling_rate)
-        coh = np.convolve(ss.windows.boxcar(timegate_samples) /
-                          timegate_samples, coh, 'same')
-        coh = np.power(coh, pws_power)
-        for c in data:
-            corr += c * coh
-        corr /= data.shape[0]
-
-    return corr
-
-def get_extension(export_format):
-    if export_format == "BOTH":
-        return ".MSEED"
-    elif export_format == "SAC":
-        return ".SAC"
-    elif export_format == "MSEED":
-        return ".MSEED"
-    else:
-        return ".MSEED"
-
-def get_t_axis(params):
-    """
-    Returns the time axis (in seconds) of the CC functions.
-
-    :rtype: :class:`numpy.array`
-    :returns: the time axis in seconds
-    """
-    samples = int(2 * params.maxlag * params.cc_sampling_rate) + 1
-    return np.linspace(-params.maxlag, params.maxlag, samples)
-
-def build_ref_datelist(params):
-    """
-    Creates a date array for the REF.
-    The returned tuple contains a start and an end date, and a list of
-    individual dates between the two.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-
-    :rtype: tuple
-    :returns: (start, end, datelist)
-    """
-    begin = params.ref_begin
-    end = params.ref_end
-    if begin[0] == '-':
-        start = datetime.date.today() + datetime.timedelta(days=int(begin))
-        end = datetime.date.today() + datetime.timedelta(days=int(end))
-    elif begin == "1970-01-01":
-        start = session.query(DataAvailability).order_by(
-            DataAvailability.starttime).first().starttime.date()
-        end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
-    else:
-        start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
-        end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
-    end = min(end, datetime.date.today())
-    datelist = pd.date_range(start, end).map(lambda x: x.date())
-    return start, end, datelist.tolist()
-
-def refstack_is_rolling(params):
-    """
-    Return True if the refstack configset uses rolling-index mode.
-
-    Rolling mode is indicated by ``ref_begin`` being a negative integer string
-    (e.g. ``"-5"``). In this mode no REF file is written to disk; the reference
-    is computed on-the-fly at MWCS/stretching/WCT time via
-    :func:`compute_rolling_ref`.
-
-    :type params: :class:`obspy.core.AttribDict`
-    :param params: Merged parameter set containing ``ref_begin``.
-    :rtype: bool
-    """
-    val = str(getattr(params, "ref_begin", "1970-01-01")).strip()
-    return val.startswith("-")
-
-def compute_rolling_ref(data, ref_begin, ref_end):
-    """
-    Compute a per-index rolling reference from a MOV CCF DataFrame.
-
-    For each time index ``i``, the reference is::
-
-        mean(data[i + ref_begin : i + ref_end])
-
-    Both ``ref_begin`` and ``ref_end`` must be negative integers with
-    ``ref_begin < ref_end <= -1``.  Use ``ref_end=-1`` to exclude the current
-    window (compare to the previous N windows).
-
-    Uses ``min_periods=1`` semantics: the first few steps receive whatever
-    partial window is available rather than NaN.
-
-    :type data: :class:`pandas.DataFrame`
-        Shape ``(n_times, n_lag_samples)``.
-    :type ref_begin: int
-        Negative offset for the start of the rolling window (e.g. ``-5``).
-    :type ref_end: int
-        Negative offset for the end of the rolling window (e.g. ``-1``).
-        Must satisfy ``ref_begin < ref_end <= 0``.
-    :rtype: :class:`numpy.ndarray`
-        Shape ``(n_times, n_lag_samples)``.  Row ``i`` is the reference for
-        time step ``i``.
-    """
-    n = len(data)
-    arr = data.values  # (n_times, n_lag_samples)
-    refs = np.full_like(arr, np.nan, dtype=float)
-
-    for i in range(n):
-        start_idx = i + ref_begin   # e.g. i - 5
-        end_idx   = i + ref_end     # e.g. i - 1  (exclusive in slice)
-        if end_idx <= 0:
-            continue                # not enough history yet
-        start_idx = max(0, start_idx)
-        if start_idx >= end_idx:
-            continue
-        refs[i] = np.nanmean(arr[start_idx:end_idx], axis=0)
-
-    return refs
-
-def strip_refstack_from_lineage(lineage_names):
-    """
-    Return a copy of ``lineage_names`` with any ``refstack_*`` entries removed.
-
-    Used by mwcs/stretching/wavelet workers to build the path for
-    :func:`xr_get_ccf`, which lives under the ``stack_N`` step folder rather
-    than under ``refstack_M``.
-
-    Example::
-
-        strip_refstack_from_lineage(
-            ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']
-        )
-        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1']
-
-    :type lineage_names: list of str
-    :rtype: list of str
-    """
-    return [n for n in lineage_names if not n.startswith("refstack_")]
-
-def validate_stack_data(dataset, stack_type="reference"):
-    """Validates stack data before processing
-
-    Parameters:
-        dataset: xarray Dataset to validate
-        stack_type: Type of stack ("reference" or "moving") for error messages
-    Returns:
-        (is_valid, message) tuple
-    """
-    if dataset is None or not dataset.data_vars:
-        return False, f"No data found for {stack_type} stack"
-
-    if not hasattr(dataset, 'CCF'):
-        return False, f"Missing CCF data in {stack_type} stack"
-
-    data = dataset.CCF
-    if data.size == 0:
-        return False, f"Empty dataset in {stack_type} stack"
-
-    nan_count = np.isnan(data.values).sum()
-    total_points = data.values.size
-
-    if nan_count == total_points:
-        return False, f"{stack_type.capitalize()} stack contains only NaN values"
-
-    if nan_count > 0:
-        percent_nan = (nan_count / total_points) * 100
-        return True, f"Warning: {stack_type.capitalize()} stack contains {percent_nan:.1f}% NaN values"
-
-    return True, "OK"
-
-def build_movstack_datelist(session):
-    """
-    Creates a date array for the analyse period.
-    The returned tuple contains a start and an end date, and a list of
-    individual dates between the two.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-
-    :rtype: tuple
-    :returns: (start, end, datelist)
-    """
-    begin = get_config(session, "startdate", category='global', set_number=1)
-    end = get_config(session, "enddate", category='global', set_number=1)
-    if begin[0] == '-':
-        start = datetime.date.today() + datetime.timedelta(days=int(begin))
-        end = datetime.date.today() + datetime.timedelta(days=int(end))
-    elif begin == "1970-01-01": # TODO this fails when the DA is empty
-        start = session.query(DataAvailability).order_by(
-            DataAvailability.starttime).first().starttime.date()
-    else:
-        start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
-
-    if end == "2100-01-01":
-        end = session.query(DataAvailability).order_by(
-            DataAvailability.endtime.desc()).first().endtime.date()
-    else:
-        end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
-    end = min(end, datetime.date.today())
-    datelist = pd.date_range(start, end).map(lambda x: x.date())
-    return start, end, datelist.tolist()
-
-def nextpow2(x):
-    """
-    Returns the next power of 2 of `x`.
-
-    :type x: int
-    :param x: any value
-
-    :rtype: int
-    :returns: the next power of 2 of `x`
-    """
-
-    return np.ceil(np.log2(np.abs(x)))
-
-def check_and_phase_shift(trace, taper_length=20.0):
-    # TODO replace this hard coded taper length
-
-    import scipy.fft as sf
-    from scipy.fft import next_fast_len
-    if trace.stats.npts < 4 * taper_length*trace.stats.sampling_rate:
-        trace.data = np.zeros(trace.stats.npts)
-        return trace
-
-    dt = np.mod(trace.stats.starttime.datetime.microsecond*1.0e-6,
-                trace.stats.delta)
-    if (trace.stats.delta - dt) <= np.finfo(float).eps:
-        dt = 0.
-    if dt != 0.:
-        if dt <= (trace.stats.delta / 2.):
-            dt = -dt
-#            direction = "left"
-        else:
-            dt = (trace.stats.delta - dt)
-#            direction = "right"
-        logging.debug("correcting time by %.6fs"%dt)
-        trace.detrend(type="demean")
-        trace.detrend(type="simple")
-        trace.taper(max_percentage=None, max_length=1.0)
-
-        n = next_fast_len(int(trace.stats.npts))
-        FFTdata = sf.fft(trace.data, n=n)
-        fftfreq = sf.fftfreq(n, d=trace.stats.delta)
-        FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
-        FFTdata = FFTdata.astype(np.complex64)
-        sf.ifft(FFTdata, n=n, overwrite_x=True)
-        trace.data = np.real(FFTdata[:len(trace.data)]).astype(float)
-        trace.stats.starttime += dt
-        del FFTdata, fftfreq
-        # clean_scipy_cache()
-        return trace
-    else:
-        return trace
-
-def getGaps(stream, min_gap=None, max_gap=None):
-    # Create shallow copy of the traces to be able to sort them later on.
-    copied_traces = copy.copy(stream.traces)
-    stream.sort()
-    gap_list = []
-    for _i in range(len(stream.traces) - 1):
-        # skip traces with different network, station, location or channel
-        if stream.traces[_i].id != stream.traces[_i + 1].id:
-            continue
-        # different sampling rates should always result in a gap or overlap
-        if stream.traces[_i].stats.delta == stream.traces[_i + 1].stats.delta:
-            flag = True
-        else:
-            flag = False
-        stats = stream.traces[_i].stats
-        stime = stats['endtime']
-        etime = stream.traces[_i + 1].stats['starttime']
-        delta = etime.timestamp - stime.timestamp
-        # Check that any overlap is not larger than the trace coverage
-        if delta < 0:
-            temp = stream.traces[_i + 1].stats['endtime'].timestamp - \
-                etime.timestamp
-            if (delta * -1) > temp:
-                delta = -1 * temp
-        # Check gap/overlap criteria
-        if min_gap and delta < min_gap:
-            continue
-        if max_gap and delta > max_gap:
-            continue
-        # Number of missing samples
-        nsamples = int(round(math.fabs(delta) * stats['sampling_rate']))
-        # skip if is equal to delta (1 / sampling rate)
-        if flag and nsamples == 1:
-            continue
-        elif delta > 0:
-            nsamples -= 1
-        else:
-            nsamples += 1
-        gap_list.append([_i, _i+1,
-                        stats['network'], stats['station'],
-                        stats['location'], stats['channel'],
-                        stime, etime, delta, nsamples])
-    # Set the original traces to not alter the stream object.
-    stream.traces = copied_traces
-    del copied_traces
-    return gap_list
-
-def preload_instrument_responses(session, return_format="dataframe"):
-    """
-    This function preloads all instrument responses from ``response_path``
-    and stores the seed ids, start and end dates, and paz for every channel
-    in a DataFrame. Any file readable by obspy's read_inventory will be processed.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-
-    :type return_format: str
-    :param return_format: The format of the returned object, either
-        ``dataframe`` or ``inventory``.
-
-    :rtype: :class:`~pandas.DataFrame` or :class:`~obspy.core.inventory.inventory.Inventory`
-    :returns: A table containing all channels with the time of operation and
-        poles and zeros (DataFrame), or an obspy Inventory object.
-
-    """
-    from obspy.core.inventory import Inventory
-    from obspy import read_inventory, UTCDateTime
-    logging.debug('Preloading instrument response')
-    files = glob.glob(os.path.join(get_config(session, 'response_path'), "*"))
-    channels = []
-    all_inv = Inventory()
-    for file in files:
-        logging.debug("Processing %s" % file)
-        try:
-            inv = read_inventory(file)
-
-            if return_format == "inventory":
-                all_inv += inv
-                continue
-
-            for net in inv.networks:
-                for sta in net.stations:
-                    for cha in sta.channels:
-                        seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
-                                                   cha.location_code,
-                                                   cha.code)
-                        pzdict = {}
-                        try:
-                            resp = inv.get_response(seed_id, cha.start_date + 10)
-                            polezerostage = resp.get_paz()
-                        except Exception as e:
-                            logging.warning(
-                                'Failed to get PAZ for SEED ID "%s", this '
-                                'SEED ID will have an empty dictionary '
-                                'for Poles and Zeros '
-                                'information (Error message: %s).' % (
-                                    seed_id, str(e)))
-                        else:
-                            totalsensitivity = resp.instrument_sensitivity
-                            pzdict['poles'] = polezerostage.poles
-                            pzdict['zeros'] = polezerostage.zeros
-                            pzdict['gain'] = polezerostage.normalization_factor
-                            pzdict['sensitivity'] = totalsensitivity.value
-                        lat = cha.latitude
-                        lon = cha.longitude
-                        elevation = cha.elevation
-                        if lat is None or lon is None or elevation is None:
-                            lat = sta.latitude
-                            lon = sta.longitude
-                            elevation = sta.elevation
-                        if lat is None or lon is None or elevation is None:
-                            logging.error(
-                                'Failed to look up coordinates for SEED '
-                                'ID: %s' % seed_id)
-                        channels.append([seed_id, cha.start_date,
-                                         cha.end_date or UTCDateTime(),
-                                         pzdict, lat, lon, elevation])
-
-        except Exception as e:
-            logging.error('Failed to process file %s: %s' % (file, str(e)))
-
-
-    logging.debug('Finished Loading instrument responses')
-    if return_format == "inventory":
-        return all_inv
-
-    if return_format == "dataframe":
-        channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
-                                                   "end_date", "paz",
-                                                   "latitude", "longitude", "elevation"],)
-        return channels
-
-
-
-# Needed for QC/PPSD, should re-order the defs
-
-def to_sds(stats,year, jday):
-    SDS="YEAR/NET/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.JDAY"
-    file=SDS.replace('YEAR', "%04i"%year)
-    file=file.replace('NET', stats.network)
-    file=file.replace('STA', stats.station)
-    file=file.replace('LOC', stats.location)
-    file=file.replace('CHAN', stats.channel)
-    file=file.replace('JDAY', "%03i"%jday)
-    file=file.replace('TYPE', "D")
-    return file
-
-## PSD part (not sure it'll end up here but easier to handle for now)
-
-def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=True):
-    from obspy.signal import PPSD
-    if loc == "--":
-        loc = ""
-    fn = "%s.%s.%s.%s-%s_%s.npz" % (net, sta, loc, chan, datelist[0], datelist[-1])
-    import tempfile
-    fn = os.path.join(tempfile.gettempdir(), "MSNOISE-PSD", fn)
-    if use_cache and os.path.isfile(fn):
-        logging.debug("I found this cool file: %s" % fn)
-        ppsd = PPSD.load_npz(fn)
-    else:
-        first = True
-        ppsd = None
-        for day in datelist:
-            jday = int(day.strftime("%j"))
-            toglob = os.path.join('PSD', 'NPZ', "%s" % day.year, net, sta,
-                                  chan + ".D", "%s.%s.%s.%s.D.%s.%03i.npz" % (
-                                  net, sta, loc, chan, day.year, jday))
-            files = glob.glob(toglob)
-            if not len(files):
-                logging.error("No files found for %s.%s.%s.%s: %s" % (
-                net, sta, loc, chan, day))
-                continue
-            file = files[0]
-            if os.path.isfile(file):
-                if first:
-                    ppsd = PPSD.load_npz(file)
-                    first = False
-                else:
-                    try:
-                        ppsd.add_npz(file)
-                    except:
-                        pass
-    if not ppsd:
-        return None
-    if use_cache:
-        if not os.path.isdir(os.path.split(fn)[0]):
-            os.makedirs(os.path.split(fn)[0], exist_ok=True)
-        ppsd.save_npz(fn[:-4])
-    return ppsd
-
-def psd_ppsd_to_dataframe(ppsd):
-    from obspy import UTCDateTime
-    ind_times = np.array(
-        [UTCDateTime(t).datetime for t in ppsd.current_times_used])
-    data = np.asarray(ppsd._binned_psds)
-    return pd.DataFrame(data, index=ind_times, columns=ppsd.period_bin_centers)
-
-def hdf_open_store_from_fn(fn, mode="a"):
-    store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
-    return store
-
-def hdf_open_store(filename, location=os.path.join("PSD", "HDF"), mode="a",
-                   format='table'):
-    if ".h5" in filename:
-        filename = filename.replace(".h5", "")
-    pd.set_option('io.hdf.default_format', format)
-    if not os.path.isdir(location):
-        os.makedirs(location, exist_ok=True)
-    fn = os.path.join(location, filename + ".h5")
-    store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
-    return store
-
-def hdf_insert_or_update(store, key, new):
-    if key in store:
-        filter = store[key].index.intersection(new.index)
-        if len(filter):
-            coordinates = store.select_as_coordinates(key, "index=filter")
-            store.remove(key, where=coordinates)
-            store.append(key, new, format='t', data_columns=True, append=True)
-    else:
-        store.append(key, new)
-
-def hdf_close_store(store):
-    store.close()
-    del store
-
-
-# ============================================================
-# Section 15 — Filters (legacy)
-# ============================================================
-
-def xr_create_or_open(fn, taxis=[], name="CCF"):
-    if os.path.isfile(fn):
-        # load_dataset works (it loads content in mem and closes, open_dataset
-        # failed, the file handle was still open and it failed later.
-        ds = xr.load_dataset(fn)
-        return ds
-    times = pd.date_range("2000-01-01", freq="h", periods=0)
-    if name == "CCF":
-        data = np.random.random((len(times), len(taxis)))
-        dr = xr.DataArray(data, coords=[times, taxis], dims=["times", "taxis"])
-    elif name == "REF":
-        data = np.random.random(len(taxis))
-        dr = xr.DataArray(data, coords=[taxis], dims=["taxis"])
-    elif name == "MWCS":
-        keys = ["M", "EM", "MCOH"]
-        data = np.random.random((len(times), len(taxis), len(keys)))
-        dr = xr.DataArray(data, coords=[times, taxis, keys],
-                          dims=["times", "taxis", "keys"])
-    elif name == "STR":
-        keys = ["Delta", "Coeff", "Error"]
-        data = np.random.random((len(times), len(keys)))
-        dr = xr.DataArray(data, coords=[times, keys],
-                          dims=["times", "keys"])
-    elif name == "DTT":
-        keys = ["m", "em", "a", "ea", "m0", "em0"]
-        data = np.random.random((len(times), len(keys)))
-        dr = xr.DataArray(data, coords=[times, keys],
-                          dims=["times", "keys"])
-    elif name == "DVV":
-        level0 = ["m", "em", "a", "ea", "m0", "em0"]
-        level1 = ['10%', '25%', '5%', '50%', '75%', '90%', '95%', 'count', 'max', 'mean',
-                  'min', 'std', 'trimmed_mean', 'trimmed_std', 'weighted_mean', 'weighted_std']
-        data = np.random.random((len(times), len(level0), len(level1)))
-        dr = xr.DataArray(data, coords=[times, level0, level1],
-                          dims=["times", "level0", "level1"])
-    elif name == "WCT":
-        dvv_data = np.random.random((len(times), len(taxis)))
-        err_data = np.random.random((len(times), len(taxis)))
-        coh_data = np.random.random((len(times), len(taxis)))
-
-        dvv_da = xr.DataArray(dvv_data, coords=[times, taxis], dims=['times', 'frequency'])
-        err_da = xr.DataArray(err_data, coords=[times, taxis], dims=['times', 'frequency'])
-        coh_da = xr.DataArray(coh_data, coords=[times, taxis], dims=['times', 'frequency'])
-
-        # Combine into a Dataset
-        ds = xr.Dataset({'dvv': dvv_da,'err': err_da,'coh': coh_da})
-        return ds
-
-    else:
-        logging.error("Not implemented, name=%s invalid." % name)
-        sys.exit(1)
-    dr.name = name
-    return dr.to_dataset()
-
-def xr_insert_or_update(dataset, new):
-    tt = new.merge(dataset, compat='override', combine_attrs="drop_conflicts")
-    return tt.combine_first(dataset)
-
-def xr_save_and_close(dataset, fn):
-    if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0], exist_ok=True)
-    dataset.to_netcdf(fn, mode="w")
-    dataset.close()
-    del dataset
-
-# ── CCF ─────────────────────────────────────────────────────
-
-def xr_save_ccf(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, new, overwrite=False):
-    path = os.path.join(root, *lineage, step_name, "_output",
-                        "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
-    fn = "%s_%s.nc" % (station1, station2)
-    fullpath = os.path.join(path, fn)
-    if overwrite:
-        xr_save_and_close(new, fullpath)
-    else:
-        dr = xr_create_or_open(fullpath, taxis, name="CCF")
-        dr = xr_insert_or_update(dr, new)
-        dr = dr.sortby("times")
-        xr_save_and_close(dr, fullpath)
-        return dr
-
-def xr_get_ccf(root, lineage, station1, station2, components, filterid, mov_stack, taxis, format="dataframe"):
-    path = os.path.join(root, *lineage, "_output",
-                        "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
-    fn = "%s_%s.nc" % (station1, station2)
-
-    fullpath = os.path.join(path, fn)
-    if not os.path.isfile(fullpath):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-        raise FileNotFoundError(fullpath)
-    data = xr_create_or_open(fullpath, taxis, name="CCF")
-    if format == "xarray":
-        return data.CCF
-    else:
-        return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
-
-def xr_save_ref(root, lineage, step_name, station1, station2, components, filterid, taxis, new, overwrite=False):
-    path = os.path.join(root, *lineage, step_name, "_output",
-                        "REF", "%s" % components)
-    fn = "%s_%s.nc" % (station1, station2)
-    fullpath = os.path.join(path, fn)
-    if overwrite:
-        xr_save_and_close(new, fullpath)
-    else:
-        dr = xr_create_or_open(fullpath, taxis, name="REF")
-        dr = xr_insert_or_update(dr, new)
-        xr_save_and_close(dr, fullpath)
-        return dr
-
-def xr_get_ref(root, lineage, station1, station2, components, filterid, taxis, ignore_network=False):
-    path = os.path.join(root, *lineage, "_output",
-                        "REF", "%s" % components)
-    # If ignore_network is True, strip the network code from the station names
-    if ignore_network:
-        s1_parts = station1.split('.')
-        s2_parts = station2.split('.')
-
-        available_files = glob.glob(os.path.join(path, "*.%s.%s_*.%s.%s.nc" % (s1_parts[1],s1_parts[2], s2_parts[1], s1_parts[2])))
-
-        if available_files:
-            # Use the first available reference file
-            fullpath = available_files[0]
-        else:
-            raise FileNotFoundError(f"No reference file found for station {s1_parts[1]} and {s2_parts[1]}")
-    else:
-        fn = "%s_%s.nc" % (station1, station2)
-
-        fullpath = os.path.join(path, fn)
-        if not os.path.isfile(fullpath):
-            # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-            raise FileNotFoundError(fullpath)
-    data = xr_create_or_open(fullpath, taxis, name="REF")
-    return data.CCF.to_dataframe()
-
-def xr_save_mwcs(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, dataframe):
-    fn = os.path.join(root, *lineage, step_name, "_output",
-                        "%s_%s" % (mov_stack[0], mov_stack[1]),
-                       "%s" % components,
-                       "%s_%s.nc" % (station1, station2))
-
-    if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0], exist_ok=True)
-    d = dataframe.stack().stack()
-    d.index = d.index.set_names(["times", "keys", "taxis"])
-    d = d.reorder_levels(["times", "taxis", "keys"])
-    d.columns = ["MWCS"]
-    taxis = np.unique(d.index.get_level_values('taxis'))
-    dr = xr_create_or_open(fn, taxis=taxis, name="MWCS")
-    rr = d.to_xarray().to_dataset(name="MWCS")
-    rr = xr_insert_or_update(dr, rr)
-    xr_save_and_close(rr, fn)
-    del dr, rr, d
-
-def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack):
-    fn = os.path.join(root, *lineage, "_output",
-                        "%s_%s" % (mov_stack[0], mov_stack[1]),
-                       "%s" % components,
-                       "%s_%s.nc" % (station1, station2))
-    if not os.path.isfile(fn):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
-        raise FileNotFoundError(fn)
-    data = xr_create_or_open(fn, name="MWCS")
-    data = data.MWCS.to_dataframe().reorder_levels(['times', 'taxis', 'keys']).unstack().droplevel(0, axis=1).unstack()
-    return data
-
-# ── DTT ─────────────────────────────────────────────────────
-
-def xr_save_dtt(root, lineage, step_name, station1, station2, components, mov_stack, dataframe):
-    """
-    :param station1: string, name of station 1
-    :param station2: string, name of station 2
-    :param components: string, name of the components
-    :param mov_stack: int, number of days in the moving stack
-    :param dataframe: pandas DataFrame containing the data
-    :return: None
-
-    Saves DTT data to a NetCDF file using lineage-aware path.
-    """
-    fn = os.path.join(root, *lineage, step_name, "_output",
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s" % components,
-                      "%s_%s.nc" % (station1, station2))
-    if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0], exist_ok=True)
-    d = dataframe.stack()
-    d.index = d.index.set_names(["times", "keys"])
-    d.columns = ["DTT"]
-    dr = xr_create_or_open(fn, taxis=[], name="DTT")
-    rr = d.to_xarray().to_dataset(name="DTT")
-    rr = xr_insert_or_update(dr, rr)
-    xr_save_and_close(rr, fn)
-
-def xr_get_dtt(root, lineage, station1, station2, components, mov_stack):
-    """
-    :param station1: The first station name
-    :param station2: The second station name
-    :param components: The components to be used
-    :param filterid: The filter ID
-    :param mov_stack: The movement stack
-    :return: The extracted data
-
-    This method retrieves the DTT data from a NetCDF file based on the given inputs. It constructs the file path using the provided parameters and checks if the file exists. If the file
-    * does not exist, it raises a FileNotFoundError. Otherwise, it opens the NetCDF file and extracts the DTT variable as a dataframe. The dataframe is then rearranged and returned as the
-    * result.
-    """
-    fn = os.path.join(root, *lineage, "_output",
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s" % components,
-                      "%s_%s.nc" % (station1, station2))
-
-    if not os.path.isfile(fn):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
-        raise FileNotFoundError(fn)
-    print(fn)
-    dr = xr_create_or_open(fn, taxis=[], name="DTT")
-    data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
-    return data
-
-# ── Stretching ──────────────────────────────────────────────
-
-def xr_save_dvv(root, lineage, step_name, components, mov_stack, dataframe):
-    fn = os.path.join(root, *lineage, step_name, "_output",
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s.nc" % components)
-    if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0], exist_ok=True)
-
-    if dataframe.columns.nlevels > 1:
-        d = dataframe.stack(future_stack=True).stack(future_stack=True)
-    else:
-        d = dataframe.stack(future_stack=True)
-
-    level_names = ["times", "level1", "level0"]
-    d.index = d.index.set_names(level_names[:d.index.nlevels])
-
-    if d.index.nlevels == 3:
-        d = d.reorder_levels(["times", "level0", "level1"])
-
-    d.columns = ["DVV"]
-    # taxis = np.unique(d.index.get_level_values('taxis'))
-    dr = xr_create_or_open(fn, taxis=[], name="DVV")
-    rr = d.to_xarray().to_dataset(name="DVV")
-    rr = xr_insert_or_update(dr, rr)
-    xr_save_and_close(rr, fn)
-    del dr, rr, d
-
-def wavg(group, dttname, errname):
-    """
-    Calculate the weighted average of a given group using the provided parameters.
-
-    :param group: A pandas DataFrame or Series representing the group of data.
-    :param dttname: The name of the column containing the data to be averaged.
-    :param errname: The name of the column containing the error for each data point.
-    :return: The weighted average of the data.
-
-    """
-    d = group[dttname]
-    group.loc[group[errname] == 0,errname] = 1e-6
-    w = 1. / group[errname]
-    try:
-        wavg = (d * w).sum() / w.sum()
-    except:
-        wavg = d.mean()
-    return wavg
-
-def wstd(group, dttname, errname):
-    """
-    :param group: A dictionary containing data for different groups.
-    :param dttname: The key in the `group` dictionary that corresponds to the data array.
-    :param errname: The key in the `group` dictionary that corresponds to the error array.
-    :return: The weighted standard deviation of the data array.
-
-    This method calculates the weighted standard deviation of the data array specified by `dttname` in the `group` dictionary.
-    The weights are derived from the error array specified by `errname` in the `group` dictionary.
-
-    The weighted standard deviation is computed using the following formula:
-        wstd = sqrt(sum(w * (d - wavg) ** 2) / ((N - 1) * sum(w) / N))
-    where:
-        - d is the data array specified by `dttname` in the `group` dictionary.
-        - w is the weight array derived from the error array specified by `errname` in the `group` dictionary.
-        - wavg is the weighted average of the data array.
-        - N is the number of non-zero weights.
-
-    Note: This method uses the `np` module from NumPy.
-    """
-    d = group[dttname]
-    group.loc[group[errname] == 0,errname] = 1e-6
-    w = 1. / group[errname]
-    wavg = (d * w).sum() / w.sum()
-    N = len(np.nonzero(w.values)[0])
-    wstd = np.sqrt(np.sum(w * (d - wavg) ** 2) / ((N - 1) * np.sum(w) / N))
-    return wstd
-
-def _get_wavgwstd(data, dttname, errname):
-    """
-    Calculate the weighted average and weighted standard deviation for a given data.
-
-    :param data: The data to calculate the weighted average and weighted standard deviation.
-    :type data: pandas.DataFrame
-
-    :param dttname: The name of the column in the data frame containing the weights for the weighted average and weighted standard deviation calculation.
-    :type dttname: str
-
-    :param errname: The name of the column in the data frame containing the errors on the data.
-    :type errname: str
-
-    :return: A tuple containing the calculated weighted average and weighted standard deviation.
-    :rtype: tuple
-    """
-    grouped = data.groupby(level=0)
-    g = grouped.apply(wavg, dttname=dttname, errname=errname)
-    h = grouped.apply(wstd, dttname=dttname, errname=errname)
-    return g, h
-
-def _trim(data, dttname, limits=0.1):
-    """
-    Trimmed mean and standard deviation calculation.
-
-    :param data: DataFrame containing the data.
-    :param dttname: Name of the column used for grouping.
-    :param limits: Trimming limits (default is 0.1).
-    :return: Tuple containing the trimmed mean and trimmed standard deviation.
-    """
-    from scipy.stats.mstats import trimmed_mean, trimmed_std
-    grouped = data[dttname].groupby(level=0)
-    if limits == 0:
-        g = grouped.mean()
-        h = grouped.std()
-    else:
-        g = grouped.apply(trimmed_mean, limits=limits)
-        h = grouped.apply(trimmed_std, limits=limits)
-    return g, h
-
-
-# ============================================================
-# Section 9 — Wavelet Coherence Transform (WCT)
-# ============================================================
-
-def compute_dvv(session, root, lineage, mov_stack, pairs=None, components=None, params=None, method=None, **kwargs):
-    """
-    Compute DVV statistics for a given seismic session, filter ID, and movement stack. The method calculates various
-    statistical measures for DVV values based on the provided parameters.
-
-    :param session: Seismic session object.
-    :type session: object
-    :param root: Root output folder path.
-    :type root: str
-    :param lineage: List of lineage path components (upstream DTT step lineage).
-    :type lineage: list
-    :param mov_stack: Movement stack object.
-    :type mov_stack: object
-    :param pairs: List of station pairs. Defaults to None.
-    :type pairs: list, optional
-    :param components: Component(s) to compute DVV for. Defaults to None.
-    :type components: str, optional
-    :param params: Parameters object containing configuration settings. Defaults to None.
-    :type params: object, optional
-    :param method: Method to use for computation. Defaults to None.
-    :type method: str, optional
-    :param **kwargs: Additional keyword arguments
-    :return: DataFrame containing the computed statistical measures for DVV values.
-    :rtype: DataFrame
-    :raises ValueError: If no DVV values are computed.
-    """
-    # Ensure params has components_to_compute; fall back to a full merge if not.
-    if params is None or not hasattr(params, "components_to_compute"):
-        _, _, params = resolve_lineage_params(session, lineage)
-
-    if pairs == None:
-        pairs = []
-        for sta1, sta2 in get_station_pairs(session):
-            for loc1 in sta1.locs():
-                s1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
-                for loc2 in sta2.locs():
-                    s2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
-                    pairs.append((s1, s2))
-    all = []
-    for (s1, s2) in pairs:
-        if components == None:
-            if s1 == s2:
-                # if not provided, we'll load all:
-                comps = params.components_to_compute_single_station
-            else:
-                comps = params.components_to_compute
-        else:
-            if components.count(',') == 0:
-                comps = [components, ]
-            else:
-                comps = components.split(',')
-
-        for comp in comps:
-
-            if (s1 == s2) and (comp not in params.components_to_compute_single_station):
-                continue
-            if (s1 != s2) and (comp not in params.components_to_compute):
-                continue
-
-            try:
-                dtt = xr_get_dtt(root, lineage, s1, s2, comp, mov_stack)
-                all.append(dtt)
-            except FileNotFoundError:
-                traceback.print_exc()
-                continue
-    if not len(all):
-        raise ValueError
-    if len(all) == 1:
-        return all[0]
-    all = pd.concat(all)
-    percentiles = kwargs.get("percentiles", [.05, .10, .25, .5, .75, .90, .95])
-    stats = all.groupby(level=0).describe(percentiles=percentiles)
-    for c in ["m", "m0", "a"]:
-        stats[(c, "weighted_mean")], stats[(c, "weighted_std")] = _get_wavgwstd(all, c, 'e'+c)
-        stats[(c, "trimmed_mean")], stats[(c, "trimmed_std")] = _trim(all, c, kwargs.get("limits", None))
-
-    return stats.sort_index(axis=1)
-
-def xr_save_wct(root, lineage, step_name, station1, station2, components, mov_stack, taxis, freqs, WXamp_list, WXcoh_list, WXdt_list, dates_list):
-    """
-    Save WCT results into an xarray Dataset and store it as a NetCDF file.
-
-    Parameters:
-    - root: str, Root output folder path
-    - lineage: list, Lineage path components
-    - step_name: str, Step name for output path
-    - station1, station2: str, Station pair
-    - components: str, Seismic component (e.g., ZZ)
-    - mov_stack: tuple, Moving stack window (e.g., ('1d', '1d'))
-    - taxis, freqs: np.array, Time axis and frequency axis
-    - WXamp_list, WXcoh_list, WXdt_list: list of np.array, WCT outputs
-    - dates_list: list of datetime, Timestamps for each WCT calculation
-    """
-
-    # Convert lists to xarray DataArrays (all WCT outputs are real-valued;
-    # cast explicitly in case intermediate complex dtype was inherited)
-    WXamp_da = xr.DataArray(
-        data=np.array(WXamp_list).real,
-        dims=["times", "freqs", "taxis"],
-        coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
-        name="WXamp"
-    )
-
-    Wcoh_da = xr.DataArray(
-        data=np.array(WXcoh_list).real,
-        dims=["times", "freqs", "taxis"],
-        coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
-        name="Wcoh"
-    )
-
-    WXdt_da = xr.DataArray(
-        data=np.array(WXdt_list).real,
-        dims=["times", "freqs", "taxis"],
-        coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
-        name="WXdt"
-    )
-
-    # Combine into an xarray Dataset
-    ds = xr.Dataset({"WXamp": WXamp_da, "Wcoh": Wcoh_da, "WXdt": WXdt_da})
-
-    # Define output directory
-    fn = os.path.join(root, *lineage, step_name, "_output",
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      components, f"{station1}_{station2}.nc")
-
-    os.makedirs(os.path.dirname(fn), exist_ok=True)
-
-    # Save to NetCDF
-    xr_save_and_close(ds, fn)
-
-    print(f"Saved WCT data for {station1}-{station2} to {fn}")
-
-    # Cleanup memory
-    del ds, WXamp_da, Wcoh_da, WXdt_da
-
-def xr_load_wct(root, lineage, station1, station2, components, mov_stack):
-    """
-    Load WCT results from an xarray Dataset stored in a NetCDF file.
-
-    Parameters:
-    - root: str, Root output folder path
-    - lineage: list, Lineage path components
-    - station1, station2: str, Station pair
-    - components: str, Seismic component (e.g., ZZ)
-    - mov_stack: tuple, Moving stack window (e.g., ('1d', '1d'))
-
-    Returns:
-    - ds: xarray.Dataset containing the WCT data (WXamp, Wcoh, WXdt)
-    """
-
-    # Construct the file path
-    fn = os.path.join(root, *lineage, "_output",
-                      f"{mov_stack[0]}_{mov_stack[1]}", components,
-                      f"{station1}_{station2}.nc")
-
-    # Check if the file exists
-    if not os.path.exists(fn):
-        raise FileNotFoundError(f"File not found: {fn}")
-
-    # Load and return the dataset
-    ds = xr.load_dataset(fn)
-    return ds
-
-def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mov_stack, taxis, dvv_df, err_df, coh_df):
-    """
-    Save the Wavelet Coherence Transform (WCT) results as a NetCDF file.
-
-    :param root: Root output folder path.
-    :type root: str
-    :param lineage: List of lineage path components.
-    :type lineage: list
-    :param step_name: Step name for output path.
-    :type step_name: str
-    :param station1: The first station in the pair.
-    :type station1: str
-    :param station2: The second station in the pair.
-    :type station2: str
-    :param components: The components (e.g., Z, N, E) being analyzed.
-    :type components: str
-    :param mov_stack: Tuple of (start, end) representing the moving stack window.
-    :type mov_stack: tuple
-    :param taxis: Time axis corresponding to the WCT data.
-    :type taxis: array-like
-    :param dvv_df: DataFrame containing dvv data (2D).
-    :type dvv_df: pandas.DataFrame
-    :param err_df: DataFrame containing err data (2D).
-    :type err_df: pandas.DataFrame
-    :param coh_df: DataFrame containing coh data (2D).
-    :type coh_df: pandas.DataFrame
-    :returns: None
-    """
-
-    # Construct the file path
-    fn = os.path.join(root, *lineage, step_name, "_output",
-                      f"{mov_stack[0]}_{mov_stack[1]}", components,
-                      f"{station1}_{station2}.nc")
-
-    # Ensure the directory exists
-    os.makedirs(os.path.dirname(fn), exist_ok=True)
-
-    # Convert DataFrames to xarray.DataArrays
-    dvv_da = xr.DataArray(dvv_df.values, coords=[dvv_df.index, dvv_df.columns], dims=['times', 'frequency'])
-    err_da = xr.DataArray(err_df.values, coords=[err_df.index, err_df.columns], dims=['times', 'frequency'])
-    coh_da = xr.DataArray(coh_df.values, coords=[coh_df.index, coh_df.columns], dims=['times', 'frequency'])
-
-    # Combine into a single xarray.Dataset
-    ds = xr.Dataset({
-        'dvv': dvv_da,
-        'err': err_da,
-        'coh': coh_da
-    })
-
-    existing_ds = xr_create_or_open(fn, name="WCT")
-    updated_ds = xr_insert_or_update(existing_ds, ds)
-    xr_save_and_close(updated_ds, fn)
-
-
-    logging.debug(f"Saved WCT data to {fn}")
-    # Clean up
-    del dvv_da, err_da, coh_da, ds
-
-def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20,
-                    mincoh=0.5, maxdt=0.2, min_nonzero=0.25, freqmin=0.1, freqmax=2.0):
-    """
-    Compute dv/v and associated errors from wavelet coherence transform results.
-
-    :param freqs: Frequency values from the WCT.
-    :param tvec: Time axis.
-    :param WXamp: Cross-wavelet amplitude array (freqs × taxis).
-    :param Wcoh: Wavelet coherence array (freqs × taxis).
-    :param delta_t: Time delay array (freqs × taxis).
-    :param lag_min: Minimum coda lag in seconds.
-    :param coda_cycles: Number of periods to use as coda window width.
-    :param mincoh: Minimum coherence threshold.
-    :param maxdt: Maximum allowed time delay.
-    :param min_nonzero: Minimum fraction of valid (non-zero weight) samples required.
-    :param freqmin: Lower frequency bound for regression.
-    :param freqmax: Upper frequency bound for regression.
-    :returns: Tuple of (dvv [%], err [%], weighting_function).
-    """
-    import warnings
-    from scipy.optimize import OptimizeWarning
-    from obspy.signal.regression import linear_regression
-
-    inx = np.where((freqs >= freqmin) & (freqs <= freqmax))
-    dvv = np.zeros(len(inx[0]))
-    err = np.zeros(len(inx[0]))
-
-    weight_func = np.log(np.abs(WXamp)) / np.log(np.abs(WXamp)).max()
-    zero_idx = np.where((Wcoh < mincoh) | (delta_t > maxdt))
-    wf = (weight_func + abs(np.nanmin(weight_func))) / weight_func.max()
-    wf[zero_idx] = 0
-
-    problematic_freqs = []
-    for ii, ifreq in enumerate(inx[0]):
-        period = 1.0 / freqs[ifreq]
-        lag_max = lag_min + (period * coda_cycles)
-        tindex = np.where(
-            ((tvec >= -lag_max) & (tvec <= -lag_min)) |
-            ((tvec >= lag_min) & (tvec <= lag_max))
-        )[0]
-        if len(tvec) > 2:
-            if not np.any(delta_t[ifreq]):
-                continue
-            delta_t[ifreq][tindex] = np.nan_to_num(delta_t[ifreq][tindex])
-            w = wf[ifreq]
-            nzc_perc = np.count_nonzero(w[tindex] > 0) / len(tindex)
-            if nzc_perc >= min_nonzero:
-                with warnings.catch_warnings(record=True) as w_catcher:
-                    warnings.simplefilter("always", OptimizeWarning)
-                    m, em = linear_regression(tvec[tindex], delta_t[ifreq][tindex],
-                                              w[tindex], intercept_origin=True)
-                    if any(issubclass(warning.category, OptimizeWarning)
-                           for warning in w_catcher):
-                        problematic_freqs.append(freqs[ifreq])
-                dvv[ii], err[ii] = -m, em
-            else:
-                dvv[ii], err[ii] = np.nan, np.nan
-    if problematic_freqs:
-        logging.warning(
-            f"Covariance issues at {min(problematic_freqs):.2f}-{max(problematic_freqs):.2f} Hz: "
-            f"consider adjusting min_nonzero={min_nonzero}, mincoh={mincoh}, "
-            f"maxdt={maxdt}, coda_cycles={coda_cycles}"
-        )
-    return dvv * 100, err * 100, wf
-
-def get_wct_avgcoh(freqs, tvec, wcoh, freqmin, freqmax, lag_min=5, coda_cycles=20):
-    """
-    Calculate average wavelet coherence over a frequency range and coda window.
-
-    :param freqs: Frequency array.
-    :param tvec: Time axis.
-    :param wcoh: Wavelet coherence array (freqs × taxis).
-    :param freqmin: Lower frequency bound.
-    :param freqmax: Upper frequency bound.
-    :param lag_min: Minimum coda lag in seconds.
-    :param coda_cycles: Number of periods to use as coda window width.
-    :returns: Average coherence per frequency bin within [freqmin, freqmax].
-    """
-    inx = np.where((freqs >= freqmin) & (freqs <= freqmax))
-    coh = np.zeros(inx[0].shape)
-    for ii, ifreq in enumerate(inx[0]):
-        period = 1.0 / freqs[ifreq]
-        lag_max = lag_min + (period * coda_cycles)
-        tindex = np.where(
-            ((tvec >= -lag_max) & (tvec <= -lag_min)) |
-            ((tvec >= lag_min) & (tvec <= lag_max))
-        )[0]
-        if len(tvec) > 2:
-            if not np.any(wcoh[ifreq]) or wcoh[ifreq][tindex].size == 0:
-                coh[ii] = np.nan
-                continue
-            coh[ii] = np.nanmean(np.abs(wcoh[ifreq][tindex]))
-        else:
-            coh[ii] = np.nan
-    return coh
-
-
-# ============================================================
-# Section 10 — Preprocessing I/O
-# ============================================================
-
-def filter_within_daterange(date, start_date, end_date):
-    """Check if a date falls within the configured range"""
-    return start_date <= date <= end_date
-
-
-# ============================================================================
-# Workflow Management Functions
-# ============================================================================
-
-
-# ============================================================
-# Section 8 — Signal Processing Utilities
-# ============================================================
 
 def get_workflow_steps(session):
     """Get all steps in a workflow"""
@@ -2764,6 +1017,7 @@ def get_workflow_steps(session):
         .filter(schema.WorkflowStep.is_active == True) \
         .order_by(schema.WorkflowStep.step_name).all()
 
+
 def get_workflow_links(session):
     """Get all links in a workflow"""
     from .msnoise_table_def import declare_tables
@@ -2772,157 +1026,6 @@ def get_workflow_links(session):
     return session.query(schema.WorkflowLink) \
         .filter(schema.WorkflowLink.is_active == True).all()
 
-def _get_step_predecessors(session, step_id):
-    """Get all steps that feed into this step"""
-    from .msnoise_table_def import declare_tables
-    schema = declare_tables()
-
-    return session.query(schema.WorkflowStep) \
-        .join(schema.WorkflowLink, schema.WorkflowStep.step_id == schema.WorkflowLink.from_step_id) \
-        .filter(schema.WorkflowLink.to_step_id == step_id) \
-        .filter(schema.WorkflowLink.is_active == True).all()
-
-def get_upstream_steps_for_step_id(session, step_id, topo_order=True, include_self=False):
-    """
-    Returns all upstream WorkflowStep nodes (recursive predecessors) for `step_id`.
-
-    Parameters
-    ----------
-    session : sqlalchemy.orm.session.Session
-    step_id : int
-        The step_id of the node whose upstream lineage you want.
-    topo_order : bool
-        If True (default), returns nodes in dependency order (upstream first),
-        suitable for "merge config" application.
-        If False, returns in discovery order (still de-duplicated).
-    include_self : bool
-        If True, includes the node identified by `step_id` in the returned list.
-
-    Returns
-    -------
-    list[WorkflowStep]
-        De-duplicated list of upstream steps.
-    """
-    visited = set()
-    ordered = []
-
-    def dfs(current_step_id):
-        # Direct predecessors of the current node:
-        preds = _get_step_predecessors(session, current_step_id) or []
-        for p in preds:
-            if p.step_id in visited:
-                continue
-            visited.add(p.step_id)
-            dfs(p.step_id)
-            if topo_order:
-                # post-order ensures: preprocess -> cc -> filter -> ...
-                ordered.append(p)
-            else:
-                ordered.append(p)
-
-    dfs(step_id)
-
-    if include_self:
-        self_step = session.query(WorkflowStep).filter(WorkflowStep.step_id == step_id).first()
-        if self_step is not None and self_step.step_id not in visited:
-            ordered.append(self_step)
-
-    return ordered
-
-def get_step_successors(session, step_id):
-    """Get all steps that this step feeds into"""
-    from .msnoise_table_def import declare_tables
-    schema = declare_tables()
-
-    return session.query(schema.WorkflowStep) \
-        .join(schema.WorkflowLink, schema.WorkflowStep.step_id == schema.WorkflowLink.to_step_id) \
-        .filter(schema.WorkflowLink.from_step_id == step_id) \
-        .filter(schema.WorkflowLink.is_active == True).all()
-
-def get_first_runnable_steps_per_branch(session, source_step_id, skip_categories=None):
-    """
-    Return the first runnable step on each outgoing branch from source_step_id,
-    skipping steps in skip_categories (default: {"filter"}).
-
-    - "Branch" roots are the immediate successors of source_step_id.
-    - If skipped nodes fan out, each fan-out is treated as a separate branch.
-    - Results are deduped (set behavior) and returned in stable order.
-    """
-    if skip_categories is None:
-        skip_categories = {"filter"}
-
-    # We dedupe by step_id, but preserve stable ordering at the end
-    result_by_step_id = {}
-
-    def immediate_successors(step_id):
-        # Reuse existing helper (one-hop)
-        return [
-            s for s in get_step_successors(session, step_id)
-            if getattr(s, "is_active", True)
-        ]
-
-    def descend_until_runnable(start_step):
-        # Explore forward until the first non-skipped step is found for each path
-        stack = [start_step]
-        visited = set()
-
-        while stack:
-            step = stack.pop()
-            if step.step_id in visited:
-                continue
-            visited.add(step.step_id)
-
-            if step.category not in skip_categories:
-                result_by_step_id[step.step_id] = step
-                continue  # stop this path at first runnable
-
-            for nxt in immediate_successors(step.step_id):
-                stack.append(nxt)
-
-    for succ in immediate_successors(source_step_id):
-        descend_until_runnable(succ)
-
-    return [result_by_step_id[k] for k in sorted(result_by_step_id)]
-
-def create_workflow_step(session, step_name, category, set_number, description=None):
-    """Create a new workflow step"""
-    from .msnoise_table_def import declare_tables
-    schema = declare_tables()
-
-    step = schema.WorkflowStep(
-        step_name=step_name,
-        category=category,
-        set_number=set_number,
-        description=description
-    )
-
-    session.add(step)
-    session.commit()
-    return step
-
-def create_workflow_link(session, from_step_id, to_step_id, link_type="default"):
-    """Create a link between two workflow steps"""
-    from .msnoise_table_def import declare_tables
-    schema = declare_tables()
-
-    # Check if link already exists
-    existing = session.query(schema.WorkflowLink).filter(
-        schema.WorkflowLink.from_step_id == from_step_id,
-        schema.WorkflowLink.to_step_id == to_step_id
-    ).first()
-
-    if existing:
-        return existing
-
-    link = schema.WorkflowLink(
-        from_step_id=from_step_id,
-        to_step_id=to_step_id,
-        link_type=link_type
-    )
-
-    session.add(link)
-    session.commit()
-    return link
 
 def get_workflow_graph(session):
     """Return workflow as nodes and edges for visualization, sorted by workflow order"""
@@ -2977,6 +1080,165 @@ def get_workflow_graph(session):
         })
 
     return {"nodes": nodes, "edges": edges}
+
+
+def create_workflow_step(session, step_name, category, set_number, description=None):
+    """Create a new workflow step"""
+    from .msnoise_table_def import declare_tables
+    schema = declare_tables()
+
+    step = schema.WorkflowStep(
+        step_name=step_name,
+        category=category,
+        set_number=set_number,
+        description=description
+    )
+
+    session.add(step)
+    session.commit()
+    return step
+
+
+def create_workflow_link(session, from_step_id, to_step_id, link_type="default"):
+    """Create a link between two workflow steps"""
+    from .msnoise_table_def import declare_tables
+    schema = declare_tables()
+
+    # Check if link already exists
+    existing = session.query(schema.WorkflowLink).filter(
+        schema.WorkflowLink.from_step_id == from_step_id,
+        schema.WorkflowLink.to_step_id == to_step_id
+    ).first()
+
+    if existing:
+        return existing
+
+    link = schema.WorkflowLink(
+        from_step_id=from_step_id,
+        to_step_id=to_step_id,
+        link_type=link_type
+    )
+
+    session.add(link)
+    session.commit()
+    return link
+
+
+def get_step_successors(session, step_id):
+    """Get all steps that this step feeds into"""
+    from .msnoise_table_def import declare_tables
+    schema = declare_tables()
+
+    return session.query(schema.WorkflowStep) \
+        .join(schema.WorkflowLink, schema.WorkflowStep.step_id == schema.WorkflowLink.to_step_id) \
+        .filter(schema.WorkflowLink.from_step_id == step_id) \
+        .filter(schema.WorkflowLink.is_active == True).all()
+
+
+def get_first_runnable_steps_per_branch(session, source_step_id, skip_categories=None):
+    """
+    Return the first runnable step on each outgoing branch from source_step_id,
+    skipping steps in skip_categories (default: {"filter"}).
+
+    - "Branch" roots are the immediate successors of source_step_id.
+    - If skipped nodes fan out, each fan-out is treated as a separate branch.
+    - Results are deduped (set behavior) and returned in stable order.
+    """
+    if skip_categories is None:
+        skip_categories = {"filter"}
+
+    # We dedupe by step_id, but preserve stable ordering at the end
+    result_by_step_id = {}
+
+    def immediate_successors(step_id):
+        # Reuse existing helper (one-hop)
+        return [
+            s for s in get_step_successors(session, step_id)
+            if getattr(s, "is_active", True)
+        ]
+
+    def descend_until_runnable(start_step):
+        # Explore forward until the first non-skipped step is found for each path
+        stack = [start_step]
+        visited = set()
+
+        while stack:
+            step = stack.pop()
+            if step.step_id in visited:
+                continue
+            visited.add(step.step_id)
+
+            if step.category not in skip_categories:
+                result_by_step_id[step.step_id] = step
+                continue  # stop this path at first runnable
+
+            for nxt in immediate_successors(step.step_id):
+                stack.append(nxt)
+
+    for succ in immediate_successors(source_step_id):
+        descend_until_runnable(succ)
+
+    return [result_by_step_id[k] for k in sorted(result_by_step_id)]
+
+
+def _get_step_predecessors(session, step_id):
+    """Get all steps that feed into this step"""
+    from .msnoise_table_def import declare_tables
+    schema = declare_tables()
+
+    return session.query(schema.WorkflowStep) \
+        .join(schema.WorkflowLink, schema.WorkflowStep.step_id == schema.WorkflowLink.from_step_id) \
+        .filter(schema.WorkflowLink.to_step_id == step_id) \
+        .filter(schema.WorkflowLink.is_active == True).all()
+
+
+def get_upstream_steps_for_step_id(session, step_id, topo_order=True, include_self=False):
+    """
+    Returns all upstream WorkflowStep nodes (recursive predecessors) for `step_id`.
+
+    Parameters
+    ----------
+    session : sqlalchemy.orm.session.Session
+    step_id : int
+        The step_id of the node whose upstream lineage you want.
+    topo_order : bool
+        If True (default), returns nodes in dependency order (upstream first),
+        suitable for "merge config" application.
+        If False, returns in discovery order (still de-duplicated).
+    include_self : bool
+        If True, includes the node identified by `step_id` in the returned list.
+
+    Returns
+    -------
+    list[WorkflowStep]
+        De-duplicated list of upstream steps.
+    """
+    visited = set()
+    ordered = []
+
+    def dfs(current_step_id):
+        # Direct predecessors of the current node:
+        preds = _get_step_predecessors(session, current_step_id) or []
+        for p in preds:
+            if p.step_id in visited:
+                continue
+            visited.add(p.step_id)
+            dfs(p.step_id)
+            if topo_order:
+                # post-order ensures: preprocess -> cc -> filter -> ...
+                ordered.append(p)
+            else:
+                ordered.append(p)
+
+    dfs(step_id)
+
+    if include_self:
+        self_step = session.query(WorkflowStep).filter(WorkflowStep.step_id == step_id).first()
+        if self_step is not None and self_step.step_id not in visited:
+            ordered.append(self_step)
+
+    return ordered
+
 
 def create_workflow_steps_from_config_sets(session):
     """
@@ -3054,6 +1316,7 @@ def create_workflow_steps_from_config_sets(session):
 
     except Exception as e:
         return 0, 0, str(e)
+
 
 def create_workflow_links_from_steps(session):
     """
@@ -3157,6 +1420,330 @@ def create_workflow_links_from_steps(session):
 
 # Job management functions for workflow-aware jobs
 
+
+def get_workflow_step_config(session, step_name):
+    """Return the :class:`WorkflowStep` for *step_name*, or ``None``.
+
+    :param session: Active SQLAlchemy session.
+    :param step_name: Exact step name string, e.g. ``"preprocess_1"``.
+    """
+    for step in get_workflow_steps(session):
+        if step.step_name == step_name:
+            return step
+    return None
+
+
+# ============================================================
+# Section 5 — Jobs
+# ============================================================
+# ── Legacy job API (used by QC sub-pipeline) ───────────────
+
+
+def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
+               ref=None):
+    """
+    Updates or Inserts a new :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the
+    database.
+
+    :type day: str
+    :param day: The day in YYYY-MM-DD format
+    :type pair: str
+    :param pair: the name of the pair (EXAMPLE?)
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type flag: str
+    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+    :type commit: bool
+    :param commit: Whether to directly commit (True, default) or not (False)
+    :type returnjob: bool
+    :param returnjob: Return the modified/inserted Job (True, default) or not
+        (False)
+
+
+    :rtype: :class:`~msnoise.msnoise_table_def.declare_tables.Job` or None
+    :returns: If returnjob is True, returns the modified/inserted Job.
+    """
+    from sqlalchemy import text
+    if ref:
+        job = session.query(Job).filter(text("ref=:ref")).params(ref=ref).first()
+    else:
+        job = session.query(Job)\
+            .filter(text("day=:day"))\
+            .filter(text("pair=:pair"))\
+            .filter(text("jobtype=:jobtype"))\
+            .params(day=day, pair=pair, jobtype=jobtype).first()
+    if job is None:
+        job = Job(day, pair, jobtype, 'T')
+        session.add(job)
+    else:
+        job.flag = flag
+        job.lastmod = datetime.datetime.now(datetime.timezone.utc)
+    if commit:
+        session.commit()
+    if returnjob:
+        return job
+
+
+def massive_insert_job(jobs):
+    """
+    Routine to use a low level function to insert much faster a list of
+    :class:`~msnoise.msnoise_table_def.declare_tables.Job`. This method uses the Engine
+    directly, no need to pass a Session object.
+
+    :type jobs: list
+    :param jobs: a list of :class:`~msnoise.msnoise_table_def.declare_tables.Job` to insert.
+    """
+    engine = get_engine()
+    with engine.connect() as conn:
+        conn.execute(
+            Job.__table__.insert(),
+            jobs)
+        try:
+            conn.commit()
+        except:
+            pass
+
+
+def massive_update_job(session, jobs, flag="D"):
+    """
+    Routine to use a low level function to update much faster a list of
+    :class:`~msnoise.msnoise_table_def.declare_tables.Job`. This method uses the Job.ref
+    which is unique.
+    :type session: Session
+    :param session: the database connection object
+    :type jobs: list or tuple
+    :param jobs: a list of :class:`~msnoise.msnoise_table_def.declare_tables.Job` to update.
+    :type flag: str
+    :param flag: The destination flag.
+    """
+    updated = False
+    mappings = [{'ref': job.ref, 'flag': flag} for job in jobs]
+    while not updated:
+        try:
+            session.bulk_update_mappings(Job, mappings)
+            session.commit()
+            updated = True
+        except:
+            time.sleep(np.random.random())
+            pass
+    return
+
+
+def is_next_job(session, flag='T', jobtype='CC'):
+    """
+    Are there any :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
+    with flag=`flag` and jobtype=`type`
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type flag: str
+    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+
+    :rtype: bool
+    :returns: True if at least one :class:`~msnoise.msnoise_table_def.declare_tables.Job`
+        matches, False otherwise.
+    """
+    job = session.query(Job).\
+        filter(Job.jobtype == jobtype).\
+        filter(Job.flag == flag).first()
+    if job is None:
+        return False
+    else:
+        return True
+
+
+def get_next_job(session, flag='T', jobtype='CC', limit=99999):
+    """
+    Get the next :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
+    with flag=`flag` and jobtype=`jobtype`. Jobs of the same `type` are grouped
+    per day. This function also sets the flag of all selected Jobs to "I"n
+    progress.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type flag: str
+    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+
+    :rtype: list
+    :returns: list of :class:`~msnoise.msnoise_table_def.declare_tables.Job`
+    """
+    from sqlalchemy import update
+    tmp = []
+    while not len(tmp):
+        jobs = session.query(Job).filter(Job.jobtype == jobtype).\
+            filter(Job.flag == flag).\
+            filter(Job.day == session.query(Job).
+                   filter(Job.jobtype == jobtype).
+                   filter(Job.flag == flag).first().day).\
+            limit(limit).with_for_update()
+
+        tmp = jobs.all()
+        refs = [_.ref for _ in tmp]
+        q = update(Job).values({"flag":"I"}).where(Job.ref.in_(refs))
+        session.execute(q)
+        # jobs.update({Job.flag: 'I'})
+        session.commit()
+    return tmp
+
+
+def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
+    """
+    Are there any DTT :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
+    with flag=`flag` and jobtype=`jobtype`. If `ref` is provided, checks if a
+    DTT "REF" job is present.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type flag: str
+    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+    :type ref: bool
+    :param ref: Whether to check for a REF job (True) or not (False, default)
+
+    :rtype: bool
+    :returns: True if at least one Job matches, False otherwise.
+    """
+    q = session.query(Job.ref).\
+        filter(Job.flag == flag).\
+        filter(Job.jobtype == jobtype)
+    if ref:
+        job = q.filter(Job.pair == ref).filter(Job.day == 'REF').count()
+    else:
+        job = q.filter(Job.day != 'REF').count()
+    if job == 0:
+        return False
+    else:
+        return True
+
+
+def get_dtt_next_job(session, flag='T', jobtype='DTT'):
+    """
+    Get the next DTT :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
+    with flag=`flag` and jobtype=`jobtype`. Jobs are then grouped per station
+    pair. This function also sets the flag of all selected Jobs to "I"n
+    progress.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type flag: str
+    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+
+    :rtype: tuple
+    :returns: (pairs, days, refs):
+        List of station pair names -
+        Days of the next DTT jobs -
+        Job IDs (for later being able to update their flag).
+    """
+    from sqlalchemy.sql.expression import func
+    if read_db_inifile().tech == 2:
+        rand = func.rand
+    else:
+        rand = func.random
+    try:
+        jobs = session.query(Job.ref, Job.day, Job.pair, Job.flag).filter(Job.flag == flag).\
+            filter(Job.jobtype == jobtype).filter(Job.day != 'REF').\
+            filter(Job.pair == session.query(Job).
+                   filter(Job.flag == flag).
+                   filter(Job.jobtype == jobtype).
+                   filter(Job.day != 'REF').
+                   order_by(rand()).first().pair).\
+            with_for_update()
+        tmp = jobs.all()
+        mappings = [{'ref': job.ref, 'flag': "I"} for job in tmp]
+        updated = False
+        while not updated:
+            try:
+                session.bulk_update_mappings(Job, mappings)
+                session.commit()
+                updated=True
+            except:
+                traceback.print_exc()
+                time.sleep(np.random.random())
+                pass
+        return tmp
+    except:
+        traceback.print_exc()
+        return []
+
+
+def reset_jobs(session, jobtype, alljobs=False, rule=None, reset_i=True, reset_e=True):
+    """
+    Sets the flag of all `jobtype` Jobs to "T"odo.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :type alljobs: bool
+    :param alljobs: If True, resets all jobsregardless of flag. If False (default),
+        only resets jobs with flags specified by reset_i and reset_e.
+    :type rule: str
+    :param rule: Optional custom SQL clause for filtering jobs to reset
+    :type reset_i: bool
+    :param reset_i: If True (default), reset jobs with 'I' flag
+    :type reset_e: bool
+    :param reset_e: If True (default), reset jobs with 'E' flag
+    """
+    dbini = read_db_inifile()
+    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
+     # If a custom rule is provided, use direct SQL
+    if rule:
+        session.execute("UPDATE %sjobs set flag='T' where jobtype='%s' and %s"
+                        % (prefix, jobtype, rule))
+        session.commit()
+        return
+
+    # Get all jobs of the specified jobtype
+    base_query = session.query(Job).filter(Job.jobtype == jobtype)
+
+    if alljobs:
+        # If alljobs is True, reset all jobs regardless of flag
+        base_query.update({Job.flag: 'T'})
+    else:
+        # Reset only jobs with specified flags
+        if reset_i:
+            jobs_i = base_query.filter(Job.flag == "I")
+            jobs_i.update({Job.flag: 'T'})
+
+        if reset_e:
+            jobs_e = base_query.filter(Job.flag == "E")
+            jobs_e.update({Job.flag: 'T'})
+    session.commit()
+
+
+def get_job_types(session, jobtype='CC'):
+    """
+    Count the number of Jobs of a specific `type`,
+    grouped by `flag`.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type jobtype: str
+    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+
+    :rtype: list
+    :returns: list of [count, flag] pairs
+    """
+    from sqlalchemy.sql.expression import func
+    return session.query(func.count(Job.flag), Job.flag).\
+        filter(Job.jobtype == jobtype).group_by(Job.flag).all()
+
+# ── Workflow-aware job API ──────────────────────────────────
+
+
 def create_job_for_step(db, step_id, day, pair, priority=0, flag='T'):
     """
     Create a job for a specific workflow step
@@ -3192,6 +1779,7 @@ def create_job_for_step(db, step_id, day, pair, priority=0, flag='T'):
     db.commit()
     return job
 
+
 def get_jobs_for_step(db, step_id, flag=None):
     """
     Get all jobs for a specific workflow step
@@ -3210,119 +1798,6 @@ def get_jobs_for_step(db, step_id, flag=None):
 
     return query.all()
 
-def create_workflow_jobs(db, current_step_name, days=None, pairs=None):
-    """
-    Create jobs for the next workflow step(s) after completing a step
-
-    :param db: Database connection
-    :param current_step_name: Name of the completed step
-    :param days: List of days to create jobs for
-    :param pairs: List of station pairs to create jobs for
-    :return: List of created Job instances
-    """
-    # Find current step
-    current_step = db.query(WorkflowStep).filter(
-        WorkflowStep.step_name == current_step_name,
-    ).first()
-
-    if not current_step:
-        raise ValueError(f"WorkflowStep '{current_step_name}' not found")
-
-    # Find next steps via WorkflowLink
-    next_steps = db.query(WorkflowStep).join(
-        WorkflowLink, WorkflowLink.to_step_id == WorkflowStep.step_id
-    ).filter(
-        WorkflowLink.from_step_id == current_step.step_id,
-        WorkflowLink.is_active == True
-    ).all()
-
-    created_jobs = []
-
-    # Create jobs for each next step
-    for next_step in next_steps:
-        # Get appropriate pairs/days based on step type or use provided ones
-        if pairs is None:
-            pairs = _get_pairs_for_step(db, next_step)
-        if days is None:
-            days = _get_days_for_step(db, next_step)
-
-        for pair in pairs:
-            for day in days:
-                # Check if job already exists
-                existing_job = db.query(Job).filter(
-                    Job.day == day,
-                    Job.pair == pair,
-                    Job.step_id == next_step.step_id,
-                ).first()
-
-                if not existing_job:
-                    job = create_job_for_step(
-                        db, next_step.step_id, day, pair
-                    )
-                    created_jobs.append(job)
-
-    return created_jobs
-
-def _get_pairs_for_step(db, step):
-    """
-    Get appropriate station pairs for a workflow step
-
-    :param db: Database connection
-    :param step: WorkflowStep instance
-    :return: List of station pairs
-    """
-    # This is a placeholder - implement based on step type and requirements
-    # For now, return all active station pairs
-    return get_station_pairs(db, used=True)
-
-def _get_days_for_step(db, step):
-    """
-    Get appropriate days for a workflow step
-
-    :param db: Database connection
-    :param step: WorkflowStep instance
-    :return: List of days
-    """
-    # This is a placeholder - implement based on step type and requirements
-    # For now, return days from data availability
-    from datetime import datetime, timedelta
-
-    # Get recent days as example
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=30)
-
-    days = []
-    current_date = start_date
-    while current_date <= end_date:
-        days.append(current_date.strftime('%Y-%m-%d'))
-        current_date += timedelta(days=1)
-
-    return days
-
-
-# ============================================================
-# Section 6 — Lineage Resolution
-# ============================================================
-
-def get_workflow_job_counts(db):
-    """
-    Get job counts by status for the workflow
-
-    :param db: Database connection
-    :return: Dictionary with job counts by status
-    """
-    from sqlalchemy import func
-
-    counts = db.query(
-        Job.flag,
-        func.count(Job.ref).label('count')
-    ).group_by(Job.flag).all()
-
-    result = {'T': 0, 'I': 0, 'D': 0}
-    for flag, count in counts:
-        result[flag] = count
-
-    return result
 
 def get_next_job_for_step(
         session,
@@ -3421,6 +1896,7 @@ def get_next_job_for_step(
 
     return jobs, step
 
+
 def is_next_job_for_step(session, step_category="preprocess", flag='T'):
     """
     Are there any workflow-aware Jobs in the database with the specified
@@ -3460,6 +1936,125 @@ def is_next_job_for_step(session, step_category="preprocess", flag='T'):
     else:
         return True
 
+
+def get_workflow_job_counts(db):
+    """
+    Get job counts by status for the workflow
+
+    :param db: Database connection
+    :return: Dictionary with job counts by status
+    """
+    from sqlalchemy import func
+
+    counts = db.query(
+        Job.flag,
+        func.count(Job.ref).label('count')
+    ).group_by(Job.flag).all()
+
+    result = {'T': 0, 'I': 0, 'D': 0}
+    for flag, count in counts:
+        result[flag] = count
+
+    return result
+
+
+def create_workflow_jobs(db, current_step_name, days=None, pairs=None):
+    """
+    Create jobs for the next workflow step(s) after completing a step
+
+    :param db: Database connection
+    :param current_step_name: Name of the completed step
+    :param days: List of days to create jobs for
+    :param pairs: List of station pairs to create jobs for
+    :return: List of created Job instances
+    """
+    # Find current step
+    current_step = db.query(WorkflowStep).filter(
+        WorkflowStep.step_name == current_step_name,
+    ).first()
+
+    if not current_step:
+        raise ValueError(f"WorkflowStep '{current_step_name}' not found")
+
+    # Find next steps via WorkflowLink
+    next_steps = db.query(WorkflowStep).join(
+        WorkflowLink, WorkflowLink.to_step_id == WorkflowStep.step_id
+    ).filter(
+        WorkflowLink.from_step_id == current_step.step_id,
+        WorkflowLink.is_active == True
+    ).all()
+
+    created_jobs = []
+
+    # Create jobs for each next step
+    for next_step in next_steps:
+        # Get appropriate pairs/days based on step type or use provided ones
+        if pairs is None:
+            pairs = _get_pairs_for_step(db, next_step)
+        if days is None:
+            days = _get_days_for_step(db, next_step)
+
+        for pair in pairs:
+            for day in days:
+                # Check if job already exists
+                existing_job = db.query(Job).filter(
+                    Job.day == day,
+                    Job.pair == pair,
+                    Job.step_id == next_step.step_id,
+                ).first()
+
+                if not existing_job:
+                    job = create_job_for_step(
+                        db, next_step.step_id, day, pair
+                    )
+                    created_jobs.append(job)
+
+    return created_jobs
+
+
+def _get_pairs_for_step(db, step):
+    """
+    Get appropriate station pairs for a workflow step
+
+    :param db: Database connection
+    :param step: WorkflowStep instance
+    :return: List of station pairs
+    """
+    # This is a placeholder - implement based on step type and requirements
+    # For now, return all active station pairs
+    return get_station_pairs(db, used=True)
+
+
+def _get_days_for_step(db, step):
+    """
+    Get appropriate days for a workflow step
+
+    :param db: Database connection
+    :param step: WorkflowStep instance
+    :return: List of days
+    """
+    # This is a placeholder - implement based on step type and requirements
+    # For now, return days from data availability
+    from datetime import datetime, timedelta
+
+    # Get recent days as example
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+
+    days = []
+    current_date = start_date
+    while current_date <= end_date:
+        days.append(current_date.strftime('%Y-%m-%d'))
+        current_date += timedelta(days=1)
+
+    return days
+
+
+# ============================================================
+# Section 6 — Lineage Resolution
+# ============================================================
+
+
 def get_filter_steps_for_cc_step(session, cc_step_id):
     """
     Get all filter steps that are children of a specific CC step.
@@ -3478,21 +2073,73 @@ def get_filter_steps_for_cc_step(session, cc_step_id):
 
     return filter_steps
 
-def _merge_params(orig_params, configs_in_order):
-    from obspy.core import AttribDict
-    merged = dict(orig_params)
-    for cfg in configs_in_order:
-        merged.update(cfg)  # later overrides earlier
-    return AttribDict(merged)
 
-def _load_step_config(db, step):
-    # step must contain config_category + config_set_number (or equivalent)
-    return get_config_set_details(
-        db,
-        step.category,
-        step.set_number,
-        format="AttribDict",
+def lineage_to_string(lineage_steps):
+    return "/".join(s.step_name for s in lineage_steps if s.step_name)
+
+
+def lineage_str_to_step_names(lineage_str, sep="/"):
+    """
+    Convert a lineage string like "preprocess_1/cc_1/filter_1" into a list of
+    step_name strings, preserving order.
+    """
+    if lineage_str is None:
+        raise ValueError("lineage_str is None")
+    lineage_str = str(lineage_str).strip()
+    if not lineage_str:
+        return []
+    return [p.strip() for p in lineage_str.split(sep) if p.strip()]
+
+
+def lineage_str_to_steps(session, lineage_str, sep="/", strict=True):
+    """
+    Resolve a lineage string to a list of WorkflowStep ORM objects (ordered).
+
+    Parameters
+    ----------
+    session : sqlalchemy.orm.session.Session
+    lineage_str : str
+        e.g. "preprocess_1/cc_1/filter_1"
+    sep : str
+        Separator used in lineage strings.
+    strict : bool
+        If True, raises if any step_name can't be resolved.
+        If False, silently skips missing steps.
+
+    Returns
+    -------
+    list[WorkflowStep]
+    """
+    names = lineage_str_to_step_names(lineage_str, sep=sep)
+    if not names:
+        return []
+
+    rows = (
+        session.query(WorkflowStep)
+        .filter(WorkflowStep.step_name.in_(names))
+        .all()
     )
+    by_name = {s.step_name: s for s in rows}
+
+    steps = []
+    missing = []
+    for name in names:
+        s = by_name.get(name)
+        if s is None:
+            missing.append(name)
+            if not strict:
+                continue
+        else:
+            steps.append(s)
+
+    if missing and strict:
+        raise ValueError(
+            "Could not resolve lineage steps: %s"
+            % ", ".join(missing)
+        )
+
+    return steps
+
 
 def get_lineages_to_step_id(
     session,
@@ -3570,6 +2217,76 @@ def get_lineages_to_step_id(
 
     return paths
 
+
+def get_done_lineages_for_category(session, category):
+    """Return all distinct computed lineages for a given workflow step category.
+
+    Queries ``Job`` rows whose associated ``WorkflowStep.category`` matches
+    *category* and whose flag is ``'D'`` (done), then de-duplicates and
+    resolves each ``lineage`` string into an ordered list of step-name
+    strings (upstream → downstream, including the step itself).
+
+    This is the correct way to enumerate output folders for a step that may
+    be reached via multiple upstream paths (e.g. multiple filters, multiple
+    MWCS configs), because it reflects what was *actually computed* rather
+    than what the DAG topology suggests.
+
+    Example::
+
+        lineages = get_done_lineages_for_category(db, 'stretching')
+        # → [
+        #     ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'stretching_1'],
+        #     ['preprocess_1', 'cc_1', 'filter_2', 'stack_1', 'stretching_1'],
+        # ]
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param category: Workflow step category, e.g. ``'stretching'``,
+        ``'mwcs_dtt'``, ``'wavelet_dtt'``.
+    :type category: str
+    :rtype: list[list[str]]
+    :returns: Sorted list of unique lineage-name lists.
+    """
+    rows = (
+        session.query(Job.lineage)
+        .join(Job.workflow_step)
+        .filter(WorkflowStep.category == category)
+        .filter(Job.flag == "D")
+        .filter(Job.lineage.isnot(None))
+        .distinct()
+        .all()
+    )
+    seen = set()
+    result = []
+    for (lineage_str,) in rows:
+        if not lineage_str or lineage_str in seen:
+            continue
+        seen.add(lineage_str)
+        names = lineage_str_to_step_names(lineage_str)
+        # Guard: skip empty or single-entry lineages (global-only, no real steps)
+        if len(names) >= 2:
+            result.append(names)
+    result.sort()
+    return result
+
+
+def _load_step_config(db, step):
+    # step must contain config_category + config_set_number (or equivalent)
+    return get_config_set_details(
+        db,
+        step.category,
+        step.set_number,
+        format="AttribDict",
+    )
+
+
+def _merge_params(orig_params, configs_in_order):
+    from obspy.core import AttribDict
+    merged = dict(orig_params)
+    for cfg in configs_in_order:
+        merged.update(cfg)  # later overrides earlier
+    return AttribDict(merged)
+
+
 def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
     # lineage is upstream -> downstream
     lineage = [s for s in lineage if s.category not in {"global"}]
@@ -3592,69 +2309,83 @@ def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
 
     return lineage, lineage_names, params
 
-def lineage_to_string(lineage_steps):
-    return "/".join(s.step_name for s in lineage_steps if s.step_name)
 
-def lineage_str_to_step_names(lineage_str, sep="/"):
+def resolve_lineage_params(session, lineage_names):
+    """Resolve a lineage name-list into a fully merged params object.
+
+    Given a list of step-name strings (as returned by
+    :func:`get_done_lineages_for_category`), resolves them to
+    :class:`~msnoise.msnoise_table_def.WorkflowStep` ORM objects and merges
+    every step's configuration into the global params, exactly as the
+    processing steps themselves do via :func:`get_next_lineage_batch`.
+
+    Returns ``(lineage_steps, lineage_names, params)`` — the same tuple as
+    :func:`get_merged_params_for_lineage` — so callers can use ``params``
+    directly (it will have ``components_to_compute``, ``mov_stack``, etc.).
+
+    Example::
+
+        lineage_names = get_done_lineages_for_category(db, 'mwcs_dtt')[0]
+        _, _, params = resolve_lineage_params(db, lineage_names)
+        mov_stack = params.mov_stack[0]
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param lineage_names: Ordered list of step-name strings, e.g.
+        ``['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'mwcs_1', 'mwcs_dtt_1']``.
+    :rtype: tuple(list, list[str], AttribDict)
     """
-    Convert a lineage string like "preprocess_1/cc_1/filter_1" into a list of
-    step_name strings, preserving order.
+    orig_params = get_params(session)
+    lineage_str = "/".join(lineage_names)
+    steps = lineage_str_to_steps(session, lineage_str, sep="/", strict=False)
+    return get_merged_params_for_lineage(session, orig_params, {}, steps)
+
+
+# ============================================================
+# Stretching xarray I/O
+# ============================================================
+
+
+def resolve_lineage_from_ids(session, params, preprocess_id=1, cc_id=None,
+                              filter_id=None, stack_id=None, refstack_id=None,
+                              mwcs_id=None, mwcs_dtt_id=None,
+                              stretching_id=None, wavelet_id=None,
+                              wavelet_dtt_id=None):
+    """Build a lineage name list from integer step-set IDs and resolve params.
+
+    Constructs step-name strings (e.g. ``"preprocess_1"``, ``"cc_2"``) from
+    the supplied integer IDs in workflow order, then delegates to
+    :func:`resolve_lineage_params` to merge all step configurations.
+    Only IDs that are not ``None`` are included.
+
+    :returns: ``(lineage_steps, lineage_names, merged_params)`` - same tuple
+        as :func:`get_merged_params_for_lineage`.
     """
-    if lineage_str is None:
-        raise ValueError("lineage_str is None")
-    lineage_str = str(lineage_str).strip()
-    if not lineage_str:
-        return []
-    return [p.strip() for p in lineage_str.split(sep) if p.strip()]
+    parts = [f"preprocess_{preprocess_id}"]
+    if cc_id is not None:
+        parts.append(f"cc_{cc_id}")
+    if filter_id is not None:
+        parts.append(f"filter_{filter_id}")
+    if stack_id is not None:
+        parts.append(f"stack_{stack_id}")
+    if refstack_id is not None:
+        parts.append(f"refstack_{refstack_id}")
+    if mwcs_id is not None:
+        parts.append(f"mwcs_{mwcs_id}")
+    if mwcs_dtt_id is not None:
+        parts.append(f"mwcs_dtt_{mwcs_dtt_id}")
+    if stretching_id is not None:
+        parts.append(f"stretching_{stretching_id}")
+    if wavelet_id is not None:
+        parts.append(f"wavelet_{wavelet_id}")
+    if wavelet_dtt_id is not None:
+        parts.append(f"wavelet_dtt_{wavelet_dtt_id}")
+    return resolve_lineage_params(session, parts)
 
-def lineage_str_to_steps(session, lineage_str, sep="/", strict=True):
-    """
-    Resolve a lineage string to a list of WorkflowStep ORM objects (ordered).
 
-    Parameters
-    ----------
-    session : sqlalchemy.orm.session.Session
-    lineage_str : str
-        e.g. "preprocess_1/cc_1/filter_1"
-    sep : str
-        Separator used in lineage strings.
-    strict : bool
-        If True, raises if any step_name can't be resolved.
-        If False, silently skips missing steps.
+# ============================================================
+# Lineage enumeration helpers
+# ============================================================
 
-    Returns
-    -------
-    list[WorkflowStep]
-    """
-    names = lineage_str_to_step_names(lineage_str, sep=sep)
-    if not names:
-        return []
-
-    rows = (
-        session.query(WorkflowStep)
-        .filter(WorkflowStep.step_name.in_(names))
-        .all()
-    )
-    by_name = {s.step_name: s for s in rows}
-
-    steps = []
-    missing = []
-    for name in names:
-        s = by_name.get(name)
-        if s is None:
-            missing.append(name)
-            if not strict:
-                continue
-        else:
-            steps.append(s)
-
-    if missing and strict:
-        raise ValueError(
-            "Could not resolve lineage steps: %s"
-            % ", ".join(missing)
-        )
-
-    return steps
 
 def get_next_lineage_batch(
         db,
@@ -3740,89 +2471,1404 @@ def get_next_lineage_batch(
         "params": params,
     }
 
-def get_done_lineages_for_category(session, category):
-    """Return all distinct computed lineages for a given workflow step category.
 
-    Queries ``Job`` rows whose associated ``WorkflowStep.category`` matches
-    *category* and whose flag is ``'D'`` (done), then de-duplicates and
-    resolves each ``lineage`` string into an ordered list of step-name
-    strings (upstream → downstream, including the step itself).
+def get_stack_lineage_for_filter(session, filterid):
+    """Get the full lineage path through a specific filter step to its downstream stack.
 
-    This is the correct way to enumerate output folders for a step that may
-    be reached via multiple upstream paths (e.g. multiple filters, multiple
-    MWCS configs), because it reflects what was *actually computed* rather
-    than what the DAG topology suggests.
+    Traverses the workflow graph upstream from ``filter_{filterid}`` to the root
+    preprocess step, then appends the stack step that is immediately downstream of
+    the filter.  Returns a list of step names suitable for use as the *lineage*
+    argument to :func:`xr_get_ref`, :func:`xr_get_ccf`, etc.
 
-    Example::
+    Example for the default single-pipeline::
 
-        lineages = get_done_lineages_for_category(db, 'stretching')
-        # → [
-        #     ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'stretching_1'],
-        #     ['preprocess_1', 'cc_1', 'filter_2', 'stack_1', 'stretching_1'],
-        # ]
+        get_stack_lineage_for_filter(db, 1)
+        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1']
 
     :type session: :class:`sqlalchemy.orm.session.Session`
-    :param category: Workflow step category, e.g. ``'stretching'``,
-        ``'mwcs_dtt'``, ``'wavelet_dtt'``.
-    :type category: str
-    :rtype: list[list[str]]
-    :returns: Sorted list of unique lineage-name lists.
+    :type filterid: int
+    :param filterid: The filter set_number (e.g. 1 for filter_1).
+    :rtype: list of str
     """
-    rows = (
-        session.query(Job.lineage)
-        .join(Job.workflow_step)
-        .filter(WorkflowStep.category == category)
-        .filter(Job.flag == "D")
-        .filter(Job.lineage.isnot(None))
-        .distinct()
-        .all()
+    steps = get_workflow_steps(session)
+    links = get_workflow_links(session)
+    step_map = {s.step_id: s for s in steps}
+
+    filter_step = next(
+        (s for s in steps if s.category == 'filter' and s.set_number == filterid),
+        None,
     )
-    seen = set()
-    result = []
-    for (lineage_str,) in rows:
-        if not lineage_str or lineage_str in seen:
+    if filter_step is None:
+        return []
+
+    # Walk upstream from filter to the root step, skipping global config steps
+    parent_map = {link.to_step_id: link.from_step_id for link in links}
+    path = [filter_step.step_name]
+    current_id = filter_step.step_id
+    visited = set()
+    while current_id in parent_map:
+        if current_id in visited:
+            break  # guard against cycles
+        visited.add(current_id)
+        parent_id = parent_map[current_id]
+        parent_step = step_map[parent_id]
+        if parent_step.category != 'global':
+            path.insert(0, parent_step.step_name)
+        current_id = parent_id
+
+    # Append the stack step immediately downstream of this filter (if any)
+    for link in links:
+        if link.from_step_id == filter_step.step_id:
+            child = step_map.get(link.to_step_id)
+            if child and child.category == 'stack':
+                path.append(child.step_name)
+                break
+
+    return path
+
+
+def get_refstack_lineage_for_filter(session, filterid, refstack_set_number=1):
+    """Get the full lineage path through a filter step down to its refstack.
+
+    Extends :func:`get_stack_lineage_for_filter` by also appending the
+    ``refstack_M`` step that is immediately downstream of the stack step.
+    This is the correct lineage to pass to :func:`xr_get_ref`, since REF
+    files now live under the refstack step folder.
+
+    Example for the default single-pipeline::
+
+        get_refstack_lineage_for_filter(db, 1)
+        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :type filterid: int
+    :param filterid: The filter set_number (e.g. 1 for filter_1).
+    :type refstack_set_number: int
+    :param refstack_set_number: Which refstack set to use (default 1).
+    :rtype: list of str
+    """
+    path = get_stack_lineage_for_filter(session, filterid)
+    if not path:
+        return path
+
+    steps = get_workflow_steps(session)
+    links = get_workflow_links(session)
+
+    # Find the stack step at the end of the path
+    stack_step_name = path[-1]
+    stack_step = next(
+        (s for s in steps if s.step_name == stack_step_name), None
+    )
+    if stack_step is None:
+        return path
+
+    # Find the refstack step downstream of this stack step
+    # Prefer the requested refstack_set_number; fall back to the first available
+    refstack_steps = [
+        s for s in steps
+        if s.category == 'refstack'
+        and any(lk.from_step_id == stack_step.step_id and lk.to_step_id == s.step_id
+                for lk in links)
+    ]
+    if not refstack_steps:
+        return path  # no refstack in this workflow, return stack-level lineage
+
+    # Pick requested set_number if available, else first
+    refstack_step = next(
+        (s for s in refstack_steps if s.set_number == refstack_set_number),
+        refstack_steps[0]
+    )
+    return path + [refstack_step.step_name]
+
+
+# ============================================================
+# Section 7 — Time and Date Utilities
+# ============================================================
+
+
+def get_t_axis(params):
+    """
+    Returns the time axis (in seconds) of the CC functions.
+
+    :rtype: :class:`numpy.array`
+    :returns: the time axis in seconds
+    """
+    samples = int(2 * params.maxlag * params.cc_sampling_rate) + 1
+    return np.linspace(-params.maxlag, params.maxlag, samples)
+
+
+def get_maxlag_samples(maxlag, cc_sampling_rate):
+    """
+    Returns the length of the CC functions. Gets the maxlag and sampling rate
+    from the database.
+
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :rtype: int
+    :returns: the length of the CCF in samples
+    """
+
+    return int(2*maxlag*cc_sampling_rate)+1
+
+
+def build_ref_datelist(params):
+    """
+    Creates a date array for the REF.
+    The returned tuple contains a start and an end date, and a list of
+    individual dates between the two.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :rtype: tuple
+    :returns: (start, end, datelist)
+    """
+    begin = params.ref_begin
+    end = params.ref_end
+    if begin[0] == '-':
+        start = datetime.date.today() + datetime.timedelta(days=int(begin))
+        end = datetime.date.today() + datetime.timedelta(days=int(end))
+    elif begin == "1970-01-01":
+        start = session.query(DataAvailability).order_by(
+            DataAvailability.starttime).first().starttime.date()
+        end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
+    else:
+        start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
+        end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
+    end = min(end, datetime.date.today())
+    datelist = pd.date_range(start, end).map(lambda x: x.date())
+    return start, end, datelist.tolist()
+
+
+def build_movstack_datelist(session):
+    """
+    Creates a date array for the analyse period.
+    The returned tuple contains a start and an end date, and a list of
+    individual dates between the two.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :rtype: tuple
+    :returns: (start, end, datelist)
+    """
+    begin = get_config(session, "startdate", category='global', set_number=1)
+    end = get_config(session, "enddate", category='global', set_number=1)
+    if begin[0] == '-':
+        start = datetime.date.today() + datetime.timedelta(days=int(begin))
+        end = datetime.date.today() + datetime.timedelta(days=int(end))
+    elif begin == "1970-01-01": # TODO this fails when the DA is empty
+        start = session.query(DataAvailability).order_by(
+            DataAvailability.starttime).first().starttime.date()
+    else:
+        start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
+
+    if end == "2100-01-01":
+        end = session.query(DataAvailability).order_by(
+            DataAvailability.endtime.desc()).first().endtime.date()
+    else:
+        end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
+    end = min(end, datetime.date.today())
+    datelist = pd.date_range(start, end).map(lambda x: x.date())
+    return start, end, datelist.tolist()
+
+
+def refstack_is_rolling(params):
+    """
+    Return True if the refstack configset uses rolling-index mode.
+
+    Rolling mode is indicated by ``ref_begin`` being a negative integer string
+    (e.g. ``"-5"``). In this mode no REF file is written to disk; the reference
+    is computed on-the-fly at MWCS/stretching/WCT time via
+    :func:`compute_rolling_ref`.
+
+    :type params: :class:`obspy.core.AttribDict`
+    :param params: Merged parameter set containing ``ref_begin``.
+    :rtype: bool
+    """
+    val = str(getattr(params, "ref_begin", "1970-01-01")).strip()
+    return val.startswith("-")
+
+
+def compute_rolling_ref(data, ref_begin, ref_end):
+    """
+    Compute a per-index rolling reference from a MOV CCF DataFrame.
+
+    For each time index ``i``, the reference is::
+
+        mean(data[i + ref_begin : i + ref_end])
+
+    Both ``ref_begin`` and ``ref_end`` must be negative integers with
+    ``ref_begin < ref_end <= -1``.  Use ``ref_end=-1`` to exclude the current
+    window (compare to the previous N windows).
+
+    Uses ``min_periods=1`` semantics: the first few steps receive whatever
+    partial window is available rather than NaN.
+
+    :type data: :class:`pandas.DataFrame`
+        Shape ``(n_times, n_lag_samples)``.
+    :type ref_begin: int
+        Negative offset for the start of the rolling window (e.g. ``-5``).
+    :type ref_end: int
+        Negative offset for the end of the rolling window (e.g. ``-1``).
+        Must satisfy ``ref_begin < ref_end <= 0``.
+    :rtype: :class:`numpy.ndarray`
+        Shape ``(n_times, n_lag_samples)``.  Row ``i`` is the reference for
+        time step ``i``.
+    """
+    n = len(data)
+    arr = data.values  # (n_times, n_lag_samples)
+    refs = np.full_like(arr, np.nan, dtype=float)
+
+    for i in range(n):
+        start_idx = i + ref_begin   # e.g. i - 5
+        end_idx   = i + ref_end     # e.g. i - 1  (exclusive in slice)
+        if end_idx <= 0:
+            continue                # not enough history yet
+        start_idx = max(0, start_idx)
+        if start_idx >= end_idx:
             continue
-        seen.add(lineage_str)
-        names = lineage_str_to_step_names(lineage_str)
-        # Guard: skip empty or single-entry lineages (global-only, no real steps)
-        if len(names) >= 2:
-            result.append(names)
-    result.sort()
-    return result
+        refs[i] = np.nanmean(arr[start_idx:end_idx], axis=0)
 
-def resolve_lineage_params(session, lineage_names):
-    """Resolve a lineage name-list into a fully merged params object.
+    return refs
 
-    Given a list of step-name strings (as returned by
-    :func:`get_done_lineages_for_category`), resolves them to
-    :class:`~msnoise.msnoise_table_def.WorkflowStep` ORM objects and merges
-    every step's configuration into the global params, exactly as the
-    processing steps themselves do via :func:`get_next_lineage_batch`.
 
-    Returns ``(lineage_steps, lineage_names, params)`` — the same tuple as
-    :func:`get_merged_params_for_lineage` — so callers can use ``params``
-    directly (it will have ``components_to_compute``, ``mov_stack``, etc.).
+def strip_refstack_from_lineage(lineage_names):
+    """
+    Return a copy of ``lineage_names`` with any ``refstack_*`` entries removed.
+
+    Used by mwcs/stretching/wavelet workers to build the path for
+    :func:`xr_get_ccf`, which lives under the ``stack_N`` step folder rather
+    than under ``refstack_M``.
 
     Example::
 
-        lineage_names = get_done_lineages_for_category(db, 'mwcs_dtt')[0]
-        _, _, params = resolve_lineage_params(db, lineage_names)
-        mov_stack = params.mov_stack[0]
+        strip_refstack_from_lineage(
+            ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']
+        )
+        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1']
+
+    :type lineage_names: list of str
+    :rtype: list of str
+    """
+    return [n for n in lineage_names if not n.startswith("refstack_")]
+
+
+def validate_stack_data(dataset, stack_type="reference"):
+    """Validates stack data before processing
+
+    Parameters:
+        dataset: xarray Dataset to validate
+        stack_type: Type of stack ("reference" or "moving") for error messages
+    Returns:
+        (is_valid, message) tuple
+    """
+    if dataset is None or not dataset.data_vars:
+        return False, f"No data found for {stack_type} stack"
+
+    if not hasattr(dataset, 'CCF'):
+        return False, f"Missing CCF data in {stack_type} stack"
+
+    data = dataset.CCF
+    if data.size == 0:
+        return False, f"Empty dataset in {stack_type} stack"
+
+    nan_count = np.isnan(data.values).sum()
+    total_points = data.values.size
+
+    if nan_count == total_points:
+        return False, f"{stack_type.capitalize()} stack contains only NaN values"
+
+    if nan_count > 0:
+        percent_nan = (nan_count / total_points) * 100
+        return True, f"Warning: {stack_type.capitalize()} stack contains {percent_nan:.1f}% NaN values"
+
+    return True, "OK"
+
+
+def filter_within_daterange(date, start_date, end_date):
+    """Check if a date falls within the configured range"""
+    return start_date <= date <= end_date
+
+
+# ============================================================================
+# Workflow Management Functions
+# ============================================================================
+
+
+# ============================================================
+# Section 8 — Signal Processing Utilities
+# ============================================================
+
+
+def nextpow2(x):
+    """
+    Returns the next power of 2 of `x`.
+
+    :type x: int
+    :param x: any value
+
+    :rtype: int
+    :returns: the next power of 2 of `x`
+    """
+
+    return np.ceil(np.log2(np.abs(x)))
+
+
+def check_and_phase_shift(trace, taper_length=20.0):
+    # TODO replace this hard coded taper length
+
+    import scipy.fft as sf
+    from scipy.fft import next_fast_len
+    if trace.stats.npts < 4 * taper_length*trace.stats.sampling_rate:
+        trace.data = np.zeros(trace.stats.npts)
+        return trace
+
+    dt = np.mod(trace.stats.starttime.datetime.microsecond*1.0e-6,
+                trace.stats.delta)
+    if (trace.stats.delta - dt) <= np.finfo(float).eps:
+        dt = 0.
+    if dt != 0.:
+        if dt <= (trace.stats.delta / 2.):
+            dt = -dt
+#            direction = "left"
+        else:
+            dt = (trace.stats.delta - dt)
+#            direction = "right"
+        logging.debug("correcting time by %.6fs"%dt)
+        trace.detrend(type="demean")
+        trace.detrend(type="simple")
+        trace.taper(max_percentage=None, max_length=1.0)
+
+        n = next_fast_len(int(trace.stats.npts))
+        FFTdata = sf.fft(trace.data, n=n)
+        fftfreq = sf.fftfreq(n, d=trace.stats.delta)
+        FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
+        FFTdata = FFTdata.astype(np.complex64)
+        sf.ifft(FFTdata, n=n, overwrite_x=True)
+        trace.data = np.real(FFTdata[:len(trace.data)]).astype(float)
+        trace.stats.starttime += dt
+        del FFTdata, fftfreq
+        # clean_scipy_cache()
+        return trace
+    else:
+        return trace
+
+
+def getGaps(stream, min_gap=None, max_gap=None):
+    # Create shallow copy of the traces to be able to sort them later on.
+    copied_traces = copy.copy(stream.traces)
+    stream.sort()
+    gap_list = []
+    for _i in range(len(stream.traces) - 1):
+        # skip traces with different network, station, location or channel
+        if stream.traces[_i].id != stream.traces[_i + 1].id:
+            continue
+        # different sampling rates should always result in a gap or overlap
+        if stream.traces[_i].stats.delta == stream.traces[_i + 1].stats.delta:
+            flag = True
+        else:
+            flag = False
+        stats = stream.traces[_i].stats
+        stime = stats['endtime']
+        etime = stream.traces[_i + 1].stats['starttime']
+        delta = etime.timestamp - stime.timestamp
+        # Check that any overlap is not larger than the trace coverage
+        if delta < 0:
+            temp = stream.traces[_i + 1].stats['endtime'].timestamp - \
+                etime.timestamp
+            if (delta * -1) > temp:
+                delta = -1 * temp
+        # Check gap/overlap criteria
+        if min_gap and delta < min_gap:
+            continue
+        if max_gap and delta > max_gap:
+            continue
+        # Number of missing samples
+        nsamples = int(round(math.fabs(delta) * stats['sampling_rate']))
+        # skip if is equal to delta (1 / sampling rate)
+        if flag and nsamples == 1:
+            continue
+        elif delta > 0:
+            nsamples -= 1
+        else:
+            nsamples += 1
+        gap_list.append([_i, _i+1,
+                        stats['network'], stats['station'],
+                        stats['location'], stats['channel'],
+                        stime, etime, delta, nsamples])
+    # Set the original traces to not alter the stream object.
+    stream.traces = copied_traces
+    del copied_traces
+    return gap_list
+
+
+def winsorizing(data, params, input="timeseries", nfft=0):
+    """Clip (Winsorise) a 2-D data array in the time or frequency domain.
+
+    Supports both one-shot sign-clipping (``winsorizing == -1``) and
+    RMS-based clipping (``winsorizing > 0``).  When *input* is ``"fft"``
+    the array is temporarily transformed back to the time domain, clipped,
+    then re-transformed.
+
+    :param data: 1-D or 2-D array of shape ``(n_traces, n_samples)``.
+    :param params: MSNoise params object; must expose ``params.winsorizing``.
+    :param input: ``"timeseries"`` (default) or ``"fft"``.
+    :param nfft: FFT length used when *input* is ``"fft"``; ignored otherwise.
+    :returns: Clipped array (same shape as input).
+    """
+    import scipy.fft as sf
+    input1D = False
+    if len(data.shape) == 1:
+        data = data.reshape(-1, data.shape[0])
+        input1D = True
+    if input == "fft":
+        data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(float)
+    for i in range(data.shape[0]):
+        if params.winsorizing == -1:
+            np.sign(data[i], data[i])  # inplace
+        elif params.winsorizing != 0:
+            rms = data[i].std() * params.winsorizing
+            np.clip(data[i], -rms, rms, data[i])  # inplace
+    if input == "fft":
+        data = sf.fftn(data, [nfft, ], axes=[1, ])
+    if input1D:
+        data = data[0]
+    return data
+
+
+def get_window(window="boxcar", half_win=3):
+    """Return a normalised complex smoothing window for MWCS processing.
+
+    :param window: ``"boxcar"`` (default) or ``"hanning"``.
+    :param half_win: Half-width in samples (full window = ``2*half_win+1``).
+    :returns: Complex numpy array of length ``2*half_win+1``, sum-normalised.
+    """
+    import scipy.signal
+    window_len = 2 * half_win + 1
+    if window == "boxcar":
+        w = scipy.signal.windows.boxcar(window_len).astype("complex")
+    else:
+        w = scipy.signal.windows.hann(window_len).astype("complex")
+    return w / window_len
+
+
+def getCoherence(dcs, ds1, ds2):
+    """Compute cross-coherence between two spectra.
+
+    :param dcs: Cross-spectrum magnitudes (1-D array, length *n*).
+    :param ds1: Auto-spectrum of signal 1 (1-D array, length *n*).
+    :param ds2: Auto-spectrum of signal 2 (1-D array, length *n*).
+    :returns: Complex coherence array of length *n*, clipped to ``|coh| <= 1``.
+    """
+    n = len(dcs)
+    coh = np.zeros(n).astype("complex")
+    valids = np.argwhere(np.logical_and(np.abs(ds1) > 0, np.abs(ds2) > 0))
+    coh[valids] = dcs[valids] / (ds1[valids] * ds2[valids])
+    coh[coh > (1.0 + 0j)] = 1.0 + 0j
+    return coh
+
+
+def prepare_abs_positive_fft(line, sampling_rate):
+    """Return the positive-frequency part of the absolute FFT of *line*.
+
+    :param line: 1-D signal array.
+    :param sampling_rate: Sampling rate in Hz.
+    :returns: ``(freq, val)`` - positive-frequency vector and absolute FFT values.
+    """
+    val = np.fft.fft(line)
+    val = np.abs(val)
+    freq = np.fft.fftfreq(len(line), 1.0 / sampling_rate)
+    idx = np.where(freq >= 0)
+    return freq[idx], val[idx]
+
+
+def wavg_wstd(data, errors):
+    """Weighted average and weighted standard deviation of equal-length arrays.
+
+    :param data: 1-D array of measurement values.
+    :param errors: 1-D array of measurement errors (zeros replaced by ``1e-6``).
+    :returns: ``(weighted_mean, weighted_std)`` as floats.
+    """
+    errors = np.where(errors == 0, 1e-6, errors)
+    w = 1.0 / errors
+    wavg = (data * w).sum() / w.sum()
+    N = len(np.nonzero(w)[0])
+    wstd = np.sqrt(np.sum(w * (data - wavg) ** 2) / ((N - 1) * np.sum(w) / N))
+    return wavg, wstd
+
+
+def wavg(group, dttname, errname):
+    """
+    Calculate the weighted average of a given group using the provided parameters.
+
+    :param group: A pandas DataFrame or Series representing the group of data.
+    :param dttname: The name of the column containing the data to be averaged.
+    :param errname: The name of the column containing the error for each data point.
+    :return: The weighted average of the data.
+
+    """
+    d = group[dttname]
+    group.loc[group[errname] == 0,errname] = 1e-6
+    w = 1. / group[errname]
+    try:
+        wavg = (d * w).sum() / w.sum()
+    except:
+        wavg = d.mean()
+    return wavg
+
+
+def wstd(group, dttname, errname):
+    """
+    :param group: A dictionary containing data for different groups.
+    :param dttname: The key in the `group` dictionary that corresponds to the data array.
+    :param errname: The key in the `group` dictionary that corresponds to the error array.
+    :return: The weighted standard deviation of the data array.
+
+    This method calculates the weighted standard deviation of the data array specified by `dttname` in the `group` dictionary.
+    The weights are derived from the error array specified by `errname` in the `group` dictionary.
+
+    The weighted standard deviation is computed using the following formula:
+        wstd = sqrt(sum(w * (d - wavg) ** 2) / ((N - 1) * sum(w) / N))
+    where:
+        - d is the data array specified by `dttname` in the `group` dictionary.
+        - w is the weight array derived from the error array specified by `errname` in the `group` dictionary.
+        - wavg is the weighted average of the data array.
+        - N is the number of non-zero weights.
+
+    Note: This method uses the `np` module from NumPy.
+    """
+    d = group[dttname]
+    group.loc[group[errname] == 0,errname] = 1e-6
+    w = 1. / group[errname]
+    wavg = (d * w).sum() / w.sum()
+    N = len(np.nonzero(w.values)[0])
+    wstd = np.sqrt(np.sum(w * (d - wavg) ** 2) / ((N - 1) * np.sum(w) / N))
+    return wstd
+
+
+def _get_wavgwstd(data, dttname, errname):
+    """
+    Calculate the weighted average and weighted standard deviation for a given data.
+
+    :param data: The data to calculate the weighted average and weighted standard deviation.
+    :type data: pandas.DataFrame
+
+    :param dttname: The name of the column in the data frame containing the weights for the weighted average and weighted standard deviation calculation.
+    :type dttname: str
+
+    :param errname: The name of the column in the data frame containing the errors on the data.
+    :type errname: str
+
+    :return: A tuple containing the calculated weighted average and weighted standard deviation.
+    :rtype: tuple
+    """
+    grouped = data.groupby(level=0)
+    g = grouped.apply(wavg, dttname=dttname, errname=errname)
+    h = grouped.apply(wstd, dttname=dttname, errname=errname)
+    return g, h
+
+
+def _trim(data, dttname, limits=0.1):
+    """
+    Trimmed mean and standard deviation calculation.
+
+    :param data: DataFrame containing the data.
+    :param dttname: Name of the column used for grouping.
+    :param limits: Trimming limits (default is 0.1).
+    :return: Tuple containing the trimmed mean and trimmed standard deviation.
+    """
+    from scipy.stats.mstats import trimmed_mean, trimmed_std
+    grouped = data[dttname].groupby(level=0)
+    if limits == 0:
+        g = grouped.mean()
+        h = grouped.std()
+    else:
+        g = grouped.apply(trimmed_mean, limits=limits)
+        h = grouped.apply(trimmed_std, limits=limits)
+    return g, h
+
+
+# ============================================================
+# Section 9 — Wavelet Coherence Transform (WCT)
+# ============================================================
+
+
+def _conv2(x, y, mode="same"):
+    """2-D convolution using :func:`scipy.signal.convolve2d` with 180-degree rotations."""
+    from scipy.signal import convolve2d
+    return np.rot90(convolve2d(np.rot90(x, 2), np.rot90(y, 2), mode=mode), 2)
+
+
+def smoothCFS(cfs, scales, dt, ns, nt):
+    """Smooth CWT coefficients along both time and scale axes.
+
+    :param cfs: CWT coefficient array, shape ``(n_scales, n_times)``.
+    :param scales: 1-D array of wavelet scales.
+    :param dt: Sampling interval in seconds.
+    :param ns: Length of the moving-average filter across scales.
+    :param nt: Gaussian width parameter along time.
+    :returns: Smoothed coefficient array, same shape as *cfs*.
+    """
+    import scipy.fft as sf
+    N = cfs.shape[1]
+    npad = sf.next_fast_len(N, real=True)
+    omega = np.arange(1, np.fix(npad / 2) + 1, 1).tolist()
+    omega = np.array(omega) * ((2 * np.pi) / npad)
+    omega_save = -omega[int(np.fix((npad - 1) / 2)) - 1:0:-1]
+    omega_2 = np.concatenate((0., omega), axis=None)
+    omega_2 = np.concatenate((omega_2, omega_save), axis=None)
+    omega = np.concatenate((omega_2, -omega[0]), axis=None)
+    normscales = scales / dt
+    for kk in range(0, cfs.shape[0]):
+        F = np.exp(-nt * (normscales[kk] ** 2) * omega ** 2)
+        smooth = np.fft.ifft(F * np.fft.fft(cfs[kk - 1], npad))
+        cfs[kk - 1] = smooth[0:N]
+    H = 1 / ns * np.ones((ns, 1))
+    cfs = _conv2(cfs, H)
+    return cfs
+
+
+def get_wavelet_type(wavelet_type):
+    """Return a :mod:`pycwt` wavelet object for the given type/parameter pair.
+
+    :param wavelet_type: Tuple ``(name, param)`` or ``(name,)``.
+        Supported names: ``"Morlet"``, ``"Paul"``, ``"DOG"``, ``"MexicanHat"``.
+    :returns: Corresponding :mod:`pycwt` wavelet instance.
+    """
+    import pycwt as wavelet
+    defaults = {"Morlet": 6, "Paul": 4, "DOG": 2, "MexicanHat": 2}
+    name = wavelet_type[0]
+    param = float(wavelet_type[1]) if len(wavelet_type) == 2 else defaults[name]
+    if name == "Morlet":
+        return wavelet.Morlet(param)
+    elif name == "Paul":
+        return wavelet.Paul(param)
+    elif name == "DOG":
+        return wavelet.DOG(param)
+    elif name == "MexicanHat":
+        return wavelet.MexicanHat()
+    else:
+        raise ValueError(f"Unknown wavelet type: {name!r}")
+
+
+def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12,
+         freqmin=0.1, freqmax=8.0, nptsfreq=100, wavelet_type=("Morlet", 6.)):
+    """Wavelet Coherence Transform (WCT) between two time series.
+
+    :param trace_ref: Reference signal (1-D array).
+    :param trace_current: Current signal (1-D array, same length).
+    :param fs: Sampling frequency in Hz.
+    :param ns: Scale-axis smoothing parameter.
+    :param nt: Time-axis smoothing parameter.
+    :param vpo: Voices-per-octave; higher = finer scale resolution.
+    :param freqmin: Lowest frequency of interest (Hz).
+    :param freqmax: Highest frequency of interest (Hz).
+    :param nptsfreq: Number of frequency points between *freqmin* and *freqmax*.
+    :param wavelet_type: ``(name, param)`` tuple passed to :func:`get_wavelet_type`.
+    :returns: ``(WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi)``
+    """
+    import pycwt as wavelet
+    mother = get_wavelet_type(wavelet_type)
+    nx = np.size(trace_current)
+    x_reference = np.transpose(trace_ref)
+    x_current = np.transpose(trace_current)
+    dt = 1 / fs
+    dj = 1 / vpo
+    J = -1
+    s0 = 2 * dt
+    freqlim = np.linspace(freqmax, freqmin, num=nptsfreq, endpoint=True)
+    cwt_reference, scales, freqs, coi, fft, fftfreqs = wavelet.cwt(
+        x_reference, dt, dj, s0, J, mother, freqs=freqlim)
+    cwt_current, _, _, _, _, _ = wavelet.cwt(
+        x_current, dt, dj, s0, J, mother, freqs=freqlim)
+    scales = np.array([[kk] for kk in scales])
+    invscales = np.kron(np.ones((1, nx)), 1 / scales)
+    power_ref = (invscales * abs(cwt_reference) ** 2).astype(complex)
+    power_cur = (invscales * abs(cwt_current) ** 2).astype(complex)
+    crossCFS = cwt_reference * np.conj(cwt_current)
+    WXamp = abs(crossCFS)
+    cross_spectrum = (invscales * crossCFS).astype(complex)
+    cfs1 = smoothCFS(power_ref, scales, dt, ns, nt)
+    cfs2 = smoothCFS(power_cur, scales, dt, ns, nt)
+    crossCFS = smoothCFS(cross_spectrum, scales, dt, ns, nt)
+    mask1 = cfs1 > 0
+    mask2 = cfs2 > 0
+    valid_mask = mask1 & mask2
+    WXspec = np.full_like(crossCFS, np.nan, dtype=complex)
+    Wcoh = np.full_like(crossCFS, np.nan)
+    WXspec[valid_mask] = crossCFS[valid_mask] / (
+        np.sqrt(cfs1[valid_mask]) * np.sqrt(cfs2[valid_mask]))
+    Wcoh[valid_mask] = (abs(crossCFS[valid_mask]) ** 2
+                        / (cfs1[valid_mask] * cfs2[valid_mask]))
+    WXangle = np.angle(WXspec)
+    Wcoh = np.clip(Wcoh, 0.0, 1.0)
+    pp = 2 * np.pi * freqs
+    pp2 = np.array([[kk] for kk in pp])
+    WXdt = WXangle / np.kron(np.ones((1, nx)), pp2)
+    return WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi
+
+
+def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20,
+                    mincoh=0.5, maxdt=0.2, min_nonzero=0.25, freqmin=0.1, freqmax=2.0):
+    """
+    Compute dv/v and associated errors from wavelet coherence transform results.
+
+    :param freqs: Frequency values from the WCT.
+    :param tvec: Time axis.
+    :param WXamp: Cross-wavelet amplitude array (freqs × taxis).
+    :param Wcoh: Wavelet coherence array (freqs × taxis).
+    :param delta_t: Time delay array (freqs × taxis).
+    :param lag_min: Minimum coda lag in seconds.
+    :param coda_cycles: Number of periods to use as coda window width.
+    :param mincoh: Minimum coherence threshold.
+    :param maxdt: Maximum allowed time delay.
+    :param min_nonzero: Minimum fraction of valid (non-zero weight) samples required.
+    :param freqmin: Lower frequency bound for regression.
+    :param freqmax: Upper frequency bound for regression.
+    :returns: Tuple of (dvv [%], err [%], weighting_function).
+    """
+    import warnings
+    from scipy.optimize import OptimizeWarning
+    from obspy.signal.regression import linear_regression
+
+    inx = np.where((freqs >= freqmin) & (freqs <= freqmax))
+    dvv = np.zeros(len(inx[0]))
+    err = np.zeros(len(inx[0]))
+
+    weight_func = np.log(np.abs(WXamp)) / np.log(np.abs(WXamp)).max()
+    zero_idx = np.where((Wcoh < mincoh) | (delta_t > maxdt))
+    wf = (weight_func + abs(np.nanmin(weight_func))) / weight_func.max()
+    wf[zero_idx] = 0
+
+    problematic_freqs = []
+    for ii, ifreq in enumerate(inx[0]):
+        period = 1.0 / freqs[ifreq]
+        lag_max = lag_min + (period * coda_cycles)
+        tindex = np.where(
+            ((tvec >= -lag_max) & (tvec <= -lag_min)) |
+            ((tvec >= lag_min) & (tvec <= lag_max))
+        )[0]
+        if len(tvec) > 2:
+            if not np.any(delta_t[ifreq]):
+                continue
+            delta_t[ifreq][tindex] = np.nan_to_num(delta_t[ifreq][tindex])
+            w = wf[ifreq]
+            nzc_perc = np.count_nonzero(w[tindex] > 0) / len(tindex)
+            if nzc_perc >= min_nonzero:
+                with warnings.catch_warnings(record=True) as w_catcher:
+                    warnings.simplefilter("always", OptimizeWarning)
+                    m, em = linear_regression(tvec[tindex], delta_t[ifreq][tindex],
+                                              w[tindex], intercept_origin=True)
+                    if any(issubclass(warning.category, OptimizeWarning)
+                           for warning in w_catcher):
+                        problematic_freqs.append(freqs[ifreq])
+                dvv[ii], err[ii] = -m, em
+            else:
+                dvv[ii], err[ii] = np.nan, np.nan
+    if problematic_freqs:
+        logging.warning(
+            f"Covariance issues at {min(problematic_freqs):.2f}-{max(problematic_freqs):.2f} Hz: "
+            f"consider adjusting min_nonzero={min_nonzero}, mincoh={mincoh}, "
+            f"maxdt={maxdt}, coda_cycles={coda_cycles}"
+        )
+    return dvv * 100, err * 100, wf
+
+
+def get_wct_avgcoh(freqs, tvec, wcoh, freqmin, freqmax, lag_min=5, coda_cycles=20):
+    """
+    Calculate average wavelet coherence over a frequency range and coda window.
+
+    :param freqs: Frequency array.
+    :param tvec: Time axis.
+    :param wcoh: Wavelet coherence array (freqs × taxis).
+    :param freqmin: Lower frequency bound.
+    :param freqmax: Upper frequency bound.
+    :param lag_min: Minimum coda lag in seconds.
+    :param coda_cycles: Number of periods to use as coda window width.
+    :returns: Average coherence per frequency bin within [freqmin, freqmax].
+    """
+    inx = np.where((freqs >= freqmin) & (freqs <= freqmax))
+    coh = np.zeros(inx[0].shape)
+    for ii, ifreq in enumerate(inx[0]):
+        period = 1.0 / freqs[ifreq]
+        lag_max = lag_min + (period * coda_cycles)
+        tindex = np.where(
+            ((tvec >= -lag_max) & (tvec <= -lag_min)) |
+            ((tvec >= lag_min) & (tvec <= lag_max))
+        )[0]
+        if len(tvec) > 2:
+            if not np.any(wcoh[ifreq]) or wcoh[ifreq][tindex].size == 0:
+                coh[ii] = np.nan
+                continue
+            coh[ii] = np.nanmean(np.abs(wcoh[ifreq][tindex]))
+        else:
+            coh[ii] = np.nan
+    return coh
+
+
+# ============================================================
+# Section 10 — Preprocessing I/O
+# ============================================================
+
+
+def preload_instrument_responses(session, return_format="dataframe"):
+    """
+    This function preloads all instrument responses from ``response_path``
+    and stores the seed ids, start and end dates, and paz for every channel
+    in a DataFrame. Any file readable by obspy's read_inventory will be processed.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
-    :param lineage_names: Ordered list of step-name strings, e.g.
-        ``['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'mwcs_1', 'mwcs_dtt_1']``.
-    :rtype: tuple(list, list[str], AttribDict)
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :type return_format: str
+    :param return_format: The format of the returned object, either
+        ``dataframe`` or ``inventory``.
+
+    :rtype: :class:`~pandas.DataFrame` or :class:`~obspy.core.inventory.inventory.Inventory`
+    :returns: A table containing all channels with the time of operation and
+        poles and zeros (DataFrame), or an obspy Inventory object.
+
     """
-    orig_params = get_params(session)
-    lineage_str = "/".join(lineage_names)
-    steps = lineage_str_to_steps(session, lineage_str, sep="/", strict=False)
-    return get_merged_params_for_lineage(session, orig_params, {}, steps)
+    from obspy.core.inventory import Inventory
+    from obspy import read_inventory, UTCDateTime
+    logging.debug('Preloading instrument response')
+    files = glob.glob(os.path.join(get_config(session, 'response_path'), "*"))
+    channels = []
+    all_inv = Inventory()
+    for file in files:
+        logging.debug("Processing %s" % file)
+        try:
+            inv = read_inventory(file)
+
+            if return_format == "inventory":
+                all_inv += inv
+                continue
+
+            for net in inv.networks:
+                for sta in net.stations:
+                    for cha in sta.channels:
+                        seed_id = "%s.%s.%s.%s" % (net.code, sta.code,
+                                                   cha.location_code,
+                                                   cha.code)
+                        pzdict = {}
+                        try:
+                            resp = inv.get_response(seed_id, cha.start_date + 10)
+                            polezerostage = resp.get_paz()
+                        except Exception as e:
+                            logging.warning(
+                                'Failed to get PAZ for SEED ID "%s", this '
+                                'SEED ID will have an empty dictionary '
+                                'for Poles and Zeros '
+                                'information (Error message: %s).' % (
+                                    seed_id, str(e)))
+                        else:
+                            totalsensitivity = resp.instrument_sensitivity
+                            pzdict['poles'] = polezerostage.poles
+                            pzdict['zeros'] = polezerostage.zeros
+                            pzdict['gain'] = polezerostage.normalization_factor
+                            pzdict['sensitivity'] = totalsensitivity.value
+                        lat = cha.latitude
+                        lon = cha.longitude
+                        elevation = cha.elevation
+                        if lat is None or lon is None or elevation is None:
+                            lat = sta.latitude
+                            lon = sta.longitude
+                            elevation = sta.elevation
+                        if lat is None or lon is None or elevation is None:
+                            logging.error(
+                                'Failed to look up coordinates for SEED '
+                                'ID: %s' % seed_id)
+                        channels.append([seed_id, cha.start_date,
+                                         cha.end_date or UTCDateTime(),
+                                         pzdict, lat, lon, elevation])
+
+        except Exception as e:
+            logging.error('Failed to process file %s: %s' % (file, str(e)))
+
+
+    logging.debug('Finished Loading instrument responses')
+    if return_format == "inventory":
+        return all_inv
+
+    if return_format == "dataframe":
+        channels = pd.DataFrame(channels, columns=["channel_id", "start_date",
+                                                   "end_date", "paz",
+                                                   "latitude", "longitude", "elevation"],)
+        return channels
+
+
+
+# Needed for QC/PPSD, should re-order the defs
+
+
+def to_sds(stats,year, jday):
+    SDS="YEAR/NET/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.JDAY"
+    file=SDS.replace('YEAR', "%04i"%year)
+    file=file.replace('NET', stats.network)
+    file=file.replace('STA', stats.station)
+    file=file.replace('LOC', stats.location)
+    file=file.replace('CHAN', stats.channel)
+    file=file.replace('JDAY', "%03i"%jday)
+    file=file.replace('TYPE', "D")
+    return file
+
+## PSD part (not sure it'll end up here but easier to handle for now)
+
+
+def save_preprocessed_streams(stream, output_dir, step_name, goal_day):
+    """Write a preprocessed Stream to disk in workflow-aware path structure.
+
+    Creates ``<output_dir>/<step_name>/_output/`` and writes
+    ``<goal_day>.mseed``.
+
+    :param stream: :class:`~obspy.core.stream.Stream` to write.
+    :param output_dir: Base output directory.
+    :param step_name: Workflow step name (e.g. ``"preprocess_1"``).
+    :param goal_day: Processing date string (``YYYY-MM-DD``).
+    :returns: List containing the single saved file path.
+    """
+    workflow_dir = os.path.join(output_dir, step_name, "_output")
+    os.makedirs(workflow_dir, exist_ok=True)
+    output_path = os.path.join(workflow_dir, f"{goal_day}.mseed")
+    for tr in stream:
+        tr.data = tr.data.astype(np.float32)
+    stream.write(output_path, format="MSEED")
+    return [output_path]
+
+
+def make_same_length(st):
+    """
+    This function takes a stream of equal sampling rate and makes sure that all
+    channels have the same length and the same gaps.
+    """
+    from obspy import Stream
+    # Merge traces
+    st.merge()
+
+    # Initialize arrays to be filled with start+endtimes of all traces
+    starttimes = []
+    endtimes = []
+
+    # Loop over all traces of the stream
+    for tr in st:
+        # Force conversion to masked arrays
+        if not np.ma.count_masked(tr.data):
+            tr.data = np.ma.array(tr.data, mask=False)
+        # Read out start+endtimes of traces to trim
+        starttimes.append(tr.stats.starttime)
+        endtimes.append(tr.stats.endtime)
+
+    # trim stream to common starttimes
+    if max(starttimes) >= min(endtimes):
+        return Stream()
+    st.trim(max(starttimes), min(endtimes))
+
+    # get the mask of all traces, i.e. the parts where at least one trace has
+    # a gap
+
+    if len(st) < 2:
+        return st
+
+    masks=[]
+    for tr in st:
+        masks.append(tr.data.mask)
+    mask =  np.any(masks,axis=0)
+
+    # apply the mask to all traces
+    for tr in st:
+        tr.data.mask = mask
+
+    st = st.split()
+    return st
 
 
 # ============================================================
-# Stretching xarray I/O
+# Section 11 — xarray I/O
 # ============================================================
+# ── Core helpers ───────────────────────────────────────────
+
+
+def xr_create_or_open(fn, taxis=[], name="CCF"):
+    if os.path.isfile(fn):
+        # load_dataset works (it loads content in mem and closes, open_dataset
+        # failed, the file handle was still open and it failed later.
+        ds = xr.load_dataset(fn)
+        return ds
+    times = pd.date_range("2000-01-01", freq="h", periods=0)
+    if name == "CCF":
+        data = np.random.random((len(times), len(taxis)))
+        dr = xr.DataArray(data, coords=[times, taxis], dims=["times", "taxis"])
+    elif name == "REF":
+        data = np.random.random(len(taxis))
+        dr = xr.DataArray(data, coords=[taxis], dims=["taxis"])
+    elif name == "MWCS":
+        keys = ["M", "EM", "MCOH"]
+        data = np.random.random((len(times), len(taxis), len(keys)))
+        dr = xr.DataArray(data, coords=[times, taxis, keys],
+                          dims=["times", "taxis", "keys"])
+    elif name == "STR":
+        keys = ["Delta", "Coeff", "Error"]
+        data = np.random.random((len(times), len(keys)))
+        dr = xr.DataArray(data, coords=[times, keys],
+                          dims=["times", "keys"])
+    elif name == "DTT":
+        keys = ["m", "em", "a", "ea", "m0", "em0"]
+        data = np.random.random((len(times), len(keys)))
+        dr = xr.DataArray(data, coords=[times, keys],
+                          dims=["times", "keys"])
+    elif name == "DVV":
+        level0 = ["m", "em", "a", "ea", "m0", "em0"]
+        level1 = ['10%', '25%', '5%', '50%', '75%', '90%', '95%', 'count', 'max', 'mean',
+                  'min', 'std', 'trimmed_mean', 'trimmed_std', 'weighted_mean', 'weighted_std']
+        data = np.random.random((len(times), len(level0), len(level1)))
+        dr = xr.DataArray(data, coords=[times, level0, level1],
+                          dims=["times", "level0", "level1"])
+    elif name == "WCT":
+        dvv_data = np.random.random((len(times), len(taxis)))
+        err_data = np.random.random((len(times), len(taxis)))
+        coh_data = np.random.random((len(times), len(taxis)))
+
+        dvv_da = xr.DataArray(dvv_data, coords=[times, taxis], dims=['times', 'frequency'])
+        err_da = xr.DataArray(err_data, coords=[times, taxis], dims=['times', 'frequency'])
+        coh_da = xr.DataArray(coh_data, coords=[times, taxis], dims=['times', 'frequency'])
+
+        # Combine into a Dataset
+        ds = xr.Dataset({'dvv': dvv_da,'err': err_da,'coh': coh_da})
+        return ds
+
+    else:
+        logging.error("Not implemented, name=%s invalid." % name)
+        sys.exit(1)
+    dr.name = name
+    return dr.to_dataset()
+
+
+def xr_insert_or_update(dataset, new):
+    tt = new.merge(dataset, compat='override', combine_attrs="drop_conflicts")
+    return tt.combine_first(dataset)
+
+
+def xr_save_and_close(dataset, fn):
+    if not os.path.isdir(os.path.split(fn)[0]):
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
+    dataset.to_netcdf(fn, mode="w")
+    dataset.close()
+    del dataset
+
+# ── CCF ─────────────────────────────────────────────────────
+
+
+def xr_save_ccf(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, new, overwrite=False):
+    path = os.path.join(root, *lineage, step_name, "_output",
+                        "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
+    fn = "%s_%s.nc" % (station1, station2)
+    fullpath = os.path.join(path, fn)
+    if overwrite:
+        xr_save_and_close(new, fullpath)
+    else:
+        dr = xr_create_or_open(fullpath, taxis, name="CCF")
+        dr = xr_insert_or_update(dr, new)
+        dr = dr.sortby("times")
+        xr_save_and_close(dr, fullpath)
+        return dr
+
+
+def xr_get_ccf(root, lineage, station1, station2, components, filterid, mov_stack, taxis, format="dataframe"):
+    path = os.path.join(root, *lineage, "_output",
+                        "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
+    fn = "%s_%s.nc" % (station1, station2)
+
+    fullpath = os.path.join(path, fn)
+    if not os.path.isfile(fullpath):
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+        raise FileNotFoundError(fullpath)
+    data = xr_create_or_open(fullpath, taxis, name="CCF")
+    if format == "xarray":
+        return data.CCF
+    else:
+        return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
+
+
+def xr_save_ref(root, lineage, step_name, station1, station2, components, filterid, taxis, new, overwrite=False):
+    path = os.path.join(root, *lineage, step_name, "_output",
+                        "REF", "%s" % components)
+    fn = "%s_%s.nc" % (station1, station2)
+    fullpath = os.path.join(path, fn)
+    if overwrite:
+        xr_save_and_close(new, fullpath)
+    else:
+        dr = xr_create_or_open(fullpath, taxis, name="REF")
+        dr = xr_insert_or_update(dr, new)
+        xr_save_and_close(dr, fullpath)
+        return dr
+
+
+def xr_get_ref(root, lineage, station1, station2, components, filterid, taxis, ignore_network=False):
+    path = os.path.join(root, *lineage, "_output",
+                        "REF", "%s" % components)
+    # If ignore_network is True, strip the network code from the station names
+    if ignore_network:
+        s1_parts = station1.split('.')
+        s2_parts = station2.split('.')
+
+        available_files = glob.glob(os.path.join(path, "*.%s.%s_*.%s.%s.nc" % (s1_parts[1],s1_parts[2], s2_parts[1], s1_parts[2])))
+
+        if available_files:
+            # Use the first available reference file
+            fullpath = available_files[0]
+        else:
+            raise FileNotFoundError(f"No reference file found for station {s1_parts[1]} and {s2_parts[1]}")
+    else:
+        fn = "%s_%s.nc" % (station1, station2)
+
+        fullpath = os.path.join(path, fn)
+        if not os.path.isfile(fullpath):
+            # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+            raise FileNotFoundError(fullpath)
+    data = xr_create_or_open(fullpath, taxis, name="REF")
+    return data.CCF.to_dataframe()
+
+
+def get_results(session, station1, station2, filterid, components, dates,
+                mov_stack=1, format="stack", params=None):
+    """
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type station1: str
+    :param station1: The name of station 1 (formatted NET.STA.LOC)
+    :type station2: str
+    :param station2: The name of station 2 (formatted NET.STA.LOC)
+    :type filterid: int
+    :param filterid: The ID (ref) of the filter
+    :type components: str
+    :param components: The name of the components used (ZZ, ZR, ...)
+    :type dates: list
+    :param dates: List of TODO datetime.datetime
+    :type mov_stack: int
+    :param mov_stack: Moving window stack.
+    :type format: str
+    :param format: Either ``stack``: the data will be stacked according to
+        the parameters passed with ``params`` or ``matrix``: to get a 2D
+        array of CCF.
+    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
+    :param params: A dictionnary of MSNoise config parameters as returned by
+        :func:`get_params`.
+    :rtype: :class:`numpy.ndarray`
+    :return: Either a 1D CCF (if format is ``stack`` or a 2D array (if format=
+        ``matrix``).
+    """
+    from obspy import read
+    if not params:
+        export_format = get_config(session, 'export_format')
+        extension = get_extension(export_format)
+    else:
+        export_format = params.export_format
+        extension = get_extension(params.export_format)
+    if export_format == "BOTH":
+        export_format = "MSEED"
+
+    stack_data = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
+    i = 0
+    base = os.path.join("STACKS", "%02i" % filterid,
+                        "%03i_DAYS" % mov_stack, components,
+                        "%s_%s" % (station1, station2), "%s") + extension
+    logging.debug("Reading files... in %s" % base)
+    lastday = dates[0]
+    for j, date in enumerate(dates):
+
+        if isinstance(date, str):
+            daystack = base % str(date)
+        else:
+            daystack = base % date.strftime('%Y-%m-%d')
+
+        try:
+            stack_data[j, :] = read(daystack, format=export_format)[0].data[:]
+            lastday = str(date)
+            i += 1
+        except:
+            # traceback.print_exc()
+            pass
+
+    if format == "matrix":
+        return i, stack_data
+
+    elif format == "dataframe":
+        taxis = get_t_axis(session)
+        return pd.DataFrame(stack_data, index=pd.DatetimeIndex(dates),
+                            columns=taxis).loc[:lastday]
+    elif format == "xarray":
+        taxis = get_t_axis(session)
+        times = pd.DatetimeIndex(dates)
+        dr = xr.DataArray(stack_data, coords=[times, taxis],
+                          dims=["times", "taxis"]).dropna("times", how="all")
+        dr.name = "CCF"
+        return dr.to_dataset()
+
+    elif format == "stack":
+        logging.debug("Stacking...")
+
+        corr = stack(stack_data, params.stack_method, params.pws_timegate,
+                     params.pws_power, params.goal_sampling_rate)
+
+        if i > 0:
+            return i, corr
+        else:
+            return 0, None
+
+
+def get_results_all(session, root, lineage_names, station1, station2, components, dates,
+                    format="dataframe", params=None):
+    """
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type station1: str
+    :param station1: The name of station 1 (formatted NET.STA.LOC)
+    :type station2: str
+    :param station2: The name of station 2 (formatted NET.STA.LOC)
+    :type components: str
+    :param components: The name of the components used (ZZ, ZR, ...)
+    :type dates: list
+    :param dates: List of TODO datetime.datetime
+    :rtype: :class:`pandas.DataFrame`
+    :return: All CCF results in a :class:`pandas.DataFrame`, where the index
+        is the time of the CCF and the columns are the times in the coda.
+    """
+
+    path = os.path.join(root, *lineage_names, "_output", "all", components,  station1, station2)
+    print("New path with lineage!:", path)
+    results = []
+    for date in dates:
+        if isinstance(date, str):
+            fname = os.path.join(path, date+".h5")
+        else:
+            fname = os.path.join(path, date.strftime('%Y-%m-%d.h5'))
+        if os.path.isfile(fname):
+            df = pd.read_hdf(fname, 'data', parse_dates=True)
+            df.index = pd.to_datetime(df.index)
+            results.append(df)
+
+    if len(results) > 0:
+        result = pd.concat(results)
+        del results
+        if format == "dataframe":
+            return result
+        elif format == "xarray":
+            taxis = get_t_axis(params)
+            times = result.index
+            dr = xr.DataArray(result, coords=[times, taxis],
+                              dims=["times", "taxis"]).dropna("times", how="all")
+            dr.name = "CCF"
+            dr = dr.sortby('times')
+            return dr.to_dataset()
+    else:
+        if format == "xarray":
+            return xr.Dataset()
+        else:
+            return pd.DataFrame()
+
+# Some helper functions
+
+# ── MWCS ────────────────────────────────────────────────────
+
+
+def xr_save_mwcs(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, dataframe):
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                        "%s_%s" % (mov_stack[0], mov_stack[1]),
+                       "%s" % components,
+                       "%s_%s.nc" % (station1, station2))
+
+    if not os.path.isdir(os.path.split(fn)[0]):
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
+    d = dataframe.stack().stack()
+    d.index = d.index.set_names(["times", "keys", "taxis"])
+    d = d.reorder_levels(["times", "taxis", "keys"])
+    d.columns = ["MWCS"]
+    taxis = np.unique(d.index.get_level_values('taxis'))
+    dr = xr_create_or_open(fn, taxis=taxis, name="MWCS")
+    rr = d.to_xarray().to_dataset(name="MWCS")
+    rr = xr_insert_or_update(dr, rr)
+    xr_save_and_close(rr, fn)
+    del dr, rr, d
+
+
+def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack):
+    fn = os.path.join(root, *lineage, "_output",
+                        "%s_%s" % (mov_stack[0], mov_stack[1]),
+                       "%s" % components,
+                       "%s_%s.nc" % (station1, station2))
+    if not os.path.isfile(fn):
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
+        raise FileNotFoundError(fn)
+    data = xr_create_or_open(fn, name="MWCS")
+    data = data.MWCS.to_dataframe().reorder_levels(['times', 'taxis', 'keys']).unstack().droplevel(0, axis=1).unstack()
+    return data
+
+# ── DTT ─────────────────────────────────────────────────────
+
+
+def xr_save_dtt(root, lineage, step_name, station1, station2, components, mov_stack, dataframe):
+    """
+    :param station1: string, name of station 1
+    :param station2: string, name of station 2
+    :param components: string, name of the components
+    :param mov_stack: int, number of days in the moving stack
+    :param dataframe: pandas DataFrame containing the data
+    :return: None
+
+    Saves DTT data to a NetCDF file using lineage-aware path.
+    """
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
+                      "%s" % components,
+                      "%s_%s.nc" % (station1, station2))
+    if not os.path.isdir(os.path.split(fn)[0]):
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
+    d = dataframe.stack()
+    d.index = d.index.set_names(["times", "keys"])
+    d.columns = ["DTT"]
+    dr = xr_create_or_open(fn, taxis=[], name="DTT")
+    rr = d.to_xarray().to_dataset(name="DTT")
+    rr = xr_insert_or_update(dr, rr)
+    xr_save_and_close(rr, fn)
+
+
+def xr_get_dtt(root, lineage, station1, station2, components, mov_stack):
+    """
+    :param station1: The first station name
+    :param station2: The second station name
+    :param components: The components to be used
+    :param filterid: The filter ID
+    :param mov_stack: The movement stack
+    :return: The extracted data
+
+    This method retrieves the DTT data from a NetCDF file based on the given inputs. It constructs the file path using the provided parameters and checks if the file exists. If the file
+    * does not exist, it raises a FileNotFoundError. Otherwise, it opens the NetCDF file and extracts the DTT variable as a dataframe. The dataframe is then rearranged and returned as the
+    * result.
+    """
+    fn = os.path.join(root, *lineage, "_output",
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
+                      "%s" % components,
+                      "%s_%s.nc" % (station1, station2))
+
+    if not os.path.isfile(fn):
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
+        raise FileNotFoundError(fn)
+    print(fn)
+    dr = xr_create_or_open(fn, taxis=[], name="DTT")
+    data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
+    return data
+
+# ── Stretching ──────────────────────────────────────────────
+
 
 def xr_save_stretching(root, lineage, step_name, station1, station2,
                         components, mov_stack, dataframe):
@@ -3867,6 +3913,7 @@ def xr_save_stretching(root, lineage, step_name, station1, station2,
     rr = xr_insert_or_update(dr, rr)
     xr_save_and_close(rr, fn)
 
+
 def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack):
     """Load per-pair stretching results from a NetCDF file.
 
@@ -3900,6 +3947,579 @@ def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack)
 # ============================================================
 
 # ── DVV ─────────────────────────────────────────────────────
+
+
+def xr_save_dvv(root, lineage, step_name, components, mov_stack, dataframe):
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
+                      "%s.nc" % components)
+    if not os.path.isdir(os.path.split(fn)[0]):
+        os.makedirs(os.path.split(fn)[0], exist_ok=True)
+
+    if dataframe.columns.nlevels > 1:
+        d = dataframe.stack(future_stack=True).stack(future_stack=True)
+    else:
+        d = dataframe.stack(future_stack=True)
+
+    level_names = ["times", "level1", "level0"]
+    d.index = d.index.set_names(level_names[:d.index.nlevels])
+
+    if d.index.nlevels == 3:
+        d = d.reorder_levels(["times", "level0", "level1"])
+
+    d.columns = ["DVV"]
+    # taxis = np.unique(d.index.get_level_values('taxis'))
+    dr = xr_create_or_open(fn, taxis=[], name="DVV")
+    rr = d.to_xarray().to_dataset(name="DVV")
+    rr = xr_insert_or_update(dr, rr)
+    xr_save_and_close(rr, fn)
+    del dr, rr, d
+
+
+def xr_get_dvv(root, lineage, components, mov_stack):
+    fn = os.path.join(root, *lineage, "_output",
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
+                      "%s.nc" % components)
+    if not os.path.isfile(fn):
+        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
+        raise FileNotFoundError(fn)
+    data = xr_create_or_open(fn, name="DVV")
+    data = data.DVV.to_dataframe().reorder_levels(['times', 'level1', 'level0']).unstack().droplevel(0, axis=1).unstack()
+    return data
+
+# ── WCT ─────────────────────────────────────────────────────
+
+
+def xr_save_wct(root, lineage, step_name, station1, station2, components, mov_stack, taxis, freqs, WXamp_list, WXcoh_list, WXdt_list, dates_list):
+    """
+    Save WCT results into an xarray Dataset and store it as a NetCDF file.
+
+    Parameters:
+    - root: str, Root output folder path
+    - lineage: list, Lineage path components
+    - step_name: str, Step name for output path
+    - station1, station2: str, Station pair
+    - components: str, Seismic component (e.g., ZZ)
+    - mov_stack: tuple, Moving stack window (e.g., ('1d', '1d'))
+    - taxis, freqs: np.array, Time axis and frequency axis
+    - WXamp_list, WXcoh_list, WXdt_list: list of np.array, WCT outputs
+    - dates_list: list of datetime, Timestamps for each WCT calculation
+    """
+
+    # Convert lists to xarray DataArrays (all WCT outputs are real-valued;
+    # cast explicitly in case intermediate complex dtype was inherited)
+    WXamp_da = xr.DataArray(
+        data=np.array(WXamp_list).real,
+        dims=["times", "freqs", "taxis"],
+        coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
+        name="WXamp"
+    )
+
+    Wcoh_da = xr.DataArray(
+        data=np.array(WXcoh_list).real,
+        dims=["times", "freqs", "taxis"],
+        coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
+        name="Wcoh"
+    )
+
+    WXdt_da = xr.DataArray(
+        data=np.array(WXdt_list).real,
+        dims=["times", "freqs", "taxis"],
+        coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
+        name="WXdt"
+    )
+
+    # Combine into an xarray Dataset
+    ds = xr.Dataset({"WXamp": WXamp_da, "Wcoh": Wcoh_da, "WXdt": WXdt_da})
+
+    # Define output directory
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                      "%s_%s" % (mov_stack[0], mov_stack[1]),
+                      components, f"{station1}_{station2}.nc")
+
+    os.makedirs(os.path.dirname(fn), exist_ok=True)
+
+    # Save to NetCDF
+    xr_save_and_close(ds, fn)
+
+    print(f"Saved WCT data for {station1}-{station2} to {fn}")
+
+    # Cleanup memory
+    del ds, WXamp_da, Wcoh_da, WXdt_da
+
+
+def xr_load_wct(root, lineage, station1, station2, components, mov_stack):
+    """
+    Load WCT results from an xarray Dataset stored in a NetCDF file.
+
+    Parameters:
+    - root: str, Root output folder path
+    - lineage: list, Lineage path components
+    - station1, station2: str, Station pair
+    - components: str, Seismic component (e.g., ZZ)
+    - mov_stack: tuple, Moving stack window (e.g., ('1d', '1d'))
+
+    Returns:
+    - ds: xarray.Dataset containing the WCT data (WXamp, Wcoh, WXdt)
+    """
+
+    # Construct the file path
+    fn = os.path.join(root, *lineage, "_output",
+                      f"{mov_stack[0]}_{mov_stack[1]}", components,
+                      f"{station1}_{station2}.nc")
+
+    # Check if the file exists
+    if not os.path.exists(fn):
+        raise FileNotFoundError(f"File not found: {fn}")
+
+    # Load and return the dataset
+    ds = xr.load_dataset(fn)
+    return ds
+
+
+def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mov_stack, taxis, dvv_df, err_df, coh_df):
+    """
+    Save the Wavelet Coherence Transform (WCT) results as a NetCDF file.
+
+    :param root: Root output folder path.
+    :type root: str
+    :param lineage: List of lineage path components.
+    :type lineage: list
+    :param step_name: Step name for output path.
+    :type step_name: str
+    :param station1: The first station in the pair.
+    :type station1: str
+    :param station2: The second station in the pair.
+    :type station2: str
+    :param components: The components (e.g., Z, N, E) being analyzed.
+    :type components: str
+    :param mov_stack: Tuple of (start, end) representing the moving stack window.
+    :type mov_stack: tuple
+    :param taxis: Time axis corresponding to the WCT data.
+    :type taxis: array-like
+    :param dvv_df: DataFrame containing dvv data (2D).
+    :type dvv_df: pandas.DataFrame
+    :param err_df: DataFrame containing err data (2D).
+    :type err_df: pandas.DataFrame
+    :param coh_df: DataFrame containing coh data (2D).
+    :type coh_df: pandas.DataFrame
+    :returns: None
+    """
+
+    # Construct the file path
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                      f"{mov_stack[0]}_{mov_stack[1]}", components,
+                      f"{station1}_{station2}.nc")
+
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(fn), exist_ok=True)
+
+    # Convert DataFrames to xarray.DataArrays
+    dvv_da = xr.DataArray(dvv_df.values, coords=[dvv_df.index, dvv_df.columns], dims=['times', 'frequency'])
+    err_da = xr.DataArray(err_df.values, coords=[err_df.index, err_df.columns], dims=['times', 'frequency'])
+    coh_da = xr.DataArray(coh_df.values, coords=[coh_df.index, coh_df.columns], dims=['times', 'frequency'])
+
+    # Combine into a single xarray.Dataset
+    ds = xr.Dataset({
+        'dvv': dvv_da,
+        'err': err_da,
+        'coh': coh_da
+    })
+
+    existing_ds = xr_create_or_open(fn, name="WCT")
+    updated_ds = xr_insert_or_update(existing_ds, ds)
+    xr_save_and_close(updated_ds, fn)
+
+
+    logging.debug(f"Saved WCT data to {fn}")
+    # Clean up
+    del dvv_da, err_da, coh_da, ds
+
+
+def xr_get_wct_dtt(root, lineage, station1, station2, components, mov_stack):
+    """Load per-pair WCT dt/t results from a NetCDF file.
+
+    Returns an :class:`xarray.Dataset` with variables ``dvv``, ``err``,
+    ``coh`` each of shape ``(times, frequency)``, as written by
+    :func:`xr_save_wct_dtt`.
+
+    Note: despite the variable name ``dvv`` in the file, the values are
+    *dt/t* (fractional time delay × 100 in percent) at each frequency bin,
+    not yet network-aggregated dv/v.
+
+    :raises FileNotFoundError: if the NetCDF file does not exist.
+    :rtype: :class:`xarray.Dataset`
+    """
+    fn = os.path.join(
+        root, *lineage, "_output",
+        "%s_%s" % (mov_stack[0], mov_stack[1]),
+        components,
+        "%s_%s.nc" % (station1, station2),
+    )
+    if not os.path.isfile(fn):
+        raise FileNotFoundError(fn)
+    return xr.load_dataset(fn)
+
+
+# ============================================================
+# WCT-DTT aggregate (all pairs → frequency-band stats DataFrame)
+# ============================================================
+
+
+# ============================================================
+# Section 12 — CCF and Stack Computation
+# ============================================================
+
+
+def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
+          goal_sampling_rate=20.0):
+    """
+    :type data: :class:`numpy.ndarray`
+    :param data: the data to stack, each row being one CCF
+    :type stack_method: str
+    :param stack_method: either ``linear``: average of all CCF or ``pws`` to
+        compute the phase weigthed stack. If ``pws`` is selected,
+        the function expects the ``pws_timegate`` and ``pws_power``.
+    :type pws_timegate: float
+    :param pws_timegate: PWS time gate in seconds. Width of the smoothing
+         window to convolve with the PWS spectrum.
+    :type pws_power: float
+    :param pws_power: Power of the PWS weights to be applied to the CCF stack.
+    :type goal_sampling_rate: float
+    :param goal_sampling_rate: Sampling rate of the CCF array submitted
+    :rtype: :class:`numpy.array`
+    :return: the stacked CCF.
+    """
+    if len(data) == 0:
+        logging.debug("No data to stack.")
+        return []
+    data = data[~np.isnan(data).any(axis=1)]
+    sanitize = False
+    # TODO clean sanitize function, add param to config and make sure not to
+    # kill the data[i] if all data are corrcoeff >0.9 (either very stable
+    # corr or autocorr, then this sanitize should not occur.
+    if len(data) != 1 and sanitize:
+        threshold = 0.99
+        npts = data.shape[1]
+        corr = data.mean(axis=0)
+        corrcoefs = np.array([np.corrcoef(di, corr)[1][0] for di in data])
+        toolarge = np.where(corrcoefs >= threshold)[0]
+        if len(toolarge):
+            data = data[np.where(corrcoefs <= threshold)[0]]
+
+    if len(data) == 0:
+        return []
+    if stack_method == "linear":
+        # logging.debug("Doing a linear stack")
+        corr = data.mean(axis=0)
+
+    elif stack_method == "pws":
+        import scipy.signal as ss
+        # logging.debug("Doing a PWS stack")
+        corr = np.zeros(data.shape[1], dtype='f8')
+        phasestack = np.zeros(data.shape[1], dtype='c8')
+        for i in range(data.shape[0]):
+            data[i] -= data[i].mean()
+        for c in data:
+            phase = np.angle(ss.hilbert(c))
+            phasestack.real += np.cos(phase)
+            phasestack.imag += np.sin(phase)
+        coh = 1. / data.shape[0] * np.abs(phasestack)
+
+        timegate_samples = int(pws_timegate * goal_sampling_rate)
+        coh = np.convolve(ss.windows.boxcar(timegate_samples) /
+                          timegate_samples, coh, 'same')
+        coh = np.power(coh, pws_power)
+        for c in data:
+            corr += c * coh
+        corr /= data.shape[0]
+
+    return corr
+
+
+def get_extension(export_format):
+    if export_format == "BOTH":
+        return ".MSEED"
+    elif export_format == "SAC":
+        return ".SAC"
+    elif export_format == "MSEED":
+        return ".MSEED"
+    else:
+        return ".MSEED"
+
+
+def export_allcorr(session, ccfid, data, base_folder=None, params=None, t_axis=None):
+    if base_folder is None:
+        # Legacy behaviour:
+        output_folder = get_config(session, 'output_folder')
+        base_folder = output_folder
+    else:
+        # If params.output_folder is an absolute project root you want to respect,
+        # you can anchor relative base_folder under it:
+        if params is not None and hasattr(params, "output_folder") and not os.path.isabs(base_folder):
+            base_folder = os.path.join(params.output_folder, base_folder)
+
+    station1, station2, components, filterid, date = ccfid.split('+')
+
+    path = os.path.join(
+        base_folder,
+        filterid,
+        '_output',
+        'all',
+        components,
+        station1, station2
+    )
+    if not os.path.isdir(path):
+        os.makedirs(path, exist_ok=True)
+
+    df = pd.DataFrame().from_dict(data).T
+    df.columns = t_axis
+    df.to_hdf(os.path.join(path, date+'.h5'), key='data')
+    del df
+    return
+
+
+def add_corr(session, station1, station2, filterid, date, time, duration,
+             components, CF, sampling_rate, day=False, ncorr=0, params=None, base_folder=None):
+    """
+    Adds a CCF to the data archive on disk.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+    :type station1: str
+    :param station1: The name of station 1 (formatted NET.STA.LOC)
+    :type station2: str
+    :param station2: The name of station 2 (formatted NET.STA.LOC)
+    :type filterid: int
+    :param filterid: The ID (ref) of the filter
+    :type date: datetime.date or str
+    :param date: The date of the CCF
+    :type time: datetime.time or str
+    :param time: The time of the CCF
+    :type duration: float
+    :param duration: The total duration of the exported CCF
+    :type components: str
+    :param components: The name of the components used (ZZ, ZR, ...)
+    :type sampling_rate: float
+    :param sampling_rate: The sampling rate of the exported CCF
+    :type day: bool
+    :param day: Whether this function is called to export a daily stack (True)
+        or each CCF (when keep_all parameter is set to True in the
+        configuration). Defaults to True.
+    :type ncorr: int
+    :param ncorr: Number of CCF that have been stacked for this CCF.
+    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
+    :param params: A dictionnary of MSNoise config parameters as returned by
+        :func:`get_params`.
+    """
+    from obspy import Stream, Trace
+    output_folder = params.output_folder
+    export_format = params.export_format
+    sac, mseed = False, False
+    if export_format == "BOTH":
+        mseed = True
+        sac = True
+    elif export_format == "SAC":
+        sac = True
+    elif export_format == "MSEED":
+        mseed = True
+
+    if day:
+        if base_folder is None:
+            # Legacy behaviour:
+            path = os.path.join(
+                "STACKS", "%02i" % filterid, "001_DAYS", components,
+                          "%s_%s" % (station1, station2), str(date)
+            )
+        else:
+            # Workflow-aware behaviour:
+            if params is not None and hasattr(params, "output_folder") and not os.path.isabs(base_folder):
+                base_folder = os.path.join(params.output_folder, base_folder)
+
+            path = os.path.join(
+                base_folder,
+                filterid,
+                '_output',
+                'daily',
+                components,
+                station1, station2,
+                str(date),
+            )
+        pair = "%s:%s" % (station1, station2)
+        if mseed:
+            _export_mseed(session, path, pair, components, filterid, CF,
+                         ncorr, params=params)
+        if sac:
+            _export_sac(session, path, pair, components, filterid, CF,
+                       ncorr, params=params)
+
+    else:
+        file = '%s.cc' % time
+        path = os.path.join(output_folder, filterid, station1,
+                            station2, components, date)
+        if not os.path.isdir(path):
+            os.makedirs(path, exist_ok=True)
+
+        t = Trace()
+        t.data = CF
+        t.stats.sampling_rate = sampling_rate
+        t.stats.starttime = -float(get_config(session, 'maxlag'))
+        t.stats.components = components
+        # if ncorr != 0:
+            # t.stats.location = "%02i"%ncorr
+        st = Stream(traces=[t, ])
+        st.write(os.path.join(path, file), format='mseed')
+        del t, st
+
+
+def _export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
+               sac_format=None, maxlag=None, cc_sampling_rate=None,
+               params=None):
+    from obspy.core.util.attribdict import AttribDict
+    from obspy import Stream, Trace
+    maxlag = params.maxlag
+    cc_sampling_rate = params.goal_sampling_rate
+    sac_format = params.sac_format
+    if sac_format is None:
+        sac_format = get_config(db, "sac_format")
+    if maxlag is None:
+        maxlag = float(get_config(db, "maxlag"))
+    if cc_sampling_rate is None:
+        cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
+    try:
+        os.makedirs(os.path.split(filename)[0], exist_ok=True)
+    except:
+        pass
+    filename += ".SAC"
+    mytrace = Trace(data=corr)
+    mytrace.stats['station'] = pair
+    mytrace.stats['sampling_rate'] = cc_sampling_rate
+    if maxlag:
+        mytrace.stats.starttime = -maxlag
+    mytrace.stats.sac = AttribDict()
+    mytrace.stats.sac.depmin = np.min(corr)
+    mytrace.stats.sac.depmax = np.max(corr)
+    mytrace.stats.sac.depmen = np.mean(corr)
+    mytrace.stats.sac.scale = 1
+    mytrace.stats.sac.npts = len(corr)
+
+    st = Stream(traces=[mytrace, ])
+    st.write(filename, format='SAC')
+    del st
+    return
+
+
+def _export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
+                 maxlag=None, cc_sampling_rate=None, params=None):
+    from obspy import Trace, Stream
+    try:
+        os.makedirs(os.path.split(filename)[0], exist_ok=True)
+    except:
+        pass
+    filename += ".MSEED"
+    maxlag = params.maxlag
+    cc_sampling_rate = params.cc_sampling_rate
+    if maxlag is None:
+        maxlag = float(get_config(db, "maxlag"))
+    if cc_sampling_rate is None:
+        cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
+
+    mytrace = Trace(data=corr)
+    mytrace.stats['station'] = pair[:11]
+    mytrace.stats['sampling_rate'] = cc_sampling_rate
+    mytrace.stats['start_time'] = -maxlag
+    mytrace.stats['location'] = "%02i" % ncorr
+
+    st = Stream(traces=[mytrace, ])
+    st.write(filename, format='MSEED')
+    del st
+    return
+
+
+# ============================================================
+# Section 13 — DVV / DTT Aggregation
+# ============================================================
+
+
+def compute_dvv(session, root, lineage, mov_stack, pairs=None, components=None, params=None, method=None, **kwargs):
+    """
+    Compute DVV statistics for a given seismic session, filter ID, and movement stack. The method calculates various
+    statistical measures for DVV values based on the provided parameters.
+
+    :param session: Seismic session object.
+    :type session: object
+    :param root: Root output folder path.
+    :type root: str
+    :param lineage: List of lineage path components (upstream DTT step lineage).
+    :type lineage: list
+    :param mov_stack: Movement stack object.
+    :type mov_stack: object
+    :param pairs: List of station pairs. Defaults to None.
+    :type pairs: list, optional
+    :param components: Component(s) to compute DVV for. Defaults to None.
+    :type components: str, optional
+    :param params: Parameters object containing configuration settings. Defaults to None.
+    :type params: object, optional
+    :param method: Method to use for computation. Defaults to None.
+    :type method: str, optional
+    :param **kwargs: Additional keyword arguments
+    :return: DataFrame containing the computed statistical measures for DVV values.
+    :rtype: DataFrame
+    :raises ValueError: If no DVV values are computed.
+    """
+    # Ensure params has components_to_compute; fall back to a full merge if not.
+    if params is None or not hasattr(params, "components_to_compute"):
+        _, _, params = resolve_lineage_params(session, lineage)
+
+    if pairs == None:
+        pairs = []
+        for sta1, sta2 in get_station_pairs(session):
+            for loc1 in sta1.locs():
+                s1 = "%s.%s.%s" % (sta1.net, sta1.sta, loc1)
+                for loc2 in sta2.locs():
+                    s2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
+                    pairs.append((s1, s2))
+    all = []
+    for (s1, s2) in pairs:
+        if components == None:
+            if s1 == s2:
+                # if not provided, we'll load all:
+                comps = params.components_to_compute_single_station
+            else:
+                comps = params.components_to_compute
+        else:
+            if components.count(',') == 0:
+                comps = [components, ]
+            else:
+                comps = components.split(',')
+
+        for comp in comps:
+
+            if (s1 == s2) and (comp not in params.components_to_compute_single_station):
+                continue
+            if (s1 != s2) and (comp not in params.components_to_compute):
+                continue
+
+            try:
+                dtt = xr_get_dtt(root, lineage, s1, s2, comp, mov_stack)
+                all.append(dtt)
+            except FileNotFoundError:
+                traceback.print_exc()
+                continue
+    if not len(all):
+        raise ValueError
+    if len(all) == 1:
+        return all[0]
+    all = pd.concat(all)
+    percentiles = kwargs.get("percentiles", [.05, .10, .25, .5, .75, .90, .95])
+    stats = all.groupby(level=0).describe(percentiles=percentiles)
+    for c in ["m", "m0", "a"]:
+        stats[(c, "weighted_mean")], stats[(c, "weighted_std")] = _get_wavgwstd(all, c, 'e'+c)
+        stats[(c, "trimmed_mean")], stats[(c, "trimmed_std")] = _trim(all, c, kwargs.get("limits", None))
+
+    return stats.sort_index(axis=1)
+
 
 def compute_dtt_stretching(session, root, lineage, mov_stack,
                             pairs=None, components=None, params=None,
@@ -4003,39 +4623,6 @@ def compute_dtt_stretching(session, root, lineage, mov_stack,
 # WCT-DTT xarray I/O
 # ============================================================
 
-def xr_get_wct_dtt(root, lineage, station1, station2, components, mov_stack):
-    """Load per-pair WCT dt/t results from a NetCDF file.
-
-    Returns an :class:`xarray.Dataset` with variables ``dvv``, ``err``,
-    ``coh`` each of shape ``(times, frequency)``, as written by
-    :func:`xr_save_wct_dtt`.
-
-    Note: despite the variable name ``dvv`` in the file, the values are
-    *dt/t* (fractional time delay × 100 in percent) at each frequency bin,
-    not yet network-aggregated dv/v.
-
-    :raises FileNotFoundError: if the NetCDF file does not exist.
-    :rtype: :class:`xarray.Dataset`
-    """
-    fn = os.path.join(
-        root, *lineage, "_output",
-        "%s_%s" % (mov_stack[0], mov_stack[1]),
-        components,
-        "%s_%s.nc" % (station1, station2),
-    )
-    if not os.path.isfile(fn):
-        raise FileNotFoundError(fn)
-    return xr.load_dataset(fn)
-
-
-# ============================================================
-# WCT-DTT aggregate (all pairs → frequency-band stats DataFrame)
-# ============================================================
-
-
-# ============================================================
-# Section 12 — CCF and Stack Computation
-# ============================================================
 
 def compute_dtt_wct(session, root, lineage, mov_stack,
                     pairs=None, components=None, params=None,
@@ -4162,339 +4749,24 @@ def compute_dtt_wct(session, root, lineage, mov_stack,
 # ============================================================
 
 
-def _conv2(x, y, mode="same"):
-    """2-D convolution using :func:`scipy.signal.convolve2d` with 180-degree rotations."""
-    from scipy.signal import convolve2d
-    return np.rot90(convolve2d(np.rot90(x, 2), np.rot90(y, 2), mode=mode), 2)
+def psd_dfrms(a):
+    """Integrate a PSD Series over its period axis using the trapezoid rule.
 
-def azimuth(coordinates, x0, y0, x1, y1):
+    :param a: :class:`pandas.Series` whose index is period values.
+    :returns: Square-root of the integrated power (RMS-equivalent).
     """
-    Returns the azimuth between two coordinate sets.
+    return np.sqrt(np.trapz(a.values, a.index))
 
-    :type coordinates: str
-    :param coordinates: {'DEG', 'UTM', 'MIX'}
-    :type x0: float
-    :param x0: X coordinate of station 1
-    :type y0: float
-    :param y0: Y coordinate of station 1
-    :type x1: float
-    :param x1: X coordinate of station 2
-    :type y1: float
-    :param y1: Y coordinate of station 2
 
-    :rtype: float
-    :returns: The azimuth in degrees
+def psd_rms(s, f):
+    """Compute RMS from a power spectrum array and frequency array.
+
+    :param s: Power spectral density values (1-D array).
+    :param f: Frequency values (1-D array, same length as *s*).
+    :returns: Float - square-root of the integrated power.
     """
-    from obspy.geodetics import gps2dist_azimuth
-    if coordinates == "DEG":
-        dist, azim, bazim = gps2dist_azimuth(y0, x0, y1, x1)
-        return azim
-    elif coordinates == 'UTM':
-        if (np.isclose(y0, y1) & np.isclose(x0, x1)):
-            return 0
-        else:
-            azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
-            return azim % 360
-    else:
-        logging.warning("Please consider having a single coordinate system for"
-                        " all stations")
-        return 0
+    return np.sqrt(np.trapz(s, f))
 
-
-# ============================================================
-# Section 3 — Data Availability
-# ============================================================
-
-def getCoherence(dcs, ds1, ds2):
-    """Compute cross-coherence between two spectra.
-
-    :param dcs: Cross-spectrum magnitudes (1-D array, length *n*).
-    :param ds1: Auto-spectrum of signal 1 (1-D array, length *n*).
-    :param ds2: Auto-spectrum of signal 2 (1-D array, length *n*).
-    :returns: Complex coherence array of length *n*, clipped to ``|coh| <= 1``.
-    """
-    n = len(dcs)
-    coh = np.zeros(n).astype("complex")
-    valids = np.argwhere(np.logical_and(np.abs(ds1) > 0, np.abs(ds2) > 0))
-    coh[valids] = dcs[valids] / (ds1[valids] * ds2[valids])
-    coh[coh > (1.0 + 0j)] = 1.0 + 0j
-    return coh
-
-def get_maxlag_samples(maxlag, cc_sampling_rate):
-    """
-    Returns the length of the CC functions. Gets the maxlag and sampling rate
-    from the database.
-
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-
-    :rtype: int
-    :returns: the length of the CCF in samples
-    """
-
-    return int(2*maxlag*cc_sampling_rate)+1
-
-def get_results(session, station1, station2, filterid, components, dates,
-                mov_stack=1, format="stack", params=None):
-    """
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA.LOC)
-    :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA.LOC)
-    :type filterid: int
-    :param filterid: The ID (ref) of the filter
-    :type components: str
-    :param components: The name of the components used (ZZ, ZR, ...)
-    :type dates: list
-    :param dates: List of TODO datetime.datetime
-    :type mov_stack: int
-    :param mov_stack: Moving window stack.
-    :type format: str
-    :param format: Either ``stack``: the data will be stacked according to
-        the parameters passed with ``params`` or ``matrix``: to get a 2D
-        array of CCF.
-    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
-    :param params: A dictionnary of MSNoise config parameters as returned by
-        :func:`get_params`.
-    :rtype: :class:`numpy.ndarray`
-    :return: Either a 1D CCF (if format is ``stack`` or a 2D array (if format=
-        ``matrix``).
-    """
-    from obspy import read
-    if not params:
-        export_format = get_config(session, 'export_format')
-        extension = get_extension(export_format)
-    else:
-        export_format = params.export_format
-        extension = get_extension(params.export_format)
-    if export_format == "BOTH":
-        export_format = "MSEED"
-
-    stack_data = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
-    i = 0
-    base = os.path.join("STACKS", "%02i" % filterid,
-                        "%03i_DAYS" % mov_stack, components,
-                        "%s_%s" % (station1, station2), "%s") + extension
-    logging.debug("Reading files... in %s" % base)
-    lastday = dates[0]
-    for j, date in enumerate(dates):
-
-        if isinstance(date, str):
-            daystack = base % str(date)
-        else:
-            daystack = base % date.strftime('%Y-%m-%d')
-
-        try:
-            stack_data[j, :] = read(daystack, format=export_format)[0].data[:]
-            lastday = str(date)
-            i += 1
-        except:
-            # traceback.print_exc()
-            pass
-
-    if format == "matrix":
-        return i, stack_data
-
-    elif format == "dataframe":
-        taxis = get_t_axis(session)
-        return pd.DataFrame(stack_data, index=pd.DatetimeIndex(dates),
-                            columns=taxis).loc[:lastday]
-    elif format == "xarray":
-        taxis = get_t_axis(session)
-        times = pd.DatetimeIndex(dates)
-        dr = xr.DataArray(stack_data, coords=[times, taxis],
-                          dims=["times", "taxis"]).dropna("times", how="all")
-        dr.name = "CCF"
-        return dr.to_dataset()
-
-    elif format == "stack":
-        logging.debug("Stacking...")
-
-        corr = stack(stack_data, params.stack_method, params.pws_timegate,
-                     params.pws_power, params.goal_sampling_rate)
-
-        if i > 0:
-            return i, corr
-        else:
-            return 0, None
-
-def get_results_all(session, root, lineage_names, station1, station2, components, dates,
-                    format="dataframe", params=None):
-    """
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA.LOC)
-    :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA.LOC)
-    :type components: str
-    :param components: The name of the components used (ZZ, ZR, ...)
-    :type dates: list
-    :param dates: List of TODO datetime.datetime
-    :rtype: :class:`pandas.DataFrame`
-    :return: All CCF results in a :class:`pandas.DataFrame`, where the index
-        is the time of the CCF and the columns are the times in the coda.
-    """
-
-    path = os.path.join(root, *lineage_names, "_output", "all", components,  station1, station2)
-    print("New path with lineage!:", path)
-    results = []
-    for date in dates:
-        if isinstance(date, str):
-            fname = os.path.join(path, date+".h5")
-        else:
-            fname = os.path.join(path, date.strftime('%Y-%m-%d.h5'))
-        if os.path.isfile(fname):
-            df = pd.read_hdf(fname, 'data', parse_dates=True)
-            df.index = pd.to_datetime(df.index)
-            results.append(df)
-
-    if len(results) > 0:
-        result = pd.concat(results)
-        del results
-        if format == "dataframe":
-            return result
-        elif format == "xarray":
-            taxis = get_t_axis(params)
-            times = result.index
-            dr = xr.DataArray(result, coords=[times, taxis],
-                              dims=["times", "taxis"]).dropna("times", how="all")
-            dr.name = "CCF"
-            dr = dr.sortby('times')
-            return dr.to_dataset()
-    else:
-        if format == "xarray":
-            return xr.Dataset()
-        else:
-            return pd.DataFrame()
-
-# Some helper functions
-
-# ── MWCS ────────────────────────────────────────────────────
-
-def get_wavelet_type(wavelet_type):
-    """Return a :mod:`pycwt` wavelet object for the given type/parameter pair.
-
-    :param wavelet_type: Tuple ``(name, param)`` or ``(name,)``.
-        Supported names: ``"Morlet"``, ``"Paul"``, ``"DOG"``, ``"MexicanHat"``.
-    :returns: Corresponding :mod:`pycwt` wavelet instance.
-    """
-    import pycwt as wavelet
-    defaults = {"Morlet": 6, "Paul": 4, "DOG": 2, "MexicanHat": 2}
-    name = wavelet_type[0]
-    param = float(wavelet_type[1]) if len(wavelet_type) == 2 else defaults[name]
-    if name == "Morlet":
-        return wavelet.Morlet(param)
-    elif name == "Paul":
-        return wavelet.Paul(param)
-    elif name == "DOG":
-        return wavelet.DOG(param)
-    elif name == "MexicanHat":
-        return wavelet.MexicanHat()
-    else:
-        raise ValueError(f"Unknown wavelet type: {name!r}")
-
-def get_window(window="boxcar", half_win=3):
-    """Return a normalised complex smoothing window for MWCS processing.
-
-    :param window: ``"boxcar"`` (default) or ``"hanning"``.
-    :param half_win: Half-width in samples (full window = ``2*half_win+1``).
-    :returns: Complex numpy array of length ``2*half_win+1``, sum-normalised.
-    """
-    import scipy.signal
-    window_len = 2 * half_win + 1
-    if window == "boxcar":
-        w = scipy.signal.windows.boxcar(window_len).astype("complex")
-    else:
-        w = scipy.signal.windows.hann(window_len).astype("complex")
-    return w / window_len
-
-def get_workflow_step_config(session, step_name):
-    """Return the :class:`WorkflowStep` for *step_name*, or ``None``.
-
-    :param session: Active SQLAlchemy session.
-    :param step_name: Exact step name string, e.g. ``"preprocess_1"``.
-    """
-    for step in get_workflow_steps(session):
-        if step.step_name == step_name:
-            return step
-    return None
-
-
-# ============================================================
-# Section 5 — Jobs
-# ============================================================
-# ── Legacy job API (used by QC sub-pipeline) ───────────────
-
-def make_same_length(st):
-    """
-    This function takes a stream of equal sampling rate and makes sure that all
-    channels have the same length and the same gaps.
-    """
-    from obspy import Stream
-    # Merge traces
-    st.merge()
-
-    # Initialize arrays to be filled with start+endtimes of all traces
-    starttimes = []
-    endtimes = []
-
-    # Loop over all traces of the stream
-    for tr in st:
-        # Force conversion to masked arrays
-        if not np.ma.count_masked(tr.data):
-            tr.data = np.ma.array(tr.data, mask=False)
-        # Read out start+endtimes of traces to trim
-        starttimes.append(tr.stats.starttime)
-        endtimes.append(tr.stats.endtime)
-
-    # trim stream to common starttimes
-    if max(starttimes) >= min(endtimes):
-        return Stream()
-    st.trim(max(starttimes), min(endtimes))
-
-    # get the mask of all traces, i.e. the parts where at least one trace has
-    # a gap
-
-    if len(st) < 2:
-        return st
-
-    masks=[]
-    for tr in st:
-        masks.append(tr.data.mask)
-    mask =  np.any(masks,axis=0)
-
-    # apply the mask to all traces
-    for tr in st:
-        tr.data.mask = mask
-
-    st = st.split()
-    return st
-
-
-# ============================================================
-# Section 11 — xarray I/O
-# ============================================================
-# ── Core helpers ───────────────────────────────────────────
-
-def prepare_abs_positive_fft(line, sampling_rate):
-    """Return the positive-frequency part of the absolute FFT of *line*.
-
-    :param line: 1-D signal array.
-    :param sampling_rate: Sampling rate in Hz.
-    :returns: ``(freq, val)`` - positive-frequency vector and absolute FFT values.
-    """
-    val = np.fft.fft(line)
-    val = np.abs(val)
-    freq = np.fft.fftfreq(len(line), 1.0 / sampling_rate)
-    idx = np.where(freq >= 0)
-    return freq[idx], val[idx]
 
 def psd_df_rms(d, freqs, output="VEL"):
     """Compute per-frequency-band RMS from a PPSD DataFrame.
@@ -4525,224 +4797,115 @@ def psd_df_rms(d, freqs, output="VEL"):
             RMS[f"{fmin:.1f}-{fmax:.1f}"] = damp.apply(psd_dfrms, axis=1)
     return pd.DataFrame(RMS, index=d.index)
 
-def psd_dfrms(a):
-    """Integrate a PSD Series over its period axis using the trapezoid rule.
 
-    :param a: :class:`pandas.Series` whose index is period values.
-    :returns: Square-root of the integrated power (RMS-equivalent).
-    """
-    return np.sqrt(np.trapz(a.values, a.index))
+def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=True):
+    from obspy.signal import PPSD
+    if loc == "--":
+        loc = ""
+    fn = "%s.%s.%s.%s-%s_%s.npz" % (net, sta, loc, chan, datelist[0], datelist[-1])
+    import tempfile
+    fn = os.path.join(tempfile.gettempdir(), "MSNOISE-PSD", fn)
+    if use_cache and os.path.isfile(fn):
+        logging.debug("I found this cool file: %s" % fn)
+        ppsd = PPSD.load_npz(fn)
+    else:
+        first = True
+        ppsd = None
+        for day in datelist:
+            jday = int(day.strftime("%j"))
+            toglob = os.path.join('PSD', 'NPZ', "%s" % day.year, net, sta,
+                                  chan + ".D", "%s.%s.%s.%s.D.%s.%03i.npz" % (
+                                  net, sta, loc, chan, day.year, jday))
+            files = glob.glob(toglob)
+            if not len(files):
+                logging.error("No files found for %s.%s.%s.%s: %s" % (
+                net, sta, loc, chan, day))
+                continue
+            file = files[0]
+            if os.path.isfile(file):
+                if first:
+                    ppsd = PPSD.load_npz(file)
+                    first = False
+                else:
+                    try:
+                        ppsd.add_npz(file)
+                    except:
+                        pass
+    if not ppsd:
+        return None
+    if use_cache:
+        if not os.path.isdir(os.path.split(fn)[0]):
+            os.makedirs(os.path.split(fn)[0], exist_ok=True)
+        ppsd.save_npz(fn[:-4])
+    return ppsd
 
-def psd_rms(s, f):
-    """Compute RMS from a power spectrum array and frequency array.
 
-    :param s: Power spectral density values (1-D array).
-    :param f: Frequency values (1-D array, same length as *s*).
-    :returns: Float - square-root of the integrated power.
-    """
-    return np.sqrt(np.trapz(s, f))
+def psd_ppsd_to_dataframe(ppsd):
+    from obspy import UTCDateTime
+    ind_times = np.array(
+        [UTCDateTime(t).datetime for t in ppsd.current_times_used])
+    data = np.asarray(ppsd._binned_psds)
+    return pd.DataFrame(data, index=ind_times, columns=ppsd.period_bin_centers)
 
-def resolve_lineage_from_ids(session, params, preprocess_id=1, cc_id=None,
-                              filter_id=None, stack_id=None, refstack_id=None,
-                              mwcs_id=None, mwcs_dtt_id=None,
-                              stretching_id=None, wavelet_id=None,
-                              wavelet_dtt_id=None):
-    """Build a lineage name list from integer step-set IDs and resolve params.
 
-    Constructs step-name strings (e.g. ``"preprocess_1"``, ``"cc_2"``) from
-    the supplied integer IDs in workflow order, then delegates to
-    :func:`resolve_lineage_params` to merge all step configurations.
-    Only IDs that are not ``None`` are included.
+def hdf_open_store_from_fn(fn, mode="a"):
+    store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
+    return store
 
-    :returns: ``(lineage_steps, lineage_names, merged_params)`` - same tuple
-        as :func:`get_merged_params_for_lineage`.
-    """
-    parts = [f"preprocess_{preprocess_id}"]
-    if cc_id is not None:
-        parts.append(f"cc_{cc_id}")
-    if filter_id is not None:
-        parts.append(f"filter_{filter_id}")
-    if stack_id is not None:
-        parts.append(f"stack_{stack_id}")
-    if refstack_id is not None:
-        parts.append(f"refstack_{refstack_id}")
-    if mwcs_id is not None:
-        parts.append(f"mwcs_{mwcs_id}")
-    if mwcs_dtt_id is not None:
-        parts.append(f"mwcs_dtt_{mwcs_dtt_id}")
-    if stretching_id is not None:
-        parts.append(f"stretching_{stretching_id}")
-    if wavelet_id is not None:
-        parts.append(f"wavelet_{wavelet_id}")
-    if wavelet_dtt_id is not None:
-        parts.append(f"wavelet_dtt_{wavelet_dtt_id}")
-    return resolve_lineage_params(session, parts)
+
+def hdf_open_store(filename, location=os.path.join("PSD", "HDF"), mode="a",
+                   format='table'):
+    if ".h5" in filename:
+        filename = filename.replace(".h5", "")
+    pd.set_option('io.hdf.default_format', format)
+    if not os.path.isdir(location):
+        os.makedirs(location, exist_ok=True)
+    fn = os.path.join(location, filename + ".h5")
+    store = pd.HDFStore(fn, complevel=9, complib="blosc:blosclz", mode=mode)
+    return store
+
+
+def hdf_insert_or_update(store, key, new):
+    if key in store:
+        filter = store[key].index.intersection(new.index)
+        if len(filter):
+            coordinates = store.select_as_coordinates(key, "index=filter")
+            store.remove(key, where=coordinates)
+            store.append(key, new, format='t', data_columns=True, append=True)
+    else:
+        store.append(key, new)
+
+
+def hdf_close_store(store):
+    store.close()
+    del store
 
 
 # ============================================================
-# Lineage enumeration helpers
+# Section 15 — Filters (legacy)
 # ============================================================
 
-def save_preprocessed_streams(stream, output_dir, step_name, goal_day):
-    """Write a preprocessed Stream to disk in workflow-aware path structure.
 
-    Creates ``<output_dir>/<step_name>/_output/`` and writes
-    ``<goal_day>.mseed``.
+def get_filters(session, all=False, ref=None):
+    """Get Filters from the database.
 
-    :param stream: :class:`~obspy.core.stream.Stream` to write.
-    :param output_dir: Base output directory.
-    :param step_name: Workflow step name (e.g. ``"preprocess_1"``).
-    :param goal_day: Processing date string (``YYYY-MM-DD``).
-    :returns: List containing the single saved file path.
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
+
+    :type all: bool
+    :param all: Returns all filters from the database if True, or only filters
+        where `used` = 1 if False (default)
+
+    :rtype: list of :class:`~msnoise.msnoise_table_def.declare_tables.Filter`
+    :returns: a list of Filter
     """
-    workflow_dir = os.path.join(output_dir, step_name, "_output")
-    os.makedirs(workflow_dir, exist_ok=True)
-    output_path = os.path.join(workflow_dir, f"{goal_day}.mseed")
-    for tr in stream:
-        tr.data = tr.data.astype(np.float32)
-    stream.write(output_path, format="MSEED")
-    return [output_path]
-
-def smoothCFS(cfs, scales, dt, ns, nt):
-    """Smooth CWT coefficients along both time and scale axes.
-
-    :param cfs: CWT coefficient array, shape ``(n_scales, n_times)``.
-    :param scales: 1-D array of wavelet scales.
-    :param dt: Sampling interval in seconds.
-    :param ns: Length of the moving-average filter across scales.
-    :param nt: Gaussian width parameter along time.
-    :returns: Smoothed coefficient array, same shape as *cfs*.
-    """
-    import scipy.fft as sf
-    N = cfs.shape[1]
-    npad = sf.next_fast_len(N, real=True)
-    omega = np.arange(1, np.fix(npad / 2) + 1, 1).tolist()
-    omega = np.array(omega) * ((2 * np.pi) / npad)
-    omega_save = -omega[int(np.fix((npad - 1) / 2)) - 1:0:-1]
-    omega_2 = np.concatenate((0., omega), axis=None)
-    omega_2 = np.concatenate((omega_2, omega_save), axis=None)
-    omega = np.concatenate((omega_2, -omega[0]), axis=None)
-    normscales = scales / dt
-    for kk in range(0, cfs.shape[0]):
-        F = np.exp(-nt * (normscales[kk] ** 2) * omega ** 2)
-        smooth = np.fft.ifft(F * np.fft.fft(cfs[kk - 1], npad))
-        cfs[kk - 1] = smooth[0:N]
-    H = 1 / ns * np.ones((ns, 1))
-    cfs = _conv2(cfs, H)
-    return cfs
-
-def wavg_wstd(data, errors):
-    """Weighted average and weighted standard deviation of equal-length arrays.
-
-    :param data: 1-D array of measurement values.
-    :param errors: 1-D array of measurement errors (zeros replaced by ``1e-6``).
-    :returns: ``(weighted_mean, weighted_std)`` as floats.
-    """
-    errors = np.where(errors == 0, 1e-6, errors)
-    w = 1.0 / errors
-    wavg = (data * w).sum() / w.sum()
-    N = len(np.nonzero(w)[0])
-    wstd = np.sqrt(np.sum(w * (data - wavg) ** 2) / ((N - 1) * np.sum(w) / N))
-    return wavg, wstd
-
-def winsorizing(data, params, input="timeseries", nfft=0):
-    """Clip (Winsorise) a 2-D data array in the time or frequency domain.
-
-    Supports both one-shot sign-clipping (``winsorizing == -1``) and
-    RMS-based clipping (``winsorizing > 0``).  When *input* is ``"fft"``
-    the array is temporarily transformed back to the time domain, clipped,
-    then re-transformed.
-
-    :param data: 1-D or 2-D array of shape ``(n_traces, n_samples)``.
-    :param params: MSNoise params object; must expose ``params.winsorizing``.
-    :param input: ``"timeseries"`` (default) or ``"fft"``.
-    :param nfft: FFT length used when *input* is ``"fft"``; ignored otherwise.
-    :returns: Clipped array (same shape as input).
-    """
-    import scipy.fft as sf
-    input1D = False
-    if len(data.shape) == 1:
-        data = data.reshape(-1, data.shape[0])
-        input1D = True
-    if input == "fft":
-        data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(float)
-    for i in range(data.shape[0]):
-        if params.winsorizing == -1:
-            np.sign(data[i], data[i])  # inplace
-        elif params.winsorizing != 0:
-            rms = data[i].std() * params.winsorizing
-            np.clip(data[i], -rms, rms, data[i])  # inplace
-    if input == "fft":
-        data = sf.fftn(data, [nfft, ], axes=[1, ])
-    if input1D:
-        data = data[0]
-    return data
-
-def xr_get_dvv(root, lineage, components, mov_stack):
-    fn = os.path.join(root, *lineage, "_output",
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s.nc" % components)
-    if not os.path.isfile(fn):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
-        raise FileNotFoundError(fn)
-    data = xr_create_or_open(fn, name="DVV")
-    data = data.DVV.to_dataframe().reorder_levels(['times', 'level1', 'level0']).unstack().droplevel(0, axis=1).unstack()
-    return data
-
-# ── WCT ─────────────────────────────────────────────────────
-
-def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12,
-         freqmin=0.1, freqmax=8.0, nptsfreq=100, wavelet_type=("Morlet", 6.)):
-    """Wavelet Coherence Transform (WCT) between two time series.
-
-    :param trace_ref: Reference signal (1-D array).
-    :param trace_current: Current signal (1-D array, same length).
-    :param fs: Sampling frequency in Hz.
-    :param ns: Scale-axis smoothing parameter.
-    :param nt: Time-axis smoothing parameter.
-    :param vpo: Voices-per-octave; higher = finer scale resolution.
-    :param freqmin: Lowest frequency of interest (Hz).
-    :param freqmax: Highest frequency of interest (Hz).
-    :param nptsfreq: Number of frequency points between *freqmin* and *freqmax*.
-    :param wavelet_type: ``(name, param)`` tuple passed to :func:`get_wavelet_type`.
-    :returns: ``(WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi)``
-    """
-    import pycwt as wavelet
-    mother = get_wavelet_type(wavelet_type)
-    nx = np.size(trace_current)
-    x_reference = np.transpose(trace_ref)
-    x_current = np.transpose(trace_current)
-    dt = 1 / fs
-    dj = 1 / vpo
-    J = -1
-    s0 = 2 * dt
-    freqlim = np.linspace(freqmax, freqmin, num=nptsfreq, endpoint=True)
-    cwt_reference, scales, freqs, coi, fft, fftfreqs = wavelet.cwt(
-        x_reference, dt, dj, s0, J, mother, freqs=freqlim)
-    cwt_current, _, _, _, _, _ = wavelet.cwt(
-        x_current, dt, dj, s0, J, mother, freqs=freqlim)
-    scales = np.array([[kk] for kk in scales])
-    invscales = np.kron(np.ones((1, nx)), 1 / scales)
-    power_ref = (invscales * abs(cwt_reference) ** 2).astype(complex)
-    power_cur = (invscales * abs(cwt_current) ** 2).astype(complex)
-    crossCFS = cwt_reference * np.conj(cwt_current)
-    WXamp = abs(crossCFS)
-    cross_spectrum = (invscales * crossCFS).astype(complex)
-    cfs1 = smoothCFS(power_ref, scales, dt, ns, nt)
-    cfs2 = smoothCFS(power_cur, scales, dt, ns, nt)
-    crossCFS = smoothCFS(cross_spectrum, scales, dt, ns, nt)
-    mask1 = cfs1 > 0
-    mask2 = cfs2 > 0
-    valid_mask = mask1 & mask2
-    WXspec = np.full_like(crossCFS, np.nan, dtype=complex)
-    Wcoh = np.full_like(crossCFS, np.nan)
-    WXspec[valid_mask] = crossCFS[valid_mask] / (
-        np.sqrt(cfs1[valid_mask]) * np.sqrt(cfs2[valid_mask]))
-    Wcoh[valid_mask] = (abs(crossCFS[valid_mask]) ** 2
-                        / (cfs1[valid_mask] * cfs2[valid_mask]))
-    WXangle = np.angle(WXspec)
-    Wcoh = np.clip(Wcoh, 0.0, 1.0)
-    pp = 2 * np.pi * freqs
-    pp2 = np.array([[kk] for kk in pp])
-    WXdt = WXangle / np.kron(np.ones((1, nx)), pp2)
-    return WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi
+    return [] #TODOOOOOOOO
+    if ref:
+        filter = session.query(Filter).filter(Filter.ref == ref).first()
+        return filter
+    if all:
+        filters = session.query(Filter).all()
+    else:
+        filters = session.query(Filter).filter(Filter.used == True).all()
+    return filters
