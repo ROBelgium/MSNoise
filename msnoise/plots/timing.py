@@ -66,13 +66,12 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
 
     if lineage is None:
         logger.error(
-            "No completed mwcs_dtt lineage for filter_%i/mwcs_%i/mwcs_dtt_%i. "
-            "Available: %s", filterid, mwcsid, dttid,
-            ["/".join(l) for l in all_lineages],
+            f"No completed mwcs_dtt lineage for filter_{filterid}/mwcs_{mwcsid}/mwcs_dtt_{dttid}. "
+            f"Available: {['/'.join(l) for l in all_lineages]}"
         )
         return
 
-    logger.info("Using lineage: %s", "/".join(lineage))
+    logger.info(f"Using lineage: {'/'.join(lineage)}")
 
     # ------------------------------------------------------------------ #
     # Moving stacks                                                        #
@@ -150,7 +149,7 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
                                     alpha=0.2)
 
         if not pair_series:
-            logger.warning("No data for mov_stack=%s comp=%s", mov_stack, components)
+            logger.warning(f"No data for mov_stack={mov_stack} comp={components}")
             continue
 
         import pandas as pd
@@ -191,7 +190,7 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
                 tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
             outfile = outfile.replace("?", tag)
         outfile = "timing_" + outfile
-        logger.info("Saving to: %s", outfile)
+        logger.info(f"Saving to: {outfile}")
         plt.savefig(outfile)
     if show:
         plt.show()

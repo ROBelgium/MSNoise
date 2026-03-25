@@ -60,13 +60,12 @@ def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
 
     if lineage is None:
         logger.error(
-            "No completed stretching lineage found for filter_%i / stretching_%i. "
-            "Available: %s", filterid, stretchingid,
-            ["/".join(l) for l in all_lineages],
+            f"No completed stretching lineage found for filter_{filterid} / stretching_{stretchingid}. "
+            f"Available: {['/'.join(l) for l in all_lineages]}"
         )
         return
 
-    logger.info("Using lineage: %s", "/".join(lineage))
+    logger.info(f"Using lineage: {'/'.join(lineage)}")
 
     # ------------------------------------------------------------------ #
     # Moving stacks                                                        #
@@ -108,9 +107,7 @@ def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
                     components=comp, params=params,
                 )
             except ValueError:
-                logger.warning(
-                    "No stretching data for mov_stack=%s comp=%s", mov_stack, comp
-                )
+                logger.warning(f"No stretching data for mov_stack={mov_stack} comp={comp}")
                 continue
 
             # dv/v (%) = (Delta - 1) * 100
@@ -153,7 +150,7 @@ def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
                 tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
             outfile = outfile.replace("?", tag)
         outfile = "dvvs_" + outfile
-        logger.info("Saving to: %s", outfile)
+        logger.info(f"Saving to: {outfile}")
         plt.savefig(outfile)
     if show:
         plt.show()

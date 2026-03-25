@@ -56,9 +56,7 @@ def _plot_timeseries(db, root, lineage, mov_stacks, comp_list,
                     freqmin=freqmin, freqmax=freqmax,
                 )
             except ValueError:
-                logger.warning(
-                    "No WCT-DTT data for mov_stack=%s comp=%s", mov_stack, comp
-                )
+                logger.warning(f"No WCT-DTT data for mov_stack={mov_stack} comp={comp}")
                 continue
 
             t = stats.index
@@ -258,7 +256,7 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
                 tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
             outfile = outfile.replace("?", tag)
         outfile = "wct_%s_%s" % (visualize, outfile)
-        logger.info("Saving to: %s", outfile)
+        logger.info(f"Saving to: {outfile}")
         fig.savefig(outfile)
     if show:
         plt.show()

@@ -80,20 +80,19 @@ def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
     maxlag2 = minlag + dtt_width
 
     # --- Load MWCS for the requested day ---
-    logger.info("Loading MWCS for %s-%s comp=%s day=%s mov=%s",
-                sta1, sta2, components, day, mov_stack)
+    logger.info(f"Loading MWCS for {sta1}-{sta2} comp={components} day={day} mov={mov_stack}")
     try:
         mwcs_all = xr_get_mwcs(params.output_folder, mwcs_lineage,
                                   sta1, sta2, components, mov_stack)
     except FileNotFoundError as fp:
-        logger.error("MWCS FILE DOES NOT EXIST: %s", fp)
+        logger.error(f"MWCS FILE DOES NOT EXIST: {fp}")
         return
 
     import pandas as pd
     day_ts = pd.Timestamp(day)
     day_data = mwcs_all[mwcs_all.index.floor("D") == day_ts]
     if day_data.empty:
-        logger.error("No MWCS data found for day %s", day)
+        logger.error(f"No MWCS data found for day {day}")
         return
 
     t   = day_data.columns.get_level_values("taxis").astype(float)
@@ -105,7 +104,7 @@ def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
         dtt_all = xr_get_dtt(params.output_folder, dtt_lineage,
                                sta1, sta2, components, mov_stack)
     except FileNotFoundError as fp:
-        logger.error("DTT FILE DOES NOT EXIST: %s", fp)
+        logger.error(f"DTT FILE DOES NOT EXIST: {fp}")
         dtt_all = None
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -157,7 +156,7 @@ def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
                 )
             )
         outfile = "dtt_" + outfile
-        logger.info("Saving to: %s", outfile)
+        logger.info(f"Saving to: {outfile}")
         plt.savefig(outfile)
     if show:
         plt.show()

@@ -150,7 +150,7 @@ def main(preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=None, ref
                 tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
             outfile = outfile.replace("?", tag)
         outfile = "dvv " + outfile
-        logger.info("Saving to: %s", outfile)
+        logger.info(f"Saving to: {outfile}")
         plt.savefig(outfile)
     if show:
         plt.show()

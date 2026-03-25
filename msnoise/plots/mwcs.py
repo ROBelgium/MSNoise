@@ -83,14 +83,13 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
         for v in (mn, -mn, mx, -mx):
             plt.axhline(v, c="g", lw=0.8)
 
-    logger.info("Loading MWCS for %s-%s comp=%s mov_stack=%s lineage=%s",
-                sta1, sta2, components, mov_stack, "/".join(lineage_names))
+    logger.info(f"Loading MWCS for {sta1}-{sta2} comp={components} mov_stack={mov_stack} lineage={'/'.join(lineage_names)}")
 
     try:
         mwcs = xr_get_mwcs(params.output_folder, lineage_names,
                              sta1, sta2, components, mov_stack)
     except FileNotFoundError as fp:
-        logger.error("FILE DOES NOT EXIST: %s", fp)
+        logger.error(f"FILE DOES NOT EXIST: {fp}")
         return
 
     alldt  = mwcs["M"].resample("D").mean()
@@ -171,7 +170,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
                 )
             )
         outfile = "mwcs_" + outfile
-        logger.info("Saving to: %s", outfile)
+        logger.info(f"Saving to: {outfile}")
         plt.savefig(outfile)
     if show:
         plt.show()
