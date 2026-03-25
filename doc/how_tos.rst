@@ -343,7 +343,7 @@ In a python shell, do the following:
 
     from obspy.core import UTCDateTime, read_inventory, read
     st = read("/path/to/a/file/for/station/XX.BBB")
-    inv = read_inventory("/path/to/the/response/for/station/XX.BBB)
+    inv = read_inventory("/path/to/the/response/for/station/XX.BBB")
     print(inv)
     response = inv.get_response(st[0].id, st[0].stats.starttime)
     print(response)
