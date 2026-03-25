@@ -341,10 +341,11 @@ def test_014_check_done_jobs():
 def test_015_check_cc_files():
     db = connect()
     output_folder = get_config(db, 'output_folder') or 'OUTPUT'
-    params = get_params(db)
+    cc_params = get_config_set_details(db, 'cc', 1, format='AttribDict')
+    components_to_compute = cc_params.components_to_compute.split(',')
     filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
     for filter_step in filter_steps:
-        for components in params.components_to_compute:
+        for components in components_to_compute:
             for (sta1, sta2) in get_station_pairs(db):
                 for loc1 in sta1.locs():
                     for loc2 in sta2.locs():

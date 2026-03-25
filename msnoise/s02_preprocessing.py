@@ -9,7 +9,9 @@ import pickle
 import traceback
 import numpy as np
 from .api import (connect, get_logger, get_params, update_job,
-                  preload_instrument_responses, get_workflow_steps, get_config_set_details, get_next_job_for_step)
+                  preload_instrument_responses, get_workflow_steps,
+                  get_config_set_details, get_next_job_for_step,
+                  save_preprocessed_streams)
 from .preprocessing import preprocess
 from obspy.core import AttribDict
 
