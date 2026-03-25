@@ -23,6 +23,7 @@ dependencies:
   - xarray
   - sqlalchemy-utils
   - pooch
+  - pytables
   - pytest
   - pytest-order
   - pytest-cov

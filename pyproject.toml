@@ -59,6 +59,7 @@ dependencies = [
     "xarray",
     "pooch",
     "pycwt",
+    "pytables",
     "pytest",
     "pytest-order"
 ]

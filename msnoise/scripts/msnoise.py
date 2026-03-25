@@ -1881,7 +1881,7 @@ def qc_plot_psd(ctx, seed_id):
          color_lim=None, show=True)
 
 
-@qc.command(name='compute_rms')
+@qc.command(name='compute_psd_rms')
 @click.pass_context
 def qc_compute_rms(ctx):
     """Computes the RMS from PSD NetCDF files."""

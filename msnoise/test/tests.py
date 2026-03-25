@@ -758,6 +758,7 @@ def test_301_compute_psd():
 @pytest.mark.order(302)
 def test_302_compute_rms():
     try:
+        new_jobs_main(after='psd')
         compute_rms_main()
     except:
         traceback.print_exc()
@@ -778,7 +779,7 @@ def test_400_run_manually():
     os.system("msnoise reset mwcs_1 --all")
     os.system("msnoise cc dtt compute_mwcs")
     os.system("msnoise reset mwcs_dtt_1 --all")
-    os.system("msnoise cc dtt compute_dtt")
+    os.system("msnoise cc dtt compute_mwcs_dtt")
     os.system("msnoise cc dtt plot mwcs_dtt -s 0 -o ?.png")
     # Stretching
     os.system("msnoise reset stretching_1 --all")
@@ -791,6 +792,11 @@ def test_400_run_manually():
     os.system("msnoise reset wavelet_dtt_1 --all")
     os.system("msnoise cc dtt compute_wct_dtt")
     os.system("msnoise cc dtt plot wct_dtt -s 0 -o ?.png")
+    # PSDs
+    os.system("msnoise reset psd_1 --all")
+    os.system("msnoise qc compute_psd")
+    os.system("msnoise reset psd_rms_1 --all")
+    os.system("msnoise qc compute_psd_rms")
 
 def test_99210_crondays_positive_float():
     parsed_crondays = parse_crondays('2.5')

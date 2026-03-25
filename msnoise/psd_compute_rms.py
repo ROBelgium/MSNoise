@@ -82,7 +82,6 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                         if ch[-1] in step_config.psd_components]
         else:
             channels = list(station.chans())
-        print(channels)
 
         days = sorted({job.day for job in jobs})
 
