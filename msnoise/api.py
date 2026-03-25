@@ -3809,7 +3809,16 @@ def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack):
         # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
         raise FileNotFoundError(fn)
     data = xr_create_or_open(fn, name="MWCS")
-    data = data.MWCS.to_dataframe().reorder_levels(['times', 'taxis', 'keys']).unstack().droplevel(0, axis=1).unstack()
+    da = data.MWCS  # DataArray with dims (times, taxis, keys)
+    # Build DataFrame directly — pandas-version-safe
+    times_vals = da.coords["times"].values
+    taxis_vals = da.coords["taxis"].values
+    keys_vals  = da.coords["keys"].values
+    n_t, n_tx, n_k = da.values.shape
+    # Transpose to (times, keys, taxis) so MultiIndex is (keys, taxis)
+    midx = pd.MultiIndex.from_product([keys_vals, taxis_vals], names=["keys", "taxis"])
+    arr = da.values.transpose(0, 2, 1).reshape(n_t, n_k * n_tx)
+    data = pd.DataFrame(arr, index=pd.DatetimeIndex(times_vals), columns=midx)
     return data
 
 # ── DTT ─────────────────────────────────────────────────────
@@ -3863,7 +3872,12 @@ def xr_get_dtt(root, lineage, station1, station2, components, mov_stack):
         # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
         raise FileNotFoundError(fn)
     dr = xr_create_or_open(fn, taxis=[], name="DTT")
-    data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
+    da = dr.DTT  # DataArray with dims (times, keys)
+    data = pd.DataFrame(
+        da.values,
+        index=pd.DatetimeIndex(da.coords["times"].values),
+        columns=list(da.coords["keys"].values),
+    )
     return data
 
 # ── Stretching ──────────────────────────────────────────────
@@ -3932,14 +3946,14 @@ def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack)
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
     dr = xr_create_or_open(fn, taxis=[], name="STR")
-    data = (
-        dr.STR.to_dataframe()
-        .reorder_levels(["times", "keys"])
-        .unstack()
-        .droplevel(0, axis=1)
-        .rename_axis(None, axis=1)  # clear 'keys' axis name for pandas compat
+    da = dr.STR  # DataArray with dims (times, keys)
+    # Build DataFrame directly from xarray coords — avoids pandas-version
+    # differences in to_dataframe().unstack().droplevel() chain.
+    data = pd.DataFrame(
+        da.values,
+        index=pd.DatetimeIndex(da.coords["times"].values),
+        columns=list(da.coords["keys"].values),
     )
-    data.index.name = None
     return data
 
 
@@ -3985,7 +3999,16 @@ def xr_get_dvv(root, lineage, components, mov_stack):
         # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
         raise FileNotFoundError(fn)
     data = xr_create_or_open(fn, name="DVV")
-    data = data.DVV.to_dataframe().reorder_levels(['times', 'level1', 'level0']).unstack().droplevel(0, axis=1).unstack()
+    da = data.DVV  # DataArray with dims (times, level0, level1)
+    # Build DataFrame directly — pandas-version-safe
+    times_vals  = da.coords["times"].values
+    level0_vals = da.coords["level0"].values
+    level1_vals = da.coords["level1"].values
+    n_t = len(times_vals)
+    midx = pd.MultiIndex.from_product([level0_vals, level1_vals],
+                                       names=["level0", "level1"])
+    arr = da.values.reshape(n_t, -1)
+    data = pd.DataFrame(arr, index=pd.DatetimeIndex(times_vals), columns=midx)
     return data
 
 # ── WCT ─────────────────────────────────────────────────────
