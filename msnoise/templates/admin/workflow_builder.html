@@ -393,7 +393,6 @@
 
         // Set up SVG
         svg = d3.select("#workflow-svg");
-        container = svg.append("g");
 
         // Get dimensions
         const svgNode = svg.node();
@@ -403,17 +402,17 @@
 
         svg.attr("viewBox", `0 0 ${width} ${height}`);
 
+        // defs FIRST — must precede container so marker IDs resolve correctly
+        const defs = svg.append("defs");
+
         // Add zoom behavior
         const zoom = d3.zoom()
             .scaleExtent([0.1, 4])
             .on("zoom", (event) => {
                 container.attr("transform", event.transform);
             });
-
         svg.call(zoom);
-
-        // Add definitions for gradients and effects
-        const defs = svg.append("defs");
+        container = svg.append("g");
 
         // Add arrow marker
         defs.append("marker")
@@ -472,12 +471,8 @@
 
         console.log('Valid edges:', validEdges);
 
-        // Create force simulation
-        simulation = d3.forceSimulation(workflowData.nodes)
-            .force("link", d3.forceLink(validEdges).id(d => d.id).distance(180))
-            .force("charge", d3.forceManyBody().strength(-1000))
-            .force("center", d3.forceCenter(width / 2, height / 2))
-            .force("collision", d3.forceCollide().radius(80));
+        // ── Static layout: compute positions once, no physics engine ──────
+        assignHierarchicalPositions(workflowData.nodes, width, height);
 
         // Create links
         link = container.append("g")
@@ -486,12 +481,13 @@
             .join("path")
             .attr("class", "link");
 
-        // Create nodes
+        // Create nodes — draggable but no simulation behind them
         node = container.append("g")
             .selectAll(".node")
             .data(workflowData.nodes)
             .join("g")
             .attr("class", "node")
+            .attr("transform", d => `translate(${d.x},${d.y})`)
             .call(d3.drag()
                 .on("start", dragstarted)
                 .on("drag", dragged)
@@ -576,47 +572,29 @@
                 link.style("opacity", 1).style("stroke-width", 2);
             });
 
-        // Update positions on simulation tick
-        simulation.on("tick", () => {
-            link.attr("d", d => {
-                const sourceX = d.source.x || 0;
-                const sourceY = d.source.y || 0;
-                const targetX = d.target.x || 0;
-                const targetY = d.target.y || 0;
-                return `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
-            });
-
-            node.attr("transform", d => `translate(${d.x || 0},${d.y || 0})`);
-        });
+        // Draw links and nodes once at their computed static positions
+        redraw();
 
         // Store zoom and dimensions for global access
         window.workflowZoom = zoom;
         window.workflowDimensions = { width, height };
-
-        // Auto-arrange after initialization
-        setTimeout(() => {
-            if (typeof arrangeHierarchical === 'function') {
-                arrangeHierarchical();
-            }
-        }, 1000);
     }
 
-    // Rest of the functions remain the same...
+    // ── Drag: purely positional, no physics ─────────────────────────────
     function dragstarted(event, d) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
+        d3.select(this).raise();  // bring to front while dragging
     }
 
     function dragged(event, d) {
-        d.fx = event.x;
-        d.fy = event.y;
+        d.x = event.x;
+        d.y = event.y;
+        d3.select(this).attr("transform", `translate(${d.x},${d.y})`);
+        // Update connected links on the fly
+        link.attr("d", e => edgePath(e.source, e.target));
     }
 
     function dragended(event, d) {
-        if (!event.active) simulation.alphaTarget(0).restart();
-        // Keep node pinned at dropped position; stop simulation shortly after
-        setTimeout(() => simulation.stop(), 300);
+        // Node stays where it was dropped — nothing to do
     }
 
     function resetZoom() {
@@ -628,80 +606,76 @@
         }
     }
 
-    function arrangeHierarchical() {
-        if (!simulation || !workflowData.nodes || workflowData.nodes.length === 0) {
-            return;
-        }
+    // ── Redraw: update SVG from current node.x/y positions ─────────────
+    function edgePath(src, tgt) {
+        // Trim line endpoints to node rect borders so arrows don't overlap cards
+        // Node rect: 140×80 centered at (x,y) → half-dims 70×40
+        const hw = 74, hh = 44;  // half-width/height + small margin
+        const dx = tgt.x - src.x, dy = tgt.y - src.y;
+        const len = Math.sqrt(dx*dx + dy*dy) || 1;
+        const ux = dx/len, uy = dy/len;
+        // Clip exit point from source node border
+        const tExit = Math.min(
+            ux !== 0 ? Math.abs(hw/ux) : Infinity,
+            uy !== 0 ? Math.abs(hh/uy) : Infinity
+        );
+        const x1 = src.x + ux*tExit, y1 = src.y + uy*tExit;
+        // Clip entry point to target node border
+        const tEntry = Math.min(
+            ux !== 0 ? Math.abs(hw/ux) : Infinity,
+            uy !== 0 ? Math.abs(hh/uy) : Infinity
+        );
+        const x2 = tgt.x - ux*tEntry, y2 = tgt.y - uy*tEntry;
+        return `M ${x1} ${y1} L ${x2} ${y2}`;
+    }
 
-        const { width, height } = window.workflowDimensions || { width: 1000, height: 600 };
+    function redraw() {
+        if (!node || !link) return;
+        node.attr("transform", d => `translate(${d.x},${d.y})`);
+        link.attr("d", d => edgePath(d.source, d.target));
+    }
 
+    function assignHierarchicalPositions(nodes, width, height) {
         const levels = {
-            'global': 0,
-            'preprocess': 1,
-            'cc': 2,
-            'psd': 1,
-            'psd_rms': 2,
-            'filter': 3,
-            'stack': 4,
-            'refstack': 5,
-            'mwcs': 6,
-            'stretching': 6,
-            'wavelet': 6,
-            'mwcs_dtt': 7,
-            'wavelet_dtt': 7
+            'global': 0, 'preprocess': 1, 'psd': 1,
+            'cc': 2, 'psd_rms': 2,
+            'filter': 3, 'stack': 4, 'refstack': 5,
+            'mwcs': 6, 'stretching': 6, 'wavelet': 6,
+            'mwcs_dtt': 7, 'wavelet_dtt': 7
         };
-
         const levelCounts = {};
-        workflowData.nodes.forEach(node => {
-            const level = levels[node.category] || 0;
-            levelCounts[level] = (levelCounts[level] || 0) + 1;
+        nodes.forEach(n => {
+            const lvl = levels[n.category] !== undefined ? levels[n.category] : 0;
+            levelCounts[lvl] = (levelCounts[lvl] || 0) + 1;
         });
-
-        const levelPositions = {};
-        workflowData.nodes.forEach((node, i) => {
-            const level = levels[node.category] || 0;
-            if (!levelPositions[level]) levelPositions[level] = 0;
-
-            const x = 150 + level * 160;
-            const y = height / 2 + (levelPositions[level] - (levelCounts[level] - 1) / 2) * 120;
-
-            node.fx = x;
-            node.fy = y;
-            levelPositions[level]++;
+        const levelPos = {};
+        nodes.forEach(n => {
+            const lvl = levels[n.category] !== undefined ? levels[n.category] : 0;
+            if (!levelPos[lvl]) levelPos[lvl] = 0;
+            n.x = 150 + lvl * 160;
+            n.y = height / 2 + (levelPos[lvl] - (levelCounts[lvl] - 1) / 2) * 120;
+            levelPos[lvl]++;
         });
+    }
 
-        // Apply positions immediately without re-running physics
-        workflowData.nodes.forEach(n => { n.x = n.fx; n.y = n.fy; });
-        simulation.stop();
-        // Redraw links and nodes at pinned positions
-        if (link) link.attr("d", d => {
-            return `M ${d.source.x} ${d.source.y} L ${d.target.x} ${d.target.y}`;
-        });
-        if (node) node.attr("transform", d => `translate(${d.x},${d.y})`);
+    function arrangeHierarchical() {
+        if (!workflowData.nodes || workflowData.nodes.length === 0) return;
+        const { width, height } = window.workflowDimensions || { width: 1000, height: 600 };
+        assignHierarchicalPositions(workflowData.nodes, width, height);
+        redraw();
     }
 
     function arrangeCircular() {
-        if (!simulation || !workflowData.nodes || workflowData.nodes.length === 0) {
-            return;
-        }
-
+        if (!workflowData.nodes || workflowData.nodes.length === 0) return;
         const { width, height } = window.workflowDimensions || { width: 1000, height: 600 };
-
         const radius = Math.min(width, height) / 3;
-        const center = { x: width / 2, y: height / 2 };
-
-        workflowData.nodes.forEach((node, i) => {
+        const cx = width / 2, cy = height / 2;
+        workflowData.nodes.forEach((n, i) => {
             const angle = (i / workflowData.nodes.length) * 2 * Math.PI;
-            node.fx = center.x + radius * Math.cos(angle);
-            node.fy = center.y + radius * Math.sin(angle);
+            n.x = cx + radius * Math.cos(angle);
+            n.y = cy + radius * Math.sin(angle);
         });
-
-        workflowData.nodes.forEach(n => { n.x = n.fx; n.y = n.fy; });
-        simulation.stop();
-        if (link) link.attr("d", d => {
-            return `M ${d.source.x} ${d.source.y} L ${d.target.x} ${d.target.y}`;
-        });
-        if (node) node.attr("transform", d => `translate(${d.x},${d.y})`);
+        redraw();
     }
 
     function exportSVG() {
