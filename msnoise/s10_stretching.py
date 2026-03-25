@@ -189,7 +189,6 @@ def main(loglevel="INFO"):
                                                 SS1.coordinates) / params.stretching_v
             maxlag2 = minlag + params.stretching_width
             mid = int(params.cc_sampling_rate * params.maxlag)
-            print("betweeen", minlag, "and", maxlag2    )
             ref[mid - int(minlag * goal_sampling_rate):mid + int(minlag * goal_sampling_rate)] = 0.
             ref[:mid - int(maxlag2 * goal_sampling_rate)] = 0.
             ref[mid + int(maxlag2 * goal_sampling_rate):] = 0.

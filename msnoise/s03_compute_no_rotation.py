@@ -222,8 +222,6 @@ def main(loglevel="INFO"):
 
     # Get Configuration
     orig_params = get_params(db)
-    print(orig_params)
-    print(orig_params.output_folder)
     # filters = get_filters(db, all=False)
     # logger.info("Will compute [%s] for different stations" % " ".join(params.components_to_compute))
     # logger.info("Will compute [%s] for single stations" % " ".join(params.components_to_compute_single_station))
@@ -293,7 +291,6 @@ def main(loglevel="INFO"):
         #     stream = executor.submit(preprocess, stations, comps, goal_day, params, responses, loglevel).result()
         # logger.info("Received preprocessed traces")
 
-        print(stream)
 
         # stream = preprocess(db, stations, comps, goal_day, params, responses)
         if not len(stream):

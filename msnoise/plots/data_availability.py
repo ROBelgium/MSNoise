@@ -39,7 +39,7 @@ def main(chan, show=False, outfile=None, loglevel="INFO"):
         logging.info("There seems to be no configured stations\n"
                      "Did you run 'msnoise db update_loc_chan'\n"
                      "to populate the channels/location codes?")
-        sys.exit(1)
+        return
     # this is needed in case users use classic FDSN requests with ? as wildcard
     chan = chan.replace("?",".")
     matcher = re.compile(chan)

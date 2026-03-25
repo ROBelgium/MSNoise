@@ -370,7 +370,6 @@ def db_da_stations_update_loc_chan(ctx):
     session = connect()
     stations = get_stations(session)
     for sta in stations:
-        print(sta.net, sta.sta)
         data = session.query(DataAvailability). \
             filter(text("net=:net")). \
             filter(text("sta=:sta")). \

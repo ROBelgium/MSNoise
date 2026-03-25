@@ -3745,7 +3745,6 @@ def get_results_all(session, root, lineage_names, station1, station2, components
     """
 
     path = os.path.join(root, *lineage_names, "_output", "all", components,  station1, station2)
-    print("New path with lineage!:", path)
     results = []
     for date in dates:
         if isinstance(date, str):
@@ -3863,7 +3862,6 @@ def xr_get_dtt(root, lineage, station1, station2, components, mov_stack):
     if not os.path.isfile(fn):
         # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
         raise FileNotFoundError(fn)
-    print(fn)
     dr = xr_create_or_open(fn, taxis=[], name="DTT")
     data = dr.DTT.to_dataframe().reorder_levels(['times', 'keys']).unstack().droplevel(0, axis=1)
     return data
@@ -4045,7 +4043,6 @@ def xr_save_wct(root, lineage, step_name, station1, station2, components, mov_st
     # Save to NetCDF
     xr_save_and_close(ds, fn)
 
-    print(f"Saved WCT data for {station1}-{station2} to {fn}")
 
     # Cleanup memory
     del ds, WXamp_da, Wcoh_da, WXdt_da

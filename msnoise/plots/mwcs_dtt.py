@@ -53,11 +53,9 @@ def main(preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=None, ref
                      f"filter_{filter_id}", f"stack_{stack_id}", f"refstack_{refstack_id}",
                      f"mwcs_{mwcs_id}", f"mwcs_dtt_{mwcs_dtt_id}"]
     lineage_str = "/".join(lineage_names)
-    print(lineage_str)
     steps = lineage_str_to_steps(db, lineage_str, "/")
     paralineage, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
 
-    print(params)
     # Normalise dttname: legacy 'M' → 'm'
     col = dttname.lower() if dttname else 'm'
 

@@ -593,14 +593,12 @@ def propagate_first_runnable_from_category(session, source_category, skip_catego
     )
 
     total_created = 0
-    print(parent_steps)
     for parent_step in parent_steps:
         runnable_children = get_first_runnable_steps_per_branch(
             session,
             source_step_id=parent_step.step_id,
             skip_categories=skip_categories,
         )
-        print(runnable_children)
         for child_step in runnable_children:
             total_created += create_passthrough_jobs_from_done_parent(
                 session=session,

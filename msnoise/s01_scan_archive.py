@@ -415,7 +415,6 @@ def worker(queue, scan_func, scan_args):
         folder_slice = queue.get()
         if folder_slice is None:  # Sentinel value to signal the worker to exit
             break
-        print(scan_args)
         scan_func([folder_slice], *scan_args)
 
 
@@ -488,7 +487,7 @@ def parse_crondays(crondays):
     except ValueError:
         # The provided value is not a float: it must match '[Xw][Xd][Xh]'
         # (with optional blank characters between groups)
-        match = re.search('^(?:(\d+)w\s*)?(?:(\d+)d\s*)?(?:(\d+)h\s*)?$',
+        match = re.search(r'^(?:(\d+)w\s*)?(?:(\d+)d\s*)?(?:(\d+)h\s*)?$',
                           crondays)
         if not match:
             raise FatalError("Unrecognized format for "

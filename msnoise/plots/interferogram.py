@@ -69,8 +69,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
                sta1, sta2, components, None, mov_stack,None)
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
-        sys.exit(1)
-    print(data)
+        return
     xextent = (date2num(data.index[0]), date2num(data.index[-1]), -params.maxlag, params.maxlag)
     ax = plt.subplot(111)
     # data = stack_total

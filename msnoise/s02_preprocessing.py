@@ -65,7 +65,6 @@ def main(init=False, threads=1, loglevel="INFO"):
             # Get workflow step configuration
             # step_config = get_workflow_step_config(db, step_name)
             step_config = get_config_set_details(db, first_job.config_category, first_job.config_set_number, format='AttribDict')
-            print(step_config)
             if not step_config:
                 logger.error(f"No workflow step configuration found for: {step_name}")
                 for job in jobs:
@@ -93,7 +92,6 @@ def main(init=False, threads=1, loglevel="INFO"):
             stream = preprocess(stations, components, goal_day, AttribDict(**params, **step_config),
                                 responses=responses, loglevel=loglevel)
 
-            print(stream)
             ids = [f"{tr.stats.network}.{tr.stats.station}.{tr.stats.location}" for tr in stream]
 
             # Save all preprocessed streams
@@ -123,7 +121,6 @@ def main(init=False, threads=1, loglevel="INFO"):
                 update_job(db, job.day, job.pair, job.jobtype, 'F')
 
             continue
-            break
 
     logger.info(f"*** Finished: Preprocessing Step - Processed {job_count} jobs ***")
 

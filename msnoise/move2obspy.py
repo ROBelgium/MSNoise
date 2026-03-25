@@ -329,16 +329,16 @@ in which :math:`{}^*` denotes the complex conjugation.
 The similarity of the two time-series is assessed using the cross-coherency
 between energy densities in the frequency domain:
 
-:math:`C(\\nu) = \\frac{|\overline{X(\\nu))}|}{\sqrt{|\overline{F_{ref}(\\nu)|^2} |\overline{F_{cur}(\\nu)|^2}}}`
+:math:`C(\\nu) = \\frac{|\\overline{X(\\nu))}|}{\\sqrt{|\\overline{F_{ref}(\\nu)|^2} |\\overline{F_{cur}(\\nu)|^2}}}`
 
 in which the over-line here represents the smoothing of the energy spectra for
 :math:`F_{ref}` and :math:`F_{cur}` and of the spectrum of :math:`X`. The mean
 coherence for the segment is defined as the mean of :math:`C(\\nu)` in the
 frequency range of interest. The time-delay between the two cross correlations
-is found in the unwrapped phase, :math:`\phi(\nu)`, of the cross spectrum and is
+is found in the unwrapped phase, :math:`\\phi(\\nu)`, of the cross spectrum and is
 linearly proportional to frequency:
 
-:math:`\phi_j = m. \nu_j, m = 2 \pi \delta t`
+:math:`\\phi_j = m. \\nu_j, m = 2 \\pi \\delta t`
 
 The time shift for each window between two signals is the slope :math:`m` of a
 weighted linear regression of the samples within the frequency band of interest.
@@ -347,11 +347,11 @@ which incorporate both the cross-spectral amplitude and cross-coherence, unlike
 [Poupinet1984]_. The errors are estimated using the weights (thus the
 coherence) and the squared misfit to the modelled slope:
 
-:math:`e_m = \sqrt{\sum_j{(\\frac{w_j \\nu_j}{\sum_i{w_i \\nu_i^2}})^2}\sigma_{\phi}^2}`
+:math:`e_m = \\sqrt{\\sum_j{(\\frac{w_j \\nu_j}{\\sum_i{w_i \\nu_i^2}})^2}\\sigma_{\\phi}^2}`
 
 where :math:`w` are weights, :math:`\\nu` are cross-coherences and
-:math:`\sigma_{\phi}^2` is the squared misfit of the data to the modelled slope
-and is calculated as :math:`\sigma_{\phi}^2 = \\frac{\sum_j(\phi_j - m \\nu_j)^2}{N-1}`
+:math:`\\sigma_{\\phi}^2` is the squared misfit of the data to the modelled slope
+and is calculated as :math:`\\sigma_{\\phi}^2 = \\frac{\\sum_j(\\phi_j - m \\nu_j)^2}{N-1}`
 
 The output of this process is a table containing, for each moving window: the
 central time lag, the measured delay, its error and the mean coherence of the
