@@ -37,7 +37,6 @@ As of MSNoise 1.6, the ``compute`` step has been completely rewritten:
   time that lead to perfect sinc autocorrelation functions. The windows should
   have a duration of at least "2 times the `maxlag`+1" to be computable.
 
-
 Configuration Parameters
 ------------------------
 
@@ -71,7 +70,6 @@ this step:
 
 .. automodule:: msnoise.preprocessing
 
-
 Computing the Cross-Correlations
 --------------------------------
 
@@ -81,16 +79,11 @@ Processing using ``msnoise cc compute_cc``
 .. todo:: We still need to describe the workflow in plain text, but the
     following graph should help you understand how the code is structured
 
-
 .. image:: ../.static/compute_cc.png
     :align: center
 
-
 .. image:: ../.static/MyCorr2.png
     :align: center
-
-
-
 
 Processing using ``msnoise cc compute_cc_rot``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -147,7 +140,6 @@ value is 2.
 
 Once done, each job is marked "D"one in the database.
 
-
 Usage
 -----
 
@@ -156,7 +148,6 @@ To run this script:
 .. code-block:: sh
 
     $ msnoise cc compute_cc
-
 
 This step also supports parallel processing/threading:
 
@@ -167,7 +158,6 @@ This step also supports parallel processing/threading:
 will start 4 instances of the code (after 1 second delay to avoid database
 conflicts). This works both with SQLite and MySQL but be aware problems
 could occur with SQLite.
-
 
 .. versionadded:: 1.4
     The Instrument Response removal & The Phase Weighted Stack &
@@ -214,34 +204,6 @@ from obspy import read
 from obspy.core import AttribDict, Stream
 
 import logbook
-
-
-def winsorizing(data, params, input="timeseries", nfft=0):
-    input1D = False
-    if len(data.shape) == 1:
-        data = data.reshape(-1, data.shape[0])
-        input1D = True
-    if input == "fft":
-        # data = np.real(sf.ifft(data, n=nfft, axis=1))
-        data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(float)
-
-    for i in range(data.shape[0]):
-        if params.winsorizing == -1:
-            np.sign(data[i], data[i])  # inplace
-        elif params.winsorizing != 0:
-
-            # imin, imax = scoreatpercentile(data[i], [0.1, 99.9])
-            # not_outliers = np.where((data[i] >= imin) &
-            #                         (data[i] <= imax))[0]
-            # rms = data[i][not_outliers].std() * params.winsorizing
-            rms = data[i].std() * params.winsorizing
-            np.clip(data[i], -rms, rms, data[i])  # inplace
-    if input == "fft":
-        data = sf.fftn(data, [nfft, ], axes=[1, ])
-    if input1D:
-        data = data[0]
-    return data
-
 
 def main(loglevel="INFO"):
     global logger
@@ -317,7 +279,6 @@ def main(loglevel="INFO"):
         logger.info("New CC Job: %s (%i pairs with %i stations)" %
                      (goal_day, len(pairs), len(stations)))
         jt = time.time()
-
 
         preprocess_filename = os.path.join(params.output_folder, *lineage_names, "_output", "%s.mseed" % goal_day)
         stream = read(preprocess_filename)
@@ -543,7 +504,6 @@ def main(loglevel="INFO"):
                     if params.clip_after_whiten:
                         # logger.debug("Winsorizing (clipping) data after bandpass (AC)")
                         tmp = winsorizing(tmp, params, input="timeseries")
-
 
                     if params.cc_type_single_station_AC == "CC":
                         ffts = sf.fftn(tmp, [nfft, ], axes=[1, ])

@@ -22,32 +22,8 @@ from ..api import (
     connect, get_params, get_logger,
     get_station, get_interstation_distance, check_stations_uniqueness,
     get_config_set_details, xr_get_mwcs, xr_get_dtt,
-    lineage_str_to_steps, get_merged_params_for_lineage,
+    lineage_str_to_steps, get_merged_params_for_lineage, resolve_lineage_from_ids,
 )
-
-
-def _resolve_mwcs_lineage(db, params, preprocess_id, cc_id, filter_id,
-                           stack_id, mwcs_id):
-    lineage_str = "/".join([
-        f"preprocess_{preprocess_id}", f"cc_{cc_id}",
-        f"filter_{filter_id}", f"stack_{stack_id}", f"mwcs_{mwcs_id}",
-    ])
-    steps = lineage_str_to_steps(db, lineage_str, "/")
-    _, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
-    return lineage_names, params
-
-
-def _resolve_dtt_lineage(db, params, preprocess_id, cc_id, filter_id,
-                          stack_id, mwcs_id, dtt_id):
-    lineage_str = "/".join([
-        f"preprocess_{preprocess_id}", f"cc_{cc_id}",
-        f"filter_{filter_id}", f"stack_{stack_id}",
-        f"mwcs_{mwcs_id}", f"mwcs_dtt_{dtt_id}",
-    ])
-    steps = lineage_str_to_steps(db, lineage_str, "/")
-    _, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
-    return lineage_names, params
-
 
 def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
          preprocess_id=1, cc_id=1, stack_id=1, stack_item=1,
@@ -82,15 +58,11 @@ def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
     sta2 = check_stations_uniqueness(db, sta2)
 
     # Resolve MWCS lineage (for raw scatter points)
-    mwcs_lineage, params = _resolve_mwcs_lineage(
-        db, params, preprocess_id, cc_id, filter_id, stack_id, mwcs_id
-    )
+    mwcs_lineage, params = resolve_lineage_from_ids(db, params, preprocess_id=preprocess_id, cc_id=cc_id, filter_id=filter_id, stack_id=stack_id, mwcs_id=mwcs_id)
     mov_stack = params.mov_stack[stack_item - 1]
 
     # Resolve DTT lineage (for regression lines)
-    dtt_lineage, _ = _resolve_dtt_lineage(
-        db, params, preprocess_id, cc_id, filter_id, stack_id, mwcs_id, dtt_id
-    )
+    dtt_lineage, _ = resolve_lineage_from_ids(db, params, preprocess_id=preprocess_id, cc_id=cc_id, filter_id=filter_id, stack_id=stack_id, mwcs_id=mwcs_id, mwcs_dtt_id=dtt_id)
 
     # DTT lag window params
     dtt_lag    = getattr(params, "dtt_lag",    "static")
@@ -191,7 +163,6 @@ def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
         plt.show()
     else:
         plt.close()
-
 
 if __name__ == "__main__":
     main("", "")

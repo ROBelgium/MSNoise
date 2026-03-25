@@ -1,6 +1,5 @@
 import logging
 
-
 import numpy as np
 import scipy
 import scipy.fft as sf
@@ -11,8 +10,7 @@ import scipy.signal
 from scipy.stats import scoreatpercentile
 from obspy.signal.invsim import cosine_taper
 from obspy.signal.regression import linear_regression
-
-
+from .api import getCoherence
 
 def myCorr(data, maxlag, plot=False, nfft=None):
     """This function takes ndimensional *data* array, computes the cross-correlation in the frequency domain
@@ -71,7 +69,6 @@ def myCorr(data, maxlag, plot=False, nfft=None):
     del data
     return corr
 
-
 def myCorr2(data, maxlag, energy, index, plot=False, nfft=None,
             normalized=False):
     """This function takes ndimensional *data* array, computes the
@@ -116,7 +113,6 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None,
 
     return corrs
 
-
 def pcc_xcorr(data, maxlag, energy, index, plot=False, nfft=None,
               normalized=False):
     """
@@ -138,7 +134,6 @@ def pcc_xcorr(data, maxlag, energy, index, plot=False, nfft=None,
                          lags=range(-ml, ml + 1),
                          parallel=True)
     return corr
-
 
 def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, returntime=False):
     """This function takes 1-dimensional *data* timeseries array,
@@ -235,7 +230,6 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, returntime=False):
         return np.real(sf.ifft(FFTRawSign, Nfft))[:len(data)]
     return FFTRawSign
 
-
 def whiten2(fft, Nfft, low, high, porte1, porte2, psds, whiten_type):
     """This function takes 1-dimensional *data* timeseries array,
     goes to frequency domain using fft, whitens the amplitude of the spectrum
@@ -305,7 +299,6 @@ def whiten2(fft, Nfft, low, high, porte1, porte2, psds, whiten_type):
         # Hermitian symmetry (because the input is real)
         fft[i, -(Nfft // 2) + 1:] = np.conjugate(fft[i, 1:(Nfft // 2)])[::-1]
 
-
 def smooth(x, window='boxcar', half_win=3):
     """ some window smoothing """
     # TODO: docsting
@@ -319,17 +312,6 @@ def smooth(x, window='boxcar', half_win=3):
         w = scipy.signal.windows.hann(window_len).astype('complex')
     y = np.convolve(w / w.sum(), s, mode='valid')
     return y[half_win:len(y) - half_win]
-
-
-def getCoherence(dcs, ds1, ds2):
-    # TODO: docsting
-    n = len(dcs)
-    coh = np.zeros(n).astype('complex')
-    valids = np.argwhere(np.logical_and(np.abs(ds1) > 0, np.abs(ds2 > 0)))
-    coh[valids] = dcs[valids] / (ds1[valids] * ds2[valids])
-    coh[coh > (1.0 + 0j)] = 1.0 + 0j
-    return coh
-
 
 def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step,
          smoothing_half_win=5):
@@ -348,7 +330,6 @@ The similarity of the two time-series is assessed using the cross-coherency
 between energy densities in the frequency domain:
 
 :math:`C(\\nu) = \\frac{|\overline{X(\\nu))}|}{\sqrt{|\overline{F_{ref}(\\nu)|^2} |\overline{F_{cur}(\\nu)|^2}}}`
-
 
 in which the over-line here represents the smoothing of the energy spectra for
 :math:`F_{ref}` and :math:`F_{cur}` and of the spectrum of :math:`X`. The mean
@@ -401,7 +382,6 @@ segment.
 :type smoothing_half_win: int
 :param smoothing_half_win: If different from 0, defines the half length of
     the smoothing hanning window.
-
 
 :rtype: :class:`numpy.ndarray`
 :returns: [time_axis,delta_t,delta_err,delta_mcoh]. time_axis contains the

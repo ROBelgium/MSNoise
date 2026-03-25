@@ -26,24 +26,8 @@ from ..api import (
     connect, get_params, get_logger, build_movstack_datelist,
     get_station, get_interstation_distance, check_stations_uniqueness,
     get_config_set_details, get_done_lineages_for_category,
-    xr_get_mwcs, lineage_str_to_steps, get_merged_params_for_lineage,
+    xr_get_mwcs, get_merged_params_for_lineage, resolve_lineage_from_ids,
 )
-
-
-def _resolve_dtt_lineage(db, params, filter_id, preprocess_id, cc_id,
-                          stack_id, mwcs_id):
-    """Build and resolve the full MWCS lineage, returning (lineage_names, params)."""
-    lineage_str = "/".join([
-        f"preprocess_{preprocess_id}",
-        f"cc_{cc_id}",
-        f"filter_{filter_id}",
-        f"stack_{stack_id}",
-        f"mwcs_{mwcs_id}",
-    ])
-    steps = lineage_str_to_steps(db, lineage_str, "/")
-    _, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
-    return lineage_names, params
-
 
 def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
          stack_item=1, mwcs_id=1,
@@ -67,9 +51,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
     db = connect()
     params = get_params(db)
 
-    lineage_names, params = _resolve_dtt_lineage(
-        db, params, filter_id, preprocess_id, cc_id, stack_id, mwcs_id
-    )
+    lineage_names, params = resolve_lineage_from_ids(db, params, preprocess_id=preprocess_id, cc_id=cc_id, filter_id=filter_id, stack_id=stack_id, mwcs_id=mwcs_id)
     mov_stack = params.mov_stack[stack_item - 1]
 
     if sta2 < sta1:
@@ -195,7 +177,6 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
         plt.show()
     else:
         plt.close()
-
 
 if __name__ == "__main__":
     main("", "")

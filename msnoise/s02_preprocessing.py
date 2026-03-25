@@ -13,38 +13,6 @@ from .api import (connect, get_logger, get_params, update_job,
 from .preprocessing import preprocess
 from obspy.core import AttribDict
 
-def get_workflow_step_config(session, step_name):
-    """Get workflow step configuration by step name."""
-    steps = get_workflow_steps(session)
-    for step in steps:
-        if step.step_name == step_name:
-            return step
-    return None
-
-
-def save_preprocessed_streams(stream, output_dir, step_name, goal_day):
-    """
-    Save preprocessed streams to disk in workflow-aware structure.
-
-    :param stream: Dictionary {station: stream}
-    :param output_dir: Base output directory
-    :param step_name: Workflow step name
-    :param goal_day: Processing date
-    :return: List of saved file paths
-    """
-    # Create workflow-aware directory structure
-    workflow_dir = os.path.join(output_dir, step_name, "_output")
-    os.makedirs(workflow_dir, exist_ok=True)
-    filename = f"{goal_day}.mseed"
-    output_path = os.path.join(workflow_dir, filename)
-    for tr in stream:
-        tr.data = tr.data.astype(np.float32)
-    stream.write(output_path, format="MSEED")
-
-
-    return [output_path]
-
-
 def main(init=False, threads=1, loglevel="INFO"):
     """
     Main preprocessing workflow function.
@@ -86,8 +54,6 @@ def main(init=False, threads=1, loglevel="INFO"):
         # All jobs in the set have the same step and day
         first_job = jobs[0]
 
-
-
         step_name = first_job.jobtype
         goal_day = first_job.day
 
@@ -121,7 +87,6 @@ def main(init=False, threads=1, loglevel="INFO"):
             # Mark all jobs as in progress
             for job in jobs:
                 update_job(db, job.day, job.pair, job.jobtype, 'I')
-
 
             stream = preprocess(stations, components, goal_day, AttribDict(**params, **step_config),
                                 responses=responses, loglevel=loglevel)
@@ -159,7 +124,6 @@ def main(init=False, threads=1, loglevel="INFO"):
             break
 
     logger.info(f"*** Finished: Preprocessing Step - Processed {job_count} jobs ***")
-
 
 if __name__ == "__main__":
     main()

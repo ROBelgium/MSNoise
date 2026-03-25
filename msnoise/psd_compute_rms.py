@@ -12,51 +12,9 @@ from obspy.signal import PPSD
 import warnings
 warnings.filterwarnings("ignore")
 
-
 from .api import *
 
 import logbook
-
-
-def dfrms(a):
-    return np.sqrt(np.trapz(a.values, a.index))
-
-def rms(s, f):
-    return np.sqrt(np.trapz(s, f))
-
-def df_rms(d, freqs, output="VEL"):
-    d = d.dropna(axis=1, how='all')
-    RMS = {}
-    for fmin, fmax in freqs:
-        pmin = 1. / fmax
-        pmax = 1. / fmin
-        ix = np.where((d.columns >= pmin) & (d.columns <= pmax))[0]
-        spec = d.iloc[:, ix]
-        f = d.columns[ix]
-
-        w2f = (2.0 * np.pi * f)
-
-        # The acceleration power spectrum (dB to Power! = divide by 10 and not 20!)
-        amp = 10.0 ** (spec / 10.)
-        if output == "ACC":
-            RMS["%.1f-%.1f" % (fmin, fmax)] = amp.apply(dfrms, axis=1)
-            continue
-
-        # velocity power spectrum (divide by omega**2)
-        vamp = amp / w2f ** 2
-        if output == "VEL":
-            RMS["%.1f-%.1f" % (fmin, fmax)] = vamp.apply(dfrms, axis=1)
-            continue
-
-        # displacement power spectrum (divide by omega**2)
-        damp = vamp / w2f ** 2
-
-        RMS["%.1f-%.1f" % (fmin, fmax)] = damp.apply(dfrms, axis=1)
-
-    return pd.DataFrame(RMS, index=d.index)  # .tz_localize("UTC")#.dropna()
-
-
-
 
 def main(loglevel="INFO", njobs_per_worker=9999):
     logger = logbook.Logger("msnoise")
@@ -111,7 +69,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             # only need to compute RMS for new/updated PSD data
             data = data.sort_index(axis=1)
 
-            RMS = df_rms(data, freqs=params.qc_rms_frequency_ranges,
+            RMS = psd_df_rms(data, freqs=params.qc_rms_frequency_ranges,
                          output=params.qc_rms_type)
             RMSstore = hdf_open_store(seed_id,
                                       location=os.path.join("PSD", "RMS",

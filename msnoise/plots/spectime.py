@@ -9,13 +9,11 @@ plotted. By default the plot uses dates determined in database.
 
 .. include:: ../clickhelp/msnoise-cc-plot-spectime.rst
 
-
 Example:
 
 ``msnoise cc plot spectime YA.UV05 YA.UV11`` will plot all defaults:
 
 .. image:: ../.static/spectime.png
-
 
 Zooming in the X-axis and playing with the amplitude:
 
@@ -23,17 +21,13 @@ Zooming in the X-axis and playing with the amplitude:
 
 .. image:: ../.static/spectime_zoom.png
 
-
 And refiltering to enhance high frequency content:
 
 ``msnoise cc plot spectime YA.UV05 YA.UV11 --xlim=0.5,1.1 --ampli=10 -r0.7:1.0``:
 
 .. image:: ../.static/spectime_refilter.png
 
-
-
 """
-
 
 import datetime
 import sys
@@ -47,8 +41,7 @@ from msnoise.api import build_movstack_datelist, connect, get_config, \
     get_filters, get_results, check_stations_uniqueness, xr_get_ccf,\
     get_t_axis, get_logger, get_params, get_stack_lineage_for_filter,\
     get_config_set_details, lineage_to_string, lineage_str_to_steps,\
-    get_merged_params_for_lineage
-
+    get_merged_params_for_lineage, prepare_abs_positive_fft
 
 def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=1,
          components="ZZ", ampli=5, show=True, outfile=None,  refilter=None,
@@ -61,7 +54,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
     lineage_names = [f"preprocess_{preprocess_id}", f"cc_{cc_id}", f"filter_{filter_id}", f"stack_{stack_id}"]
     lineage_str = "/".join(lineage_names)
     steps = lineage_str_to_steps(db, lineage_str, "/")
-    paralineage, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
+    paralineage, lineage_names, params = get_merged_params_for_lineage, prepare_abs_positive_fft(db, params, {}, steps)
     mov_stack = params.mov_stack[stack_item - 1]
     start, end, datelist = build_movstack_datelist(db)
 
@@ -86,7 +79,6 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
         sys.exit(1)
 
-
     # convert index to mdates
     stack_total.index = mdates.date2num(stack_total.index.to_pydatetime())
 
@@ -105,15 +97,13 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
             line = bandpass(line, freqmin, freqmax, params.cc_sampling_rate,
                             zerophase=True)
 
-        freq, line = prepare_abs_postitive_fft(line, params.cc_sampling_rate)
+        freq, line = prepare_abs_positive_fft(line, params.cc_sampling_rate)
         line /= line.max()
 
         ax.plot(freq, line * ampli + i, c='k', lw=1)
 
-
     low = float(params.freqmin)
     high = float(params.freqmax)
-
 
     ax.set_ylim(start-datetime.timedelta(days=ampli),
                 end+datetime.timedelta(days=ampli))
@@ -150,28 +140,3 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
         plt.show()
     else:
         plt.close(fig)
-
-
-def prepare_abs_postitive_fft(line, sampling_rate):
-    """
-    Method that returns a positive part of FFT of provided signal along with
-    a corresponding frequency vector.
-
-    :type line: numpy.ndarray
-    :param line: Signal to calculate fft.
-    :type sampling_rate: float
-    :param sampling_rate: Sampling rate of provided signal
-
-    :rtype: tuple(numpy.ndarray, numpy.ndarray)
-    :return: Tuple of two arrays. One contains frequency vector for positive
-    part of FFT, second contains positive and absolute FFT of input array.
-    """
-    val = np.fft.fft(line)
-    val = np.abs(val)
-
-    freq = np.fft.fftfreq(len(line), (1/sampling_rate))
-    idx = np.where(freq >= 0)
-    freq = freq[idx]
-    val = val[idx]
-
-    return freq, val
