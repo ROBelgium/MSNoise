@@ -10,7 +10,7 @@ Two plot styles are available via the ``--visualize`` option:
 * ``"timeseries"`` (default): weighted-mean dv/v vs time, one subplot per
   moving-stack window.
 * ``"heatmap"``: 2-D time × frequency heatmap of the first available pair's
-  ``dvv`` DataArray (useful for inspecting frequency dependence).
+  ``dtt`` DataArray (useful for inspecting frequency dependence).
 
 Example:
 
@@ -60,14 +60,14 @@ def _plot_timeseries(db, root, lineage, mov_stacks, comp_list,
                 continue
 
             t = stats.index
-            # WCT stores dt/t; dv/v = -dt/t (same sign convention as MWCS)
-            ax.plot(t, -stats[("dvv", "weighted_mean")],
+            # WCT stores dt/t; dv/v = -dt/t (same sign convention as MWCS plot)
+            ax.plot(t, -100*stats[("dtt", "weighted_mean")],
                     label="%s: weighted mean" % comp)
-            ax.plot(t, -stats[("dvv", "mean")],
+            ax.plot(t, -100*stats[("dtt", "mean")],
                     label="%s: mean" % comp, alpha=0.6)
-            ax.plot(t, -stats[("dvv", "50%")],
+            ax.plot(t, -100*stats[("dtt", "50%")],
                     label="%s: median" % comp, alpha=0.6)
-            ax.plot(t, -stats[("dvv", "trimmed_mean")],
+            ax.plot(t, -100*stats[("dtt", "trimmed_mean")],
                     label="%s: trimmed mean" % comp, alpha=0.6)
 
             if left is None and len(t):
@@ -121,16 +121,16 @@ def _plot_heatmap(db, root, lineage, mov_stack, comp, logger):
         logger.error("No WCT-DTT data found for heatmap.")
         return None
 
-    dvv_df = (ds["dvv"].to_dataframe()
+    dtt_df = (ds["dtt"].to_dataframe()
               .unstack(level="frequency")
               .droplevel(0, axis=1))
-    full_idx = dvv_df.index
-    freqs = dvv_df.columns.astype(float)
-    data = np.ma.masked_invalid(dvv_df.values)
+    full_idx = dtt_df.index
+    freqs = dtt_df.columns.astype(float)
+    data = np.ma.masked_invalid(dtt_df.values)
 
     fig, axes = plt.subplots(3, 1, figsize=(14, 10), sharex=True)
-    variables = [("dvv", "dt/t (%)", "RdBu_r", None, None),
-                 ("err", "Error (%)", "viridis", 0, None),
+    variables = [("dtt", "dt/t", "RdBu_r", None, None),
+                 ("err", "Error", "viridis", 0, None),
                  ("coh", "Coherence", "RdYlGn", 0, 1)]
 
     for ax, (var, label, cmap, vmin, vmax) in zip(axes, variables):
@@ -166,7 +166,7 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
          pairs=None, showALL=False, start="1970-01-01", end="2100-01-01",
          visualize="timeseries", ranges="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]",
          show=True, outfile=None, loglevel="INFO"):
-    """Plot dt/t / dv/v from WCT results.
+    """Plot dt/t from WCT DTT results.
 
     :param mov_stackid: 1-based moving-stack index (0 = all).
     :param components: Component pair string.

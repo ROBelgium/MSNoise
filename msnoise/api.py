@@ -3253,7 +3253,7 @@ def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12,
     return WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi
 
 
-def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20,
+def compute_wct_dtt(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20,
                     mincoh=0.5, maxdt=0.2, min_nonzero=0.25, freqmin=0.1, freqmax=2.0):
     """
     Compute dv/v and associated errors from wavelet coherence transform results.
@@ -3270,7 +3270,7 @@ def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20
     :param min_nonzero: Minimum fraction of valid (non-zero weight) samples required.
     :param freqmin: Lower frequency bound for regression.
     :param freqmax: Upper frequency bound for regression.
-    :returns: Tuple of (dvv [%], err [%], weighting_function).
+    :returns: Tuple of (dt/t, err, weighting_function).
     """
     import warnings
     from scipy.optimize import OptimizeWarning
@@ -3307,7 +3307,7 @@ def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20
                     if any(issubclass(warning.category, OptimizeWarning)
                            for warning in w_catcher):
                         problematic_freqs.append(freqs[ifreq])
-                dvv[ii], err[ii] = -m, em
+                dvv[ii], err[ii] = m, em
             else:
                 dvv[ii], err[ii] = np.nan, np.nan
     if problematic_freqs:
@@ -3316,7 +3316,7 @@ def compute_wct_dvv(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20
             f"consider adjusting min_nonzero={min_nonzero}, mincoh={mincoh}, "
             f"maxdt={maxdt}, coda_cycles={coda_cycles}"
         )
-    return dvv * 100, err * 100, wf
+    return dvv, err, wf
 
 
 def get_wct_avgcoh(freqs, tvec, wcoh, freqmin, freqmax, lag_min=5, coda_cycles=20):
@@ -4138,7 +4138,7 @@ def xr_load_wct(root, lineage, station1, station2, components, mov_stack):
     return ds
 
 
-def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mov_stack, taxis, dvv_df, err_df, coh_df):
+def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mov_stack, taxis, dtt_df, err_df, coh_df):
     """
     Save the Wavelet Coherence Transform (WCT) results as a NetCDF file.
 
@@ -4158,8 +4158,8 @@ def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mo
     :type mov_stack: tuple
     :param taxis: Time axis corresponding to the WCT data.
     :type taxis: array-like
-    :param dvv_df: DataFrame containing dvv data (2D).
-    :type dvv_df: pandas.DataFrame
+    :param dtt_df: DataFrame containing dtt data (2D).
+    :type dtt_df: pandas.DataFrame
     :param err_df: DataFrame containing err data (2D).
     :type err_df: pandas.DataFrame
     :param coh_df: DataFrame containing coh data (2D).
@@ -4176,13 +4176,13 @@ def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mo
     os.makedirs(os.path.dirname(fn), exist_ok=True)
 
     # Convert DataFrames to xarray.DataArrays
-    dvv_da = xr.DataArray(dvv_df.values, coords=[dvv_df.index, dvv_df.columns], dims=['times', 'frequency'])
+    dtt_da = xr.DataArray(dtt_df.values, coords=[dtt_df.index, dtt_df.columns], dims=['times', 'frequency'])
     err_da = xr.DataArray(err_df.values, coords=[err_df.index, err_df.columns], dims=['times', 'frequency'])
     coh_da = xr.DataArray(coh_df.values, coords=[coh_df.index, coh_df.columns], dims=['times', 'frequency'])
 
     # Combine into a single xarray.Dataset
     ds = xr.Dataset({
-        'dvv': dvv_da,
+        'dtt': dtt_da,
         'err': err_da,
         'coh': coh_da
     })
@@ -4192,9 +4192,9 @@ def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mo
     xr_save_and_close(updated_ds, fn)
 
 
-    logging.debug(f"Saved WCT data to {fn}")
+    logging.debug(f"Saved WCT DTT data to {fn}")
     # Clean up
-    del dvv_da, err_da, coh_da, ds
+    del dtt_da, err_da, coh_da, ds
 
 
 def xr_get_wct_dtt(root, lineage, station1, station2, components, mov_stack):
@@ -4735,7 +4735,7 @@ def compute_dtt_wct(session, root, lineage, mov_stack,
         comps_cc = [c.strip() for c in components.split(",")]
         comps_sc = comps_cc
 
-    dvv_frames = []
+    dtt_frames = []
     err_frames = []
 
     for (s1, s2) in pairs:
@@ -4746,57 +4746,57 @@ def compute_dtt_wct(session, root, lineage, mov_stack,
             except FileNotFoundError:
                 continue
 
-            dvv_da = ds["dvv"]
+            dtt_da = ds["dtt"]
             err_da = ds["err"]
 
             # Frequency band selection
-            freqs = dvv_da.coords["frequency"].values
+            freqs = dtt_da.coords["frequency"].values
             if freqmin is not None or freqmax is not None:
                 lo = freqmin if freqmin is not None else freqs.min()
                 hi = freqmax if freqmax is not None else freqs.max()
                 mask = (freqs >= lo) & (freqs <= hi)
-                dvv_da = dvv_da.isel(frequency=mask)
+                dtt_da = dtt_da.isel(frequency=mask)
                 err_da = err_da.isel(frequency=mask)
 
             # Average over frequency → 1D time series
-            dvv_ts = dvv_da.mean(dim="frequency").to_series()
+            dtt_ts = dtt_da.mean(dim="frequency").to_series()
             err_ts = err_da.mean(dim="frequency").to_series()
 
-            dvv_frames.append(dvv_ts)
+            dtt_frames.append(dtt_ts)
             err_frames.append(err_ts)
 
-    if not dvv_frames:
+    if not dtt_frames:
         raise ValueError(
             "No WCT-DTT data found for lineage=%s mov_stack=%s" % (lineage, mov_stack)
         )
 
-    dvv_all = pd.concat(dvv_frames, axis=1)
+    dtt_all = pd.concat(dtt_frames, axis=1)
     err_all = pd.concat(err_frames, axis=1)
 
     # Stack to long form for per-timestamp statistics
-    dvv_long = dvv_all.stack()
-    dvv_long.index = dvv_long.index.droplevel(1)
-    dvv_long.index.name = "times"
+    dtt_long = dtt_all.stack()
+    dtt_long.index = dtt_long.index.droplevel(1)
+    dtt_long.index.name = "times"
 
     err_long = err_all.stack()
     err_long.index = err_long.index.droplevel(1)
     err_long.index.name = "times"
 
-    flat = pd.DataFrame({"m": dvv_long.values, "em": err_long.values},
-                        index=dvv_long.index)
+    flat = pd.DataFrame({"m": dtt_long.values, "em": err_long.values},
+                        index=dtt_long.index)
 
-    stats = dvv_long.groupby(level=0).describe(percentiles=percentiles)
+    stats = dtt_long.groupby(level=0).describe(percentiles=percentiles)
     stats.columns = pd.MultiIndex.from_tuples(
-        [("dvv", c) for c in stats.columns]
+        [("dtt", c) for c in stats.columns]
     )
 
     wm, ws = _get_wavgwstd(flat, "m", "em")
-    stats[("dvv", "weighted_mean")] = wm
-    stats[("dvv", "weighted_std")] = ws
+    stats[("dtt", "weighted_mean")] = wm
+    stats[("dtt", "weighted_std")] = ws
 
     tm, ts = _trim(flat, "m")
-    stats[("dvv", "trimmed_mean")] = tm
-    stats[("dvv", "trimmed_std")] = ts
+    stats[("dtt", "trimmed_mean")] = tm
+    stats[("dtt", "trimmed_std")] = ts
 
     # Error stats
     err_stats = err_long.groupby(level=0).mean()

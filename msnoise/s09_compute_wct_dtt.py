@@ -31,7 +31,7 @@ from .api import (
     connect, get_logger, is_next_job_for_step, get_next_lineage_batch,
     get_station_pairs, get_interstation_distance,
     xr_load_wct, xr_save_wct_dtt, massive_update_job,
-    compute_wct_dvv, get_wct_avgcoh,
+    compute_wct_dtt, get_wct_avgcoh,
 )
 
 
@@ -171,7 +171,7 @@ def main(loglevel="INFO", batch_size=None):
                 valid_mask = (times_dt >= start) & (times_dt <= end)
 
                 dates_out = []
-                dvv_rows = []
+                dtt_rows = []
                 err_rows = []
                 coh_rows = []
 
@@ -184,7 +184,7 @@ def main(loglevel="INFO", batch_size=None):
                     WXdt_i = ds["WXdt"].values[i]
 
                     try:
-                        dvv, err, _ = compute_wct_dvv(
+                        dtt, err, _ = compute_wct_dtt(
                             freqs, taxis, WXamp_i, Wcoh_i, WXdt_i,
                             lag_min=lag_min, coda_cycles=coda_cycles,
                             mincoh=mincoh, maxdt=maxdt,
@@ -203,7 +203,7 @@ def main(loglevel="INFO", batch_size=None):
                         continue
 
                     dates_out.append(pd.Timestamp(t))
-                    dvv_rows.append(dvv)
+                    dtt_rows.append(dtt)
                     err_rows.append(err)
                     coh_rows.append(coh)
 
@@ -211,14 +211,14 @@ def main(loglevel="INFO", batch_size=None):
 
                 if not dates_out:
                     logger.warning(
-                        f"No DVV results for {pair}/{component}/{mov_stack}"
+                        f"No DTT results for {pair}/{component}/{mov_stack}"
                     )
                     continue
 
-                dvv_df = pd.DataFrame(dvv_rows, index=dates_out, columns=freqs_subset)
+                dtt_df = pd.DataFrame(dtt_rows, index=dates_out, columns=freqs_subset)
                 err_df = pd.DataFrame(err_rows, index=dates_out, columns=freqs_subset)
                 coh_df = pd.DataFrame(coh_rows, index=dates_out, columns=freqs_subset)
-                dvv_df.sort_index(inplace=True)
+                dtt_df.sort_index(inplace=True)
                 err_df.sort_index(inplace=True)
                 coh_df.sort_index(inplace=True)
 
@@ -228,7 +228,7 @@ def main(loglevel="INFO", batch_size=None):
                     xr_save_wct_dtt(
                         root, lineage_names, step.step_name,
                         station1, station2, component, mov_stack,
-                        taxis, dvv_df, err_df, coh_df,
+                        taxis, dtt_df, err_df, coh_df,
                     )
                     logger.info(
                         f"Saved WCT DTT for {pair}/{component}/{mov_stack} "

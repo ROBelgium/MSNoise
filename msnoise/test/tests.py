@@ -198,7 +198,7 @@ def test_003_set_and_config(setup_environment):
 def test_004_set_and_get_filters():
     db = connect()
     # filter_1 configset was created in test_002b; update its frequency parameters
-    update_config(db, 'freqmin', '0.01', category='filter', set_number=1)
+    update_config(db, 'freqmin', '0.1', category='filter', set_number=1)
     update_config(db, 'freqmax', '1.0', category='filter', set_number=1)
     for param in ['CC', 'SC', 'AC']:
         update_config(db, param, 'Y', category='filter', set_number=1)
@@ -206,18 +206,19 @@ def test_004_set_and_get_filters():
     set_number = create_config_set(db, 'filter')
     assert set_number == 2
     update_config(db, 'freqmin', '0.1', category='filter', set_number=2)
-    update_config(db, 'freqmax', '1.0', category='filter', set_number=2)
+    update_config(db, 'freqmax', '5.0', category='filter', set_number=2)
     for param in ['CC', 'SC', 'AC']:
         update_config(db, param, 'Y', category='filter', set_number=2)
     # Register the new WorkflowStep and links for filter_2
     create_workflow_steps_from_config_sets(db)
     create_workflow_links_from_steps(db)
     # Verify both filter configsets
-    for set_num, expected_freqmin in [(1, '0.01'), (2, '0.1')]:
+    for set_num, expected_freqmin, expected_freqmax in [(1, '0.1', '1.0'), (2, '0.1', '5.0')]:
         details = {d['name']: d['value'] for d in get_config_set_details(db, 'filter', set_num)}
         assert details['freqmin'] == expected_freqmin, \
             f"freqmin for filter_{set_num} wrong: {details.get('freqmin')}"
-        assert details['freqmax'] == '1.0'
+        assert details['freqmax'] == expected_freqmax, \
+            f"freqmin for filter_{set_num} wrong: {details.get('freqmax')}"
         assert details['CC'] == 'Y'
     db.close()
 
@@ -778,18 +779,18 @@ def test_400_run_manually():
     os.system("msnoise cc dtt compute_mwcs")
     os.system("msnoise reset mwcs_dtt_1 --all")
     os.system("msnoise cc dtt compute_dtt")
-    os.system("msnoise cc dtt plot dvv -s 0 -o ?.png")
+    os.system("msnoise cc dtt plot mwcs_dtt -s 0 -o ?.png")
     # Stretching
     os.system("msnoise reset stretching_1 --all")
     os.system("msnoise cc dtt compute_stretching")
-    os.system("msnoise cc dtt plot dvvs -s 0 -o ?.png")
+    os.system("msnoise cc dtt plot stretching_dtt -s 0 -o ?.png")
     # Wavelet
     os.system("msnoise reset wavelet_1 --all")
     os.system("msnoise cc dtt compute_wct")
     os.system("msnoise new_jobs --after wavelet")
     os.system("msnoise reset wavelet_dtt_1 --all")
     os.system("msnoise cc dtt compute_wct_dtt")
-    os.system("msnoise cc dtt plot wct -s 0 -o ?.png")
+    os.system("msnoise cc dtt plot wct_dtt -s 0 -o ?.png")
 
 def test_99210_crondays_positive_float():
     parsed_crondays = parse_crondays('2.5')
