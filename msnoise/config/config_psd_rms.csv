@@ -1,0 +1,3 @@
+name,default,definition,type,possible_values
+psd_rms_frequency_ranges,"[(1.0, 20.0), (4.0, 14.0), (4.0, 40.0), (4.0, 9.0)]",Specify the frequency bounds (in Hz) to compute the RMS from PSDs,eval,
+psd_rms_type,DISP,What units do you want for the exported RMS,str,DISP/VEL/ACC
