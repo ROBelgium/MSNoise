@@ -887,10 +887,11 @@ class WorkflowStepView(BaseModelView):
 
 
 WORKFLOW_CHAINS = {
-    'global':      ['preprocess', 'qc'],
+    'global':      ['preprocess', 'psd'],
     'preprocess':  ['cc'],
     'cc':          ['filter'],
-    'qc':          [],
+    'psd':         ['psd_rms'],
+    'psd_rms':     [],
     'filter':      ['stack'],
     'stack':       ['refstack'],
     'refstack':    ['mwcs', 'stretching', 'wavelet'],

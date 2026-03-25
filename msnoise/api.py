@@ -500,7 +500,8 @@ def get_config_categories_definition():
         ('stretching', 'Stretching'),
         ('wavelet', 'Wavelet'),
         ('wavelet_dtt', 'Wavelet dt/t'),
-        ('qc', 'QC')
+        ('psd', 'PSD'),
+        ('psd_rms', 'PSD RMS')
     ]
 
 
@@ -1038,7 +1039,8 @@ def get_workflow_graph(session):
         'global',
         'preprocess',
         'cc',
-        'qc',
+        'psd',
+        'psd_rms',
         'filter',
         'stack',
         'refstack',
@@ -1258,7 +1260,8 @@ def create_workflow_steps_from_config_sets(session):
         'global',
         'preprocess',
         'cc',
-        'qc',
+        'psd',
+        'psd_rms',
         'filter',
         'stack',
         'refstack',
@@ -1333,10 +1336,11 @@ def create_workflow_links_from_steps(session):
 
     # Define the natural workflow chains
     WORKFLOW_CHAINS = {
-        'global': ['preprocess', 'qc'],
+        'global': ['preprocess', 'psd'],
         'preprocess': ['cc'],
         'cc': ['filter'],
-        'qc': [],
+        'psd': ['psd_rms'],
+        'psd_rms': [],
         'filter': ['stack'],
         'stack': ['refstack'],
         'refstack': ['mwcs', 'stretching', 'wavelet'],

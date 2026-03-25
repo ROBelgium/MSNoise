@@ -764,7 +764,7 @@ def main(init=False, nocc=False, after=False):
 
         # Optional validation: ensure it's a known config-set type/category
         allowed_categories = {
-            "global", "preprocess", "qc", "cc", "filter",
+            "global", "preprocess", "psd", "psd_rms", "cc", "filter",
             "stack", "refstack", "mwcs", "mwcs_dtt", "stretching",
             "wavelet", "wavelet_dtt",
         }
@@ -833,7 +833,7 @@ def main(init=False, nocc=False, after=False):
 
     # Get all workflow steps with category "preprocess"
     workflow_steps = get_workflow_steps(db)
-    preprocess_steps = [step for step in workflow_steps if step.category in ["preprocess", "qc"]]
+    preprocess_steps = [step for step in workflow_steps if step.category in ["preprocess", "psd"]]
 
     logger.info(f'Found {len(preprocess_steps)} preprocess workflow steps')
     for step in preprocess_steps:
