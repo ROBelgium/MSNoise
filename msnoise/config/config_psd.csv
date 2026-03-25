@@ -1,5 +1,5 @@
 name,default,definition,type,possible_values
-psd_components,Z,"Components to process for PSD, defaults to [Z], but can be any comma separated list (e.g. 'Z,E,N')",str,
+psd_components,"E,N,Z","Components to process for PSD, defaults to [E,N,Z], but can be any comma separated list (e.g. 'Z,E,N')",str,
 psd_ppsd_length,3600.0,Length of data segments passed to psd in seconds. In the paper by McNamara et al (2004) a value of 3600 (1 hour) was chosen. Longer segments increase the upper limit of analyzed periods but decrease the number of analyzed segments.,float,
 psd_ppsd_overlap,0.0,"Overlap of segments passed to psd. Overlap may take values between 0 and 1 and is given as fraction of the length of one segment, e.g. `psd_ppsd_length=3600` and `psd_ppsd_overlap=0.5` result in an overlap of 1800s of the segments.",float,
 psd_ppsd_period_smoothing_width_octaves,0.125,Determines over what period/frequency range the psd is smoothed around every central period/frequency. Given in fractions of octaves (default of ``1`` means the psd is averaged over a full octave at each central frequency).,float,

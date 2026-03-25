@@ -39,17 +39,21 @@
                 </div>
             </div>
             <style>
-                .cfg-level-0 { padding-left: 0px; }
-                .cfg-level-1 { padding-left: 20px; border-left: 3px solid #17a2b8; }
-                .cfg-level-2 { padding-left: 40px; border-left: 3px solid #6f42c1; }
-                .cfg-level-3 { padding-left: 60px; border-left: 3px solid #e83e8c; }
-                .cfg-level-4 { padding-left: 80px; border-left: 3px solid #20c997; }
-                .cfg-level-5 { padding-left: 100px; border-left: 3px solid #28a745; }
-                .cfg-level-6 { padding-left: 120px; border-left: 3px solid #ffc107; }
-                .cfg-level-7 { padding-left: 140px; border-left: 3px solid #dc3545; }
+                /* Indent spans live inside the <td>, so Bootstrap cell padding
+                   is not overridden.  margin-left creates the visual offset;
+                   border-left acts as the depth connector. */
+                .cfg-indent { display: inline-block; padding-left: 8px; width: 100%; box-sizing: border-box; }
+                .cfg-indent-0 { margin-left:   0px; }
+                .cfg-indent-1 { margin-left:  10px; border-left: 3px solid #17a2b8; }
+                .cfg-indent-2 { margin-left:  20px; border-left: 3px solid #6f42c1; }
+                .cfg-indent-3 { margin-left:  30px; border-left: 3px solid #e83e8c; }
+                .cfg-indent-4 { margin-left:  40px; border-left: 3px solid #20c997; }
+                .cfg-indent-5 { margin-left:  50px; border-left: 3px solid #28a745; }
+                .cfg-indent-6 { margin-left:  60px; border-left: 3px solid #ffc107; }
+                .cfg-indent-7 { margin-left:  70px; border-left: 3px solid #dc3545; }
                 .cfg-section-header td { background-color: #f8f9fa; }
                 .cfg-section-header h4 { margin: 4px 0; font-size: 14px; }
-                .cfg-level-0 h4 { font-size: 16px; font-weight: bold; }
+                .cfg-indent-0 h4 { font-size: 16px; font-weight: bold; }
             </style>
             <table class="table table-striped table-hover">
                     <thead>
@@ -64,15 +68,19 @@
                         {% for category_info in categories %}
                         {% set lvl = category_info.level | default(0) %}
                         <tr class="cfg-section-header">
-                            <td colspan="4" class="cfg-level-{{ lvl }}">
-                                <h4>{{ category_info.display_name }}</h4>
+                            <td colspan="4">
+                                <span class="cfg-indent cfg-indent-{{ lvl }}">
+                                    <h4>{{ category_info.display_name }}</h4>
+                                </span>
                             </td>
                         </tr>
                             {% if category_info.sets %}
                                 {% for set_info in category_info.sets %}
                                 <tr>
-                                    <td class="cfg-level-{{ lvl }}">
-                                        <span class="label label-info">{{ category_info.category }}</span>
+                                    <td>
+                                        <span class="cfg-indent cfg-indent-{{ lvl }}">
+                                            <span class="label label-info">{{ category_info.category }}</span>
+                                        </span>
                                     </td>
                                     <td>
                                         <span class="label label-primary">#{{ set_info.set_number }}</span>
@@ -107,8 +115,10 @@
                                 {% endfor %}
                             {% else %}
                                 <tr class="text-muted">
-                                    <td class="cfg-level-{{ lvl }}">
-                                        <span class="label label-default">{{ category_info.display_name }}</span>
+                                    <td>
+                                        <span class="cfg-indent cfg-indent-{{ lvl }}">
+                                            <span class="label label-default">{{ category_info.display_name }}</span>
+                                        </span>
                                     </td>
                                     <td colspan="3">
                                         <em>No configuration sets found</em>
