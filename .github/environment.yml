@@ -9,6 +9,7 @@ dependencies:
   - flask
   - flask-admin<2
   - flask-wtf
+  - flask-babel
   - markdown
   - wtforms<3.2
   - scandir
