@@ -54,7 +54,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
     lineage_names = [f"preprocess_{preprocess_id}", f"cc_{cc_id}", f"filter_{filter_id}", f"stack_{stack_id}"]
     lineage_str = "/".join(lineage_names)
     steps = lineage_str_to_steps(db, lineage_str, "/")
-    paralineage, lineage_names, params = get_merged_params_for_lineage, prepare_abs_positive_fft(db, params, {}, steps)
+    paralineage, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
     mov_stack = params.mov_stack[stack_item - 1]
     start, end, datelist = build_movstack_datelist(db)
 

@@ -280,7 +280,10 @@ def test_009_control_data_availability():
     db = connect()
     files = get_new_files(db)
     assert len(files) == 3
-    flags = count_data_availability_flags(db)
+    # count_data_availability_flags was removed; query distinct flags directly
+    from sqlalchemy.sql.expression import func
+    flags = db.query(func.count(DataAvailability.flag),
+                     DataAvailability.flag).group_by(DataAvailability.flag).all()
     assert len(flags) == 1
     for station in get_stations(db):
         for loc in station.locs():
@@ -338,9 +341,10 @@ def test_014_check_done_jobs():
 def test_015_check_cc_files():
     db = connect()
     output_folder = get_config(db, 'output_folder') or 'OUTPUT'
+    params = get_params(db)
     filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
     for filter_step in filter_steps:
-        for components in get_components_to_compute(db):
+        for components in params.components_to_compute:
             for (sta1, sta2) in get_station_pairs(db):
                 for loc1 in sta1.locs():
                     for loc2 in sta2.locs():
