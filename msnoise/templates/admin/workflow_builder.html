@@ -38,6 +38,15 @@
         text-shadow: 0 1px 2px rgba(0,0,0,0.3);
     }
 
+    .node-highlighted > rect {
+        filter: drop-shadow(0 0 8px rgba(0,0,0,0.7));
+        stroke: #fff;
+        stroke-width: 2.5px;
+    }
+    .node-dimmed {
+        opacity: 0.25;
+    }
+
     .node-category {
         font-weight: bold;
         font-size: 11px;
@@ -71,7 +80,7 @@
     }
 
     .workflow-tooltip {
-        position: absolute;
+        position: fixed;
         background: rgba(0, 0, 0, 0.9);
         color: white;
         padding: 12px;
@@ -526,8 +535,8 @@
                     <div style="margin-bottom: 3px;"><strong>Category:</strong> ${d.category}</div>
                     ${d.description ? `<div style="margin-top: 8px; font-style: italic;">${d.description}</div>` : ''}
                 `)
-                .style("left", (event.pageX + 15) + "px")
-                .style("top", (event.pageY - 10) + "px");
+                .style("left", (event.clientX + 15) + "px")
+                .style("top", (event.clientY - 10) + "px");
 
             // Highlight connected nodes
             const connectedNodes = new Set([d.id]);
@@ -541,11 +550,14 @@
                 }
             });
 
-            node.style("opacity", n => connectedNodes.has(n.id) ? 1 : 0.3)
-                .attr("transform", n => {
-                    const s = connectedNodes.has(n.id) ? 1.05 : 1;
-                    return `translate(${n.x || 0},${n.y || 0}) scale(${s})`;
-                });
+            node.classed("node-highlighted", n => connectedNodes.has(n.id))
+                .classed("node-dimmed", n => !connectedNodes.has(n.id));
+
+            // Raise highlighted nodes to top of SVG paint order so they
+            // are never obscured by neighbours (SVG has no z-index).
+            node.filter(n => connectedNodes.has(n.id)).raise();
+            // Raise the hovered node last so it sits above its neighbours.
+            node.filter(n => n.id === d.id).raise();
 
             link.style("opacity", l => {
                 const sourceId = l.source.id || l.source;
@@ -559,8 +571,8 @@
         })
             .on("mouseout", function() {
                 tooltip.style("opacity", 0);
-                node.style("opacity", 1)
-                    .attr("transform", n => `translate(${n.x || 0},${n.y || 0})`);
+                node.classed("node-highlighted", false)
+                    .classed("node-dimmed", false);
                 link.style("opacity", 1).style("stroke-width", 2);
             });
 
@@ -602,9 +614,9 @@
     }
 
     function dragended(event, d) {
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
+        if (!event.active) simulation.alphaTarget(0).restart();
+        // Keep node pinned at dropped position; stop simulation shortly after
+        setTimeout(() => simulation.stop(), 300);
     }
 
     function resetZoom() {
@@ -658,7 +670,14 @@
             levelPositions[level]++;
         });
 
-        simulation.alpha(0.3).restart();
+        // Apply positions immediately without re-running physics
+        workflowData.nodes.forEach(n => { n.x = n.fx; n.y = n.fy; });
+        simulation.stop();
+        // Redraw links and nodes at pinned positions
+        if (link) link.attr("d", d => {
+            return `M ${d.source.x} ${d.source.y} L ${d.target.x} ${d.target.y}`;
+        });
+        if (node) node.attr("transform", d => `translate(${d.x},${d.y})`);
     }
 
     function arrangeCircular() {
@@ -677,7 +696,12 @@
             node.fy = center.y + radius * Math.sin(angle);
         });
 
-        simulation.alpha(0.3).restart();
+        workflowData.nodes.forEach(n => { n.x = n.fx; n.y = n.fy; });
+        simulation.stop();
+        if (link) link.attr("d", d => {
+            return `M ${d.source.x} ${d.source.y} L ${d.target.x} ${d.target.y}`;
+        });
+        if (node) node.attr("transform", d => `translate(${d.x},${d.y})`);
     }
 
     function exportSVG() {
