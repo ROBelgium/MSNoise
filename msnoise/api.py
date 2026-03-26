@@ -4536,7 +4536,7 @@ def psd_dfrms(a):
     :param a: :class:`pandas.Series` whose index is period values.
     :returns: Square-root of the integrated power (RMS-equivalent).
     """
-    return np.sqrt(np.trapz(a.values, a.index))
+    return np.sqrt(np.trapezoid(a.values, a.index))
 
 
 def psd_rms(s, f):
@@ -4546,7 +4546,7 @@ def psd_rms(s, f):
     :param f: Frequency values (1-D array, same length as *s*).
     :returns: Float - square-root of the integrated power.
     """
-    return np.sqrt(np.trapz(s, f))
+    return np.sqrt(np.trapezoid(s, f))
 
 
 def psd_df_rms(d, freqs, output="VEL"):
