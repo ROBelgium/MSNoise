@@ -62,7 +62,7 @@ import pandas as pd
 
 # Module-level logger used by propagation functions (propagate_stack_jobs_from_cc_done, etc.)
 # that are called before main() has a chance to configure a logger.
-logger = get_logger('msnoise.new_jobs')
+logger = get_logger('msnoise.new_jobs', loglevel="INFO")
 
 def propagate_stack_jobs_from_cc_done(session):
     """

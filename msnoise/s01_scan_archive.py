@@ -87,7 +87,7 @@ from . import data_structures
 
 # Module-level logger used by helper functions (update_availability, etc.)
 # that are called before main() has a chance to configure a logger.
-logger = api.get_logger('msnoise.scan_archive')
+logger = api.get_logger('msnoise.scan_archive', loglevel="INFO")
 
 
 def update_availability(db, folder, basename, data):
