@@ -1105,7 +1105,7 @@ def test_120010_msnoise_result_get_ccf():
     pairs = get_station_pairs(db)
     if not pairs:
         pytest.skip("No station pairs configured")
-    sta1, sta2 = pairs[0]
+    sta1, sta2 = next(pairs)
     loc1 = sta1.locs()[0] if sta1.locs() else "00"
     loc2 = sta2.locs()[0] if sta2.locs() else "00"
     pair_str = f"{sta1.net}.{sta1.sta}.{loc1}:{sta2.net}.{sta2.sta}.{loc2}"
