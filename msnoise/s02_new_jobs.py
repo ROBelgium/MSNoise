@@ -882,7 +882,7 @@ def main(init=False, nocc=False, after=False):
             cc_jobs, created = create_cc_jobs_from_preprocess(session=db)
             if cc_jobs:
                 for job in cc_jobs:
-                    update_job_workflow(db, job['day'], job['pair'],
+                    update_job(db, job['day'], job['pair'],
                                         job['jobtype'], job['flag'],
                                         step_id=job.get('step_id'),
                                         priority=job.get('priority', 0),
@@ -996,7 +996,7 @@ def main(init=False, nocc=False, after=False):
 
             if init and len(all_jobs) > 1e5:
                 logger.debug('Already 100.000 jobs, inserting/updating')
-                massive_insert_job_workflow(db, all_jobs)
+                massive_insert_job(db, all_jobs)
                 all_jobs = []
                 count += 1e5
 
@@ -1004,10 +1004,10 @@ def main(init=False, nocc=False, after=False):
     if len(all_jobs) != 0:
         logger.debug('Inserting/Updating %i jobs' % len(all_jobs))
         if init:
-            massive_insert_job_workflow(db, all_jobs)
+            massive_insert_job(db, all_jobs)
         else:
             for job in all_jobs:
-                update_job_workflow(db, job['day'], job['pair'],
+                update_job(db, job['day'], job['pair'],
                                     job['jobtype'], job['flag'],
                                     step_id=job.get('step_id'),
                                     priority=job.get('priority', 0),
@@ -1030,10 +1030,10 @@ def main(init=False, nocc=False, after=False):
         if cc_jobs:
             logger.debug(f'Inserting/Updating {len(cc_jobs)} CC jobs')
             if init:
-                massive_insert_job_workflow(db, cc_jobs)
+                massive_insert_job(db, cc_jobs)
             else:
                 for job in cc_jobs:
-                    update_job_workflow(db, job['day'], job['pair'],
+                    update_job(db, job['day'], job['pair'],
                                         job['jobtype'], job['flag'],
                                         step_id=job.get('step_id'),
                                         priority=job.get('priority', 0),
@@ -1043,84 +1043,3 @@ def main(init=False, nocc=False, after=False):
             logger.info(f"Created {cc_count} CC jobs")
 
     return count
-
-
-def update_job_workflow(session, day, pair, jobtype, flag,
-                        step_id=None, priority=0, lineage=None, commit=True, returnjob=True, ref=None):
-    """
-    Updates or Inserts a new workflow-aware Job in the database.
-
-    Extended version of update_job that handles workflow fields.
-    """
-    from sqlalchemy import text
-    from .msnoise_table_def import declare_tables
-
-    schema = declare_tables()
-    Job = schema.Job
-
-    if ref:
-        job = session.query(Job).filter(text("ref=:ref")).params(ref=ref).first()
-    else:
-        job = session.query(Job) \
-            .filter(text("day=:day")) \
-            .filter(text("pair=:pair")) \
-            .filter(text("jobtype=:jobtype")) \
-            .filter(text("lineage=:lineage")) \
-            .params(day=day, pair=pair, jobtype=jobtype, lineage=lineage).first()
-
-    if job is None:
-        # Create new job with workflow fields
-        job = Job()
-        job.day = day
-        job.pair = pair
-        job.jobtype = jobtype
-        job.step_id = step_id
-        job.priority = priority
-        job.flag = flag
-        job.lastmod = datetime.datetime.utcnow()
-        job.lineage = lineage  # <-- NEW
-        session.add(job)
-    else:
-        # Update existing job — but never bump a Done job back to Todo
-        if not (job.flag == "D" and flag == "T"):
-            job.flag = flag
-        job.step_id = step_id
-        job.priority = priority
-        job.lastmod = datetime.datetime.utcnow()
-        job.lineage = lineage  # <-- NEW (keep consistent)
-
-    if commit:
-        session.commit()
-    if returnjob:
-        return job
-
-
-def massive_insert_job_workflow(session, jobs):
-    """
-    Massive insert of workflow-aware jobs using bulk operations.
-
-    Extended version of massive_insert_job that handles workflow fields.
-    """
-    from .msnoise_table_def import declare_tables
-
-    schema = declare_tables()
-    Job = schema.Job
-
-    # Convert jobs to format expected by SQLAlchemy bulk operations
-    job_records = []
-    for job in jobs:
-        job_records.append({
-            'day': job['day'],
-            'pair': job['pair'],
-            'jobtype': job['jobtype'],
-            'step_id': job.get('step_id'),
-            'priority': job.get('priority', 0),
-            'flag': job['flag'],
-            'lastmod': job['lastmod'],
-            'lineage': job.get('lineage'),
-        })
-
-    # Use bulk insert for better performance
-    session.bulk_insert_mappings(Job, job_records)
-    session.commit()
-

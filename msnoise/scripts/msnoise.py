@@ -1294,15 +1294,19 @@ def cc_stack(ctx, ref, mov, step):
     delay = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
 
+    if ref:
+        click.secho(
+            "ERROR: 'msnoise cc stack -r' is no longer supported.\n"
+            "Use 'msnoise cc stack_refstack' instead.",
+            fg='red', err=True)
+        sys.exit(1)
+
     if ref and mov:
         click.secho("With MSNoise 1.6, you can't run REF & MOV stacks"
                     "simultaneously, please run them one after the other.")
         sys.exit()
 
     if threads == 1:
-        if ref:
-            from ..s04_stack_ref import main
-            main('ref', loglevel=loglevel)
         if mov:
             from ..s04_stack_mov import main
             main('mov', loglevel=loglevel)
@@ -1311,16 +1315,6 @@ def cc_stack(ctx, ref, mov, step):
     else:
         from multiprocessing import Process
         processes = []
-        if ref:
-            from ..s04_stack_ref import main
-            for i in range(threads):
-                p = Process(target=main, args=["ref",],
-                            kwargs={"loglevel": loglevel})
-                p.start()
-                processes.append(p)
-                time.sleep(delay)
-        for p in processes:
-            p.join()
         if mov:
             from ..s04_stack_mov import main
             for i in range(threads):

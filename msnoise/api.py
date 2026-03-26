@@ -18,7 +18,9 @@ import pandas as pd
 import xarray as xr
 
 from . import DBConfigNotFoundError
-from .msnoise_table_def import Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink
+from .msnoise_table_def import (Job, Station, Config, DataAvailability,
+                                WorkflowStep, WorkflowLink,
+                                WORKFLOW_CHAINS, WORKFLOW_ORDER)
 
 
 # ============================================================
@@ -1068,24 +1070,7 @@ def get_workflow_graph(session):
     steps = get_workflow_steps(session)
     links = get_workflow_links(session)
 
-    # Define the natural workflow order
-    WORKFLOW_ORDER = [
-        'global',
-        'preprocess',
-        'cc',
-        'psd',
-        'psd_rms',
-        'filter',
-        'stack',
-        'refstack',
-        'mwcs',
-        'mwcs_dtt',
-        'stretching',
-        'wavelet',
-        'wavelet_dtt'
-    ]
-
-    # Sort steps by workflow order
+    # Sort steps by workflow order (WORKFLOW_ORDER imported from msnoise_table_def)
     def get_workflow_order_key(step):
         try:
             category_order = WORKFLOW_ORDER.index(step.category)
@@ -1289,23 +1274,6 @@ def create_workflow_steps_from_config_sets(session):
 
     schema = declare_tables()
 
-    # Define the natural workflow order
-    WORKFLOW_ORDER = [
-        'global',
-        'preprocess',
-        'cc',
-        'psd',
-        'psd_rms',
-        'filter',
-        'stack',
-        'refstack',
-        'mwcs',
-        'mwcs_dtt',
-        'stretching',
-        'wavelet',
-        'wavelet_dtt'
-    ]
-
     try:
         # Get all unique category+set_number combinations
         config_sets = session.query(
@@ -1368,23 +1336,6 @@ def create_workflow_links_from_steps(session):
 
     schema = declare_tables()
 
-    # Define the natural workflow chains
-    WORKFLOW_CHAINS = {
-        'global': ['preprocess', 'psd'],
-        'preprocess': ['cc'],
-        'cc': ['filter'],
-        'psd': ['psd_rms'],
-        'psd_rms': [],
-        'filter': ['stack'],
-        'stack': ['refstack'],
-        'refstack': ['mwcs', 'stretching', 'wavelet'],
-        'mwcs': ['mwcs_dtt'],
-        'stretching': [],
-        'wavelet': ['wavelet_dtt'],
-        'wavelet_dtt': [],
-        'mwcs_dtt': []
-    }
-
     try:
         # Get all workflow steps
         steps = session.query(schema.WorkflowStep).all()
@@ -1401,7 +1352,11 @@ def create_workflow_links_from_steps(session):
         existing_count = 0
 
         # Create links based on workflow chains
+        # WORKFLOW_CHAINS imported from msnoise_table_def; use simple next_steps list
         for source_category, target_categories in WORKFLOW_CHAINS.items():
+            # msnoise_table_def WORKFLOW_CHAINS values are dicts with 'next_steps'
+            if isinstance(target_categories, dict):
+                target_categories = target_categories.get('next_steps', [])
             if source_category not in steps_by_category:
                 continue
 
@@ -1475,72 +1430,110 @@ def get_workflow_step_config(session, step_name):
 # ============================================================
 # Section 5 — Jobs
 # ============================================================
-# ── Legacy job API (used by QC sub-pipeline) ───────────────
 
 
-def update_job(session, day, pair, jobtype, flag, commit=True, returnjob=True,
-               ref=None):
+def update_job(session, day, pair, jobtype, flag,
+               step_id=None, priority=0, lineage=None,
+               commit=True, returnjob=True, ref=None):
     """
-    Updates or Inserts a new :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the
-    database.
+    Updates or Inserts a :class:`~msnoise.msnoise_table_def.declare_tables.Job`
+    in the database.  Workflow-aware: handles ``step_id`` and ``lineage`` fields.
 
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
+        obtained by :func:`connect`
     :type day: str
     :param day: The day in YYYY-MM-DD format
     :type pair: str
-    :param pair: the name of the pair (EXAMPLE?)
+    :param pair: the name of the station pair
     :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
+    :param jobtype: Job type string, e.g. ``"preprocess_1"``
     :type flag: str
-    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
+    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one, "F"ailed.
+    :type step_id: int or None
+    :param step_id: WorkflowStep primary key, or None
+    :type priority: int
+    :param priority: Job priority (default 0)
+    :type lineage: str or None
+    :param lineage: Lineage string encoding upstream configset chain
     :type commit: bool
     :param commit: Whether to directly commit (True, default) or not (False)
     :type returnjob: bool
-    :param returnjob: Return the modified/inserted Job (True, default) or not
-        (False)
-
+    :param returnjob: Return the modified/inserted Job (True, default) or not (False)
+    :type ref: int or None
+    :param ref: If provided, look up the job by its primary key instead of
+        (day, pair, jobtype, lineage).
 
     :rtype: :class:`~msnoise.msnoise_table_def.declare_tables.Job` or None
     :returns: If returnjob is True, returns the modified/inserted Job.
     """
     from sqlalchemy import text
+
     if ref:
         job = session.query(Job).filter(text("ref=:ref")).params(ref=ref).first()
     else:
-        job = session.query(Job)\
-            .filter(text("day=:day"))\
-            .filter(text("pair=:pair"))\
-            .filter(text("jobtype=:jobtype"))\
-            .params(day=day, pair=pair, jobtype=jobtype).first()
+        job = (session.query(Job)
+               .filter(text("day=:day"))
+               .filter(text("pair=:pair"))
+               .filter(text("jobtype=:jobtype"))
+               .filter(text("lineage=:lineage"))
+               .params(day=day, pair=pair, jobtype=jobtype, lineage=lineage)
+               .first())
+
     if job is None:
-        job = Job(day, pair, jobtype, 'T')
+        job = Job()
+        job.day = day
+        job.pair = pair
+        job.jobtype = jobtype
+        job.step_id = step_id
+        job.priority = priority
+        job.flag = flag
+        job.lastmod = datetime.datetime.utcnow()
+        job.lineage = lineage
         session.add(job)
     else:
-        job.flag = flag
-        job.lastmod = datetime.datetime.now(datetime.timezone.utc)
+        # Never demote a Done job back to Todo
+        if not (job.flag == "D" and flag == "T"):
+            job.flag = flag
+        job.step_id = step_id
+        job.priority = priority
+        job.lastmod = datetime.datetime.utcnow()
+        job.lineage = lineage
+
     if commit:
         session.commit()
     if returnjob:
         return job
 
 
-def massive_insert_job(jobs):
+def massive_insert_job(session, jobs):
     """
-    Routine to use a low level function to insert much faster a list of
-    :class:`~msnoise.msnoise_table_def.declare_tables.Job`. This method uses the Engine
-    directly, no need to pass a Session object.
+    Bulk-insert a list of job dicts into the jobs table.
 
-    :type jobs: list
-    :param jobs: a list of :class:`~msnoise.msnoise_table_def.declare_tables.Job` to insert.
+    Each dict must contain at minimum ``day``, ``pair``, ``jobtype``,
+    ``flag`` and ``lastmod`` keys.  Optional keys: ``step_id``, ``priority``,
+    ``lineage``.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object
+    :type jobs: list[dict]
+    :param jobs: Job records to insert.
     """
-    engine = get_engine()
-    with engine.connect() as conn:
-        conn.execute(
-            Job.__table__.insert(),
-            jobs)
-        try:
-            conn.commit()
-        except:
-            pass
+    job_records = [
+        {
+            'day':      j['day'],
+            'pair':     j['pair'],
+            'jobtype':  j['jobtype'],
+            'step_id':  j.get('step_id'),
+            'priority': j.get('priority', 0),
+            'flag':     j['flag'],
+            'lastmod':  j['lastmod'],
+            'lineage':  j.get('lineage'),
+        }
+        for j in jobs
+    ]
+    session.bulk_insert_mappings(Job, job_records)
+    session.commit()
 
 
 def massive_update_job(session, jobs, flag="D"):
@@ -1568,274 +1561,7 @@ def massive_update_job(session, jobs, flag="D"):
     return
 
 
-def is_next_job(session, flag='T', jobtype='CC'):
-    """
-    Are there any :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
-    with flag=`flag` and jobtype=`type`
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type flag: str
-    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
-
-    :rtype: bool
-    :returns: True if at least one :class:`~msnoise.msnoise_table_def.declare_tables.Job`
-        matches, False otherwise.
-    """
-    job = session.query(Job).\
-        filter(Job.jobtype == jobtype).\
-        filter(Job.flag == flag).first()
-    if job is None:
-        return False
-    else:
-        return True
-
-
-def get_next_job(session, flag='T', jobtype='CC', limit=99999):
-    """
-    Get the next :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
-    with flag=`flag` and jobtype=`jobtype`. Jobs of the same `type` are grouped
-    per day. This function also sets the flag of all selected Jobs to "I"n
-    progress.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type flag: str
-    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
-
-    :rtype: list
-    :returns: list of :class:`~msnoise.msnoise_table_def.declare_tables.Job`
-    """
-    from sqlalchemy import update
-    tmp = []
-    while not len(tmp):
-        jobs = session.query(Job).filter(Job.jobtype == jobtype).\
-            filter(Job.flag == flag).\
-            filter(Job.day == session.query(Job).
-                   filter(Job.jobtype == jobtype).
-                   filter(Job.flag == flag).first().day).\
-            limit(limit).with_for_update()
-
-        tmp = jobs.all()
-        refs = [_.ref for _ in tmp]
-        q = update(Job).values({"flag":"I"}).where(Job.ref.in_(refs))
-        session.execute(q)
-        # jobs.update({Job.flag: 'I'})
-        session.commit()
-    return tmp
-
-
-def is_dtt_next_job(session, flag='T', jobtype='DTT', ref=False):
-    """
-    Are there any DTT :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
-    with flag=`flag` and jobtype=`jobtype`. If `ref` is provided, checks if a
-    DTT "REF" job is present.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type flag: str
-    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
-    :type ref: bool
-    :param ref: Whether to check for a REF job (True) or not (False, default)
-
-    :rtype: bool
-    :returns: True if at least one Job matches, False otherwise.
-    """
-    q = session.query(Job.ref).\
-        filter(Job.flag == flag).\
-        filter(Job.jobtype == jobtype)
-    if ref:
-        job = q.filter(Job.pair == ref).filter(Job.day == 'REF').count()
-    else:
-        job = q.filter(Job.day != 'REF').count()
-    if job == 0:
-        return False
-    else:
-        return True
-
-
-def get_dtt_next_job(session, flag='T', jobtype='DTT'):
-    """
-    Get the next DTT :class:`~msnoise.msnoise_table_def.declare_tables.Job` in the database,
-    with flag=`flag` and jobtype=`jobtype`. Jobs are then grouped per station
-    pair. This function also sets the flag of all selected Jobs to "I"n
-    progress.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type flag: str
-    :param flag: Status of the Job: "T"odo, "I"n Progress, "D"one.
-
-    :rtype: tuple
-    :returns: (pairs, days, refs):
-        List of station pair names -
-        Days of the next DTT jobs -
-        Job IDs (for later being able to update their flag).
-    """
-    from sqlalchemy.sql.expression import func
-    if read_db_inifile().tech == 2:
-        rand = func.rand
-    else:
-        rand = func.random
-    try:
-        jobs = session.query(Job.ref, Job.day, Job.pair, Job.flag).filter(Job.flag == flag).\
-            filter(Job.jobtype == jobtype).filter(Job.day != 'REF').\
-            filter(Job.pair == session.query(Job).
-                   filter(Job.flag == flag).
-                   filter(Job.jobtype == jobtype).
-                   filter(Job.day != 'REF').
-                   order_by(rand()).first().pair).\
-            with_for_update()
-        tmp = jobs.all()
-        mappings = [{'ref': job.ref, 'flag': "I"} for job in tmp]
-        updated = False
-        while not updated:
-            try:
-                session.bulk_update_mappings(Job, mappings)
-                session.commit()
-                updated=True
-            except:
-                traceback.print_exc()
-                time.sleep(np.random.random())
-                pass
-        return tmp
-    except:
-        traceback.print_exc()
-        return []
-
-
-def reset_jobs(session, jobtype, alljobs=False, rule=None, reset_i=True, reset_e=True):
-    """
-    Sets the flag of all `jobtype` Jobs to "T"odo.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-    :type alljobs: bool
-    :param alljobs: If True, resets all jobsregardless of flag. If False (default),
-        only resets jobs with flags specified by reset_i and reset_e.
-    :type rule: str
-    :param rule: Optional custom SQL clause for filtering jobs to reset
-    :type reset_i: bool
-    :param reset_i: If True (default), reset jobs with 'I' flag
-    :type reset_e: bool
-    :param reset_e: If True (default), reset jobs with 'E' flag
-    """
-    dbini = read_db_inifile()
-    prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
-     # If a custom rule is provided, use direct SQL
-    if rule:
-        session.execute("UPDATE %sjobs set flag='T' where jobtype='%s' and %s"
-                        % (prefix, jobtype, rule))
-        session.commit()
-        return
-
-    # Get all jobs of the specified jobtype
-    base_query = session.query(Job).filter(Job.jobtype == jobtype)
-
-    if alljobs:
-        # If alljobs is True, reset all jobs regardless of flag
-        base_query.update({Job.flag: 'T'})
-    else:
-        # Reset only jobs with specified flags
-        if reset_i:
-            jobs_i = base_query.filter(Job.flag == "I")
-            jobs_i.update({Job.flag: 'T'})
-
-        if reset_e:
-            jobs_e = base_query.filter(Job.flag == "E")
-            jobs_e.update({Job.flag: 'T'})
-    session.commit()
-
-
-def get_job_types(session, jobtype='CC'):
-    """
-    Count the number of Jobs of a specific `type`,
-    grouped by `flag`.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type jobtype: str
-    :param jobtype: CrossCorrelation (CC) or dt/t (DTT) Job?
-
-    :rtype: list
-    :returns: list of [count, flag] pairs
-    """
-    from sqlalchemy.sql.expression import func
-    return session.query(func.count(Job.flag), Job.flag).\
-        filter(Job.jobtype == jobtype).group_by(Job.flag).all()
-
 # ── Workflow-aware job API ──────────────────────────────────
-
-
-def create_job_for_step(db, step_id, day, pair, priority=0, flag='T'):
-    """
-    Create a job for a specific workflow step
-
-    :param db: Database connection
-    :param step_id: WorkflowStep ID
-    :param day: Day in YYYY-MM-DD format
-    :param pair: Station pair
-    :param priority: Job priority
-    :param flag: Job status flag
-    :return: Created Job instance
-    """
-    # Get the step to derive jobtype
-    step = db.query(WorkflowStep).filter(
-        WorkflowStep.step_id == step_id
-    ).first()
-
-    if not step:
-        raise ValueError(f"WorkflowStep with id {step_id} not found")
-
-    jobtype = f"{step.step_name}_{step.set_number}"
-
-    job = Job(
-        day=day,
-        pair=pair,
-        flag=flag,
-        step_id=step_id,
-        jobtype=jobtype,
-        priority=priority
-    )
-
-    db.add(job)
-    db.commit()
-    return job
-
-
-def get_jobs_for_step(db, step_id, flag=None):
-    """
-    Get all jobs for a specific workflow step
-
-    :param db: Database connection
-    :param step_id: WorkflowStep ID
-    :param flag: Optional job status filter
-    :return: List of Job instances
-    """
-    query = db.query(Job).filter(
-        Job.step_id == step_id
-    )
-
-    if flag:
-        query = query.filter(Job.flag == flag)
-
-    return query.all()
 
 
 def get_next_job_for_step(
@@ -1995,98 +1721,6 @@ def get_workflow_job_counts(db):
         result[flag] = count
 
     return result
-
-
-def create_workflow_jobs(db, current_step_name, days=None, pairs=None):
-    """
-    Create jobs for the next workflow step(s) after completing a step
-
-    :param db: Database connection
-    :param current_step_name: Name of the completed step
-    :param days: List of days to create jobs for
-    :param pairs: List of station pairs to create jobs for
-    :return: List of created Job instances
-    """
-    # Find current step
-    current_step = db.query(WorkflowStep).filter(
-        WorkflowStep.step_name == current_step_name,
-    ).first()
-
-    if not current_step:
-        raise ValueError(f"WorkflowStep '{current_step_name}' not found")
-
-    # Find next steps via WorkflowLink
-    next_steps = db.query(WorkflowStep).join(
-        WorkflowLink, WorkflowLink.to_step_id == WorkflowStep.step_id
-    ).filter(
-        WorkflowLink.from_step_id == current_step.step_id,
-        WorkflowLink.is_active == True
-    ).all()
-
-    created_jobs = []
-
-    # Create jobs for each next step
-    for next_step in next_steps:
-        # Get appropriate pairs/days based on step type or use provided ones
-        if pairs is None:
-            pairs = _get_pairs_for_step(db, next_step)
-        if days is None:
-            days = _get_days_for_step(db, next_step)
-
-        for pair in pairs:
-            for day in days:
-                # Check if job already exists
-                existing_job = db.query(Job).filter(
-                    Job.day == day,
-                    Job.pair == pair,
-                    Job.step_id == next_step.step_id,
-                ).first()
-
-                if not existing_job:
-                    job = create_job_for_step(
-                        db, next_step.step_id, day, pair
-                    )
-                    created_jobs.append(job)
-
-    return created_jobs
-
-
-def _get_pairs_for_step(db, step):
-    """
-    Get appropriate station pairs for a workflow step
-
-    :param db: Database connection
-    :param step: WorkflowStep instance
-    :return: List of station pairs
-    """
-    # This is a placeholder - implement based on step type and requirements
-    # For now, return all active station pairs
-    return get_station_pairs(db, used=True)
-
-
-def _get_days_for_step(db, step):
-    """
-    Get appropriate days for a workflow step
-
-    :param db: Database connection
-    :param step: WorkflowStep instance
-    :return: List of days
-    """
-    # This is a placeholder - implement based on step type and requirements
-    # For now, return days from data availability
-    from datetime import datetime, timedelta
-
-    # Get recent days as example
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=30)
-
-    days = []
-    current_date = start_date
-    while current_date <= end_date:
-        days.append(current_date.strftime('%Y-%m-%d'))
-        current_date += timedelta(days=1)
-
-    return days
 
 
 # ============================================================
@@ -5053,26 +4687,4 @@ def xr_load_rms(root, lineage, step_name, seed_id):
 # ============================================================
 
 
-def get_filters(session, all=False, ref=None):
-    """Get Filters from the database.
 
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-
-    :type all: bool
-    :param all: Returns all filters from the database if True, or only filters
-        where `used` = 1 if False (default)
-
-    :rtype: list of :class:`~msnoise.msnoise_table_def.declare_tables.Filter`
-    :returns: a list of Filter
-    """
-    return [] #TODOOOOOOOO
-    if ref:
-        filter = session.query(Filter).filter(Filter.ref == ref).first()
-        return filter
-    if all:
-        filters = session.query(Filter).all()
-    else:
-        filters = session.query(Filter).filter(Filter.used == True).all()
-    return filters

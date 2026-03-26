@@ -75,6 +75,24 @@ WORKFLOW_CHAINS = {
     }
 }
 
+# Canonical processing order used for sorting workflow steps in the UI and
+# during step creation.  Keep in sync with WORKFLOW_CHAINS above.
+WORKFLOW_ORDER = [
+    'global',
+    'preprocess',
+    'cc',
+    'psd',
+    'psd_rms',
+    'filter',
+    'stack',
+    'refstack',
+    'mwcs',
+    'mwcs_dtt',
+    'stretching',
+    'wavelet',
+    'wavelet_dtt',
+]
+
 
 def declare_tables(prefix=None):
     """
