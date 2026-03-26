@@ -1561,6 +1561,61 @@ def massive_update_job(session, jobs, flag="D"):
     return
 
 
+def reset_jobs(session, jobtype, alljobs=False, reset_i=True, reset_e=True):
+    """Reset jobs with the given ``jobtype`` string back to "T"odo.
+
+    Works with the v2 workflow model where ``jobtype`` is a step name such
+    as ``"cc_1"`` or ``"refstack_1"``.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object
+    :type jobtype: str
+    :param jobtype: Step name to reset (e.g. ``"cc_1"``)
+    :type alljobs: bool
+    :param alljobs: If True reset all jobs regardless of current flag;
+        otherwise only resets "I" and/or "E" flagged jobs.
+    :type reset_i: bool
+    :param reset_i: Reset "I"n-progress jobs (default True)
+    :type reset_e: bool
+    :param reset_e: Reset "E"rror/failed jobs (default True)
+    """
+    from sqlalchemy import update as sa_update
+    q = sa_update(Job).where(Job.jobtype == jobtype)
+    if alljobs:
+        session.execute(q.values(flag='T'))
+    else:
+        flags = []
+        if reset_i:
+            flags.append('I')
+        if reset_e:
+            flags.append('F')
+        if flags:
+            session.execute(q.where(Job.flag.in_(flags)).values(flag='T'))
+    session.commit()
+
+
+def get_job_types(session, jobtype):
+    """Return job counts grouped by flag for a given ``jobtype`` string.
+
+    Works with the v2 workflow model where ``jobtype`` is a step name such
+    as ``"cc_1"``.  Returns a list of ``(count, flag)`` tuples, matching the
+    interface expected by the test suite.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object
+    :type jobtype: str
+    :param jobtype: Step name to query (e.g. ``"cc_1"``)
+    :rtype: list of (int, str)
+    :returns: List of (count, flag) pairs
+    """
+    from sqlalchemy import func
+    rows = (session.query(func.count(Job.flag), Job.flag)
+            .filter(Job.jobtype == jobtype)
+            .group_by(Job.flag)
+            .all())
+    return rows
+
+
 # ── Workflow-aware job API ──────────────────────────────────
 
 
@@ -1973,8 +2028,12 @@ def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
     # TODO: gather all those into a "sanitize params" def?
     params = _merge_params(orig_params, lineage_cfgs + [step_params])
 
-    params.components_to_compute = params.components_to_compute.split(',')
-    params.components_to_compute_single_station = params.components_to_compute_single_station.split(',')
+    # Split comma-separated component strings only when the param is present
+    # and not already a list (preprocess/psd steps don't carry these keys).
+    for key in ('components_to_compute', 'components_to_compute_single_station'):
+        val = getattr(params, key, None)
+        if val is not None and isinstance(val, str):
+            setattr(params, key, val.split(','))
 
     if hasattr(params, "mov_stack"):
         if not isinstance(params.mov_stack[0], tuple):

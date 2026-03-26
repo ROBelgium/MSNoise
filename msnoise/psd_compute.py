@@ -81,6 +81,8 @@ def main(loglevel="INFO"):
     logger.info("*** Starting: Compute PSD ***")
 
     db = connect()
+    # Always load the response, they are needed for the PSD calculations
+    responses = preload_instrument_responses(db, return_format="inventory")
 
     while is_next_job_for_step(db, step_category=CATEGORY):
         batch = get_next_lineage_batch(db, step_category=CATEGORY,
@@ -106,14 +108,6 @@ def main(loglevel="INFO"):
         period_step    = params.psd_ppsd_period_step_octaves
         period_limits  = params.psd_ppsd_period_limits
         db_bins        = params.psd_ppsd_db_bins
-
-        # Only preload responses when the step is actually configured to
-        # remove the instrument response.
-        if getattr(params, 'remove_response', 'N') in ('Y', 'y'):
-            logger.debug("Preloading all instrument responses")
-            responses = preload_instrument_responses(db, return_format="inventory")
-        else:
-            responses = None
 
         # lineage_names already contains the current step name
         # (drop_current_step_name=False), so use it directly for path
