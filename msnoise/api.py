@@ -2323,7 +2323,7 @@ def get_refstack_lineage_for_filter(session, filterid, refstack_set_number=1):
 # ============================================================
 
 
-def _extend_days(days):
+def extend_days(days):
     """Return a :class:`~pandas.DatetimeIndex` from *days* extended by one
     extra day at the end.
 

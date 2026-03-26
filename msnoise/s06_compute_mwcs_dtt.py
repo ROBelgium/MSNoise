@@ -74,7 +74,7 @@ def main(interval=1, loglevel="INFO"):
                 # mwcs = mwcs.loc[todo]
                 # mwcs = mwcs.dropna()
 
-                to_search = _extend_days(days)
+                to_search = extend_days(days)
                 mwcs = mwcs[mwcs.index.floor('d').isin(to_search)]
                 mwcs = mwcs.dropna()
 

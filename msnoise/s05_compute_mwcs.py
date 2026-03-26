@@ -173,7 +173,7 @@ def main(loglevel="INFO"):
                 # todo = data.index.intersection()
                 # data = data.loc[todo]
 
-                to_search = _extend_days(days)
+                to_search = extend_days(days)
                 # data = data[(data.index.floor('d').isin(to_search) or data.index.ceil('d').isin(to_search))]
                 data = data[data.index.floor('d').isin(to_search)]
                 data = data.dropna()

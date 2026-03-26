@@ -140,7 +140,7 @@ def main(loglevel="INFO", batch_size=None):
                     logger.error(f"FILE DOES NOT EXIST: {fp}, skipping")
                     continue
 
-                to_search = _extend_days(days)
+                to_search = extend_days(days)
                 data = data[data.index.floor('d').isin(to_search)]
                 data = data.dropna()
 
