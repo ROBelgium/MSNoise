@@ -35,33 +35,31 @@ classifiers = [
 
 dependencies = [
     "setuptools",
-    "numpy>=1.0",
+    "numpy>=1.20",        # practical minimum for array operations used
     "scipy",
-    "pandas",
+    "pandas>=2.0",        # pandas 2.x required; patch4 removed the deprecated .append()
     "matplotlib",
     "sqlalchemy",
     "sqlalchemy-utils",
     "obspy",
     "click",
     "click-plugins",
-    "click-command-tree",
+    # "click-command-tree",  # CLI code using it is commented out
     "pymysql",
     "flask",
-    "flask-admin<2",
+    "flask-admin<2",      # flask-admin 2.x has breaking changes
     "flask_babel",
     "flask-wtf",
     "markdown",
     "folium",
-    "wtforms<3.2",
+    "wtforms<3.2",        # flask-admin compat: wtforms>=3.2 breaks form rendering
     "jinja2",
-    "scandir",
+    # "scandir",            # Python 2 backport; os.scandir is stdlib since Python 3.5
     "logbook",
     "xarray",
     "pooch",
-    "pycwt",
-    "pytest",
-    "pytest-order",
-    "tables",
+    "pycwt",              # required for wavelet coherence step (s08_compute_wct)
+    "tables",             # PyTables: backend for pd.read_hdf/to_hdf in get_results_all and export_allcorr
 ]
 
 [project.optional-dependencies]
@@ -70,6 +68,10 @@ doc = [
     "sphinx_bootstrap_theme",
     "numpydoc",
     "sphinx_gallery"
+]
+test = [
+    "pytest",
+    "pytest-order",
 ]
 
 [project.scripts]
