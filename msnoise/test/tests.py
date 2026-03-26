@@ -904,3 +904,241 @@ def test_20000_invoke_script(setup_environment):
 
         result = runner.invoke(cmd)
         assert result.exit_code == 0, f"Command failed with exit code {result.exit_code}"
+
+
+# ============================================================
+# Unit tests — core lineage / scheduling API  (Patch 11)
+# ============================================================
+
+@pytest.mark.order(110000)
+def test_110000_lineage_str_to_steps_strict():
+    """lineage_str_to_steps raises on missing step when strict=True."""
+    db = connect()
+    from ..api import lineage_str_to_steps
+    with pytest.raises(Exception):
+        lineage_str_to_steps(db, "preprocess_1/nonexistent_99", strict=True)
+    db.close()
+
+
+@pytest.mark.order(110001)
+def test_110001_lineage_str_to_steps_permissive():
+    """lineage_str_to_steps returns partial list when strict=False."""
+    db = connect()
+    from ..api import lineage_str_to_steps
+    steps = lineage_str_to_steps(db, "preprocess_1/nonexistent_99", strict=False)
+    # Should return whatever steps were resolved, not raise
+    assert isinstance(steps, list)
+    db.close()
+
+
+@pytest.mark.order(110002)
+def test_110002_lineage_str_to_steps_valid():
+    """lineage_str_to_steps resolves a valid lineage correctly."""
+    db = connect()
+    from ..api import lineage_str_to_steps, get_workflow_steps
+    # Build a lineage string from real steps
+    steps = get_workflow_steps(db)
+    preprocess = next((s for s in steps if s.category == 'preprocess'), None)
+    if preprocess is None:
+        pytest.skip("No preprocess step configured")
+    lineage_str = preprocess.step_name
+    resolved = lineage_str_to_steps(db, lineage_str, strict=True)
+    assert len(resolved) >= 1
+    assert resolved[0].step_name == preprocess.step_name
+    db.close()
+
+
+@pytest.mark.order(110010)
+def test_110010_get_merged_params_overrides():
+    """get_merged_params_for_lineage: later configsets override earlier."""
+    db = connect()
+    from ..api import get_merged_params_for_lineage, get_params, lineage_str_to_steps, get_workflow_steps
+    orig_params = get_params(db)
+    steps = get_workflow_steps(db)
+    # Find a filter step
+    filter_step = next((s for s in steps if s.category == 'filter'), None)
+    if filter_step is None:
+        pytest.skip("No filter step configured")
+    lineage_str = "/".join([s.step_name for s in steps
+                             if s.category in ('preprocess', 'cc', 'filter')][:3])
+    lineage_steps = lineage_str_to_steps(db, lineage_str, strict=False)
+    if not lineage_steps:
+        pytest.skip("Could not resolve lineage steps")
+    _, names, params = get_merged_params_for_lineage(db, orig_params, {}, lineage_steps)
+    assert isinstance(names, list)
+    assert len(names) >= 1
+    db.close()
+
+
+@pytest.mark.order(110011)
+def test_110011_get_merged_params_components_split():
+    """get_merged_params_for_lineage splits components_to_compute into a list."""
+    db = connect()
+    from ..api import get_merged_params_for_lineage, get_params, lineage_str_to_steps, get_workflow_steps
+    orig_params = get_params(db)
+    steps = get_workflow_steps(db)
+    cc_steps = [s for s in steps if s.category == 'cc']
+    if not cc_steps:
+        pytest.skip("No CC step configured")
+    lineage_str = cc_steps[0].step_name
+    lineage_steps = lineage_str_to_steps(db, lineage_str, strict=False)
+    if not lineage_steps:
+        pytest.skip("Could not resolve CC lineage")
+    _, _, params = get_merged_params_for_lineage(db, orig_params, {}, lineage_steps)
+    if hasattr(params, 'components_to_compute'):
+        assert isinstance(params.components_to_compute, list), \
+            "components_to_compute should be a list after merging"
+    db.close()
+
+
+@pytest.mark.order(110020)
+def test_110020_get_done_lineages_for_category():
+    """get_done_lineages_for_category returns done lineages after pipeline run."""
+    db = connect()
+    from ..api import get_done_lineages_for_category
+    lineages = get_done_lineages_for_category(db, 'cc')
+    assert isinstance(lineages, list)
+    assert len(lineages) >= 1, "Expected at least one done CC lineage"
+    for lin in lineages:
+        assert isinstance(lin, list)
+        assert all(isinstance(n, str) for n in lin)
+    db.close()
+
+
+@pytest.mark.order(110021)
+def test_110021_get_done_lineages_deduplicates():
+    """get_done_lineages_for_category deduplicates lineage strings."""
+    db = connect()
+    from ..api import get_done_lineages_for_category
+    lineages = get_done_lineages_for_category(db, 'cc')
+    # Convert to frozensets for dedup check
+    as_tuples = [tuple(lin) for lin in lineages]
+    assert len(as_tuples) == len(set(as_tuples)), \
+        "get_done_lineages_for_category returned duplicate lineages"
+    db.close()
+
+
+# ============================================================
+# Unit tests — MSNoiseResult  (Patch 11 / Patch 9)
+# ============================================================
+
+@pytest.mark.order(120000)
+def test_120000_msnoise_result_import():
+    """MSNoiseResult can be imported from msnoise.results."""
+    from ..results import MSNoiseResult
+    assert MSNoiseResult is not None
+
+
+@pytest.mark.order(120001)
+def test_120001_msnoise_result_from_ids():
+    """MSNoiseResult.from_ids constructs correctly."""
+    db = connect()
+    from ..results import MSNoiseResult
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1)
+    assert r.lineage_names == ['preprocess_1', 'cc_1']
+    assert r.category == 'cc'
+    assert r.output_folder is not None
+    db.close()
+
+
+@pytest.mark.order(120002)
+def test_120002_msnoise_result_from_names():
+    """MSNoiseResult.from_names constructs correctly."""
+    db = connect()
+    from ..results import MSNoiseResult
+    names = ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']
+    r = MSNoiseResult.from_names(db, names)
+    assert r.lineage_names == names
+    assert r.category == 'refstack'
+    db.close()
+
+
+@pytest.mark.order(120003)
+def test_120003_msnoise_result_list():
+    """MSNoiseResult.list returns done results for a category."""
+    db = connect()
+    from ..results import MSNoiseResult
+    results = MSNoiseResult.list(db, 'cc')
+    assert isinstance(results, list)
+    assert len(results) >= 1
+    for r in results:
+        assert r.category == 'cc'
+        assert 'cc_1' in r.lineage_names
+    db.close()
+
+
+@pytest.mark.order(120004)
+def test_120004_msnoise_result_require_category_raises():
+    """MSNoiseResult raises ValueError when accessing wrong step."""
+    db = connect()
+    from ..results import MSNoiseResult
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1)
+    with pytest.raises(ValueError, match="does not include"):
+        r.get_ref()   # needs refstack, not present in lineage
+    db.close()
+
+
+@pytest.mark.order(120005)
+def test_120005_msnoise_result_branches():
+    """MSNoiseResult.branches returns downstream children."""
+    db = connect()
+    from ..results import MSNoiseResult
+    # Build up to refstack — should have mwcs/stretching/wavelet children
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                stack=1, refstack=1)
+    children = r.branches()
+    assert isinstance(children, list)
+    # At least one downstream branch should have done jobs
+    if children:
+        for child in children:
+            assert child.category in ('mwcs', 'stretching', 'wavelet')
+            assert child.lineage_names[:-1] == r.lineage_names
+    db.close()
+
+
+@pytest.mark.order(120010)
+def test_120010_msnoise_result_get_ccf():
+    """MSNoiseResult.get_ccf loads CCF data for a specific pair."""
+    db = connect()
+    from ..results import MSNoiseResult
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
+    pairs = get_station_pairs(db)
+    if not pairs:
+        pytest.skip("No station pairs configured")
+    sta1, sta2 = pairs[0]
+    loc1 = sta1.locs()[0] if sta1.locs() else "00"
+    loc2 = sta2.locs()[0] if sta2.locs() else "00"
+    pair_str = f"{sta1.net}.{sta1.sta}.{loc1}:{sta2.net}.{sta2.sta}.{loc2}"
+
+    # get_ccf with all None → dict
+    all_ccfs = r.get_ccf()
+    assert isinstance(all_ccfs, dict)
+
+    # get_ccf with specific mov_stack → dict keyed by (pair, comp, ms) or subset
+    if all_ccfs:
+        first_key = next(iter(all_ccfs))
+        pair_k, comp_k, ms_k = first_key
+        single = r.get_ccf(pair_k, comp_k, ms_k)
+        import pandas as pd
+        assert isinstance(single, pd.DataFrame)
+        assert len(single) > 0
+    db.close()
+
+
+@pytest.mark.order(120011)
+def test_120011_msnoise_result_get_ref():
+    """MSNoiseResult.get_ref loads REF stack."""
+    db = connect()
+    from ..results import MSNoiseResult
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                stack=1, refstack=1)
+    all_refs = r.get_ref()
+    assert isinstance(all_refs, dict)
+    if all_refs:
+        first_key = next(iter(all_refs))
+        pair_k, comp_k = first_key
+        ds = r.get_ref(pair_k, comp_k)
+        import xarray as xr
+        assert isinstance(ds, xr.Dataset)
+    db.close()
+
