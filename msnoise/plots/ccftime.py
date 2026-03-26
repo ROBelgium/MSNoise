@@ -48,11 +48,8 @@ from ..api import (
     check_stations_uniqueness,
     connect,
     get_logger,
-    get_merged_params_for_lineage,
-    get_params,
-    lineage_str_to_steps,
-    xr_get_ccf,
 )
+from ..results import MSNoiseResult
 
 
 def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=1,
@@ -62,11 +59,9 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
     logger = get_logger('msnoise.cc_plot_ccftime', loglevel,
                         with_pid=True)
     db = connect()
-    params = get_params(db)
-    lineage_names = [f"preprocess_{preprocess_id}",f"cc_{cc_id}",f"filter_{filter_id}", f"stack_{stack_id}"]
-    lineage_str = "/".join(lineage_names)
-    steps = lineage_str_to_steps(db, lineage_str, "/")
-    paralineage, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
+    result = MSNoiseResult.from_ids(db, preprocess=preprocess_id, cc=cc_id,
+                                    filter=filter_id, stack=stack_id)
+    params = result.params
     mov_stack = params.mov_stack[stack_item-1]
     start, end, datelist = build_movstack_datelist(db)
 
@@ -84,8 +79,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
 
     pair = "_".join([sta1, sta2])
     try:
-        stack_total = xr_get_ccf(params.output_folder, lineage_names,
-               sta1, sta2, components, mov_stack, None)
+        stack_total = result.get_ccf(f"{sta1}:{sta2}", components, mov_stack)
         t = stack_total.columns.values
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)

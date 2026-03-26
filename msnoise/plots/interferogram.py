@@ -18,8 +18,7 @@ Example:
 # plot interferogram
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.dates import date2num, DateFormatter, YearLocator, DayLocator,\
-    HourLocator
+from matplotlib.dates import date2num, DateFormatter
 from matplotlib.widgets import Cursor
 
 from obspy.signal.filter import bandpass
@@ -28,14 +27,10 @@ from ..api import (
     build_movstack_datelist,
     check_stations_uniqueness,
     connect,
-    get_config,
     get_config_set_details,
     get_logger,
-    get_merged_params_for_lineage,
-    get_params,
-    lineage_str_to_steps,
-    xr_get_ccf,
 )
+from ..results import MSNoiseResult
 
 
 def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=1,
@@ -44,16 +39,12 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
     logger = get_logger('msnoise.cc_plot_interferogram', loglevel,
                         with_pid=True)
     db = connect()
-    params = get_params(db)
-    lineage_names = [f"preprocess_{preprocess_id}", f"cc_{cc_id}", f"filter_{filter_id}", f"stack_{stack_id}"]
-    lineage_str = "/".join(lineage_names)
-    steps = lineage_str_to_steps(db, lineage_str, "/")
-    paralineage, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
+    result = MSNoiseResult.from_ids(db, preprocess=preprocess_id, cc=cc_id,
+                                    filter=filter_id, stack=stack_id)
+    params = result.params
     mov_stack = params.mov_stack[stack_item - 1]
     start, end, datelist = build_movstack_datelist(db)
 
-
-    start, end, datelist = build_movstack_datelist(db)
     if refilter:
         freqmin, freqmax = refilter.split(':')
         freqmin = float(freqmin)
@@ -69,16 +60,12 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
 
     pair = "%s:%s" % (sta1, sta2)
 
-    # print(mov_stack)
-    output_folder = get_config(db, 'output_folder') or 'OUTPUT'
-
     logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filter_id,
                                         mov_stack))
 
 
     try:
-        data = xr_get_ccf(params.output_folder, lineage_names,
-               sta1, sta2, components, mov_stack, None)
+        data = result.get_ccf(f"{sta1}:{sta2}", components, mov_stack)
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
         return

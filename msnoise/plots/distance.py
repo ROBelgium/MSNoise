@@ -19,15 +19,12 @@ import matplotlib.pyplot as plt
 from obspy import Trace
 from ..api import (
     connect,
-    get_config_set_details,
     get_interstation_distance,
     get_logger,
-    get_params,
     get_refstack_lineage_for_filter,
-    get_stack_lineage_for_filter,
     get_station_pairs,
-    xr_get_ref,
 )
+from ..results import MSNoiseResult
 
 import numpy as np
 
@@ -37,20 +34,9 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
                         with_pid=True)
     db = connect()
 
-    # Build merged params from all configsets in the lineage — same approach
-    # as batch["params"] in the processing steps.
-    # global_1 is excluded from the lineage by get_stack_lineage_for_filter;
-    # global params are already in get_params(db).
-    # Use get_refstack_lineage_for_filter so xr_get_ref finds files under
-    # the refstack step folder (.../stack_1/refstack_1/_output/REF/...).
     lineage = get_refstack_lineage_for_filter(db, filterid)
-    stack_lineage = get_stack_lineage_for_filter(db, filterid)
-    params = get_params(db)
-    for step_name in lineage:
-        category, set_num = step_name.rsplit('_', 1)
-        cfg = get_config_set_details(db, category, int(set_num), format='AttribDict')
-        if cfg:
-            params.update(cfg)
+    result = MSNoiseResult.from_names(db, lineage)
+    params = result.params
 
     cc_sampling_rate = float(params.cc_sampling_rate)
     maxlag = float(params.maxlag)
@@ -84,8 +70,8 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
                         continue
 
                 try:
-                    ref = xr_get_ref(output_folder, lineage, sta1, sta2, components, taxis)
-                    ref = Trace(data=ref.CCF.values.copy())
+                    ds = result.get_ref(f"{sta1}:{sta2}", components)
+                    ref = Trace(data=ds.REF.values.copy())
                     ref.stats.sampling_rate = cc_sampling_rate
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)

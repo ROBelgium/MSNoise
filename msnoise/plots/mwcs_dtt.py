@@ -19,11 +19,9 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 
 from ..api import (
-    connect, get_params, get_logger, build_movstack_datelist,
-    get_done_lineages_for_category, compute_dvv,
-    resolve_lineage_params,
-    get_config, get_config_set_details, lineage_str_to_steps, get_merged_params_for_lineage
+    connect, get_logger,
 )
+from ..results import MSNoiseResult
 
 
 def main(preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=None, refstack_id=1,
@@ -48,18 +46,16 @@ def main(preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=None, ref
     logger = get_logger('msnoise.cc_dtt_plot_dvv', loglevel, with_pid=True)
 
     db = connect()
-    params = get_params(db)
-    lineage_names = [f"preprocess_{preprocess_id}", f"cc_{cc_id}",
-                     f"filter_{filter_id}", f"stack_{stack_id}", f"refstack_{refstack_id}",
-                     f"mwcs_{mwcs_id}", f"mwcs_dtt_{mwcs_dtt_id}"]
-    lineage_str = "/".join(lineage_names)
-    steps = lineage_str_to_steps(db, lineage_str, "/")
-    paralineage, lineage_names, params = get_merged_params_for_lineage(db, params, {}, steps)
+    result = MSNoiseResult.from_ids(db, preprocess=preprocess_id, cc=cc_id,
+                                    filter=filter_id, stack=stack_id,
+                                    refstack=refstack_id, mwcs=mwcs_id,
+                                    mwcs_dtt=mwcs_dtt_id)
+    params = result.params
 
     # Normalise dttname: legacy 'M' → 'm'
     col = dttname.lower() if dttname else 'm'
 
-    logger.info("Using lineage: %s" % "/".join(lineage_names))
+    logger.info("Using lineage: %s" % "/".join(result.lineage_names))
 
     # ------------------------------------------------------------------ #
     # Moving stacks                                                        #
@@ -92,10 +88,7 @@ def main(preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=None, ref
 
         for comp in comp_list:
             try:
-                stats = compute_dvv(
-                    db, params.output_folder, lineage_names, mov_stack,
-                    components=comp, params=params,
-                )
+                stats = result.get_dvv(comp, mov_stack)
             except ValueError:
                 logger.warning(
                     "No mwcs_dtt data for mov_stack=%s comp=%s" % (mov_stack, comp)
