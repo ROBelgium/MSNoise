@@ -72,7 +72,9 @@ could occur with SQLite.
 """
 
 import logbook
+import time
 
+import numpy as np
 from obspy.signal.invsim import cosine_taper
 from obspy.signal.regression import linear_regression
 import pandas as pd

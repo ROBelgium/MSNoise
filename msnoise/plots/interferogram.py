@@ -16,6 +16,7 @@ Example:
 
 """
 # plot interferogram
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num, DateFormatter, YearLocator, DayLocator,\
     HourLocator

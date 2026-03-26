@@ -13,7 +13,9 @@ Example:
 """
 
 import glob
-import pandas as pd
+import logging
+import os
+
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num
 from matplotlib.gridspec import GridSpec
@@ -49,7 +51,7 @@ def main(net, sta, loc, chan, time_of_weekday=None, period_lim=None, show=False,
     logger.debug("Calculate histogram...")
     ppsd.calculate_histogram( time_of_weekday=time_of_weekday)
     if len(ppsd._times_processed) < 2:
-        logger.warning("Not enough data for %s.%s - %s"%(net, sta, comp))
+        logger.warning("Not enough data for %s.%s - %s"%(net, sta, chan))
         return
     logger.info("Plotting PPSD...")
     fig = ppsd.plot(show_mean=True, show=False, period_lim=period_lim,show_coverage=False)

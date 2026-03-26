@@ -32,7 +32,7 @@ It is sometimes useful to refilter the CCFs on the fly:
 
 """
 # plot interferogram
-
+import numpy as np
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Cursor
