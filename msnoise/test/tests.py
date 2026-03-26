@@ -28,7 +28,6 @@ from ..s01_scan_archive import parse_crondays
 from ..s02_new_jobs import main as new_jobs_main
 from ..s03_compute_no_rotation import main as compute_cc_main
 from ..s04_stack_mov import main as stack_mov
-from ..s04_stack_ref import main as stack_ref  # deprecated
 from ..s04_stack_refstack import main as stack_refstack_main
 from ..s05_compute_mwcs import main as compute_mwcs_main
 from ..s06_compute_mwcs_dtt import main as compute_dtt_main

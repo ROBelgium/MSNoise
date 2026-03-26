@@ -19,7 +19,7 @@ except ImportError:
 
 
 from .. import MSNoiseError, DBConfigNotFoundError
-from ..api import connect, get_config, update_station, get_logger, get_job_types
+from ..api import connect, get_config, update_station, get_logger
 from ..api import delete_config_set, list_config_sets, get_config_set_details
 
 from ..msnoise_table_def import DataAvailability
@@ -128,17 +128,18 @@ def info_folders(db):
         click.echo(" - %s exists" % output_folder)
     else:
         if get_config(db, 'keep_all') in ['Y', 'y']:
-            for job in get_job_types(db):
-                if job[1] == 'D':
-                    if job[0] > 0:
-                        click.secho(
-                            " - %s does not exists and that is not normal"
-                            " (%i CC jobs done)" % (output_folder, job[0]),
-                            fg='red')
-                    else:
-                        click.secho(
-                            " - %s does not exists and that is normal"
-                            " (%i CC jobs done)" % (output_folder, job[0]))
+            from ..api import get_workflow_job_counts
+            counts = get_workflow_job_counts(db)
+            done_count = counts.get('D', 0)
+            if done_count > 0:
+                click.secho(
+                    " - %s does not exists and that is not normal"
+                    " (%i jobs done)" % (output_folder, done_count),
+                    fg='red')
+            else:
+                click.secho(
+                    " - %s does not exists and that is normal"
+                    " (%i jobs done)" % (output_folder, done_count))
         else:
             click.secho(
                 " - %s does not exists (and that is normal because"
@@ -149,7 +150,6 @@ def info_parameters(db):
     """
     Show values of each configuration parameters.
     """
-    from ..api import get_filters
     from ..default import default
     click.echo('')
     click.echo('Configuration values:'
@@ -157,19 +157,6 @@ def info_parameters(db):
             '   | Green indicates "M"odified values')
     # TODO: add plugins params
     show_config_values(db, default.keys())
-
-    click.echo('')
-    click.echo('Filters:')
-    click.echo(' ID:   [freqmin:freqmax]    CC  SC  AC   Used?') 
-
-    for f in get_filters(db, all=True):
-        click.echo(' {:2d}: {:^15s} {:1s} {:1s} {:1s}  {:1s}'
-            .format(f.ref,
-                '[{:.3f}:{:.3f}]'.format(f.freqmin, f.freqmax),
-                'Y' if f.CC else 'N',
-                'Y' if f.SC else 'N',
-                'Y' if f.AC else 'N',
-                'Y' if f.used else 'N'))
 
 
 def info_stations(db):
@@ -200,29 +187,17 @@ def info_jobs(db):
     """
     Show information about jobs registered in database.
     """
-    from ..api import get_job_types
-
-    jobtypes = {}
-    jobtypes["QC"] = ["PSD", "PSD_RMS"]
-    jobtypes["CC"] = ["CC", "STACK", "MWCS", "DTT", "DVV", "WCT", "STR"]
-
+    from ..api import get_workflow_job_counts
+    counts = get_workflow_job_counts(db)
     click.echo("Jobs:")
-    for category in ["QC", "CC"]:
-        click.echo(' %s:' % category)
-        for jobtype in jobtypes[category]:
-            click.echo('  %s:' % jobtype)
-            n = None
-            for (n, jobtype) in get_job_types(db, jobtype):
-                click.echo("   %s : %i" % (jobtype, n))
-            if n is None:
-                click.echo('   none defined')
+    for flag, label in [('T', 'Todo'), ('I', 'In Progress'), ('D', 'Done'), ('F', 'Failed')]:
+        click.echo('  %s: %i' % (label, counts.get(flag, 0)))
 
 
 def info_plugins(db):
     """
     Show information about configured plugins.
     """
-    from ..api import get_config, get_job_types
     plugins = get_config(db, "plugins")
     if not plugins:
         return
@@ -234,9 +209,7 @@ def info_plugins(db):
             click.echo('')
             click.echo('Plugin: %s' % module_name)
             for row in ep.load()():
-                click.echo(' %s:' % row["name"])
-                for (n, jobtype) in get_job_types(db, row["name"]):
-                    click.echo("  %s : %i" % (jobtype, n))
+                click.echo(' %s' % row["name"])
 
 
 # if sys.version_info < (3, 11):
