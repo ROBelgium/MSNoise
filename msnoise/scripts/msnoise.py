@@ -30,6 +30,32 @@ class OrderedGroup(click.Group):
         return self.commands.keys()
 
 
+def run_threaded(main_func, ctx, **kwargs):
+    """Run *main_func* once (threads=1) or in parallel worker processes.
+
+    Reads ``MSNOISE_threads``, ``MSNOISE_threadsdelay`` and
+    ``MSNOISE_verbosity`` from *ctx.obj* so callers don't have to repeat
+    that boilerplate.  Any extra keyword arguments are forwarded to
+    *main_func* alongside ``loglevel``.
+    """
+    threads  = ctx.obj['MSNOISE_threads']
+    delay    = ctx.obj['MSNOISE_threadsdelay']
+    loglevel = ctx.obj['MSNOISE_verbosity']
+    if threads == 1:
+        main_func(loglevel=loglevel, **kwargs)
+    else:
+        from multiprocessing import Process
+        processes = []
+        for i in range(threads):
+            p = Process(target=main_func,
+                        kwargs={"loglevel": loglevel, **kwargs})
+            p.start()
+            processes.append(p)
+            time.sleep(delay)
+        for p in processes:
+            p.join()
+
+
 def parse_extra_args(ctx, param, extra_args):
     # extra_args = extra_args.split(" ")
     kwargs = {}
@@ -1190,22 +1216,7 @@ def cc():
 def preprocess(ctx, threads, verbose):
     """Run preprocessing computations on workflow jobs"""
     from ..s02_preprocessing import main
-
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel})
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+    run_threaded(main, ctx)
 
 
 @cc.command(name='compute_cc')
@@ -1213,21 +1224,7 @@ def preprocess(ctx, threads, verbose):
 def cc_compute_cc(ctx):
     """Computes the CC jobs (based on the "New Jobs" identified)"""
     from ..s03_compute_no_rotation import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel})
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+    run_threaded(main, ctx)
 
 
 @cc.command(name='compute_cc_rot')
@@ -1235,21 +1232,7 @@ def cc_compute_cc(ctx):
 def cc_compute_cc_rot(ctx):
     """Computes the CC jobs too (allows for R or T components)"""
     from msnoise.unused.s03compute_cc import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel})
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+    run_threaded(main, ctx)
 
 
 @cc.command(name="stack")
@@ -1322,22 +1305,7 @@ def cc_stack_refstack(ctx):
       computed on-the-fly inside the MWCS/stretching/WCT workers.
     """
     from ..s04_stack_refstack import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay   = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel})
-            p.start()
-            processes.append(p)
-            import time as _time
-            _time.sleep(delay)
-        for p in processes:
-            p.join()
+    run_threaded(main, ctx)
 
 
 @cc.group(name="plot")
@@ -1534,21 +1502,7 @@ def dtt():
 def dtt_compute_mwcs(ctx):
     """Computes the MWCS jobs"""
     from ..s05_compute_mwcs import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel})
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+    run_threaded(main, ctx)
 
 
 @dtt.command(name='compute_mwcs_dtt')
@@ -1556,21 +1510,7 @@ def dtt_compute_mwcs(ctx):
 def dtt_compute_dtt(ctx):
     """Computes the dt/t jobs based on the new MWCS data"""
     from ..s06_compute_mwcs_dtt import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel})
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+    run_threaded(main, ctx)
 
 
 @dtt.command(name='compute_stretching')
@@ -1578,73 +1518,29 @@ def dtt_compute_dtt(ctx):
 def dtt_compute_stretching2(ctx):
     """Computes the stretching based on the new stacked data"""
     from ..s10_stretching import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main()
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main)
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+    run_threaded(main, ctx)
 
 
-# @dtt.command(name='compute_mwcs_dvv')
-# @click.pass_context
-# def dtt_compute_dvv(ctx):
-#     """Computes the dt/t jobs based on the new DTT data"""
-#     from ..s07_compute_dvv import main
-#     threads = ctx.obj['MSNOISE_threads']
-#     delay = ctx.obj['MSNOISE_threadsdelay']
-#     loglevel = ctx.obj['MSNOISE_verbosity']
-#     if threads == 1:
-#         main(loglevel=loglevel)
-#     else:
-#         from multiprocessing import Process
-#         processes = []
-#         for i in range(threads):
-#             p = Process(target=main, kwargs={"loglevel": loglevel})
-#             p.start()
-#             processes.append(p)
-#             time.sleep(delay)
-#         for p in processes:
-#             p.join()
+@dtt.command(name='compute_mwcs_dvv')
+@click.pass_context
+def dtt_compute_dvv(ctx):
+    """Computes the dt/t jobs based on the new DTT data"""
+    from ..s07_compute_dvv import main
+    run_threaded(main, ctx)
 
 @dtt.command(name='compute_wct')
 @click.pass_context
-@click.option('-b', '--batch-size', default=5, help='Number of jobs to process in each batch', type=int)
-def dtt_compute_wct(ctx, batch_size):
+def dtt_compute_wct(ctx):
     """Computes the wavelet jobs based on the new STACK data"""
     from ..s08_compute_wct import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    if threads == 1:
-        main(loglevel=loglevel, batch_size=batch_size)
-    else:
-        from multiprocessing import Process
-        processes = []
-        for i in range(threads):
-            p = Process(target=main, kwargs={"loglevel": loglevel, "batch_size": batch_size})
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+    run_threaded(main, ctx)
 
 @dtt.command(name='compute_wct_dtt')
 @click.pass_context
 def dtt_compute_wct_dtt(ctx):
     """Computes dv/v from WCT results (wavelet_dtt step, lineage-based)"""
     from ..s09_compute_wct_dtt import main
-    loglevel = ctx.obj['MSNOISE_verbosity']
-    main(loglevel=loglevel)
+    run_threaded(main, ctx)
 
 @dtt.group(name="plot")
 def dtt_plot():
@@ -1815,23 +1711,7 @@ def qc_compute_psd(ctx, njobs_per_worker):
     """Computes the PSD jobs, saves results as NetCDF files.
        Based on New or Modified files identified by the new_jobs step."""
     from ..psd_compute import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-
-    if threads == 1:
-        main(loglevel=loglevel, njobs_per_worker=njobs_per_worker)
-    else:
-        from multiprocessing import Process
-        processes = []
-        kwargs = {"loglevel": loglevel, "njobs_per_worker": njobs_per_worker}
-        for i in range(threads):
-            p = Process(target=main, kwargs=kwargs)
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+    run_threaded(main, ctx, njobs_per_worker=njobs_per_worker)
 
 
 
@@ -1853,23 +1733,7 @@ def qc_plot_psd(ctx, seed_id):
 def qc_compute_rms(ctx):
     """Computes the RMS from PSD NetCDF files."""
     from ..psd_compute_rms import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
-
-    if threads == 1:
-        main(loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        kwargs = {"loglevel": loglevel}
-        for i in range(threads):
-            p = Process(target=main, kwargs=kwargs)
-            p.start()
-            processes.append(p)
-            time.sleep(delay)
-        for p in processes:
-            p.join()
+    run_threaded(main, ctx)
 
 
 

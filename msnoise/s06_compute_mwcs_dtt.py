@@ -19,7 +19,7 @@ from .api import (
 )
 
 
-def main(interval=1, loglevel="INFO"):
+def main(loglevel="INFO"):
     logger = get_logger('msnoise.mwcs_dtt', loglevel, with_pid=True)
     logger.info('*** Starting: Compute DT/T ***')
     db = connect()

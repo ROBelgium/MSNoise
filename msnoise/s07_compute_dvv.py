@@ -16,7 +16,7 @@ from .api import (
 )
 
 
-def main(interval=1, loglevel="INFO"):
+def main(loglevel="INFO"):
     logger = get_logger('msnoise.stretching', loglevel, with_pid=True)
     logger.info('*** Starting: Compute DV/V ***')
     db = connect()

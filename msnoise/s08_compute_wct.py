@@ -62,7 +62,7 @@ from .api import (
     xwt,
 )
 
-def main(loglevel="INFO", batch_size=None):
+def main(loglevel="INFO"):
     """
     Main function to process WCT jobs using lineage-based approach
     """
