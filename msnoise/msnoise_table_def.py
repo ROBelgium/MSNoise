@@ -14,7 +14,7 @@ from sqlalchemy.sql import func, text
 
 WORKFLOW_CHAINS = {
     'global': {
-        'next_steps': ['preprocess', 'qc'],
+        'next_steps': ['preprocess', 'psd'],
         'is_entry_point': True,
         'is_terminal': False
     },
@@ -23,7 +23,12 @@ WORKFLOW_CHAINS = {
         'is_entry_point': False,
         'is_terminal': False
     },
-    'qc': {
+    'psd': {
+        'next_steps': ['psd_rms'],
+        'is_entry_point': False,
+        'is_terminal': False
+    },
+    'psd_rms': {
         'next_steps': [],
         'is_entry_point': False,
         'is_terminal': True
