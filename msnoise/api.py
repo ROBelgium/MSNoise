@@ -3297,7 +3297,7 @@ def xr_save_and_close(dataset, fn):
 # ── CCF ─────────────────────────────────────────────────────
 
 
-def xr_save_ccf(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, new, overwrite=False):
+def xr_save_ccf(root, lineage, step_name, station1, station2, components, mov_stack, taxis, new, overwrite=False):
     path = os.path.join(root, *lineage, step_name, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
@@ -3312,7 +3312,7 @@ def xr_save_ccf(root, lineage, step_name, station1, station2, components, filter
         return dr
 
 
-def xr_get_ccf(root, lineage, station1, station2, components, filterid, mov_stack, taxis, format="dataframe"):
+def xr_get_ccf(root, lineage, station1, station2, components, mov_stack, taxis, format="dataframe"):
     path = os.path.join(root, *lineage, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
@@ -3328,7 +3328,7 @@ def xr_get_ccf(root, lineage, station1, station2, components, filterid, mov_stac
         return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
 
 
-def xr_save_ref(root, lineage, step_name, station1, station2, components, filterid, taxis, new, overwrite=False):
+def xr_save_ref(root, lineage, step_name, station1, station2, components, taxis, new, overwrite=False):
     path = os.path.join(root, *lineage, step_name, "_output",
                         "REF", "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
@@ -3342,7 +3342,7 @@ def xr_save_ref(root, lineage, step_name, station1, station2, components, filter
         return dr
 
 
-def xr_get_ref(root, lineage, station1, station2, components, filterid, taxis, ignore_network=False):
+def xr_get_ref(root, lineage, station1, station2, components, taxis, ignore_network=False):
     path = os.path.join(root, *lineage, "_output",
                         "REF", "%s" % components)
     # If ignore_network is True, strip the network code from the station names
@@ -3365,7 +3365,7 @@ def xr_get_ref(root, lineage, station1, station2, components, filterid, taxis, i
             # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
             raise FileNotFoundError(fullpath)
     data = xr_create_or_open(fullpath, taxis, name="REF")
-    return data.CCF.to_dataframe()
+    return data
 
 
 def get_results(session, station1, station2, filterid, components, dates,
@@ -3511,7 +3511,7 @@ def get_results_all(session, root, lineage_names, station1, station2, components
 # ── MWCS ────────────────────────────────────────────────────
 
 
-def xr_save_mwcs(root, lineage, step_name, station1, station2, components, filterid, mov_stack, taxis, dataframe):
+def xr_save_mwcs(root, lineage, step_name, station1, station2, components, mov_stack, taxis, dataframe):
     fn = os.path.join(root, *lineage, step_name, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]),
                        "%s" % components,

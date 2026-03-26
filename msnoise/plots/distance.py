@@ -73,7 +73,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
                         continue
 
                 try:
-                    ref = xr_get_ref(output_folder, lineage, sta1, sta2, components, filterid, taxis)
+                    ref = xr_get_ref(output_folder, lineage, sta1, sta2, components, taxis)
                     ref = Trace(data=ref.CCF.values.copy())
                     ref.stats.sampling_rate = cc_sampling_rate
                 except FileNotFoundError as fullpath:

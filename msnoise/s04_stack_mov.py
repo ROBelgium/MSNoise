@@ -74,10 +74,8 @@ def main(stype, loglevel="INFO"):
             "There are STACKS jobs for some days to recompute for %s" % pair)
 
         sta1, sta2 = pair.split(':')
-        filterid = 1
         for components in params.components_to_compute:
-            logger.info('Processing %s-%s-%i MOV stack' %
-                (pair, components, filterid))
+            logger.info('Processing %s-%s MOV stack' % (pair, components))
 
             # Calculate the maximum mov_rolling value (in days)
             max_mov_rolling = max(pd.to_timedelta(mov_stack[0]).total_seconds() for mov_stack in mov_stacks)
@@ -144,24 +142,25 @@ def main(stype, loglevel="INFO"):
                                     sta1, sta2, components, all_days, format="xarray",
                                     params=params)
                 if not len(c):
-                    logger.warning("No data found for %s-%s-%i" % (sta1, sta2, filterid))
+                    logger.warning("No data found for %s-%s" % (sta1, sta2))
                     continue
                 c = c.sortby('times')
                 dr = c.resample(times="%is" % params.corr_duration).mean()
 
             else:
-                # TODO this is not yet compatible with the lineage folder structure:
-                logger.warning("keep_all=N used, sampling interval will be 1-day")
-                c = get_results(db, lineage_names, sta1, sta2, filterid, components, all_days,  mov_stack=1, format="xarray",
-                    params=params).sortby('times')
+                logger.warning("keep_all=N is unsupported in lineage workflow; "
+                               "falling back to get_results_all")
+                c = get_results_all(db, params.output_folder, lineage_names,
+                                    sta1, sta2, components, all_days, format="xarray",
+                                    params=params).sortby('times')
                 dr = c.resample(times="1D").mean()
 
             is_valid, message = validate_stack_data(c, "moving")
             if not is_valid:
-                logger.error(f"Invalid moving stack data for {sta1}:{sta2}-{components}-{filterid}: {message}")
+                logger.error(f"Invalid moving stack data for {sta1}:{sta2}-{components}: {message}")
                 continue
             elif "Warning" in message:
-                logger.warning(f"{sta1}:{sta2}-{components}-{filterid}: {message}")
+                logger.warning(f"{sta1}:{sta2}-{components}: {message}")
 
             if wienerfilt:
                 dr = wiener_filt(dr, wiener_M, wiener_N, wiener_gap_threshold)
@@ -196,7 +195,7 @@ def main(stype, loglevel="INFO"):
                 xx_cleaned = xx.where(~mask, drop=True) #remove days not associated with current jobs
 
                 xr_save_ccf(params.output_folder, lineage_names, step.step_name,
-                            sta1, sta2, components, filterid, mov_stack, taxis, xx_cleaned, overwrite=False)
+                            sta1, sta2, components, mov_stack, taxis, xx_cleaned, overwrite=False)
                 del xx, xx_cleaned
 
         massive_update_job(db, jobs, "D")

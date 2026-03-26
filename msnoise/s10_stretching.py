@@ -170,7 +170,7 @@ def main(loglevel="INFO"):
                 # Mode A: load fixed REF from disk
                 try:
                     ref = xr_get_ref(root, lineage_names,
-                                     station1, station2, components, None, taxis)
+                                     station1, station2, components, taxis)
                     ref = ref.CCF.values.copy()
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
@@ -207,7 +207,7 @@ def main(loglevel="INFO"):
 
                 try:
                     data = xr_get_ccf(root, lineage_names_mov,
-                                      station1, station2, components, None, mov_stack, taxis)
+                                      station1, station2, components, mov_stack, taxis)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue

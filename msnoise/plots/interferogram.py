@@ -66,7 +66,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
 
     try:
         data = xr_get_ccf(params.output_folder, lineage_names,
-               sta1, sta2, components, None, mov_stack,None)
+               sta1, sta2, components, mov_stack, None)
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
         return

@@ -154,7 +154,7 @@ def main(loglevel="INFO"):
                 # Mode A: load fixed REF from disk (under refstack_M folder)
                 try:
                     ref = xr_get_ref(params.output_folder, lineage_names,
-                                     station1, station2, components, None, taxis)
+                                     station1, station2, components, taxis)
                     ref = ref.CCF.values
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
@@ -167,7 +167,7 @@ def main(loglevel="INFO"):
                 output = []
                 try:
                     data = xr_get_ccf(params.output_folder, lineage_names_mov,
-                                      station1, station2, components, None, mov_stack, taxis)
+                                      station1, station2, components, mov_stack, taxis)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
@@ -334,7 +334,7 @@ def main(loglevel="INFO"):
                 output = pd.concat(output, axis=1)
 
                 xr_save_mwcs(params.output_folder, lineage_names, step.step_name,
-                              station1, station2, components, None, mov_stack, taxis, output)
+                              station1, station2, components, mov_stack, taxis, output)
                 del data, output
 
         massive_update_job(db, jobs, "D")

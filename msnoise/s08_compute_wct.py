@@ -118,7 +118,7 @@ def main(loglevel="INFO", batch_size=None):
                 # Mode A: load fixed REF from disk
                 try:
                     ref_data = xr_get_ref(root, lineage_names, station1, station2,
-                                          component, None, taxis, ignore_network=True)
+                                          component, taxis, ignore_network=True)
                     ref = ref_data.CCF.values
                     if wct_norm:
                         ori_waveform = ref / ref.max()
@@ -143,7 +143,7 @@ def main(loglevel="INFO", batch_size=None):
 
                 try:
                     data = xr_get_ccf(root, lineage_names_mov, station1, station2,
-                                      component, None, mov_stack, taxis)
+                                      component, mov_stack, taxis)
                 except FileNotFoundError as fp:
                     logger.error(f"FILE DOES NOT EXIST: {fp}, skipping")
                     continue
