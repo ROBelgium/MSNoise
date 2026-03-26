@@ -37,7 +37,11 @@ from wtforms.widgets import TextArea, Select, CheckboxInput, NumberInput
 
 from .api import connect, get_config, get_logger
 from .api import get_config_categories_definition
-from .msnoise_table_def import declare_tables
+from .msnoise_table_def import declare_tables, WORKFLOW_CHAINS as _WC_FULL
+# Flatten the richer msnoise_table_def format to {category: [next_step, ...]}
+# which is all the admin workflow builder needs.
+WORKFLOW_CHAINS = {k: (v['next_steps'] if isinstance(v, dict) else v)
+                   for k, v in _WC_FULL.items()}
 
 
 # Initialize Flask app and extensions
@@ -102,13 +106,17 @@ def job_dependencies(job_id):
         }
 
         if job.workflow_step:
-            # Get predecessor jobs
+            job_lineage = job.lineage or ""
+
+            # Get predecessor jobs — match by (day, pair, step_id) AND lineage
+            # prefix so multi-configset branches don't bleed into each other.
             for link in job.workflow_step.incoming_links:
                 if link.is_active:
                     pred_jobs = db.query(Job).filter(
                         Job.day == job.day,
                         Job.pair == job.pair,
                         Job.step_id == link.from_step_id,
+                        Job.lineage == job_lineage.rsplit('/', 1)[0] if '/' in job_lineage else Job.lineage != None,
                     ).all()
 
                     for pred_job in pred_jobs:
@@ -118,13 +126,14 @@ def job_dependencies(job_id):
                             'flag': pred_job.flag
                         })
 
-            # Get successor jobs
+            # Get successor jobs — match by lineage that starts with current
             for link in job.workflow_step.outgoing_links:
                 if link.is_active:
                     succ_jobs = db.query(Job).filter(
                         Job.day == job.day,
                         Job.pair == job.pair,
                         Job.step_id == link.to_step_id,
+                        Job.lineage.startswith(job_lineage + '/') if job_lineage else Job.lineage != None,
                     ).all()
 
                     for succ_job in succ_jobs:
@@ -303,7 +312,7 @@ class ConfigView(BaseModelView):
                         config = self.session.query(schema.Config).get(config_id)
                         if config:
                             config.value = value
-                            config.updated_at = datetime.datetime.utcnow()
+                            # Config table has no updated_at column; skip.
 
                 self.session.commit()
                 flash('Configuration updated successfully', 'success')
@@ -640,7 +649,7 @@ class ConfigSetView(BaseView):
                         # Only update if we have a valid new value
                         if new_value is not None:
                             config.value = new_value
-                            config.updated_at = datetime.datetime.utcnow()
+                            # Config table has no updated_at column; skip.
 
                             # Validate against possible values (only for non-empty values)
                             if new_value.strip():
@@ -884,23 +893,6 @@ class WorkflowStepView(BaseModelView):
 
     def __init__(self, session, *args, **kwargs):
         super(WorkflowStepView, self).__init__(schema.WorkflowStep, session, *args, **kwargs)
-
-
-WORKFLOW_CHAINS = {
-    'global':      ['preprocess', 'psd'],
-    'preprocess':  ['cc'],
-    'cc':          ['filter'],
-    'psd':         ['psd_rms'],
-    'psd_rms':     [],
-    'filter':      ['stack'],
-    'stack':       ['refstack'],
-    'refstack':    ['mwcs', 'stretching', 'wavelet'],
-    'mwcs':        ['mwcs_dtt'],
-    'stretching':  [],
-    'wavelet':     ['wavelet_dtt'],
-    'wavelet_dtt': [],
-    'mwcs_dtt':    [],
-}
 
 
 class WorkflowLinkView(BaseModelView):

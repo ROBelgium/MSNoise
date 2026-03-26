@@ -177,12 +177,23 @@ def info_parameters(db):
     Show values of each configuration parameters.
     """
     from ..default import default
+    from ..api import get_workflow_steps, get_config_set_details
     click.echo('')
     click.echo('Configuration values:'
             '   | Normal colour indicates that the default value is used'
             '   | Green indicates "M"odified values')
     # TODO: add plugins params
     show_config_values(db, default.keys())
+
+    filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
+    if filter_steps:
+        click.echo('')
+        click.echo('Filter configsets:')
+        for step in filter_steps:
+            details = get_config_set_details(db, 'filter', step.set_number)
+            click.echo(f'  filter_{step.set_number} ({step.step_name}):')
+            for row in details:
+                click.echo(f'    {row["name"]} = {row["value"]}')
 
 
 def info_stations(db):
@@ -1124,6 +1135,7 @@ def populate(ctx, fromda):
 @click.pass_context
 def scan_archive(ctx, init, crondays, path, recursively):
     """Scan the archive and insert into the Data Availability table."""
+    from .. import s01_scan_archive as s01scan_archive
     nthreads = ctx.obj['MSNOISE_threads']
     if path:
         if not os.path.isdir(path):
