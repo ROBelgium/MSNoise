@@ -58,17 +58,9 @@ def main(loglevel="INFO", batch_size=None):
 
     db = connect()
 
-    db.close()
-
-    while True:
-        db = connect()
-        if not is_next_job_for_step(db, step_category="wavelet"):
-            db.close()
-            break
-
+    while is_next_job_for_step(db, step_category="wavelet"):
         batch = get_next_lineage_batch(db, step_category="wavelet", group_by="pair_lineage",
                                        loglevel=loglevel)
-        db.close()
 
         if batch is None:
             time.sleep(np.random.random())
@@ -107,7 +99,7 @@ def main(loglevel="INFO", batch_size=None):
         nt = getattr(params, 'wct_nt', 5)
         vpo = getattr(params, 'wct_vpo', 20)
         nptsfreq = getattr(params, 'wct_nptsfreq', 300)
-        wct_norm = getattr(params, 'wct_norm', "Y")
+        wct_norm = getattr(params, 'wct_norm', "Y") == "Y"
         wavelet_type = eval(getattr(params, 'wavelet_type', '') or "('Morlet',6.)")
 
         logger.info(f"WCT params: freqmin={freqmin} freqmax={freqmax} ns={ns} nt={nt} vpo={vpo}")
@@ -148,10 +140,7 @@ def main(loglevel="INFO", batch_size=None):
                     logger.error(f"FILE DOES NOT EXIST: {fp}, skipping")
                     continue
 
-                to_search = pd.to_datetime(days)
-                to_search = to_search.append(
-                    pd.DatetimeIndex([to_search[-1] + pd.Timedelta("1d")])
-                )
+                to_search = _extend_days(days)
                 data = data[data.index.floor('d').isin(to_search)]
                 data = data.dropna()
 
@@ -194,8 +183,7 @@ def main(loglevel="INFO", batch_size=None):
                     except Exception as e:
                         logger.error(f"Error saving WCT: {str(e)}")
 
-        db = connect()
         massive_update_job(db, jobs, "D")
-        db.close()
 
+    db.close()
     logger.info('*** Finished: Compute WCT ***')

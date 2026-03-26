@@ -173,8 +173,7 @@ def main(loglevel="INFO"):
                 # todo = data.index.intersection()
                 # data = data.loc[todo]
 
-                to_search = pd.to_datetime(days)
-                to_search = to_search.append(pd.DatetimeIndex([to_search[-1]+pd.Timedelta("1d"),]))
+                to_search = _extend_days(days)
                 # data = data[(data.index.floor('d').isin(to_search) or data.index.ceil('d').isin(to_search))]
                 data = data[data.index.floor('d').isin(to_search)]
                 data = data.dropna()

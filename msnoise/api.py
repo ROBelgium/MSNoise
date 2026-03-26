@@ -2323,6 +2323,24 @@ def get_refstack_lineage_for_filter(session, filterid, refstack_set_number=1):
 # ============================================================
 
 
+def _extend_days(days):
+    """Return a :class:`~pandas.DatetimeIndex` from *days* extended by one
+    extra day at the end.
+
+    Replaces the pandas 1.x pattern::
+
+        idx = pd.to_datetime(days)
+        idx = idx.append(pd.DatetimeIndex([idx[-1] + pd.Timedelta("1d")]))
+
+    which was removed in pandas 2.0.
+
+    :param days: sequence of date-like values (strings, dates, datetimes…)
+    :rtype: :class:`pandas.DatetimeIndex`
+    """
+    idx = pd.to_datetime(days)
+    return pd.DatetimeIndex(list(idx) + [idx[-1] + pd.Timedelta("1d")])
+
+
 def get_t_axis(params):
     """
     Returns the time axis (in seconds) of the CC functions.

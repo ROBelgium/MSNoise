@@ -62,19 +62,12 @@ def main(loglevel="INFO", batch_size=None):
             interstations["%s_%s" % (s1, s2)] = get_interstation_distance(
                 sta1, sta2, sta1.coordinates
             )
-    db.close()
 
-    while True:
-        db = connect()
-        if not is_next_job_for_step(db, step_category="wavelet_dtt"):
-            db.close()
-            break
-
+    while is_next_job_for_step(db, step_category="wavelet_dtt"):
         batch = get_next_lineage_batch(
             db, step_category="wavelet_dtt", group_by="pair_lineage",
             loglevel=loglevel,
         )
-        db.close()
 
         if batch is None:
             time.sleep(np.random.random())
@@ -239,8 +232,7 @@ def main(loglevel="INFO", batch_size=None):
                         f"Error saving WCT DTT for {pair}/{component}/{mov_stack}: {e}"
                     )
 
-        db = connect()
         massive_update_job(db, jobs, "D")
-        db.close()
 
+    db.close()
     logger.info('*** Finished: Compute WCT DTT ***')

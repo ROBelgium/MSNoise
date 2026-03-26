@@ -551,8 +551,10 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
             api.get_config(db, 'enddate', category='global', set_number=1), '%Y-%m-%d').date()
     archive_format = api.get_config(db, 'archive_format', category='global', set_number=1)
 
-    # TODO ! this comes from the preprocessing step now, so probably should avoid filtering it here!
-    goal_sampling_rate = float(api.get_config(db, 'cc_sampling_rate', category='preprocess', set_number=1))
+    # Scanning is agnostic of downstream sampling rate — files that don't meet
+    # the target rate are filtered at preprocessing time, not here. Using 0.0
+    # accepts all files regardless of their sampling rate.
+    goal_sampling_rate = 0.0
 
     search_info_log = 'Will search for files between {} and {}'\
                       .format(startdate, enddate)
