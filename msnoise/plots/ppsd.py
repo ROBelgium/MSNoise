@@ -19,7 +19,14 @@ from matplotlib.dates import date2num
 from matplotlib.gridspec import GridSpec
 from obspy import read_inventory, UTCDateTime
 from obspy.signal import PPSD
-from msnoise.api import *
+from ..api import (
+    build_movstack_datelist,
+    connect,
+    get_config,
+    get_logger,
+    psd_ppsd_to_dataframe,
+    psd_read_results,
+)
 
 
 def main(net, sta, loc, chan, time_of_weekday=None, period_lim=None, show=False,

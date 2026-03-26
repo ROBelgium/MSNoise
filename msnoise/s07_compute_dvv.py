@@ -5,7 +5,15 @@ import numpy as np
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 from obspy.signal.regression import linear_regression
-from .api import *
+from .api import (
+    compute_dvv,
+    connect,
+    get_logger,
+    get_next_lineage_batch,
+    is_next_job_for_step,
+    massive_update_job,
+    xr_save_dvv,
+)
 
 import logbook
 

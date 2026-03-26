@@ -182,11 +182,33 @@ could occur with SQLite.
 """
 #TODO docstring
 import sys
+import itertools
+import logging
+import os
 import time
 
+import numpy as np
 import matplotlib.mlab as mlab
 
-from .api import *
+from .api import (
+    add_corr,
+    connect,
+    export_allcorr,
+    extend_days,
+    get_config_set_details,
+    get_filter_steps_for_cc_step,
+    get_logger,
+    get_next_lineage_batch,
+    get_params,
+    get_t_axis,
+    is_next_job_for_step,
+    massive_update_job,
+    nextpow2,
+    preload_instrument_responses,
+    stack,
+    update_job,
+    winsorizing,
+)
 from .move2obspy import myCorr2
 from .move2obspy import whiten2
 from .move2obspy import pcc_xcorr

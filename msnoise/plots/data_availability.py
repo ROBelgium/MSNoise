@@ -14,6 +14,8 @@ Example:
 
 """
 
+import datetime
+
 import matplotlib.dates
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -24,7 +26,13 @@ register_matplotlib_converters()
 
 import re
 
-from ..api import *
+from ..api import (
+    build_movstack_datelist,
+    connect,
+    get_data_availability,
+    get_logger,
+    get_stations,
+)
 
 
 def main(chan, show=False, outfile=None, loglevel="INFO"):

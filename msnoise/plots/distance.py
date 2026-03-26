@@ -17,8 +17,19 @@ Example:
 
 import matplotlib.pyplot as plt
 from obspy import Trace
-from ..api import *
+from ..api import (
+    connect,
+    get_config_set_details,
+    get_interstation_distance,
+    get_logger,
+    get_params,
+    get_refstack_lineage_for_filter,
+    get_stack_lineage_for_filter,
+    get_station_pairs,
+    xr_get_ref,
+)
 
+import numpy as np
 
 def main(filterid, components, ampli=1, show=True, outfile=None,
          refilter=None, virtual_source=None, loglevel="INFO", **kwargs):

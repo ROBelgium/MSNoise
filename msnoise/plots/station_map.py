@@ -31,7 +31,10 @@ import traceback
 import matplotlib.pyplot as plt
 
 
-from ..api import *
+from ..api import (
+    connect,
+    get_stations,
+)
 
 
 def main(show=True, outfile=None):
