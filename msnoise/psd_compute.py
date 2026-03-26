@@ -76,7 +76,7 @@ from .api import (
 CATEGORY = "psd"
 
 
-def main(loglevel="INFO"):
+def main(loglevel="INFO", njobs_per_worker=9999):
     logger = get_logger(f"msnoise.{CATEGORY}", loglevel, with_pid=True)
     logger.info("*** Starting: Compute PSD ***")
 
