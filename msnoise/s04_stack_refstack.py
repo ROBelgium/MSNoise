@@ -90,9 +90,11 @@ def main(loglevel="INFO"):
         params      = batch["params"]
         # lineage_names_upstream ends with stack_N (current step refstack_M excluded)
         lineage_names = batch["lineage_names_upstream"]
-        # lineage_names_mov strips stack_N too, ending at filter_N
-        # (where raw daily CC h5 files live under filter_N/_output/all/...)
-        lineage_names_cc = batch["lineage_names_mov"]
+        # lineage_names_cc strips stack_N too, ending at filter_N
+        # where raw daily CC h5 files live under filter_N/_output/all/...
+        # Note: cannot use lineage_names_mov here — that strips refstack_* entries
+        # which don't exist at this level; we need to strip stack_N explicitly.
+        lineage_names_cc = lineage_names[:-1]
         step          = batch["step"]
         lineage_str   = batch["lineage_str"]
 
