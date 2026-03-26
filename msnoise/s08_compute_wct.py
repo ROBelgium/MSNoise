@@ -67,7 +67,7 @@ def main(loglevel="INFO", batch_size=None):
             break
 
         batch = get_next_lineage_batch(db, step_category="wavelet", group_by="pair_lineage",
-                                       loglevel=loglevel, drop_current_step_name=False)
+                                       loglevel=loglevel)
         db.close()
 
         if batch is None:
@@ -78,8 +78,8 @@ def main(loglevel="INFO", batch_size=None):
         pair = batch["pair"]
         days = batch["days"]
         params = batch["params"]
-        lineage_names = batch["lineage_names"][:-1]
-        lineage_names_mov = strip_refstack_from_lineage(lineage_names)
+        lineage_names = batch["lineage_names_upstream"]
+        lineage_names_mov = batch["lineage_names_mov"]
         lineage_str = batch["lineage_str"]
         step = batch["step"]
         root = params.output_folder

@@ -131,8 +131,7 @@ def main(loglevel="INFO"):
     smoothing_half_win = 5
     while is_next_job_for_step(db, step_category="stretching"):
         logger.info("Getting the next job")
-        batch = get_next_lineage_batch(db, step_category="stretching", group_by="pair_lineage", loglevel=loglevel,
-                                       drop_current_step_name=False)
+        batch = get_next_lineage_batch(db, step_category="stretching", group_by="pair_lineage", loglevel=loglevel)
         if batch is None:
             time.sleep(np.random.random())
             continue
@@ -141,8 +140,8 @@ def main(loglevel="INFO"):
         pair = batch["pair"]
         days = batch["days"]
         params = batch["params"]
-        lineage_names = batch["lineage_names"][:-1]
-        lineage_names_mov = strip_refstack_from_lineage(lineage_names)
+        lineage_names = batch["lineage_names_upstream"]
+        lineage_names_mov = batch["lineage_names_mov"]
         lineage_str = batch["lineage_str"]
         step = batch["step"]
 

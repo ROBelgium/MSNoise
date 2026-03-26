@@ -86,8 +86,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
 
     while is_next_job_for_step(db, step_category=CATEGORY):
         batch = get_next_lineage_batch(db, step_category=CATEGORY,
-                                       group_by="day", loglevel=loglevel,
-                                       drop_current_step_name=False)
+                                       group_by="day", loglevel=loglevel)
         if batch is None:
             time.sleep(np.random.random())
             continue
@@ -109,10 +108,8 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         period_limits  = params.psd_ppsd_period_limits
         db_bins        = params.psd_ppsd_db_bins
 
-        # lineage_names already contains the current step name
-        # (drop_current_step_name=False), so use it directly for path
-        # construction once xr_save_psd accepts it; for now keep empty list
-        # as psd is a root step (global -> psd).
+        # psd is a root step (global -> psd); keep empty lineage for path
+        # construction until xr_save_psd is updated to accept lineage_names.
         lineage = []
 
         for job in jobs:

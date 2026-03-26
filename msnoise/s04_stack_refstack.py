@@ -80,7 +80,6 @@ def main(loglevel="INFO"):
             step_category="refstack",
             group_by="pair_lineage",
             loglevel=loglevel,
-            drop_current_step_name=True,
         )
         if batch is None:
             time.sleep(np.random.random())
@@ -89,13 +88,11 @@ def main(loglevel="INFO"):
         jobs        = batch["jobs"]
         pair        = batch["pair"]
         params      = batch["params"]
-        # lineage_names has refstack_M dropped (drop_current_step_name=True),
-        # so it ends with stack_N.
-        lineage_names = batch["lineage_names"]
-        # lineage_names_cc strips stack_N too, so it ends at filter_N.
-        # The raw daily CC h5 files live at filter_N/_output/all/...
-        # (same source that stack_mov reads via its own [:-1] strip).
-        lineage_names_cc = lineage_names[:-1]
+        # lineage_names_upstream ends with stack_N (current step refstack_M excluded)
+        lineage_names = batch["lineage_names_upstream"]
+        # lineage_names_mov strips stack_N too, ending at filter_N
+        # (where raw daily CC h5 files live under filter_N/_output/all/...)
+        lineage_names_cc = batch["lineage_names_mov"]
         step          = batch["step"]
         lineage_str   = batch["lineage_str"]
 

@@ -241,8 +241,7 @@ def main(loglevel="INFO"):
     #     responses = None
     logger.info("Checking if there are jobs to do")
     while is_next_job_for_step(db, step_category="cc"):
-        batch = get_next_lineage_batch(db, step_category="cc", group_by="day_lineage", loglevel=loglevel,
-                                       drop_current_step_name=False)
+        batch = get_next_lineage_batch(db, step_category="cc", group_by="day_lineage", loglevel=loglevel)
         if batch is None:
             time.sleep(np.random.random())
             continue
@@ -251,7 +250,7 @@ def main(loglevel="INFO"):
         pair = batch["pair"]
         days = batch["days"]
         params = batch["params"]
-        lineage_names = batch["lineage_names"][:-1]
+        lineage_names = batch["lineage_names_upstream"]
         step = batch["step"]
 
         stations = []

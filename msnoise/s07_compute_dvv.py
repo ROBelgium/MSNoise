@@ -21,14 +21,14 @@ def main(interval=1, loglevel="INFO"):
     while is_next_job_for_step(db, step_category="stretching"):
         logger.info("Getting the next job")
         batch = get_next_lineage_batch(db, step_category="stretching", group_by="pair_lineage",
-                                       loglevel=loglevel, drop_current_step_name=False)
+                                       loglevel=loglevel)
         if batch is None:
             time.sleep(np.random.random())
             continue
 
         jobs = batch["jobs"]
         params = batch["params"]
-        lineage_names = batch["lineage_names"][:-1]
+        lineage_names = batch["lineage_names_upstream"]
         lineage_str = batch["lineage_str"]
         step = batch["step"]
 

@@ -72,7 +72,7 @@ def main(loglevel="INFO", batch_size=None):
 
         batch = get_next_lineage_batch(
             db, step_category="wavelet_dtt", group_by="pair_lineage",
-            loglevel=loglevel, drop_current_step_name=False,
+            loglevel=loglevel,
         )
         db.close()
 
@@ -84,11 +84,11 @@ def main(loglevel="INFO", batch_size=None):
         pair = batch["pair"]
         days = batch["days"]
         params = batch["params"]
-        # lineage_names[:-1] ends with the upstream "wavelet" step name, used
-        # for xr_load_wct (read).  The full lineage (including wavelet_dtt step)
-        # is reconstructed via  lineage_names[:-1] + step.step_name  inside
-        # xr_save_wct_dtt, yielding:  <lineage>/wavelet_dtt_N/_output/...
-        lineage_names = batch["lineage_names"][:-1]
+        # lineage_names_upstream ends with the upstream "wavelet" step name,
+        # used for xr_load_wct (read).  The full lineage (including wavelet_dtt)
+        # is reconstructed via lineage_names_upstream + step.step_name inside
+        # xr_save_wct_dtt, yielding: <lineage>/wavelet_dtt_N/_output/...
+        lineage_names = batch["lineage_names_upstream"]
         lineage_str = batch["lineage_str"]
         step = batch["step"]
         root = params.output_folder

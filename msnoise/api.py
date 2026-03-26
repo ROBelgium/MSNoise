@@ -2125,7 +2125,6 @@ def get_next_lineage_batch(
         group_by="pair_lineage",
         loglevel="INFO",
         day_value=None,
-        drop_current_step_name=True,
 ):
     """
     Standard worker prolog for lineage-aware steps.
@@ -2135,13 +2134,16 @@ def get_next_lineage_batch(
     - Loads current step config (from the job row).
     - Resolves lineage_str -> WorkflowStep objects.
     - Merges params for that lineage + current step config.
-    - Optionally drops the current step name from lineage_names (useful for folder paths).
 
     Returns
     -------
     dict with keys:
       - jobs, step
-      - pair, lineage_str, lineage_steps, lineage_names
+      - pair, lineage_str, lineage_steps
+      - lineage_names          — full list including current step name
+      - lineage_names_upstream — full minus current step (replaces manual [:-1])
+      - lineage_names_mov      — upstream with any refstack_* entries stripped
+                                 (used by mwcs/wct/stretching to find MOV CCFs)
       - refs, days
       - step_params, params
     or None if no jobs were claimed (caller should continue/sleep).
@@ -2185,8 +2187,9 @@ def get_next_lineage_batch(
     lineage_steps = lineage_str_to_steps(db, lineage_str, strict=True)
     lineage_steps, lineage_names, params = get_merged_params_for_lineage(db, orig_params, step_params, lineage_steps)
 
-    if drop_current_step_name and lineage_names:
-        lineage_names = lineage_names[:-1]
+    # Derived lineage lists — no manual slicing needed in callers
+    lineage_names_upstream = lineage_names[:-1] if lineage_names else []
+    lineage_names_mov = _strip_refstack_from_lineage(lineage_names_upstream)
 
     logger.info(f"New {step_category.upper()} batch: pair={pair} n={len(jobs)} group_by={group_by} lineage={lineage_str}")
 
@@ -2197,6 +2200,8 @@ def get_next_lineage_batch(
         "lineage_str": lineage_str,
         "lineage_steps": lineage_steps,
         "lineage_names": lineage_names,
+        "lineage_names_upstream": lineage_names_upstream,
+        "lineage_names_mov": lineage_names_mov,
         "refs": refs,
         "days": days,
         "step_params": step_params,
@@ -2470,17 +2475,17 @@ def compute_rolling_ref(data, ref_begin, ref_end):
     return refs
 
 
-def strip_refstack_from_lineage(lineage_names):
+def _strip_refstack_from_lineage(lineage_names):
     """
     Return a copy of ``lineage_names`` with any ``refstack_*`` entries removed.
 
-    Used by mwcs/stretching/wavelet workers to build the path for
-    :func:`xr_get_ccf`, which lives under the ``stack_N`` step folder rather
-    than under ``refstack_M``.
+    Used internally by :func:`get_next_lineage_batch` to build
+    ``lineage_names_mov`` — the path for :func:`xr_get_ccf`, which lives
+    under the ``stack_N`` step folder rather than under ``refstack_M``.
 
     Example::
 
-        strip_refstack_from_lineage(
+        _strip_refstack_from_lineage(
             ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']
         )
         # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1']
@@ -2489,6 +2494,10 @@ def strip_refstack_from_lineage(lineage_names):
     :rtype: list of str
     """
     return [n for n in lineage_names if not n.startswith("refstack_")]
+
+
+# Public alias kept for external code that imported the old name
+strip_refstack_from_lineage = _strip_refstack_from_lineage
 
 
 def validate_stack_data(dataset, stack_type="reference"):
