@@ -37,10 +37,10 @@ import numpy as np
 from matplotlib.widgets import Cursor
 from obspy.signal.filter import bandpass
 
-from msnoise.api import build_movstack_datelist, connect, get_config, \
-    get_filters, get_results, check_stations_uniqueness, xr_get_ccf,\
-    get_t_axis, get_logger, get_params, get_stack_lineage_for_filter,\
-    get_config_set_details, lineage_to_string, lineage_str_to_steps,\
+from msnoise.api import build_movstack_datelist, connect,  \
+      check_stations_uniqueness, xr_get_ccf,\
+     get_logger, get_params, \
+      lineage_str_to_steps,\
     get_merged_params_for_lineage, prepare_abs_positive_fft
 
 def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=1,

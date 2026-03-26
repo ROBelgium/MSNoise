@@ -3,126 +3,99 @@ This step preprocesses waveforms using the preprocessing.py module and saves
 the resulting Stream objects to disk in a workflow-aware folder structure.
 """
 
-import os
-import datetime
-import pickle
+import time
 import traceback
 import numpy as np
-from .api import (connect, get_logger, get_params, update_job,
-                  preload_instrument_responses, get_workflow_steps,
-                  get_config_set_details, get_next_job_for_step,
+from .api import (connect, get_logger, is_next_job_for_step,
+                  get_next_lineage_batch, massive_update_job,
+                  preload_instrument_responses,
                   save_preprocessed_streams)
 from .preprocessing import preprocess
-from obspy.core import AttribDict
 
-def main(init=False, threads=1, loglevel="INFO"):
+CATEGORY = "preprocess"
+
+
+def main(loglevel="INFO"):
     """
     Main preprocessing workflow function.
 
     Processes waveforms using the preprocessing.py module and saves
     the resulting Stream objects to disk.
     """
-    logger = get_logger('msnoise.step_preprocessing', loglevel, with_pid=True)
+    logger = get_logger(f"msnoise.{CATEGORY}", loglevel, with_pid=True)
     logger.info('*** Starting: Preprocessing Step ***')
 
-    # Connect to database and get params
     db = connect()
-    params = get_params(db)
 
-    # # Load instrument responses if needed
-    # responses = None
-    # if params.remove_response in ["Y", "y"]:
-    #     logger.info("Loading instrument responses...")
-    #     responses = preload_instrument_responses(db)
+    while is_next_job_for_step(db, step_category=CATEGORY):
+        batch = get_next_lineage_batch(db, step_category=CATEGORY,
+                                       group_by="day", loglevel=loglevel,
+                                       drop_current_step_name=False)
+        if batch is None:
+            time.sleep(np.random.random())
+            continue
 
-    # Get output directory
-    output_dir = getattr(params, 'output_folder', "OUTPUT")
+        jobs          = batch["jobs"]
+        step          = batch["step"]
+        params        = batch["params"]
+        lineage_names = batch["lineage_names"]
+        days          = batch["days"]
 
-    job_count = 0
-
-    while True:
-        # Get next set of preprocessing jobs (same step + day)
-
-        jobs = get_next_job_for_step(db, step_category="preprocess")
-
-        if not jobs:
-            logger.info("No more preprocessing jobs to process")
-            break
-
-        jobs, step = jobs
-        if not jobs:
-            break
-
-        # All jobs in the set have the same step and day
-        first_job = jobs[0]
-
-        step_name = first_job.jobtype
-        goal_day = first_job.day
+        goal_day  = days[0]
+        step_name = step.step_name
+        output_dir = getattr(params, 'output_folder', "OUTPUT")
 
         logger.info(f"Processing {len(jobs)} jobs for step '{step_name}' on {goal_day}")
 
+        # Mark all in-progress BEFORE the try block
+        for job in jobs:
+            job.flag = 'I'
+        db.commit()
+
         try:
-            # Get workflow step configuration
-            # step_config = get_workflow_step_config(db, step_name)
-            step_config = get_config_set_details(db, first_job.config_category, first_job.config_set_number, format='AttribDict')
-            if not step_config:
-                logger.error(f"No workflow step configuration found for: {step_name}")
-                for job in jobs:
-                    update_job(db, job.day, job.pair, job.jobtype, 'F')
-                continue
+            components = (params.preprocess_components.split(',')
+                          if getattr(params, 'preprocess_components', None)
+                          else ['Z'])
 
-            # Parse components from step configuration
-            components = step_config.preprocess_components.split(',') if step_config.preprocess_components else ['Z']
-
-            if step_config.remove_response:
-                logger.debug('Pre-loading all instrument response')
+            if getattr(params, 'remove_response', 'N') in ('Y', 'y'):
+                logger.debug('Pre-loading all instrument responses')
                 responses = preload_instrument_responses(db, return_format="inventory")
             else:
                 responses = None
-            # Extract stations from jobs
-            stations = [job.pair for job in jobs]
 
+            stations = [job.pair for job in jobs]
             logger.info(f"Processing stations: {stations}")
             logger.info(f"Components: {components}")
 
-            # Mark all jobs as in progress
-            for job in jobs:
-                update_job(db, job.day, job.pair, job.jobtype, 'I')
-
-            stream = preprocess(stations, components, goal_day, AttribDict(**params, **step_config),
+            stream = preprocess(stations, components, goal_day, params,
                                 responses=responses, loglevel=loglevel)
 
-            ids = [f"{tr.stats.network}.{tr.stats.station}.{tr.stats.location}" for tr in stream]
+            ids = {f"{tr.stats.network}.{tr.stats.station}.{tr.stats.location}"
+                   for tr in stream}
 
-            # Save all preprocessed streams
-            saved_files = save_preprocessed_streams(stream, output_dir,
-                                                    step_name, goal_day)
-
+            saved_files = save_preprocessed_streams(
+                stream, output_dir, step_name, goal_day)
             logger.info(f"Saved {len(saved_files)} preprocessed files")
 
-            # Update job statuses
+            # Mark per-job D or F depending on whether station was processed
             for job in jobs:
-                station = job.pair
-                if station in ids:
-                    update_job(db, job.day, job.pair, job.jobtype, 'D')
-                    logger.info(f"Job {job.jobtype} for {job.pair} marked as done")
+                if job.pair in ids:
+                    job.flag = 'D'
+                    logger.debug(f"Job {step_name} for {job.pair} marked Done")
                 else:
-                    update_job(db, job.day, job.pair, job.jobtype, 'F')
-                    logger.warning(f"Job {job.jobtype} for {job.pair} marked as failed")
+                    job.flag = 'F'
+                    logger.warning(f"Job {step_name} for {job.pair} marked Failed")
+            db.commit()
 
-            job_count += len(jobs)
-
-        except Exception as e:
-            logger.error(f"Error processing job set for step {step_name} on {goal_day}: {str(e)}")
+        except Exception:
+            logger.error(f"Error processing step {step_name} on {goal_day}:")
             logger.error(traceback.format_exc())
-
-            # Mark all jobs as failed
             for job in jobs:
-                update_job(db, job.day, job.pair, job.jobtype, 'F')
+                job.flag = 'F'
+            db.commit()
 
-            continue
+    logger.info('*** Finished: Preprocessing Step ***')
 
-    logger.info(f"*** Finished: Preprocessing Step - Processed {job_count} jobs ***")
 
 if __name__ == "__main__":
     main()

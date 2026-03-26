@@ -22,9 +22,9 @@ import pandas as pd
 from .api import (
     connect,
     get_config_set_details,
+    get_config,
     get_logger,
     get_next_job_for_step,
-    get_params,
     get_station,
     is_next_job_for_step,
     massive_update_job,
@@ -39,13 +39,12 @@ def main(loglevel="INFO", njobs_per_worker=9999):
     logger.info("*** Starting: Compute PSD RMS ***")
 
     db = connect()
-    orig_params = get_params(db)
-    output_folder = getattr(orig_params, "output_folder", "OUTPUT")
+    output_folder = get_config(db, "output_folder") or "OUTPUT"
 
     while is_next_job_for_step(db, step_category="psd_rms"):
         logger.info("Getting the next job")
         result = get_next_job_for_step(
-            db, step_category="psd_rms", group_by="pair"
+            db, step_category="psd_rms", group_by="pair_lineage"
         )
 
         if result is None:

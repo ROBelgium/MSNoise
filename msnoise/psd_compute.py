@@ -42,81 +42,88 @@ Parallel execution:
 .. versionchanged:: 2.1
     Output format changed from NPZ+PNG to NetCDF.  The intermediate
     ``psd_to_hdf`` step is no longer needed.
+.. versionchanged:: 2.2
+    Migrated to canonical get_next_lineage_batch worker loop.
+    Instrument responses are only preloaded when remove_response is set.
+    PNG output path is now relative to output_folder.
 """
 
 import datetime
 import os
+import time
 import traceback
 
 import matplotlib
 matplotlib.use("Agg")
 import numpy as np
 from obspy import Stream
-from obspy.core import AttribDict, UTCDateTime
+from obspy.core import UTCDateTime
 from obspy.signal import PPSD
 
 from .api import (
     connect,
-    get_config,
-    get_config_set_details,
     get_data_availability,
     get_logger,
-    get_params,
     is_next_job_for_step,
-    get_next_job_for_step,
+    get_next_lineage_batch,
+    massive_update_job,
     preload_instrument_responses,
     psd_ppsd_to_dataframe,
     to_sds,
-    update_job,
     xr_save_psd,
 )
 
+CATEGORY = "psd"
 
-def main(loglevel="INFO", njobs_per_worker=9999):
-    logger = get_logger("msnoise.psd_compute", loglevel, with_pid=True)
+
+def main(loglevel="INFO"):
+    logger = get_logger(f"msnoise.{CATEGORY}", loglevel, with_pid=True)
     logger.info("*** Starting: Compute PSD ***")
 
     db = connect()
-    logger.debug("Preloading all instrument responses")
-    responses = preload_instrument_responses(db, return_format="inventory")
 
-    orig_params = get_params(db)
-    output_folder = getattr(orig_params, "output_folder", "OUTPUT")
-
-    while is_next_job_for_step(db, step_category="psd"):
-        logger.info("Getting the next job")
-        result = get_next_job_for_step(db, step_category="psd")
-        if result is None:
-            break
-        jobs, step = result
-        if not jobs:
+    while is_next_job_for_step(db, step_category=CATEGORY):
+        batch = get_next_lineage_batch(db, step_category=CATEGORY,
+                                       group_by="day", loglevel=loglevel,
+                                       drop_current_step_name=False)
+        if batch is None:
+            time.sleep(np.random.random())
             continue
 
-        step_config = get_config_set_details(
-            db,
-            jobs[0].config_category,
-            jobs[0].config_set_number,
-            format="AttribDict",
-        )
-        params = AttribDict(**orig_params, **step_config)
+        jobs          = batch["jobs"]
+        step          = batch["step"]
+        params        = batch["params"]
+        lineage_names = batch["lineage_names"]
+        days          = batch["days"]
 
-        psd_components   = params.psd_components
-        ppsd_length      = params.psd_ppsd_length
-        ppsd_overlap     = params.psd_ppsd_overlap
-        period_smooth    = params.psd_ppsd_period_smoothing_width_octaves
-        period_step      = params.psd_ppsd_period_step_octaves
-        period_limits    = params.psd_ppsd_period_limits
-        db_bins          = params.psd_ppsd_db_bins
+        step_name     = step.step_name
+        output_folder = getattr(params, "output_folder", "OUTPUT")
 
-        # Lineage for output path: upstream steps leading to this one.
-        # For a psd_N step the lineage is just [step.step_name] since psd
-        # is a root-level workflow (global → psd).
-        lineage = []  # no upstream steps
-        step_name = step.step_name  # e.g. "psd_1"
+        psd_components = params.psd_components
+        ppsd_length    = params.psd_ppsd_length
+        ppsd_overlap   = params.psd_ppsd_overlap
+        period_smooth  = params.psd_ppsd_period_smoothing_width_octaves
+        period_step    = params.psd_ppsd_period_step_octaves
+        period_limits  = params.psd_ppsd_period_limits
+        db_bins        = params.psd_ppsd_db_bins
+
+        # Only preload responses when the step is actually configured to
+        # remove the instrument response.
+        if getattr(params, 'remove_response', 'N') in ('Y', 'y'):
+            logger.debug("Preloading all instrument responses")
+            responses = preload_instrument_responses(db, return_format="inventory")
+        else:
+            responses = None
+
+        # lineage_names already contains the current step name
+        # (drop_current_step_name=False), so use it directly for path
+        # construction once xr_save_psd accepts it; for now keep empty list
+        # as psd is a root step (global -> psd).
+        lineage = []
 
         for job in jobs:
             net, sta, loc = job.pair.split(".")
-            logger.debug(f"Processing {job.pair}")
+            logger.debug(f"Processing {job.pair} {job.day}")
             gd = UTCDateTime(job.day).datetime
 
             files = get_data_availability(
@@ -127,7 +134,8 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             )
             if not files:
                 logger.error(f"No files found for {job.pair} {job.day}")
-                update_job(db, job.day, job.pair, job.jobtype, "F", ref=job.ref)
+                job.flag = "F"
+                db.commit()
                 continue
 
             job_failed = False
@@ -175,7 +183,6 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                     continue
                 tr = sel[0]
 
-                # PPSD computation
                 ppsd = PPSD(
                     tr.stats,
                     metadata=responses,
@@ -195,39 +202,28 @@ def main(loglevel="INFO", njobs_per_worker=9999):
 
                 if not ppsd.times_processed:
                     logger.debug(
-                        f"No PPSD windows processed for {job.pair} {comp} {job.day}"
+                        f"No PPSD windows for {job.pair} {comp} {job.day}"
                     )
                     del ppsd
                     continue
 
-                # Convert to DataFrame and save as NetCDF
                 df = psd_ppsd_to_dataframe(ppsd)
-                seed_id = f"{tr.stats.network}.{tr.stats.station}" \
-                          f".{tr.stats.location}.{tr.stats.channel}"
+                seed_id = (f"{tr.stats.network}.{tr.stats.station}"
+                           f".{tr.stats.location}.{tr.stats.channel}")
 
                 try:
-                    xr_save_psd(
-                        output_folder,
-                        lineage,
-                        step_name,
-                        seed_id,
-                        job.day,
-                        df,
-                    )
-                    logger.debug(
-                        f"Saved PSD NC for {seed_id} {job.day}"
-                    )
+                    xr_save_psd(output_folder, lineage, step_name,
+                                seed_id, job.day, df)
+                    logger.debug(f"Saved PSD NC for {seed_id} {job.day}")
                 except Exception:
-                    logger.error(
-                        f"Failed saving PSD NC for {seed_id} {job.day}"
-                    )
+                    logger.error(f"Failed saving PSD NC for {seed_id} {job.day}")
                     traceback.print_exc()
                     job_failed = True
 
-                # Optional PNG for quick visual check
+                # Optional PNG — path anchored under output_folder
                 try:
                     out = to_sds(tr.stats, gd.year, int(gd.strftime("%j")))
-                    pngout = os.path.join("PSD", "PNG", out)
+                    pngout = os.path.join(output_folder, "PSD", "PNG", out)
                     os.makedirs(os.path.dirname(pngout), exist_ok=True)
                     ppsd.plot(pngout + ".png")
                 except Exception:
@@ -235,9 +231,8 @@ def main(loglevel="INFO", njobs_per_worker=9999):
 
                 del ppsd
 
-            flag = "F" if job_failed else "D"
-            update_job(db, job.day, job.pair, job.jobtype, flag, ref=job.ref)
-
-        logger.debug('Day (job) "D"one')
+            job.flag = "F" if job_failed else "D"
+            db.commit()
+            logger.debug('Job done')
 
     logger.info("*** Finished: Compute PSD ***")
