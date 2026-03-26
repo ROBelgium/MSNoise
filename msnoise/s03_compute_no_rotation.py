@@ -225,14 +225,10 @@ from obspy.signal.filter import bandpass
 from obspy import read
 from obspy.core import AttribDict, Stream
 
-import logbook
 
 def main(loglevel="INFO"):
     global logger
-    logger = logbook.Logger(__name__)
-    # Reconfigure logger to show the pid number in log records
-    logger = get_logger('msnoise.compute_cc_norot_child', loglevel,
-                        with_pid=True)
+    logger = get_logger('msnoise.cc', loglevel, with_pid=True)
     logger.info('*** Starting: Compute CC ***')
 
     # Connection to the DB

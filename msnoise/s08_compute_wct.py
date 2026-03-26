@@ -67,7 +67,7 @@ def main(loglevel="INFO", batch_size=None):
     Main function to process WCT jobs using lineage-based approach
     """
     global logger
-    logger = get_logger('msnoise.compute_wct_child', loglevel, with_pid=True)
+    logger = get_logger('msnoise.wavelet', loglevel, with_pid=True)
     logger.info('*** Starting: Compute WCT ***')
 
     db = connect()

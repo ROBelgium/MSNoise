@@ -25,7 +25,6 @@ from .api import (
 from .wiener import *
 from obspy.core import AttribDict
 
-import logbook
 import matplotlib.pyplot as plt
 
 
@@ -40,9 +39,7 @@ def main(stype, loglevel="INFO"):
         Number of days before now to search for modified CC jobs
 
     """
-    # logger = logbook.Logger(__name__)
-    # Reconfigure logger to show the pid number in log records
-    logger = get_logger('msnoise.stack_child', loglevel, with_pid=True)
+    logger = get_logger('msnoise.stack', loglevel, with_pid=True)
     logger.debug('Starting the %s stack' % stype)
     db = connect()
 

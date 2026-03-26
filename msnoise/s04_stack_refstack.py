@@ -66,7 +66,7 @@ from .wiener import wiener_filt
 def main(loglevel="INFO"):
     """Compute REF stacks for all pending ``refstack`` jobs."""
 
-    logger = get_logger("msnoise.refstack_child", loglevel, with_pid=True)
+    logger = get_logger("msnoise.refstack", loglevel, with_pid=True)
     logger.info("*** Starting: Compute REF Stack (refstack) ***")
 
     db = connect()

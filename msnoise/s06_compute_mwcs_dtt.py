@@ -18,13 +18,9 @@ from .api import (
     xr_save_dtt,
 )
 
-import logbook
 
 def main(interval=1, loglevel="INFO"):
-    logger = logbook.Logger(__name__)
-    # Reconfigure logger to show the pid number in log records
-    logger = get_logger('msnoise.compute_dtt_child', loglevel,
-                        with_pid=True)
+    logger = get_logger('msnoise.mwcs_dtt', loglevel, with_pid=True)
     logger.info('*** Starting: Compute DT/T ***')
     db = connect()
     orig_params = get_params(db)

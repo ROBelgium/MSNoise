@@ -71,7 +71,6 @@ could occur with SQLite.
     Parallel Processing
 """
 
-import logbook
 import time
 
 import numpy as np
@@ -105,11 +104,7 @@ from .api import (
 )
 
 def main(loglevel="INFO"):
-
-    # Reconfigure logger to show the pid number in log records
-    global logger
-    logger = get_logger('msnoise.compute_mwcs_child', loglevel,
-                        with_pid=True)
+    logger = get_logger('msnoise.mwcs', loglevel, with_pid=True)
     logger.info('*** Starting: Compute MWCS ***')
 
     db = connect()

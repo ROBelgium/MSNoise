@@ -85,8 +85,9 @@ from . import FatalError
 from . import data_structures
 
 
-import logbook
-logger = logbook.Logger(__name__)
+# Module-level logger used by helper functions (update_availability, etc.)
+# that are called before main() has a chance to configure a logger.
+logger = api.get_logger('msnoise.scan_archive')
 
 
 def update_availability(db, folder, basename, data):
@@ -291,7 +292,7 @@ def scan_folders(folders, mintime, startdate, enddate, goal_sampling_rate,
     """
     global logger
     # Reconfigure logger to show the pid number in log records
-    logger = api.get_logger('msnoise.scan_archive_child', logger.level,
+    logger = api.get_logger('msnoise.scan_archive', logger.level,
                             with_pid=True)
     db = api.connect()
     for folder in folders:

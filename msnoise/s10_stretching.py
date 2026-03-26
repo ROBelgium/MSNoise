@@ -84,7 +84,6 @@ from .api import (
     xr_save_stretching,
 )
 
-import logbook
 import time
 
 import numpy as np
@@ -137,10 +136,7 @@ def stretch_mat_creation(refcc, str_range=0.01, nstr=1001):
 
 
 def main(loglevel="INFO"):
-    logger = logbook.Logger(__name__)
-    # Reconfigure logger to show the pid number in log records
-    logger = get_logger('msnoise.compute_str_child', loglevel,
-                        with_pid=True)
+    logger = get_logger('msnoise.stretching', loglevel, with_pid=True)
     logger.info('*** Starting: Compute Stretching ***')
 
     db = connect()

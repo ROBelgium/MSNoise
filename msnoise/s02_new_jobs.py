@@ -60,8 +60,9 @@ from .api import (
 import pandas as pd
 
 
-import logbook
-logger = logbook.Logger(__name__)
+# Module-level logger used by propagation functions (propagate_stack_jobs_from_cc_done, etc.)
+# that are called before main() has a chance to configure a logger.
+logger = get_logger('msnoise.new_jobs')
 
 def propagate_stack_jobs_from_cc_done(session):
     """
