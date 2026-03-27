@@ -439,7 +439,7 @@ def test_023_stack():
 
     # Capture plain-stack CCF for comparison
     result_plain = MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"])
-    pairs_plain = result_plain.list(category="stack")
+    pairs_plain = result_plain.list(db, category="stack")
     assert len(pairs_plain) > 0, "No plain-stack CCF results found"
 
     # Re-run with Wiener filter enabled
@@ -796,8 +796,8 @@ def test_099_plot_interferogram():
                                       filterid=filter_step.set_number,
                                       components="ZZ", stackid_item=1,
                                       show=False, outfile="?.png")
-                    fn = f'interferogram {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m6h_6h.png'
-                    assert os.path.isfile(fn), f"{fn} doesn't exist"
+                    fn = glob.glob(f'interferogram__*{sta_id1}*ZZ*.png')
+                    assert len(fn) >= 1, f"interferogram plot for {sta_id1}-{sta_id2} doesn't exist"
 
 @pytest.mark.order(100)
 def test_100_plot_ccftime():
@@ -812,8 +812,8 @@ def test_100_plot_ccftime():
                     ccftime_main(sta_id1, sta_id2, 1, 1,
                                  filter_step.set_number, 1, 1,
                                  show=False, outfile="?.png")
-                    fn = f'ccftime {sta_id1}_{sta_id2}-ZZ-f{filter_step.set_number}-m6h_6h.png'
-                    assert os.path.isfile(fn), f"{fn} doesn't exist"
+                    fn = glob.glob(f'ccftime__*{sta_id1}*ZZ*.png')
+                    assert len(fn) >= 1, f"ccftime plot for {sta_id1}-{sta_id2} doesn't exist"
 
 
 @pytest.mark.order(101)
@@ -829,18 +829,18 @@ def test_101_plot_spectime():
                     spectime_main(sta_id1, sta_id2, 1, 1,
                                   filter_step.set_number, 1, 1,
                                   show=False, outfile="?.png")
-                    fn = f'spectime {sta_id1}_{sta_id2}-ZZ-f{filter_step.set_number}-m6h_6h.png'
-                    assert os.path.isfile(fn), f"{fn} doesn't exist"
+                    fn = glob.glob(f'spectime__*{sta_id1}*ZZ*.png')
+                    assert len(fn) >= 1, f"spectime plot for {sta_id1}-{sta_id2} doesn't exist"
 
 @pytest.mark.order(102)
 def test_102_plot_distance():
     distance_main(filterid=1, components="ZZ", show=False, outfile="?.png")
-    fn = "distance ZZ-f1.png"
-    assert os.path.isfile(fn), f"{fn} doesn't exist"
+    fn = glob.glob("distance__*ZZ*.png")
+    assert len(fn) >= 1, "distance plot doesn't exist"
 
     distance_main(filterid=1, components="ZZ", show=False, outfile="?_refilter.png", refilter="0.2:0.9")
-    fn = "distance ZZ-f1_refilter.png"
-    assert os.path.isfile(fn), f"{fn} doesn't exist"
+    fn = glob.glob("distance__*ZZ*_refilter.png")
+    assert len(fn) >= 1, "distance refilter plot doesn't exist"
 
 @pytest.mark.order(103)
 def test_103_plot_dvv():
@@ -849,9 +849,8 @@ def test_103_plot_dvv():
         dvv_main(components="ZZ", show=False, outfile="?.png", dvvid=1)
     except (FileNotFoundError, ValueError):
         pytest.skip("No mwcs_dtt_dvv aggregate data available — run compute first")
-    # The outfile substitution replaces ? with "dvv ZZ-f<id>-mm<ms>"
-    fn = glob.glob("dvv ZZ-f*-mm*.png")
-    assert len(fn) >= 1, "Expected at least one dvv plot PNG file"
+    fn = glob.glob("dvv_mwcs__*ZZ*.png")
+    assert len(fn) >= 1, "Expected at least one dvv_mwcs plot PNG file"
 
 @pytest.mark.order(103)
 def test_103b_plot_stretching_dvv():
@@ -861,9 +860,8 @@ def test_103b_plot_stretching_dvv():
         stretching_dvv_main(components="ZZ", show=False, outfile="?.png", dvvid=1)
     except (FileNotFoundError, ValueError):
         pytest.skip("No stretching_dvv aggregate data available")
-    # filename: dvvs_<comp>-f<filterid>-s<stretchingid>-dvv<dvvid>[-m<ms>].png
-    fn = glob.glob("dvvs_*.png")
-    assert len(fn) >= 1, "Expected at least one stretching_dvv plot PNG (dvvs_*.png)"
+    fn = glob.glob("dvv_stretching__*ZZ*.png")
+    assert len(fn) >= 1, "Expected at least one dvv_stretching plot PNG"
 
 @pytest.mark.order(103)
 def test_103c_plot_wavelet_dtt_dvv():
@@ -873,9 +871,8 @@ def test_103c_plot_wavelet_dtt_dvv():
                              show=False, outfile="?.png", dvvid=1)
     except (FileNotFoundError, ValueError):
         pytest.skip("No wavelet_dtt_dvv aggregate data available")
-    # filename: wct_timeseries_<comp>-f<filterid>-w<wctid>-d<dttid>[-m<ms>].png
-    fn = glob.glob("wct_*.png")
-    assert len(fn) >= 1, "Expected at least one wavelet_dtt_dvv plot PNG (wct_*.png)"
+    fn = glob.glob("dvv_wavelet__*ZZ*.png")
+    assert len(fn) >= 1, "Expected at least one dvv_wavelet plot PNG"
 
 @pytest.mark.order(104)
 def test_104_plot_data_availability():

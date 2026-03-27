@@ -25,6 +25,7 @@ import numpy as np
 from ..api import (
     connect, get_logger,
     get_station, get_interstation_distance, check_stations_uniqueness,
+    build_plot_outfile,
 )
 from ..results import MSNoiseResult
 
@@ -171,17 +172,12 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
     plt.tight_layout()
 
     if outfile:
-        if outfile.startswith("?"):
-            outfile = outfile.replace(
-                "?", "%s-%s-%s-f%i-w%i-m%s_%s" % (
-                    sta1.replace(".", "-"), sta2.replace(".", "-"),
-                    components, filterid, mwcsid,
-                    mov_stack[0], mov_stack[1],
-                )
-            )
-        outfile = "mwcs_" + outfile
-        logger.info(f"Saving to: {outfile}")
-        plt.savefig(outfile)
+        outfile = build_plot_outfile(
+            outfile, "mwcs", result.lineage_names,
+            pair=f"{sta1}:{sta2}", components=components, mov_stack=mov_stack)
+        if outfile:
+            logger.info(f"Saving to: {outfile}")
+            plt.savefig(outfile)
     if show:
         plt.show()
     else:

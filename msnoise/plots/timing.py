@@ -19,6 +19,7 @@ from ..api import (
     connect, get_logger, build_movstack_datelist,
     get_config_set_details,
     get_station_pairs,
+    build_plot_outfile,
 )
 from ..results import MSNoiseResult
 
@@ -184,14 +185,12 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
     )
 
     if outfile:
-        if outfile.startswith("?"):
-            tag = "%s-f%i-w%i-d%i-%s" % (components, filterid, mwcsid, dttid, col)
-            if len(mov_stacks) == 1:
-                tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
-            outfile = outfile.replace("?", tag)
-        outfile = "timing_" + outfile
-        logger.info(f"Saving to: {outfile}")
-        plt.savefig(outfile)
+        outfile = build_plot_outfile(
+            outfile, "timing", result.lineage_names,
+            components=components, extra=col)
+        if outfile:
+            logger.info(f"Saving to: {outfile}")
+            plt.savefig(outfile)
     if show:
         plt.show()
     else:

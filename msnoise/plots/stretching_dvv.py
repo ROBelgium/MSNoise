@@ -18,6 +18,7 @@ from matplotlib.dates import DateFormatter
 from ..api import (
     connect, get_logger,
     get_config_set_details,
+    build_plot_outfile,
 )
 from ..results import MSNoiseResult
 
@@ -136,15 +137,12 @@ def main(mov_stackid=None, components="ZZ", pair_type="CC", filterid=1, stretchi
     )
 
     if outfile:
-        if outfile.startswith("?"):
-            tag = "%s-f%i-s%i-dvv%i" % (
-                ",".join(comp_list), filterid, stretchingid, dvvid)
-            if len(mov_stacks) == 1:
-                tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
-            outfile = outfile.replace("?", tag)
-        outfile = "dvvs_" + outfile
-        logger.info(f"Saving to: {outfile}")
-        plt.savefig(outfile)
+        outfile = build_plot_outfile(
+            outfile, "dvv_stretching", result.lineage_names,
+            components=",".join(comp_list))
+        if outfile:
+            logger.info(f"Saving to: {outfile}")
+            plt.savefig(outfile)
     if show:
         plt.show()
     else:

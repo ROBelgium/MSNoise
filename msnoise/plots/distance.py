@@ -23,6 +23,7 @@ from ..api import (
     get_logger,
     get_refstack_lineage_for_filter,
     get_station_pairs,
+    build_plot_outfile,
 )
 from ..results import MSNoiseResult
 
@@ -110,12 +111,12 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
     plt.grid(True)
     plt.legend(loc=4)
     if outfile:
-        if outfile.startswith("?"):
-            newname = 'distance %s-f%i' % (components,
-                                           filterid)
-            outfile = outfile.replace('?', newname)
-        logger.info("output to: %s" % outfile)
-        plt.savefig(outfile)
+        outfile = build_plot_outfile(
+            outfile, "distance", result.lineage_names,
+            components=components)
+        if outfile:
+            logger.info(f"Saving to: {outfile}")
+            plt.savefig(outfile)
     if show:
         plt.show()
     else:

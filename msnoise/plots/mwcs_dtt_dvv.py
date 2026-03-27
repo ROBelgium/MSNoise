@@ -20,6 +20,7 @@ from matplotlib.dates import DateFormatter
 
 from ..api import (
     connect, get_logger,
+    build_plot_outfile,
 )
 from ..results import MSNoiseResult
 
@@ -123,10 +124,12 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
     )
 
     if outfile:
-        if outfile.startswith("?"):
-            tag = "dvv ZZ-f%i-mm%s" % (filterid, mov_stacks[0][0])
-            outfile = outfile.replace("?", tag, 1)
-        plt.savefig(outfile)
+        outfile = build_plot_outfile(
+            outfile, "dvv_mwcs", result.lineage_names,
+            components=components)
+        if outfile:
+            logger.info(f"Saving to: {outfile}")
+            plt.savefig(outfile)
     if show:
         plt.show()
     plt.close()

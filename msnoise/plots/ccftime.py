@@ -48,6 +48,7 @@ from ..api import (
     check_stations_uniqueness,
     connect,
     get_logger,
+    build_plot_outfile,
 )
 from ..results import MSNoiseResult
 
@@ -137,17 +138,12 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
     ax.fmt_ydata = mdates.DateFormatter('%Y-%m-%d')
     plt.tight_layout()
     if outfile:
-        if outfile.startswith("?"):
-            pair = pair.replace(':', '-')
-            # TODO outfile naming -> make it a helper based on lineage??
-            outfile = outfile.replace('?', '%s-%s-f%i-m%s_%s' % (pair,
-                                                              components,
-                                                              filterid,
-                                                              mov_stack[0],
-                                                              mov_stack[1]))
-        outfile = "ccftime " + outfile
-        logger.info("output to: %s" % outfile)
-        plt.savefig(outfile)
+        outfile = build_plot_outfile(
+            outfile, "ccftime", result.lineage_names,
+            pair=pair, components=components, mov_stack=mov_stack)
+        if outfile:
+            logger.info(f"Saving to: {outfile}")
+            plt.savefig(outfile)
     if show:
         cursor = Cursor(ax, useblit=True, color='red', linewidth=1)  # noqa: F841
         plt.show()

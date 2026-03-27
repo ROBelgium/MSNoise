@@ -1579,6 +1579,119 @@ def get_job_types(session, jobtype):
     return rows
 
 
+# ── Plot filename helpers ────────────────────────────────────────────────────
+
+#: Short abbreviations for each workflow step category, used by
+#: :func:`build_plot_outfile` to produce compact but human-readable filenames.
+_STEP_ABBREVS = {
+    "preprocess":     "pre",
+    "cc":             "cc",
+    "filter":         "f",
+    "stack":          "stk",
+    "refstack":       "ref",
+    "mwcs":           "mwcs",
+    "mwcs_dtt":       "dtt",
+    "mwcs_dtt_dvv":   "dvv",
+    "stretching":     "str",
+    "stretching_dvv": "sdvv",
+    "wavelet":        "wct",
+    "wavelet_dtt":    "wdtt",
+    "wavelet_dtt_dvv": "wdvv",
+    "psd":            "psd",
+    "psd_rms":        "rms",
+}
+
+
+def lineage_to_plot_tag(lineage_names):
+    """Convert a list of step names to a compact plot filename tag.
+
+    Each step is abbreviated using :data:`_STEP_ABBREVS` and the set number is
+    appended.  Steps are joined with ``-``.
+
+    Examples::
+
+        lineage_to_plot_tag(["preprocess_1","cc_1","filter_1","stack_1"])
+        # → "pre1-cc1-f1-stk1"
+
+        lineage_to_plot_tag(["preprocess_1","cc_1","filter_1","stack_1",
+                              "refstack_1","mwcs_1","mwcs_dtt_1","mwcs_dtt_dvv_1"])
+        # → "pre1-cc1-f1-stk1-ref1-mwcs1-dtt1-dvv1"
+
+    :param lineage_names: List of step name strings from
+        :attr:`MSNoiseResult.lineage_names`.
+    :returns: Hyphen-joined abbreviated tag string.
+    """
+    parts = []
+    for step in lineage_names:
+        tail = step.rsplit("_", 1)
+        if len(tail) == 2 and tail[1].isdigit():
+            base, num = tail[0], tail[1]
+        else:
+            base, num = step, ""
+        abbrev = _STEP_ABBREVS.get(base, base)
+        parts.append(f"{abbrev}{num}")
+    return "-".join(parts)
+
+
+def build_plot_outfile(outfile, plot_name, lineage_names, *,
+                       pair=None, components=None,
+                       mov_stack=None, extra=None):
+    """Resolve the output filename for a plot.
+
+    When *outfile* starts with ``"?"``, replaces ``"?"`` with a standardised
+    auto-generated tag and prepends *plot_name*, producing a filename of the
+    form::
+
+        <plot_name>__<lineage>[__<pair>][__<comp>][__m<ms>][__<extra>].<ext>
+
+    If *outfile* does not start with ``"?"``, it is returned unchanged (the
+    caller supplied an explicit path).
+
+    If *outfile* is ``None`` or empty, returns ``None``.
+
+    :param outfile: Raw ``outfile`` argument passed to the plot function
+        (e.g. ``"?.png"``).
+    :param plot_name: Short plot identifier, e.g. ``"ccftime"`` or
+        ``"dvv_mwcs"``.  Must not contain ``__``.
+    :param lineage_names: List of step name strings (e.g.
+        ``["preprocess_1", "cc_1", "filter_1", "stack_1"]``) from
+        :attr:`MSNoiseResult.lineage_names`.
+    :param pair: Optional station pair string (``"NET.STA.LOC-NET.STA.LOC"``).
+        Dots are kept; colons are replaced with ``-``.
+    :param components: Optional component string, e.g. ``"ZZ"``.
+    :param mov_stack: Optional moving-stack tuple or string,
+        e.g. ``("1D", "1D")`` → ``"m1D-1D"``.
+    :param extra: Optional extra qualifier string appended last.
+    :returns: Resolved filename string, or *outfile* unchanged.
+    """
+    if not outfile:
+        return outfile
+    if not outfile.startswith("?"):
+        return outfile
+
+    # Build tag components
+    lin_tag = lineage_to_plot_tag(lineage_names)
+    parts = [lin_tag]
+
+    if pair:
+        pair_clean = str(pair).replace(":", "-").replace(" ", "")
+        parts.append(pair_clean)
+    if components:
+        parts.append(str(components))
+    if mov_stack is not None:
+        if isinstance(mov_stack, (tuple, list)) and len(mov_stack) == 2:
+            parts.append(f"m{mov_stack[0]}-{mov_stack[1]}")
+        else:
+            parts.append(f"m{mov_stack}")
+    if extra:
+        parts.append(str(extra))
+
+    tag = "__".join(parts)
+    # Replace the leading '?' — preserve any suffix the user appended (e.g. '.png')
+    resolved = outfile.replace("?", tag, 1)
+    return f"{plot_name}__{resolved}"
+
+
 # ── Workflow-aware job API ──────────────────────────────────
 
 

@@ -28,6 +28,7 @@ from matplotlib.dates import DateFormatter
 from ..api import (
     connect, get_logger, build_movstack_datelist,
     get_station_pairs,
+    build_plot_outfile,
 )
 from ..results import MSNoiseResult
 
@@ -265,14 +266,12 @@ def main(mov_stackid=0, components="ZZ", pair_type="CC", filterid=1, wctid=1, dt
         return
 
     if outfile:
-        if outfile.startswith("?"):
-            tag = "%s-f%i-w%i-d%i" % (",".join(comp_list), filterid, wctid, dttid)
-            if len(mov_stacks) == 1:
-                tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
-            outfile = outfile.replace("?", tag)
-        outfile = "wct_%s_%s" % (visualize, outfile)
-        logger.info(f"Saving to: {outfile}")
-        fig.savefig(outfile)
+        outfile = build_plot_outfile(
+            outfile, "dvv_wavelet", result.lineage_names,
+            components=",".join(comp_list), extra=visualize)
+        if outfile:
+            logger.info(f"Saving to: {outfile}")
+            fig.savefig(outfile)
     if show:
         plt.show()
     else:

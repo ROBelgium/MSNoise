@@ -21,6 +21,7 @@ import numpy as np
 from ..api import (
     connect, get_logger,
     get_station, get_interstation_distance, check_stations_uniqueness,
+    build_plot_outfile,
 )
 from ..results import MSNoiseResult
 
@@ -152,16 +153,12 @@ def main(sta1, sta2, filterid=1, components="ZZ", day=None,
     plt.tight_layout()
 
     if outfile:
-        if outfile.startswith("?"):
-            outfile = outfile.replace(
-                "?", "%s-%s-%s-f%i-w%i-d%i-%s" % (
-                    sta1.replace(".", "-"), sta2.replace(".", "-"),
-                    components, filterid, mwcsid, mwcsdttid, day,
-                )
-            )
-        outfile = "dtt_" + outfile
-        logger.info(f"Saving to: {outfile}")
-        plt.savefig(outfile)
+        outfile = build_plot_outfile(
+            outfile, "dtt", dtt_result.lineage_names,
+            pair=f"{sta1}:{sta2}", components=components, extra=day)
+        if outfile:
+            logger.info(f"Saving to: {outfile}")
+            plt.savefig(outfile)
     if show:
         plt.show()
     else:
