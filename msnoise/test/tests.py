@@ -3,6 +3,7 @@ import glob
 import logging
 import os
 import shutil
+import subprocess
 import traceback
 from click.testing import CliRunner
 from obspy import read
@@ -573,6 +574,18 @@ def test_042_compute_mwcs_dtt_dvv():
         traceback.print_exc()
         pytest.fail("mwcs_dtt_dvv computation failed")
 
+    # Verify the DVV aggregate has >= 2 time steps (both days present)
+    db = connect()
+    results = MSNoiseResult.list(db, category='mwcs_dtt_dvv')
+    assert len(results) >= 1, "No mwcs_dtt_dvv results found"
+    dvv_data = results[0].get_dvv()
+    for key, ds in dvv_data.items():
+        n = len(ds.times) if hasattr(ds, 'times') else 0
+        assert n >= 2, \
+            f"Expected >= 2 DVV time steps after 2 days, got {n} for {key}"
+        break  # spot-check first result
+    db.close()
+
 
 @pytest.mark.order(43)
 def test_043_new_jobs_after_stretching():
@@ -603,6 +616,18 @@ def test_044_compute_stretching_dvv():
         traceback.print_exc()
         pytest.fail("stretching_dvv computation failed")
 
+    # Verify the stretching DVV aggregate has >= 2 time steps
+    db = connect()
+    results = MSNoiseResult.list(db, category='stretching_dvv')
+    assert len(results) >= 1, "No stretching_dvv results found"
+    dvv_data = results[0].get_dvv()
+    for key, ds in dvv_data.items():
+        n = len(ds.times) if hasattr(ds, 'times') else 0
+        assert n >= 2, \
+            f"Expected >= 2 stretching DVV time steps after 2 days, got {n} for {key}"
+        break
+    db.close()
+
 @pytest.mark.order(33)
 def test_033_create_fake_new_files(setup_environment):
     data_folder = setup_environment['data_folder']
@@ -628,6 +653,51 @@ def test_033_create_fake_new_files(setup_environment):
     counts = {flag: count for count, flag in jobs}
     assert counts.get('D', 0) == 3, f"Expected 3 done cc_1 jobs, got: {counts}"
     assert counts.get('T', 0) == 3, f"Expected 3 todo cc_1 jobs, got: {counts}"
+    db.close()
+
+@pytest.mark.order(33)
+def test_033b_compute_second_day():
+    """Propagate the second day's CC jobs through the full pipeline.
+
+    test_033 added day 2 data, scanned the archive, ran preprocess and CC for
+    the new day.  This test runs all downstream steps so that day 2 is present
+    in every output (stack, refstack, MWCS, DTT, stretching, WCT, WCT-DTT),
+    giving DVV aggregates at least 2 time steps.
+    """
+    # ── Stack ────────────────────────────────────────────────────────────────
+    new_jobs_main(after='cc')
+    stack_mov('mov')
+    new_jobs_main(after='stack')
+    stack_refstack_main()
+
+    # ── MWCS ─────────────────────────────────────────────────────────────────
+    new_jobs_main(after='refstack')
+    compute_mwcs_main()
+    new_jobs_main(after='mwcs')
+    compute_dtt_main()
+
+    # ── Stretching ───────────────────────────────────────────────────────────
+    from ..s10_stretching import main as stretch_main
+    stretch_main()
+
+    # ── Wavelet (WCT) ────────────────────────────────────────────────────────
+    compute_wct_main()
+    new_jobs_main(after='wavelet')
+    wavelet_dtt_main()
+
+    # Verify at least 2 days of MWCS output exist
+    db = connect()
+    results = MSNoiseResult.list(db, category='mwcs_dtt')
+    assert len(results) >= 1, "Expected at least one mwcs_dtt result after second day"
+    r = results[0]
+    mwcs_data = r.get_mwcs()
+    n_times = 0
+    for v in mwcs_data.values():
+        if hasattr(v, 'times'):
+            n_times = max(n_times, len(v.times))
+        elif hasattr(v, 'index'):
+            n_times = max(n_times, len(v))
+    assert n_times >= 2,         f"Expected ≥ 2 time steps in MWCS output after 2 days of data, got {n_times}"
     db.close()
 
 @pytest.mark.order(34)
@@ -885,7 +955,8 @@ def test_104_plot_data_availability():
 @pytest.mark.order(105)
 def test_105_db_dump():
     """ Tests the dump of the database and the creation of csv files """
-    os.system("msnoise db dump")
+    ret = subprocess.run(["msnoise", "db", "dump"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise db dump failed: {ret.stderr.decode()}"
     assert os.path.isfile("config.csv")
     assert os.path.isfile("stations.csv")
     assert os.path.isfile("jobs.csv")
@@ -950,45 +1021,78 @@ def test_302_compute_rms():
 @pytest.mark.order(400)
 def test_400_run_manually():
     # MOV stack
-    os.system("msnoise reset stack_1 --all")
-    os.system("msnoise cc stack -m")
+    ret = subprocess.run(["msnoise", "reset", "stack_1", "--all"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise reset stack_1 --all failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "stack", "-m"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc stack -m failed: {ret.stderr.decode()}"
     # Refstack (REF jobs triggered by stack completion)
-    os.system("msnoise new_jobs --after stack")
-    os.system("msnoise reset refstack_1 --all")
-    os.system("msnoise cc stack_refstack")
+    ret = subprocess.run(["msnoise", "new_jobs", "--after", "stack"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise new_jobs --after stack failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "reset", "refstack_1", "--all"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise reset refstack_1 --all failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "stack_refstack"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc stack_refstack failed: {ret.stderr.decode()}"
     # DVV jobs triggered by refstack completion
-    os.system("msnoise new_jobs --after refstack")
+    ret = subprocess.run(["msnoise", "new_jobs", "--after", "refstack"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise new_jobs --after refstack failed: {ret.stderr.decode()}"
     # MWCS
-    os.system("msnoise reset mwcs_1 --all")
-    os.system("msnoise cc dtt compute_mwcs")
-    os.system("msnoise reset mwcs_dtt_1 --all")
-    os.system("msnoise cc dtt compute_mwcs_dtt")
-    os.system("msnoise new_jobs --after mwcs_dtt")
-    os.system("msnoise reset mwcs_dtt_dvv_1 --all")
-    os.system("msnoise cc dtt dvv compute_mwcs_dtt_dvv")
-    os.system("msnoise cc dtt dvv plot mwcs_dvv -s 0 -o ?.png")
+    ret = subprocess.run(["msnoise", "reset", "mwcs_1", "--all"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise reset mwcs_1 --all failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "dtt", "compute_mwcs"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc dtt compute_mwcs failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "reset", "mwcs_dtt_1", "--all"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise reset mwcs_dtt_1 --all failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "dtt", "compute_mwcs_dtt"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc dtt compute_mwcs_dtt failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "new_jobs", "--after", "mwcs_dtt"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise new_jobs --after mwcs_dtt failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "reset", "mwcs_dtt_dvv_1", "--all"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise reset mwcs_dtt_dvv_1 --all failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "dtt", "dvv", "compute_mwcs_dtt_dvv"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc dtt dvv compute_mwcs_dtt_dvv failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "dtt", "dvv", "plot", "mwcs_dvv", "-s", "0", "-o", "?.png"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc dtt dvv plot mwcs_dvv -s 0 -o ?.png failed: {ret.stderr.decode()}"
     # Stretching
-    os.system("msnoise reset stretching_1 --all")
-    os.system("msnoise cc dtt compute_stretching")
-    os.system("msnoise new_jobs --after stretching")
-    os.system("msnoise reset stretching_dvv_1 --all")
-    os.system("msnoise cc dtt dvv compute_stretching_dvv")
-    os.system("msnoise cc dtt dvv plot stretching_dvv -s 0 -o ?.png")
+    ret = subprocess.run(["msnoise", "reset", "stretching_1", "--all"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise reset stretching_1 --all failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "dtt", "compute_stretching"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc dtt compute_stretching failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "new_jobs", "--after", "stretching"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise new_jobs --after stretching failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "reset", "stretching_dvv_1", "--all"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise reset stretching_dvv_1 --all failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "dtt", "dvv", "compute_stretching_dvv"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc dtt dvv compute_stretching_dvv failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "dtt", "dvv", "plot", "stretching_dvv", "-s", "0", "-o", "?.png"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc dtt dvv plot stretching_dvv -s 0 -o ?.png failed: {ret.stderr.decode()}"
     # Wavelet
-    os.system("msnoise reset wavelet_1 --all")
-    os.system("msnoise cc dtt compute_wct")
-    os.system("msnoise new_jobs --after wavelet")
-    os.system("msnoise reset wavelet_dtt_1 --all")
-    os.system("msnoise cc dtt compute_wct_dtt")
-    os.system("msnoise new_jobs --after wavelet_dtt")
-    os.system("msnoise reset wavelet_dtt_dvv_1 --all")
-    os.system("msnoise cc dtt dvv compute_wavelet_dtt_dvv")
-    os.system("msnoise cc dtt dvv plot wavelet_dvv -s 0 -o ?.png")
+    ret = subprocess.run(["msnoise", "reset", "wavelet_1", "--all"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise reset wavelet_1 --all failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "dtt", "compute_wct"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc dtt compute_wct failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "new_jobs", "--after", "wavelet"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise new_jobs --after wavelet failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "reset", "wavelet_dtt_1", "--all"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise reset wavelet_dtt_1 --all failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "dtt", "compute_wct_dtt"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc dtt compute_wct_dtt failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "new_jobs", "--after", "wavelet_dtt"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise new_jobs --after wavelet_dtt failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "reset", "wavelet_dtt_dvv_1", "--all"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise reset wavelet_dtt_dvv_1 --all failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "dtt", "dvv", "compute_wavelet_dtt_dvv"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc dtt dvv compute_wavelet_dtt_dvv failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "cc", "dtt", "dvv", "plot", "wavelet_dvv", "-s", "0", "-o", "?.png"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise cc dtt dvv plot wavelet_dvv -s 0 -o ?.png failed: {ret.stderr.decode()}"
     # PSDs
-    os.system("msnoise reset psd_1 --all")
-    os.system("msnoise qc compute_psd")
-    os.system("msnoise reset psd_rms_1 --all")
-    os.system("msnoise qc compute_psd_rms")
+    ret = subprocess.run(["msnoise", "reset", "psd_1", "--all"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise reset psd_1 --all failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "qc", "compute_psd"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise qc compute_psd failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "reset", "psd_rms_1", "--all"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise reset psd_rms_1 --all failed: {ret.stderr.decode()}"
+    ret = subprocess.run(["msnoise", "qc", "compute_psd_rms"], capture_output=True)
+    assert ret.returncode == 0, f"msnoise qc compute_psd_rms failed: {ret.stderr.decode()}"
 
 def test_99210_crondays_positive_float():
     parsed_crondays = parse_crondays('2.5')
