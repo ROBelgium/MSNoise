@@ -75,11 +75,12 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
 
         for comp in comp_list:
             try:
-                ds = result.get_dvv(pair_type="ALL", components=comp,
+                # TODO: hardcoded pair_type: should be provided from CLI
+                ds = result.get_dvv(pair_type="CC", components=comp,
                                      mov_stack=mov_stack, format="xarray")
             except (FileNotFoundError, ValueError):
                 logger.warning(
-                    "No mwcs_dtt_dvv data for mov_stack=%s comp=%s. "
+                    "No mwcs_dtt_dvv data for mov_stack=%s comp=%s pair_type=ZZ"
                     "Run 'msnoise dtt dvv compute_mwcs_dtt_dvv' first." % (mov_stack, comp)
                 )
                 continue

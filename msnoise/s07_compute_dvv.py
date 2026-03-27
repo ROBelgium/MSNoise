@@ -78,7 +78,7 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
         params      = batch["params"]
         step        = batch["step"]
         lineage_str = batch["lineage_str"]
-
+        print(params)
         # dvv_lineage = lineage up to but not including the dvv step itself.
         # The parent DTT step is the last entry in that list.
         dvv_lineage   = batch["lineage_names_upstream"]
@@ -113,59 +113,38 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
             + params.components_to_compute_single_station
         ) if c]  # drop empty strings
 
-        split_pair_type  = str(getattr(params, "dvv_split_pair_type",  "Y")).upper() == "Y"
-        split_components = str(getattr(params, "dvv_split_components", "Y")).upper() == "Y"
+        split_pair_type  = params.dvv_split_pair_type
+        split_components = params.dvv_split_components
 
-        pair_types  = ["CC", "SC", "AC", "ALL"] if split_pair_type  else ["ALL"]
-        comp_groups = all_components + ["ALL"]  if split_components  else ["ALL"]
+        # split=Y → one file per individual type/component
+        # split=N → one combined ALL file
+        pair_types  = ["CC", "SC", "AC"] if split_pair_type  else ["ALL"]
+        comp_groups = list(all_components) if split_components else ["ALL"]
 
         mov_stacks = params.mov_stack
 
         for mov_stack in mov_stacks:
-            for comp in comp_groups:
-                comp_list = all_components if comp == "ALL" else [comp]
-
-                for pt in pair_types:
-                    datasets = []
-                    for c in comp_list:
-                        try:
-                            ds = aggregate_dvv_pairs(
-                                root=root,
-                                parent_lineage=parent_lineage,
-                                parent_step_name=parent_step_name,
-                                parent_category=parent_category,
-                                mov_stack=mov_stack,
-                                component=c,
-                                pair_type=pt,
-                                pairs=all_pairs,
-                                params=params,
-                            )
-                            datasets.append(ds)
-                        except ValueError:
-                            import traceback
-                            traceback.print_exc()
-                            logger.debug(
-                                f"No data for mov_stack={mov_stack} "
-                                f"comp={c} pair_type={pt} — skipping"
-                            )
-                            continue
-
-                    if not datasets:
-                        logger.warning(
+            for pt in pair_types:
+                for comp in comp_groups:
+                    print(comp)
+                    try:
+                        ds_out = aggregate_dvv_pairs(
+                            root=root,
+                            parent_lineage=parent_lineage,
+                            parent_step_name=parent_step_name,
+                            parent_category=parent_category,
+                            mov_stack=mov_stack,
+                            component=comp,
+                            pair_type=pt,
+                            pairs=all_pairs,
+                            params=params,
+                        )
+                    except ValueError:
+                        logger.debug(
                             f"No data for mov_stack={mov_stack} "
-                            f"comp={comp} pair_type={pt}"
+                            f"comp={comp} pair_type={pt} — skipping"
                         )
                         continue
-
-                    if len(datasets) == 1:
-                        ds_out = datasets[0]
-                    else:
-                        # "ALL" components: average stats across components
-                        import xarray as xr
-                        combined = xr.concat(datasets, dim="component")
-                        ds_out = combined.mean(dim="component", skipna=True)
-                        ds_out.attrs = datasets[0].attrs
-                        ds_out.attrs["component"] = "ALL"
 
                     try:
                         xr_save_dvv_agg(

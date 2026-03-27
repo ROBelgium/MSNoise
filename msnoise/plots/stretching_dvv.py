@@ -97,7 +97,8 @@ def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
 
         for comp in comp_list:
             try:
-                ds = result.get_dvv(pair_type="ALL", components=comp,
+                # TODO: hardcoded pair_type: should be provided from CLI
+                ds = result.get_dvv(pair_type="CC", components=comp,
                                      mov_stack=mov_stack, format="xarray")
             except (FileNotFoundError, ValueError):
                 logger.warning(
