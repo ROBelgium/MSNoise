@@ -454,7 +454,13 @@ class MSNoiseResult:
 
         def _apply_format(ds):
             if format == "dataframe":
-                return ds.CCF.to_dataframe().unstack().droplevel(0, axis=1)
+                import pandas as pd_ref
+                # REF is a 1D array (taxis,) representing the reference waveform
+                da = ds.REF
+                return pd_ref.DataFrame(
+                    da.values.reshape(1, -1),
+                    columns=da.coords["taxis"].values,
+                )
             return ds
 
         if pair is not None and components is not None:

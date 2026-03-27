@@ -4338,7 +4338,8 @@ def compute_dtt_stretching(session, root, lineage, mov_stack,
         comps = comps_sc if s1 == s2 else comps_cc
         for comp in comps:
             try:
-                df = _xr_get_stretching(root, lineage, s1, s2, comp, mov_stack)
+                df = _xr_get_stretching(root, lineage, s1, s2, comp, mov_stack,
+                                        format="dataframe")
                 all_frames.append(df)
             except FileNotFoundError:
                 continue
