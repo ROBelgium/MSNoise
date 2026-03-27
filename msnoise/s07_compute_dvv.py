@@ -3,7 +3,7 @@ DVV Aggregate Step
 ==================
 
 Aggregates per-pair dv/v results (from ``mwcs_dtt``, ``stretching``, or
-``wct_dtt``) into network-level statistics across station pairs.
+``wavelet_dtt``) into network-level statistics across station pairs.
 
 One worker handles all three DVV step categories; the category is passed as
 an argument to :func:`main`.  Each category maps to a parent DTT step:
@@ -13,7 +13,7 @@ DVV step category     Parent category
 ====================  ===============
 ``mwcs_dtt_dvv``      ``mwcs_dtt``
 ``stretching_dvv``    ``stretching``
-``wct_dtt_dvv``       ``wct_dtt``
+``wct_dtt_dvv``       ``wavelet_dtt``
 ====================  ===============
 
 Output files live at::
@@ -41,7 +41,7 @@ from .api import (
 PARENT_CATEGORY = {
     "mwcs_dtt_dvv":   "mwcs_dtt",
     "stretching_dvv": "stretching",
-    "wct_dtt_dvv":    "wct_dtt",
+    "wct_dtt_dvv":    "wavelet_dtt",
 }
 
 

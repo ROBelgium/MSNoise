@@ -444,6 +444,110 @@ def propagate_mwcs_jobs_from_refstack_done(session):
     return created
 
 
+def propagate_dvv_jobs_from_dtt_done(session, source_category: str) -> int:
+    """Insert one ``day="DVV"`` job per unique lineage into each downstream
+    DVV step when the parent DTT step has at least one DONE job.
+
+    Unlike the per-day passthrough used for MWCS/stretching/WCT jobs,
+    DVV aggregation operates over the **full time series** of all pairs at
+    once, so a single sentinel job per lineage is sufficient.
+
+    :param source_category: ``"mwcs_dtt"``, ``"stretching"``, or
+        ``"wct_dtt"`` — the parent DTT step category.
+    :returns: Number of new DVV jobs created or reset to ``"T"``.
+    """
+    DVV_TARGET = {
+        "mwcs_dtt":    "mwcs_dtt_dvv",
+        "stretching":  "stretching_dvv",
+        "wavelet_dtt": "wct_dtt_dvv",
+    }
+    target_category = DVV_TARGET.get(source_category)
+    if target_category is None:
+        raise ValueError(f"Unknown source_category {source_category!r}")
+
+    from .msnoise_table_def import declare_tables
+
+    schema = declare_tables()
+    Job = schema.Job
+    WorkflowStep = schema.WorkflowStep
+
+    now = datetime.datetime.utcnow()
+    created = 0
+
+    # Find all active parent DTT steps
+    parent_steps = (
+        session.query(WorkflowStep)
+        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.category == source_category)
+        .all()
+    )
+
+    for parent_step in parent_steps:
+        # Find downstream DVV steps linked from this parent
+        dvv_steps = (
+            session.query(WorkflowStep)
+            .join(schema.WorkflowLink,
+                  schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
+            .filter(schema.WorkflowLink.from_step_id == parent_step.step_id)
+            .filter(schema.WorkflowLink.is_active == True)
+            .filter(WorkflowStep.category == target_category)
+            .all()
+        )
+        if not dvv_steps:
+            continue
+
+        # Collect unique lineages from DONE parent jobs (any pair, any day)
+        done_lineages = (
+            session.query(Job.lineage)
+            .filter(Job.step_id == parent_step.step_id)
+            .filter(Job.flag == "D")
+            .distinct()
+            .all()
+        )
+        done_lineages = [row[0] for row in done_lineages if row[0]]
+        if not done_lineages:
+            continue
+
+        for dvv_step in dvv_steps:
+            for parent_lineage_str in done_lineages:
+                # DVV lineage = parent lineage + "/" + dvv step name
+                dvv_lineage_str = (
+                    parent_lineage_str.rstrip("/") + "/" + dvv_step.step_name
+                )
+
+                # If a job already exists, reset to TODO if not already TODO
+                existing = (
+                    session.query(Job)
+                    .filter(Job.step_id == dvv_step.step_id)
+                    .filter(Job.day == "DVV")
+                    .filter(Job.lineage == dvv_lineage_str)
+                    .first()
+                )
+                if existing:
+                    if existing.flag != "T":
+                        existing.flag = "T"
+                        existing.lastmod = now
+                    continue
+
+                session.add(Job(
+                    day="DVV",
+                    pair="ALL",
+                    flag="T",
+                    step_id=dvv_step.step_id,
+                    jobtype=dvv_step.step_name,
+                    priority=0,
+                    lastmod=now,
+                    lineage=dvv_lineage_str,
+                ))
+                created += 1
+
+    session.commit()
+    logger.info(
+        f"[--after {source_category}] DVV aggregate jobs created: {created}"
+    )
+    return created
+
+
 def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
     """
     DONE parent_step jobs -> TODO child_step jobs, preserving (day, pair).
@@ -925,6 +1029,15 @@ def main(init=False, nocc=False, after=False):
         if source_category == "refstack":
             created = propagate_mwcs_jobs_from_refstack_done(session=db)
             logger.info(f'Propagation from category "refstack" created {created} DVV job(s)')
+            return
+
+        if source_category in ("mwcs_dtt", "stretching", "wavelet_dtt"):
+            created = propagate_dvv_jobs_from_dtt_done(session=db,
+                                                        source_category=source_category)
+            logger.info(
+                f'Propagation from category "{source_category}" '
+                f'created {created} DVV aggregate job(s)'
+            )
             return
 
         created = propagate_first_runnable_from_category(

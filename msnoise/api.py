@@ -4174,7 +4174,7 @@ def _dvv_column_spec(parent_category: str, pair_type: str, params) -> tuple:
     (smart defaults: CC→free-intercept m/em, SC/AC→forced-zero m0/em0).
     For ``stretching`` and ``wct_dtt`` the columns are fixed.
 
-    :param parent_category: ``"mwcs_dtt"``, ``"stretching"``, or ``"wct_dtt"``.
+    :param parent_category: ``"mwcs_dtt"``, ``"stretching"``, or ``"wavelet_dtt"``.
     :param pair_type: ``"CC"``, ``"SC"``, ``"AC"``, or ``"ALL"``.
     :param params: Params object from :func:`get_params`.
     :returns: Tuple ``(dv_col, err_col, quality_col)`` where any of the
@@ -4188,7 +4188,7 @@ def _dvv_column_spec(parent_category: str, pair_type: str, params) -> tuple:
         return dv_col, err_col, "mcoh"
     elif parent_category == "stretching":
         return "Delta", "Error", "Coeff"
-    elif parent_category == "wct_dtt":
+    elif parent_category == "wavelet_dtt":
         # WCT stores dtt/err/coh per frequency; scalar extracted separately
         return "dtt", "err", "coh"
     else:
@@ -4289,7 +4289,7 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
     :param parent_lineage: Lineage name list up to and including the parent
         DTT step (e.g. ``["preprocess_1", ..., "mwcs_dtt_1"]``).
     :param parent_step_name: Step name of the parent DTT step.
-    :param parent_category: ``"mwcs_dtt"``, ``"stretching"``, or ``"wct_dtt"``.
+    :param parent_category: ``"mwcs_dtt"``, ``"stretching"``, or ``"wavelet_dtt"``.
     :param mov_stack: Tuple ``(window, step)`` e.g. ``("1D", "1D")``.
     :param component: Component string e.g. ``"ZZ"``.
     :param pair_type: ``"CC"``, ``"SC"``, ``"AC"``, or ``"ALL"``.
@@ -4310,7 +4310,7 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
     percentiles    = [float(p) for p in str(percentile_str).split(",") if p.strip()]
 
     # WCT-specific params
-    if parent_category == "wct_dtt":
+    if parent_category == "wavelet_dtt":
         wct_freqmin  = float(getattr(params, "dvv_freqmin", 0.1))
         wct_freqmax  = float(getattr(params, "dvv_freqmax", 2.0))
         wct_freq_agg = str(getattr(params, "dvv_freq_agg", "mean"))
@@ -4349,7 +4349,7 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                 # Convert Delta → dv/v: dv/v = Delta - 1
                 da_dv = da_dv - 1.0
 
-            elif parent_category == "wct_dtt":
+            elif parent_category == "wavelet_dtt":
                 ds = xr_get_wct_dtt(root, parent_lineage, sta1, sta2,
                                      component, mov_stack)
                 da_dv, da_err = _freq_average_wct(
