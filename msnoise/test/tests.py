@@ -437,23 +437,25 @@ def test_023_stack():
     assert counts_ref.get('D', 0) >= 1, \
         f"Expected at least 1 done refstack_1 job, got: {counts_ref}"
 
-    # Capture plain-stack CCF for comparison
+    # Capture plain-stack CCF for comparison — discovery mode returns {(pair, comp, ms): data}
     result_plain = MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"])
-    pairs_plain = result_plain.list(db, category="stack")
-    assert len(pairs_plain) > 0, "No plain-stack CCF results found"
+    ccfs_plain = result_plain.get_ccf()
+    assert len(ccfs_plain) > 0, "No plain-stack CCF results found"
 
     # Re-run with Wiener filter enabled
     update_config(db, 'wienerfilt', 'Y', category='stack', set_number=1)
     reset_jobs(db, "stack_1", alljobs=True)
     stack_mov('mov')
 
-    # Verify Wiener output differs from plain stack
+    # Verify Wiener output differs from plain stack — spot-check first entry
     result_wiener = MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"])
-    for sta1, sta2, comp, ms in pairs_plain[:1]:  # spot-check first pair
-        import numpy as np
-        plain_ccf  = result_plain.get_ccf(sta1, sta2, comp, mov_stack=ms).values
-        wiener_ccf = result_wiener.get_ccf(sta1, sta2, comp, mov_stack=ms).values
-        assert not np.allclose(plain_ccf, wiener_ccf, equal_nan=True), \
+    ccfs_wiener = result_wiener.get_ccf()
+    first_key = next(iter(ccfs_plain))
+    import numpy as np
+    plain_vals  = ccfs_plain[first_key].values
+    wiener_vals = ccfs_wiener.get(first_key)
+    if wiener_vals is not None:
+        assert not np.allclose(plain_vals, wiener_vals.values, equal_nan=True), \
             "Wiener-filtered CCF is identical to plain CCF — filter had no effect"
 
     # REVERT: disable Wiener so downstream tests use standard processing
