@@ -26,7 +26,7 @@ from ..results import MSNoiseResult
 
 def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refstackid=1,
          mwcsid=1, mwcsdttid=1, dvvid=1,
-         dttname="m", components='ZZ', show=False, outfile=None, loglevel="INFO"):
+         dttname="m", components='ZZ', pair_type="CC", show=False, outfile=None, loglevel="INFO"):
     """Plot network-level dv/v from the MWCS-DTT aggregate.
 
     Requires the ``mwcs_dtt_dvv`` step to have been run first
@@ -75,13 +75,12 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
 
         for comp in comp_list:
             try:
-                # TODO: hardcoded pair_type: should be provided from CLI
-                ds = result.get_dvv(pair_type="CC", components=comp,
+                ds = result.get_dvv(pair_type=pair_type, components=comp,
                                      mov_stack=mov_stack, format="xarray")
             except (FileNotFoundError, ValueError):
                 logger.warning(
-                    "No mwcs_dtt_dvv data for mov_stack=%s comp=%s pair_type=ZZ"
-                    "Run 'msnoise dtt dvv compute_mwcs_dtt_dvv' first." % (mov_stack, comp)
+                    "No mwcs_dtt_dvv data for mov_stack=%s comp=%s pair_type=%s. "
+                    "Run 'msnoise dtt dvv compute_mwcs_dtt_dvv' first." % (mov_stack, comp, pair_type)
                 )
                 continue
             except Exception:

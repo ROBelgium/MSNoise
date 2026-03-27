@@ -22,7 +22,7 @@ from ..api import (
 from ..results import MSNoiseResult
 
 
-def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
+def main(mov_stackid=None, components="ZZ", pair_type="CC", filterid=1, stretchingid=1,
          dvvid=1, pairs=None, show=False, outfile=None, loglevel="INFO"):
     """Plot network-level dv/v from the stretching aggregate.
 
@@ -97,8 +97,7 @@ def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
 
         for comp in comp_list:
             try:
-                # TODO: hardcoded pair_type: should be provided from CLI
-                ds = result.get_dvv(pair_type="CC", components=comp,
+                ds = result.get_dvv(pair_type=pair_type, components=comp,
                                      mov_stack=mov_stack, format="xarray")
             except (FileNotFoundError, ValueError):
                 logger.warning(

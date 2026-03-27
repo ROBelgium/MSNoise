@@ -53,8 +53,7 @@ def _plot_timeseries(result, mov_stacks, comp_list,
 
         for comp in comp_list:
             try:
-                # TODO: hardcoded pair_type: should be provided from CLI
-                ds = result.get_dvv(pair_type="CC", components=comp,
+                ds = result.get_dvv(pair_type=pair_type, components=comp,
                                      mov_stack=mov_stack, format="xarray")
             except (FileNotFoundError, ValueError):
                 logger.warning(
@@ -162,7 +161,7 @@ def _plot_heatmap(result, mov_stack, comp, logger):
     return fig
 
 
-def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
+def main(mov_stackid=0, components="ZZ", pair_type="CC", filterid=1, wctid=1, dttid=1,
          dvvid=1, pairs=None, showALL=False, start="1970-01-01", end="2100-01-01",
          visualize="timeseries", ranges="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]",
          show=True, outfile=None, loglevel="INFO"):

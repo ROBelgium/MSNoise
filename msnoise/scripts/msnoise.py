@@ -1568,12 +1568,14 @@ def dtt_dvv_plot():
 @mwcsdtt_options
 @click.option('-D', '--dvvid', default=1, help='MWCS-DTT-DVV aggregate config set number')
 @click.option('-M', '--dttname', default="m", help='DTT column: m (slope) or m0 (zero-intercept slope)')
+@click.option('-p', '--pair_type', default="CC", type=click.Choice(["CC", "SC", "AC"]),
+              help='Pair type to plot (CC/SC/AC). Default: CC')
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format.',
               default=None, type=str)
 @click.pass_context
 def dtt_dvv_plot_mwcs(ctx, preprocessid, ccid, filterid, stackid, stackid_item,
-                      refstackid, mwcsid, mwcsdttid, dvvid, comp, dttname, show, outfile):
+                      refstackid, mwcsid, mwcsdttid, dvvid, comp, dttname, pair_type, show, outfile):
     """Plot dv/v from MWCS-DTT aggregate. Requires mwcs_dtt_dvv step."""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
@@ -1582,7 +1584,7 @@ def dtt_dvv_plot_mwcs(ctx, preprocessid, ccid, filterid, stackid, stackid_item,
         from ..plots.mwcs_dtt_dvv import main
     main(preprocessid, ccid, filterid, stackid, stackid_item, refstackid,
          mwcsid, mwcsdttid, dvvid=dvvid, components=comp,
-         dttname=dttname, show=show, outfile=outfile, loglevel=loglevel)
+         dttname=dttname, pair_type=pair_type, show=show, outfile=outfile, loglevel=loglevel)
 
 
 @dtt_dvv_plot.command(name="stretching_dvv")
@@ -1591,11 +1593,13 @@ def dtt_dvv_plot_mwcs(ctx, preprocessid, ccid, filterid, stackid, stackid_item,
 @click.option('-D', '--dvvid', default=1, help='Stretching DVV aggregate config set number')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stack (1-based index, 0=all)')
+@click.option('-p', '--pair_type', default="CC", type=click.Choice(["CC", "SC", "AC"]),
+              help='Pair type to plot (CC/SC/AC). Default: CC')
 @click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
 @click.option('-o', '--outfile', help='Output filename (?=auto)', default=None, type=str)
 @click.pass_context
 def dtt_dvv_plot_stretching(ctx, mov_stack, comp, filterid, stretchingid,
-                             dvvid, show, outfile):
+                             dvvid, pair_type, show, outfile):
     """Plot dv/v from Stretching aggregate. Requires stretching_dvv step."""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
@@ -1603,7 +1607,7 @@ def dtt_dvv_plot_stretching(ctx, mov_stack, comp, filterid, stretchingid,
     else:
         from ..plots.stretching_dvv import main
     main(mov_stackid=mov_stack, components=comp, filterid=filterid,
-         stretchingid=stretchingid, dvvid=dvvid,
+         stretchingid=stretchingid, dvvid=dvvid, pair_type=pair_type,
          show=show, outfile=outfile, loglevel=loglevel)
 
 
@@ -1614,6 +1618,8 @@ def dtt_dvv_plot_stretching(ctx, mov_stack, comp, filterid, stretchingid,
 @click.option('-w', '--wctid', default=1, help='WCT config set number')
 @click.option('-d', '--dttid', default=1, help='WCT-DTT config set number')
 @click.option('-D', '--dvvid', default=1, help='WCT-DTT-DVV aggregate config set number')
+@click.option('-p', '--pair_type', default="CC", type=click.Choice(["CC", "SC", "AC"]),
+              help='Pair type to plot (CC/SC/AC). Default: CC')
 @click.option('-v', '--visualize', default="timeseries",
               type=click.Choice(["timeseries", "heatmap"]),
               help='Plot style: timeseries (uses dvv aggregate) or heatmap (uses per-pair data)')
@@ -1623,7 +1629,7 @@ def dtt_dvv_plot_stretching(ctx, mov_stack, comp, filterid, stretchingid,
 @click.option('-o', '--outfile', help='Output filename (?=auto)', default=None, type=str)
 @click.pass_context
 def dtt_dvv_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, dvvid,
-                     visualize, ranges, show, outfile):
+                     pair_type, visualize, ranges, show, outfile):
     """Plot dv/v from WCT-DTT aggregate. Use -v heatmap for per-pair frequency view."""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
@@ -1631,8 +1637,8 @@ def dtt_dvv_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, dvvid,
     else:
         from ..plots.wavelet_dtt_dvv import main
     main(mov_stackid=mov_stack, components=comp, filterid=filterid,
-         wctid=wctid, dttid=dttid, dvvid=dvvid, visualize=visualize,
-         ranges=ranges, show=show, outfile=outfile, loglevel=loglevel)
+         wctid=wctid, dttid=dttid, dvvid=dvvid, pair_type=pair_type,
+         visualize=visualize, ranges=ranges, show=show, outfile=outfile, loglevel=loglevel)
 
 
 
