@@ -4265,11 +4265,12 @@ def xr_get_dvv_agg(root, lineage, step_name, mov_stack,
     :raises FileNotFoundError: if the file does not exist.
     """
     ms_str = "%s_%s" % (mov_stack[0], mov_stack[1])
-    fn = os.path.join(root, *lineage, step_name, "_output",
+    fn = os.path.join(root, *lineage, "_output",
                       ms_str, f"dvv_{pair_type}_{component}.nc")
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
     ds = xr.load_dataset(fn)
+
     if format == "dataframe":
         return ds.to_dataframe()
     return ds
@@ -4338,9 +4339,9 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                 da_err = ds["DTT"].sel(keys=err_col)
                 if quality_col in ds["DTT"].coords["keys"].values:
                     da_q = ds["DTT"].sel(keys=quality_col)
-                    bad = (da_q < quality_min).values  # numpy bool array avoids xarray coord mismatch
-                    da_dv  = da_dv.where(~bad)
-                    da_err = da_err.where(~bad)
+                    bad = (da_q < quality_min).values  # numpy bool; scalar 'keys' coord on da_dv/da_q
+                    da_dv  = da_dv.copy(data=np.where(bad, np.nan, da_dv.values))
+                    da_err = da_err.copy(data=np.where(bad, np.nan, da_err.values))
 
             elif parent_category == "stretching":
                 ds = _xr_get_stretching(root, dtt_lineage, sta1, sta2,
@@ -4349,9 +4350,9 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                 da_err = ds["STR"].sel(keys=err_col)
                 if quality_col:
                     da_q = ds["STR"].sel(keys=quality_col)
-                    bad = (da_q < quality_min).values  # numpy bool array avoids xarray coord mismatch
-                    da_dv  = da_dv.where(~bad)
-                    da_err = da_err.where(~bad)
+                    bad = (da_q < quality_min).values  # numpy bool; scalar 'keys' coord on da_dv/da_q
+                    da_dv  = da_dv.copy(data=np.where(bad, np.nan, da_dv.values))
+                    da_err = da_err.copy(data=np.where(bad, np.nan, da_err.values))
                 # Convert Delta → dv/v: dv/v = Delta - 1
                 da_dv = da_dv - 1.0
 
