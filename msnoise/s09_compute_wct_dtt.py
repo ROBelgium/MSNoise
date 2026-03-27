@@ -25,7 +25,7 @@ To run this step:
 import time
 
 import numpy as np
-import pandas as pd
+import xarray as xr
 
 from .api import (
     connect, get_logger, is_next_job_for_step, get_next_lineage_batch,
@@ -155,13 +155,11 @@ def main(loglevel="INFO"):
                     continue
                 freqs_subset = freqs[freq_inx]
 
-                times_dt = pd.DatetimeIndex(times)
-                to_search = pd.to_datetime(days)
-
-                start = to_search.min().normalize()
-                end = (to_search.max() + pd.Timedelta(days=1)).normalize()
-
-                valid_mask = (times_dt >= start) & (times_dt <= end)
+                times_np   = times.astype("datetime64[D]")
+                to_search  = np.array(list(days), dtype="datetime64[D]")
+                day_min    = to_search.min()
+                day_max    = to_search.max() + np.timedelta64(1, "D")
+                valid_mask = (times_np >= day_min) & (times_np < day_max)
 
                 dates_out = []
                 dtt_rows = []
@@ -195,7 +193,7 @@ def main(loglevel="INFO"):
                         )
                         continue
 
-                    dates_out.append(pd.Timestamp(t))
+                    dates_out.append(t)
                     dtt_rows.append(dtt)
                     err_rows.append(err)
                     coh_rows.append(coh)
@@ -208,12 +206,31 @@ def main(loglevel="INFO"):
                     )
                     continue
 
-                dtt_df = pd.DataFrame(dtt_rows, index=dates_out, columns=freqs_subset)
-                err_df = pd.DataFrame(err_rows, index=dates_out, columns=freqs_subset)
-                coh_df = pd.DataFrame(coh_rows, index=dates_out, columns=freqs_subset)
-                dtt_df.sort_index(inplace=True)
-                err_df.sort_index(inplace=True)
-                coh_df.sort_index(inplace=True)
+                # Build output Dataset directly — no DataFrame round-trip
+                dates_arr = np.array(dates_out, dtype="datetime64[ns]")
+                sort_idx  = np.argsort(dates_arr)
+                ds_out = xr.Dataset(
+                    {
+                        "dtt": xr.DataArray(
+                            np.array(dtt_rows)[sort_idx],
+                            dims=["times", "frequency"],
+                            coords={"times": dates_arr[sort_idx],
+                                    "frequency": freqs_subset},
+                        ),
+                        "err": xr.DataArray(
+                            np.array(err_rows)[sort_idx],
+                            dims=["times", "frequency"],
+                            coords={"times": dates_arr[sort_idx],
+                                    "frequency": freqs_subset},
+                        ),
+                        "coh": xr.DataArray(
+                            np.array(coh_rows)[sort_idx],
+                            dims=["times", "frequency"],
+                            coords={"times": dates_arr[sort_idx],
+                                    "frequency": freqs_subset},
+                        ),
+                    }
+                )
 
                 try:
                     # Output path: root/<lineage_names>/<step.step_name>/_output/...
@@ -221,7 +238,7 @@ def main(loglevel="INFO"):
                     xr_save_wct_dtt(
                         root, lineage_names, step.step_name,
                         station1, station2, component, mov_stack,
-                        taxis, dtt_df, err_df, coh_df,
+                        taxis, ds_out,
                     )
                     logger.info(
                         f"Saved WCT DTT for {pair}/{component}/{mov_stack} "
