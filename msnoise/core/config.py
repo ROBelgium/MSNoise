@@ -148,8 +148,7 @@ def create_config_set(session, set_name):
     from sqlalchemy import func
 
     # Define the config file path
-    config_file = os.path.join(os.path.dirname(__file__), 'config', f'config_{set_name}.csv')
-
+    config_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', f'config_{set_name}.csv')
     if not os.path.exists(config_file):
         return None
 
