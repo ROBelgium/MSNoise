@@ -1326,7 +1326,10 @@ refstackid_option = click.option('-rs', '--refstackid', default=1, help='REF Sta
 comp_option = click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 
 mwcsid_option = click.option('-w', '--mwcsid', default=1, help='MWCS config set number')
-mwcsdttid_option = click.option('-wi', '--mwcsdttid', default=1, help='MWCS-DTT config set number')
+mwcsdttid_option   = click.option('-wi', '--mwcsdttid', default=1, help='MWCS-DTT config set number')
+stretchingid_option = click.option('-S', '--stretchingid', default=1, help='Stretching config set number')
+wctid_option        = click.option('-w', '--wctid', default=1, help='WCT config set number')
+wctdttid_option     = click.option('-d', '--wctdttid', default=1, help='WCT-DTT config set number')
 
 # Build incremental option bundles (CC side)
 base_options = common_options(preprocessid_option, ccid_option, filterid_option)
@@ -1582,10 +1585,10 @@ def dtt_dvv_plot_mwcs(ctx, preprocessid, ccid, filterid, stackid, stackid_item,
 
 
 @dtt_dvv_plot.command(name="stretching_dvv")
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-S', '--stretchingid', default=1, help='Stretching config set number')
+@filterid_option
+@stretchingid_option
 @dvvid_option
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
+@comp_option
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stack (1-based index, 0=all)')
 @pair_type_option
 @show_option
@@ -1605,11 +1608,11 @@ def dtt_dvv_plot_stretching(ctx, mov_stack, comp, filterid, stretchingid,
 
 
 @dtt_dvv_plot.command(name="wavelet_dvv")
-@click.option('-f', '--filterid', default=1, help='Filter ID')
-@click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
+@filterid_option
+@comp_option
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stack (1-based index, 0=all)')
-@click.option('-w', '--wctid', default=1, help='WCT config set number')
-@click.option('-d', '--dttid', default=1, help='WCT-DTT config set number')
+@wctid_option
+@wctdttid_option
 @dvvid_option
 @pair_type_option
 @click.option('-v', '--visualize', default="timeseries",
@@ -1620,7 +1623,7 @@ def dtt_dvv_plot_stretching(ctx, mov_stack, comp, filterid, stretchingid,
 @show_option
 @outfile_option
 @click.pass_context
-def dtt_dvv_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, dvvid,
+def dtt_dvv_plot_wct(ctx, filterid, comp, mov_stack, wctid, wctdttid, dvvid,
                      pair_type, visualize, ranges, show, outfile):
     """Plot dv/v from WCT-DTT aggregate. Use -v heatmap for per-pair frequency view."""
     loglevel = ctx.obj['MSNOISE_verbosity']
@@ -1629,7 +1632,7 @@ def dtt_dvv_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, dvvid,
     else:
         from ..plots.wavelet_dtt_dvv import main
     main(mov_stackid=mov_stack, components=comp, filterid=filterid,
-         wctid=wctid, dttid=dttid, dvvid=dvvid, pair_type=pair_type,
+         wctid=wctid, dttid=wctdttid, dvvid=dvvid, pair_type=pair_type,
          visualize=visualize, ranges=ranges, show=show, outfile=outfile, loglevel=loglevel)
 
 
@@ -1848,11 +1851,23 @@ def utils_jupyter():
               help='MWCS step ID (optional)')
 @click.option('-wi', '--mwcsdttid', default=None, type=int,
               help='MWCS-DTT step ID (optional)')
+@click.option('-S', '--stretchingid', default=None, type=int,
+              help='Stretching step ID (optional)')
+@click.option('-sd', '--stretchingdvvid', default=None, type=int,
+              help='Stretching-DVV step ID (optional)')
+@click.option('-W', '--wctid', default=None, type=int,
+              help='WCT step ID (optional)')
+@click.option('-wd', '--wctdttid', default=None, type=int,
+              help='WCT-DTT step ID (optional)')
+@click.option('-wdv', '--waveletdvvid', default=None, type=int,
+              help='Wavelet-DVV step ID (optional)')
 @click.option('-o', '--output', default=None, type=str,
               help='Output YAML path (default: params_<lineage>.yaml in current dir)')
 @click.pass_context
 def utils_export_params(ctx, lineage, preprocessid, ccid, filterid, stackid,
-                        refstackid, mwcsid, mwcsdttid, output):
+                        refstackid, mwcsid, mwcsdttid,
+                        stretchingid, stretchingdvvid,
+                        wctid, wctdttid, waveletdvvid, output):
     """Export the full layered parameter chain for a lineage to YAML.
 
     Either supply --lineage as a slash-separated string, or build it from
@@ -1864,6 +1879,8 @@ def utils_export_params(ctx, lineage, preprocessid, ccid, filterid, stackid,
 
         msnoise utils export-params --lineage preprocess_1/cc_1/filter_1/stack_1
         msnoise utils export-params -p 1 -cc 1 -f 1 -m 1 -w 1 -wi 1
+        msnoise utils export-params -p 1 -cc 1 -f 1 -m 1 -S 1 -sd 1
+        msnoise utils export-params -p 1 -cc 1 -f 1 -m 1 -W 1 -wd 1 -wdv 1
     """
     from ..api import connect, get_params, lineage_str_to_steps
     from ..api import get_merged_params_for_lineage
@@ -1877,9 +1894,14 @@ def utils_export_params(ctx, lineage, preprocessid, ccid, filterid, stackid,
         # Build from integer IDs
         parts = [f"preprocess_{preprocessid}", f"cc_{ccid}",
                  f"filter_{filterid}", f"stack_{stackid}"]
-        if refstackid: parts.append(f"refstack_{refstackid}")
-        if mwcsid:     parts.append(f"mwcs_{mwcsid}")
-        if mwcsdttid:  parts.append(f"mwcs_dtt_{mwcsdttid}")
+        if refstackid:     parts.append(f"refstack_{refstackid}")
+        if mwcsid:         parts.append(f"mwcs_{mwcsid}")
+        if mwcsdttid:      parts.append(f"mwcs_dtt_{mwcsdttid}")
+        if stretchingid:   parts.append(f"stretching_{stretchingid}")
+        if stretchingdvvid: parts.append(f"stretching_dvv_{stretchingdvvid}")
+        if wctid:          parts.append(f"wavelet_{wctid}")
+        if wctdttid:       parts.append(f"wavelet_dtt_{wctdttid}")
+        if waveletdvvid:   parts.append(f"wavelet_dtt_dvv_{waveletdvvid}")
         lin_str = "/".join(parts)
 
     steps = lineage_str_to_steps(db, lin_str, sep="/", strict=False)
