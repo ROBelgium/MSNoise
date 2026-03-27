@@ -880,8 +880,9 @@ def main(init=False, nocc=False, after=False):
         # Optional validation: ensure it's a known config-set type/category
         allowed_categories = {
             "global", "preprocess", "psd", "psd_rms", "cc", "filter",
-            "stack", "refstack", "mwcs", "mwcs_dtt", "stretching",
-            "wavelet", "wavelet_dtt",
+            "stack", "refstack", "mwcs", "mwcs_dtt", "mwcs_dtt_dvv",
+            "stretching", "stretching_dvv",
+            "wavelet", "wavelet_dtt", "wct_dtt_dvv",
         }
         if source_category not in allowed_categories:
             raise ValueError(

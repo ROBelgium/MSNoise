@@ -59,14 +59,14 @@ WORKFLOW_CHAINS = {
         'is_terminal': False
     },
     'mwcs_dtt': {
-        'next_steps': [],
+        'next_steps': ['mwcs_dtt_dvv'],
         'is_entry_point': False,
-        'is_terminal': True
+        'is_terminal': False
     },
     'stretching': {
-        'next_steps': [],
+        'next_steps': ['stretching_dvv'],
         'is_entry_point': False,
-        'is_terminal': True
+        'is_terminal': False
     },
     'wavelet': {
         'next_steps': ['wavelet_dtt'],
@@ -74,6 +74,21 @@ WORKFLOW_CHAINS = {
         'is_terminal': False
     },
     'wavelet_dtt': {
+        'next_steps': ['wct_dtt_dvv'],
+        'is_entry_point': False,
+        'is_terminal': False
+    },
+    'mwcs_dtt_dvv': {
+        'next_steps': [],
+        'is_entry_point': False,
+        'is_terminal': True
+    },
+    'stretching_dvv': {
+        'next_steps': [],
+        'is_entry_point': False,
+        'is_terminal': True
+    },
+    'wct_dtt_dvv': {
         'next_steps': [],
         'is_entry_point': False,
         'is_terminal': True
@@ -93,9 +108,12 @@ WORKFLOW_ORDER = [
     'refstack',
     'mwcs',
     'mwcs_dtt',
+    'mwcs_dtt_dvv',
     'stretching',
+    'stretching_dvv',
     'wavelet',
     'wavelet_dtt',
+    'wct_dtt_dvv',
 ]
 
 

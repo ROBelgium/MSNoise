@@ -1,0 +1,12 @@
+name,default,definition,type,possible_values
+dvv_freqmin,0.1,"Lower frequency bound (Hz) for dv/v extraction from the WCT-DTT output. Can be a subset of the parent wct_dtt computation band — enables multi-band analysis from one broadband WCT run.",float,
+dvv_freqmax,2.0,"Upper frequency bound (Hz) for dv/v extraction. Multiple wct_dtt_dvv configsets with different freqmin/freqmax can be linked to the same wct_dtt step.",float,
+dvv_freq_agg,mean,"How to collapse the frequency dimension to a scalar dv/v time series: mean or median over the selected band.",str,mean/median
+dvv_quality_min,0.5,"Minimum wavelet coherence (coh) to include a time-frequency cell before frequency averaging. Cells below this threshold are masked.",float,
+dvv_split_pair_type,Y,"Split dv/v by pair type (CC/SC/AC) separately. CC=inter-station; SC=same station different location; AC=autocorrelation.",bool,Y/N
+dvv_split_components,Y,"Split dv/v by component pair (ZZ/RR/TT/etc) separately.",bool,Y/N
+dvv_weighted_mean,Y,"Compute 1/err^2 weighted mean across pairs after frequency averaging.",bool,Y/N
+dvv_trimmed_mean,Y,"Compute trimmed mean: reject pairs whose dv/v deviates more than dvv_trim_limit sigma from the mean.",bool,Y/N
+dvv_trim_limit,3.0,"Sigma cutoff for trimmed mean.",float,
+dvv_percentiles,"5,25,75,95","Comma-separated list of percentiles to save (e.g. 5,25,75,95).",str,
+dvv_output_percent,Y,"Output dv/v in percent.",bool,Y/N

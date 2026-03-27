@@ -134,12 +134,13 @@ def main(loglevel="INFO"):
                 MCOH[row_indices, col_indices] = 0.0
 
                 # ── Row-by-row WLS regression ────────────────────────────
-                m_vals  = []
-                em_vals = []
-                a_vals  = []
-                ea_vals = []
-                m0_vals = []
+                m_vals   = []
+                em_vals  = []
+                a_vals   = []
+                ea_vals  = []
+                m0_vals  = []
                 em0_vals = []
+                mcoh_vals = []   # mean coherence over valid lag window
                 out_times = []
 
                 for i in range(len(times)):
@@ -161,9 +162,13 @@ def main(loglevel="INFO"):
                     m0, em0 = linear_regression(
                         VecXfilt, VecYfilt, w, intercept_origin=True)
 
-                    m_vals.append(m);   em_vals.append(em)
-                    a_vals.append(a);   ea_vals.append(ea)
-                    m0_vals.append(m0); em0_vals.append(em0)
+                    # Mean coherence over the valid lag window (tindex)
+                    mcoh = float(np.nanmean(cohArray[tindex])) if len(tindex) else 0.0
+
+                    m_vals.append(m);     em_vals.append(em)
+                    a_vals.append(a);     ea_vals.append(ea)
+                    m0_vals.append(m0);   em0_vals.append(em0)
+                    mcoh_vals.append(mcoh)
                     out_times.append(times[i])
 
                 if not out_times:
@@ -175,11 +180,13 @@ def main(loglevel="INFO"):
                     {
                         "DTT": xr.DataArray(
                             np.column_stack([m_vals, em_vals, a_vals,
-                                            ea_vals, m0_vals, em0_vals]),
+                                            ea_vals, m0_vals, em0_vals,
+                                            mcoh_vals]),
                             dims=["times", "keys"],
                             coords={
                                 "times": out_times,
-                                "keys":  ["m", "em", "a", "ea", "m0", "em0"],
+                                "keys":  ["m", "em", "a", "ea", "m0", "em0",
+                                          "mcoh"],
                             },
                         )
                     }

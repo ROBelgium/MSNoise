@@ -1,0 +1,9 @@
+name,default,definition,type,possible_values
+dvv_split_pair_type,Y,"Split dv/v by pair type (CC/SC/AC) separately. CC=inter-station; SC=same station different location; AC=autocorrelation.",bool,Y/N
+dvv_split_components,Y,"Split dv/v by component pair (ZZ/RR/TT/etc) separately.",bool,Y/N
+dvv_quality_min,0.65,"Minimum cross-correlation coefficient (Coeff) between stretched reference and data. Pairs below this threshold at a given time step are excluded.",float,
+dvv_weighted_mean,Y,"Compute 1/Error^2 weighted mean across pairs. Error is the half-width at full maximum of the Gaussian fit.",bool,Y/N
+dvv_trimmed_mean,Y,"Compute trimmed mean: reject pairs whose dv/v deviates more than dvv_trim_limit sigma from the mean.",bool,Y/N
+dvv_trim_limit,3.0,"Sigma cutoff for trimmed mean.",float,
+dvv_percentiles,"5,25,75,95","Comma-separated list of percentiles to save (e.g. 5,25,75,95).",str,
+dvv_output_percent,Y,"Output dv/v in percent: dv/v(%) = (Delta-1)*100. If N output as raw Delta-1 fraction.",bool,Y/N

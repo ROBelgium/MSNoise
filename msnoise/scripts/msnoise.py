@@ -332,8 +332,10 @@ def _create_default_workflow():
     ALL_CATEGORIES = [
         'preprocess', 'cc', 'filter', 'stack',
         'refstack',
-        'mwcs', 'mwcs_dtt', 'stretching',
-        'wavelet', 'wavelet_dtt', 'psd', 'psd_rms',
+        'mwcs', 'mwcs_dtt', 'mwcs_dtt_dvv',
+        'stretching', 'stretching_dvv',
+        'wavelet', 'wavelet_dtt', 'wct_dtt_dvv',
+        'psd', 'psd_rms',
     ]
 
     db = connect()

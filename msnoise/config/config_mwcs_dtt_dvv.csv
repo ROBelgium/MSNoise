@@ -1,0 +1,15 @@
+name,default,definition,type,possible_values
+dvv_split_pair_type,Y,"Split dv/v by pair type (CC/SC/AC) separately. CC=inter-station; SC=same station different location; AC=autocorrelation.",bool,Y/N
+dvv_split_components,Y,"Split dv/v by component pair (ZZ/RR/TT/etc) separately.",bool,Y/N
+dvv_cc_value,m,"dv/v column to use for CC (inter-station) pairs. m=free-intercept slope; m0=forced-through-zero slope.",str,m/m0
+dvv_cc_error,em,"Error column for CC pairs. Must match dvv_cc_value: em for m; em0 for m0.",str,em/em0
+dvv_sc_value,m0,"dv/v column for SC (single-station different location) pairs. m0 recommended: no clock error expected.",str,m/m0
+dvv_sc_error,em0,"Error column for SC pairs.",str,em/em0
+dvv_ac_value,m0,"dv/v column for AC (autocorrelation) pairs. m0 recommended: no clock error expected.",str,m/m0
+dvv_ac_error,em0,"Error column for AC pairs.",str,em/em0
+dvv_quality_min,0.0,"Minimum mean coherence (mcoh) to include a pair at a given time step. Set to 0 to disable.",float,
+dvv_weighted_mean,Y,"Compute 1/error^2 weighted mean across pairs.",bool,Y/N
+dvv_trimmed_mean,Y,"Compute trimmed mean: reject pairs whose dv/v deviates more than dvv_trim_limit sigma from the mean.",bool,Y/N
+dvv_trim_limit,3.0,"Sigma cutoff for trimmed mean.",float,
+dvv_percentiles,"5,25,75,95","Comma-separated list of percentiles to save (e.g. 5,25,75,95).",str,
+dvv_output_percent,Y,"Output dv/v in percent (multiply slope by 100). If N output as fraction.",bool,Y/N

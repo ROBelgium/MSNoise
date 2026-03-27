@@ -137,7 +137,9 @@ def test_002_ConnectToDB():
 def test_002b_create_workflow():
     db = connect()
     for category in ['preprocess', 'cc', 'filter', 'stack', 'refstack',
-                     'mwcs', 'mwcs_dtt', 'stretching', 'wavelet', 'wavelet_dtt',
+                     'mwcs', 'mwcs_dtt', 'mwcs_dtt_dvv',
+                     'stretching', 'stretching_dvv',
+                     'wavelet', 'wavelet_dtt', 'wct_dtt_dvv',
                      'psd', 'psd_rms']:
         set_number = create_config_set(db, category)
         assert set_number == 1, f"Expected set_number=1 for {category}, got {set_number}"
@@ -156,7 +158,9 @@ def test_002c_verify_workflow():
     steps = get_workflow_steps(db)
     step_names = {s.step_name for s in steps}
     for name in ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1',
-                 'mwcs_1', 'mwcs_dtt_1', 'stretching_1', 'wavelet_1', 'wavelet_dtt_1',
+                 'mwcs_1', 'mwcs_dtt_1', 'mwcs_dtt_dvv_1',
+                 'stretching_1', 'stretching_dvv_1',
+                 'wavelet_1', 'wavelet_dtt_1', 'wct_dtt_dvv_1',
                  'psd_1', 'psd_rms_1']:
         assert name in step_names, f"Workflow step '{name}' not found"
     links = get_workflow_links(db)
