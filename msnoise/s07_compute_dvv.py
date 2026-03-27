@@ -108,10 +108,10 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
                         f"{s2.net}.{s2.sta}.{loc2}",
                     ))
 
-        all_components = list(np.unique(
+        all_components = [c for c in np.unique(
             params.components_to_compute
             + params.components_to_compute_single_station
-        ))
+        ) if c]  # drop empty strings
 
         split_pair_type  = str(getattr(params, "dvv_split_pair_type",  "Y")).upper() == "Y"
         split_components = str(getattr(params, "dvv_split_components", "Y")).upper() == "Y"

@@ -4355,9 +4355,13 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                 da_dv, da_err = _freq_average_wct(
                     ds, wct_freqmin, wct_freqmax, quality_min, wct_freq_agg)
 
-        except FileNotFoundError:
+        except FileNotFoundError as e:
+            logging.getLogger("msnoise").debug(
+                f"DTT file not found for {sta1}:{sta2}/{component}: {e}")
             continue
-        except Exception:
+        except Exception as e:
+            logging.getLogger("msnoise").warning(
+                f"Error reading {sta1}:{sta2}/{component}: {e}")
             continue
 
         if out_percent:
