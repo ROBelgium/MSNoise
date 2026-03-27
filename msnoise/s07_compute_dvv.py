@@ -1,73 +1,187 @@
-import traceback
+"""
+DVV Aggregate Step
+==================
+
+Aggregates per-pair dv/v results (from ``mwcs_dtt``, ``stretching``, or
+``wct_dtt``) into network-level statistics across station pairs.
+
+One worker handles all three DVV step categories; the category is passed as
+an argument to :func:`main`.  Each category maps to a parent DTT step:
+
+====================  ===============
+DVV step category     Parent category
+====================  ===============
+``mwcs_dtt_dvv``      ``mwcs_dtt``
+``stretching_dvv``    ``stretching``
+``wct_dtt_dvv``       ``wct_dtt``
+====================  ===============
+
+Output files live at::
+
+    <root>/<lineage>/<dvv_step>/_output/<mov_stack>/dvv_<pair_type>_<comp>.nc
+
+where ``pair_type`` is one of ``CC``, ``SC``, ``AC``, ``ALL`` and ``comp``
+is the component pair string (e.g. ``ZZ``) or ``ALL``.
+"""
 import time
 import numpy as np
 
-import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
-from obspy.signal.regression import linear_regression
 from .api import (
-    compute_dvv,
     connect,
     get_logger,
     get_next_lineage_batch,
+    get_station_pairs,
     is_next_job_for_step,
     massive_update_job,
-    xr_save_dvv,
+    aggregate_dvv_pairs,
+    xr_save_dvv_agg,
 )
 
+# Maps DVV step category → parent DTT step category
+PARENT_CATEGORY = {
+    "mwcs_dtt_dvv":   "mwcs_dtt",
+    "stretching_dvv": "stretching",
+    "wct_dtt_dvv":    "wct_dtt",
+}
 
-def main(loglevel="INFO"):
-    logger = get_logger('msnoise.stretching', loglevel, with_pid=True)
-    logger.info('*** Starting: Compute DV/V ***')
+
+def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
+    """Aggregate per-pair dv/v into network-level statistics.
+
+    :param step_category: One of ``"mwcs_dtt_dvv"``, ``"stretching_dvv"``,
+        ``"wct_dtt_dvv"``.
+    :param loglevel: Logging level string.
+    """
+    if step_category not in PARENT_CATEGORY:
+        raise ValueError(
+            f"Unknown DVV step category {step_category!r}. "
+            f"Expected one of: {list(PARENT_CATEGORY)}"
+        )
+    parent_category = PARENT_CATEGORY[step_category]
+
+    logger = get_logger(f"msnoise.{step_category}", loglevel, with_pid=True)
+    logger.info(f"*** Starting: {step_category} ***")
+
     db = connect()
 
-    while is_next_job_for_step(db, step_category="stretching"):
+    while is_next_job_for_step(db, step_category=step_category):
         logger.debug("Getting the next batch")
-        batch = get_next_lineage_batch(db, step_category="stretching", group_by="pair_lineage",
-                                       loglevel=loglevel)
+        batch = get_next_lineage_batch(
+            db, step_category=step_category,
+            group_by="pair_lineage", loglevel=loglevel,
+        )
         if batch is None:
             time.sleep(np.random.random())
             continue
 
-        jobs = batch["jobs"]
-        params = batch["params"]
-        lineage_names = batch["lineage_names_upstream"]
+        jobs        = batch["jobs"]
+        params      = batch["params"]
+        step        = batch["step"]
         lineage_str = batch["lineage_str"]
-        step = batch["step"]
 
-        root = params.output_folder
-        mov_stacks = params.mov_stack
+        # dvv_lineage = lineage up to but not including the dvv step itself.
+        # The parent DTT step is the last entry in that list.
+        dvv_lineage   = batch["lineage_names_upstream"]
+        root          = params.output_folder
+        dvv_step_name = step.step_name
 
-        filt_all_components = np.unique(
-            params.components_to_compute + params.components_to_compute_single_station
-        )
+        if not dvv_lineage:
+            logger.error(f"Empty lineage for {step_category} job — skipping")
+            massive_update_job(db, jobs, "F")
+            continue
+
+        # Parent step name is the last element of the upstream lineage
+        parent_step_name = dvv_lineage[-1]
+        # Parent lineage for reading DTT files = dvv_lineage (same path)
+        parent_lineage = dvv_lineage
 
         logger.info(f"New DVV Job: lineage={lineage_str}")
 
+        # Build (sta1, sta2) pairs as NET.STA.LOC strings
+        all_pairs = []
+        for s1, s2 in get_station_pairs(db):
+            loc1 = s1.locs()[0] if s1.locs() else "00"
+            loc2 = s2.locs()[0] if s2.locs() else "00"
+            all_pairs.append((
+                f"{s1.net}.{s1.sta}.{loc1}",
+                f"{s2.net}.{s2.sta}.{loc2}",
+            ))
+
+        all_components = list(np.unique(
+            params.components_to_compute
+            + params.components_to_compute_single_station
+        ))
+
+        split_pair_type  = str(getattr(params, "dvv_split_pair_type",  "Y")).upper() == "Y"
+        split_components = str(getattr(params, "dvv_split_components", "Y")).upper() == "Y"
+
+        pair_types  = ["CC", "SC", "AC", "ALL"] if split_pair_type  else ["ALL"]
+        comp_groups = all_components + ["ALL"]  if split_components  else ["ALL"]
+
+        mov_stacks = params.mov_stack
+
         for mov_stack in mov_stacks:
-            for components in filt_all_components:
-                logger.debug("Processing m%s %s" % (mov_stack, components))
-                try:
-                    dvv = compute_dvv(db, root, lineage_names, mov_stack,
-                                       pairs=None, components=components, params=params)
-                except ValueError:
-                    traceback.print_exc()
-                    logger.error("No data for m%s: %s" % (mov_stack, components))
-                    continue
-                xr_save_dvv(root, lineage_names, step.step_name, components, mov_stack, dvv)
-                del dvv
-            try:
-                dvv = compute_dvv(db, root, lineage_names, mov_stack,
-                                   pairs=None, components=None, params=params)
-            except ValueError:
-                logger.warning("No data for any component: m%s" % str(mov_stack))
-                continue
-            xr_save_dvv(root, lineage_names, step.step_name, "ALL", mov_stack, dvv)
-            del dvv
+            for comp in comp_groups:
+                comp_list = all_components if comp == "ALL" else [comp]
+
+                for pt in pair_types:
+                    datasets = []
+                    for c in comp_list:
+                        try:
+                            ds = aggregate_dvv_pairs(
+                                root=root,
+                                parent_lineage=parent_lineage,
+                                parent_step_name=parent_step_name,
+                                parent_category=parent_category,
+                                mov_stack=mov_stack,
+                                component=c,
+                                pair_type=pt,
+                                pairs=all_pairs,
+                                params=params,
+                            )
+                            datasets.append(ds)
+                        except ValueError:
+                            logger.debug(
+                                f"No data for mov_stack={mov_stack} "
+                                f"comp={c} pair_type={pt} — skipping"
+                            )
+                            continue
+
+                    if not datasets:
+                        logger.warning(
+                            f"No data for mov_stack={mov_stack} "
+                            f"comp={comp} pair_type={pt}"
+                        )
+                        continue
+
+                    if len(datasets) == 1:
+                        ds_out = datasets[0]
+                    else:
+                        # "ALL" components: average stats across components
+                        import xarray as xr
+                        combined = xr.concat(datasets, dim="component")
+                        ds_out = combined.mean(dim="component", skipna=True)
+                        ds_out.attrs = datasets[0].attrs
+                        ds_out.attrs["component"] = "ALL"
+
+                    try:
+                        xr_save_dvv_agg(
+                            root, dvv_lineage, dvv_step_name,
+                            mov_stack, pt, comp, ds_out,
+                        )
+                        logger.info(
+                            f"Saved dvv_{pt}_{comp} mov_stack={mov_stack} "
+                            f"({ds_out.sizes['times']} time steps)"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Failed saving dvv_{pt}_{comp} "
+                            f"mov_stack={mov_stack}: {e}"
+                        )
 
         massive_update_job(db, jobs, "D")
 
-    logger.info('*** Finished: Compute DV/V ***')
+    logger.info(f"*** Finished: {step_category} ***")
 
 
 if __name__ == "__main__":
