@@ -567,6 +567,7 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
         .filter(Job.step_id == parent_step.step_id)
         .filter(Job.flag == "D")
         .filter(Job.day != "REF")
+        .filter(Job.day != "DVV")
         .all()
     )
 
