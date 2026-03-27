@@ -4301,6 +4301,24 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
     dv_col, err_col, quality_col = _dvv_column_spec(
         parent_category, pair_type, params)
 
+    # The DTT/stretching/wct_dtt getters follow the same convention as all
+    # other xr_get_* functions: the file lives at
+    #   root / *lineage / _output / …
+    # where *lineage already ends with the step name (e.g. "mwcs_dtt_1").
+    # aggregate_dvv_pairs receives parent_lineage that ends one level *above*
+    # the DTT step (it is lineage_names_upstream of the DVV job, which strips
+    # the DVV step name but still ends with e.g. "mwcs_dtt_1").  We therefore
+    # pass parent_lineage as-is — it already contains the step name as its
+    # last element, matching what results.py/_lineage_through produces.
+    # However, the lineage stored on the DVV job was built as:
+    #   parent_lineage_str + "/" + dvv_step_name
+    # so lineage_names_upstream (= lineage_names[:-1]) strips dvv_step_name
+    # and correctly ends with parent_step_name.  Verify this assumption and
+    # append parent_step_name only when it is missing (safety guard).
+    dtt_lineage = list(parent_lineage)
+    if not dtt_lineage or dtt_lineage[-1] != parent_step_name:
+        dtt_lineage = dtt_lineage + [parent_step_name]
+
     quality_min    = float(getattr(params, "dvv_quality_min", 0.0))
     do_weighted    = str(getattr(params, "dvv_weighted_mean", "Y")).upper() == "Y"
     do_trimmed     = str(getattr(params, "dvv_trimmed_mean", "Y")).upper() == "Y"
@@ -4326,7 +4344,7 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
 
         try:
             if parent_category == "mwcs_dtt":
-                ds = xr_get_dtt(root, parent_lineage, sta1, sta2,
+                ds = xr_get_dtt(root, dtt_lineage, sta1, sta2,
                                  component, mov_stack, format="dataset")
                 da_dv  = ds["DTT"].sel(keys=dv_col)
                 da_err = ds["DTT"].sel(keys=err_col)
@@ -4337,7 +4355,7 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                     da_err = da_err.where(~bad)
 
             elif parent_category == "stretching":
-                ds = _xr_get_stretching(root, parent_lineage, sta1, sta2,
+                ds = _xr_get_stretching(root, dtt_lineage, sta1, sta2,
                                          component, mov_stack, format="dataset")
                 da_dv  = ds["STR"].sel(keys=dv_col)
                 da_err = ds["STR"].sel(keys=err_col)
@@ -4350,14 +4368,15 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                 da_dv = da_dv - 1.0
 
             elif parent_category == "wavelet_dtt":
-                ds = xr_get_wct_dtt(root, parent_lineage, sta1, sta2,
+                ds = xr_get_wct_dtt(root, dtt_lineage, sta1, sta2,
                                      component, mov_stack)
                 da_dv, da_err = _freq_average_wct(
                     ds, wct_freqmin, wct_freqmax, quality_min, wct_freq_agg)
 
         except FileNotFoundError as e:
-            logging.getLogger("msnoise").debug(
-                f"DTT file not found for {sta1}:{sta2}/{component}: {e}")
+            logging.getLogger("msnoise").warning(
+                f"DTT file not found for {sta1}:{sta2}/{component} "
+                f"(lineage={dtt_lineage}, mov_stack={mov_stack}): {e}")
             continue
         except Exception as e:
             logging.getLogger("msnoise").warning(
