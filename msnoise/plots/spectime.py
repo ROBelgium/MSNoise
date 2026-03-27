@@ -36,11 +36,11 @@ from matplotlib.widgets import Cursor
 import numpy as np
 from obspy.signal.filter import bandpass
 
-from ....db import connect, get_logger
-from ....config import build_plot_outfile
-from ....stations import check_stations_uniqueness
-from ....workflow import build_movstack_datelist
-from ....signal import prepare_abs_positive_fft
+from ..db import connect, get_logger
+from ..config import build_plot_outfile
+from ..stations import check_stations_uniqueness
+from ..workflow import build_movstack_datelist
+from ..signal import prepare_abs_positive_fft
 from ..results import MSNoiseResult
 
 def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=1,

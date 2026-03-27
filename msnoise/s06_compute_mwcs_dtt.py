@@ -3,10 +3,10 @@ import time
 import numpy as np
 import xarray as xr
 from obspy.signal.regression import linear_regression
-from ...db import connect, get_logger
-from ...stations import get_interstation_distance, get_station_pairs
-from ...workflow import (extend_days, get_next_lineage_batch, is_next_job_for_step, massive_update_job)
-from ...io import xr_get_mwcs, xr_save_dtt
+from .db import connect, get_logger
+from .stations import get_interstation_distance, get_station_pairs
+from .workflow import (extend_days, get_next_lineage_batch, is_next_job_for_step, massive_update_job)
+from .io import xr_get_mwcs, xr_save_dtt
 
 
 def main(loglevel="INFO"):

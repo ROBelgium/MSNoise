@@ -18,9 +18,9 @@ will plot MWCS scatter + DTT regression for that day:
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ....db import connect, get_logger
-from ....config import build_plot_outfile
-from ....stations import check_stations_uniqueness, get_interstation_distance, get_station
+from ..db import connect, get_logger
+from ..config import build_plot_outfile
+from ..stations import check_stations_uniqueness, get_interstation_distance, get_station
 from ..results import MSNoiseResult
 
 def main(sta1, sta2, filterid=1, components="ZZ", day=None,

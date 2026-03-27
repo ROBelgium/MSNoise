@@ -83,10 +83,10 @@ from scipy.fft import next_fast_len
 import scipy.optimize
 import scipy.signal
 
-from ...db import connect, get_logger
-from ...workflow import (compute_rolling_ref, extend_days, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, refstack_is_rolling)
-from ...signal import getCoherence, get_window, nextpow2
-from ...io import xr_get_ccf, xr_get_ref, xr_save_mwcs
+from .db import connect, get_logger
+from .workflow import (compute_rolling_ref, extend_days, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, refstack_is_rolling)
+from .signal import getCoherence, get_window, nextpow2
+from .io import xr_get_ccf, xr_get_ref, xr_save_mwcs
 
 def main(loglevel="INFO"):
     logger = get_logger('msnoise.mwcs', loglevel, with_pid=True)

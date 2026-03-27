@@ -25,6 +25,8 @@ from ..stations import update_station
 
 from ..msnoise_table_def import DataAvailability
 
+from ..msnoise_table_def import Config
+
 
 class OrderedGroup(click.Group):
     def list_commands(self, ctx):

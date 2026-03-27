@@ -26,8 +26,8 @@ from sqlalchemy import func
 from wtforms import Form, StringField, TextAreaField, SelectField, BooleanField, IntegerField, FloatField
 from wtforms.validators import Optional
 
-from ...db import connect, get_logger
-from ...config import get_config_categories_definition
+from .db import connect, get_logger
+from .config import get_config_categories_definition
 from .msnoise_table_def import declare_tables, WORKFLOW_CHAINS as _WC_FULL
 # Flatten the richer msnoise_table_def format to {category: [next_step, ...]}
 # which is all the admin workflow builder needs.

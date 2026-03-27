@@ -67,11 +67,11 @@ could occur with SQLite.
     Parallel Processing
 """
 
-from ...db import connect, get_logger
-from ...config import get_params
-from ...stations import get_interstation_distance, get_station
-from ...workflow import (compute_rolling_ref, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, refstack_is_rolling)
-from ...io import xr_get_ccf, xr_get_ref, xr_save_stretching
+from .db import connect, get_logger
+from .config import get_params
+from .stations import get_interstation_distance, get_station
+from .workflow import (compute_rolling_ref, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, refstack_is_rolling)
+from .io import xr_get_ccf, xr_get_ref, xr_save_stretching
 
 import time
 

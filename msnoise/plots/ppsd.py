@@ -17,9 +17,9 @@ import logging
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from obspy import UTCDateTime
-from ....db import connect, get_logger
-from ....workflow import build_movstack_datelist
-from ....io import psd_ppsd_to_dataframe, psd_read_results
+from ..db import connect, get_logger
+from ..workflow import build_movstack_datelist
+from ..io import psd_ppsd_to_dataframe, psd_read_results
 
 
 def main(net, sta, loc, chan, time_of_weekday=None, period_lim=None, show=False,

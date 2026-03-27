@@ -33,8 +33,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-from ....db import connect
-from ....stations import get_stations
+from ..db import connect
+from ..stations import get_stations
 
 
 def main(show=True, outfile=None):

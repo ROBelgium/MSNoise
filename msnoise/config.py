@@ -1,12 +1,9 @@
 """MSNoise configuration management, parameter merging, and plot filename helpers."""
-import collections
-import copy
-import os
-import warnings
+import traceback
 
-from .db import connect, get_logger
-from .msnoise_table_def import Config, WORKFLOW_CHAINS, WORKFLOW_ORDER
-from .params import LayeredParams
+from .db import get_logger
+from .msnoise_table_def import Config
+
 
 _STEP_ABBREVS = {
     "preprocess":     "pre",
@@ -25,7 +22,6 @@ _STEP_ABBREVS = {
     "psd":            "psd",
     "psd_rms":        "rms",
 }
-
 
 def get_config(session, name=None, isbool=False, plugin=None, category='global', set_number=None):
     """Get the value of one or all config bits from the database.

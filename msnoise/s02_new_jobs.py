@@ -38,10 +38,10 @@ should be run after the ``msnoise compute_cc`` step in order to create the
 
 import datetime
 
-from ...db import connect, get_logger
-from ...config import get_config, get_config_set_details
-from ...stations import get_new_files, get_stations, mark_data_availability
-from ...workflow import (build_movstack_datelist, filter_within_daterange, get_lineages_to_step_id, get_workflow_steps, lineage_str_to_step_names, massive_insert_job, update_job)
+from .db import connect, get_logger
+from .config import get_config, get_config_set_details
+from .stations import get_new_files, get_stations, mark_data_availability
+from .workflow import (build_movstack_datelist, filter_within_daterange, get_lineages_to_step_id, get_workflow_steps, lineage_str_to_step_names, massive_insert_job, update_job)
 import pandas as pd
 
 

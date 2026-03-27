@@ -80,10 +80,12 @@ import glob
 import sys
 import traceback
 
-from ...db import connect, get_logger
-from ...config import get_config
-from ...stations import update_station
-from ...msnoise_table_def import DataAvailability, Station
+from .db import connect, get_logger
+from .config import get_config
+from .stations import update_station
+
+import logging
+import os
 
 
 def main(loglevel="INFO"):

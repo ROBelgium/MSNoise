@@ -29,9 +29,9 @@ register_matplotlib_converters()
 
 import re
 
-from ....db import connect, get_logger
-from ....stations import get_data_availability, get_stations
-from ....workflow import build_movstack_datelist
+from ..db import connect, get_logger
+from ..stations import get_data_availability, get_stations
+from ..workflow import build_movstack_datelist
 
 
 def main(chan, show=False, outfile=None, loglevel="INFO"):

@@ -1,18 +1,14 @@
 """MSNoise signal processing, preprocessing helpers, and stacking utilities."""
+import copy
+import glob
 import logging
 import math
 import os
-import traceback
 import warnings
 
 import numpy as np
 import pandas as pd
-import xarray as xr
-from obspy import Stream, Trace, read
-from obspy.core import UTCDateTime
-from scipy.signal import hilbert
 
-from .db import connect, get_logger
 from .config import get_config
 
 def validate_stack_data(dataset, stack_type="reference"):

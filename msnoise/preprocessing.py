@@ -43,12 +43,17 @@ try:
 except Exception:
     pass
 
-from ...db import connect, get_logger
-from ...config import get_params
-from ...stations import get_data_availability
-from ...signal import check_and_phase_shift, getGaps, preload_instrument_responses
+from .db import connect, get_logger
+from .stations import get_data_availability
+from .signal import check_and_phase_shift, getGaps
 import io
 import logbook
+
+import datetime
+import glob
+import os
+
+import numpy as np
 logger = logbook.Logger(__name__)
 
 def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO", logger='msnoise.compute_cc_norot_child'):
@@ -61,7 +66,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
 
     :Example:
 
-    >>> from msnoise.api import connect, get_params, preload_instrument_responses
+    >>> from msnoise.api import connect, get_params
     >>> from msnoise.preprocessing import preprocess
     >>> db = connect()
     >>> params = get_params(db)

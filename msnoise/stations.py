@@ -1,9 +1,9 @@
 """MSNoise station and data-availability management."""
-import datetime
-import glob
-import os
+import itertools
+import logging
 
-from .db import connect, get_logger
+import numpy as np
+
 from .config import get_config
 from .msnoise_table_def import Station, DataAvailability
 

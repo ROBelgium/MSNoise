@@ -1,9 +1,8 @@
 """MSNoise database connection and logging utilities."""
-import logging
-import os
-import sys
 import collections
+import os
 import pickle
+import sys
 
 from logbook import Logger, StreamHandler
 

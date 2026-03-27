@@ -1,9 +1,6 @@
 """MSNoise workflow topology, job management, lineage resolution and scheduling."""
-import collections
 import datetime
-import math
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -11,8 +8,7 @@ import pandas as pd
 from .db import connect, get_logger
 from .config import (get_config, get_config_set_details,
                      get_merged_params_for_lineage, get_params)
-from .signal import stack
-from .msnoise_table_def import (Job, WorkflowStep, Config, DataAvailability,
+from .msnoise_table_def import (Job, WorkflowStep, DataAvailability,
                                 WORKFLOW_CHAINS, WORKFLOW_ORDER)
 
 def get_workflow_steps(session):

@@ -17,10 +17,10 @@ Example:
 
 import matplotlib.pyplot as plt
 from obspy import Trace
-from ....db import connect, get_logger
-from ....config import build_plot_outfile
-from ....stations import get_interstation_distance, get_station_pairs
-from ....workflow import get_refstack_lineage_for_filter
+from ..db import connect, get_logger
+from ..config import build_plot_outfile
+from ..stations import get_interstation_distance, get_station_pairs
+from ..workflow import get_refstack_lineage_for_filter
 from ..results import MSNoiseResult
 
 import numpy as np
