@@ -97,15 +97,16 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
 
         logger.info(f"New DVV Job: lineage={lineage_str}")
 
-        # Build (sta1, sta2) pairs as NET.STA.LOC strings
+        # Build (sta1, sta2) pairs as NET.STA.LOC strings,
+        # enumerating all configured location code combinations.
         all_pairs = []
         for s1, s2 in get_station_pairs(db):
-            loc1 = s1.locs()[0] if s1.locs() else "00"
-            loc2 = s2.locs()[0] if s2.locs() else "00"
-            all_pairs.append((
-                f"{s1.net}.{s1.sta}.{loc1}",
-                f"{s2.net}.{s2.sta}.{loc2}",
-            ))
+            for loc1 in (s1.locs() or ["00"]):
+                for loc2 in (s2.locs() or ["00"]):
+                    all_pairs.append((
+                        f"{s1.net}.{s1.sta}.{loc1}",
+                        f"{s2.net}.{s2.sta}.{loc2}",
+                    ))
 
         all_components = list(np.unique(
             params.components_to_compute

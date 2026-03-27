@@ -1508,12 +1508,29 @@ def dtt_compute_stretching2(ctx):
     run_threaded(main, ctx)
 
 
-@dtt.command(name='compute_mwcs_dvv')
+@dtt.command(name='compute_mwcs_dtt_dvv')
 @click.pass_context
-def dtt_compute_dvv(ctx):
-    """Computes the dt/t jobs based on the new DTT data"""
+def dtt_compute_mwcs_dtt_dvv(ctx):
+    """Aggregate MWCS dv/v across station pairs (mwcs_dtt_dvv step)."""
     from ..s07_compute_dvv import main
-    run_threaded(main, ctx)
+    run_threaded(main, ctx, "mwcs_dtt_dvv")
+
+
+@dtt.command(name='compute_stretching_dvv')
+@click.pass_context
+def dtt_compute_stretching_dvv(ctx):
+    """Aggregate Stretching dv/v across station pairs (stretching_dvv step)."""
+    from ..s07_compute_dvv import main
+    run_threaded(main, ctx, "stretching_dvv")
+
+
+@dtt.command(name='compute_wct_dtt_dvv')
+@click.pass_context
+def dtt_compute_wct_dtt_dvv(ctx):
+    """Aggregate WCT dv/v across station pairs (wct_dtt_dvv step). Supports multi-band extraction."""
+    from ..s07_compute_dvv import main
+    run_threaded(main, ctx, "wct_dtt_dvv")
+
 
 @dtt.command(name='compute_wct')
 @click.pass_context
