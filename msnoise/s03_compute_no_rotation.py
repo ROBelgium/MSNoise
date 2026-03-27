@@ -268,11 +268,9 @@ def main(loglevel="INFO"):
         pair = batch["pair"]
         days = batch["days"]
         params = batch["params"]
-        lineage_names = batch["lineage_names_upstream"]
+        lineage_names_upstream = batch["lineage_names_upstream"]
+        lineage_names = batch["lineage_names"]  # full: e.g. [preprocess_1, cc_1]
         step = batch["step"]
-        # The CC step outputs under the filter step folder:
-        # lineage_names_upstream ends with cc_1; filter_1 is the last of lineage_names
-        filter_step_name = batch["lineage_names"][-1]
 
         stations = []
         pairs = []
@@ -298,7 +296,7 @@ def main(loglevel="INFO"):
                      (goal_day, len(pairs), len(stations)))
         jt = time.time()
 
-        preprocess_filename = os.path.join(params.output_folder, *lineage_names, "_output", "%s.mseed" % goal_day)
+        preprocess_filename = os.path.join(params.output_folder, *lineage_names_upstream, "_output", "%s.mseed" % goal_day)
         stream = read(preprocess_filename)
 
         # Filter the stream for only necessary net.sta.loc
@@ -634,7 +632,7 @@ def main(loglevel="INFO"):
                 xr_save_ccf_all(
                     root=params.output_folder,
                     lineage=lineage_names,
-                    step_name=filter_step_name,
+                    step_name=filterid,  # filterid from ccfid = filter step name e.g. 'filter_1'
                     station1=station1,
                     station2=station2,
                     components=components,
@@ -664,7 +662,7 @@ def main(loglevel="INFO"):
                 save_daily_ccf(
                     root=params.output_folder,
                     lineage=lineage_names,
-                    step_name=filter_step_name,
+                    step_name=filter_name,  # filter_name from ccfid = filter step name e.g. 'filter_1'
                     station1=station1,
                     station2=station2,
                     components=components,

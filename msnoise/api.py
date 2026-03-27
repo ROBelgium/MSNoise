@@ -3509,36 +3509,35 @@ def get_results_all(session, root, lineage_names, station1, station2, components
         is the time of the CCF and the columns are the times in the coda.
     """
 
-    # Read per-day NetCDF files written by xr_save_ccf_all (in s03_compute_no_rotation).
-    # s03 writes with lineage=lineage_names_upstream and step_name=cc_step_name.
-    # Find the cc step in the lineage: it is the first step whose name starts with "cc_".
-    cc_step_name = next(
-        (n for n in lineage_names if n.startswith("cc_")), None
+    # Path written by s03: root / *cc_upstream / cc_step / filter_step / _output / ...
+    # lineage_names is the full lineage e.g. ['preprocess_1','cc_1','filter_1','stack_1',...]
+    # cc_upstream = everything up to and including the cc step
+    # filter_step = the step immediately after the cc step
+    cc_idx = next(
+        (i for i, n in enumerate(lineage_names) if n.startswith("cc_")), None
     )
-    if cc_step_name is None:
+    if cc_idx is None or cc_idx + 1 >= len(lineage_names):
         return xr.Dataset() if format == "xarray" else pd.DataFrame()
-    cc_idx = lineage_names.index(cc_step_name)
-    cc_upstream = lineage_names[:cc_idx]  # everything before the cc step
+    cc_lineage = lineage_names[:cc_idx + 1]   # e.g. ['preprocess_1', 'cc_1']
+    filter_step = lineage_names[cc_idx + 1]   # e.g. 'filter_1'
 
     das = []
     for date in dates:
         date_str = date if isinstance(date, str) else date.strftime('%Y-%m-%d')
         try:
-            da = xr_get_ccf_all(root, cc_upstream, cc_step_name,
+            da = xr_get_ccf_all(root, cc_lineage, filter_step,
                                 station1, station2, components, date_str)
             das.append(da)
         except FileNotFoundError:
             continue
 
     if not das:
-        # Fallback: try daily stacks from keep_days output (xr_save_ccf_daily)
-        # These are 1-D (taxis only) — expand with a times dimension from date
+        # Fallback: daily stacks from keep_days (xr_save_ccf_daily)
         for date in dates:
             date_str = date if isinstance(date, str) else date.strftime('%Y-%m-%d')
             try:
-                da = xr_get_ccf_daily(root, cc_upstream, cc_step_name,
+                da = xr_get_ccf_daily(root, cc_lineage, filter_step,
                                       station1, station2, components, date_str)
-                # Add times dimension using the date as a single timestamp
                 t = pd.Timestamp(date_str)
                 da = da.expand_dims({"times": [t]})
                 das.append(da)
