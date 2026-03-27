@@ -27,7 +27,6 @@ from matplotlib.dates import DateFormatter
 
 from ..api import (
     connect, get_logger, build_movstack_datelist,
-    compute_dtt_wct,
     get_station_pairs,
 )
 from ..results import MSNoiseResult
@@ -35,9 +34,13 @@ from ..results import MSNoiseResult
 
 def _plot_timeseries(result, mov_stacks, comp_list,
                      filterid, wctid, dttid, freqmin, freqmax, logger):
-    """Weighted-mean dv/v timeseries, one subplot per moving stack."""
+    """Weighted-mean dv/v timeseries, one subplot per moving stack.
+
+    Reads from the pre-aggregated ``wct_dtt_dvv`` step output.
+    The result must be instantiated at the ``wct_dtt_dvv`` step.
+    """
     params = result.params
-    low = params.freqmin
+    low  = params.freqmin
     high = params.freqmax
 
     fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
@@ -50,24 +53,21 @@ def _plot_timeseries(result, mov_stacks, comp_list,
 
         for comp in comp_list:
             try:
-                stats = compute_dtt_wct(
-                    result._db, result.output_folder, result.lineage_names, mov_stack,
-                    components=comp, params=params,
-                    freqmin=freqmin, freqmax=freqmax,
+                ds = result.get_dvv(pair_type="ALL", components=comp,
+                                     mov_stack=mov_stack, format="xarray")
+            except (FileNotFoundError, ValueError):
+                logger.warning(
+                    f"No wct_dtt_dvv data for mov_stack={mov_stack} comp={comp}. "
+                    "Run 'msnoise dtt compute_wct_dtt_dvv' first."
                 )
-            except ValueError:
-                logger.warning(f"No WCT-DTT data for mov_stack={mov_stack} comp={comp}")
                 continue
 
-            t = stats.index
-            ax.plot(t, -100*stats[("dtt", "weighted_mean")],
-                    label="%s: weighted mean" % comp)
-            ax.plot(t, -100*stats[("dtt", "mean")],
-                    label="%s: mean" % comp, alpha=0.6)
-            ax.plot(t, -100*stats[("dtt", "50%")],
-                    label="%s: median" % comp, alpha=0.6)
-            ax.plot(t, -100*stats[("dtt", "trimmed_mean")],
-                    label="%s: trimmed mean" % comp, alpha=0.6)
+            t = ds.coords["times"].values
+            for stat_name, alpha in [("weighted_mean", 1.0), ("mean", 0.6),
+                                      ("median", 0.6), ("trimmed_mean", 0.6)]:
+                if stat_name in ds:
+                    ax.plot(t, ds[stat_name].values,
+                            label=f"{comp}: {stat_name}", alpha=alpha)
 
             if left is None and len(t):
                 left, right = t[0], t[-1]
@@ -162,7 +162,7 @@ def _plot_heatmap(result, mov_stack, comp, logger):
 
 
 def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
-         pairs=None, showALL=False, start="1970-01-01", end="2100-01-01",
+         dvvid=1, pairs=None, showALL=False, start="1970-01-01", end="2100-01-01",
          visualize="timeseries", ranges="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]",
          show=True, outfile=None, loglevel="INFO"):
     """Plot dt/t from WCT DTT results.
@@ -172,7 +172,9 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
     :param filterid: Filter set number.
     :param wctid: WCT config set number.
     :param dttid: WCT-DTT config set number.
-    :param visualize: ``'timeseries'`` or ``'heatmap'``.
+    :param dvvid: ``wct_dtt_dvv`` config set number.
+    :param visualize: ``'timeseries'`` (uses pre-aggregated dvv) or ``'heatmap'``
+        (uses per-pair wct_dtt data directly).
     :param show: Display the figure interactively.
     :param outfile: Save path (``?`` = auto-name).
     :param loglevel: Logging verbosity.
@@ -183,28 +185,44 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
     # ------------------------------------------------------------------ #
     # Resolve lineage via MSNoiseResult                                    #
     # ------------------------------------------------------------------ #
-    filter_step  = f"filter_{filterid}"
-    wct_step     = f"wavelet_{wctid}"
-    wct_dtt_step = f"wavelet_dtt_{dttid}"
+    filter_step    = f"filter_{filterid}"
+    wct_step       = f"wavelet_{wctid}"
+    wct_dtt_step   = f"wavelet_dtt_{dttid}"
+    dvv_step       = f"wct_dtt_dvv_{dvvid}"
 
-    all_results = MSNoiseResult.list(db, "wavelet_dtt")
+    if visualize == "heatmap":
+        # Heatmap reads per-pair WCT-DTT data — resolve at wavelet_dtt level
+        all_results = MSNoiseResult.list(db, "wavelet_dtt")
+        target_cat  = "wavelet_dtt"
+        target_step = wct_dtt_step
+    else:
+        # Timeseries reads pre-aggregated dvv — resolve at wct_dtt_dvv level
+        all_results = MSNoiseResult.list(db, "wct_dtt_dvv")
+        target_cat  = "wct_dtt_dvv"
+        target_step = dvv_step
+
     if not all_results:
-        logger.error("No completed wavelet_dtt jobs found in the database.")
+        logger.error(
+            f"No completed {target_cat} results found. "
+            + ("Run 'msnoise dtt compute_wct_dtt_dvv' first."
+               if target_cat == "wct_dtt_dvv" else "")
+        )
         return
 
     result = next(
         (r for r in all_results
-         if filter_step in r.lineage_names
-         and wct_step in r.lineage_names
-         and r.lineage_names[-1] == wct_dtt_step),
+         if filter_step  in r.lineage_names
+         and wct_step    in r.lineage_names
+         and wct_dtt_step in r.lineage_names
+         and r.lineage_names[-1] == target_step),
         None
     )
     if result is None:
         logger.error(
-            "No completed wavelet_dtt lineage found for "
-            "filter_%i / wavelet_%i / wavelet_dtt_%i. Available: %s",
-            filterid, wctid, dttid,
-            ["/".join(r.lineage_names) for r in all_results],
+            f"No {target_cat} lineage found for "
+            f"filter_{filterid} / wavelet_{wctid} / wavelet_dtt_{dttid}"
+            + (f" / dvv_{dvvid}" if target_cat == "wct_dtt_dvv" else "")
+            + f". Available: {['/'.join(r.lineage_names) for r in all_results]}"
         )
         return
 

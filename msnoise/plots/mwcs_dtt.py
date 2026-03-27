@@ -1,14 +1,14 @@
 """
 Plot dv/v from the MWCS → dt/t method.
 
-Reads per-pair MWCS-DTT results and plots network-aggregated statistics
-using :func:`msnoise.api.compute_dvv`.
+Reads pre-aggregated network dv/v from the ``mwcs_dtt_dvv`` step output
+written by :mod:`msnoise.s07_compute_dvv`.
 
 Example:
 
-``msnoise cc dtt plot dvv`` will plot all defaults.
+``msnoise cc dtt plot mwcs_dtt`` will plot all defaults.
 
-``msnoise cc dtt plot dvv -f 2 -m 1 -c ZZ`` will plot filter 2, mov_stack 1,
+``msnoise cc dtt plot mwcs_dtt -f 2 -m 1 -c ZZ`` will plot filter 2, mov_stack 1,
 component ZZ.
 
 .. image:: ../.static/dvv.png
@@ -25,18 +25,19 @@ from ..results import MSNoiseResult
 
 
 def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refstackid=1,
-         mwcsid=1, mwcsdttid=1,
-         dttname="M", components='ZZ', show=False, outfile=None, loglevel="INFO"):
-    """Plot network-level dv/v from the MWCS-DTT method.
+         mwcsid=1, mwcsdttid=1, dvvid=1,
+         dttname="m", components='ZZ', show=False, outfile=None, loglevel="INFO"):
+    """Plot network-level dv/v from the MWCS-DTT aggregate.
 
+    Requires the ``mwcs_dtt_dvv`` step to have been run first
+    (``msnoise dtt compute_mwcs_dtt_dvv``).
+
+    :param dvvid: ``mwcs_dtt_dvv`` config set number.
     :param stackid_item: 1-based index into ``params.mov_stack``.
         ``None`` or ``0`` plots all moving-stack windows.
-    :param dttname: Column to use for dv/v (``'m'`` = slope, ``'m0'`` =
-        zero-intercept slope).  Default ``'M'`` is remapped to ``'m'``.
+    :param dttname: Ignored (kept for CLI compat). The aggregate always shows
+        all available statistics (mean, weighted_mean, trimmed_mean, median).
     :param components: Component pair string, comma-separated for multiple.
-    :param filterid: Filter set number (selects the lineage).
-    :param mwcsid: MWCS config set number.
-    :param mwcsdttid: MWCS-DTT config set number.
     :param show: Display the figure interactively.
     :param outfile: Save path (``?`` = auto-name).
     :param loglevel: Logging verbosity.
@@ -44,38 +45,26 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
     logger = get_logger('msnoise.cc_dtt_plot_dvv', loglevel, with_pid=True)
 
     db = connect()
-    result = MSNoiseResult.from_ids(db, preprocess=preprocessid, cc=ccid,
-                                    filter=filterid, stack=stackid,
-                                    refstack=refstackid, mwcs=mwcsid,
-                                    mwcs_dtt=mwcsdttid)
+    result = MSNoiseResult.from_ids(
+        db, preprocess=preprocessid, cc=ccid,
+        filter=filterid, stack=stackid,
+        refstack=refstackid, mwcs=mwcsid,
+        mwcs_dtt=mwcsdttid, mwcs_dtt_dvv=dvvid,
+    )
     params = result.params
 
-    # Normalise dttname: legacy 'M' → 'm'
-    col = dttname.lower() if dttname else 'm'
-
     logger.info("Using lineage: %s" % "/".join(result.lineage_names))
-
-    # ------------------------------------------------------------------ #
-    # Moving stacks                                                        #
-    # ------------------------------------------------------------------ #
-
 
     if stackid_item and stackid_item != 0:
         mov_stacks = [params.mov_stack[stackid_item - 1]]
     else:
         mov_stacks = params.mov_stack
 
-    # ------------------------------------------------------------------ #
-    # Component list and filter bounds                                     #
-    # ------------------------------------------------------------------ #
     comp_list = [c.strip() for c in components.split(",")]
 
     low = float(params.freqmin)
     high = float(params.freqmax)
 
-    # ------------------------------------------------------------------ #
-    # Plot                                                                 #
-    # ------------------------------------------------------------------ #
     fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
     left = right = None
@@ -86,29 +75,27 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
 
         for comp in comp_list:
             try:
-                stats = result.get_dvv(comp, mov_stack, format="dataframe")
-            except ValueError:
+                ds = result.get_dvv(pair_type="ALL", components=comp,
+                                     mov_stack=mov_stack, format="xarray")
+            except (FileNotFoundError, ValueError):
                 logger.warning(
-                    "No mwcs_dtt data for mov_stack=%s comp=%s" % (mov_stack, comp)
+                    "No mwcs_dtt_dvv data for mov_stack=%s comp=%s. "
+                    "Run 'msnoise dtt compute_mwcs_dtt_dvv' first." % (mov_stack, comp)
                 )
                 continue
             except Exception:
                 logger.error(traceback.format_exc())
                 continue
 
-            t = stats.index
-            for stat_name in ("mean", "50%", "trimmed_mean", "weighted_mean"):
-                try:
-                    ax.plot(t, stats.loc[:, (col, stat_name)] * -100,
+            t = ds.coords["times"].values
+            for stat_name in ("mean", "median", "trimmed_mean", "weighted_mean"):
+                if stat_name in ds:
+                    ax.plot(t, ds[stat_name].values,
                             label="%s: %s" % (comp, stat_name))
-                except KeyError:
-                    pass
-            for stat_name in ("5%", "95%"):
-                try:
-                    ax.plot(t, stats.loc[:, (col, stat_name)] * -100,
+            for stat_name in ("q05", "q95"):
+                if stat_name in ds:
+                    ax.plot(t, ds[stat_name].values,
                             label="%s: %s" % (comp, stat_name), alpha=0.4)
-                except KeyError:
-                    pass
 
             if left is None and len(t):
                 left, right = t[0], t[-1]
@@ -128,26 +115,19 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
 
     fig.autofmt_xdate()
     plt.suptitle(
-        "%s  |  Filter %d (%.2f – %.2f Hz)  |  MWCS-DTT"
-        % (",".join(comp_list), filterid, low, high)
+        "dv/v — MWCS-DTT | filter %i (%.3f-%.3f Hz) | preprocess %i / "
+        "cc %i / stack %i / refstack %i / mwcs %i / mwcs_dtt %i / dvv %i" % (
+            filterid, low, high,
+            preprocessid, ccid, stackid, refstackid, mwcsid, mwcsdttid, dvvid
+        )
     )
 
     if outfile:
-        if outfile.startswith("?"):
-            # Use str(comp_list) to match original naming convention
-            # e.g. ['ZZ']-f1-MM.png  so tests can assert the filename
-            tag = "%s-f%i-M%s" % (str(comp_list), filterid, dttname)
-            if len(mov_stacks) == 1:
-                tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
-            outfile = outfile.replace("?", tag)
-        outfile = "dvv " + outfile
-        logger.info(f"Saving to: {outfile}")
+        if outfile == "?":
+            outfile = "dvv ZZ-f%i-mm%s.png" % (filterid, mov_stacks[0][0])
         plt.savefig(outfile)
     if show:
         plt.show()
-    else:
-        plt.close()
+    plt.close()
+    db.close()
 
-
-if __name__ == "__main__":
-    main()

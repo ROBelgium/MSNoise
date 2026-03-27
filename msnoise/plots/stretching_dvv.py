@@ -1,8 +1,8 @@
 """
 Plot dv/v from the Stretching method.
 
-Reads per-pair stretching results (stored as NetCDF by the stretching step)
-and plots network-aggregated statistics using :func:`msnoise.api.compute_dtt_stretching`.
+Reads pre-aggregated network dv/v from the ``stretching_dvv`` step output
+written by :mod:`msnoise.s07_compute_dvv`.
 
 Example:
 
@@ -16,81 +16,77 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 
 from ..api import (
-    connect, get_logger, build_movstack_datelist,
-    compute_dtt_stretching,
+    connect, get_logger,
     get_config_set_details,
 )
 from ..results import MSNoiseResult
 
 
 def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
-         pairs=None, show=False, outfile=None, loglevel="INFO"):
-    """Plot network-level dv/v from the stretching method.
+         dvvid=1, pairs=None, show=False, outfile=None, loglevel="INFO"):
+    """Plot network-level dv/v from the stretching aggregate.
 
-    :param mov_stackid: 1-based index into ``params.mov_stack`` to plot a
-        single moving-stack window.  ``None`` or ``0`` plots all.
+    Requires the ``stretching_dvv`` step to have been run first
+    (``msnoise dtt compute_stretching_dvv``).
+
+    :param mov_stackid: 1-based index into ``params.mov_stack``.
+        ``None`` or ``0`` plots all moving-stack windows.
     :param components: Component pair string, comma-separated for multiple.
-    :param filterid: Filter set number (used to select the lineage).
+    :param filterid: Filter set number.
     :param stretchingid: Stretching config set number.
-    :param pairs: Unused (kept for CLI signature compatibility).
+    :param dvvid: ``stretching_dvv`` config set number.
     :param show: Display the figure interactively.
-    :param outfile: Save figure to this path (``?`` triggers auto-naming).
+    :param outfile: Save path (``?`` = auto-name).
     :param loglevel: Logging verbosity.
     """
     logger = get_logger("msnoise.cc_dtt_plot_dvvs", loglevel, with_pid=True)
     db = connect()
 
-    # ------------------------------------------------------------------ #
-    # Resolve lineage via MSNoiseResult                                    #
-    # ------------------------------------------------------------------ #
-    filter_step = f"filter_{filterid}"
+    # Resolve lineage: find a stretching_dvv result that matches
+    filter_step     = f"filter_{filterid}"
     stretching_step = f"stretching_{stretchingid}"
+    dvv_step        = f"stretching_dvv_{dvvid}"
 
-    all_results = MSNoiseResult.list(db, "stretching")
+    all_results = MSNoiseResult.list(db, "stretching_dvv")
     if not all_results:
-        logger.error("No completed stretching jobs found in the database.")
+        logger.error(
+            "No completed stretching_dvv results found. "
+            "Run 'msnoise dtt compute_stretching_dvv' first."
+        )
         return
 
     result = next(
         (r for r in all_results
-         if filter_step in r.lineage_names and r.lineage_names[-1] == stretching_step),
+         if filter_step     in r.lineage_names
+         and stretching_step in r.lineage_names
+         and r.lineage_names[-1] == dvv_step),
         None
     )
     if result is None:
         logger.error(
-            f"No completed stretching lineage found for filter_{filterid} / stretching_{stretchingid}. "
+            f"No stretching_dvv result for filter_{filterid} / "
+            f"stretching_{stretchingid} / dvv_{dvvid}. "
             f"Available: {['/'.join(r.lineage_names) for r in all_results]}"
         )
         return
 
     logger.info(f"Using lineage: {'/'.join(result.lineage_names)}")
     params = result.params
-    root = result.output_folder
-
-    # ------------------------------------------------------------------ #
-    # Moving stacks                                                        #
-    # ------------------------------------------------------------------ #
-    build_movstack_datelist(db)
 
     if mov_stackid and mov_stackid != 0:
         mov_stacks = [params.mov_stack[mov_stackid - 1]]
     else:
         mov_stacks = params.mov_stack
 
-    # ------------------------------------------------------------------ #
-    # Component list and filter bounds                                     #
-    # ------------------------------------------------------------------ #
     comp_list = [c.strip() for c in components.split(",")]
 
     low = high = 0.0
-    filter_params = get_config_set_details(db, "filter", filterid, format="AttribDict")
+    filter_params = get_config_set_details(db, "filter", filterid,
+                                           format="AttribDict")
     if filter_params:
-        low = float(filter_params.freqmin)
+        low  = float(filter_params.freqmin)
         high = float(filter_params.freqmax)
 
-    # ------------------------------------------------------------------ #
-    # Plot                                                                 #
-    # ------------------------------------------------------------------ #
     fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
     left = right = None
@@ -101,24 +97,21 @@ def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
 
         for comp in comp_list:
             try:
-                stats = compute_dtt_stretching(
-                    db, root, result.lineage_names, mov_stack,
-                    components=comp, params=params,
+                ds = result.get_dvv(pair_type="ALL", components=comp,
+                                     mov_stack=mov_stack, format="xarray")
+            except (FileNotFoundError, ValueError):
+                logger.warning(
+                    f"No stretching_dvv data for mov_stack={mov_stack} comp={comp}. "
+                    "Run 'msnoise dtt compute_stretching_dvv' first."
                 )
-            except ValueError:
-                logger.warning(f"No stretching data for mov_stack={mov_stack} comp={comp}")
                 continue
 
-            # dv/v (%) = (Delta - 1) * 100
-            t = stats.index
-            ax.plot(t, (stats[("Delta", "weighted_mean")] - 1) * 100,
-                    label="%s: weighted mean" % comp)
-            ax.plot(t, (stats[("Delta", "mean")] - 1) * 100,
-                    label="%s: mean" % comp, alpha=0.6)
-            ax.plot(t, (stats[("Delta", "50%")] - 1) * 100,
-                    label="%s: median" % comp, alpha=0.6)
-            ax.plot(t, (stats[("Delta", "trimmed_mean")] - 1) * 100,
-                    label="%s: trimmed mean" % comp, alpha=0.6)
+            t = ds.coords["times"].values
+            for stat_name, alpha in [("weighted_mean", 1.0), ("mean", 0.6),
+                                      ("median", 0.6), ("trimmed_mean", 0.6)]:
+                if stat_name in ds:
+                    ax.plot(t, ds[stat_name].values,
+                            label=f"{comp}: {stat_name}", alpha=alpha)
 
             if left is None and len(t):
                 left, right = t[0], t[-1]
@@ -138,13 +131,14 @@ def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
 
     fig.autofmt_xdate()
     plt.suptitle(
-        "%s  |  Filter %d (%.2f – %.2f Hz)  |  Stretching"
+        "%s  |  Filter %d (%.2f – %.2f Hz)  |  Stretching dv/v"
         % (",".join(comp_list), filterid, low, high)
     )
 
     if outfile:
         if outfile.startswith("?"):
-            tag = "%s-f%i-s%i" % (",".join(comp_list), filterid, stretchingid)
+            tag = "%s-f%i-s%i-dvv%i" % (
+                ",".join(comp_list), filterid, stretchingid, dvvid)
             if len(mov_stacks) == 1:
                 tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
             outfile = outfile.replace("?", tag)
