@@ -41,11 +41,8 @@ could occur with SQLite.
 
 """
 
-import os
 import time
 import numpy as np
-import pandas as pd
-import xarray as xr
 from .api import (
     compute_rolling_ref,
     connect,
@@ -154,17 +151,20 @@ def main(loglevel="INFO"):
                     logger.error(f"FILE DOES NOT EXIST: {fp}, skipping")
                     continue
 
+                # ── Time filtering ───────────────────────────────────────
                 to_search = extend_days(days)
-                data = data[data.index.floor('d').isin(to_search)]
-                data = data.dropna()
+                times_floor = data.coords["times"].values.astype("datetime64[D]")
+                mask = np.isin(times_floor, np.array(list(to_search), dtype="datetime64[D]"))
+                data = data.isel(times=mask)
+                data = data.dropna("times", how="all")
 
                 if rolling_mode:
                     ref_rolling = compute_rolling_ref(
                         data, int(params.ref_begin), int(params.ref_end)
                     )
 
-                for _i_row, (date, row) in enumerate(data.iterrows()):
-                    waveform = row.values
+                for _i_row, date in enumerate(data.coords["times"].values):
+                    waveform = data.isel(times=_i_row).values
                     if wct_norm:
                         new_waveform = waveform / waveform.max()
                     else:

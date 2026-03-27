@@ -221,7 +221,8 @@ def main(loglevel="INFO"):
 
                 try:
                     data = xr_get_ccf(root, lineage_names_mov,
-                                      station1, station2, components, mov_stack, taxis)
+                                      station1, station2, components, mov_stack, taxis,
+                                      format="dataframe")
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue

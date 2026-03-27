@@ -2451,8 +2451,7 @@ def refstack_is_rolling(params):
 
 
 def compute_rolling_ref(data, ref_begin, ref_end):
-    """
-    Compute a per-index rolling reference from a MOV CCF DataFrame.
+    """Compute a per-index rolling reference from CCF data.
 
     For each time index ``i``, the reference is::
 
@@ -2465,7 +2464,7 @@ def compute_rolling_ref(data, ref_begin, ref_end):
     Uses ``min_periods=1`` semantics: the first few steps receive whatever
     partial window is available rather than NaN.
 
-    :type data: :class:`pandas.DataFrame`
+    :type data: :class:`pandas.DataFrame` or :class:`xarray.DataArray`
         Shape ``(n_times, n_lag_samples)``.
     :type ref_begin: int
         Negative offset for the start of the rolling window (e.g. ``-5``).
@@ -2476,8 +2475,12 @@ def compute_rolling_ref(data, ref_begin, ref_end):
         Shape ``(n_times, n_lag_samples)``.  Row ``i`` is the reference for
         time step ``i``.
     """
-    n = len(data)
-    arr = data.values  # (n_times, n_lag_samples)
+    import xarray as xr_mod
+    if isinstance(data, xr_mod.DataArray):
+        arr = data.values
+    else:
+        arr = data.values  # DataFrame.values
+    n = arr.shape[0]
     refs = np.full_like(arr, np.nan, dtype=float)
 
     for i in range(n):
@@ -3339,20 +3342,28 @@ def xr_save_ccf(root, lineage, step_name, station1, station2, components, mov_st
         return dr
 
 
-def xr_get_ccf(root, lineage, station1, station2, components, mov_stack, taxis, format="dataframe"):
+def xr_get_ccf(root, lineage, station1, station2, components, mov_stack, taxis, format="dataset"):
+    """Load CCF results from a NetCDF file.
+
+    Parameters
+    ----------
+    format : str
+        ``"dataset"`` (default) returns a :class:`xarray.DataArray` (CCF variable).
+        ``"dataframe"`` returns a :class:`~pandas.DataFrame` (legacy).
+        ``"xarray"`` is an alias for ``"dataset"`` (deprecated, kept for compat).
+    """
     path = os.path.join(root, *lineage, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
 
     fullpath = os.path.join(path, fn)
     if not os.path.isfile(fullpath):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
         raise FileNotFoundError(fullpath)
     data = xr_create_or_open(fullpath, taxis, name="CCF")
-    if format == "xarray":
+    if format in ("dataset", "xarray"):
         return data.CCF
-    else:
-        return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
+    # ── DataFrame (legacy) ──────────────────────────────────────────────
+    return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
 
 
 def xr_save_ref(root, lineage, step_name, station1, station2, components, taxis, new, overwrite=False):
