@@ -4306,12 +4306,6 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
     # DVV job, which strips the DVV step and ends with the DTT step name —
     # exactly what the getters need.  No adjustment required.
     dtt_lineage = list(parent_lineage)
-    # after building dtt_lineage in aggregate_dvv_pairs (api.py), add:
-    import os
-    print("DEBUG dtt_lineage:", dtt_lineage)
-    print("DEBUG root:", root)
-    print("DEBUG would look for:", os.path.join(root, *dtt_lineage, "_output",
-                                                f"{mov_stack[0]}_{mov_stack[1]}", component))
 
     quality_min    = float(getattr(params, "dvv_quality_min", 0.0))
     do_weighted    = str(getattr(params, "dvv_weighted_mean", "Y")).upper() == "Y"
