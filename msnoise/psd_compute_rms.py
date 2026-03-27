@@ -42,7 +42,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
     output_folder = get_config(db, "output_folder") or "OUTPUT"
 
     while is_next_job_for_step(db, step_category="psd_rms"):
-        logger.info("Getting the next job")
+        logger.debug("Getting the next batch")
         result = get_next_job_for_step(
             db, step_category="psd_rms", group_by="pair_lineage"
         )

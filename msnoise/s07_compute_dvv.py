@@ -22,7 +22,7 @@ def main(loglevel="INFO"):
     db = connect()
 
     while is_next_job_for_step(db, step_category="stretching"):
-        logger.info("Getting the next job")
+        logger.debug("Getting the next batch")
         batch = get_next_lineage_batch(db, step_category="stretching", group_by="pair_lineage",
                                        loglevel=loglevel)
         if batch is None:
@@ -60,7 +60,7 @@ def main(loglevel="INFO"):
                 dvv = compute_dvv(db, root, lineage_names, mov_stack,
                                    pairs=None, components=None, params=params)
             except ValueError:
-                logger.error("No data for any component: m%s" % str(mov_stack))
+                logger.warning("No data for any component: m%s" % str(mov_stack))
                 continue
             xr_save_dvv(root, lineage_names, step.step_name, "ALL", mov_stack, dvv)
             del dvv

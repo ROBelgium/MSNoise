@@ -1142,3 +1142,168 @@ def test_120011_msnoise_result_get_ref():
         assert isinstance(ds, xr.Dataset)
     db.close()
 
+
+# ============================================================
+# Unit tests — MSNoiseResult format options + list()  (Patch 23)
+# ============================================================
+
+@pytest.mark.order(120020)
+def test_120020_msnoise_result_get_ccf_xarray():
+    """MSNoiseResult.get_ccf returns xarray DataArray when format='xarray'."""
+    db = connect()
+    from ..results import MSNoiseResult
+    import xarray as xr
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
+    all_ccfs = r.get_ccf()
+    if not all_ccfs:
+        pytest.skip("No CCF data available")
+    pair_k, comp_k, ms_k = next(iter(all_ccfs))
+    da = r.get_ccf(pair_k, comp_k, ms_k, format="xarray")
+    assert isinstance(da, xr.DataArray)
+    db.close()
+
+
+@pytest.mark.order(120021)
+def test_120021_msnoise_result_get_ref_dataframe():
+    """MSNoiseResult.get_ref returns DataFrame when format='dataframe'."""
+    db = connect()
+    from ..results import MSNoiseResult
+    import pandas as pd
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                stack=1, refstack=1)
+    all_refs = r.get_ref()
+    if not all_refs:
+        pytest.skip("No REF data available")
+    pair_k, comp_k = next(iter(all_refs))
+    df = r.get_ref(pair_k, comp_k, format="dataframe")
+    assert isinstance(df, pd.DataFrame)
+    db.close()
+
+
+@pytest.mark.order(120022)
+def test_120022_msnoise_result_get_mwcs_both_formats():
+    """MSNoiseResult.get_mwcs returns DataFrame or xarray Dataset by format."""
+    db = connect()
+    from ..results import MSNoiseResult
+    import pandas as pd
+    import xarray as xr
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                stack=1, refstack=1, mwcs=1)
+    all_mwcs = r.get_mwcs()
+    if not all_mwcs:
+        pytest.skip("No MWCS data available")
+    pair_k, comp_k, ms_k = next(iter(all_mwcs))
+    df = r.get_mwcs(pair_k, comp_k, ms_k, format="dataframe")
+    assert isinstance(df, pd.DataFrame)
+    ds = r.get_mwcs(pair_k, comp_k, ms_k, format="xarray")
+    assert isinstance(ds, xr.Dataset)
+    db.close()
+
+
+@pytest.mark.order(120023)
+def test_120023_msnoise_result_get_mwcs_dtt_both_formats():
+    """MSNoiseResult.get_mwcs_dtt returns DataFrame or xarray Dataset by format."""
+    db = connect()
+    from ..results import MSNoiseResult
+    import pandas as pd
+    import xarray as xr
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                stack=1, refstack=1, mwcs=1, mwcs_dtt=1)
+    all_dtt = r.get_mwcs_dtt()
+    if not all_dtt:
+        pytest.skip("No MWCS-DTT data available")
+    pair_k, comp_k, ms_k = next(iter(all_dtt))
+    df = r.get_mwcs_dtt(pair_k, comp_k, ms_k, format="dataframe")
+    assert isinstance(df, pd.DataFrame)
+    ds = r.get_mwcs_dtt(pair_k, comp_k, ms_k, format="xarray")
+    assert isinstance(ds, xr.Dataset)
+    db.close()
+
+
+@pytest.mark.order(120024)
+def test_120024_msnoise_result_list_include_empty():
+    """MSNoiseResult.list(include_empty=True) returns >= done results."""
+    db = connect()
+    from ..results import MSNoiseResult
+    done = MSNoiseResult.list(db, 'cc', include_empty=False)
+    all_steps = MSNoiseResult.list(db, 'cc', include_empty=True)
+    assert isinstance(all_steps, list)
+    assert len(all_steps) >= len(done), \
+        "include_empty=True should return >= done results"
+    for r in all_steps:
+        assert r.category == 'cc'
+    db.close()
+
+
+@pytest.mark.order(120025)
+def test_120025_msnoise_result_list_psd():
+    """MSNoiseResult.list works for PSD root step category."""
+    db = connect()
+    from ..results import MSNoiseResult
+    results = MSNoiseResult.list(db, 'psd')
+    assert isinstance(results, list)
+    for r in results:
+        assert any('psd' in n for n in r.lineage_names), \
+            f"Expected 'psd' in lineage_names: {r.lineage_names}"
+    db.close()
+
+
+@pytest.mark.order(120026)
+def test_120026_msnoise_result_get_psd_formats():
+    """MSNoiseResult.get_psd returns DataFrame or xarray Dataset by format."""
+    db = connect()
+    from ..results import MSNoiseResult
+    import pandas as pd
+    import xarray as xr
+    results = MSNoiseResult.list(db, 'psd')
+    if not results:
+        pytest.skip("No PSD results available")
+    r = results[0]
+    all_psd = r.get_psd()
+    if not all_psd:
+        pytest.skip("No PSD data files available")
+    (sid_k, day_k) = next(iter(all_psd))
+    df = r.get_psd(sid_k, day_k, format="dataframe")
+    assert isinstance(df, pd.DataFrame)
+    ds = r.get_psd(sid_k, day_k, format="xarray")
+    assert isinstance(ds, xr.Dataset)
+    db.close()
+
+
+@pytest.mark.order(120027)
+def test_120027_msnoise_result_branches_from_stack():
+    """MSNoiseResult.branches() from stack returns refstack children."""
+    db = connect()
+    from ..results import MSNoiseResult
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
+    children = r.branches()
+    assert isinstance(children, list)
+    for child in children:
+        assert child.category in ('refstack',), \
+            f"Unexpected category from stack: {child.category}"
+        assert child.lineage_names[:-1] == r.lineage_names
+    db.close()
+
+
+@pytest.mark.order(120028)
+def test_120028_msnoise_result_default_formats():
+    """Default format for get_ccf=dataframe, get_ref=xarray."""
+    db = connect()
+    from ..results import MSNoiseResult
+    import pandas as pd
+    import xarray as xr
+    # get_ccf default = dataframe
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
+    all_ccfs = r.get_ccf()
+    if all_ccfs:
+        v = next(iter(all_ccfs.values()))
+        assert isinstance(v, pd.DataFrame), "get_ccf default should be DataFrame"
+    # get_ref default = xarray Dataset
+    r2 = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                 stack=1, refstack=1)
+    all_refs = r2.get_ref()
+    if all_refs:
+        v2 = next(iter(all_refs.values()))
+        assert isinstance(v2, xr.Dataset), "get_ref default should be xarray Dataset"
+    db.close()
+

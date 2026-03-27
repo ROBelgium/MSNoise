@@ -117,7 +117,7 @@ def main(loglevel="INFO"):
     hanningwindow = get_window("hanning", smoothing_half_win)
 
     while is_next_job_for_step(db, step_category="mwcs"):
-        logger.info("Getting the next job")
+        logger.debug("Getting the next batch")
         batch = get_next_lineage_batch(db, step_category="mwcs", group_by="pair_lineage", loglevel=loglevel)
         if batch is None:
             time.sleep(np.random.random())

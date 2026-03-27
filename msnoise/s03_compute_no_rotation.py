@@ -257,7 +257,7 @@ def main(loglevel="INFO"):
     #     responses = preload_instrument_responses(db, return_format="inventory")
     # else:
     #     responses = None
-    logger.info("Checking if there are jobs to do")
+    logger.debug("Checking if there are jobs to do")
     while is_next_job_for_step(db, step_category="cc"):
         batch = get_next_lineage_batch(db, step_category="cc", group_by="day_lineage", loglevel=loglevel)
         if batch is None:
