@@ -1424,8 +1424,8 @@ def cc_plot_interferogram(ctx, sta1, sta2,  preprocessid, ccid, filterid, stacki
         from interferogram import main # NOQA
     else:
         from ..plots.interferogram import main
-    main(sta1, sta2,  preprocessid, ccid, filterid, stackid, stackid_item,
-                    comp, show, outfile, refilter,
+    main(sta1, sta2, preprocessid, ccid, filterid, stackid, stackid_item,
+         comp, show, outfile, refilter,
          loglevel=loglevel, **extra_args)
 
 
@@ -1578,9 +1578,9 @@ def dtt_plot_mwcs(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid,
     else:
         from ..plots.mwcs import main
     main(sta1, sta2,
-         preprocess_id=preprocessid, cc_id=ccid, filter_id=filterid,
-         stack_id=stackid, stack_item=stackid_item or 1, refstack_id=refstackid,
-         mwcs_id=mwcsid, mwcs_dtt_id=dttid,
+         preprocessid=preprocessid, ccid=ccid, filterid=filterid,
+         stackid=stackid, stackid_item=stackid_item or 1, refstackid=refstackid,
+         mwcsid=mwcsid, mwcsdttid=dttid,
          components=comp, show=show, outfile=outfile, loglevel=loglevel)
 
 
@@ -1622,9 +1622,9 @@ def dtt_plot_dtt(ctx, sta1, sta2, day, preprocessid, ccid, filterid,
         from dtt import main  # NOQA
     else:
         from ..plots.dtt import main
-    main(sta1, sta2, filter_id=filterid, components=comp, day=day,
-         preprocess_id=preprocessid, cc_id=ccid, stack_id=stackid,
-         stack_item=stackid_item, mwcs_id=mwcsid, dtt_id=dttid,
+    main(sta1, sta2, filterid=filterid, components=comp, day=day,
+         preprocessid=preprocessid, ccid=ccid, stackid=stackid,
+         stackid_item=stackid_item, mwcsid=mwcsid, mwcsdttid=dttid,
          show=show, outfile=outfile, loglevel=loglevel)
 
 

@@ -24,21 +24,19 @@ from ..api import (
 from ..results import MSNoiseResult
 
 
-def main(preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=None, refstack_id=1,
-         mwcs_id=1, mwcs_dtt_id=1,
+def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refstackid=1,
+         mwcsid=1, mwcsdttid=1,
          dttname="M", components='ZZ', show=False, outfile=None, loglevel="INFO"):
     """Plot network-level dv/v from the MWCS-DTT method.
 
-    :param mov_stackid: 1-based index into ``params.mov_stack``.
+    :param stackid_item: 1-based index into ``params.mov_stack``.
         ``None`` or ``0`` plots all moving-stack windows.
     :param dttname: Column to use for dv/v (``'m'`` = slope, ``'m0'`` =
         zero-intercept slope).  Default ``'M'`` is remapped to ``'m'``.
     :param components: Component pair string, comma-separated for multiple.
     :param filterid: Filter set number (selects the lineage).
     :param mwcsid: MWCS config set number.
-    :param dttid: MWCS-DTT config set number.
-    :param pairs: Unused (kept for CLI compatibility).
-    :param showALL: Unused (kept for CLI compatibility).
+    :param mwcsdttid: MWCS-DTT config set number.
     :param show: Display the figure interactively.
     :param outfile: Save path (``?`` = auto-name).
     :param loglevel: Logging verbosity.
@@ -46,10 +44,10 @@ def main(preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=None, ref
     logger = get_logger('msnoise.cc_dtt_plot_dvv', loglevel, with_pid=True)
 
     db = connect()
-    result = MSNoiseResult.from_ids(db, preprocess=preprocess_id, cc=cc_id,
-                                    filter=filter_id, stack=stack_id,
-                                    refstack=refstack_id, mwcs=mwcs_id,
-                                    mwcs_dtt=mwcs_dtt_id)
+    result = MSNoiseResult.from_ids(db, preprocess=preprocessid, cc=ccid,
+                                    filter=filterid, stack=stackid,
+                                    refstack=refstackid, mwcs=mwcsid,
+                                    mwcs_dtt=mwcsdttid)
     params = result.params
 
     # Normalise dttname: legacy 'M' → 'm'
@@ -62,8 +60,8 @@ def main(preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=None, ref
     # ------------------------------------------------------------------ #
 
 
-    if stack_item and stack_item != 0:
-        mov_stacks = [params.mov_stack[stack_item - 1]]
+    if stackid_item and stackid_item != 0:
+        mov_stacks = [params.mov_stack[stackid_item - 1]]
     else:
         mov_stacks = params.mov_stack
 
@@ -122,7 +120,7 @@ def main(preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=None, ref
         if i == 0:
             ax.legend(bbox_to_anchor=(0.0, 1.02, 1.0, 0.102), loc=4,
                       ncol=2, borderaxespad=0.0)
-            ax.set_title("Stack %i (%s)" % (stack_item or 1, stack_label))
+            ax.set_title("Stack %i (%s)" % (stackid_item or 1, stack_label))
         else:
             ax.set_title("Stack %i (%s)" % (i + 1, stack_label))
             if left is not None:
@@ -131,14 +129,14 @@ def main(preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=None, ref
     fig.autofmt_xdate()
     plt.suptitle(
         "%s  |  Filter %d (%.2f – %.2f Hz)  |  MWCS-DTT"
-        % (",".join(comp_list), filter_id, low, high)
+        % (",".join(comp_list), filterid, low, high)
     )
 
     if outfile:
         if outfile.startswith("?"):
             # Use str(comp_list) to match original naming convention
             # e.g. ['ZZ']-f1-MM.png  so tests can assert the filename
-            tag = "%s-f%i-M%s" % (str(comp_list), filter_id, dttname)
+            tag = "%s-f%i-M%s" % (str(comp_list), filterid, dttname)
             if len(mov_stacks) == 1:
                 tag += "-m%s_%s" % (mov_stacks[0][0], mov_stacks[0][1])
             outfile = outfile.replace("?", tag)

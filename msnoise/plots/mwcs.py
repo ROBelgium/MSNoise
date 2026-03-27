@@ -23,25 +23,24 @@ from matplotlib.dates import date2num, AutoDateFormatter, AutoDateLocator
 import numpy as np
 
 from ..api import (
-    connect, get_params, get_logger, build_movstack_datelist,
+    connect, get_params, get_logger,
     get_station, get_interstation_distance, check_stations_uniqueness,
-    get_config_set_details, get_done_lineages_for_category,
-    xr_get_mwcs, get_merged_params_for_lineage, resolve_lineage_from_ids,
+    xr_get_mwcs, resolve_lineage_from_ids,
 )
 
-def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
-         stack_item=1, refstack_id=1, mwcs_id=1, mwcs_dtt_id=1,
+def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
+         stackid_item=1, refstackid=1, mwcsid=1, mwcsdttid=1,
          components="ZZ", show=True, outfile=None, loglevel="INFO"):
     """Plot MWCS dt and coherence images for a station pair.
 
     :param sta1: Station 1 in NET.STA.LOC format.
     :param sta2: Station 2 in NET.STA.LOC format (must be ≥ sta1 alphabetically).
-    :param preprocess_id: Preprocessing step set number.
-    :param cc_id: Cross-correlation step set number.
-    :param filter_id: Filter step set number.
-    :param stack_id: Stack step set number.
-    :param stack_item: 1-based index into ``params.mov_stack``.
-    :param mwcs_id: MWCS step set number.
+    :param preprocessid: Preprocessing step set number.
+    :param ccid: Cross-correlation step set number.
+    :param filterid: Filter step set number.
+    :param stackid: Stack step set number.
+    :param stackid_item: 1-based index into ``params.mov_stack``.
+    :param mwcsid: MWCS step set number.
     :param components: Component pair string (e.g. ``'ZZ'``).
     :param show: Display the figure interactively.
     :param outfile: Save path (``?`` = auto-name).
@@ -51,14 +50,14 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
     db = connect()
     params = get_params(db)
 
-    lineage_steps, lineage_names, dtt_params = resolve_lineage_from_ids(db, params, preprocess_id=preprocess_id,
-                                                                    cc_id=cc_id, filter_id=filter_id, stack_id=stack_id,
-                                                                    refstack_id=refstack_id, mwcs_id=mwcs_id, mwcs_dtt_id=mwcs_dtt_id)
+    lineage_steps, lineage_names, dtt_params = resolve_lineage_from_ids(db, params, preprocessid=preprocessid,
+                                                                    ccid=ccid, filterid=filterid, stackid=stackid,
+                                                                    refstackid=refstackid, mwcsid=mwcsid, mwcsdttid=mwcsdttid)
 
-    lineage_steps, lineage_names, params = resolve_lineage_from_ids(db, params, preprocess_id=preprocess_id, cc_id=cc_id, filter_id=filter_id, stack_id=stack_id, refstack_id=refstack_id, mwcs_id=mwcs_id)
+    lineage_steps, lineage_names, params = resolve_lineage_from_ids(db, params, preprocessid=preprocessid, ccid=ccid, filterid=filterid, stackid=stackid, refstackid=refstackid, mwcsid=mwcsid)
 
-    print(type(stack_item), stack_item)
-    mov_stack = params.mov_stack[stack_item-1]
+    print(type(stackid_item), stackid_item)
+    mov_stack = params.mov_stack[stackid_item-1]
 
     if sta2 < sta1:
         logger.error("Stations STA1 STA2 should be sorted alphabetically")
@@ -121,8 +120,8 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
              "Preprocess %i – CC %i – Filter %i – Stack %i – REF Stack %i - MWCS %i  |  "
              "mov_stack=%s_%s\n Reference lines from (future) MWCS-DTT %i") % (
         sta1, sta2, components,
-        preprocess_id, cc_id, filter_id, stack_id, refstack_id, mwcs_id,
-        mov_stack[0], mov_stack[1], mwcs_dtt_id
+        preprocessid, ccid, filterid, stackid, refstackid, mwcsid,
+        mov_stack[0], mov_stack[1], mwcsdttid
     )
     plt.suptitle(title)
     plot_lags(minlag, maxlag2)
@@ -171,7 +170,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1,
             outfile = outfile.replace(
                 "?", "%s-%s-%s-f%i-w%i-m%s_%s" % (
                     sta1.replace(".", "-"), sta2.replace(".", "-"),
-                    components, filter_id, mwcs_id,
+                    components, filterid, mwcsid,
                     mov_stack[0], mov_stack[1],
                 )
             )

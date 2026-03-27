@@ -33,16 +33,16 @@ from ..api import (
 from ..results import MSNoiseResult
 
 
-def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=1,
+def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=1,
          components="ZZ", show=True,
          outfile=None, refilter=None, loglevel="INFO", **kwargs):
     logger = get_logger('msnoise.cc_plot_interferogram', loglevel,
                         with_pid=True)
     db = connect()
-    result = MSNoiseResult.from_ids(db, preprocess=preprocess_id, cc=cc_id,
-                                    filter=filter_id, stack=stack_id)
+    result = MSNoiseResult.from_ids(db, preprocess=preprocessid, cc=ccid,
+                                    filter=filterid, stack=stackid)
     params = result.params
-    mov_stack = params.mov_stack[stack_item - 1]
+    mov_stack = params.mov_stack[stackid_item - 1]
     start, end, datelist = build_movstack_datelist(db)
 
     if refilter:
@@ -60,7 +60,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
 
     pair = "%s:%s" % (sta1, sta2)
 
-    logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filter_id,
+    logger.info("Fetching CCF data for %s-%s-%i-%s" % (pair, components, filterid,
                                         mov_stack))
 
 
@@ -90,7 +90,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
     # ax.xaxis.set_minor_locator(DayLocator())
     # ax.xaxis.set_minor_formatter(DateFormatter('%Y-%m-%d %H:%M'))
 
-    filter_params = get_config_set_details(db, 'filter', filter_id, format='AttribDict')
+    filter_params = get_config_set_details(db, 'filter', filterid, format='AttribDict')
     if filter_params:
         low = float(filter_params.freqmin)
         high = float(filter_params.freqmax)
@@ -104,7 +104,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
 
     title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %i (%s_%s)' % \
             (sta1, sta2, components,
-             filter_id, low, high, stack_id, mov_stack[0], mov_stack[1])
+             filterid, low, high, stackid, mov_stack[0], mov_stack[1])
     if refilter:
         title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
     plt.title(title)
@@ -116,7 +116,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
             pair = pair.replace(':', '-')
             outfile = outfile.replace('?', '%s-%s-f%i-m%s_%s' % (pair,
                                                               components,
-                                                              filter_id,
+                                                              filterid,
                                                               mov_stack[0],
                                                               mov_stack[1]))
         outfile = "interferogram " + outfile

@@ -45,17 +45,17 @@ from ..api import (
 )
 from ..results import MSNoiseResult
 
-def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_item=1,
+def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=1,
          components="ZZ", ampli=5, show=True, outfile=None,  refilter=None,
          loglevel="INFO", **kwargs):
     logger = get_logger('msnoise.cc_plot_spectime', loglevel,
                         with_pid=True)
 
     db = connect()
-    result = MSNoiseResult.from_ids(db, preprocess=preprocess_id, cc=cc_id,
-                                    filter=filter_id, stack=stack_id)
+    result = MSNoiseResult.from_ids(db, preprocess=preprocessid, cc=ccid,
+                                    filter=filterid, stack=stackid)
     params = result.params
-    mov_stack = params.mov_stack[stack_item - 1]
+    mov_stack = params.mov_stack[stackid_item - 1]
     start, end, datelist = build_movstack_datelist(db)
 
     if refilter:
@@ -116,8 +116,8 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
     ax.grid()
 
     title = '%s : %s, %s\n Preprocess %i - CC %i - Filter %d (%.2f - %.2f Hz) - Stack %i (%s_%s)' %\
-            (sta1, sta2, components, preprocess_id, cc_id,
-             filter_id, low, high, stack_id, mov_stack[0], mov_stack[1])
+            (sta1, sta2, components, preprocessid, ccid,
+             filterid, low, high, stackid, mov_stack[0], mov_stack[1])
     if refilter:
         title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
     ax.set_title(title)
@@ -129,7 +129,7 @@ def main(sta1, sta2, preprocess_id=1, cc_id=1, filter_id=1, stack_id=1, stack_it
             # TODO outfile naming -> make it a helper based on lineage??
             outfile = outfile.replace('?', '%s-%s-f%i-m%s_%s' % (pair,
                                                               components,
-                                                              filter_id,
+                                                              filterid,
                                                               mov_stack[0],
                                                               mov_stack[1]))
         outfile = "spectime " + outfile

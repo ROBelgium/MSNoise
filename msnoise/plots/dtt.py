@@ -21,27 +21,27 @@ import numpy as np
 from ..api import (
     connect, get_params, get_logger,
     get_station, get_interstation_distance, check_stations_uniqueness,
-    get_config_set_details, xr_get_mwcs, xr_get_dtt,
-    lineage_str_to_steps, get_merged_params_for_lineage, resolve_lineage_from_ids,
+    xr_get_mwcs, xr_get_dtt,
+    resolve_lineage_from_ids,
 )
 
-def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
-         preprocess_id=1, cc_id=1, stack_id=1, stack_item=1,
-         mwcs_id=1, dtt_id=1,
+def main(sta1, sta2, filterid=1, components="ZZ", day=None,
+         preprocessid=1, ccid=1, stackid=1, stackid_item=1,
+         mwcsid=1, mwcsdttid=1,
          show=True, outfile=None, loglevel="INFO"):
     """Plot dt vs t scatter and regression lines for a single day.
 
     :param sta1: Station 1 (NET.STA.LOC).
     :param sta2: Station 2 (NET.STA.LOC, ≥ sta1 alphabetically).
-    :param filter_id: Filter set number.
+    :param filterid: Filter set number.
     :param components: Component pair string.
     :param day: Date string in ``YYYY-MM-DD`` format.
-    :param preprocess_id: Preprocessing step set number.
-    :param cc_id: CC step set number.
-    :param stack_id: Stack step set number.
-    :param stack_item: 1-based index into ``params.mov_stack``.
-    :param mwcs_id: MWCS step set number.
-    :param dtt_id: MWCS-DTT step set number.
+    :param preprocessid: Preprocessing step set number.
+    :param ccid: CC step set number.
+    :param stackid: Stack step set number.
+    :param stackid_item: 1-based index into ``params.mov_stack``.
+    :param mwcsid: MWCS step set number.
+    :param mwcsdttid: MWCS-DTT step set number.
     :param show: Display interactively.
     :param outfile: Save path (``?`` = auto-name).
     :param loglevel: Logging verbosity.
@@ -58,11 +58,11 @@ def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
     sta2 = check_stations_uniqueness(db, sta2)
 
     # Resolve MWCS lineage (for raw scatter points)
-    mwcs_lineage, params = resolve_lineage_from_ids(db, params, preprocess_id=preprocess_id, cc_id=cc_id, filter_id=filter_id, stack_id=stack_id, mwcs_id=mwcs_id)
-    mov_stack = params.mov_stack[stack_item - 1]
+    mwcs_lineage, params = resolve_lineage_from_ids(db, params, preprocessid=preprocessid, ccid=ccid, filterid=filterid, stackid=stackid, mwcsid=mwcsid)
+    mov_stack = params.mov_stack[stackid_item - 1]
 
     # Resolve DTT lineage (for regression lines)
-    dtt_lineage, _ = resolve_lineage_from_ids(db, params, preprocess_id=preprocess_id, cc_id=cc_id, filter_id=filter_id, stack_id=stack_id, mwcs_id=mwcs_id, mwcs_dtt_id=dtt_id)
+    dtt_lineage, _ = resolve_lineage_from_ids(db, params, preprocessid=preprocessid, ccid=ccid, filterid=filterid, stackid=stackid, mwcsid=mwcsid, mwcsdttid=mwcsdttid)
 
     # DTT lag window params
     dtt_lag    = getattr(params, "dtt_lag",    "static")
@@ -141,8 +141,8 @@ def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
              "Preprocess %i – CC %i – Filter %i – Stack %i item %i"
              " – MWCS %i – DTT %i") % (
         sta1, sta2, components, day,
-        preprocess_id, cc_id, filter_id, stack_id, stack_item,
-        mwcs_id, dtt_id,
+        preprocessid, ccid, filterid, stackid, stackid_item,
+        mwcsid, mwcsdttid,
     )
     ax.set_title(title)
     plt.tight_layout()
@@ -152,7 +152,7 @@ def main(sta1, sta2, filter_id=1, components="ZZ", day=None,
             outfile = outfile.replace(
                 "?", "%s-%s-%s-f%i-w%i-d%i-%s" % (
                     sta1.replace(".", "-"), sta2.replace(".", "-"),
-                    components, filter_id, mwcs_id, dtt_id, day,
+                    components, filterid, mwcsid, mwcsdttid, day,
                 )
             )
         outfile = "dtt_" + outfile
