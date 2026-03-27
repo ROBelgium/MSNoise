@@ -32,6 +32,7 @@ And refiltering to enhance high frequency content:
 import datetime
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Cursor  # noqa: F401 — used interactively in GUI
 import numpy as np
 from obspy.signal.filter import bandpass
 

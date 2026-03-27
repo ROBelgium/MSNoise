@@ -19,6 +19,7 @@ Example:
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num, DateFormatter
+from matplotlib.widgets import Cursor  # noqa: F401 — used interactively in GUI
 
 from obspy.signal.filter import bandpass
 

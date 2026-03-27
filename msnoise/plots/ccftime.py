@@ -38,6 +38,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
 from pandas.plotting import register_matplotlib_converters
+from matplotlib.widgets import Cursor  # noqa: F401 — used interactively in GUI
 register_matplotlib_converters()
 
 from obspy.signal.filter import envelope as obspy_envelope
