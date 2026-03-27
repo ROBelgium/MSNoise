@@ -1378,7 +1378,12 @@ def create_workflow_links_from_steps(session):
                         # Global steps link to all steps in target categories
                         target_steps_to_link = list(steps_by_category[target_category].values())
 
-                    elif target_category in ['filter', 'refstack', 'mwcs', 'stretching', 'wavelet', 'mwcs_dtt', 'wavelet_dtt']:
+                    elif target_category in [
+                        'filter', 'refstack',
+                        'mwcs', 'stretching', 'wavelet',
+                        'mwcs_dtt', 'wavelet_dtt',
+                        'mwcs_dtt_dvv', 'stretching_dvv', 'wct_dtt_dvv',
+                    ]:
                         # For all processing steps that can have multiple instances,
                         # link to all target steps in the category
                         # This includes DTT steps which can process results from multiple MWCS/wavelet sets
@@ -3830,13 +3835,9 @@ def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mo
 def xr_get_wct_dtt(root, lineage, station1, station2, components, mov_stack):
     """Load per-pair WCT dt/t results from a NetCDF file.
 
-    Returns an :class:`xarray.Dataset` with variables ``dvv``, ``err``,
+    Returns an :class:`xarray.Dataset` with variables ``dtt``, ``err``,
     ``coh`` each of shape ``(times, frequency)``, as written by
     :func:`xr_save_wct_dtt`.
-
-    Note: despite the variable name ``dvv`` in the file, the values are
-    *dt/t* (fractional time delay × 100 in percent) at each frequency bin,
-    not yet network-aggregated dv/v.
 
     :raises FileNotFoundError: if the NetCDF file does not exist.
     :rtype: :class:`xarray.Dataset`

@@ -1579,7 +1579,7 @@ def dtt_dvv_plot_mwcs(ctx, preprocessid, ccid, filterid, stackid, stackid_item,
     if ctx.obj['MSNOISE_custom']:
         from dvv import main  # NOQA
     else:
-        from ..plots.mwcs_dtt import main
+        from ..plots.mwcs_dtt_dvv import main
     main(preprocessid, ccid, filterid, stackid, stackid_item, refstackid,
          mwcsid, mwcsdttid, dvvid=dvvid, components=comp,
          dttname=dttname, show=show, outfile=outfile, loglevel=loglevel)
