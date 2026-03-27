@@ -347,7 +347,7 @@ def test_015_check_cc_files():
     output_folder = get_config(db, 'output_folder') or 'OUTPUT'
     cc_params = get_config_set_details(db, 'cc', 1, format='AttribDict')
     components_to_compute = cc_params.components_to_compute.split(',')
-    filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
+    filter_steps = [s for s in get_workflow_steps(db) if s.category == "filter"]
     for filter_step in filter_steps:
         for components in components_to_compute:
             for (sta1, sta2) in get_station_pairs(db):
@@ -357,8 +357,8 @@ def test_015_check_cc_files():
                         sta2_id = f"{sta2.net}.{sta2.sta}.{loc2}"
                         tmp = os.path.join(output_folder, "preprocess_1", "cc_1",
                                            filter_step.step_name, "_output", "daily",
-                                           components, sta1_id, sta2_id,
-                                           f"2010-09-01.MSEED")
+                                           components, f"{sta1_id}_{sta2_id}",
+                                           "2010-09-01.nc")
                         print("checking", tmp)
                         assert os.path.isfile(tmp), f"{tmp} does not exist"
     db.close()

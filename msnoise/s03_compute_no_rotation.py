@@ -270,6 +270,9 @@ def main(loglevel="INFO"):
         params = batch["params"]
         lineage_names = batch["lineage_names_upstream"]
         step = batch["step"]
+        # The CC step outputs under the filter step folder:
+        # lineage_names_upstream ends with cc_1; filter_1 is the last of lineage_names
+        filter_step_name = batch["lineage_names"][-1]
 
         stations = []
         pairs = []
@@ -631,7 +634,7 @@ def main(loglevel="INFO"):
                 xr_save_ccf_all(
                     root=params.output_folder,
                     lineage=lineage_names,
-                    step_name=step.step_name,
+                    step_name=filter_step_name,
                     station1=station1,
                     station2=station2,
                     components=components,
@@ -642,8 +645,6 @@ def main(loglevel="INFO"):
                 )
 
         if params.cc.keep_days:
-            # Root folder for "daily stacks" output:
-            cc_daily_base = os.path.join(*lineage_names, step.step_name)
             for ccfid in allcorr.keys():
                 logging.debug("Exporting %s" % ccfid)
                 station1, station2, components, filter_name, date = \
@@ -663,7 +664,7 @@ def main(loglevel="INFO"):
                 save_daily_ccf(
                     root=params.output_folder,
                     lineage=lineage_names,
-                    step_name=step.step_name,
+                    step_name=filter_step_name,
                     station1=station1,
                     station2=station2,
                     components=components,
