@@ -78,7 +78,7 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
         params      = batch["params"]
         step        = batch["step"]
         lineage_str = batch["lineage_str"]
-        print(params)
+
         # dvv_lineage = lineage up to but not including the dvv step itself.
         # The parent DTT step is the last entry in that list.
         dvv_lineage   = batch["lineage_names_upstream"]
@@ -126,7 +126,6 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
         for mov_stack in mov_stacks:
             for pt in pair_types:
                 for comp in comp_groups:
-                    print(comp)
                     try:
                         ds_out = aggregate_dvv_pairs(
                             root=root,

@@ -878,7 +878,7 @@ def test_400_run_manually():
     os.system("msnoise new_jobs --after mwcs_dtt")
     os.system("msnoise reset mwcs_dtt_dvv_1 --all")
     os.system("msnoise cc dtt dvv compute_mwcs_dtt_dvv")
-    os.system("msnoise cc dtt dvv plot mwcs_dtt_dvv -s 0 -o ?.png")
+    os.system("msnoise cc dtt dvv plot mwcs_dvv -s 0 -o ?.png")
     # Stretching
     os.system("msnoise reset stretching_1 --all")
     os.system("msnoise cc dtt compute_stretching")
@@ -895,7 +895,7 @@ def test_400_run_manually():
     os.system("msnoise new_jobs --after wavelet_dtt")
     os.system("msnoise reset wavelet_dtt_dvv_1 --all")
     os.system("msnoise cc dtt dvv compute_wavelet_dtt_dvv")
-    os.system("msnoise cc dtt dvv plot wavelet_dtt_dvv -s 0 -o ?.png")
+    os.system("msnoise cc dtt dvv plot wavelet_dvv -s 0 -o ?.png")
     # PSDs
     os.system("msnoise reset psd_1 --all")
     os.system("msnoise qc compute_psd")

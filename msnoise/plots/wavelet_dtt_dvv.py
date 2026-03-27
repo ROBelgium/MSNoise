@@ -33,7 +33,8 @@ from ..results import MSNoiseResult
 
 
 def _plot_timeseries(result, mov_stacks, comp_list,
-                     filterid, wctid, dttid, freqmin, freqmax, logger):
+                     filterid, wctid, dttid, freqmin, freqmax, pair_type,
+                     logger):
     """Weighted-mean dv/v timeseries, one subplot per moving stack.
 
     Reads from the pre-aggregated ``wavelet_dtt_dvv`` step output.
@@ -259,7 +260,7 @@ def main(mov_stackid=0, components="ZZ", pair_type="CC", filterid=1, wctid=1, dt
     else:
         fig = _plot_timeseries(result, mov_stacks, comp_list,
                                filterid, wctid, dttid,
-                               freqmin, freqmax, logger)
+                               freqmin, freqmax, pair_type, logger)
 
     if fig is None:
         return

@@ -1564,7 +1564,7 @@ def dtt_dvv_plot():
     pass
 
 
-@dtt_dvv_plot.command(name="mwcs_dtt_dvv")
+@dtt_dvv_plot.command(name="mwcs_dvv")
 @mwcsdtt_options
 @click.option('-D', '--dvvid', default=1, help='MWCS-DTT-DVV aggregate config set number')
 @click.option('-M', '--dttname', default="m", help='DTT column: m (slope) or m0 (zero-intercept slope)')
@@ -1611,7 +1611,7 @@ def dtt_dvv_plot_stretching(ctx, mov_stack, comp, filterid, stretchingid,
          show=show, outfile=outfile, loglevel=loglevel)
 
 
-@dtt_dvv_plot.command(name="wavelet_dtt_dvv")
+@dtt_dvv_plot.command(name="wavelet_dvv")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stack (1-based index, 0=all)')
