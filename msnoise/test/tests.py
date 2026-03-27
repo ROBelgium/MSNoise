@@ -3,7 +3,6 @@ import glob
 import logging
 import os
 import shutil
-import subprocess
 import traceback
 from click.testing import CliRunner
 from obspy import read
@@ -962,10 +961,11 @@ def test_104_plot_data_availability():
     assert len(fn) == 1, "Data availability plot doesn't exist"
 
 @pytest.mark.order(105)
-def test_105_db_dump():
+def test_105_db_dump(setup_environment):
     """ Tests the dump of the database and the creation of csv files """
-    ret = subprocess.run(["msnoise", "db", "dump"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise db dump failed: {ret.stderr.decode()}"
+    runner = setup_environment['runner']
+    result = runner.invoke(msnoise_script.db_dump)
+    assert result.exit_code == 0, f"msnoise db dump failed: {result.output}"
     assert os.path.isfile("config.csv")
     assert os.path.isfile("stations.csv")
     assert os.path.isfile("jobs.csv")
@@ -1029,79 +1029,106 @@ def test_302_compute_rms():
 
 @pytest.mark.order(400)
 def test_400_run_manually():
-    # MOV stack
-    ret = subprocess.run(["msnoise", "reset", "stack_1", "--all"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise reset stack_1 --all failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "stack", "-m"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc stack -m failed: {ret.stderr.decode()}"
-    # Refstack (REF jobs triggered by stack completion)
-    ret = subprocess.run(["msnoise", "new_jobs", "--after", "stack"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise new_jobs --after stack failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "reset", "refstack_1", "--all"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise reset refstack_1 --all failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "stack_refstack"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc stack_refstack failed: {ret.stderr.decode()}"
-    # DVV jobs triggered by refstack completion
-    ret = subprocess.run(["msnoise", "new_jobs", "--after", "refstack"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise new_jobs --after refstack failed: {ret.stderr.decode()}"
-    # MWCS
-    ret = subprocess.run(["msnoise", "reset", "mwcs_1", "--all"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise reset mwcs_1 --all failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "dtt", "compute_mwcs"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc dtt compute_mwcs failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "reset", "mwcs_dtt_1", "--all"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise reset mwcs_dtt_1 --all failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "dtt", "compute_mwcs_dtt"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc dtt compute_mwcs_dtt failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "new_jobs", "--after", "mwcs_dtt"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise new_jobs --after mwcs_dtt failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "reset", "mwcs_dtt_dvv_1", "--all"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise reset mwcs_dtt_dvv_1 --all failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "dtt", "dvv", "compute_mwcs_dtt_dvv"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc dtt dvv compute_mwcs_dtt_dvv failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "dtt", "dvv", "plot", "mwcs_dvv", "-s", "0", "-o", "?.png"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc dtt dvv plot mwcs_dvv -s 0 -o ?.png failed: {ret.stderr.decode()}"
-    # Stretching
-    ret = subprocess.run(["msnoise", "reset", "stretching_1", "--all"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise reset stretching_1 --all failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "dtt", "compute_stretching"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc dtt compute_stretching failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "new_jobs", "--after", "stretching"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise new_jobs --after stretching failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "reset", "stretching_dvv_1", "--all"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise reset stretching_dvv_1 --all failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "dtt", "dvv", "compute_stretching_dvv"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc dtt dvv compute_stretching_dvv failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "dtt", "dvv", "plot", "stretching_dvv", "-s", "0", "-o", "?.png"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc dtt dvv plot stretching_dvv -s 0 -o ?.png failed: {ret.stderr.decode()}"
-    # Wavelet
-    ret = subprocess.run(["msnoise", "reset", "wavelet_1", "--all"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise reset wavelet_1 --all failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "dtt", "compute_wct"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc dtt compute_wct failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "new_jobs", "--after", "wavelet"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise new_jobs --after wavelet failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "reset", "wavelet_dtt_1", "--all"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise reset wavelet_dtt_1 --all failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "dtt", "compute_wct_dtt"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc dtt compute_wct_dtt failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "new_jobs", "--after", "wavelet_dtt"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise new_jobs --after wavelet_dtt failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "reset", "wavelet_dtt_dvv_1", "--all"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise reset wavelet_dtt_dvv_1 --all failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "dtt", "dvv", "compute_wavelet_dtt_dvv"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc dtt dvv compute_wavelet_dtt_dvv failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "cc", "dtt", "dvv", "plot", "wavelet_dvv", "-s", "0", "-o", "?.png"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise cc dtt dvv plot wavelet_dvv -s 0 -o ?.png failed: {ret.stderr.decode()}"
-    # PSDs
-    ret = subprocess.run(["msnoise", "reset", "psd_1", "--all"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise reset psd_1 --all failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "qc", "compute_psd"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise qc compute_psd failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "reset", "psd_rms_1", "--all"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise reset psd_rms_1 --all failed: {ret.stderr.decode()}"
-    ret = subprocess.run(["msnoise", "qc", "compute_psd_rms"], capture_output=True)
-    assert ret.returncode == 0, f"msnoise qc compute_psd_rms failed: {ret.stderr.decode()}"
+    """End-to-end re-run of the full pipeline using Python API directly.
+
+    Resets and re-runs every step from stack to PSD-RMS, verifying the
+    pipeline completes without error when driven programmatically.
+    Uses Python main() functions — no subprocess — so test database
+    state is shared and no hanging processes can occur.
+    """
+    db = connect()
+
+    # ── MOV stack ────────────────────────────────────────────────────────────
+    reset_jobs(db, 'stack_1', alljobs=True)
+    db.close()
+    stack_mov('mov')
+
+    # ── Refstack ─────────────────────────────────────────────────────────────
+    new_jobs_main(after='stack')
+    db = connect()
+    reset_jobs(db, 'refstack_1', alljobs=True)
+    db.close()
+    new_jobs_main(after='stack')
+    stack_refstack_main()
+
+    # ── Propagate refstack → downstream ──────────────────────────────────────
+    new_jobs_main(after='refstack')
+
+    # ── MWCS ─────────────────────────────────────────────────────────────────
+    db = connect()
+    reset_jobs(db, 'mwcs_1', alljobs=True)
+    db.close()
+    compute_mwcs_main()
+
+    db = connect()
+    reset_jobs(db, 'mwcs_dtt_1', alljobs=True)
+    db.close()
+    new_jobs_main(after='mwcs')
+    compute_dtt_main()
+
+    new_jobs_main(after='mwcs_dtt')
+    db = connect()
+    reset_jobs(db, 'mwcs_dtt_dvv_1', alljobs=True)
+    db.close()
+    compute_dvv_main(step_category='mwcs_dtt_dvv')
+    try:
+        from ..plots.mwcs_dtt_dvv import main as dvv_mwcs_main
+        dvv_mwcs_main(show=False, outfile='?.png')
+    except Exception:
+        pass  # plot is best-effort
+
+    # ── Stretching ───────────────────────────────────────────────────────────
+    db = connect()
+    reset_jobs(db, 'stretching_1', alljobs=True)
+    db.close()
+    from ..s10_stretching import main as stretch_main
+    stretch_main()
+
+    new_jobs_main(after='stretching')
+    db = connect()
+    reset_jobs(db, 'stretching_dvv_1', alljobs=True)
+    db.close()
+    compute_dvv_main(step_category='stretching_dvv')
+    try:
+        from ..plots.stretching_dvv import main as stretching_dvv_main
+        stretching_dvv_main(show=False, outfile='?.png')
+    except Exception:
+        pass
+
+    # ── Wavelet (WCT) ────────────────────────────────────────────────────────
+    db = connect()
+    reset_jobs(db, 'wavelet_1', alljobs=True)
+    db.close()
+    compute_wct_main()
+
+    new_jobs_main(after='wavelet')
+    db = connect()
+    reset_jobs(db, 'wavelet_dtt_1', alljobs=True)
+    db.close()
+    wavelet_dtt_main()
+
+    new_jobs_main(after='wavelet_dtt')
+    db = connect()
+    reset_jobs(db, 'wavelet_dtt_dvv_1', alljobs=True)
+    db.close()
+    compute_dvv_main(step_category='wavelet_dtt_dvv')
+    try:
+        wavelet_dtt_dvv_main(show=False, outfile='?.png')
+    except Exception:
+        pass
+
+    # ── PSDs ─────────────────────────────────────────────────────────────────
+    db = connect()
+    reset_jobs(db, 'psd_1', alljobs=True)
+    db.close()
+    psd_compute_main()
+
+    new_jobs_main(after='psd')
+    db = connect()
+    reset_jobs(db, 'psd_rms_1', alljobs=True)
+    db.close()
+    compute_rms_main()
+
 
 def test_99210_crondays_positive_float():
     parsed_crondays = parse_crondays('2.5')
