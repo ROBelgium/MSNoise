@@ -66,7 +66,6 @@ from .api import (
     get_logger,
     is_next_job_for_step,
     get_next_lineage_batch,
-    massive_update_job,
     preload_instrument_responses,
     psd_ppsd_to_dataframe,
     to_sds,
@@ -94,7 +93,6 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         jobs          = batch["jobs"]
         step          = batch["step"]
         params        = batch["params"]
-        lineage_names = batch["lineage_names"]
         days          = batch["days"]
 
         step_name     = step.step_name
@@ -108,8 +106,12 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         period_limits  = params.psd_ppsd_period_limits
         db_bins        = params.psd_ppsd_db_bins
 
-        # psd is a root step (global -> psd); keep empty lineage for path
-        # construction until xr_save_psd is updated to accept lineage_names.
+        # PSD is a root step (global → psd); there is no upstream lineage.
+        # xr_save_psd / xr_load_psd use `lineage=[]` so files land at:
+        #   <output_folder>/<step_name>/_output/daily/<seed_id>/<day>.nc
+        # The batch lineage_names (e.g. ['global_1', 'psd_1']) includes
+        # the global step which is not a real output folder — using [] is
+        # consistent with how psd_compute_rms.py reads these files.
         lineage = []
 
         for job in jobs:
