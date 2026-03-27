@@ -51,7 +51,7 @@ def _plot_timeseries(result, mov_stacks, comp_list,
         for comp in comp_list:
             try:
                 stats = compute_dtt_wct(
-                    None, result.output_folder, result.lineage_names, mov_stack,
+                    result._db, result.output_folder, result.lineage_names, mov_stack,
                     components=comp, params=params,
                     freqmin=freqmin, freqmax=freqmax,
                 )
