@@ -2018,38 +2018,23 @@ def _load_step_config(db, step):
     )
 
 
-def _merge_params(orig_params, configs_in_order):
-    from obspy.core import AttribDict
-    merged = dict(orig_params)
-    for cfg in configs_in_order:
-        merged.update(cfg)  # later overrides earlier
-    return AttribDict(merged)
-
-
 def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
-    # lineage is upstream -> downstream
+    """Build a :class:`~msnoise.params.LayeredParams` for the given lineage.
+
+    Returns ``(lineage, lineage_names, LayeredParams)``.
+    """
+    from .params import _build_layered_params
+
     lineage = [s for s in lineage if s.category not in {"global"}]
-
     lineage_names = [s.step_name for s in lineage]
-    # print("Lineage Names:", lineage_names)
-
     lineage_cfgs = [_load_step_config(db, s) for s in lineage]
-    # print("Lineage Configs:", lineage_cfgs)
 
-    # TODO: gather all those into a "sanitize params" def?
-    params = _merge_params(orig_params, lineage_cfgs + [step_params])
-
-    # Split comma-separated component strings only when the param is present
-    # and not already a list (preprocess/psd steps don't carry these keys).
-    for key in ('components_to_compute', 'components_to_compute_single_station'):
-        val = getattr(params, key, None)
-        if val is not None and isinstance(val, str):
-            setattr(params, key, val.split(','))
-
-    if hasattr(params, "mov_stack"):
-        if not isinstance(params.mov_stack[0], tuple):
-            params.mov_stack = [params.mov_stack]
-
+    params = _build_layered_params(
+        global_attrib=orig_params,
+        lineage_steps=lineage,
+        lineage_names=lineage_names,
+        step_configs=lineage_cfgs,
+    )
     return lineage, lineage_names, params
 
 
@@ -2075,7 +2060,7 @@ def resolve_lineage_params(session, lineage_names):
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param lineage_names: Ordered list of step-name strings, e.g.
         ``['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'mwcs_1', 'mwcs_dtt_1']``.
-    :rtype: tuple(list, list[str], AttribDict)
+    :rtype: tuple(list, list[str], LayeredParams)
     """
     orig_params = get_params(session)
     lineage_str = "/".join(lineage_names)
@@ -2144,7 +2129,7 @@ def get_next_lineage_batch(
     - Extracts (pair, lineage_str, refs, days).
     - Loads current step config (from the job row).
     - Resolves lineage_str -> WorkflowStep objects.
-    - Merges params for that lineage + current step config.
+    - Builds a LayeredParams for that lineage (one layer per category).
 
     Returns
     -------
@@ -2156,7 +2141,7 @@ def get_next_lineage_batch(
       - lineage_names_mov      — upstream with any refstack_* entries stripped
                                  (used by mwcs/wct/stretching to find MOV CCFs)
       - refs, days
-      - step_params, params
+      - step_params, params    — params is a LayeredParams instance
     or None if no jobs were claimed (caller should continue/sleep).
     """
     # Important: keep logging policy consistent with your scripts
