@@ -74,9 +74,9 @@ could occur with SQLite.
 import time
 
 import numpy as np
+import xarray as xr
 from obspy.signal.invsim import cosine_taper
 from obspy.signal.regression import linear_regression
-import pandas as pd
 import scipy
 import scipy.fft as sf
 from scipy.fft import next_fast_len
@@ -97,7 +97,6 @@ from .api import (
     massive_update_job,
     nextpow2,
     refstack_is_rolling,
-    stack,
     xr_get_ccf,
     xr_get_ref,
     xr_save_mwcs,
@@ -333,21 +332,35 @@ def main(loglevel="INFO"):
 
                     ti = -params.maxlag + params.mwcs_wlen / 2. + count * (step_samples/goal_sampling_rate)
                     # print("Finished processing t_center=", ti, "s")
-                    S = pd.DataFrame(np.array([M, E, MCOH]).T,
-                                    index=data.index,
-                                    columns=["M", "EM", "MCOH"])
-                    S.columns = pd.MultiIndex.from_product(
-                        [[ti], S.columns])
-                    output.append(S)
+                    output.append((ti, M, E, MCOH))
                     count += 1
                     del fcur, fref, fcur2, fref2, result, cri
                     del X
                     del M, E, MCOH
-                output = pd.concat(output, axis=1)
 
+                # Build xarray Dataset: dims (times, taxis, keys)
+                t_centers = np.array([o[0] for o in output])
+                M_arr    = np.stack([o[1] for o in output], axis=1)  # (n_times, n_taxis)
+                E_arr    = np.stack([o[2] for o in output], axis=1)
+                MCOH_arr = np.stack([o[3] for o in output], axis=1)
+
+                times_coord = data.index.values
+                ds_out = xr.Dataset(
+                    {
+                        "MWCS": xr.DataArray(
+                            np.stack([M_arr, E_arr, MCOH_arr], axis=2),
+                            dims=["times", "taxis", "keys"],
+                            coords={
+                                "times": times_coord,
+                                "taxis": t_centers,
+                                "keys":  ["M", "EM", "MCOH"],
+                            },
+                        )
+                    }
+                )
                 xr_save_mwcs(params.output_folder, lineage_names, step.step_name,
-                              station1, station2, components, mov_stack, taxis, output)
-                del data, output
+                              station1, station2, components, mov_stack, taxis, ds_out)
+                del data, output, ds_out
 
         massive_update_job(db, jobs, "D")
         # if not params.hpc:

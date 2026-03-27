@@ -88,7 +88,7 @@ import time
 
 import numpy as np
 import pandas as pd
-from scipy.fft import next_fast_len
+import xarray as xr
 from numpy import asarray as ar
 from scipy.optimize import curve_fit
 from scipy.ndimage import map_coordinates
@@ -293,14 +293,22 @@ def main(loglevel="INFO"):
                         error = np.nan  # gaussian fit failed
 
                     allerrs.append(error)
-                # Migrate from CSV to xarray NetCDF format
-                df = pd.DataFrame(
-                    np.array([alldeltas, allcoefs, allerrs]).T,
-                    index=alldays, columns=["Delta", "Coeff", "Error"],
+                # Build xarray Dataset directly — no DataFrame round-trip
+                ds_out = xr.Dataset(
+                    {
+                        "STR": xr.DataArray(
+                            np.column_stack([alldeltas, allcoefs, allerrs]),
+                            dims=["times", "keys"],
+                            coords={
+                                "times": alldays.values,
+                                "keys":  ["Delta", "Coeff", "Error"],
+                            },
+                        )
+                    }
                 )
                 xr_save_stretching(
                     root, lineage_names, step.step_name,
-                    station1, station2, components, mov_stack, df,
+                    station1, station2, components, mov_stack, ds_out,
                 )
 
         massive_update_job(db, jobs, "D")
