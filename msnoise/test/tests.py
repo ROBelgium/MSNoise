@@ -41,7 +41,7 @@ from ..plots.spectime import main as spectime_main
 from ..plots.distance import main as distance_main
 from ..plots.mwcs_dtt_dvv import main as dvv_main
 from ..plots.data_availability import main as data_availability_main
-from ..plots.wct_dvv import main as wct_dvv_main
+from ..plots.wavelet_dtt_dvv import main as wavelet_dtt_dvv_main
 from ..s02_preprocessing import main as preprocess_main
 from ..s08_compute_wct import main as compute_wct_main
 from ..s09_compute_wct_dtt import main as wavelet_dtt_main
@@ -139,7 +139,7 @@ def test_002b_create_workflow():
     for category in ['preprocess', 'cc', 'filter', 'stack', 'refstack',
                      'mwcs', 'mwcs_dtt', 'mwcs_dtt_dvv',
                      'stretching', 'stretching_dvv',
-                     'wavelet', 'wavelet_dtt', 'wct_dtt_dvv',
+                     'wavelet', 'wavelet_dtt', 'wavelet_dtt_dvv',
                      'psd', 'psd_rms']:
         set_number = create_config_set(db, category)
         assert set_number == 1, f"Expected set_number=1 for {category}, got {set_number}"
@@ -160,7 +160,7 @@ def test_002c_verify_workflow():
     for name in ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1',
                  'mwcs_1', 'mwcs_dtt_1', 'mwcs_dtt_dvv_1',
                  'stretching_1', 'stretching_dvv_1',
-                 'wavelet_1', 'wavelet_dtt_1', 'wct_dtt_dvv_1',
+                 'wavelet_1', 'wavelet_dtt_1', 'wavelet_dtt_dvv_1',
                  'psd_1', 'psd_rms_1']:
         assert name in step_names, f"Workflow step '{name}' not found"
     links = get_workflow_links(db)
@@ -708,14 +708,14 @@ def test_039_wct_pipeline():
 
 
 @pytest.mark.order(40)
-def test_040_compute_wct_dtt_dvv():
-    """Compute WCT dv/v aggregate — wct_dtt_dvv step."""
+def test_040_compute_wavelet_dtt_dvv():
+    """Compute WCT dv/v aggregate — wavelet_dtt_dvv step."""
     new_jobs_main(after='wavelet_dtt')
     try:
-        compute_dvv_main(step_category="wct_dtt_dvv")
+        compute_dvv_main(step_category="wavelet_dtt_dvv")
     except Exception:
         traceback.print_exc()
-        pytest.fail("wct_dtt_dvv computation failed")
+        pytest.fail("wavelet_dtt_dvv computation failed")
 
 @pytest.mark.order(99)
 def test_099_plot_interferogram():
@@ -804,7 +804,7 @@ def test_105_db_dump():
 
 #@pytest.mark.order(106)
 #def test_106_plot_wct():
-#    wct_dvv_main(filterid=1, wctid=1, dttid=1, components="ZZ", show=False, outfile="?.png")
+#    wavelet_dtt_dvv_main(filterid=1, wctid=1, dttid=1, components="ZZ", show=False, outfile="?.png")
 #    fn = "wct ZZ-f1-dvv.png"
 #    assert os.path.isfile(fn), f"{fn} doesn't exist"
 
@@ -890,9 +890,9 @@ def test_400_run_manually():
     os.system("msnoise reset wavelet_dtt_1 --all")
     os.system("msnoise cc dtt compute_wct_dtt")
     os.system("msnoise new_jobs --after wavelet_dtt")
-    os.system("msnoise reset wct_dtt_dvv_1 --all")
-    os.system("msnoise cc dtt dvv compute_wct_dtt_dvv")
-    os.system("msnoise cc dtt dvv plot wct_dtt_dvv -s 0 -o ?.png")
+    os.system("msnoise reset wavelet_dtt_dvv_1 --all")
+    os.system("msnoise cc dtt dvv compute_wavelet_dtt_dvv")
+    os.system("msnoise cc dtt dvv plot wavelet_dtt_dvv -s 0 -o ?.png")
     # PSDs
     os.system("msnoise reset psd_1 --all")
     os.system("msnoise qc compute_psd")

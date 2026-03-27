@@ -459,7 +459,7 @@ def propagate_dvv_jobs_from_dtt_done(session, source_category: str) -> int:
     DVV_TARGET = {
         "mwcs_dtt":    "mwcs_dtt_dvv",
         "stretching":  "stretching_dvv",
-        "wavelet_dtt": "wct_dtt_dvv",
+        "wavelet_dtt": "wavelet_dtt_dvv",
     }
     target_category = DVV_TARGET.get(source_category)
     if target_category is None:
@@ -987,7 +987,7 @@ def main(init=False, nocc=False, after=False):
             "global", "preprocess", "psd", "psd_rms", "cc", "filter",
             "stack", "refstack", "mwcs", "mwcs_dtt", "mwcs_dtt_dvv",
             "stretching", "stretching_dvv",
-            "wavelet", "wavelet_dtt", "wct_dtt_dvv",
+            "wavelet", "wavelet_dtt", "wavelet_dtt_dvv",
         }
         if source_category not in allowed_categories:
             raise ValueError(

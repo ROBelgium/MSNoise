@@ -49,7 +49,7 @@ _STEP_PREFIXES = [
     "stretching_dvv",
     "wavelet",
     "wavelet_dtt",
-    "wct_dtt_dvv",
+    "wavelet_dtt_dvv",
 ]
 
 # Map step-name prefix → keyword argument name used in from_ids()
@@ -125,7 +125,7 @@ class MSNoiseResult:
         stretching_dvv: Optional[int] = None,
         wavelet: Optional[int] = None,
         wavelet_dtt: Optional[int] = None,
-        wct_dtt_dvv: Optional[int] = None,
+        wavelet_dtt_dvv: Optional[int] = None,
     ) -> "MSNoiseResult":
         """Build from integer configset IDs, stopping at the last non-None step.
 
@@ -166,7 +166,7 @@ class MSNoiseResult:
             "stretching_dvv":stretching_dvv,
             "wavelet":       wavelet,
             "wavelet_dtt":   wavelet_dtt,
-            "wct_dtt_dvv":   wct_dtt_dvv,
+            "wavelet_dtt_dvv":   wavelet_dtt_dvv,
         }
         parts = []
         for prefix in _STEP_PREFIXES:
@@ -627,7 +627,7 @@ class MSNoiseResult:
         """Load pre-aggregated network dv/v statistics.
 
         The :class:`MSNoiseResult` must be instantiated at a DVV aggregate step
-        (``mwcs_dtt_dvv``, ``stretching_dvv``, or ``wct_dtt_dvv``).
+        (``mwcs_dtt_dvv``, ``stretching_dvv``, or ``wavelet_dtt_dvv``).
 
         Parameters
         ----------
@@ -651,7 +651,7 @@ class MSNoiseResult:
         """
         from .api import xr_get_dvv_agg
 
-        DVV_CATEGORIES = ("mwcs_dtt_dvv", "stretching_dvv", "wct_dtt_dvv")
+        DVV_CATEGORIES = ("mwcs_dtt_dvv", "stretching_dvv", "wavelet_dtt_dvv")
         self._require_category(*DVV_CATEGORIES)
 
         # Resolve the DVV step name and its lineage

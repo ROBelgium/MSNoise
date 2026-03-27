@@ -334,7 +334,7 @@ def _create_default_workflow():
         'refstack',
         'mwcs', 'mwcs_dtt', 'mwcs_dtt_dvv',
         'stretching', 'stretching_dvv',
-        'wavelet', 'wavelet_dtt', 'wct_dtt_dvv',
+        'wavelet', 'wavelet_dtt', 'wavelet_dtt_dvv',
         'psd', 'psd_rms',
     ]
 
@@ -1550,12 +1550,12 @@ def dtt_dvv_compute_stretching(ctx):
     run_threaded(main, ctx, "stretching_dvv")
 
 
-@dtt_dvv.command(name='compute_wct_dtt_dvv')
+@dtt_dvv.command(name='compute_wavelet_dtt_dvv')
 @click.pass_context
 def dtt_dvv_compute_wct(ctx):
-    """Aggregate WCT dv/v across station pairs (wct_dtt_dvv step). Supports multi-band extraction."""
+    """Aggregate WCT dv/v across station pairs (wavelet_dtt_dvv step). Supports multi-band extraction."""
     from ..s07_compute_dvv import main
-    run_threaded(main, ctx, "wct_dtt_dvv")
+    run_threaded(main, ctx, "wavelet_dtt_dvv")
 
 
 @dtt_dvv.group(name="plot")
@@ -1607,7 +1607,7 @@ def dtt_dvv_plot_stretching(ctx, mov_stack, comp, filterid, stretchingid,
          show=show, outfile=outfile, loglevel=loglevel)
 
 
-@dtt_dvv_plot.command(name="wct_dtt_dvv")
+@dtt_dvv_plot.command(name="wavelet_dtt_dvv")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stack (1-based index, 0=all)')
@@ -1627,9 +1627,9 @@ def dtt_dvv_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, dvvid,
     """Plot dv/v from WCT-DTT aggregate. Use -v heatmap for per-pair frequency view."""
     loglevel = ctx.obj['MSNOISE_verbosity']
     if ctx.obj['MSNOISE_custom']:
-        from wct_dvv import main  # NOQA
+        from wavelet_dtt_dvv import main  # NOQA
     else:
-        from ..plots.wct_dvv import main
+        from ..plots.wavelet_dtt_dvv import main
     main(mov_stackid=mov_stack, components=comp, filterid=filterid,
          wctid=wctid, dttid=dttid, dvvid=dvvid, visualize=visualize,
          ranges=ranges, show=show, outfile=outfile, loglevel=loglevel)

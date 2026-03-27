@@ -13,7 +13,7 @@ DVV step category     Parent category
 ====================  ===============
 ``mwcs_dtt_dvv``      ``mwcs_dtt``
 ``stretching_dvv``    ``stretching``
-``wct_dtt_dvv``       ``wavelet_dtt``
+``wavelet_dtt_dvv``       ``wavelet_dtt``
 ====================  ===============
 
 Output files live at::
@@ -41,7 +41,7 @@ from .api import (
 PARENT_CATEGORY = {
     "mwcs_dtt_dvv":   "mwcs_dtt",
     "stretching_dvv": "stretching",
-    "wct_dtt_dvv":    "wavelet_dtt",
+    "wavelet_dtt_dvv":    "wavelet_dtt",
 }
 
 
@@ -49,7 +49,7 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
     """Aggregate per-pair dv/v into network-level statistics.
 
     :param step_category: One of ``"mwcs_dtt_dvv"``, ``"stretching_dvv"``,
-        ``"wct_dtt_dvv"``.
+        ``"wavelet_dtt_dvv"``.
     :param loglevel: Logging level string.
     """
     if step_category not in PARENT_CATEGORY:

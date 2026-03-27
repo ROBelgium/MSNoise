@@ -2,7 +2,7 @@
 Plot dt/t (and dv/v) from the Wavelet Coherence Transform method.
 
 The ``timeseries`` style reads pre-aggregated network dv/v from the
-``wct_dtt_dvv`` step output written by :mod:`msnoise.s07_compute_dvv`.
+``wavelet_dtt_dvv`` step output written by :mod:`msnoise.s07_compute_dvv`.
 The ``heatmap`` style reads per-pair WCT dt/t NetCDF files directly.
 
 Two plot styles are available via the ``--visualize`` option:
@@ -14,9 +14,9 @@ Two plot styles are available via the ``--visualize`` option:
 
 Example:
 
-``msnoise cc dtt dvv plot wct_dtt_dvv`` will plot all defaults (timeseries).
+``msnoise cc dtt dvv plot wavelet_dtt_dvv`` will plot all defaults (timeseries).
 
-``msnoise cc dtt dvv plot wct_dtt_dvv -v heatmap -f 1 -w 1 -d 1`` plots a
+``msnoise cc dtt dvv plot wavelet_dtt_dvv -v heatmap -f 1 -w 1 -d 1`` plots a
 heatmap for filter 1, WCT set 1, DTT set 1.
 """
 
@@ -36,8 +36,8 @@ def _plot_timeseries(result, mov_stacks, comp_list,
                      filterid, wctid, dttid, freqmin, freqmax, logger):
     """Weighted-mean dv/v timeseries, one subplot per moving stack.
 
-    Reads from the pre-aggregated ``wct_dtt_dvv`` step output.
-    The result must be instantiated at the ``wct_dtt_dvv`` step.
+    Reads from the pre-aggregated ``wavelet_dtt_dvv`` step output.
+    The result must be instantiated at the ``wavelet_dtt_dvv`` step.
     """
     params = result.params
     low  = params.freqmin
@@ -57,8 +57,8 @@ def _plot_timeseries(result, mov_stacks, comp_list,
                                      mov_stack=mov_stack, format="xarray")
             except (FileNotFoundError, ValueError):
                 logger.warning(
-                    f"No wct_dtt_dvv data for mov_stack={mov_stack} comp={comp}. "
-                    "Run 'msnoise dtt compute_wct_dtt_dvv' first."
+                    f"No wavelet_dtt_dvv data for mov_stack={mov_stack} comp={comp}. "
+                    "Run 'msnoise dtt compute_wavelet_dtt_dvv' first."
                 )
                 continue
 
@@ -172,7 +172,7 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
     :param filterid: Filter set number.
     :param wctid: WCT config set number.
     :param dttid: WCT-DTT config set number.
-    :param dvvid: ``wct_dtt_dvv`` config set number.
+    :param dvvid: ``wavelet_dtt_dvv`` config set number.
     :param visualize: ``'timeseries'`` (uses pre-aggregated dvv) or ``'heatmap'``
         (uses per-pair wct_dtt data directly).
     :param show: Display the figure interactively.
@@ -188,7 +188,7 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
     filter_step    = f"filter_{filterid}"
     wct_step       = f"wavelet_{wctid}"
     wct_dtt_step   = f"wavelet_dtt_{dttid}"
-    dvv_step       = f"wct_dtt_dvv_{dvvid}"
+    dvv_step       = f"wavelet_dtt_dvv_{dvvid}"
 
     if visualize == "heatmap":
         # Heatmap reads per-pair WCT-DTT data — resolve at wavelet_dtt level
@@ -196,16 +196,16 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
         target_cat  = "wavelet_dtt"
         target_step = wct_dtt_step
     else:
-        # Timeseries reads pre-aggregated dvv — resolve at wct_dtt_dvv level
-        all_results = MSNoiseResult.list(db, "wct_dtt_dvv")
-        target_cat  = "wct_dtt_dvv"
+        # Timeseries reads pre-aggregated dvv — resolve at wavelet_dtt_dvv level
+        all_results = MSNoiseResult.list(db, "wavelet_dtt_dvv")
+        target_cat  = "wavelet_dtt_dvv"
         target_step = dvv_step
 
     if not all_results:
         logger.error(
             f"No completed {target_cat} results found. "
-            + ("Run 'msnoise dtt compute_wct_dtt_dvv' first."
-               if target_cat == "wct_dtt_dvv" else "")
+            + ("Run 'msnoise dtt compute_wavelet_dtt_dvv' first."
+               if target_cat == "wavelet_dtt_dvv" else "")
         )
         return
 
@@ -221,7 +221,7 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
         logger.error(
             f"No {target_cat} lineage found for "
             f"filter_{filterid} / wavelet_{wctid} / wavelet_dtt_{dttid}"
-            + (f" / dvv_{dvvid}" if target_cat == "wct_dtt_dvv" else "")
+            + (f" / dvv_{dvvid}" if target_cat == "wavelet_dtt_dvv" else "")
             + f". Available: {['/'.join(r.lineage_names) for r in all_results]}"
         )
         return

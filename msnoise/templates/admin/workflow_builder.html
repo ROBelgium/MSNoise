@@ -223,9 +223,12 @@
                                     <option value="refstack">REF Stack</option>
                                     <option value="mwcs">MWCS</option>
                                     <option value="mwcs_dtt">MWCS DTT</option>
+                                    <option value="mwcs_dtt_dvv">MWCS dv/v Aggregate</option>
                                     <option value="stretching">Stretching</option>
+                                    <option value="stretching_dvv">Stretching dv/v Aggregate</option>
                                     <option value="wavelet">Wavelet</option>
                                     <option value="wavelet_dtt">Wavelet DTT</option>
+                                    <option value="wavelet_dtt_dvv">Wavelet dv/v Aggregate</option>
                                 </select>
                             </div>
                             <div class="form-group col-md-2">
@@ -323,7 +326,7 @@
                             <div class="form-group col-md-10">
                                 <p class="text-muted">
                                     This will automatically create workflow links between existing steps following the natural workflow progression:
-                                    <strong>preprocess → cc → filter → stack → refstack → mwcs/stretching/wavelet → mwcs_dtt/wavelet_dtt</strong>
+                                    <strong>preprocess → cc → filter → stack → refstack → mwcs/stretching/wavelet → mwcs_dtt/wavelet_dtt → mwcs_dtt_dvv/stretching_dvv/wavelet_dtt_dvv</strong>
                                 </p>
                             </div>
                             <div class="form-group col-md-2">
@@ -365,7 +368,7 @@
         'stretching_dvv': '#53c462',
         'wavelet': '#007bff',
         'wavelet_dtt': '#343a40',
-        'wct_dtt_dvv': '#53c462',
+        'wavelet_dtt_dvv': '#53c462',
     };
 
     // Category nice names
@@ -380,9 +383,12 @@
         'refstack': 'REF Stacking',
         'mwcs': 'MWCS Analysis',
         'mwcs_dtt': 'MWCS dt/t',
+        'mwcs_dtt_dvv': 'MWCS dv/v Aggregate',
         'stretching': 'Stretching',
+        'stretching_dvv': 'Stretching dv/v Aggregate',
         'wavelet': 'Wavelet Analysis',
-        'wavelet_dtt': 'Wavelet dt/t'
+        'wavelet_dtt': 'Wavelet dt/t',
+        'wavelet_dtt_dvv': 'Wavelet dv/v Aggregate'
     };
 
     // Initialize D3 graph only if we have nodes
@@ -646,7 +652,7 @@
             'filter': 3, 'stack': 4, 'refstack': 5,
             'mwcs': 6, 'stretching': 6, 'wavelet': 6,
             'mwcs_dtt': 7, 'wavelet_dtt': 7,
-            'mwcs_dtt_dvv': 8, 'stretching_dvv': 8, 'wct_dtt_dvv': 8,
+            'mwcs_dtt_dvv': 8, 'stretching_dvv': 8, 'wavelet_dtt_dvv': 8,
         };
         const levelCounts = {};
         nodes.forEach(n => {
@@ -739,10 +745,13 @@
                         'stack': ['refstack'],
                         'refstack': ['mwcs', 'stretching', 'wavelet'],
                         'mwcs': ['mwcs_dtt'],
-                        'stretching': [],
+                        'mwcs_dtt': ['mwcs_dtt_dvv'],
+                        'mwcs_dtt_dvv': [],
+                        'stretching': ['stretching_dvv'],
+                        'stretching_dvv': [],
                         'wavelet': ['wavelet_dtt'],
-                        'wavelet_dtt': [],
-                        'mwcs_dtt': []
+                        'wavelet_dtt': ['wavelet_dtt_dvv'],
+                        'wavelet_dtt_dvv': []
                     };
 
                     const validNextCategories = WORKFLOW_CHAINS[fromNode.category] || [];

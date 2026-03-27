@@ -510,7 +510,7 @@ def get_config_categories_definition():
         ('stretching_dvv','Stretching dv/v Aggregate',7),
         ('wavelet',       'Wavelet',                  6),
         ('wavelet_dtt',   'Wavelet dt/t',             7),
-        ('wct_dtt_dvv',   'WCT dv/v Aggregate',       8),
+        ('wavelet_dtt_dvv',   'WCT dv/v Aggregate',       8),
         ('psd',         'PSD',                 1),
         ('psd_rms',     'PSD RMS',             2),
     ]
@@ -1382,7 +1382,7 @@ def create_workflow_links_from_steps(session):
                         'filter', 'refstack',
                         'mwcs', 'stretching', 'wavelet',
                         'mwcs_dtt', 'wavelet_dtt',
-                        'mwcs_dtt_dvv', 'stretching_dvv', 'wct_dtt_dvv',
+                        'mwcs_dtt_dvv', 'stretching_dvv', 'wavelet_dtt_dvv',
                     ]:
                         # For all processing steps that can have multiple instances,
                         # link to all target steps in the category

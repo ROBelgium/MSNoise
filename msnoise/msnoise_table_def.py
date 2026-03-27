@@ -74,7 +74,7 @@ WORKFLOW_CHAINS = {
         'is_terminal': False
     },
     'wavelet_dtt': {
-        'next_steps': ['wct_dtt_dvv'],
+        'next_steps': ['wavelet_dtt_dvv'],
         'is_entry_point': False,
         'is_terminal': False
     },
@@ -88,7 +88,7 @@ WORKFLOW_CHAINS = {
         'is_entry_point': False,
         'is_terminal': True
     },
-    'wct_dtt_dvv': {
+    'wavelet_dtt_dvv': {
         'next_steps': [],
         'is_entry_point': False,
         'is_terminal': True
@@ -113,7 +113,7 @@ WORKFLOW_ORDER = [
     'stretching_dvv',
     'wavelet',
     'wavelet_dtt',
-    'wct_dtt_dvv',
+    'wavelet_dtt_dvv',
 ]
 
 
