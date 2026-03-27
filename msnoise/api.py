@@ -1558,6 +1558,29 @@ def reset_jobs(session, jobtype, alljobs=False, reset_i=True, reset_e=True):
     session.commit()
 
 
+def get_job_types(session, jobtype):
+    """Return job counts grouped by flag for a given ``jobtype`` string.
+
+    Works with the v2 workflow model where ``jobtype`` is a step name such
+    as ``"cc_1"``.  Returns a list of ``(count, flag)`` tuples.
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :param session: A :class:`~sqlalchemy.orm.session.Session` object
+    :type jobtype: str
+    :param jobtype: Step name to query (e.g. ``"cc_1"``)
+    :rtype: list of (int, str)
+    :returns: List of (count, flag) pairs
+    """
+    from sqlalchemy import func
+    schema = declare_tables()
+    Job = schema.Job
+    rows = (session.query(func.count(Job.flag), Job.flag)
+            .filter(Job.jobtype == jobtype)
+            .group_by(Job.flag)
+            .all())
+    return rows
+
+
 # ── Workflow-aware job API ──────────────────────────────────
 
 
