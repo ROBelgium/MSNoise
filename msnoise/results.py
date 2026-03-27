@@ -652,7 +652,14 @@ class MSNoiseResult:
         from .api import xr_get_dvv_agg
 
         DVV_CATEGORIES = ("mwcs_dtt_dvv", "stretching_dvv", "wavelet_dtt_dvv")
-        self._require_category(*DVV_CATEGORIES)
+        present = {_step_prefix(n) for n in self.lineage_names}
+        if not any(cat in present for cat in DVV_CATEGORIES):
+            raise ValueError(
+                f"Lineage {'/'.join(self.lineage_names)!r} does not include "
+                f"any DVV aggregate step "
+                f"({', '.join(DVV_CATEGORIES)}). "
+                "Run the appropriate dvv compute step first."
+            )
 
         # Resolve the DVV step name and its lineage
         dvv_cat = self.category

@@ -123,8 +123,9 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
     )
 
     if outfile:
-        if outfile == "?":
-            outfile = "dvv ZZ-f%i-mm%s.png" % (filterid, mov_stacks[0][0])
+        if outfile.startswith("?"):
+            tag = "dvv ZZ-f%i-mm%s" % (filterid, mov_stacks[0][0])
+            outfile = outfile.replace("?", tag, 1)
         plt.savefig(outfile)
     if show:
         plt.show()

@@ -784,6 +784,9 @@ def test_103_plot_dvv():
         dvv_main(components="ZZ", show=False, outfile="?.png", dvvid=1)
     except (FileNotFoundError, ValueError):
         pytest.skip("No mwcs_dtt_dvv aggregate data available — run compute first")
+    # The outfile substitution replaces ? with "dvv ZZ-f<id>-mm<ms>"
+    fn = glob.glob("dvv ZZ-f*-mm*.png")
+    assert len(fn) >= 1, "Expected at least one dvv plot PNG file"
 
 @pytest.mark.order(104)
 def test_104_plot_data_availability():
