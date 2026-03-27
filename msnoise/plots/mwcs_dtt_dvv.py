@@ -30,7 +30,7 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
     """Plot network-level dv/v from the MWCS-DTT aggregate.
 
     Requires the ``mwcs_dtt_dvv`` step to have been run first
-    (``msnoise dtt compute_mwcs_dtt_dvv``).
+    (``msnoise dtt dvv compute_mwcs_dtt_dvv``).
 
     :param dvvid: ``mwcs_dtt_dvv`` config set number.
     :param stackid_item: 1-based index into ``params.mov_stack``.
@@ -80,7 +80,7 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
             except (FileNotFoundError, ValueError):
                 logger.warning(
                     "No mwcs_dtt_dvv data for mov_stack=%s comp=%s. "
-                    "Run 'msnoise dtt compute_mwcs_dtt_dvv' first." % (mov_stack, comp)
+                    "Run 'msnoise dtt dvv compute_mwcs_dtt_dvv' first." % (mov_stack, comp)
                 )
                 continue
             except Exception:
