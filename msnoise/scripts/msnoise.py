@@ -1157,6 +1157,18 @@ def plot():
     pass
 
 
+# Shared plot options — reused across all plot commands
+show_option    = click.option('-s', '--show', default=True, type=bool,
+                               help='Show figure interactively?')
+outfile_option = click.option('-o', '--outfile', default=None, type=str,
+                               help='Output filename (?=auto). Supports any matplotlib format, '
+                                    'e.g. ?.pdf for PDF with automatic naming.')
+pair_type_option = click.option('-p', '--pair_type', default="CC",
+                                 type=click.Choice(["CC", "SC", "AC"]),
+                                 help='Pair type to plot (CC/SC/AC). Default: CC')
+dvvid_option   = click.option('-D', '--dvvid', default=1,
+                               help='DVV aggregate config set number')
+
 
 @plot.command(name='data_availability')
 @click.option('-c', '--chan', default="?HZ", help="Channel, you can use the ? wildcard, e.g. '?HZ' (default) or "
@@ -1303,6 +1315,7 @@ def common_options(*decorators):
         return f
     return decorator
 
+
 # Define individual options as reusable decorators
 preprocessid_option = click.option('-p', '--preprocessid', default=1, help='Preprocessing step ID')
 ccid_option = click.option('-cc', '--ccid', default=1, help='CC step ID')
@@ -1323,17 +1336,6 @@ full_options  = common_options(stack_options, comp_option)
 mwcs_options = common_options(stack_options, mwcsid_option, comp_option)
 mwcsdtt_options = common_options(mwcs_options, mwcsdttid_option)
 
-# Shared plot options — reused across all plot commands
-show_option    = click.option('-s', '--show', default=True, type=bool,
-                               help='Show figure interactively?')
-outfile_option = click.option('-o', '--outfile', default=None, type=str,
-                               help='Output filename (?=auto). Supports any matplotlib format, '
-                                    'e.g. ?.pdf for PDF with automatic naming.')
-pair_type_option = click.option('-p', '--pair_type', default="CC",
-                                 type=click.Choice(["CC", "SC", "AC"]),
-                                 help='Pair type to plot (CC/SC/AC). Default: CC')
-dvvid_option   = click.option('-D', '--dvvid', default=1,
-                               help='DVV aggregate config set number')
 
 
 # DTT-side lineage options (preprocess → cc → filter → stack → mwcs → mwcs_dtt)
