@@ -343,7 +343,7 @@ class MSNoiseResult:
         pair: Optional[str] = None,
         components: Optional[str] = None,
         mov_stack: Optional[tuple] = None,
-        format: str = "dataframe",
+        format: str = "xarray",
     ):
         """Load cross-correlation functions from the stack step output.
 
@@ -357,7 +357,7 @@ class MSNoiseResult:
         mov_stack:
             Moving-stack tuple e.g. ``("6h", "6h")``.  If None, all stacks returned.
         format:
-            ``"dataframe"`` (default) or ``"xarray"``.
+            ``"xarray"`` (default) or ``"dataframe"``.
 
         Returns
         -------
@@ -494,14 +494,14 @@ class MSNoiseResult:
         pair: Optional[str] = None,
         components: Optional[str] = None,
         mov_stack: Optional[tuple] = None,
-        format: str = "dataframe",
+        format: str = "xarray",
     ):
         """Load MWCS results.
 
         Parameters
         ----------
         format:
-            ``"dataframe"`` (default) or ``"xarray"``.
+            ``"xarray"`` (default) or ``"dataframe"``.
 
         Returns
         -------
@@ -530,14 +530,14 @@ class MSNoiseResult:
         pair: Optional[str] = None,
         components: Optional[str] = None,
         mov_stack: Optional[tuple] = None,
-        format: str = "dataframe",
+        format: str = "xarray",
     ):
         """Load MWCS-DTT (dt/t) results.
 
         Parameters
         ----------
         format:
-            ``"dataframe"`` (default) or ``"xarray"``.
+            ``"xarray"`` (default) or ``"dataframe"``.
 
         Returns
         -------
@@ -566,14 +566,14 @@ class MSNoiseResult:
         pair: Optional[str] = None,
         components: Optional[str] = None,
         mov_stack: Optional[tuple] = None,
-        format: str = "dataframe",
+        format: str = "xarray",
     ):
         """Load stretching results.
 
         Parameters
         ----------
         format:
-            ``"dataframe"`` (default) or ``"xarray"``.
+            ``"xarray"`` (default) or ``"dataframe"``.
 
         Returns
         -------
@@ -601,14 +601,14 @@ class MSNoiseResult:
         self,
         components: Optional[str] = None,
         mov_stack: Optional[tuple] = None,
-        format: str = "dataframe",
+        format: str = "xarray",
     ):
         """Load network-aggregated dv/v results.
 
         Parameters
         ----------
         format:
-            ``"dataframe"`` (default) or ``"xarray"``.
+            ``"xarray"`` (default) or ``"dataframe"``.
 
         Returns
         -------
@@ -729,7 +729,7 @@ class MSNoiseResult:
         self,
         seed_id: Optional[str] = None,
         day: Optional[str] = None,
-        format: str = "dataframe",
+        format: str = "xarray",
     ):
         """Load daily PSD results.
 
@@ -740,7 +740,7 @@ class MSNoiseResult:
         day:
             Date string ``"YYYY-MM-DD"``.  If None, all days.
         format:
-            ``"dataframe"`` (default) or ``"xarray"``.
+            ``"xarray"`` (default) or ``"dataframe"``.
 
         Returns
         -------
@@ -787,7 +787,7 @@ class MSNoiseResult:
     def get_psd_rms(
         self,
         seed_id: Optional[str] = None,
-        format: str = "dataframe",
+        format: str = "xarray",
     ):
         """Load PSD RMS results.
 
@@ -796,7 +796,7 @@ class MSNoiseResult:
         seed_id:
             SEED identifier ``"NET.STA.LOC.CHAN"``.  If None, all channels.
         format:
-            ``"dataframe"`` (default) or ``"xarray"``.
+            ``"xarray"`` (default) or ``"dataframe"``.
 
         Returns
         -------

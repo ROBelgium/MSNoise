@@ -126,7 +126,8 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
 
         for (s1, s2) in all_pairs:
             try:
-                df = result.get_mwcs_dtt(f"{s1}:{s2}", components, mov_stack)
+                df = result.get_mwcs_dtt(f"{s1}:{s2}", components, mov_stack,
+                                          format="dataframe")
             except FileNotFoundError:
                 continue
 

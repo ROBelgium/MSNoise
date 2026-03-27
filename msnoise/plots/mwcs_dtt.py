@@ -86,7 +86,7 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
 
         for comp in comp_list:
             try:
-                stats = result.get_dvv(comp, mov_stack)
+                stats = result.get_dvv(comp, mov_stack, format="dataframe")
             except ValueError:
                 logger.warning(
                     "No mwcs_dtt data for mov_stack=%s comp=%s" % (mov_stack, comp)

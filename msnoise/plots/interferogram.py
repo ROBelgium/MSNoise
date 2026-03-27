@@ -65,7 +65,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
 
 
     try:
-        data = result.get_ccf(f"{sta1}:{sta2}", components, mov_stack)
+        data = result.get_ccf(f"{sta1}:{sta2}", components, mov_stack, format="dataframe")
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
         return

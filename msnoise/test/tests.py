@@ -1114,14 +1114,14 @@ def test_120010_msnoise_result_get_ccf():
     all_ccfs = r.get_ccf()
     assert isinstance(all_ccfs, dict)
 
-    # get_ccf with specific mov_stack → dict keyed by (pair, comp, ms) or subset
+    # get_ccf with specific mov_stack → xarray DataArray (default)
     if all_ccfs:
         first_key = next(iter(all_ccfs))
         pair_k, comp_k, ms_k = first_key
         single = r.get_ccf(pair_k, comp_k, ms_k)
-        import pandas as pd
-        assert isinstance(single, pd.DataFrame)
-        assert len(single) > 0
+        import xarray as xr
+        assert isinstance(single, xr.DataArray)
+        assert single.sizes["times"] > 0
     db.close()
 
 
@@ -1287,17 +1287,16 @@ def test_120027_msnoise_result_branches_from_stack():
 
 @pytest.mark.order(120028)
 def test_120028_msnoise_result_default_formats():
-    """Default format for get_ccf=dataframe, get_ref=xarray."""
+    """Default format for get_ccf=xarray, get_ref=xarray."""
     db = connect()
     from ..results import MSNoiseResult
-    import pandas as pd
     import xarray as xr
-    # get_ccf default = dataframe
+    # get_ccf default = xarray DataArray
     r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
     all_ccfs = r.get_ccf()
     if all_ccfs:
         v = next(iter(all_ccfs.values()))
-        assert isinstance(v, pd.DataFrame), "get_ccf default should be DataFrame"
+        assert isinstance(v, xr.DataArray), "get_ccf default should be xarray DataArray"
     # get_ref default = xarray Dataset
     r2 = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
                                  stack=1, refstack=1)
