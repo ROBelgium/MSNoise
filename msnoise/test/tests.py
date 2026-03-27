@@ -532,26 +532,14 @@ def test_032_stretching():
     db = connect()
     output_folder = get_config(db, 'output_folder') or 'OUTPUT'
     filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
-    found = False
-    for filter_step in filter_steps:
-        for sta1, sta2 in get_station_pairs(db):
-            for loc1 in sta1.locs():
-                for loc2 in sta2.locs():
-                    sta1_id = f"{sta1.net}.{sta1.sta}.{loc1}"
-                    sta2_id = f"{sta2.net}.{sta2.sta}.{loc2}"
-                    # stretching output lives at: stack_1/stretching_1/_output/<ms>/<comp>/<sta1>_<sta2>.nc
-                    path = os.path.join(
-                        output_folder, "preprocess_1", "cc_1",
-                        filter_step.step_name, "stack_1", "stretching_1",
-                        "_output"
-                    )
-                    files = glob.glob(os.path.join(path, "**", f"{sta1_id}_{sta2_id}.nc"), recursive=True)
-                    if files:
-                        found = True
-                        break
-            if found: break
-        if found: break
-    assert found, f"No stretching NetCDF output found under {output_folder}"
+    # Path: root/preprocess_1/cc_1/filter_1/stack_1/refstack_1/stretching_1/_output/<ms>/<comp>/<s1>_<s2>.nc
+    files = glob.glob(
+        os.path.join(output_folder, "preprocess_1", "cc_1",
+                     "filter_1", "stack_1", "refstack_1", "stretching_1",
+                     "_output", "**", "*.nc"),
+        recursive=True
+    )
+    assert len(files) > 0, f"No stretching NetCDF output found under {output_folder}"
     db.close()
 
 
@@ -873,8 +861,9 @@ def test_103b_plot_stretching_dvv():
         stretching_dvv_main(components="ZZ", show=False, outfile="?.png", dvvid=1)
     except (FileNotFoundError, ValueError):
         pytest.skip("No stretching_dvv aggregate data available")
-    fn = glob.glob("stretching_dvv ZZ-f*-mm*.png")
-    assert len(fn) >= 1, "Expected at least one stretching_dvv plot PNG"
+    # filename: dvvs_<comp>-f<filterid>-s<stretchingid>-dvv<dvvid>[-m<ms>].png
+    fn = glob.glob("dvvs_*.png")
+    assert len(fn) >= 1, "Expected at least one stretching_dvv plot PNG (dvvs_*.png)"
 
 @pytest.mark.order(103)
 def test_103c_plot_wavelet_dtt_dvv():
@@ -884,8 +873,9 @@ def test_103c_plot_wavelet_dtt_dvv():
                              show=False, outfile="?.png", dvvid=1)
     except (FileNotFoundError, ValueError):
         pytest.skip("No wavelet_dtt_dvv aggregate data available")
-    fn = glob.glob("wavelet_dtt_dvv ZZ-f*-mm*.png")
-    assert len(fn) >= 1, "Expected at least one wavelet_dtt_dvv plot PNG"
+    # filename: wct_timeseries_<comp>-f<filterid>-w<wctid>-d<dttid>[-m<ms>].png
+    fn = glob.glob("wct_*.png")
+    assert len(fn) >= 1, "Expected at least one wavelet_dtt_dvv plot PNG (wct_*.png)"
 
 @pytest.mark.order(104)
 def test_104_plot_data_availability():

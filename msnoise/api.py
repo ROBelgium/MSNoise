@@ -1572,8 +1572,6 @@ def get_job_types(session, jobtype):
     :returns: List of (count, flag) pairs
     """
     from sqlalchemy import func
-    schema = declare_tables()
-    Job = schema.Job
     rows = (session.query(func.count(Job.flag), Job.flag)
             .filter(Job.jobtype == jobtype)
             .group_by(Job.flag)
