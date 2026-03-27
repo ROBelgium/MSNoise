@@ -1,7 +1,7 @@
 import time
 
 import numpy as np
-import pandas as pd
+import xarray as xr
 from obspy.signal.regression import linear_regression
 from .api import (
     connect,
@@ -75,27 +75,32 @@ def main(loglevel="INFO"):
             "There are DTT jobs for some days to recompute for %s" % pair)
         for components in components_to_compute:
             for mov_stack in mov_stacks:
-                output = []
                 try:
-                    mwcs = xr_get_mwcs(params.output_folder, lineage_names,
-                                        station1, station2, components, mov_stack,
-                                        format="dataframe")
+                    ds = xr_get_mwcs(params.output_folder, lineage_names,
+                                     station1, station2, components, mov_stack)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
-                # todo = mwcs.index.intersection(pd.to_datetime(days))
-                # mwcs = mwcs.loc[todo]
-                # mwcs = mwcs.dropna()
 
+                # ── Time filtering ───────────────────────────────────────
                 to_search = extend_days(days)
-                mwcs = mwcs[mwcs.index.floor('d').isin(to_search)]
-                mwcs = mwcs.dropna()
+                times_floor = ds.coords["times"].values.astype("datetime64[D]")
+                mask = np.isin(times_floor, np.array(list(to_search), dtype="datetime64[D]"))
+                ds = ds.isel(times=mask)
+                # Drop times where all MWCS values are NaN
+                ds = ds.dropna("times", how="all")
+                if ds.sizes["times"] == 0:
+                    continue
 
-                M = mwcs.xs("M", level=0, axis=1).copy()
-                EM = mwcs.xs("EM", level=0, axis=1).copy()
-                MCOH = mwcs.xs("MCOH", level=0, axis=1).copy()
-                tArray = M.columns.values
+                # ── Extract per-key arrays: shape (times, taxis) ─────────
+                da = ds["MWCS"]  # dims: (times, taxis, keys)
+                M    = da.sel(keys="M").values.copy()     # (times, taxis)
+                EM   = da.sel(keys="EM").values.copy()
+                MCOH = da.sel(keys="MCOH").values.copy()
+                tArray = da.coords["taxis"].values        # (taxis,)
+                times  = ds.coords["times"].values
 
+                # ── Lag window masking ───────────────────────────────────
                 if params.dtt_lag == "static":
                     lmlag = -params.dtt_minlag
                     rmlag = params.dtt_minlag
@@ -107,61 +112,80 @@ def main(loglevel="INFO"):
 
                 if params.dtt_sides == "both":
                     tindex = np.where(
-                        ((tArray >= lMlag) & (tArray <= lmlag)) | (
-                                    (tArray >= rmlag) & (tArray <= rMlag)))[
-                        0]
+                        ((tArray >= lMlag) & (tArray <= lmlag)) |
+                        ((tArray >= rmlag) & (tArray <= rMlag)))[0]
                 elif params.dtt_sides == "left":
-                    tindex = \
-                    np.where((tArray >= lMlag) & (tArray <= lmlag))[0]
+                    tindex = np.where((tArray >= lMlag) & (tArray <= lmlag))[0]
                 else:
-                    tindex = \
-                    np.where((tArray >= rmlag) & (tArray <= rMlag))[0]
+                    tindex = np.where((tArray >= rmlag) & (tArray <= rMlag))[0]
+
                 tmp = np.setdiff1d(np.arange(len(tArray)), tindex)
-                EM.iloc[:, tmp] = 1.0
-                MCOH.iloc[:, tmp] *= 0.0
+                EM[:, tmp]   = 1.0
+                MCOH[:, tmp] = 0.0
 
                 MCOH[MCOH < params.dtt_mincoh] = 0.0
                 if params.dtt_maxerr > 0:
                     EM[EM > params.dtt_maxerr] = 1.0
 
-                #compute dt/t and exclude values exceeding dtt_maxdtt
+                # Exclude values exceeding dtt_maxdtt
                 dtt_values = np.abs(M / tArray)
-                invalid_dtt_indices = np.where(dtt_values > params.dtt_maxdtt)
-                row_indices, col_indices = invalid_dtt_indices
+                row_indices, col_indices = np.where(dtt_values > params.dtt_maxdtt)
+                EM[row_indices, col_indices]   = 1.0
+                MCOH[row_indices, col_indices] = 0.0
 
-                for r, c in zip(row_indices, col_indices):
-                    EM.iloc[r, c] = 1.0
-                    MCOH.iloc[r, c] = 0.0
+                # ── Row-by-row WLS regression ────────────────────────────
+                m_vals  = []
+                em_vals = []
+                a_vals  = []
+                ea_vals = []
+                m0_vals = []
+                em0_vals = []
+                out_times = []
 
-                values = []
-                dates = []
-                for i in range(len(M.index)):
-                    errArray = EM.iloc[i]
-                    dtArray = M.iloc[i]
-                    cohArray = MCOH.iloc[i]
+                for i in range(len(times)):
+                    errArray = EM[i]
+                    dtArray  = M[i]
+                    cohArray = MCOH[i]
 
                     index = np.where((errArray != 1.0) & (cohArray != 0.0))[0]
-                    errArray = errArray.iloc[index]
-                    dtArray = dtArray.iloc[index]
+                    if len(index) < 2:
+                        continue
 
-                    w = 1.0 / errArray
+                    w = 1.0 / errArray[index]
                     w[~np.isfinite(w)] = 1.0
                     VecXfilt = tArray[index]
-                    VecYfilt = dtArray
-                    if len(VecYfilt) >= 2:
-                        m, a, em, ea = linear_regression(
-                            VecXfilt, VecYfilt, w,
-                            intercept_origin=False)
-                        m0, em0 = linear_regression(
-                            VecXfilt, VecYfilt, w,
-                            intercept_origin=True)
-                        values.append([m, em, a, ea, m0, em0])
-                        dates.append(M.index[i])
-                output = pd.DataFrame(values, index=dates,
-                                    columns=["m", "em", "a", "ea", "m0", "em0"])
+                    VecYfilt = dtArray[index]
 
+                    m, a, em, ea = linear_regression(
+                        VecXfilt, VecYfilt, w, intercept_origin=False)
+                    m0, em0 = linear_regression(
+                        VecXfilt, VecYfilt, w, intercept_origin=True)
+
+                    m_vals.append(m);   em_vals.append(em)
+                    a_vals.append(a);   ea_vals.append(ea)
+                    m0_vals.append(m0); em0_vals.append(em0)
+                    out_times.append(times[i])
+
+                if not out_times:
+                    continue
+
+                # ── Build output Dataset ─────────────────────────────────
+                out_times = np.array(out_times)
+                ds_out = xr.Dataset(
+                    {
+                        "DTT": xr.DataArray(
+                            np.column_stack([m_vals, em_vals, a_vals,
+                                            ea_vals, m0_vals, em0_vals]),
+                            dims=["times", "keys"],
+                            coords={
+                                "times": out_times,
+                                "keys":  ["m", "em", "a", "ea", "m0", "em0"],
+                            },
+                        )
+                    }
+                )
                 xr_save_dtt(params.output_folder, lineage_names, step.step_name,
-                             station1, station2, components, mov_stack, output)
+                            station1, station2, components, mov_stack, ds_out)
 
         massive_update_job(db, jobs, "D")
 
