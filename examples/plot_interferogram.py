@@ -14,43 +14,36 @@ import matplotlib
 matplotlib.use("agg")
 
 import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from pandas.plotting import register_matplotlib_converters
-register_matplotlib_converters()
 
 plt.style.use("ggplot")
 
-from msnoise.api import connect, get_results, build_movstack_datelist, get_params, get_t_axis, xr_get_ccf
+from msnoise.api import connect
+from msnoise.results import MSNoiseResult
 
 # connect to the database
 db = connect()
 
-# Obtain a list of dates between ``start_date`` and ``enddate``
-start, end, datelist = build_movstack_datelist(db)
-
-# Get the list of parameters from the DB:
-params = get_params(db)
-
-# Get the time axis for plotting the CCF:
-taxis = get_t_axis(db)
+# Build a result object at the default stack step
+result = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
+params = result.params
 
 # Get the first mov_stack configured:
 mov_stack = params.mov_stack[0]
 
-# Get the results for two station, filter id=1, ZZ component, mov_stack=1 and the results as a 2D array:
-ccf = xr_get_ccf("PF.FJS.00", "PF.FOR.00", "ZZ", 1, mov_stack, taxis, format="xarray")
+# Get the CCF for two stations, filter 1, ZZ component, first mov_stack:
+ccf = result.get_ccf(pair="PF.FJS.00:PF.FOR.00", components="ZZ",
+                     mov_stack=mov_stack, format="xarray")
 
 # Plot the interferogram
-ccf.plot(robust=True, figsize=(10,8))
+ccf.plot(robust=True, figsize=(10, 8))
 
 
 ##############################################################################
-# Running a simple moving window average can be done with pandas's functions:
+# Running a simple moving window average can be done with xarray's rolling:
 
 smooth = ccf.rolling(times=5).mean()
 
-smooth.plot(robust=True, figsize=(10,8))
+smooth.plot(robust=True, figsize=(10, 8))
 
 
 #############################################################
@@ -63,16 +56,16 @@ if "SPHINX_DOC_BUILD" in os.environ:
 # Get the last mov_stack configured:
 mov_stack = params.mov_stack[-1]
 
-# Get the results for two station, filter id=1, ZZ component, mov_stack=1 and the results as a 2D array:
-ccf = xr_get_ccf("PF.FJS.00", "PF.FOR.00", "ZZ", 1, mov_stack, taxis, format="xarray")
+ccf = result.get_ccf(pair="PF.FJS.00:PF.FOR.00", components="ZZ",
+                     mov_stack=mov_stack, format="xarray")
 
-# Plot the interferogram and zoom in around +- 10 seconds lag
-ccf.loc[:,-20:20].plot(robust=True, figsize=(10,8))
+# Plot and zoom to +-20 seconds lag
+ccf.loc[:, -20:20].plot(robust=True, figsize=(10, 8))
 
 
 #############################################################
 # Finally, stacking to a Reference function
 
-ccf.mean(axis=0).plot(figsize=(10,8))
+ccf.mean(axis=0).plot(figsize=(10, 8))
 
 #EOF

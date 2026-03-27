@@ -3,6 +3,7 @@ import copy
 import datetime
 import itertools
 import logging
+import warnings
 import os
 import glob
 import traceback
@@ -863,6 +864,7 @@ def azimuth(coordinates, x0, y0, x1, y1):
     :rtype: float
     :returns: The azimuth in degrees
     """
+    warnings.warn("azimuth() is deprecated and will be removed in a future MSNoise release.", DeprecationWarning, stacklevel=2)
     from obspy.geodetics import gps2dist_azimuth
     if coordinates == "DEG":
         dist, azim, bazim = gps2dist_azimuth(y0, x0, y1, x1)
@@ -2374,6 +2376,7 @@ def get_maxlag_samples(maxlag, cc_sampling_rate):
     :rtype: int
     :returns: the length of the CCF in samples
     """
+    warnings.warn("get_maxlag_samples() is deprecated; use int(2*maxlag*cc_sampling_rate)+1 directly.", DeprecationWarning, stacklevel=2)
 
     return int(2*maxlag*cc_sampling_rate)+1
 
@@ -2771,6 +2774,7 @@ def wavg_wstd(data, errors):
     :param errors: 1-D array of measurement errors (zeros replaced by ``1e-6``).
     :returns: ``(weighted_mean, weighted_std)`` as floats.
     """
+    warnings.warn("wavg_wstd() is deprecated; use aggregate_dvv_pairs() for network dv/v statistics.", DeprecationWarning, stacklevel=2)
     errors = np.where(errors == 0, 1e-6, errors)
     w = 1.0 / errors
     wavg = (data * w).sum() / w.sum()
@@ -2789,6 +2793,7 @@ def wavg(group, dttname, errname):
     :return: The weighted average of the data.
 
     """
+    warnings.warn("wavg() is deprecated; use aggregate_dvv_pairs() for network dv/v statistics.", DeprecationWarning, stacklevel=2)
     d = group[dttname]
     group.loc[group[errname] == 0,errname] = 1e-6
     w = 1. / group[errname]
@@ -2819,6 +2824,7 @@ def wstd(group, dttname, errname):
 
     Note: This method uses the `np` module from NumPy.
     """
+    warnings.warn("wstd() is deprecated; use aggregate_dvv_pairs() for network dv/v statistics.", DeprecationWarning, stacklevel=2)
     d = group[dttname]
     group.loc[group[errname] == 0,errname] = 1e-6
     w = 1. / group[errname]
@@ -3224,6 +3230,7 @@ def make_same_length(st):
     This function takes a stream of equal sampling rate and makes sure that all
     channels have the same length and the same gaps.
     """
+    warnings.warn("make_same_length() is deprecated and will be removed in a future MSNoise release.", DeprecationWarning, stacklevel=2)
     from obspy import Stream
     # Merge traces
     st.merge()
@@ -3449,6 +3456,10 @@ def get_results(session, station1, station2, filterid, components, dates,
     :return: Either a 1D CCF (if format is ``stack`` or a 2D array (if format=
         ``matrix``).
     """
+    warnings.warn(
+        "get_results() is deprecated; use xr_get_ccf() or MSNoiseResult.get_ccf() instead.",
+        DeprecationWarning, stacklevel=2
+    )
     from obspy import read
     if not params:
         export_format = get_config(session, 'export_format')
@@ -3935,6 +3946,7 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
 
 
 def get_extension(export_format):
+    warnings.warn("get_extension() is deprecated and will be removed in a future MSNoise release.", DeprecationWarning, stacklevel=2)
     if export_format == "BOTH":
         return ".MSEED"
     elif export_format == "SAC":
@@ -4497,6 +4509,7 @@ def psd_dfrms(a):
     :param a: :class:`pandas.Series` whose index is period values.
     :returns: Square-root of the integrated power (RMS-equivalent).
     """
+    warnings.warn("psd_dfrms() is deprecated and will be removed in a future MSNoise release.", DeprecationWarning, stacklevel=2)
     return np.sqrt(np.trapezoid(a.values, a.index))
 
 
