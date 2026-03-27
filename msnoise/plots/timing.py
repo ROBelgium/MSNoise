@@ -16,11 +16,11 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 
 from ..api import (
-    connect, get_params, get_logger, build_movstack_datelist,
-    get_config, get_config_set_details,
-    get_done_lineages_for_category, get_station_pairs, xr_get_dtt,
-    resolve_lineage_params,
+    connect, get_logger, build_movstack_datelist,
+    get_config_set_details,
+    get_station_pairs,
 )
+from ..results import MSNoiseResult
 
 
 def main(mov_stackid=None, dttname="m", components="ZZ",
@@ -44,40 +44,40 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
     """
     logger = get_logger("msnoise.cc_dtt_plot_timing", loglevel, with_pid=True)
     db = connect()
-    params = get_params(db)
-    root = get_config(db, "output_folder") or "OUTPUT"
 
     # ------------------------------------------------------------------ #
-    # Resolve lineage                                                      #
+    # Resolve lineage via MSNoiseResult                                    #
     # ------------------------------------------------------------------ #
-    all_lineages = get_done_lineages_for_category(db, "mwcs_dtt")
-    if not all_lineages:
+    filter_step = f"filter_{filterid}"
+    mwcs_step   = f"mwcs_{mwcsid}"
+    dtt_step    = f"mwcs_dtt_{dttid}"
+
+    all_results = MSNoiseResult.list(db, "mwcs_dtt")
+    if not all_results:
         logger.error("No completed mwcs_dtt jobs found in the database.")
         return
 
-    filter_step   = "filter_%i"   % filterid
-    mwcs_step     = "mwcs_%i"     % mwcsid
-    dtt_step      = "mwcs_dtt_%i" % dttid
-    lineage = None
-    for lin in all_lineages:
-        if filter_step in lin and mwcs_step in lin and lin[-1] == dtt_step:
-            lineage = lin
-            break
-
-    if lineage is None:
+    result = next(
+        (r for r in all_results
+         if filter_step in r.lineage_names
+         and mwcs_step in r.lineage_names
+         and r.lineage_names[-1] == dtt_step),
+        None
+    )
+    if result is None:
         logger.error(
             f"No completed mwcs_dtt lineage for filter_{filterid}/mwcs_{mwcsid}/mwcs_dtt_{dttid}. "
-            f"Available: {['/'.join(l) for l in all_lineages]}"
+            f"Available: {['/'.join(r.lineage_names) for r in all_results]}"
         )
         return
 
-    logger.info(f"Using lineage: {'/'.join(lineage)}")
+    logger.info(f"Using lineage: {'/'.join(result.lineage_names)}")
+    params = result.params
 
     # ------------------------------------------------------------------ #
     # Moving stacks                                                        #
     # ------------------------------------------------------------------ #
     build_movstack_datelist(db)
-    _, _, params = resolve_lineage_params(db, lineage)
 
     if mov_stackid and mov_stackid != 0:
         mov_stacks = [params.mov_stack[mov_stackid - 1]]
@@ -126,7 +126,7 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
 
         for (s1, s2) in all_pairs:
             try:
-                df = xr_get_dtt(root, lineage, s1, s2, components, mov_stack)
+                df = result.get_mwcs_dtt(f"{s1}:{s2}", components, mov_stack)
             except FileNotFoundError:
                 continue
 

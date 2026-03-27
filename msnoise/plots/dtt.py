@@ -19,11 +19,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ..api import (
-    connect, get_params, get_logger,
+    connect, get_logger,
     get_station, get_interstation_distance, check_stations_uniqueness,
-    xr_get_mwcs, xr_get_dtt,
-    resolve_lineage_from_ids,
 )
+from ..results import MSNoiseResult
 
 def main(sta1, sta2, filterid=1, components="ZZ", day=None,
          preprocessid=1, ccid=1, stackid=1, stackid_item=1,
@@ -48,7 +47,6 @@ def main(sta1, sta2, filterid=1, components="ZZ", day=None,
     """
     logger = get_logger("msnoise.cc_dtt_plot_dtt", loglevel, with_pid=True)
     db = connect()
-    params = get_params(db)
 
     if sta2 < sta1:
         logger.error("Stations STA1 STA2 should be sorted alphabetically")
@@ -57,12 +55,18 @@ def main(sta1, sta2, filterid=1, components="ZZ", day=None,
     sta1 = check_stations_uniqueness(db, sta1)
     sta2 = check_stations_uniqueness(db, sta2)
 
-    # Resolve MWCS lineage (for raw scatter points)
-    mwcs_lineage, params = resolve_lineage_from_ids(db, params, preprocessid=preprocessid, ccid=ccid, filterid=filterid, stackid=stackid, mwcsid=mwcsid)
+    # MWCS result — for raw scatter points
+    mwcs_result = MSNoiseResult.from_ids(db, preprocess=preprocessid, cc=ccid,
+                                         filter=filterid, stack=stackid,
+                                         refstack=1, mwcs=mwcsid)
+    params = mwcs_result.params
     mov_stack = params.mov_stack[stackid_item - 1]
 
-    # Resolve DTT lineage (for regression lines)
-    dtt_lineage, _ = resolve_lineage_from_ids(db, params, preprocessid=preprocessid, ccid=ccid, filterid=filterid, stackid=stackid, mwcsid=mwcsid, mwcsdttid=mwcsdttid)
+    # DTT result — for regression lines
+    dtt_result = MSNoiseResult.from_ids(db, preprocess=preprocessid, cc=ccid,
+                                        filter=filterid, stack=stackid,
+                                        refstack=1, mwcs=mwcsid,
+                                        mwcs_dtt=mwcsdttid)
 
     # DTT lag window params
     dtt_lag    = getattr(params, "dtt_lag",    "static")
@@ -82,8 +86,7 @@ def main(sta1, sta2, filterid=1, components="ZZ", day=None,
     # --- Load MWCS for the requested day ---
     logger.info(f"Loading MWCS for {sta1}-{sta2} comp={components} day={day} mov={mov_stack}")
     try:
-        mwcs_all = xr_get_mwcs(params.output_folder, mwcs_lineage,
-                                  sta1, sta2, components, mov_stack)
+        mwcs_all = mwcs_result.get_mwcs(f"{sta1}:{sta2}", components, mov_stack)
     except FileNotFoundError as fp:
         logger.error(f"MWCS FILE DOES NOT EXIST: {fp}")
         return
@@ -101,8 +104,7 @@ def main(sta1, sta2, filterid=1, components="ZZ", day=None,
 
     # --- Load DTT regression for the requested day ---
     try:
-        dtt_all = xr_get_dtt(params.output_folder, dtt_lineage,
-                               sta1, sta2, components, mov_stack)
+        dtt_all = dtt_result.get_mwcs_dtt(f"{sta1}:{sta2}", components, mov_stack)
     except FileNotFoundError as fp:
         logger.error(f"DTT FILE DOES NOT EXIST: {fp}")
         dtt_all = None

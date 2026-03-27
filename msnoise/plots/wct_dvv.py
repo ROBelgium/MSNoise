@@ -26,17 +26,17 @@ import matplotlib.dates as mdates
 from matplotlib.dates import DateFormatter
 
 from ..api import (
-    connect, get_params, get_logger, build_movstack_datelist,
-    get_done_lineages_for_category, compute_dtt_wct, xr_get_wct_dtt,
-    resolve_lineage_params,
-    get_config, get_config_set_details, get_station_pairs,
+    connect, get_logger, build_movstack_datelist,
+    compute_dtt_wct,
+    get_station_pairs,
 )
+from ..results import MSNoiseResult
 
 
-def _plot_timeseries(db, root, lineage, mov_stacks, comp_list,
-                     filterid, wctid, dttid, freqmin, freqmax,
-                     params, logger):
+def _plot_timeseries(result, mov_stacks, comp_list,
+                     filterid, wctid, dttid, freqmin, freqmax, logger):
     """Weighted-mean dv/v timeseries, one subplot per moving stack."""
+    params = result.params
     low = params.freqmin
     high = params.freqmax
 
@@ -51,7 +51,7 @@ def _plot_timeseries(db, root, lineage, mov_stacks, comp_list,
         for comp in comp_list:
             try:
                 stats = compute_dtt_wct(
-                    db, root, lineage, mov_stack,
+                    None, result.output_folder, result.lineage_names, mov_stack,
                     components=comp, params=params,
                     freqmin=freqmin, freqmax=freqmax,
                 )
@@ -60,7 +60,6 @@ def _plot_timeseries(db, root, lineage, mov_stacks, comp_list,
                 continue
 
             t = stats.index
-            # WCT stores dt/t; dv/v = -dt/t (same sign convention as MWCS plot)
             ax.plot(t, -100*stats[("dtt", "weighted_mean")],
                     label="%s: weighted mean" % comp)
             ax.plot(t, -100*stats[("dtt", "mean")],
@@ -96,9 +95,9 @@ def _plot_timeseries(db, root, lineage, mov_stacks, comp_list,
     return fig
 
 
-def _plot_heatmap(db, root, lineage, mov_stack, comp, logger):
+def _plot_heatmap(result, mov_stack, comp, logger):
     """2-D time × frequency heatmap for the first available pair."""
-    # Find first pair that has data
+    db = result._db
     ds = None
     pair_label = ""
     for sta1, sta2 in get_station_pairs(db):
@@ -107,7 +106,7 @@ def _plot_heatmap(db, root, lineage, mov_stack, comp, logger):
             for loc2 in sta2.locs():
                 s2 = "%s.%s.%s" % (sta2.net, sta2.sta, loc2)
                 try:
-                    ds = xr_get_wct_dtt(root, lineage, s1, s2, comp, mov_stack)
+                    ds = result.get_wct_dtt(f"{s1}:{s2}", comp, mov_stack)
                     pair_label = "%s – %s" % (s1, s2)
                     break
                 except FileNotFoundError:
@@ -180,43 +179,42 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
     """
     logger = get_logger("msnoise.cc_dtt_plot_wct", loglevel, with_pid=True)
     db = connect()
-    params = get_params(db)
-    root = get_config(db, "output_folder") or "OUTPUT"
 
     # ------------------------------------------------------------------ #
-    # Resolve lineage                                                      #
+    # Resolve lineage via MSNoiseResult                                    #
     # ------------------------------------------------------------------ #
-    all_lineages = get_done_lineages_for_category(db, "wavelet_dtt")
-    if not all_lineages:
+    filter_step  = f"filter_{filterid}"
+    wct_step     = f"wavelet_{wctid}"
+    wct_dtt_step = f"wavelet_dtt_{dttid}"
+
+    all_results = MSNoiseResult.list(db, "wavelet_dtt")
+    if not all_results:
         logger.error("No completed wavelet_dtt jobs found in the database.")
         return
 
-    filter_step = "filter_%i" % filterid
-    wct_step = "wavelet_%i" % wctid
-    wct_dtt_step = "wavelet_dtt_%i" % dttid
-    lineage = None
-    for lin in all_lineages:
-        if (filter_step in lin and wct_step in lin
-                and lin[-1] == wct_dtt_step):
-            lineage = lin
-            break
-
-    if lineage is None:
+    result = next(
+        (r for r in all_results
+         if filter_step in r.lineage_names
+         and wct_step in r.lineage_names
+         and r.lineage_names[-1] == wct_dtt_step),
+        None
+    )
+    if result is None:
         logger.error(
             "No completed wavelet_dtt lineage found for "
             "filter_%i / wavelet_%i / wavelet_dtt_%i. Available: %s",
             filterid, wctid, dttid,
-            ["/".join(l) for l in all_lineages],
+            ["/".join(r.lineage_names) for r in all_results],
         )
         return
 
-    logger.info("Using lineage: %s" % "/".join(lineage))
+    logger.info("Using lineage: %s" % "/".join(result.lineage_names))
+    params = result.params
 
     # ------------------------------------------------------------------ #
     # Moving stacks                                                        #
     # ------------------------------------------------------------------ #
     build_movstack_datelist(db)
-    _, _, params = resolve_lineage_params(db, lineage)
 
     if mov_stackid and mov_stackid != 0:
         mov_stacks = [params.mov_stack[mov_stackid - 1]]
@@ -239,12 +237,11 @@ def main(mov_stackid=0, components="ZZ", filterid=1, wctid=1, dttid=1,
     # Dispatch to plot style                                               #
     # ------------------------------------------------------------------ #
     if visualize == "heatmap":
-        fig = _plot_heatmap(db, root, lineage, mov_stacks[0],
-                            comp_list[0], logger)
+        fig = _plot_heatmap(result, mov_stacks[0], comp_list[0], logger)
     else:
-        fig = _plot_timeseries(db, root, lineage, mov_stacks, comp_list,
+        fig = _plot_timeseries(result, mov_stacks, comp_list,
                                filterid, wctid, dttid,
-                               freqmin, freqmax, params, logger)
+                               freqmin, freqmax, logger)
 
     if fig is None:
         return

@@ -16,11 +16,11 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 
 from ..api import (
-    connect, get_params, get_logger, build_movstack_datelist,
-    get_done_lineages_for_category, compute_dtt_stretching,
-    resolve_lineage_params,
-    get_config, get_config_set_details,
+    connect, get_logger, build_movstack_datelist,
+    compute_dtt_stretching,
+    get_config_set_details,
 )
+from ..results import MSNoiseResult
 
 
 def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
@@ -39,39 +39,38 @@ def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
     """
     logger = get_logger("msnoise.cc_dtt_plot_dvvs", loglevel, with_pid=True)
     db = connect()
-    params = get_params(db)
-    root = get_config(db, "output_folder") or "OUTPUT"
 
     # ------------------------------------------------------------------ #
-    # Resolve lineage                                                      #
+    # Resolve lineage via MSNoiseResult                                    #
     # ------------------------------------------------------------------ #
-    all_lineages = get_done_lineages_for_category(db, "stretching")
-    if not all_lineages:
+    filter_step = f"filter_{filterid}"
+    stretching_step = f"stretching_{stretchingid}"
+
+    all_results = MSNoiseResult.list(db, "stretching")
+    if not all_results:
         logger.error("No completed stretching jobs found in the database.")
         return
 
-    filter_step = "filter_%i" % filterid
-    stretching_step = "stretching_%i" % stretchingid
-    lineage = None
-    for lin in all_lineages:
-        if filter_step in lin and lin[-1] == stretching_step:
-            lineage = lin
-            break
-
-    if lineage is None:
+    result = next(
+        (r for r in all_results
+         if filter_step in r.lineage_names and r.lineage_names[-1] == stretching_step),
+        None
+    )
+    if result is None:
         logger.error(
             f"No completed stretching lineage found for filter_{filterid} / stretching_{stretchingid}. "
-            f"Available: {['/'.join(l) for l in all_lineages]}"
+            f"Available: {['/'.join(r.lineage_names) for r in all_results]}"
         )
         return
 
-    logger.info(f"Using lineage: {'/'.join(lineage)}")
+    logger.info(f"Using lineage: {'/'.join(result.lineage_names)}")
+    params = result.params
+    root = result.output_folder
 
     # ------------------------------------------------------------------ #
     # Moving stacks                                                        #
     # ------------------------------------------------------------------ #
     build_movstack_datelist(db)
-    _, _, params = resolve_lineage_params(db, lineage)
 
     if mov_stackid and mov_stackid != 0:
         mov_stacks = [params.mov_stack[mov_stackid - 1]]
@@ -103,7 +102,7 @@ def main(mov_stackid=None, components="ZZ", filterid=1, stretchingid=1,
         for comp in comp_list:
             try:
                 stats = compute_dtt_stretching(
-                    db, root, lineage, mov_stack,
+                    db, root, result.lineage_names, mov_stack,
                     components=comp, params=params,
                 )
             except ValueError:

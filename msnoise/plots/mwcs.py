@@ -23,10 +23,10 @@ from matplotlib.dates import date2num, AutoDateFormatter, AutoDateLocator
 import numpy as np
 
 from ..api import (
-    connect, get_params, get_logger,
+    connect, get_logger,
     get_station, get_interstation_distance, check_stations_uniqueness,
-    xr_get_mwcs, resolve_lineage_from_ids,
 )
+from ..results import MSNoiseResult
 
 def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
          stackid_item=1, refstackid=1, mwcsid=1, mwcsdttid=1,
@@ -41,6 +41,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
     :param stackid: Stack step set number.
     :param stackid_item: 1-based index into ``params.mov_stack``.
     :param mwcsid: MWCS step set number.
+    :param mwcsdttid: MWCS-DTT step set number (used for DTT lag window params).
     :param components: Component pair string (e.g. ``'ZZ'``).
     :param show: Display the figure interactively.
     :param outfile: Save path (``?`` = auto-name).
@@ -48,15 +49,20 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
     """
     logger = get_logger("msnoise.cc_dtt_plot_mwcs", loglevel, with_pid=True)
     db = connect()
-    params = get_params(db)
 
-    lineage_steps, lineage_names, dtt_params = resolve_lineage_from_ids(db, params, preprocessid=preprocessid,
-                                                                    ccid=ccid, filterid=filterid, stackid=stackid,
-                                                                    refstackid=refstackid, mwcsid=mwcsid, mwcsdttid=mwcsdttid)
+    # Full lineage including mwcs_dtt — for DTT lag window params
+    dtt_result = MSNoiseResult.from_ids(db, preprocess=preprocessid, cc=ccid,
+                                        filter=filterid, stack=stackid,
+                                        refstack=refstackid, mwcs=mwcsid,
+                                        mwcs_dtt=mwcsdttid)
+    dtt_params = dtt_result.params
 
-    lineage_steps, lineage_names, params = resolve_lineage_from_ids(db, params, preprocessid=preprocessid, ccid=ccid, filterid=filterid, stackid=stackid, refstackid=refstackid, mwcsid=mwcsid)
+    # MWCS-only lineage for data loading
+    result = MSNoiseResult.from_ids(db, preprocess=preprocessid, cc=ccid,
+                                    filter=filterid, stack=stackid,
+                                    refstack=refstackid, mwcs=mwcsid)
+    params = result.params
 
-    print(type(stackid_item), stackid_item)
     mov_stack = params.mov_stack[stackid_item-1]
 
     if sta2 < sta1:
@@ -88,11 +94,10 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
         for v in (mn, -mn, mx, -mx):
             plt.axhline(v, c="g", lw=0.8)
 
-    logger.info(f"Loading MWCS for {sta1}-{sta2} comp={components} mov_stack={mov_stack} lineage={'/'.join(lineage_names)}")
+    logger.info(f"Loading MWCS for {sta1}-{sta2} comp={components} mov_stack={mov_stack} lineage={'/'.join(result.lineage_names)}")
 
     try:
-        mwcs = xr_get_mwcs(params.output_folder, lineage_names,
-                             sta1, sta2, components, mov_stack)
+        mwcs = result.get_mwcs(f"{sta1}:{sta2}", components, mov_stack)
     except FileNotFoundError as fp:
         logger.error(f"FILE DOES NOT EXIST: {fp}")
         return
