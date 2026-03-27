@@ -3278,7 +3278,7 @@ def make_same_length(st):
 # ── Core helpers ───────────────────────────────────────────
 
 
-def xr_create_or_open(fn, taxis=[], name="CCF"):
+def _xr_create_or_open(fn, taxis=[], name="CCF"):
     if os.path.isfile(fn):
         # load_dataset works (it loads content in mem and closes, open_dataset
         # failed, the file handle was still open and it failed later.
@@ -3333,12 +3333,12 @@ def xr_create_or_open(fn, taxis=[], name="CCF"):
     return dr.to_dataset()
 
 
-def xr_insert_or_update(dataset, new):
+def _xr_insert_or_update(dataset, new):
     tt = new.merge(dataset, compat='override', combine_attrs="drop_conflicts")
     return tt.combine_first(dataset)
 
 
-def xr_save_and_close(dataset, fn):
+def _xr_save_and_close(dataset, fn):
     if not os.path.isdir(os.path.split(fn)[0]):
         os.makedirs(os.path.split(fn)[0], exist_ok=True)
     dataset.to_netcdf(fn, mode="w")
@@ -3354,12 +3354,12 @@ def xr_save_ccf(root, lineage, step_name, station1, station2, components, mov_st
     fn = "%s_%s.nc" % (station1, station2)
     fullpath = os.path.join(path, fn)
     if overwrite:
-        xr_save_and_close(new, fullpath)
+        _xr_save_and_close(new, fullpath)
     else:
-        dr = xr_create_or_open(fullpath, taxis, name="CCF")
-        dr = xr_insert_or_update(dr, new)
+        dr = _xr_create_or_open(fullpath, taxis, name="CCF")
+        dr = _xr_insert_or_update(dr, new)
         dr = dr.sortby("times")
-        xr_save_and_close(dr, fullpath)
+        _xr_save_and_close(dr, fullpath)
         return dr
 
 
@@ -3380,7 +3380,7 @@ def xr_get_ccf(root, lineage, station1, station2, components, mov_stack, taxis, 
     fullpath = os.path.join(path, fn)
     if not os.path.isfile(fullpath):
         raise FileNotFoundError(fullpath)
-    data = xr_create_or_open(fullpath, taxis, name="CCF")
+    data = _xr_create_or_open(fullpath, taxis, name="CCF")
     if format in ("dataset", "xarray"):
         return data.CCF
     # ── DataFrame (legacy) ──────────────────────────────────────────────
@@ -3393,11 +3393,11 @@ def xr_save_ref(root, lineage, step_name, station1, station2, components, taxis,
     fn = "%s_%s.nc" % (station1, station2)
     fullpath = os.path.join(path, fn)
     if overwrite:
-        xr_save_and_close(new, fullpath)
+        _xr_save_and_close(new, fullpath)
     else:
-        dr = xr_create_or_open(fullpath, taxis, name="REF")
-        dr = xr_insert_or_update(dr, new)
-        xr_save_and_close(dr, fullpath)
+        dr = _xr_create_or_open(fullpath, taxis, name="REF")
+        dr = _xr_insert_or_update(dr, new)
+        _xr_save_and_close(dr, fullpath)
         return dr
 
 
@@ -3423,7 +3423,7 @@ def xr_get_ref(root, lineage, station1, station2, components, taxis, ignore_netw
         if not os.path.isfile(fullpath):
             # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
             raise FileNotFoundError(fullpath)
-    data = xr_create_or_open(fullpath, taxis, name="REF")
+    data = _xr_create_or_open(fullpath, taxis, name="REF")
     return data
 
 
@@ -3586,9 +3586,9 @@ def xr_save_mwcs(root, lineage, step_name, station1, station2, components, mov_s
                        "%s" % components,
                        "%s_%s.nc" % (station1, station2))
     os.makedirs(os.path.split(fn)[0], exist_ok=True)
-    dr = xr_create_or_open(fn, taxis=dataset.coords.get("taxis", taxis), name="MWCS")
-    rr = xr_insert_or_update(dr, dataset)
-    xr_save_and_close(rr, fn)
+    dr = _xr_create_or_open(fn, taxis=dataset.coords.get("taxis", taxis), name="MWCS")
+    rr = _xr_insert_or_update(dr, dataset)
+    _xr_save_and_close(rr, fn)
 
 
 def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack, format="dataset"):
@@ -3607,7 +3607,7 @@ def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack, format
                        "%s_%s.nc" % (station1, station2))
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
-    data = xr_create_or_open(fn, name="MWCS")
+    data = _xr_create_or_open(fn, name="MWCS")
 
     if format == "dataset":
         return data
@@ -3638,9 +3638,9 @@ def xr_save_dtt(root, lineage, step_name, station1, station2, components, mov_st
                       "%s" % components,
                       "%s_%s.nc" % (station1, station2))
     os.makedirs(os.path.split(fn)[0], exist_ok=True)
-    dr = xr_create_or_open(fn, taxis=[], name="DTT")
-    rr = xr_insert_or_update(dr, dataset)
-    xr_save_and_close(rr, fn)
+    dr = _xr_create_or_open(fn, taxis=[], name="DTT")
+    rr = _xr_insert_or_update(dr, dataset)
+    _xr_save_and_close(rr, fn)
 
 
 def xr_get_dtt(root, lineage, station1, station2, components, mov_stack, format="dataset"):
@@ -3659,7 +3659,7 @@ def xr_get_dtt(root, lineage, station1, station2, components, mov_stack, format=
 
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
-    dr = xr_create_or_open(fn, taxis=[], name="DTT")
+    dr = _xr_create_or_open(fn, taxis=[], name="DTT")
 
     if format == "dataset":
         return dr
@@ -3694,9 +3694,9 @@ def xr_save_stretching(root, lineage, step_name, station1, station2,
         "%s_%s.nc" % (station1, station2),
     )
     os.makedirs(os.path.dirname(fn), exist_ok=True)
-    dr = xr_create_or_open(fn, taxis=[], name="STR")
-    rr = xr_insert_or_update(dr, dataset)
-    xr_save_and_close(rr, fn)
+    dr = _xr_create_or_open(fn, taxis=[], name="STR")
+    rr = _xr_insert_or_update(dr, dataset)
+    _xr_save_and_close(rr, fn)
 
 
 def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack, format="dataset"):
@@ -3719,7 +3719,7 @@ def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack,
     )
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
-    dr = xr_create_or_open(fn, taxis=[], name="STR")
+    dr = _xr_create_or_open(fn, taxis=[], name="STR")
 
     if format == "dataset":
         return dr
@@ -3796,7 +3796,7 @@ def xr_save_wct(root, lineage, step_name, station1, station2, components, mov_st
     os.makedirs(os.path.dirname(fn), exist_ok=True)
 
     # Save to NetCDF
-    xr_save_and_close(ds, fn)
+    _xr_save_and_close(ds, fn)
 
 
     # Cleanup memory
@@ -3843,9 +3843,9 @@ def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mo
                       f"{mov_stack[0]}_{mov_stack[1]}", components,
                       f"{station1}_{station2}.nc")
     os.makedirs(os.path.dirname(fn), exist_ok=True)
-    existing_ds = xr_create_or_open(fn, name="WCT")
-    updated_ds = xr_insert_or_update(existing_ds, dataset)
-    xr_save_and_close(updated_ds, fn)
+    existing_ds = _xr_create_or_open(fn, name="WCT")
+    updated_ds = _xr_insert_or_update(existing_ds, dataset)
+    _xr_save_and_close(updated_ds, fn)
     logging.debug(f"Saved WCT DTT data to {fn}")
 
 
@@ -4692,7 +4692,7 @@ def xr_save_rms(root, lineage, step_name, seed_id, dataframe):
     if isinstance(dataframe, xr.Dataset):
         if os.path.isfile(fn):
             existing_ds = xr.load_dataset(fn)
-            merged = xr_insert_or_update(existing_ds, dataframe)
+            merged = _xr_insert_or_update(existing_ds, dataframe)
             merged.to_netcdf(fn, mode="w")
         else:
             dataframe.to_netcdf(fn, mode="w")
