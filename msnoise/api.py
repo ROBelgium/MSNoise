@@ -3539,6 +3539,12 @@ def get_results_all(session, root, lineage_names, station1, station2, components
 
 
 def xr_save_mwcs(root, lineage, step_name, station1, station2, components, mov_stack, taxis, dataframe):
+    """Save MWCS results to a NetCDF file.
+
+    Accepts either a :class:`~pandas.DataFrame` (legacy) or an
+    :class:`xarray.Dataset` with variables ``M``, ``EM``, ``MCOH``
+    and dimensions ``(times, taxis)``.
+    """
     fn = os.path.join(root, *lineage, step_name, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]),
                        "%s" % components,
@@ -3546,7 +3552,16 @@ def xr_save_mwcs(root, lineage, step_name, station1, station2, components, mov_s
 
     if not os.path.isdir(os.path.split(fn)[0]):
         os.makedirs(os.path.split(fn)[0], exist_ok=True)
-    d = dataframe.stack().stack()
+
+    # ── Dataset path (new, xarray-native) ──────────────────────────────
+    if isinstance(dataframe, xr.Dataset):
+        dr = xr_create_or_open(fn, taxis=dataframe.coords.get("taxis", taxis), name="MWCS")
+        rr = xr_insert_or_update(dr, dataframe)
+        xr_save_and_close(rr, fn)
+        return
+
+    # ── DataFrame path (legacy compat) ─────────────────────────────────
+    d = dataframe.stack(future_stack=True).stack(future_stack=True)
     d.index = d.index.set_names(["times", "keys", "taxis"])
     d = d.reorder_levels(["times", "taxis", "keys"])
     d.columns = ["MWCS"]
@@ -3558,15 +3573,28 @@ def xr_save_mwcs(root, lineage, step_name, station1, station2, components, mov_s
     del dr, rr, d
 
 
-def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack):
+def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack, format="dataframe"):
+    """Load MWCS results from a NetCDF file.
+
+    Parameters
+    ----------
+    format : str
+        ``"dataframe"`` (default, legacy) returns a :class:`~pandas.DataFrame`
+        with MultiIndex columns ``(keys, taxis)``.
+        ``"dataset"`` returns an :class:`xarray.Dataset` (xarray-native path).
+    """
     fn = os.path.join(root, *lineage, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]),
                        "%s" % components,
                        "%s_%s.nc" % (station1, station2))
     if not os.path.isfile(fn):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
         raise FileNotFoundError(fn)
     data = xr_create_or_open(fn, name="MWCS")
+
+    if format == "dataset":
+        return data
+
+    # ── DataFrame (default/legacy) ──────────────────────────────────────
     da = data.MWCS  # DataArray with dims (times, taxis, keys)
     # Build DataFrame directly — pandas-version-safe
     times_vals = da.coords["times"].values
@@ -3576,22 +3604,17 @@ def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack):
     # Transpose to (times, keys, taxis) so MultiIndex is (keys, taxis)
     midx = pd.MultiIndex.from_product([keys_vals, taxis_vals], names=["keys", "taxis"])
     arr = da.values.transpose(0, 2, 1).reshape(n_t, n_k * n_tx)
-    data = pd.DataFrame(arr, index=pd.DatetimeIndex(times_vals), columns=midx)
-    return data
+    return pd.DataFrame(arr, index=pd.DatetimeIndex(times_vals), columns=midx)
 
 # ── DTT ─────────────────────────────────────────────────────
 
 
 def xr_save_dtt(root, lineage, step_name, station1, station2, components, mov_stack, dataframe):
-    """
-    :param station1: string, name of station 1
-    :param station2: string, name of station 2
-    :param components: string, name of the components
-    :param mov_stack: int, number of days in the moving stack
-    :param dataframe: pandas DataFrame containing the data
-    :return: None
+    """Save DTT results to a NetCDF file.
 
-    Saves DTT data to a NetCDF file using lineage-aware path.
+    Accepts either a :class:`~pandas.DataFrame` (legacy, columns = DTT keys,
+    index = DatetimeIndex) or an :class:`xarray.Dataset` with variables
+    ``m``, ``em``, ``a``, ``ea``, ``m0``, ``em0`` and dimension ``times``.
     """
     fn = os.path.join(root, *lineage, step_name, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
@@ -3599,7 +3622,16 @@ def xr_save_dtt(root, lineage, step_name, station1, station2, components, mov_st
                       "%s_%s.nc" % (station1, station2))
     if not os.path.isdir(os.path.split(fn)[0]):
         os.makedirs(os.path.split(fn)[0], exist_ok=True)
-    d = dataframe.stack()
+
+    # ── Dataset path (new, xarray-native) ──────────────────────────────
+    if isinstance(dataframe, xr.Dataset):
+        dr = xr_create_or_open(fn, taxis=[], name="DTT")
+        rr = xr_insert_or_update(dr, dataframe)
+        xr_save_and_close(rr, fn)
+        return
+
+    # ── DataFrame path (legacy compat) ─────────────────────────────────
+    d = dataframe.stack(future_stack=True)
     d.index = d.index.set_names(["times", "keys"])
     d.columns = ["DTT"]
     dr = xr_create_or_open(fn, taxis=[], name="DTT")
@@ -3608,18 +3640,14 @@ def xr_save_dtt(root, lineage, step_name, station1, station2, components, mov_st
     xr_save_and_close(rr, fn)
 
 
-def xr_get_dtt(root, lineage, station1, station2, components, mov_stack):
-    """
-    :param station1: The first station name
-    :param station2: The second station name
-    :param components: The components to be used
-    :param filterid: The filter ID
-    :param mov_stack: The movement stack
-    :return: The extracted data
+def xr_get_dtt(root, lineage, station1, station2, components, mov_stack, format="dataframe"):
+    """Load DTT results from a NetCDF file.
 
-    This method retrieves the DTT data from a NetCDF file based on the given inputs. It constructs the file path using the provided parameters and checks if the file exists. If the file
-    * does not exist, it raises a FileNotFoundError. Otherwise, it opens the NetCDF file and extracts the DTT variable as a dataframe. The dataframe is then rearranged and returned as the
-    * result.
+    Parameters
+    ----------
+    format : str
+        ``"dataframe"`` (default, legacy) returns a :class:`~pandas.DataFrame`.
+        ``"dataset"`` returns an :class:`xarray.Dataset` (xarray-native path).
     """
     fn = os.path.join(root, *lineage, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
@@ -3627,16 +3655,19 @@ def xr_get_dtt(root, lineage, station1, station2, components, mov_stack):
                       "%s_%s.nc" % (station1, station2))
 
     if not os.path.isfile(fn):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
         raise FileNotFoundError(fn)
     dr = xr_create_or_open(fn, taxis=[], name="DTT")
+
+    if format == "dataset":
+        return dr
+
+    # ── DataFrame (legacy) ──────────────────────────────────────────────
     da = dr.DTT  # DataArray with dims (times, keys)
-    data = pd.DataFrame(
+    return pd.DataFrame(
         da.values,
         index=pd.DatetimeIndex(da.coords["times"].values),
         columns=list(da.coords["keys"].values),
     )
-    return data
 
 # ── Stretching ──────────────────────────────────────────────
 
@@ -3674,8 +3705,16 @@ def xr_save_stretching(root, lineage, step_name, station1, station2,
     )
     os.makedirs(os.path.dirname(fn), exist_ok=True)
 
+    # ── Dataset path (new, xarray-native) ──────────────────────────────
+    if isinstance(dataframe, xr.Dataset):
+        dr = xr_create_or_open(fn, taxis=[], name="STR")
+        rr = xr_insert_or_update(dr, dataframe)
+        xr_save_and_close(rr, fn)
+        return
+
+    # ── DataFrame path (legacy compat) ─────────────────────────────────
     # Stack to long form: index = (times, keys)
-    d = dataframe.stack()
+    d = dataframe.stack(future_stack=True)
     d.index = d.index.set_names(["times", "keys"])
     d = d.rename("STR")
 
@@ -3685,15 +3724,17 @@ def xr_save_stretching(root, lineage, step_name, station1, station2,
     xr_save_and_close(rr, fn)
 
 
-def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack):
+def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack, format="dataframe"):
     """Load per-pair stretching results from a NetCDF file.
 
-    Returns a :class:`~pandas.DataFrame` with columns ``Delta``, ``Coeff``,
-    ``Error`` and a :class:`~pandas.DatetimeIndex`, mirroring the structure
-    written by :func:`xr_save_stretching`.
+    Parameters
+    ----------
+    format : str
+        ``"dataframe"`` (default, legacy) returns a :class:`~pandas.DataFrame`
+        with columns ``Delta``, ``Coeff``, ``Error``.
+        ``"dataset"`` returns an :class:`xarray.Dataset` (xarray-native path).
 
     :raises FileNotFoundError: if the NetCDF file does not exist.
-    :rtype: :class:`~pandas.DataFrame`
     """
     fn = os.path.join(
         root, *lineage, "_output",
@@ -3704,15 +3745,17 @@ def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack)
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
     dr = xr_create_or_open(fn, taxis=[], name="STR")
+
+    if format == "dataset":
+        return dr
+
+    # ── DataFrame (legacy) ──────────────────────────────────────────────
     da = dr.STR  # DataArray with dims (times, keys)
-    # Build DataFrame directly from xarray coords — avoids pandas-version
-    # differences in to_dataframe().unstack().droplevel() chain.
-    data = pd.DataFrame(
+    return pd.DataFrame(
         da.values,
         index=pd.DatetimeIndex(da.coords["times"].values),
         columns=list(da.coords["keys"].values),
     )
-    return data
 
 
 # ============================================================
@@ -3723,12 +3766,25 @@ def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack)
 
 
 def xr_save_dvv(root, lineage, step_name, components, mov_stack, dataframe):
+    """Save network DVV results to a NetCDF file.
+
+    Accepts either a :class:`~pandas.DataFrame` (legacy) or an
+    :class:`xarray.Dataset` with a DVV variable.
+    """
     fn = os.path.join(root, *lineage, step_name, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s.nc" % components)
     if not os.path.isdir(os.path.split(fn)[0]):
         os.makedirs(os.path.split(fn)[0], exist_ok=True)
 
+    # ── Dataset path (new, xarray-native) ──────────────────────────────
+    if isinstance(dataframe, xr.Dataset):
+        dr = xr_create_or_open(fn, taxis=[], name="DVV")
+        rr = xr_insert_or_update(dr, dataframe)
+        xr_save_and_close(rr, fn)
+        return
+
+    # ── DataFrame path (legacy compat) ─────────────────────────────────
     if dataframe.columns.nlevels > 1:
         d = dataframe.stack(future_stack=True).stack(future_stack=True)
     else:
@@ -3749,14 +3805,26 @@ def xr_save_dvv(root, lineage, step_name, components, mov_stack, dataframe):
     del dr, rr, d
 
 
-def xr_get_dvv(root, lineage, components, mov_stack):
+def xr_get_dvv(root, lineage, components, mov_stack, format="dataframe"):
+    """Load network DVV results from a NetCDF file.
+
+    Parameters
+    ----------
+    format : str
+        ``"dataframe"`` (default, legacy) returns a :class:`~pandas.DataFrame`.
+        ``"dataset"`` returns an :class:`xarray.Dataset` (xarray-native path).
+    """
     fn = os.path.join(root, *lineage, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
                       "%s.nc" % components)
     if not os.path.isfile(fn):
-        # logging.error("FILE DOES NOT EXIST: %s, skipping" % fn)
         raise FileNotFoundError(fn)
     data = xr_create_or_open(fn, name="DVV")
+
+    if format == "dataset":
+        return data
+
+    # ── DataFrame (default/legacy) ──────────────────────────────────────
     da = data.DVV  # DataArray with dims (times, level0, level1)
     # Build DataFrame directly — pandas-version-safe
     times_vals  = da.coords["times"].values
@@ -3858,44 +3926,27 @@ def xr_load_wct(root, lineage, station1, station2, components, mov_stack):
     return ds
 
 
-def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mov_stack, taxis, dtt_df, err_df, coh_df):
-    """
-    Save the Wavelet Coherence Transform (WCT) results as a NetCDF file.
+def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mov_stack, taxis, dtt_df, err_df=None, coh_df=None):
+    """Save WCT-DTT results to a NetCDF file.
 
-    :param root: Root output folder path.
-    :type root: str
-    :param lineage: List of lineage path components.
-    :type lineage: list
-    :param step_name: Step name for output path.
-    :type step_name: str
-    :param station1: The first station in the pair.
-    :type station1: str
-    :param station2: The second station in the pair.
-    :type station2: str
-    :param components: The components (e.g., Z, N, E) being analyzed.
-    :type components: str
-    :param mov_stack: Tuple of (start, end) representing the moving stack window.
-    :type mov_stack: tuple
-    :param taxis: Time axis corresponding to the WCT data.
-    :type taxis: array-like
-    :param dtt_df: DataFrame containing dtt data (2D).
-    :type dtt_df: pandas.DataFrame
-    :param err_df: DataFrame containing err data (2D).
-    :type err_df: pandas.DataFrame
-    :param coh_df: DataFrame containing coh data (2D).
-    :type coh_df: pandas.DataFrame
-    :returns: None
+    Accepts either three separate :class:`~pandas.DataFrame` objects
+    ``dtt_df``, ``err_df``, ``coh_df`` (legacy) or a single
+    :class:`xarray.Dataset` passed as ``dtt_df`` with variables
+    ``dtt``, ``err``, ``coh`` and dims ``(times, frequency)``.
     """
-
-    # Construct the file path
     fn = os.path.join(root, *lineage, step_name, "_output",
                       f"{mov_stack[0]}_{mov_stack[1]}", components,
                       f"{station1}_{station2}.nc")
-
-    # Ensure the directory exists
     os.makedirs(os.path.dirname(fn), exist_ok=True)
 
-    # Convert DataFrames to xarray.DataArrays
+    # ── Dataset path (new, xarray-native) ──────────────────────────────
+    if isinstance(dtt_df, xr.Dataset):
+        existing_ds = xr_create_or_open(fn, name="WCT")
+        updated_ds = xr_insert_or_update(existing_ds, dtt_df)
+        xr_save_and_close(updated_ds, fn)
+        return
+
+    # ── DataFrame path (legacy compat) ─────────────────────────────────
     dtt_da = xr.DataArray(dtt_df.values, coords=[dtt_df.index, dtt_df.columns], dims=['times', 'frequency'])
     err_da = xr.DataArray(err_df.values, coords=[err_df.index, err_df.columns], dims=['times', 'frequency'])
     coh_da = xr.DataArray(coh_df.values, coords=[coh_df.index, coh_df.columns], dims=['times', 'frequency'])
@@ -4494,11 +4545,11 @@ def compute_dtt_wct(session, root, lineage, mov_stack,
     err_all = pd.concat(err_frames, axis=1)
 
     # Stack to long form for per-timestamp statistics
-    dtt_long = dtt_all.stack()
+    dtt_long = dtt_all.stack(future_stack=True)
     dtt_long.index = dtt_long.index.droplevel(1)
     dtt_long.index.name = "times"
 
-    err_long = err_all.stack()
+    err_long = err_all.stack(future_stack=True)
     err_long.index = err_long.index.droplevel(1)
     err_long.index.name = "times"
 
@@ -4630,25 +4681,11 @@ def psd_ppsd_to_dataframe(ppsd):
 
 
 def xr_save_psd(root, lineage, step_name, seed_id, day, dataframe):
-    """Save a daily PSD result DataFrame to a NetCDF file.
+    """Save a daily PSD result to a NetCDF file.
 
-    The DataFrame must have shape ``(n_windows, n_period_bins)`` with a
-    :class:`~pandas.DatetimeIndex` and period-bin-centre float columns, as
-    returned by :func:`psd_ppsd_to_dataframe`.
-
-    Path layout::
-
-        <root>/<lineage>/<step_name>/_output/daily/<seed_id>/<YYYY-MM-DD>.nc
-
-    :param root: Output folder root (``params.output_folder``).
-    :param lineage: List of step-name strings (upstream → current, same
-        convention as :func:`xr_save_ccf`).
-    :param step_name: Current PSD step name (e.g. ``'psd_1'``).
-    :param seed_id: SEED identifier string ``'NET.STA.LOC.CHAN'``.
-    :param day: Processing date (``'YYYY-MM-DD'`` string or
-        :class:`datetime.date`).
-    :param dataframe: :class:`~pandas.DataFrame` of PSD values
-        (index = window datetimes, columns = period bin centres).
+    Accepts either a :class:`~pandas.DataFrame` (legacy, index = window
+    datetimes, columns = period bin centres) or an :class:`xarray.Dataset`
+    with a ``PSD`` variable and dims ``(times, periods)``.
     """
     day_str = day if isinstance(day, str) else day.strftime("%Y-%m-%d")
     fn = os.path.join(
@@ -4657,6 +4694,12 @@ def xr_save_psd(root, lineage, step_name, seed_id, day, dataframe):
     )
     os.makedirs(os.path.dirname(fn), exist_ok=True)
 
+    # ── Dataset path (new, xarray-native) ──────────────────────────────
+    if isinstance(dataframe, xr.Dataset):
+        dataframe.to_netcdf(fn, mode="w")
+        return
+
+    # ── DataFrame path (legacy compat) ─────────────────────────────────
     periods = np.array(dataframe.columns, dtype=float)
     times   = pd.DatetimeIndex(dataframe.index)
     da = xr.DataArray(
@@ -4670,18 +4713,15 @@ def xr_save_psd(root, lineage, step_name, seed_id, day, dataframe):
     ds.close()
 
 
-def xr_load_psd(root, lineage, step_name, seed_id, day):
+def xr_load_psd(root, lineage, step_name, seed_id, day, format="dataframe"):
     """Load a daily PSD NetCDF written by :func:`xr_save_psd`.
 
-    :param root: Output folder root.
-    :param lineage: List of step-name strings.
-    :param step_name: PSD step name (e.g. ``'psd_1'``).
-    :param seed_id: SEED identifier string ``'NET.STA.LOC.CHAN'``.
-    :param day: Date to load (``'YYYY-MM-DD'`` string or
-        :class:`datetime.date`).
-    :returns: :class:`~pandas.DataFrame` with index = window datetimes and
-        columns = period bin centres, or ``None`` if the file does not exist.
-    :rtype: :class:`~pandas.DataFrame` or None
+    Parameters
+    ----------
+    format : str
+        ``"dataframe"`` (default, legacy) returns a :class:`~pandas.DataFrame`
+        or ``None`` if file not found.
+        ``"dataset"`` returns an :class:`xarray.Dataset` or ``None``.
     """
     day_str = day if isinstance(day, str) else day.strftime("%Y-%m-%d")
     fn = os.path.join(
@@ -4690,9 +4730,14 @@ def xr_load_psd(root, lineage, step_name, seed_id, day):
     )
     if not os.path.isfile(fn):
         return None
-    ds  = xr.load_dataset(fn)
-    da  = ds.PSD
-    df  = pd.DataFrame(
+    ds = xr.load_dataset(fn)
+
+    if format == "dataset":
+        return ds
+
+    # ── DataFrame (default/legacy) ──────────────────────────────────────
+    da = ds.PSD
+    df = pd.DataFrame(
         da.values,
         index=pd.DatetimeIndex(da.coords["times"].values),
         columns=da.coords["periods"].values.astype(float),
@@ -4703,28 +4748,24 @@ def xr_load_psd(root, lineage, step_name, seed_id, day):
 def xr_save_rms(root, lineage, step_name, seed_id, dataframe):
     """Save per-station PSD RMS results to a NetCDF file.
 
-    The output lives hierarchically under the upstream PSD step::
-
-        <root>/<*lineage>/<step_name>/_output/<seed_id>/RMS.nc
-
-    The DataFrame must have a :class:`~pandas.DatetimeIndex` and columns
-    that are frequency-band label strings (e.g. ``"1.0-20.0"``), as
-    returned by :func:`psd_df_rms`.
-
-    When the file already exists its contents are merged: existing rows
-    that share a timestamp with *dataframe* are overwritten, other rows
-    are preserved.
-
-    :param root: Output folder root (``params.output_folder``).
-    :param lineage: Upstream step-name list, e.g. ``["psd_1"]``.
-    :param step_name: Current psd_rms step name, e.g. ``"psd_rms_1"``.
-    :param seed_id: SEED identifier string ``"NET.STA.LOC.CHAN"``.
-    :param dataframe: :class:`~pandas.DataFrame` of RMS values
-        (index = window datetimes, columns = band labels).
+    Accepts either a :class:`~pandas.DataFrame` (legacy, index = DatetimeIndex,
+    columns = band labels) or an :class:`xarray.Dataset` with a ``RMS``
+    variable and dims ``(times, bands)``.
     """
     fn = os.path.join(root, *lineage, step_name, "_output", seed_id, "RMS.nc")
     os.makedirs(os.path.dirname(fn), exist_ok=True)
 
+    # ── Dataset path (new, xarray-native) ──────────────────────────────
+    if isinstance(dataframe, xr.Dataset):
+        if os.path.isfile(fn):
+            existing_ds = xr.load_dataset(fn)
+            merged = xr_insert_or_update(existing_ds, dataframe)
+            merged.to_netcdf(fn, mode="w")
+        else:
+            dataframe.to_netcdf(fn, mode="w")
+        return
+
+    # ── DataFrame path (legacy compat) ─────────────────────────────────
     bands = list(dataframe.columns.astype(str))
     times = pd.DatetimeIndex(dataframe.index)
 
@@ -4745,20 +4786,25 @@ def xr_save_rms(root, lineage, step_name, seed_id, dataframe):
     da.to_dataset().to_netcdf(fn, mode="w")
 
 
-def xr_load_rms(root, lineage, step_name, seed_id):
+def xr_load_rms(root, lineage, step_name, seed_id, format="dataframe"):
     """Load per-station PSD RMS results from a NetCDF file.
 
-    :param root: Output folder root.
-    :param lineage: Upstream step-name list, e.g. ``["psd_1"]``.
-    :param step_name: PSD_RMS step name, e.g. ``"psd_rms_1"``.
-    :param seed_id: SEED identifier string ``"NET.STA.LOC.CHAN"``.
-    :returns: :class:`~pandas.DataFrame` or ``None`` if file not found.
-    :rtype: :class:`~pandas.DataFrame` or None
+    Parameters
+    ----------
+    format : str
+        ``"dataframe"`` (default, legacy) returns a :class:`~pandas.DataFrame`
+        or ``None`` if file not found.
+        ``"dataset"`` returns an :class:`xarray.Dataset` or ``None``.
     """
     fn = os.path.join(root, *lineage, step_name, "_output", seed_id, "RMS.nc")
     if not os.path.isfile(fn):
         return None
     ds = xr.load_dataset(fn)
+
+    if format == "dataset":
+        return ds
+
+    # ── DataFrame (default/legacy) ──────────────────────────────────────
     df = pd.DataFrame(
         ds.RMS.values,
         index=pd.DatetimeIndex(ds.RMS.coords["times"].values),
