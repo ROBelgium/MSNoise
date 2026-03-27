@@ -166,8 +166,8 @@ def main(loglevel="INFO"):
 
         root = params.output_folder
         mov_stacks = params.mov_stack
-        goal_sampling_rate = params.cc_sampling_rate
-        maxlag = params.maxlag
+        goal_sampling_rate = params.cc.cc_sampling_rate
+        maxlag = params.cc.maxlag
 
         netsta1, netsta2 = pair.split(':')
         station1, station2 = pair.split(":")
@@ -191,8 +191,8 @@ def main(loglevel="INFO"):
                     continue
 
             # zero the data outside of the minlag-maxlag timing
-            if params.stretching_lag == "static":
-                minlag = params.stretching_minlag
+            if params.stretching.stretching_lag == "static":
+                minlag = params.stretching.stretching_minlag
             else:
                 SS1 = station1.split(".")
                 SS2 = station2.split(".")
@@ -200,16 +200,16 @@ def main(loglevel="INFO"):
                 SS1 = get_station(db, SS1[0], SS1[1])
                 SS2 = get_station(db, SS2[0], SS2[1])
                 minlag = get_interstation_distance(SS1, SS2,
-                                                SS1.coordinates) / params.stretching_v
-            maxlag2 = minlag + params.stretching_width
-            mid = int(params.cc_sampling_rate * params.maxlag)
+                                                SS1.coordinates) / params.stretching.stretching_v
+            maxlag2 = minlag + params.stretching.stretching_width
+            mid = int(params.cc.cc_sampling_rate * params.cc.maxlag)
             ref[mid - int(minlag * goal_sampling_rate):mid + int(minlag * goal_sampling_rate)] = 0.
             ref[:mid - int(maxlag2 * goal_sampling_rate)] = 0.
             ref[mid + int(maxlag2 * goal_sampling_rate):] = 0.
 
             # TODO ADD the def here or in the API
-            str_range = params.stretching_max
-            nstr = params.stretching_nsteps
+            str_range = params.stretching.stretching_max
+            nstr = params.stretching.stretching_nsteps
             ref_stretched, deltas = stretch_mat_creation(ref,str_range=str_range, nstr=nstr)
 
             for mov_stack in mov_stacks:
@@ -234,17 +234,17 @@ def main(loglevel="INFO"):
 
                 if rolling_mode:
                     ref_rolling = compute_rolling_ref(
-                        data, int(params.ref_begin), int(params.ref_end)
+                        data, int(params.refstack.ref_begin), int(params.refstack.ref_end)
                     )
 
                 # print("Whitening %s" % fn)
                 # data = pd.DataFrame(data)
                 # data = data.apply(ww, axis=1, result_type="broadcast")
 
-                data.iloc[:,mid - int(minlag * params.cc_sampling_rate):mid + int(
-                    minlag * params.cc_sampling_rate)] *= 0.
-                data.iloc[:,mid - int(maxlag2 * params.cc_sampling_rate)] *= 0.
-                data.iloc[:,mid + int(maxlag2 * params.cc_sampling_rate):] *= 0.
+                data.iloc[:,mid - int(minlag * params.cc.cc_sampling_rate):mid + int(
+                    minlag * params.cc.cc_sampling_rate)] *= 0.
+                data.iloc[:,mid - int(maxlag2 * params.cc.cc_sampling_rate)] *= 0.
+                data.iloc[:,mid + int(maxlag2 * params.cc.cc_sampling_rate):] *= 0.
 
                 data_values = data.values
                 num_days = data_values.shape[0]
@@ -313,7 +313,7 @@ def main(loglevel="INFO"):
                 )
 
         massive_update_job(db, jobs, "D")
-    #    if not params.hpc:
+    #    if not params.global_.hpc:
    #        for job in jobs:
      #           update_job(db, job.day, job.pair, 'DTT', 'T')
     logger.info('*** Finished: Compute Stretching ***')

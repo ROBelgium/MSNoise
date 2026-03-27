@@ -627,8 +627,8 @@ def get_params(session):
             params[name] = itemtype(get_config(s, name))
 
     # TODO remove reference to goal_sampling_rate
-    # params.goal_sampling_rate = params.cc_sampling_rate
-    # params.min30 = params.corr_duration * params.goal_sampling_rate
+    # params.goal_sampling_rate = params.cc.cc_sampling_rate
+    # params.min30 = params.cc.corr_duration * params.goal_sampling_rate
     # params.components_to_compute = get_components_to_compute(s)
     # params.components_to_compute_single_station = get_components_to_compute_single_station(s)
     # params.all_components = np.unique(params.components_to_compute_single_station + \
@@ -2344,8 +2344,8 @@ def get_t_axis(params):
     :rtype: :class:`numpy.array`
     :returns: the time axis in seconds
     """
-    samples = int(2 * params.maxlag * params.cc_sampling_rate) + 1
-    return np.linspace(-params.maxlag, params.maxlag, samples)
+    samples = int(2 * params.cc.maxlag * params.cc.cc_sampling_rate) + 1
+    return np.linspace(-params.cc.maxlag, params.cc.maxlag, samples)
 
 
 def get_maxlag_samples(maxlag, cc_sampling_rate):
@@ -2382,8 +2382,8 @@ def build_ref_datelist(params, session=None):
     :rtype: tuple
     :returns: (start, end, datelist)
     """
-    begin = params.ref_begin
-    end = params.ref_end
+    begin = params.refstack.ref_begin
+    end = params.refstack.ref_end
     if begin[0] == '-':
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
         end = datetime.date.today() + datetime.timedelta(days=int(end))
@@ -2681,7 +2681,7 @@ def winsorizing(data, params, input="timeseries", nfft=0):
     then re-transformed.
 
     :param data: 1-D or 2-D array of shape ``(n_traces, n_samples)``.
-    :param params: MSNoise params object; must expose ``params.winsorizing``.
+    :param params: MSNoise params object; must expose ``params.cc.winsorizing``.
     :param input: ``"timeseries"`` (default) or ``"fft"``.
     :param nfft: FFT length used when *input* is ``"fft"``; ignored otherwise.
     :returns: Clipped array (same shape as input).
@@ -2694,10 +2694,10 @@ def winsorizing(data, params, input="timeseries", nfft=0):
     if input == "fft":
         data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(float)
     for i in range(data.shape[0]):
-        if params.winsorizing == -1:
+        if params.cc.winsorizing == -1:
             np.sign(data[i], data[i])  # inplace
-        elif params.winsorizing != 0:
-            rms = data[i].std() * params.winsorizing
+        elif params.cc.winsorizing != 0:
+            rms = data[i].std() * params.cc.winsorizing
             np.clip(data[i], -rms, rms, data[i])  # inplace
     if input == "fft":
         data = sf.fftn(data, [nfft, ], axes=[1, ])
@@ -3450,8 +3450,8 @@ def get_results(session, station1, station2, filterid, components, dates,
         export_format = get_config(session, 'export_format')
         extension = get_extension(export_format)
     else:
-        export_format = params.export_format
-        extension = get_extension(params.export_format)
+        export_format = params.stack.export_format
+        extension = get_extension(params.stack.export_format)
     if export_format == "BOTH":
         export_format = "MSEED"
 
@@ -3495,8 +3495,8 @@ def get_results(session, station1, station2, filterid, components, dates,
     elif format == "stack":
         logging.debug("Stacking...")
 
-        corr = stack(stack_data, params.stack_method, params.pws_timegate,
-                     params.pws_power, params.goal_sampling_rate)
+        corr = stack(stack_data, params.stack.stack_method, params.stack.pws_timegate,
+                     params.stack.pws_power, params.goal_sampling_rate)
 
         if i > 0:
             return i, corr
@@ -4009,7 +4009,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
     """
     from obspy import Stream, Trace
     output_folder = params.output_folder
-    export_format = params.export_format
+    export_format = params.stack.export_format
     sac, mseed = False, False
     if export_format == "BOTH":
         mseed = True
@@ -4072,9 +4072,9 @@ def _export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
                params=None):
     from obspy.core.util.attribdict import AttribDict
     from obspy import Stream, Trace
-    maxlag = params.maxlag
+    maxlag = params.cc.maxlag
     cc_sampling_rate = params.goal_sampling_rate
-    sac_format = params.sac_format
+    sac_format = params.stack.sac_format
     if sac_format is None:
         sac_format = get_config(db, "sac_format")
     if maxlag is None:
@@ -4112,8 +4112,8 @@ def _export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
     except Exception:
         pass
     filename += ".MSEED"
-    maxlag = params.maxlag
-    cc_sampling_rate = params.cc_sampling_rate
+    maxlag = params.cc.maxlag
+    cc_sampling_rate = params.cc.cc_sampling_rate
     if maxlag is None:
         maxlag = float(get_config(db, "maxlag"))
     if cc_sampling_rate is None:

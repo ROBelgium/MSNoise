@@ -120,7 +120,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                             _ = MULTIPLEX_files[fn]
                         else:
                             # print("Reading %s" % fn)
-                            _ = read(fn, format=params.archive_format or None)
+                            _ = read(fn, format=params.global_.archive_format or None)
                             traces = []
                             for tr in _:
                                 if "%s.%s" % (tr.stats.network, tr.stats.station) in stations and tr.stats.channel[-1] in comps:
@@ -149,7 +149,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                                       starttime=UTCDateTime(gd),
                                       endtime=UTCDateTime(gd)+86400,
                                       station=sta,
-                                      format=params.archive_format or None)
+                                      format=params.global_.archive_format or None)
                             # print("done in", time.time()-t)
                         except:
                             logger.debug("ERROR reading file %s" % file)
@@ -198,13 +198,13 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                     continue
                 logger.debug("%s Checking sample alignment" % stream[0].id)
                 for i, trace in enumerate(stream):
-                    stream[i] = check_and_phase_shift(trace, params.preprocess_taper_length)
+                    stream[i] = check_and_phase_shift(trace, params.preprocess.preprocess_taper_length)
 
                 logger.debug("%s Checking Gaps" % stream[0].id)
                 gaps = getGaps(stream)
                 if len(gaps) > 0:
                     logger.debug(" found %i gaps" % len(gaps))
-                    max_gap = params.preprocess_max_gap*stream[0].stats.sampling_rate
+                    max_gap = params.preprocess.preprocess_max_gap*stream[0].stats.sampling_rate
 
                     while len(gaps):
                         too_long = 0
@@ -229,10 +229,10 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                 stream = stream.split()
                 logger.debug("%s Checking sampling rate" % stream[0].id)
                 for tr in stream:
-                    if tr.stats.sampling_rate < (params.cc_sampling_rate-1):
+                    if tr.stats.sampling_rate < (params.preprocess.cc_sampling_rate-1):
                         logger.warning("Trace has a lower sampling rate than the cc_sampling_rate, removing!")
                         stream.remove(tr)
-                taper_length = params.preprocess_taper_length  # seconds
+                taper_length = params.preprocess.preprocess_taper_length  # seconds
                 for trace in stream:
                     if trace.stats.npts < (4 * taper_length * trace.stats.sampling_rate):
                         stream.remove(trace)
@@ -249,47 +249,47 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
 
                 for trace in stream:
                     logger.debug(
-                        "%s Highpass at %.2f Hz" % (trace.id, params.preprocess_highpass))
-                    trace.filter("highpass", freq=params.preprocess_highpass, zerophase=True, corners=4)
+                        "%s Highpass at %.2f Hz" % (trace.id, params.preprocess.preprocess_highpass))
+                    trace.filter("highpass", freq=params.preprocess.preprocess_highpass, zerophase=True, corners=4)
 
-                    if trace.stats.sampling_rate != params.cc_sampling_rate:
+                    if trace.stats.sampling_rate != params.preprocess.cc_sampling_rate:
                         logger.debug(
-                            "%s Lowpass at %.2f Hz" % (trace.id, params.preprocess_lowpass))
-                        trace.filter("lowpass", freq=params.preprocess_lowpass, zerophase=True, corners=8)
+                            "%s Lowpass at %.2f Hz" % (trace.id, params.preprocess.preprocess_lowpass))
+                        trace.filter("lowpass", freq=params.preprocess.preprocess_lowpass, zerophase=True, corners=8)
 
-                        if params.resampling_method == "Resample":
+                        if params.preprocess.resampling_method == "Resample":
                             logger.debug("%s Downsample to %.1f Hz" %
-                                          (trace.id, params.cc_sampling_rate))
+                                          (trace.id, params.preprocess.cc_sampling_rate))
                             trace.data = resample(
-                                trace.data, params.cc_sampling_rate / trace.stats.sampling_rate, 'sinc_fastest')
+                                trace.data, params.preprocess.cc_sampling_rate / trace.stats.sampling_rate, 'sinc_fastest')
 
-                        elif params.resampling_method == "Decimate":
-                            decimation_factor = trace.stats.sampling_rate / params.cc_sampling_rate
+                        elif params.preprocess.resampling_method == "Decimate":
+                            decimation_factor = trace.stats.sampling_rate / params.preprocess.cc_sampling_rate
                             if not int(decimation_factor) == decimation_factor:
                                 logger.warning("%s CANNOT be decimated by an integer factor, consider using Resample or Lanczos methods"
                                                 " Trace sampling rate = %i ; Desired CC sampling rate = %i" %
-                                                (trace.id, trace.stats.sampling_rate, params.cc_sampling_rate))
+                                                (trace.id, trace.stats.sampling_rate, params.preprocess.cc_sampling_rate))
                                 sys.stdout.flush()
                                 sys.exit()
                             logger.debug("%s Decimate by a factor of %i" %
                                           (trace.id, decimation_factor))
                             trace.data = trace.data[::int(decimation_factor)]
 
-                        elif params.resampling_method == "Lanczos":
+                        elif params.preprocess.resampling_method == "Lanczos":
                             logger.debug("%s Downsample to %.1f Hz" %
-                                          (trace.id, params.cc_sampling_rate))
+                                          (trace.id, params.preprocess.cc_sampling_rate))
                             trace.data = np.array(trace.data)
-                            trace.interpolate(method="lanczos", sampling_rate=params.cc_sampling_rate, a=1.0)
+                            trace.interpolate(method="lanczos", sampling_rate=params.preprocess.cc_sampling_rate, a=1.0)
 
-                        trace.stats.sampling_rate = params.cc_sampling_rate
+                        trace.stats.sampling_rate = params.preprocess.cc_sampling_rate
                     del trace
 
-                if params.remove_response:
+                if params.preprocess.remove_response:
                     logger.debug('%s Removing instrument response' %
                                  stream[0].id)
                     try:
                         stream.attach_response(responses)
-                        stream.remove_response(pre_filt=params.response_prefilt,
+                        stream.remove_response(pre_filt=params.preprocess.response_prefilt,
                                                taper=False)
                     except:
                         logger.error("Bad or no instrument response "

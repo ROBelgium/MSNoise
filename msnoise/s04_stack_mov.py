@@ -66,14 +66,14 @@ def main(stype, loglevel="INFO"):
         taxis = get_t_axis(params)
 
         mov_stacks = params.mov_stack
-        wiener_mlen = params.wiener_mlen
-        wiener_nlen = params.wiener_nlen
-        wienerfilt = params.wienerfilt
-        wiener_M = int(pd.to_timedelta(wiener_mlen).total_seconds() / params.corr_duration)
-        wiener_N = int(pd.to_timedelta(wiener_nlen).total_seconds() * params.cc_sampling_rate)
+        wiener_mlen = params.stack.wiener_mlen
+        wiener_nlen = params.stack.wiener_nlen
+        wienerfilt = params.stack.wienerfilt
+        wiener_M = int(pd.to_timedelta(wiener_mlen).total_seconds() / params.cc.corr_duration)
+        wiener_N = int(pd.to_timedelta(wiener_nlen).total_seconds() * params.cc.cc_sampling_rate)
 
         # is there a better alternative for threshold?
-        if params.keep_all:
+        if params.cc.keep_all:
             wiener_gap_threshold = wiener_M  # no. indices which will be considered adjacent by wiener
         else:
             wiener_gap_threshold = pd.to_timedelta(wiener_mlen).days
@@ -148,7 +148,7 @@ def main(stype, loglevel="INFO"):
             all_days = sorted(set(all_days))
             excess_days = sorted(set(excess_days))
 
-            if params.keep_all:
+            if params.cc.keep_all:
                 c = get_results_all(db, params.output_folder, lineage_names,
                                     sta1, sta2, components, all_days, format="xarray",
                                     params=params)
@@ -156,7 +156,7 @@ def main(stype, loglevel="INFO"):
                     logger.warning("No data found for %s-%s" % (sta1, sta2))
                     continue
                 c = c.sortby('times')
-                dr = c.resample(times="%is" % params.corr_duration).mean()
+                dr = c.resample(times="%is" % params.cc.corr_duration).mean()
 
             else:
                 logger.warning("keep_all=N is unsupported in lineage workflow; "
@@ -191,14 +191,14 @@ def main(stype, loglevel="INFO"):
                 else:
                     mov_rolling = pd.to_timedelta(mov_rolling).total_seconds()
                     # print("Will roll over %i seconds" % mov_rolling)
-                    if params.keep_all:
-                        duration_to_windows = mov_rolling / params.corr_duration
+                    if params.cc.keep_all:
+                        duration_to_windows = mov_rolling / params.cc.corr_duration
                     else:
                         duration_to_windows = mov_rolling / 86400.0
                     if not duration_to_windows.is_integer():
                         logger.print("Warning, rounding down the number of windows to roll over")
                     duration_to_windows = int(max(1, math.floor(duration_to_windows)))
-                    # print("Which is %i windows of %i seconds duration" % (duration_to_windows, params.corr_duration))
+                    # print("Which is %i windows of %i seconds duration" % (duration_to_windows, params.cc.corr_duration))
                     xx = dr.rolling(times=duration_to_windows, min_periods=1).mean("win")
                     xx = xx.resample(times=mov_sample, label="right", skipna=True).asfreq().dropna("times", how="all")
 
@@ -211,7 +211,7 @@ def main(stype, loglevel="INFO"):
 
         massive_update_job(db, jobs, "D")
 
-        # if stype != "step" and not params.hpc:
+        # if stype != "step" and not params.global_.hpc:
         #     for job in jobs:
         #         update_job(db, job.day, job.pair, 'MWCS', 'T')
         #         update_job(db, job.day, job.pair, 'WCT', 'T')

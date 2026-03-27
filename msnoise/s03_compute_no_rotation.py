@@ -252,7 +252,7 @@ def main(loglevel="INFO"):
     #     logger.info("The 'whitening' parameter is set to '%s', which is not supported by this process. Set it to 'A' or 'N', or use the 'msnoise compute_cc_rot' instead." % params.cc.whitening)
     #     return ()
     #
-    # if params.remove_response:
+    # if params.preprocess.remove_response:
     #     logger.debug('Pre-loading all instrument response')
     #     responses = preload_instrument_responses(db, return_format="inventory")
     # else:
@@ -659,7 +659,7 @@ def main(loglevel="INFO"):
 
         # THIS SHOULD BE IN THE API
         massive_update_job(db, jobs, "D")
-        # if not params.hpc:
+        # if not params.global_.hpc:
         #     for job in jobs:
         #         update_job(db, job.day, job.pair, 'STACK', 'T')
 
