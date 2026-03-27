@@ -6,10 +6,9 @@ the resulting Stream objects to disk in a workflow-aware folder structure.
 import time
 import traceback
 import numpy as np
-from .api import (connect, get_logger, is_next_job_for_step,
-                  get_next_lineage_batch, massive_update_job,
-                  preload_instrument_responses,
-                  save_preprocessed_streams)
+from ...db import connect, get_logger
+from ...workflow import get_next_lineage_batch, is_next_job_for_step, massive_update_job
+from ...signal import preload_instrument_responses, save_preprocessed_streams
 from .preprocessing import preprocess
 
 CATEGORY = "preprocess"

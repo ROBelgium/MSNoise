@@ -23,14 +23,10 @@ from matplotlib.widgets import Cursor
 
 from obspy.signal.filter import bandpass
 
-from ..api import (
-    build_movstack_datelist,
-    check_stations_uniqueness,
-    connect,
-    get_config_set_details,
-    get_logger,
-    build_plot_outfile,
-)
+from ....db import connect, get_logger
+from ....config import build_plot_outfile, get_config_set_details
+from ....stations import check_stations_uniqueness
+from ....workflow import build_movstack_datelist
 from ..results import MSNoiseResult
 
 

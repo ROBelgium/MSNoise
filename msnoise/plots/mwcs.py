@@ -22,11 +22,9 @@ from matplotlib import cm
 from matplotlib.dates import date2num, AutoDateFormatter, AutoDateLocator
 import numpy as np
 
-from ..api import (
-    connect, get_logger,
-    get_station, get_interstation_distance, check_stations_uniqueness,
-    build_plot_outfile,
-)
+from ....db import connect, get_logger
+from ....config import build_plot_outfile
+from ....stations import check_stations_uniqueness, get_interstation_distance, get_station
 from ..results import MSNoiseResult
 
 def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,

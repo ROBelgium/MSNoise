@@ -19,8 +19,9 @@ except ImportError:
 
 
 from .. import MSNoiseError, DBConfigNotFoundError
-from ..api import connect, get_config, update_station, get_logger
-from ..api import delete_config_set, list_config_sets, get_config_set_details
+from ....db import connect, get_logger
+from ....config import (delete_config_set, get_config, get_config_set_details, list_config_sets)
+from ....stations import update_station
 
 from ..msnoise_table_def import DataAvailability
 
@@ -83,7 +84,7 @@ def show_config_values(db, names):
     """
     Show configuration value of parameters provided in the 'names' list.
     """
-    from ..api import get_config
+    from ..config import get_config
     from ..default import default
     for key in names:
         display_value = value = get_config(db, key)
@@ -105,7 +106,7 @@ def info_db_ini():
     """
     Show information stored in the db.ini file.
     """
-    from ..api import read_db_inifile
+    from ..db import read_db_inifile
     dbini = read_db_inifile()
     click.echo('Database information stored in the db.ini file:')
     if dbini.tech == 1:
@@ -124,7 +125,7 @@ def info_folders(db):
     """
     Show information about folders used by MSNoise.
     """
-    from ..api import get_config
+    from ..config import get_config
     click.echo('')
     click.echo('General:')
 
@@ -154,7 +155,7 @@ def info_folders(db):
         click.echo(" - %s exists" % output_folder)
     else:
         if get_config(db, 'keep_all') in ['Y', 'y']:
-            from ..api import get_workflow_job_counts
+            from ..workflow import get_workflow_job_counts
             counts = get_workflow_job_counts(db)
             done_count = counts.get('D', 0)
             if done_count > 0:
@@ -177,7 +178,8 @@ def info_parameters(db):
     Show values of each configuration parameters.
     """
     from ..default import default
-    from ..api import get_workflow_steps, get_config_set_details
+    from ..config import get_config_set_details
+    from ..workflow import get_workflow_steps
     click.echo('')
     click.echo('Configuration values:'
             '   | Normal colour indicates that the default value is used'
@@ -200,7 +202,7 @@ def info_stations(db):
     """
     Show information about configured stations.
     """
-    from ..api import get_stations
+    from ..stations import get_stations
     click.echo('')
     click.echo('Stations:')
     click.echo('  NET.STA    Long.     Lat.    Alt.   Coord. Used?')
@@ -224,7 +226,7 @@ def info_jobs(db):
     """
     Show information about jobs registered in database.
     """
-    from ..api import get_workflow_job_counts
+    from ..workflow import get_workflow_job_counts
     counts = get_workflow_job_counts(db)
     click.echo("Jobs:")
     for flag, label in [('T', 'Todo'), ('I', 'In Progress'), ('D', 'Done'), ('F', 'Failed')]:
@@ -326,8 +328,10 @@ def db_init(tech, auto_workflow):
 
 def _create_default_workflow():
     """Create default config sets, workflow steps and links after db init."""
-    from ..api import connect, create_config_set, \
-        create_workflow_steps_from_config_sets, create_workflow_links_from_steps
+    from ..db import connect
+    from ..config import create_config_set
+    from ..workflow import (create_workflow_steps_from_config_sets,
+                            create_workflow_links_from_steps)
 
     ALL_CATEGORIES = [
         'preprocess', 'cc', 'filter', 'stack',
@@ -378,7 +382,8 @@ def _create_default_workflow():
 def db_da_stations_update_loc_chan(ctx):
     """Populates the Location & Channel from the Data Availability
     table. Warning: rewrites automatically, no confirmation."""
-    from msnoise.api import connect, get_stations
+    from msnoise.db import connect
+    from msnoise.stations import get_stations
     session = connect()
     stations = get_stations(session)
     for sta in stations:
@@ -409,7 +414,7 @@ def db_da_stations_update_loc_chan(ctx):
 def db_execute(ctx, sql_command, outfile=None, show=True):
     """EXPERT MODE: Executes 'sql_command' on the database. Use this command
     at your own risk!!"""
-    from msnoise.api import connect
+    from msnoise.db import connect
     db = connect()
     for cmd in sql_command.split(";"):
         if not len(cmd):
@@ -445,7 +450,7 @@ def db_upgrade():
     This procedure adds new parameters with their default value
     in the config database.
     """
-    from ..api import connect, Config, read_db_inifile
+    from ..db import connect, read_db_inifile
     from ..default import default
     db = connect()
     dbini = read_db_inifile()
@@ -490,7 +495,7 @@ def db_upgrade():
 @db.command(name='clean_duplicates')
 def db_clean_duplicates():
     """Checks the Jobs table and deletes duplicate entries"""
-    from msnoise.api import connect, read_db_inifile
+    from msnoise.db import connect, read_db_inifile
 
     dbini = read_db_inifile()
     prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
@@ -514,7 +519,7 @@ def db_clean_duplicates():
 def db_dump(format):
     """Dumps the complete database in formatted files, defaults to CSV.
     """
-    from ..api import get_engine
+    from ..db import get_engine
     from sqlalchemy import MetaData
     import pandas as pd
 
@@ -542,7 +547,7 @@ def db_import(table, format, force):
     """
     Imports msnoise tables from formatted files (CSV).
     """
-    from ..api import get_engine, read_db_inifile
+    from ..db import get_engine, read_db_inifile
     import pandas as pd
     dbini = read_db_inifile(inifile=os.path.join(os.getcwd(), 'db.ini'))
 
@@ -574,7 +579,7 @@ def db_import(table, format, force):
 def info(jobs):
     """Outputs general information about the current install and config, plus
     information about jobs and their status."""
-    from ..api import connect
+    from ..db import connect
 
     if not os.path.isfile('db.ini'):
         click.secho(' - db.ini is not present, is MSNoise installed here ?',
@@ -606,8 +611,9 @@ def config_sync():
     """
     Synchronise station metadata from inventory/dataless.
     """
-    from ..api import connect, get_stations, update_station,\
-        preload_instrument_responses
+    from ..db import connect
+    from ..stations import get_stations, update_station
+    from ..signal import preload_instrument_responses
 
     db = connect()
     responses = preload_instrument_responses(db)
@@ -654,7 +660,8 @@ def config_set(name_value):
     if name not in default:
         click.echo("!! unknown parameter %s !!" % name)
         return
-    from ..api import connect, update_config
+    from ..config import update_config
+    from ..db import connect
     db = connect()
     update_config(db, name, value)
     db.commit()
@@ -668,7 +675,7 @@ def config_get(names):
     """
     Display the value of the given configuration variable(s).
     """
-    from ..api import connect
+    from ..db import connect
     db = connect()
     show_config_values(db, names)
     db.close()
@@ -681,7 +688,8 @@ def config_reset(names):
     Reset the value of the given configuration variable(s) to their default.
     """
     from ..default import default
-    from ..api import connect, update_config
+    from ..config import update_config
+    from ..db import connect
     for key in names:
         default_value = default[key].default
         db = connect()
@@ -698,7 +706,8 @@ def create_set(ctx, set_name):
 
     SET_NAME: Name of the workflow step (e.g., mwcs, mwcs_dtt, etc.)
     """
-    from ..api import connect, create_config_set
+    from ..config import create_config_set
+    from ..db import connect
 
     db = connect()
 
@@ -909,7 +918,8 @@ def create_all_sets(force, dry_run):
         'wavelet_dtt',
     ]
 
-    from ..api import connect, create_config_set
+    from ..config import create_config_set
+    from ..db import connect
 
     db = connect()
     for set_name in categories:
@@ -925,7 +935,7 @@ def create_all_sets(force, dry_run):
 @click.pass_context
 def create_workflow_step(ctx):
     """Create a new workflow step interactively"""
-    from ..api import create_workflow_step
+    from ..workflow import create_workflow_step
 
     session = ctx.obj['session']
 
@@ -948,7 +958,8 @@ def create_workflow_steps_from_configs(verbose):
     This command scans all configuration sets in the database and creates
     corresponding workflow steps, sorted by natural workflow order.
     """
-    from ..api import connect, create_workflow_steps_from_config_sets
+    from ..db import connect
+    from ..workflow import create_workflow_steps_from_config_sets
 
     if verbose:
         click.echo("Creating workflow steps")
@@ -985,7 +996,8 @@ def create_workflow_steps_from_configs(verbose):
 @click.pass_context
 def list_workflow_steps(ctx):
     """List all workflow steps"""
-    from ..api import connect, get_workflow_steps
+    from ..db import connect
+    from ..workflow import get_workflow_steps
 
     session = connect()
     steps = get_workflow_steps(session)
@@ -1003,7 +1015,8 @@ def list_workflow_steps(ctx):
 @click.pass_context
 def show_workflow_graph(ctx):
     """Show workflow graph"""
-    from ..api import connect, get_workflow_graph
+    from ..db import connect
+    from ..workflow import get_workflow_graph
 
     session = connect()
     graph = get_workflow_graph(session)
@@ -1028,7 +1041,8 @@ def create_workflow_links(verbose):
 
     Links are created based on matching set numbers and workflow logic.
     """
-    from ..api import connect, create_workflow_links_from_steps
+    from ..db import connect
+    from ..workflow import create_workflow_links_from_steps
 
     if verbose:
         click.echo("Creating workflow links")
@@ -1070,7 +1084,8 @@ def reset(jobtype, all, rule):
     By default only resets jobs "I"n progress. --all resets all jobs, whatever
     the flag value. Standard Job Types are CC, STACK, MWCS and DTT, but
     plugins can define their own."""
-    from ..api import connect, reset_jobs, read_db_inifile
+    from ..db import connect, read_db_inifile
+    from ..workflow import reset_jobs
     dbini = read_db_inifile()
     prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
     session = connect()
@@ -1882,8 +1897,10 @@ def utils_export_params(ctx, lineage, preprocessid, ccid, filterid, stackid,
         msnoise utils export-params -p 1 -cc 1 -f 1 -m 1 -S 1 -sd 1
         msnoise utils export-params -p 1 -cc 1 -f 1 -m 1 -W 1 -wd 1 -wdv 1
     """
-    from ..api import connect, get_params, lineage_str_to_steps
-    from ..api import get_merged_params_for_lineage
+    from ..config import get_params
+    from ..db import connect
+    from ..workflow import lineage_str_to_steps
+    from ..config import get_merged_params_for_lineage
 
     db = connect()
     orig_params = get_params(db)

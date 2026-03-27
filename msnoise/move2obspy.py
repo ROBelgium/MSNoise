@@ -10,7 +10,7 @@ import scipy.signal
 from scipy.stats import scoreatpercentile
 from obspy.signal.invsim import cosine_taper
 from obspy.signal.regression import linear_regression
-from .api import getCoherence
+from ...signal import getCoherence
 
 def myCorr(data, maxlag, plot=False, nfft=None):
     """This function takes ndimensional *data* array, computes the cross-correlation in the frequency domain
@@ -398,7 +398,7 @@ segment.
     #     from sf.helper import next_fast_len
     # except ImportError:
     #     from obspy.signal.util import next_pow_2 as next_fast_len
-    from msnoise.api import nextpow2
+    from .signal import nextpow2
     padd = int(2 ** (nextpow2(window_length_samples) + 2))
     # padd = next_fast_len(window_length_samples)
     count = 0

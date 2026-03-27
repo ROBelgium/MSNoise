@@ -15,11 +15,8 @@ component ZZ.
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 
-from ..api import (
-    connect, get_logger,
-    get_config_set_details,
-    build_plot_outfile,
-)
+from ....db import connect, get_logger
+from ....config import build_plot_outfile, get_config_set_details
 from ..results import MSNoiseResult
 
 

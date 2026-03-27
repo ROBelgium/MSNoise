@@ -14,8 +14,36 @@ import pooch
 import pytest
 from .. import s01_scan_archive, FatalError
 from ..scripts import msnoise as msnoise_script
-from ..api import *
-                #(connect, get_config, update_config, get_job_types,
+from ..db import connect, read_db_inifile
+from ..config import (
+    create_config_set,
+    get_config,
+    get_config_set_details,
+    get_merged_params_for_lineage,
+    get_params,
+    update_config)
+from ..stations import (
+    get_data_availability,
+    get_new_files,
+    get_station_pairs,
+    get_stations,
+    update_station)
+from ..workflow import (
+    build_movstack_datelist,
+    build_ref_datelist,
+    create_workflow_links_from_steps,
+    create_workflow_steps_from_config_sets,
+    get_done_lineages_for_category,
+    get_job_types,
+    get_workflow_links,
+    get_workflow_steps,
+    is_next_job_for_step,
+    lineage_str_to_steps,
+    reset_jobs)
+from ..signal import compute_wct_dtt, stack, validate_stack_data
+from ..io import psd_rms
+from ..msnoise_table_def import DataAvailability, Job, WorkflowStep
+#(connect, get_config, update_config, get_job_types,
                 #   get_new_files, get_filters, get_station_pairs,
                 #   get_components_to_compute, update_filter, Filter,
                 #   get_stations, update_station, get_data_availability,
@@ -746,7 +774,7 @@ def test_036_wct_dtt_param_update():
   
 @pytest.mark.order(37)
 def test_037_validate_stack_data():
-    from ..api import validate_stack_data
+    from ..signal import validate_stack_data
     import xarray as xr
     import numpy as np
     import pandas as pd
@@ -802,7 +830,7 @@ def test_037_validate_stack_data():
     
 @pytest.mark.order(38)
 def test_038_stack_validation_handling():
-    from ..api import validate_stack_data
+    from ..signal import validate_stack_data
     import xarray as xr
     import numpy as np
     import pandas as pd
@@ -1194,7 +1222,7 @@ def test_20000_invoke_script(setup_environment):
 def test_110000_lineage_str_to_steps_strict():
     """lineage_str_to_steps raises on missing step when strict=True."""
     db = connect()
-    from ..api import lineage_str_to_steps
+    from ..workflow import lineage_str_to_steps
     with pytest.raises(Exception):
         lineage_str_to_steps(db, "preprocess_1/nonexistent_99", strict=True)
     db.close()
@@ -1204,7 +1232,7 @@ def test_110000_lineage_str_to_steps_strict():
 def test_110001_lineage_str_to_steps_permissive():
     """lineage_str_to_steps returns partial list when strict=False."""
     db = connect()
-    from ..api import lineage_str_to_steps
+    from ..workflow import lineage_str_to_steps
     steps = lineage_str_to_steps(db, "preprocess_1/nonexistent_99", strict=False)
     # Should return whatever steps were resolved, not raise
     assert isinstance(steps, list)
@@ -1215,7 +1243,8 @@ def test_110001_lineage_str_to_steps_permissive():
 def test_110002_lineage_str_to_steps_valid():
     """lineage_str_to_steps resolves a valid lineage correctly."""
     db = connect()
-    from ..api import lineage_str_to_steps, get_workflow_steps
+    from ..workflow import lineage_str_to_steps
+    from ..workflow import get_workflow_steps
     # Build a lineage string from real steps
     steps = get_workflow_steps(db)
     preprocess = next((s for s in steps if s.category == 'preprocess'), None)
@@ -1232,7 +1261,10 @@ def test_110002_lineage_str_to_steps_valid():
 def test_110010_get_merged_params_overrides():
     """get_merged_params_for_lineage: later configsets override earlier."""
     db = connect()
-    from ..api import get_merged_params_for_lineage, get_params, lineage_str_to_steps, get_workflow_steps
+    from ..config import get_merged_params_for_lineage
+    from ..config import get_params
+    from ..workflow import lineage_str_to_steps
+    from ..workflow import get_workflow_steps
     orig_params = get_params(db)
     steps = get_workflow_steps(db)
     # Find a filter step
@@ -1254,7 +1286,10 @@ def test_110010_get_merged_params_overrides():
 def test_110011_get_merged_params_components_split():
     """get_merged_params_for_lineage splits components_to_compute into a list."""
     db = connect()
-    from ..api import get_merged_params_for_lineage, get_params, lineage_str_to_steps, get_workflow_steps
+    from ..config import get_merged_params_for_lineage
+    from ..config import get_params
+    from ..workflow import lineage_str_to_steps
+    from ..workflow import get_workflow_steps
     orig_params = get_params(db)
     steps = get_workflow_steps(db)
     cc_steps = [s for s in steps if s.category == 'cc']
@@ -1275,7 +1310,7 @@ def test_110011_get_merged_params_components_split():
 def test_110020_get_done_lineages_for_category():
     """get_done_lineages_for_category returns done lineages after pipeline run."""
     db = connect()
-    from ..api import get_done_lineages_for_category
+    from ..workflow import get_done_lineages_for_category
     lineages = get_done_lineages_for_category(db, 'cc')
     assert isinstance(lineages, list)
     assert len(lineages) >= 1, "Expected at least one done CC lineage"
@@ -1289,7 +1324,7 @@ def test_110020_get_done_lineages_for_category():
 def test_110021_get_done_lineages_deduplicates():
     """get_done_lineages_for_category deduplicates lineage strings."""
     db = connect()
-    from ..api import get_done_lineages_for_category
+    from ..workflow import get_done_lineages_for_category
     lineages = get_done_lineages_for_category(db, 'cc')
     # Convert to frozensets for dedup check
     as_tuples = [tuple(lin) for lin in lineages]

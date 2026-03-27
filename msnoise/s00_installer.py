@@ -235,7 +235,7 @@ def main(tech=None, hostname=None, username=None, password=None,
     session = Session()
 
     # Add default configuration values to the database
-    from .api import create_config_set
+    from .config import create_config_set
 
 
     try:

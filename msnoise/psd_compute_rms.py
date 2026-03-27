@@ -19,19 +19,11 @@ psd_rms_frequency_ranges).
 import traceback
 import pandas as pd
 
-from .api import (
-    connect,
-    get_config_set_details,
-    get_config,
-    get_logger,
-    get_next_job_for_step,
-    get_station,
-    is_next_job_for_step,
-    massive_update_job,
-    psd_df_rms,
-    xr_load_psd,
-    xr_save_rms,
-)
+from ...db import connect, get_logger
+from ...config import get_config, get_config_set_details
+from ...stations import get_station
+from ...workflow import get_next_job_for_step, is_next_job_for_step, massive_update_job
+from ...io import psd_df_rms, xr_load_psd, xr_save_rms
 
 
 def main(loglevel="INFO", njobs_per_worker=9999):

@@ -3,7 +3,11 @@ import tempfile
 import pooch
 import pytest
 from ..scripts import msnoise as msnoise_script
-from ..api import *
+from ..db import connect, read_db_inifile
+from ..config import get_config, update_config
+from ..stations import get_data_availability, get_new_files, get_station_pairs, get_stations, update_station
+from ..workflow import build_movstack_datelist, build_ref_datelist, get_job_types, reset_jobs
+from ..msnoise_table_def import Job
 #(connect, get_config, update_config, get_job_types,
 #                   get_new_files, get_filters, get_station_pairs,
 #                   get_components_to_compute, update_filter, Filter,

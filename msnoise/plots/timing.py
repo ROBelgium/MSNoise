@@ -15,12 +15,10 @@ Example:
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 
-from ..api import (
-    connect, get_logger, build_movstack_datelist,
-    get_config_set_details,
-    get_station_pairs,
-    build_plot_outfile,
-)
+from ....db import connect, get_logger
+from ....config import build_plot_outfile, get_config_set_details
+from ....stations import get_station_pairs
+from ....workflow import build_movstack_datelist
 from ..results import MSNoiseResult
 
 

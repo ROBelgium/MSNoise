@@ -38,22 +38,10 @@ should be run after the ``msnoise compute_cc`` step in order to create the
 
 import datetime
 
-from .api import (
-    build_movstack_datelist,
-    connect,
-    filter_within_daterange,
-    get_config,
-    get_config_set_details,
-    get_lineages_to_step_id,
-    get_logger,
-    get_new_files,
-    get_stations,
-    get_workflow_steps,
-    lineage_str_to_step_names,
-    mark_data_availability,
-    massive_insert_job,
-    update_job,
-)
+from ...db import connect, get_logger
+from ...config import get_config, get_config_set_details
+from ...stations import get_new_files, get_stations, mark_data_availability
+from ...workflow import (build_movstack_datelist, filter_within_daterange, get_lineages_to_step_id, get_workflow_steps, lineage_str_to_step_names, massive_insert_job, update_job)
 import pandas as pd
 
 
@@ -799,7 +787,7 @@ def propagate_first_runnable_from_category(session, source_category, skip_catego
     from .msnoise_table_def import declare_tables
 
     schema = declare_tables()
-    from .api import get_first_runnable_steps_per_branch
+    from .workflow import get_first_runnable_steps_per_branch
     WorkflowStep = schema.WorkflowStep
 
     parent_steps = (
@@ -835,7 +823,8 @@ def create_cc_jobs_from_preprocess(session):
     corresponding CC jobs based on workflow links and CC step configurations.
     """
     from .msnoise_table_def import declare_tables
-    from .api import get_step_successors, get_config_set_details
+    from .config import get_config_set_details
+    from .workflow import get_step_successors
 
     schema = declare_tables()
     Job = schema.Job

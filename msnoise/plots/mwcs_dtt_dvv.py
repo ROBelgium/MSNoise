@@ -18,10 +18,8 @@ import traceback
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 
-from ..api import (
-    connect, get_logger,
-    build_plot_outfile,
-)
+from ....db import connect, get_logger
+from ....config import build_plot_outfile
 from ..results import MSNoiseResult
 
 
