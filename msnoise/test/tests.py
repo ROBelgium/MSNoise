@@ -654,8 +654,8 @@ def test_099_plot_interferogram():
                 sta_id2 = f"{sta2.net}.{sta2.sta}.{loc2}"
                 for filter_step in filter_steps:
                     interferogram_main(sta_id1, sta_id2,
-                                      filter_id=filter_step.set_number,
-                                      components="ZZ", stack_item=1,
+                                      filterid=filter_step.set_number,
+                                      components="ZZ", stackid_item=1,
                                       show=False, outfile="?.png")
                     fn = f'interferogram {sta_id1}-{sta_id2}-ZZ-f{filter_step.set_number}-m6h_6h.png'
                     assert os.path.isfile(fn), f"{fn} doesn't exist"
