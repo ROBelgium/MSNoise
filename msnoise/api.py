@@ -2377,15 +2377,18 @@ def get_maxlag_samples(maxlag, cc_sampling_rate):
     return int(2*maxlag*cc_sampling_rate)+1
 
 
-def build_ref_datelist(params):
+def build_ref_datelist(params, session=None):
     """
     Creates a date array for the REF.
     The returned tuple contains a start and an end date, and a list of
     individual dates between the two.
 
-    :type session: :class:`sqlalchemy.orm.session.Session`
+    :type params: :class:`~msnoise.api.AttribDict`
+    :param params: A params object as obtained by :func:`get_params`.
+    :type session: :class:`sqlalchemy.orm.session.Session`, optional
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
+        obtained by :func:`connect`. Required only when ``ref_begin`` is
+        ``"1970-01-01"`` (auto-detect from data availability).
 
     :rtype: tuple
     :returns: (start, end, datelist)
@@ -2396,6 +2399,8 @@ def build_ref_datelist(params):
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
         end = datetime.date.today() + datetime.timedelta(days=int(end))
     elif begin == "1970-01-01":
+        if session is None:
+            session = connect()
         start = session.query(DataAvailability).order_by(
             DataAvailability.starttime).first().starttime.date()
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()

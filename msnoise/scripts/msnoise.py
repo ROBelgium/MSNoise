@@ -1327,7 +1327,7 @@ stack_options = common_options(base_options, stackid_option, stackid_item_option
 full_options  = common_options(stack_options, comp_option)
 
 mwcs_options = common_options(stack_options, mwcsid_option, comp_option)
-mwcsdtt_options = common_options(mwcs_options, mwcsdttid_option, comp_option)
+mwcsdtt_options = common_options(mwcs_options, mwcsdttid_option)
 
 
 # DTT-side lineage options (preprocess → cc → filter → stack → mwcs → mwcs_dtt)
