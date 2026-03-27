@@ -10,7 +10,7 @@ import scipy.signal
 from scipy.stats import scoreatpercentile
 from obspy.signal.invsim import cosine_taper
 from obspy.signal.regression import linear_regression
-from .signal import getCoherence
+from .core.signal import getCoherence
 
 def myCorr(data, maxlag, plot=False, nfft=None):
     """This function takes ndimensional *data* array, computes the cross-correlation in the frequency domain

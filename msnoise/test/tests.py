@@ -6,43 +6,33 @@ import shutil
 import traceback
 from click.testing import CliRunner
 from obspy import read
-from numpy.testing import assert_allclose
-from sqlalchemy import text
 import tempfile
 import pandas as pd
 import pooch
 import pytest
-from .. import s01_scan_archive, FatalError
+from .. import FatalError
 from ..scripts import msnoise as msnoise_script
-from ..db import connect, read_db_inifile
-from ..config import (
+from ..core.db import connect
+from ..core.config import (
     create_config_set,
     get_config,
     get_config_set_details,
-    get_merged_params_for_lineage,
-    get_params,
     update_config)
-from ..stations import (
+from ..core.stations import (
     get_data_availability,
     get_new_files,
     get_station_pairs,
     get_stations,
     update_station)
-from ..workflow import (
-    build_movstack_datelist,
-    build_ref_datelist,
+from ..core.workflow import (
     create_workflow_links_from_steps,
     create_workflow_steps_from_config_sets,
-    get_done_lineages_for_category,
     get_job_types,
     get_workflow_links,
     get_workflow_steps,
     is_next_job_for_step,
-    lineage_str_to_steps,
     reset_jobs)
-from ..signal import compute_wct_dtt, stack, validate_stack_data
-from ..io import psd_rms
-from ..msnoise_table_def import DataAvailability, Job, WorkflowStep
+from ..msnoise_table_def import DataAvailability
 #(connect, get_config, update_config, get_job_types,
                 #   get_new_files, get_filters, get_station_pairs,
                 #   get_components_to_compute, update_filter, Filter,

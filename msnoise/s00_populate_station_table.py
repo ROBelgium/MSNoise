@@ -80,9 +80,9 @@ import glob
 import sys
 import traceback
 
-from .db import connect, get_logger
-from .config import get_config
-from .stations import update_station
+from .core.db import connect, get_logger
+from .core.config import get_config
+from .core.stations import update_station
 
 import logging
 import os

@@ -43,9 +43,9 @@ try:
 except Exception:
     pass
 
-from .db import connect, get_logger
-from .stations import get_data_availability
-from .signal import check_and_phase_shift, getGaps
+from .core.db import connect, get_logger
+from .core.stations import get_data_availability
+from .core.signal import check_and_phase_shift, getGaps
 import io
 import logbook
 

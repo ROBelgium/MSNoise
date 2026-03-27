@@ -5,7 +5,7 @@ import logging
 import numpy as np
 
 from .config import get_config
-from .msnoise_table_def import Station, DataAvailability
+from ..msnoise_table_def import Station, DataAvailability
 
 def get_stations(session, all=False, net=None, format="raw"):
     """Get Stations from the database.

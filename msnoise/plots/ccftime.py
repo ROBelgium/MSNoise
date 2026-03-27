@@ -43,10 +43,10 @@ register_matplotlib_converters()
 
 from obspy.signal.filter import envelope as obspy_envelope
 from obspy.signal.filter import bandpass
-from ..db import connect, get_logger
-from ..config import build_plot_outfile
-from ..stations import check_stations_uniqueness
-from ..workflow import build_movstack_datelist
+from ..core.db import connect, get_logger
+from ..core.config import build_plot_outfile
+from ..core.stations import check_stations_uniqueness
+from ..core.workflow import build_movstack_datelist
 from ..results import MSNoiseResult
 
 

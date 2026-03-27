@@ -88,7 +88,7 @@ class MSNoiseResult:
     # ------------------------------------------------------------------ #
 
     def __init__(self, db, lineage_names: list[str]):
-        from .workflow import resolve_lineage_params
+        from .core.workflow import resolve_lineage_params
         self._db = db
         self.lineage_names: list[str] = list(lineage_names)
         _, _, self.params = resolve_lineage_params(db, lineage_names)
@@ -201,7 +201,7 @@ class MSNoiseResult:
             for r in MSNoiseResult.list(db, 'mwcs_dtt'):
                 print(r.lineage_names)
         """
-        from .workflow import get_done_lineages_for_category, get_workflow_steps
+        from .core.workflow import get_done_lineages_for_category, get_workflow_steps
 
         results = []
 
@@ -378,8 +378,8 @@ class MSNoiseResult:
         If all args are specified: a :class:`~pandas.DataFrame`.
         Otherwise: a dict keyed by ``(pair, components, mov_stack)``.
         """
-        from .io import xr_get_ccf
-        from .workflow import get_t_axis
+        from .core.io import xr_get_ccf
+        from .core.workflow import get_t_axis
 
         self._require_category("stack")
         # CCFs live under the stack step folder
@@ -460,8 +460,8 @@ class MSNoiseResult:
         If all args specified: result in requested format.
         Otherwise: dict keyed by ``(pair, components)``.
         """
-        from .io import xr_get_ref
-        from .workflow import get_t_axis
+        from .core.io import xr_get_ref
+        from .core.workflow import get_t_axis
 
         self._require_category("refstack")
         lineage = self._lineage_through("refstack")
@@ -530,7 +530,7 @@ class MSNoiseResult:
         If all args specified: result in requested format.
         Otherwise: dict keyed by ``(pair, components, mov_stack)``.
         """
-        from .io import xr_get_mwcs
+        from .core.io import xr_get_mwcs
 
         self._require_category("mwcs")
         lineage = self._lineage_through("mwcs")
@@ -566,7 +566,7 @@ class MSNoiseResult:
         If all args specified: result in requested format.
         Otherwise: dict keyed by ``(pair, components, mov_stack)``.
         """
-        from .io import xr_get_dtt
+        from .core.io import xr_get_dtt
 
         self._require_category("mwcs_dtt")
         lineage = self._lineage_through("mwcs_dtt")
@@ -602,7 +602,7 @@ class MSNoiseResult:
         If all args specified: result in requested format.
         Otherwise: dict keyed by ``(pair, components, mov_stack)``.
         """
-        from .io import _xr_get_stretching
+        from .core.io import _xr_get_stretching
 
         self._require_category("stretching")
         lineage = self._lineage_through("stretching")
@@ -651,7 +651,7 @@ class MSNoiseResult:
         requested format.
         Otherwise: dict keyed by ``(pair_type, components, mov_stack)``.
         """
-        from .io import xr_get_dvv_agg
+        from .core.io import xr_get_dvv_agg
 
         DVV_CATEGORIES = ("mwcs_dtt_dvv", "stretching_dvv", "wavelet_dtt_dvv")
         present = {_step_prefix(n) for n in self.lineage_names}
@@ -733,7 +733,7 @@ class MSNoiseResult:
         If all args specified: result in requested format.
         Otherwise: dict keyed by ``(pair, components, mov_stack)``.
         """
-        from .io import xr_load_wct
+        from .core.io import xr_load_wct
 
         self._require_category("wavelet")
         lineage = self._lineage_through("wavelet")
@@ -769,7 +769,7 @@ class MSNoiseResult:
         If all args specified: result in requested format.
         Otherwise: dict keyed by ``(pair, components, mov_stack)``.
         """
-        from .io import xr_get_wct_dtt
+        from .core.io import xr_get_wct_dtt
 
         self._require_category("wavelet_dtt")
         lineage = self._lineage_through("wavelet_dtt")
@@ -807,7 +807,7 @@ class MSNoiseResult:
         If all args specified: result in requested format.
         Otherwise: dict keyed by ``(seed_id, day)``.
         """
-        from .io import xr_load_psd
+        from .core.io import xr_load_psd
 
         self._require_category("psd")
         step_name = self._step_name_for("psd")
@@ -863,7 +863,7 @@ class MSNoiseResult:
         If specified: result in requested format.
         Otherwise: dict keyed by ``seed_id``.
         """
-        from .io import xr_load_rms
+        from .core.io import xr_load_rms
 
         self._require_category("psd_rms")
         step_name = self._step_name_for("psd_rms")
@@ -951,7 +951,7 @@ def _upstream_lineage_for_step(db, step) -> list[str]:
     In a multi-configset DAG (multiple incoming links to one step), all
     paths are enumerated.
     """
-    from .workflow import get_workflow_links
+    from .core.workflow import get_workflow_links
     from .msnoise_table_def import declare_tables
 
     schema = declare_tables()

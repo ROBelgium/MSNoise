@@ -27,11 +27,11 @@ import time
 import numpy as np
 import xarray as xr
 
-from .db import connect, get_logger
-from .stations import get_interstation_distance, get_station_pairs
-from .workflow import (extend_days, get_next_lineage_batch, is_next_job_for_step, massive_update_job)
-from .signal import compute_wct_dtt, get_wct_avgcoh
-from .io import xr_load_wct, xr_save_wct_dtt
+from .core.db import connect, get_logger
+from .core.stations import get_interstation_distance, get_station_pairs
+from .core.workflow import (extend_days, get_next_lineage_batch, is_next_job_for_step, massive_update_job)
+from .core.signal import compute_wct_dtt, get_wct_avgcoh
+from .core.io import xr_load_wct, xr_save_wct_dtt
 
 
 def main(loglevel="INFO"):

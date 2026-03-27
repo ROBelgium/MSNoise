@@ -6,7 +6,7 @@ import sys
 
 from logbook import Logger, StreamHandler
 
-from . import DBConfigNotFoundError
+from .. import DBConfigNotFoundError
 
 def get_logger(name, loglevel=None, with_pid=False):
     """

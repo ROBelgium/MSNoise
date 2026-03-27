@@ -2,7 +2,7 @@
 import traceback
 
 from .db import get_logger
-from .msnoise_table_def import Config
+from ..msnoise_table_def import Config
 
 
 _STEP_ABBREVS = {
