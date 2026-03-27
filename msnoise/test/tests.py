@@ -659,33 +659,41 @@ def test_033_create_fake_new_files(setup_environment):
 def test_033b_compute_second_day():
     """Propagate the second day's CC jobs through the full pipeline.
 
-    test_033 added day 2 data, scanned the archive, ran preprocess and CC for
-    the new day.  This test runs all downstream steps so that day 2 is present
-    in every output (stack, refstack, MWCS, DTT, stretching, WCT, WCT-DTT),
-    giving DVV aggregates at least 2 time steps.
+    test_033 left cc_1 jobs with flag 'T' for day 2.  This test runs them
+    through the full pipeline (CC → stack → refstack → MWCS → DTT →
+    stretching → WCT → WCT-DTT) so DVV aggregates see >= 2 time steps.
     """
-    # ── Stack ────────────────────────────────────────────────────────────────
+    db = connect()
+
+    # ── CC day 2 ─────────────────────────────────────────────────────────────
+    compute_cc_main()
+
+    # ── Stack day 2 ──────────────────────────────────────────────────────────
     new_jobs_main(after='cc')
     stack_mov('mov')
+
+    # ── Refstack: reset so it re-integrates both days into the REF ──────────
+    reset_jobs(db, 'refstack_1', alljobs=True)
+    db.close()
     new_jobs_main(after='stack')
     stack_refstack_main()
 
-    # ── MWCS ─────────────────────────────────────────────────────────────────
+    # ── MWCS day 2 ───────────────────────────────────────────────────────────
     new_jobs_main(after='refstack')
     compute_mwcs_main()
     new_jobs_main(after='mwcs')
     compute_dtt_main()
 
-    # ── Stretching ───────────────────────────────────────────────────────────
+    # ── Stretching day 2 ─────────────────────────────────────────────────────
     from ..s10_stretching import main as stretch_main
     stretch_main()
 
-    # ── Wavelet (WCT) ────────────────────────────────────────────────────────
+    # ── WCT day 2 ────────────────────────────────────────────────────────────
     compute_wct_main()
     new_jobs_main(after='wavelet')
     wavelet_dtt_main()
 
-    # Verify at least 2 days of MWCS output exist
+    # ── Verify 2 days in MWCS output ─────────────────────────────────────────
     db = connect()
     results = MSNoiseResult.list(db, category='mwcs_dtt')
     assert len(results) >= 1, "Expected at least one mwcs_dtt result after second day"
@@ -697,7 +705,8 @@ def test_033b_compute_second_day():
             n_times = max(n_times, len(v.times))
         elif hasattr(v, 'index'):
             n_times = max(n_times, len(v))
-    assert n_times >= 2,         f"Expected ≥ 2 time steps in MWCS output after 2 days of data, got {n_times}"
+    assert n_times >= 2, \
+        f"Expected >= 2 time steps in MWCS output after 2 days of data, got {n_times}"
     db.close()
 
 @pytest.mark.order(34)
