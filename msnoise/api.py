@@ -4511,22 +4511,33 @@ def compute_dtt_wct(session, root, lineage, mov_stack,
 # ============================================================
 
 
-def _classify_pair_type(sta1: str, sta2: str) -> str:
+def _classify_pair_type(sta1: str, sta2: str, component: str = "") -> str:
     """Classify a station pair as CC, SC, or AC.
+
+    Classification is based on the SEED ``NET.STA.LOC`` ids and the component
+    pair string (e.g. ``"ZZ"``, ``"ZN"``):
+
+    - **AC** (autocorrelation): ``sta1 == sta2`` *and* both component letters
+      are identical (e.g. ``"ZZ"``, ``"EE"``).  Same instrument correlating
+      with itself.
+    - **SC** (single-channel cross-component): ``sta1 == sta2`` *and*
+      component letters differ (e.g. ``"ZN"``).  Different channels at the
+      same location.
+    - **CC** (cross-correlation): ``sta1 != sta2``.  Different physical
+      locations regardless of component.
 
     :param sta1: First station SEED id ``NET.STA.LOC``.
     :param sta2: Second station SEED id ``NET.STA.LOC``.
-    :returns: ``"AC"`` if the two ids are identical (true autocorrelation),
-        ``"SC"`` if they share ``NET.STA`` but differ in ``LOC``,
-        ``"CC"`` for all other (cross-correlation) pairs.
+    :param component: Component-pair string (e.g. ``"ZZ"``, ``"ZN"``).
+        If empty or length < 2, falls back to comparing only the SEED ids.
+    :returns: ``"AC"``, ``"SC"``, or ``"CC"``.
     """
-    if sta1 == sta2:
+    if sta1 != sta2:
+        return "CC"
+    # Same NET.STA.LOC — distinguish by component
+    if len(component) >= 2 and component[0] == component[-1]:
         return "AC"
-    parts1 = sta1.split(".")
-    parts2 = sta2.split(".")
-    if len(parts1) >= 2 and len(parts2) >= 2 and parts1[:2] == parts2[:2]:
-        return "SC"
-    return "CC"
+    return "SC"
 
 
 def _dvv_column_spec(parent_category: str, pair_type: str, params) -> tuple:
@@ -4682,7 +4693,7 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
 
     for sta1, sta2 in pairs:
         # Filter by pair_type
-        pt = _classify_pair_type(sta1, sta2)
+        pt = _classify_pair_type(sta1, sta2, component)
         if pair_type != "ALL" and pt != pair_type:
             continue
 
