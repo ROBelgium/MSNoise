@@ -1,9 +1,9 @@
 """
 Plot dt/t (and dv/v) from the Wavelet Coherence Transform method.
 
-Reads per-pair WCT dt/t results (stored as NetCDF by the ``wavelet_dtt``
-step) and plots network-aggregated statistics using
-:func:`msnoise.api.compute_dtt_wct`.
+The ``timeseries`` style reads pre-aggregated network dv/v from the
+``wct_dtt_dvv`` step output written by :mod:`msnoise.s07_compute_dvv`.
+The ``heatmap`` style reads per-pair WCT dt/t NetCDF files directly.
 
 Two plot styles are available via the ``--visualize`` option:
 
@@ -14,10 +14,10 @@ Two plot styles are available via the ``--visualize`` option:
 
 Example:
 
-``msnoise cc dtt plot wct`` will plot all defaults (timeseries).
+``msnoise cc dtt dvv plot wct_dtt_dvv`` will plot all defaults (timeseries).
 
-``msnoise cc dtt plot wct -v heatmap -f 1 -w 1 -d 1`` plots a heatmap for
-filter 1, WCT set 1, DTT set 1.
+``msnoise cc dtt dvv plot wct_dtt_dvv -v heatmap -f 1 -w 1 -d 1`` plots a
+heatmap for filter 1, WCT set 1, DTT set 1.
 """
 
 import numpy as np
