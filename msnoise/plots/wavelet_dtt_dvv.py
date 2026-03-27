@@ -41,8 +41,8 @@ def _plot_timeseries(result, mov_stacks, comp_list,
     The result must be instantiated at the ``wavelet_dtt_dvv`` step.
     """
     params = result.params
-    low  = params.freqmin
-    high = params.freqmax
+    low  = params.filter.freqmin
+    high = params.filter.freqmax
 
     fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
@@ -88,7 +88,7 @@ def _plot_timeseries(result, mov_stacks, comp_list,
 
     fig.autofmt_xdate()
 
-    freq_label = " [%.2f–%.2f Hz band]" % (params.wct_dtt_freqmin, params.wct_dtt_freqmax)
+    freq_label = " [%.2f–%.2f Hz band]" % (params.wavelet_dtt.wct_dtt_freqmin, params.wavelet_dtt.wct_dtt_freqmax)
     plt.suptitle(
         "%s  |  Filter %d (%.2f–%.2f Hz)  |  WCT%s"
         % (",".join(comp_list), filterid, low, high, freq_label)

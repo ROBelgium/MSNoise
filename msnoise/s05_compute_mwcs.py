@@ -137,20 +137,20 @@ def main(loglevel="INFO"):
 
         mov_stacks = params.mov_stack
 
-        goal_sampling_rate = params.cc_sampling_rate
-        maxlag = params.maxlag
+        goal_sampling_rate = params.cc.cc_sampling_rate
+        maxlag = params.cc.maxlag
 
         logger.info(
             "There are MWCS jobs for some days to recompute for %s" % pair)
 
         # mwcsid = int(params.ref)
-        freqmin = params.freqmin
-        freqmax = params.freqmax
+        freqmin = params.mwcs.freqmin
+        freqmax = params.mwcs.freqmax
 
         def ww(a):
             from .move2obspy import whiten
             n = next_fast_len(len(a))
-            return whiten(a, n, 1./params.cc_sampling_rate,
+            return whiten(a, n, 1./params.cc.cc_sampling_rate,
                           freqmin, freqmax, returntime=True)
         ref_name = pair.replace(':', '_')
         station1, station2 = pair.split(":")
@@ -196,7 +196,7 @@ def main(loglevel="INFO"):
                 if rolling_mode:
                     # Mode B: compute per-index rolling reference from MOV data
                     ref_rolling = compute_rolling_ref(
-                        data, int(params.ref_begin), int(params.ref_end)
+                        data, int(params.refstack.ref_begin), int(params.refstack.ref_end)
                     )
                     # ref_rolling shape: (n_times, n_lag_samples)
 
@@ -206,7 +206,7 @@ def main(loglevel="INFO"):
 
                 # work on 2D mwcs:
                 window_length_samples = int(
-                    params.mwcs_wlen * goal_sampling_rate)
+                    params.mwcs.mwcs_wlen * goal_sampling_rate)
 
                 padd = int(2 ** (nextpow2(window_length_samples) + 2))
 
@@ -214,10 +214,10 @@ def main(loglevel="INFO"):
                 tp = cosine_taper(window_length_samples, 0.85)
                 minind = 0
                 maxind = window_length_samples
-                step_samples = int(params.mwcs_step * goal_sampling_rate)
-                if step_samples != (params.mwcs_step * goal_sampling_rate):
+                step_samples = int(params.mwcs.mwcs_step * goal_sampling_rate)
+                if step_samples != (params.mwcs.mwcs_step * goal_sampling_rate):
                     logger.warning('mwcs_step of %g s incompatible with %i Hz sampling rate. Step size of %g s used instead' %
-                                    (params.mwcs_step, goal_sampling_rate, step_samples/goal_sampling_rate))
+                                    (params.mwcs.mwcs_step, goal_sampling_rate, step_samples/goal_sampling_rate))
 
                 freq_vec = sf.fftfreq(padd, 1. / goal_sampling_rate)[
                         :padd // 2]
@@ -331,7 +331,7 @@ def main(loglevel="INFO"):
                     sx2 = np.sum(W * v ** 2, axis=1)
                     E = np.sqrt(e * s2x2 / sx2 ** 2)
 
-                    ti = -params.maxlag + params.mwcs_wlen / 2. + count * (step_samples/goal_sampling_rate)
+                    ti = -params.cc.maxlag + params.mwcs.mwcs_wlen / 2. + count * (step_samples/goal_sampling_rate)
                     # print("Finished processing t_center=", ti, "s")
                     output.append((ti, M, E, MCOH))
                     count += 1
@@ -364,7 +364,7 @@ def main(loglevel="INFO"):
                 del data, output, ds_out
 
         massive_update_job(db, jobs, "D")
-        # if not params.hpc:
+        # if not params.global_.hpc:
         #     for job in jobs:
         #         update_job(db, job.day, job.pair, 'DTT', 'T')
     logger.info('*** Finished: Compute MWCS ***')

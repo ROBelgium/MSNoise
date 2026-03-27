@@ -113,8 +113,8 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
             + params.components_to_compute_single_station
         ) if c]  # drop empty strings
 
-        split_pair_type  = params.dvv_split_pair_type
-        split_components = params.dvv_split_components
+        split_pair_type  = params.category_layer.dvv_split_pair_type
+        split_components = params.category_layer.dvv_split_components
 
         # split=Y → one file per individual type/component
         # split=N → one combined ALL file

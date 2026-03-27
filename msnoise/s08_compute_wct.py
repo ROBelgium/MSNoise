@@ -99,19 +99,19 @@ def main(loglevel="INFO"):
             components_to_compute = params.components_to_compute
 
         mov_stacks = params.mov_stack
-        goal_sampling_rate = params.cc_sampling_rate
+        goal_sampling_rate = params.cc.cc_sampling_rate
 
         # Filter frequency range from the wavelet step config
-        freqmin = params.wct_freqmin
-        freqmax = params.wct_freqmax
+        freqmin = params.wavelet.wct_freqmin
+        freqmax = params.wavelet.wct_freqmax
 
         # Wavelet computation parameters from the wavelet step config
-        ns = getattr(params, 'wct_ns', 5)
-        nt = getattr(params, 'wct_nt', 5)
-        vpo = getattr(params, 'wct_vpo', 20)
-        nptsfreq = getattr(params, 'wct_nptsfreq', 300)
-        wct_norm = getattr(params, 'wct_norm', "Y") == "Y"
-        wavelet_type = eval(getattr(params, 'wavelet_type', '') or "('Morlet',6.)")
+        ns = params.wavelet.wct_ns
+        nt = params.wavelet.wct_nt
+        vpo = params.wavelet.wct_vpo
+        nptsfreq = params.wavelet.wct_nptsfreq
+        wct_norm = params.wavelet.wct_norm
+        wavelet_type = eval(params.wavelet.wavelet_type or "('Morlet',6.)")
 
         logger.info(f"WCT params: freqmin={freqmin} freqmax={freqmax} ns={ns} nt={nt} vpo={vpo}")
 
@@ -160,7 +160,7 @@ def main(loglevel="INFO"):
 
                 if rolling_mode:
                     ref_rolling = compute_rolling_ref(
-                        data, int(params.ref_begin), int(params.ref_end)
+                        data, int(params.refstack.ref_begin), int(params.refstack.ref_end)
                     )
 
                 for _i_row, date in enumerate(data.coords["times"].values):

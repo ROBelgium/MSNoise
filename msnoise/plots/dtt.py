@@ -69,11 +69,11 @@ def main(sta1, sta2, filterid=1, components="ZZ", day=None,
                                         mwcs_dtt=mwcsdttid)
 
     # DTT lag window params
-    dtt_lag    = getattr(params, "dtt_lag",    "static")
-    dtt_v      = float(getattr(params, "dtt_v",     1.0))
-    dtt_minlag = float(getattr(params, "dtt_minlag", 5.0))
-    dtt_width  = float(getattr(params, "dtt_width",  30.0))
-    maxlag     = float(getattr(params, "maxlag",     120.0))
+    dtt_lag    = params.mwcs_dtt.dtt_lag
+    dtt_v      = params.mwcs_dtt.dtt_v
+    dtt_minlag = params.mwcs_dtt.dtt_minlag
+    dtt_width  = params.mwcs_dtt.dtt_width
+    maxlag     = params.cc.maxlag
 
     if dtt_lag == "dynamic":
         st1 = get_station(db, *sta1.split(".")[:2])

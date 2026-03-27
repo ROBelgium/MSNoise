@@ -73,14 +73,14 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
     sta2 = check_stations_uniqueness(db, sta2)
 
     # DTT lag window parameters (from merged params or defaults)
-    dtt_lag   = dtt_params.dtt_lag
-    dtt_v     = dtt_params.dtt_v
-    dtt_minlag= dtt_params.dtt_minlag
-    dtt_width = dtt_params.dtt_width
-    minCoh    = dtt_params.dtt_mincoh
-    maxErr    = dtt_params.dtt_maxerr
-    maxDt     = dtt_params.dtt_maxdtt
-    maxlag    = dtt_params.maxlag
+    dtt_lag   = dtt_params.mwcs_dtt.dtt_lag
+    dtt_v     = dtt_params.mwcs_dtt.dtt_v
+    dtt_minlag= dtt_params.mwcs_dtt.dtt_minlag
+    dtt_width = dtt_params.mwcs_dtt.dtt_width
+    minCoh    = dtt_params.mwcs_dtt.dtt_mincoh
+    maxErr    = dtt_params.mwcs_dtt.dtt_maxerr
+    maxDt     = dtt_params.mwcs_dtt.dtt_maxdtt
+    maxlag    = dtt_params.cc.maxlag
 
     if dtt_lag == "dynamic":
         st1 = get_station(db, *sta1.split(".")[:2])

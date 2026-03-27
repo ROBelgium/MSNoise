@@ -38,8 +38,8 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
     result = MSNoiseResult.from_names(db, lineage)
     params = result.params
 
-    cc_sampling_rate = float(params.cc_sampling_rate)
-    maxlag = float(params.maxlag)
+    cc_sampling_rate = float(params.cc.cc_sampling_rate)
+    maxlag = float(params.cc.maxlag)
     output_folder = params.output_folder or 'OUTPUT'
     taxis = np.linspace(-maxlag, maxlag, int(2 * maxlag * cc_sampling_rate) + 1)
 
@@ -88,8 +88,8 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
 
     plt.ylabel("Interstation Distance in km")
     plt.xlabel("Lag Time")
-    low = float(params.freqmin)
-    high = float(params.freqmax)
+    low = float(params.filter.freqmin)
+    high = float(params.filter.freqmax)
     title = '%s, Filter %d (%.2f - %.2f Hz)' % \
             (components, filterid, low, high,)
     if refilter:

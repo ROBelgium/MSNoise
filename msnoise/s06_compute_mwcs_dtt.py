@@ -97,20 +97,20 @@ def main(loglevel="INFO"):
                 times  = ds.coords["times"].values
 
                 # ── Lag window masking ───────────────────────────────────
-                if params.dtt_lag == "static":
-                    lmlag = -params.dtt_minlag
-                    rmlag = params.dtt_minlag
+                if params.mwcs_dtt.dtt_lag == "static":
+                    lmlag = -params.mwcs_dtt.dtt_minlag
+                    rmlag = params.mwcs_dtt.dtt_minlag
                 else:
-                    lmlag = -dist / params.dtt_v
-                    rmlag = dist / params.dtt_v
-                lMlag = lmlag - params.dtt_width
-                rMlag = rmlag + params.dtt_width
+                    lmlag = -dist / params.mwcs_dtt.dtt_v
+                    rmlag = dist / params.mwcs_dtt.dtt_v
+                lMlag = lmlag - params.mwcs_dtt.dtt_width
+                rMlag = rmlag + params.mwcs_dtt.dtt_width
 
-                if params.dtt_sides == "both":
+                if params.mwcs_dtt.dtt_sides == "both":
                     tindex = np.where(
                         ((tArray >= lMlag) & (tArray <= lmlag)) |
                         ((tArray >= rmlag) & (tArray <= rMlag)))[0]
-                elif params.dtt_sides == "left":
+                elif params.mwcs_dtt.dtt_sides == "left":
                     tindex = np.where((tArray >= lMlag) & (tArray <= lmlag))[0]
                 else:
                     tindex = np.where((tArray >= rmlag) & (tArray <= rMlag))[0]
@@ -119,13 +119,13 @@ def main(loglevel="INFO"):
                 EM[:, tmp]   = 1.0
                 MCOH[:, tmp] = 0.0
 
-                MCOH[MCOH < params.dtt_mincoh] = 0.0
-                if params.dtt_maxerr > 0:
-                    EM[EM > params.dtt_maxerr] = 1.0
+                MCOH[MCOH < params.mwcs_dtt.dtt_mincoh] = 0.0
+                if params.mwcs_dtt.dtt_maxerr > 0:
+                    EM[EM > params.mwcs_dtt.dtt_maxerr] = 1.0
 
                 # Exclude values exceeding dtt_maxdtt
                 dtt_values = np.abs(M / tArray)
-                row_indices, col_indices = np.where(dtt_values > params.dtt_maxdtt)
+                row_indices, col_indices = np.where(dtt_values > params.mwcs_dtt.dtt_maxdtt)
                 EM[row_indices, col_indices]   = 1.0
                 MCOH[row_indices, col_indices] = 0.0
 

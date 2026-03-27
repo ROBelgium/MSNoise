@@ -93,16 +93,16 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
             continue
 
         if refilter:
-            line = bandpass(line, freqmin, freqmax, params.cc_sampling_rate,
+            line = bandpass(line, freqmin, freqmax, params.cc.cc_sampling_rate,
                             zerophase=True)
 
-        freq, line = prepare_abs_positive_fft(line, params.cc_sampling_rate)
+        freq, line = prepare_abs_positive_fft(line, params.cc.cc_sampling_rate)
         line /= line.max()
 
         ax.plot(freq, line * ampli + i, c='k', lw=1)
 
-    low = float(params.freqmin)
-    high = float(params.freqmax)
+    low = float(params.filter.freqmin)
+    high = float(params.filter.freqmax)
 
     ax.set_ylim(start-datetime.timedelta(days=ampli),
                 end+datetime.timedelta(days=ampli))

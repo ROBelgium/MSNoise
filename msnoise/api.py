@@ -2448,7 +2448,7 @@ def refstack_is_rolling(params):
     :param params: Merged parameter set containing ``ref_begin``.
     :rtype: bool
     """
-    val = str(getattr(params, "ref_begin", "1970-01-01")).strip()
+    val = str(params.refstack.ref_begin).strip()
     return val.startswith("-")
 
 
@@ -4185,8 +4185,8 @@ def _dvv_column_spec(parent_category: str, pair_type: str, params) -> tuple:
     if parent_category == "mwcs_dtt":
         pt = pair_type if pair_type in ("CC", "SC", "AC") else "CC"
         pt_lower = pt.lower()
-        dv_col  = getattr(params, f"dvv_{pt_lower}_value",  "m" if pt == "CC" else "m0")
-        err_col = getattr(params, f"dvv_{pt_lower}_error", "em" if pt == "CC" else "em0")
+        dv_col  = getattr(params.category_layer, f"dvv_{pt_lower}_value",  "m" if pt == "CC" else "m0")
+        err_col = getattr(params.category_layer, f"dvv_{pt_lower}_error", "em" if pt == "CC" else "em0")
         return dv_col, err_col, "mcoh"
     elif parent_category == "stretching":
         return "Delta", "Error", "Coeff"
@@ -4310,19 +4310,19 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
     # exactly what the getters need.  No adjustment required.
     dtt_lineage = list(parent_lineage)
 
-    quality_min    = float(getattr(params, "dvv_quality_min", 0.0))
-    do_weighted    = str(getattr(params, "dvv_weighted_mean", "Y")).upper() == "Y"
-    do_trimmed     = str(getattr(params, "dvv_trimmed_mean", "Y")).upper() == "Y"
-    trim_sigma     = float(getattr(params, "dvv_trim_limit", 3.0))
-    out_percent    = str(getattr(params, "dvv_output_percent", "Y")).upper() == "Y"
-    percentile_str = getattr(params, "dvv_percentiles", "5,25,75,95")
+    quality_min    = params.category_layer.dvv_quality_min
+    do_weighted    = str(params.category_layer.dvv_weighted_mean).upper() == "Y"
+    do_trimmed     = str(params.category_layer.dvv_trimmed_mean).upper() == "Y"
+    trim_sigma     = params.category_layer.dvv_trim_limit
+    out_percent    = str(params.category_layer.dvv_output_percent).upper() == "Y"
+    percentile_str = params.category_layer.dvv_percentiles
     percentiles    = [float(p) for p in str(percentile_str).split(",") if p.strip()]
 
     # WCT-specific params
     if parent_category == "wavelet_dtt":
-        wct_freqmin  = float(getattr(params, "dvv_freqmin", 0.1))
-        wct_freqmax  = float(getattr(params, "dvv_freqmax", 2.0))
-        wct_freq_agg = str(getattr(params, "dvv_freq_agg", "mean"))
+        wct_freqmin  = params.category_layer.dvv_freqmin
+        wct_freqmax  = params.category_layer.dvv_freqmax
+        wct_freq_agg = str(params.category_layer.dvv_freq_agg)
 
     # ── 1. Collect per-pair 1-D time series ─────────────────────────────
     pair_dvv  = []   # list of (times_array, dv_array, err_array)

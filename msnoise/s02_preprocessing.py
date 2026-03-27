@@ -42,7 +42,7 @@ def main(loglevel="INFO"):
 
         goal_day  = days[0]
         step_name = step.step_name
-        output_dir = getattr(params, 'output_folder', "OUTPUT")
+        output_dir = params.output_folder
 
         logger.info(f"Processing {len(jobs)} jobs for step '{step_name}' on {goal_day}")
 
@@ -50,11 +50,10 @@ def main(loglevel="INFO"):
         massive_update_job(db, jobs, "I")
 
         try:
-            components = (params.preprocess_components.split(',')
-                          if getattr(params, 'preprocess_components', None)
-                          else ['Z'])
+            raw = params.preprocess.preprocess_components
+            components = raw.split(',') if isinstance(raw, str) else (list(raw) if raw else ['Z'])
 
-            if getattr(params, 'remove_response', 'N') in ('Y', 'y'):
+            if params.preprocess.remove_response in ('Y', 'y', True):
                 logger.debug('Pre-loading all instrument responses')
                 responses = preload_instrument_responses(db, return_format="inventory")
             else:

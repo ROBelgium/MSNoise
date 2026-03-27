@@ -101,7 +101,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
         if np.all(np.isnan(line)):
             continue
         if refilter:
-            line = bandpass(line, freqmin, freqmax, params.cc_sampling_rate,
+            line = bandpass(line, freqmin, freqmax, params.cc.cc_sampling_rate,
                             zerophase=True)
         if envelope:
             line = obspy_envelope(line)
@@ -114,8 +114,8 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
             plt.fill_between(t, y1, y2, where=y2 >= y1, facecolor='k',
                              interpolate=True)
 
-    low = float(params.freqmin)
-    high = float(params.freqmax)
+    low = float(params.filter.freqmin)
+    high = float(params.filter.freqmax)
 
     plt.xlabel("Lag Time (s)")
     plt.axhline(0, lw=0.5, c='k')
@@ -133,7 +133,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
     if "xlim" in kwargs:
         plt.xlim(kwargs["xlim"][0],kwargs["xlim"][1])
     else:
-        plt.xlim(-params.maxlag, params.maxlag)
+        plt.xlim(-params.cc.maxlag, params.cc.maxlag)
     ax.fmt_ydata = mdates.DateFormatter('%Y-%m-%d')
     cursor = Cursor(ax, useblit=True, color='red', linewidth=1.2)
     plt.tight_layout()

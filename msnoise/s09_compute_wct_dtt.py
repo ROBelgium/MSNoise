@@ -100,17 +100,15 @@ def main(loglevel="INFO"):
 
         # DVV computation parameters from the wavelet_dtt step config.
         # Fall back to wavelet-step freq bounds when dtt-specific bounds are unset.
-        dtt_freqmin = float(getattr(params, 'wct_dtt_freqmin', None) or
-                            getattr(params, 'wct_freqmin', 0.1))
-        dtt_freqmax = float(getattr(params, 'wct_dtt_freqmax', None) or
-                            getattr(params, 'wct_freqmax', 2.0))
-        minlag = float(getattr(params, 'wct_minlag', 5.0))
-        lag_type = str(getattr(params, 'wct_lag', None) or 'static')
-        v = float(getattr(params, 'wct_v', 1.0))
-        mincoh = float(getattr(params, 'wct_mincoh', 0.0))
-        maxdt = float(getattr(params, 'wct_maxdt', 1.0))
-        coda_cycles = int(getattr(params, 'wct_codacycles', 5))
-        min_nonzero = float(getattr(params, 'wct_min_nonzero', 0.1))
+        dtt_freqmin = params.wavelet_dtt.wct_dtt_freqmin
+        dtt_freqmax = params.wavelet_dtt.wct_dtt_freqmax
+        minlag = params.wavelet_dtt.wct_minlag
+        lag_type = str(params.wavelet_dtt.wct_lag or 'static')
+        v = params.wavelet_dtt.wct_v
+        mincoh = params.wavelet_dtt.wct_mincoh
+        maxdt = params.wavelet_dtt.wct_maxdt
+        coda_cycles = int(params.wavelet_dtt.wct_codacycles)
+        min_nonzero = params.wavelet_dtt.wct_min_nonzero
 
         # Resolve interstation distance for dynamic lag
         n1, s1, _l1 = station1.split(".")

@@ -84,8 +84,8 @@ def main(mov_stackid=None, components="ZZ", pair_type="CC", filterid=1, stretchi
     filter_params = get_config_set_details(db, "filter", filterid,
                                            format="AttribDict")
     if filter_params:
-        low  = float(filter_params.freqmin)
-        high = float(filter_params.freqmax)
+        low  = float(filter_params.filter.freqmin)
+        high = float(filter_params.filter.freqmax)
 
     fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)

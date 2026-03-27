@@ -97,15 +97,15 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         days          = batch["days"]
 
         step_name     = step.step_name
-        output_folder = getattr(params, "output_folder", "OUTPUT")
+        output_folder = params.output_folder
 
-        psd_components = params.psd_components
-        ppsd_length    = params.psd_ppsd_length
-        ppsd_overlap   = params.psd_ppsd_overlap
-        period_smooth  = params.psd_ppsd_period_smoothing_width_octaves
-        period_step    = params.psd_ppsd_period_step_octaves
-        period_limits  = params.psd_ppsd_period_limits
-        db_bins        = params.psd_ppsd_db_bins
+        psd_components = params.psd.psd_components
+        ppsd_length    = params.psd.psd_ppsd_length
+        ppsd_overlap   = params.psd.psd_ppsd_overlap
+        period_smooth  = params.psd.psd_ppsd_period_smoothing_width_octaves
+        period_step    = params.psd.psd_ppsd_period_step_octaves
+        period_limits  = params.psd.psd_ppsd_period_limits
+        db_bins        = params.psd.psd_ppsd_db_bins
 
         # PSD is a root step (global → psd); there is no upstream lineage.
         # xr_save_psd / xr_load_psd use `lineage=[]` so files land at:

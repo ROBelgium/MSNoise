@@ -248,8 +248,8 @@ def main(loglevel="INFO"):
     #     logger.info("You seem to have configured R and/or T components, thus rotations ARE needed. You should therefore use the 'msnoise compute_cc_rot' instead.")
     #     return()
     #
-    # if params.whitening not in ["A", "N"]:
-    #     logger.info("The 'whitening' parameter is set to '%s', which is not supported by this process. Set it to 'A' or 'N', or use the 'msnoise compute_cc_rot' instead." % params.whitening)
+    # if params.cc.whitening not in ["A", "N"]:
+    #     logger.info("The 'whitening' parameter is set to '%s', which is not supported by this process. Set it to 'A' or 'N', or use the 'msnoise compute_cc_rot' instead." % params.cc.whitening)
     #     return ()
     #
     # if params.remove_response:
@@ -317,12 +317,12 @@ def main(loglevel="INFO"):
                 update_job(db, job.day, job.pair, job.jobtype, 'F', ref=job.ref)
             continue
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
-        dt = 1. / params.cc_sampling_rate
+        dt = 1. / params.cc.cc_sampling_rate
         logger.debug("Starting slides")
         start_processing = time.time()
         allcorr = {}
-        for tmp in stream.slide(params.corr_duration,
-                                params.corr_duration * (1 - params.overlap)):
+        for tmp in stream.slide(params.cc.corr_duration,
+                                params.cc.corr_duration * (1 - params.cc.overlap)):
             logger.debug("Processing %s - %s" % (tmp[0].stats.starttime,
                                                  tmp[0].stats.endtime))
             tmp = tmp.copy().sort()
@@ -346,7 +346,7 @@ def main(loglevel="INFO"):
                 continue
 
             base = np.amax([tr.stats.npts for tr in tmp])
-            if base <= (params.maxlag*params.cc_sampling_rate*2+1):
+            if base <= (params.cc.maxlag*params.cc.cc_sampling_rate*2+1):
                 logger.debug("All traces shorter are too short to export"
                               " +-maxlag")
                 continue
@@ -369,7 +369,7 @@ def main(loglevel="INFO"):
             data = np.asarray([tr.data for tr in tmp])
             names = [tr.id.split(".") for tr in tmp]
 
-            if not params.clip_after_whiten:
+            if not params.cc.clip_after_whiten:
                 # logger.debug("Winsorizing (clipping) data before whiten")
                 data = winsorizing(data, params) #inplace
 
@@ -383,7 +383,7 @@ def main(loglevel="INFO"):
                 data[i] *= taper
             # index net.sta comps for energy later
             channel_index = {}
-            if params.whitening != "N" and params.whitening_type == "PSD":
+            if params.cc.whitening != "N" and params.cc.whitening_type == "PSD":
                 psds = []
                 for i, name in enumerate(names):
                     n1, s1, l1, c1 = name
@@ -495,27 +495,27 @@ def main(loglevel="INFO"):
 
                 # Make a copy of the original data to prevent modifying it
                 _data = data.copy()
-                if params.whitening == "N":
+                if params.cc.whitening == "N":
                     # if the data doesn't need to be whitened, we can simply
                     # band-pass filter the traces now:
                     for i, _ in enumerate(_data):
                         _data[i] = bandpass(_, freqmin=filterlow,
                                             freqmax=filterhigh,
-                                            df=params.cc_sampling_rate,
+                                            df=params.cc.cc_sampling_rate,
                                             corners=8)
 
                 # First let's compute the AC and SC
                 if len(single_station_pair_index_ac):
                     tmp = _data.copy()
-                    if params.whitening == "A":
+                    if params.cc.whitening == "A":
                         # if the data isn't already filtered, we still need to
                         # do it for the AutoCorrelation:
                         for i, _ in enumerate(tmp):
                             tmp[i] = bandpass(_, freqmin=filterlow,
                                               freqmax=filterhigh,
-                                              df=params.cc_sampling_rate,
+                                              df=params.cc.cc_sampling_rate,
                                               corners=8)
-                    if params.clip_after_whiten:
+                    if params.cc.clip_after_whiten:
                         # logger.debug("Winsorizing (clipping) data after bandpass (AC)")
                         tmp = winsorizing(tmp, params, input="timeseries")
 
@@ -526,15 +526,15 @@ def main(loglevel="INFO"):
                             axis=1)))
                         # Computing standard CC
                         corr = myCorr2(ffts,
-                                       np.ceil(params.maxlag / dt),
+                                       np.ceil(params.cc.maxlag / dt),
                                        energy,
                                        single_station_pair_index_ac,
                                        plot=False,
                                        nfft=nfft,
-                                       normalized=params.cc_normalisation)
+                                       normalized=params.cc.cc_normalisation)
 
                     elif params.cc_type_single_station_AC == "PCC":
-                        corr = pcc_xcorr(tmp, np.ceil(params.maxlag / dt),
+                        corr = pcc_xcorr(tmp, np.ceil(params.cc.maxlag / dt),
                                          None, single_station_pair_index_ac)
                     else:
                         logging.error("cc_type_single_station_AC = %s not implemented, "
@@ -550,12 +550,12 @@ def main(loglevel="INFO"):
                     del corr, energy
 
                 if len(cc_index):
-                    if params.cc_type == "CC":
+                    if params.cc.cc_type == "CC":
                         ffts = sf.fftn(_data, [nfft, ], axes=[1, ])
-                        if params.whitening != "N":
+                        if params.cc.whitening != "N":
                             whiten2(ffts, nfft, low, high, p1, p2, psds,
-                                    params.whitening_type)  # inplace
-                        if params.clip_after_whiten:
+                                    params.cc.whitening_type)  # inplace
+                        if params.cc.clip_after_whiten:
                             # logger.debug(
                             #     "Winsorizing (clipping) data after whiten")
                             ffts = winsorizing(ffts, params, input="fft", nfft=nfft)
@@ -566,12 +566,12 @@ def main(loglevel="INFO"):
                         # logger.info("Pre-whitened %i traces"%(i+1))
                         # Computing standard CC
                         corr = myCorr2(ffts,
-                                       np.ceil(params.maxlag / dt),
+                                       np.ceil(params.cc.maxlag / dt),
                                        energy,
                                        cc_index,
                                        plot=False,
                                        nfft=nfft,
-                                       normalized=params.cc_normalisation)
+                                       normalized=params.cc.cc_normalisation)
 
                         for key in corr:
                             ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
@@ -587,12 +587,12 @@ def main(loglevel="INFO"):
 
                 if len(single_station_pair_index_sc):
                     if params.cc_type_single_station_SC == "CC":
-                        # logger.debug("Compute SC using %s" % params.cc_type)
+                        # logger.debug("Compute SC using %s" % params.cc.cc_type)
                         ffts = sf.fftn(_data, [nfft, ], axes=[1, ])
-                        if params.whitening != "N":
+                        if params.cc.whitening != "N":
                             whiten2(ffts, nfft, low, high, p1, p2, psds,
-                                    params.whitening_type)  # inplace
-                        if params.clip_after_whiten:
+                                    params.cc.whitening_type)  # inplace
+                        if params.cc.clip_after_whiten:
                             ffts = winsorizing(ffts, params, input="fft",
                                                nfft=nfft)
                         # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
@@ -603,12 +603,12 @@ def main(loglevel="INFO"):
                         # logger.info("Pre-whitened %i traces"%(i+1))
                         # Computing standard CC
                         corr = myCorr2(ffts,
-                                       np.ceil(params.maxlag / dt),
+                                       np.ceil(params.cc.maxlag / dt),
                                        energy,
                                        single_station_pair_index_sc,
                                        plot=False,
                                        nfft=nfft,
-                                       normalized=params.cc_normalisation)
+                                       normalized=params.cc.cc_normalisation)
 
                         for key in corr:
                             ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
@@ -623,13 +623,13 @@ def main(loglevel="INFO"):
                         exit(1)
             del psds
 
-        if params.keep_all:
+        if params.cc.keep_all:
             # Root folder for "all windows" output:
             cc_all_base = os.path.join(*lineage_names, step.step_name)
             for ccfid in allcorr.keys():
                 export_allcorr(db, ccfid, allcorr[ccfid], base_folder=cc_all_base, params=params, t_axis=t_axis)
 
-        if params.keep_days:
+        if params.cc.keep_days:
             # Root folder for "daily stacks" output:
             cc_daily_base = os.path.join(*lineage_names, step.step_name)
             for ccfid in allcorr.keys():
@@ -641,8 +641,8 @@ def main(loglevel="INFO"):
                 if not len(corrs):
                     logger.debug("No data to stack.")
                     continue
-                corr = stack(corrs, params.stack_method, params.pws_timegate,
-                             params.pws_power, params.cc_sampling_rate)
+                corr = stack(corrs, params.cc.stack_method, params.cc.pws_timegate,
+                             params.cc.pws_power, params.cc.cc_sampling_rate)
                 if not len(corr):
                     logger.debug("No data to save.")
                     continue
@@ -650,9 +650,9 @@ def main(loglevel="INFO"):
                 thistime = "0_0"
                 add_corr(
                     db, station1, station2, filter_name,
-                    thisdate, thistime, params.corr_duration,
+                    thisdate, thistime, params.cc.corr_duration,
                     components, corr,
-                    params.cc_sampling_rate, day=True,
+                    params.cc.cc_sampling_rate, day=True,
                     ncorr=corrs.shape[0],
                     params=params,
                     base_folder=cc_daily_base)

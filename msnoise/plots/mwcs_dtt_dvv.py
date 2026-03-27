@@ -62,8 +62,8 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
 
     comp_list = [c.strip() for c in components.split(",")]
 
-    low = float(params.freqmin)
-    high = float(params.freqmax)
+    low = float(params.filter.freqmin)
+    high = float(params.filter.freqmax)
 
     fig, axes = plt.subplots(len(mov_stacks), 1, sharex=True, figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)

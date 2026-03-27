@@ -69,12 +69,12 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
         return
-    xextent = (date2num(data.index[0]), date2num(data.index[-1]), -params.maxlag, params.maxlag)
+    xextent = (date2num(data.index[0]), date2num(data.index[-1]), -params.cc.maxlag, params.cc.maxlag)
     ax = plt.subplot(111)
     # data = stack_total
     if refilter:
         for i, d in enumerate(data):
-            data.iloc[i] = bandpass(data.iloc[i], freqmin, freqmax, params.cc_sampling_rate,
+            data.iloc[i] = bandpass(data.iloc[i], freqmin, freqmax, params.cc.cc_sampling_rate,
                                zerophase=True)
     vmax = np.nanmax(data) * 0.9
     plt.imshow(data.T, extent=xextent, aspect="auto",
@@ -92,15 +92,15 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
 
     filter_params = get_config_set_details(db, 'filter', filterid, format='AttribDict')
     if filter_params:
-        low = float(filter_params.freqmin)
-        high = float(filter_params.freqmax)
+        low = float(filter_params.filter.freqmin)
+        high = float(filter_params.filter.freqmax)
     else:
         low = high = 0.0
 
     if "ylim" in kwargs:
         plt.ylim(kwargs["ylim"][0],kwargs["ylim"][1])
     else:
-        plt.ylim(-params.maxlag, params.maxlag)
+        plt.ylim(-params.cc.maxlag, params.cc.maxlag)
 
     title = '%s : %s, %s, Filter %d (%.2f - %.2f Hz), Stack %i (%s_%s)' % \
             (sta1, sta2, components,

@@ -103,8 +103,8 @@ def main(loglevel="INFO"):
         # ── Mode B: rolling — no file to write, just validate data exists ──
         if refstack_is_rolling(params):
             logger.info(
-                f"Mode B (rolling index): ref_begin={params.ref_begin}, "
-                f"ref_end={params.ref_end}. "
+                f"Mode B (rolling index): ref_begin={params.refstack.ref_begin}, "
+                f"ref_end={params.refstack.ref_end}. "
                 "No REF file will be written; reference computed on-the-fly "
                 "at MWCS/stretching/WCT time."
             )
@@ -119,34 +119,34 @@ def main(loglevel="INFO"):
         sta1, sta2 = pair.split(":")
 
         # Wiener filter parameters (reuse stack logic if configured)
-        wienerfilt  = getattr(params, "wienerfilt", False)
+        wienerfilt  = params.stack.wienerfilt
         wiener_M    = None
         wiener_N    = None
         gap_threshold = None
         if wienerfilt:
             wiener_M = int(
-                pd.to_timedelta(params.wiener_mlen).total_seconds()
-                / params.corr_duration
+                pd.to_timedelta(params.stack.wiener_mlen).total_seconds()
+                / params.cc.corr_duration
             )
             wiener_N = int(
-                pd.to_timedelta(params.wiener_nlen).total_seconds()
-                * params.cc_sampling_rate
+                pd.to_timedelta(params.stack.wiener_nlen).total_seconds()
+                * params.cc.cc_sampling_rate
             )
             gap_threshold = (
-                wiener_M if params.keep_all
-                else pd.to_timedelta(params.wiener_mlen).days
+                wiener_M if params.cc.keep_all
+                else pd.to_timedelta(params.stack.wiener_mlen).days
             )
             logger.info("Wiener filter enabled for REF stack")
 
         for components in params.components_to_compute:
             logger.info(
                 f"Processing {pair}-{components} REF stack (Mode A, "
-                f"ref_begin={params.ref_begin}, ref_end={params.ref_end})"
+                f"ref_begin={params.refstack.ref_begin}, ref_end={params.refstack.ref_end})"
             )
 
             start, end, datelist = build_ref_datelist(params)
 
-            if params.keep_all:
+            if params.cc.keep_all:
                 c = get_results_all(
                     db, params.output_folder, lineage_names_cc,
                     sta1, sta2, components, datelist,
