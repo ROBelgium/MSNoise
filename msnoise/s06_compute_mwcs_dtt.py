@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from obspy.signal.regression import linear_regression
 from .api import (
-    build_movstack_datelist,
     connect,
     extend_days,
     get_interstation_distance,
@@ -79,7 +78,8 @@ def main(loglevel="INFO"):
                 output = []
                 try:
                     mwcs = xr_get_mwcs(params.output_folder, lineage_names,
-                                        station1, station2, components, mov_stack)
+                                        station1, station2, components, mov_stack,
+                                        format="dataframe")
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue

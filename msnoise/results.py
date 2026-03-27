@@ -513,27 +513,17 @@ class MSNoiseResult:
         self._require_category("mwcs")
         lineage = self._lineage_through("mwcs")
         root = self.output_folder
-        step_name = self.lineage_names[-1]
+        api_fmt = "dataset" if format == "xarray" else "dataframe"
 
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
-            if format == "xarray":
-                import xarray as xr
-                path = os.path.join(root, *lineage, step_name, "_output",
-                                    "%s_%s" % (mov_stack[0], mov_stack[1]),
-                                    components, "%s_%s.nc" % (sta1, sta2))
-                return xr.open_dataset(path)
-            return xr_get_mwcs(root, lineage, sta1, sta2, components, mov_stack)
+            return xr_get_mwcs(root, lineage, sta1, sta2, components, mov_stack,
+                               format=api_fmt)
 
         return self._load_pair_comp_movstack(
-            root, lineage, xr_get_mwcs, pair, components, mov_stack)
-
-    def _mwcs_path(self, root, lineage, sta1, sta2, components, mov_stack):
-        """Return the NetCDF path for an MWCS result."""
-        step_name = self.lineage_names[-1]
-        return os.path.join(root, *lineage, step_name, "_output",
-                            "%s_%s" % (mov_stack[0], mov_stack[1]),
-                            components, "%s_%s.nc" % (sta1, sta2))
+            root, lineage,
+            lambda *a, **kw: xr_get_mwcs(*a, format=api_fmt, **kw),
+            pair, components, mov_stack)
 
     def get_mwcs_dtt(
         self,
@@ -559,20 +549,17 @@ class MSNoiseResult:
         self._require_category("mwcs_dtt")
         lineage = self._lineage_through("mwcs_dtt")
         root = self.output_folder
-        step_name = self.lineage_names[-1]
+        api_fmt = "dataset" if format == "xarray" else "dataframe"
 
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
-            if format == "xarray":
-                import xarray as xr
-                path = os.path.join(root, *lineage, step_name, "_output",
-                                    "%s_%s" % (mov_stack[0], mov_stack[1]),
-                                    components, "%s_%s.nc" % (sta1, sta2))
-                return xr.open_dataset(path)
-            return xr_get_dtt(root, lineage, sta1, sta2, components, mov_stack)
+            return xr_get_dtt(root, lineage, sta1, sta2, components, mov_stack,
+                              format=api_fmt)
 
         return self._load_pair_comp_movstack(
-            root, lineage, xr_get_dtt, pair, components, mov_stack)
+            root, lineage,
+            lambda *a, **kw: xr_get_dtt(*a, format=api_fmt, **kw),
+            pair, components, mov_stack)
 
     def get_stretching(
         self,
@@ -598,21 +585,17 @@ class MSNoiseResult:
         self._require_category("stretching")
         lineage = self._lineage_through("stretching")
         root = self.output_folder
-        step_name = self.lineage_names[-1]
+        api_fmt = "dataset" if format == "xarray" else "dataframe"
 
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
-            if format == "xarray":
-                import xarray as xr
-                path = os.path.join(root, *lineage, step_name, "_output",
-                                    "%s_%s" % (mov_stack[0], mov_stack[1]),
-                                    components, "%s_%s.nc" % (sta1, sta2))
-                return xr.open_dataset(path)
             return _xr_get_stretching(root, lineage, sta1, sta2,
-                                      components, mov_stack)
+                                      components, mov_stack, format=api_fmt)
 
         return self._load_pair_comp_movstack(
-            root, lineage, _xr_get_stretching, pair, components, mov_stack)
+            root, lineage,
+            lambda *a, **kw: _xr_get_stretching(*a, format=api_fmt, **kw),
+            pair, components, mov_stack)
 
     def get_dvv(
         self,
@@ -637,15 +620,10 @@ class MSNoiseResult:
         self._require_category("mwcs_dtt")
         lineage = self._lineage_through("mwcs_dtt")
         root = self.output_folder
+        api_fmt = "dataset" if format == "xarray" else "dataframe"
 
         if components is not None and mov_stack is not None:
-            if format == "xarray":
-                import xarray as xr
-                path = os.path.join(root, *lineage, "_output",
-                                    "%s_%s" % (mov_stack[0], mov_stack[1]),
-                                    "%s.nc" % components)
-                return xr.open_dataset(path)
-            return xr_get_dvv(root, lineage, components, mov_stack)
+            return xr_get_dvv(root, lineage, components, mov_stack, format=api_fmt)
 
         base = os.path.join(root, *lineage, "_output")
         results = {}
@@ -666,8 +644,8 @@ class MSNoiseResult:
             for fpath in comp_files:
                 comp_key = os.path.splitext(os.path.basename(fpath))[0]
                 try:
-                    df = xr_get_dvv(root, lineage, comp_key, ms_tuple)
-                    results[(comp_key, ms_tuple)] = df
+                    results[(comp_key, ms_tuple)] = xr_get_dvv(
+                        root, lineage, comp_key, ms_tuple, format=api_fmt)
                 except (FileNotFoundError, Exception):
                     pass
 
@@ -775,14 +753,11 @@ class MSNoiseResult:
         step_name = self._step_name_for("psd")
         lineage = self._lineage_upstream_of("psd")
         root = self.output_folder
+        api_fmt = "dataset" if format == "xarray" else "dataframe"
 
         if seed_id is not None and day is not None:
-            if format == "xarray":
-                import xarray as xr
-                path = os.path.join(root, *lineage, step_name, "_output",
-                                    "daily", seed_id, f"{day}.nc")
-                return xr.open_dataset(path)
-            return xr_load_psd(root, lineage, step_name, seed_id, day)
+            return xr_load_psd(root, lineage, step_name, seed_id, day,
+                               format=api_fmt)
 
         base = os.path.join(root, *lineage, step_name, "_output", "daily")
         results = {}
@@ -800,9 +775,10 @@ class MSNoiseResult:
             )
             for fpath in day_files:
                 day_key = os.path.splitext(os.path.basename(fpath))[0]
-                df = xr_load_psd(root, lineage, step_name, sid, day_key)
-                if df is not None:
-                    results[(sid, day_key)] = df
+                result = xr_load_psd(root, lineage, step_name, sid, day_key,
+                                     format=api_fmt)
+                if result is not None:
+                    results[(sid, day_key)] = result
 
         if seed_id is not None:
             return {k[1]: v for k, v in results.items()}
@@ -833,14 +809,10 @@ class MSNoiseResult:
         step_name = self._step_name_for("psd_rms")
         lineage = self._lineage_upstream_of("psd_rms")
         root = self.output_folder
+        api_fmt = "dataset" if format == "xarray" else "dataframe"
 
         if seed_id is not None:
-            if format == "xarray":
-                import xarray as xr
-                path = os.path.join(root, *lineage, step_name, "_output",
-                                    seed_id, "RMS.nc")
-                return xr.open_dataset(path)
-            return xr_load_rms(root, lineage, step_name, seed_id)
+            return xr_load_rms(root, lineage, step_name, seed_id, format=api_fmt)
 
         base = os.path.join(root, *lineage, step_name, "_output")
         results = {}
@@ -848,9 +820,9 @@ class MSNoiseResult:
             if not os.path.isdir(sid_dir):
                 continue
             sid = os.path.basename(sid_dir)
-            df = xr_load_rms(root, lineage, step_name, sid)
-            if df is not None:
-                results[sid] = df
+            result = xr_load_rms(root, lineage, step_name, sid, format=api_fmt)
+            if result is not None:
+                results[sid] = result
         return results
 
     # ------------------------------------------------------------------ #

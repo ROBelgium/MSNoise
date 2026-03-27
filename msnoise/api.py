@@ -3573,15 +3573,15 @@ def xr_save_mwcs(root, lineage, step_name, station1, station2, components, mov_s
     del dr, rr, d
 
 
-def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack, format="dataframe"):
+def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack, format="dataset"):
     """Load MWCS results from a NetCDF file.
 
     Parameters
     ----------
     format : str
-        ``"dataframe"`` (default, legacy) returns a :class:`~pandas.DataFrame`
+        ``"dataframe"`` returns a :class:`~pandas.DataFrame`
         with MultiIndex columns ``(keys, taxis)``.
-        ``"dataset"`` returns an :class:`xarray.Dataset` (xarray-native path).
+        ``"dataset"`` (default) returns an :class:`xarray.Dataset`.
     """
     fn = os.path.join(root, *lineage, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]),
@@ -3594,7 +3594,7 @@ def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack, format
     if format == "dataset":
         return data
 
-    # ── DataFrame (default/legacy) ──────────────────────────────────────
+    # ── DataFrame (legacy) ──────────────────────────────────────
     da = data.MWCS  # DataArray with dims (times, taxis, keys)
     # Build DataFrame directly — pandas-version-safe
     times_vals = da.coords["times"].values
@@ -3640,14 +3640,14 @@ def xr_save_dtt(root, lineage, step_name, station1, station2, components, mov_st
     xr_save_and_close(rr, fn)
 
 
-def xr_get_dtt(root, lineage, station1, station2, components, mov_stack, format="dataframe"):
+def xr_get_dtt(root, lineage, station1, station2, components, mov_stack, format="dataset"):
     """Load DTT results from a NetCDF file.
 
     Parameters
     ----------
     format : str
-        ``"dataframe"`` (default, legacy) returns a :class:`~pandas.DataFrame`.
-        ``"dataset"`` returns an :class:`xarray.Dataset` (xarray-native path).
+        ``"dataframe"`` returns a :class:`~pandas.DataFrame`.
+        ``"dataset"`` (default) returns an :class:`xarray.Dataset`.
     """
     fn = os.path.join(root, *lineage, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
@@ -3724,15 +3724,15 @@ def xr_save_stretching(root, lineage, step_name, station1, station2,
     xr_save_and_close(rr, fn)
 
 
-def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack, format="dataframe"):
+def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack, format="dataset"):
     """Load per-pair stretching results from a NetCDF file.
 
     Parameters
     ----------
     format : str
-        ``"dataframe"`` (default, legacy) returns a :class:`~pandas.DataFrame`
+        ``"dataframe"`` returns a :class:`~pandas.DataFrame`
         with columns ``Delta``, ``Coeff``, ``Error``.
-        ``"dataset"`` returns an :class:`xarray.Dataset` (xarray-native path).
+        ``"dataset"`` (default) returns an :class:`xarray.Dataset`.
 
     :raises FileNotFoundError: if the NetCDF file does not exist.
     """
@@ -3805,14 +3805,14 @@ def xr_save_dvv(root, lineage, step_name, components, mov_stack, dataframe):
     del dr, rr, d
 
 
-def xr_get_dvv(root, lineage, components, mov_stack, format="dataframe"):
+def xr_get_dvv(root, lineage, components, mov_stack, format="dataset"):
     """Load network DVV results from a NetCDF file.
 
     Parameters
     ----------
     format : str
-        ``"dataframe"`` (default, legacy) returns a :class:`~pandas.DataFrame`.
-        ``"dataset"`` returns an :class:`xarray.Dataset` (xarray-native path).
+        ``"dataframe"`` returns a :class:`~pandas.DataFrame`.
+        ``"dataset"`` (default) returns an :class:`xarray.Dataset`.
     """
     fn = os.path.join(root, *lineage, "_output",
                       "%s_%s" % (mov_stack[0], mov_stack[1]),
@@ -3824,7 +3824,7 @@ def xr_get_dvv(root, lineage, components, mov_stack, format="dataframe"):
     if format == "dataset":
         return data
 
-    # ── DataFrame (default/legacy) ──────────────────────────────────────
+    # ── DataFrame (legacy) ──────────────────────────────────────
     da = data.DVV  # DataArray with dims (times, level0, level1)
     # Build DataFrame directly — pandas-version-safe
     times_vals  = da.coords["times"].values
@@ -4713,15 +4713,15 @@ def xr_save_psd(root, lineage, step_name, seed_id, day, dataframe):
     ds.close()
 
 
-def xr_load_psd(root, lineage, step_name, seed_id, day, format="dataframe"):
+def xr_load_psd(root, lineage, step_name, seed_id, day, format="dataset"):
     """Load a daily PSD NetCDF written by :func:`xr_save_psd`.
 
     Parameters
     ----------
     format : str
-        ``"dataframe"`` (default, legacy) returns a :class:`~pandas.DataFrame`
+        ``"dataframe"`` returns a :class:`~pandas.DataFrame`
         or ``None`` if file not found.
-        ``"dataset"`` returns an :class:`xarray.Dataset` or ``None``.
+        ``"dataset"`` (default) returns an :class:`xarray.Dataset` or ``None``.
     """
     day_str = day if isinstance(day, str) else day.strftime("%Y-%m-%d")
     fn = os.path.join(
@@ -4735,7 +4735,7 @@ def xr_load_psd(root, lineage, step_name, seed_id, day, format="dataframe"):
     if format == "dataset":
         return ds
 
-    # ── DataFrame (default/legacy) ──────────────────────────────────────
+    # ── DataFrame (legacy) ──────────────────────────────────────
     da = ds.PSD
     df = pd.DataFrame(
         da.values,
@@ -4786,15 +4786,15 @@ def xr_save_rms(root, lineage, step_name, seed_id, dataframe):
     da.to_dataset().to_netcdf(fn, mode="w")
 
 
-def xr_load_rms(root, lineage, step_name, seed_id, format="dataframe"):
+def xr_load_rms(root, lineage, step_name, seed_id, format="dataset"):
     """Load per-station PSD RMS results from a NetCDF file.
 
     Parameters
     ----------
     format : str
-        ``"dataframe"`` (default, legacy) returns a :class:`~pandas.DataFrame`
+        ``"dataframe"`` returns a :class:`~pandas.DataFrame`
         or ``None`` if file not found.
-        ``"dataset"`` returns an :class:`xarray.Dataset` or ``None``.
+        ``"dataset"`` (default) returns an :class:`xarray.Dataset` or ``None``.
     """
     fn = os.path.join(root, *lineage, step_name, "_output", seed_id, "RMS.nc")
     if not os.path.isfile(fn):
@@ -4804,7 +4804,7 @@ def xr_load_rms(root, lineage, step_name, seed_id, format="dataframe"):
     if format == "dataset":
         return ds
 
-    # ── DataFrame (default/legacy) ──────────────────────────────────────
+    # ── DataFrame (legacy) ──────────────────────────────────────
     df = pd.DataFrame(
         ds.RMS.values,
         index=pd.DatetimeIndex(ds.RMS.coords["times"].values),
