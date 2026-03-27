@@ -46,10 +46,8 @@ def main(loglevel="INFO"):
 
         logger.info(f"Processing {len(jobs)} jobs for step '{step_name}' on {goal_day}")
 
-        # Mark all in-progress BEFORE the try block
-        for job in jobs:
-            job.flag = 'I'
-        db.commit()
+        # Mark all in-progress atomically before processing
+        massive_update_job(db, jobs, "I")
 
         try:
             components = (params.preprocess_components.split(',')
@@ -63,8 +61,8 @@ def main(loglevel="INFO"):
                 responses = None
 
             stations = [job.pair for job in jobs]
-            logger.info(f"Processing stations: {stations}")
-            logger.info(f"Components: {components}")
+            logger.debug(f"Processing stations: {stations}")
+            logger.debug(f"Components: {components}")
 
             stream = preprocess(stations, components, goal_day, params,
                                 responses=responses, loglevel=loglevel)
@@ -76,22 +74,19 @@ def main(loglevel="INFO"):
                 stream, output_dir, step_name, goal_day)
             logger.info(f"Saved {len(saved_files)} preprocessed files")
 
-            # Mark per-job D or F depending on whether station was processed
-            for job in jobs:
-                if job.pair in ids:
-                    job.flag = 'D'
-                    logger.debug(f"Job {step_name} for {job.pair} marked Done")
-                else:
-                    job.flag = 'F'
-                    logger.warning(f"Job {step_name} for {job.pair} marked Failed")
-            db.commit()
+            # Partition jobs into done/failed and batch-update both
+            done_jobs   = [j for j in jobs if j.pair in ids]
+            failed_jobs = [j for j in jobs if j.pair not in ids]
+            if done_jobs:
+                massive_update_job(db, done_jobs, "D")
+            if failed_jobs:
+                logger.warning(f"{len(failed_jobs)} job(s) for {step_name} on {goal_day} marked Failed (station not in stream)")
+                massive_update_job(db, failed_jobs, "F")
 
         except Exception:
             logger.error(f"Error processing step {step_name} on {goal_day}:")
             logger.error(traceback.format_exc())
-            for job in jobs:
-                job.flag = 'F'
-            db.commit()
+            massive_update_job(db, jobs, "F")
 
     logger.info('*** Finished: Preprocessing Step ***')
 

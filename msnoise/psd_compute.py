@@ -66,6 +66,7 @@ from .api import (
     get_logger,
     is_next_job_for_step,
     get_next_lineage_batch,
+    massive_update_job,
     preload_instrument_responses,
     psd_ppsd_to_dataframe,
     to_sds,
@@ -114,6 +115,9 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         # consistent with how psd_compute_rms.py reads these files.
         lineage = []
 
+        done_jobs   = []
+        failed_jobs = []
+
         for job in jobs:
             net, sta, loc = job.pair.split(".")
             logger.debug(f"Processing {job.pair} {job.day}")
@@ -126,9 +130,8 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                 endtime=gd,
             )
             if not files:
-                logger.error(f"No files found for {job.pair} {job.day}")
-                job.flag = "F"
-                db.commit()
+                logger.warning(f"No files found for {job.pair} {job.day} — marking Failed")
+                failed_jobs.append(job)
                 continue
 
             job_failed = False
@@ -161,7 +164,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                 try:
                     st.merge()
                 except Exception:
-                    logger.info("Failed merging streams:")
+                    logger.warning("Failed merging streams:")
                     traceback.print_exc()
                     continue
 
@@ -189,7 +192,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                 try:
                     ppsd.add(st)
                 except Exception:
-                    logger.debug(f"PPSD.add failed for {job.pair} {comp}")
+                    logger.warning(f"PPSD.add failed for {job.pair} {comp}")
                     traceback.print_exc()
                     continue
 
@@ -224,8 +227,17 @@ def main(loglevel="INFO", njobs_per_worker=9999):
 
                 del ppsd
 
-            job.flag = "F" if job_failed else "D"
-            db.commit()
-            logger.debug('Job done')
+            if job_failed:
+                failed_jobs.append(job)
+            else:
+                done_jobs.append(job)
+
+        # Batch-update all job flags in two calls instead of N commits
+        if done_jobs:
+            massive_update_job(db, done_jobs, "D")
+            logger.debug(f"Marked {len(done_jobs)} PSD job(s) Done")
+        if failed_jobs:
+            massive_update_job(db, failed_jobs, "F")
+            logger.warning(f"Marked {len(failed_jobs)} PSD job(s) Failed")
 
     logger.info("*** Finished: Compute PSD ***")
