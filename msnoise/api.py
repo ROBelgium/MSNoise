@@ -4009,7 +4009,7 @@ def add_corr(session, station1, station2, filterid, date, time, duration,
     """
     from obspy import Stream, Trace
     output_folder = params.output_folder
-    export_format = getattr(params, "export_format", "MSEED")
+    export_format = params.stack.export_format
     sac, mseed = False, False
     if export_format == "BOTH":
         mseed = True

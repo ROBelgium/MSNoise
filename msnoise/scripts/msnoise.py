@@ -1835,6 +1835,62 @@ def utils_jupyter():
     os.system("jupyter notebook --ip 0.0.0.0 --no-browser")
 
 
+@utils.command(name="export-params")
+@click.option('-l', '--lineage', default=None, type=str,
+              help='Lineage string e.g. "preprocess_1/cc_1/filter_1/stack_1/mwcs_1/mwcs_dtt_1"')
+@preprocessid_option
+@ccid_option
+@filterid_option
+@stackid_option
+@click.option('-rs', '--refstackid', default=None, type=int,
+              help='REF Stack step ID (optional)')
+@click.option('-w', '--mwcsid', default=None, type=int,
+              help='MWCS step ID (optional)')
+@click.option('-wi', '--mwcsdttid', default=None, type=int,
+              help='MWCS-DTT step ID (optional)')
+@click.option('-o', '--output', default=None, type=str,
+              help='Output YAML path (default: params_<lineage>.yaml in current dir)')
+@click.pass_context
+def utils_export_params(ctx, lineage, preprocessid, ccid, filterid, stackid,
+                        refstackid, mwcsid, mwcsdttid, output):
+    """Export the full layered parameter chain for a lineage to YAML.
+
+    Either supply --lineage as a slash-separated string, or build it from
+    individual step IDs.  The resulting YAML contains one block per
+    config category in lineage order — no key collisions, fully
+    self-describing for reproducibility.
+
+    Examples::
+
+        msnoise utils export-params --lineage preprocess_1/cc_1/filter_1/stack_1
+        msnoise utils export-params -p 1 -cc 1 -f 1 -m 1 -w 1 -wi 1
+    """
+    from ..api import connect, get_params, lineage_str_to_steps
+    from ..api import get_merged_params_for_lineage
+
+    db = connect()
+    orig_params = get_params(db)
+
+    if lineage:
+        lin_str = lineage
+    else:
+        # Build from integer IDs
+        parts = [f"preprocess_{preprocessid}", f"cc_{ccid}",
+                 f"filter_{filterid}", f"stack_{stackid}"]
+        if refstackid: parts.append(f"refstack_{refstackid}")
+        if mwcsid:     parts.append(f"mwcs_{mwcsid}")
+        if mwcsdttid:  parts.append(f"mwcs_dtt_{mwcsdttid}")
+        lin_str = "/".join(parts)
+
+    steps = lineage_str_to_steps(db, lin_str, sep="/", strict=False)
+    _, lineage_names, params = get_merged_params_for_lineage(db, orig_params, {}, steps)
+
+    out_path = output or f"params_{lin_str.replace('/', '_')}.yaml"
+    params.to_yaml(out_path)
+    click.echo(f"Exported params for lineage '{lin_str}' → {out_path}")
+    db.close()
+
+
 
 
 def run():
