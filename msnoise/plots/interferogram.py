@@ -92,8 +92,8 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
 
     filter_params = get_config_set_details(db, 'filter', filterid, format='AttribDict')
     if filter_params:
-        low = float(filter_params.filter.freqmin)
-        high = float(filter_params.filter.freqmax)
+        low = float(filter_params.freqmin)
+        high = float(filter_params.freqmax)
     else:
         low = high = 0.0
 

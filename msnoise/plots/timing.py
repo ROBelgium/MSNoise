@@ -91,8 +91,8 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
     filter_params = get_config_set_details(db, "filter", filterid,
                                            format="AttribDict")
     if filter_params:
-        low  = float(filter_params.filter.freqmin)
-        high = float(filter_params.filter.freqmax)
+        low  = float(filter_params.freqmin)
+        high = float(filter_params.freqmax)
 
     # ------------------------------------------------------------------ #
     # Build pair list                                                      #
