@@ -192,13 +192,13 @@ class MSNoiseResult:
         results = []
 
         if include_empty:
-            # Return all active workflow steps of this category
+            # Return all active workflow steps of this category,
+            # enumerating ALL distinct upstream paths (handles multi-configset DAGs).
             for step in get_workflow_steps(db):
                 if step.category == category:
-                    # Reconstruct lineage by walking upstream
-                    names = _upstream_lineage_for_step(db, step)
-                    if names:
-                        results.append(cls(db, names))
+                    for names in _upstream_lineage_for_step(db, step):
+                        if names:
+                            results.append(cls(db, names))
         else:
             for names in get_done_lineages_for_category(db, category):
                 results.append(cls(db, names))
@@ -430,12 +430,19 @@ class MSNoiseResult:
         self,
         pair: Optional[str] = None,
         components: Optional[str] = None,
+        format: str = "xarray",
     ):
         """Load reference stack from the refstack step output.
 
+        Parameters
+        ----------
+        format:
+            ``"xarray"`` (default) returns an :class:`xarray.Dataset`.
+            ``"dataframe"`` calls ``.CCF.to_dataframe()`` on the Dataset.
+
         Returns
         -------
-        If all args specified: an :class:`xarray.Dataset`.
+        If all args specified: result in requested format.
         Otherwise: dict keyed by ``(pair, components)``.
         """
         from .api import xr_get_ref, get_t_axis
@@ -445,9 +452,14 @@ class MSNoiseResult:
         taxis = get_t_axis(self.params)
         root = self.output_folder
 
+        def _apply_format(ds):
+            if format == "dataframe":
+                return ds.CCF.to_dataframe().unstack().droplevel(0, axis=1)
+            return ds
+
         if pair is not None and components is not None:
             sta1, sta2 = pair.split(":")
-            return xr_get_ref(root, lineage, sta1, sta2, components, taxis)
+            return _apply_format(xr_get_ref(root, lineage, sta1, sta2, components, taxis))
 
         base = os.path.join(root, *lineage, "_output", "REF")
         results = {}
@@ -469,7 +481,7 @@ class MSNoiseResult:
                 pair_key = f"{sta1}:{sta2}"
                 try:
                     ds = xr_get_ref(root, lineage, sta1, sta2, comp, taxis)
-                    results[(pair_key, comp)] = ds
+                    results[(pair_key, comp)] = _apply_format(ds)
                 except (FileNotFoundError, Exception):
                     pass
 
@@ -482,12 +494,18 @@ class MSNoiseResult:
         pair: Optional[str] = None,
         components: Optional[str] = None,
         mov_stack: Optional[tuple] = None,
+        format: str = "dataframe",
     ):
         """Load MWCS results.
 
+        Parameters
+        ----------
+        format:
+            ``"dataframe"`` (default) or ``"xarray"``.
+
         Returns
         -------
-        If all args specified: :class:`~pandas.DataFrame`.
+        If all args specified: result in requested format.
         Otherwise: dict keyed by ``(pair, components, mov_stack)``.
         """
         from .api import xr_get_mwcs
@@ -495,25 +513,45 @@ class MSNoiseResult:
         self._require_category("mwcs")
         lineage = self._lineage_through("mwcs")
         root = self.output_folder
+        step_name = self.lineage_names[-1]
 
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
+            if format == "xarray":
+                import xarray as xr
+                path = os.path.join(root, *lineage, step_name, "_output",
+                                    "%s_%s" % (mov_stack[0], mov_stack[1]),
+                                    components, "%s_%s.nc" % (sta1, sta2))
+                return xr.open_dataset(path)
             return xr_get_mwcs(root, lineage, sta1, sta2, components, mov_stack)
 
         return self._load_pair_comp_movstack(
             root, lineage, xr_get_mwcs, pair, components, mov_stack)
+
+    def _mwcs_path(self, root, lineage, sta1, sta2, components, mov_stack):
+        """Return the NetCDF path for an MWCS result."""
+        step_name = self.lineage_names[-1]
+        return os.path.join(root, *lineage, step_name, "_output",
+                            "%s_%s" % (mov_stack[0], mov_stack[1]),
+                            components, "%s_%s.nc" % (sta1, sta2))
 
     def get_mwcs_dtt(
         self,
         pair: Optional[str] = None,
         components: Optional[str] = None,
         mov_stack: Optional[tuple] = None,
+        format: str = "dataframe",
     ):
         """Load MWCS-DTT (dt/t) results.
 
+        Parameters
+        ----------
+        format:
+            ``"dataframe"`` (default) or ``"xarray"``.
+
         Returns
         -------
-        If all args specified: :class:`~pandas.DataFrame`.
+        If all args specified: result in requested format.
         Otherwise: dict keyed by ``(pair, components, mov_stack)``.
         """
         from .api import xr_get_dtt
@@ -521,9 +559,16 @@ class MSNoiseResult:
         self._require_category("mwcs_dtt")
         lineage = self._lineage_through("mwcs_dtt")
         root = self.output_folder
+        step_name = self.lineage_names[-1]
 
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
+            if format == "xarray":
+                import xarray as xr
+                path = os.path.join(root, *lineage, step_name, "_output",
+                                    "%s_%s" % (mov_stack[0], mov_stack[1]),
+                                    components, "%s_%s.nc" % (sta1, sta2))
+                return xr.open_dataset(path)
             return xr_get_dtt(root, lineage, sta1, sta2, components, mov_stack)
 
         return self._load_pair_comp_movstack(
@@ -534,12 +579,18 @@ class MSNoiseResult:
         pair: Optional[str] = None,
         components: Optional[str] = None,
         mov_stack: Optional[tuple] = None,
+        format: str = "dataframe",
     ):
         """Load stretching results.
 
+        Parameters
+        ----------
+        format:
+            ``"dataframe"`` (default) or ``"xarray"``.
+
         Returns
         -------
-        If all args specified: :class:`~pandas.DataFrame`.
+        If all args specified: result in requested format.
         Otherwise: dict keyed by ``(pair, components, mov_stack)``.
         """
         from .api import _xr_get_stretching
@@ -547,9 +598,16 @@ class MSNoiseResult:
         self._require_category("stretching")
         lineage = self._lineage_through("stretching")
         root = self.output_folder
+        step_name = self.lineage_names[-1]
 
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
+            if format == "xarray":
+                import xarray as xr
+                path = os.path.join(root, *lineage, step_name, "_output",
+                                    "%s_%s" % (mov_stack[0], mov_stack[1]),
+                                    components, "%s_%s.nc" % (sta1, sta2))
+                return xr.open_dataset(path)
             return _xr_get_stretching(root, lineage, sta1, sta2,
                                       components, mov_stack)
 
@@ -560,12 +618,18 @@ class MSNoiseResult:
         self,
         components: Optional[str] = None,
         mov_stack: Optional[tuple] = None,
+        format: str = "dataframe",
     ):
         """Load network-aggregated dv/v results.
 
+        Parameters
+        ----------
+        format:
+            ``"dataframe"`` (default) or ``"xarray"``.
+
         Returns
         -------
-        If all args specified: :class:`~pandas.DataFrame`.
+        If all args specified: result in requested format.
         Otherwise: dict keyed by ``(components, mov_stack)``.
         """
         from .api import xr_get_dvv
@@ -575,6 +639,12 @@ class MSNoiseResult:
         root = self.output_folder
 
         if components is not None and mov_stack is not None:
+            if format == "xarray":
+                import xarray as xr
+                path = os.path.join(root, *lineage, "_output",
+                                    "%s_%s" % (mov_stack[0], mov_stack[1]),
+                                    "%s.nc" % components)
+                return xr.open_dataset(path)
             return xr_get_dvv(root, lineage, components, mov_stack)
 
         base = os.path.join(root, *lineage, "_output")
@@ -610,12 +680,19 @@ class MSNoiseResult:
         pair: Optional[str] = None,
         components: Optional[str] = None,
         mov_stack: Optional[tuple] = None,
+        format: str = "xarray",
     ):
         """Load Wavelet Coherence Transform results.
 
+        Parameters
+        ----------
+        format:
+            ``"xarray"`` (default) returns an :class:`xarray.Dataset`.
+            ``"dataframe"`` flattens to a :class:`~pandas.DataFrame`.
+
         Returns
         -------
-        If all args specified: :class:`xarray.Dataset`.
+        If all args specified: result in requested format.
         Otherwise: dict keyed by ``(pair, components, mov_stack)``.
         """
         from .api import xr_load_wct
@@ -626,7 +703,10 @@ class MSNoiseResult:
 
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
-            return xr_load_wct(root, lineage, sta1, sta2, components, mov_stack)
+            ds = xr_load_wct(root, lineage, sta1, sta2, components, mov_stack)
+            if format == "dataframe":
+                return ds.to_dataframe()
+            return ds
 
         return self._load_pair_comp_movstack(
             root, lineage, xr_load_wct, pair, components, mov_stack)
@@ -636,12 +716,19 @@ class MSNoiseResult:
         pair: Optional[str] = None,
         components: Optional[str] = None,
         mov_stack: Optional[tuple] = None,
+        format: str = "xarray",
     ):
         """Load WCT dt/t results.
 
+        Parameters
+        ----------
+        format:
+            ``"xarray"`` (default) returns an :class:`xarray.Dataset`.
+            ``"dataframe"`` flattens to a :class:`~pandas.DataFrame`.
+
         Returns
         -------
-        If all args specified: :class:`xarray.Dataset`.
+        If all args specified: result in requested format.
         Otherwise: dict keyed by ``(pair, components, mov_stack)``.
         """
         from .api import xr_get_wct_dtt
@@ -652,8 +739,10 @@ class MSNoiseResult:
 
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
-            return xr_get_wct_dtt(root, lineage, sta1, sta2,
-                                   components, mov_stack)
+            ds = xr_get_wct_dtt(root, lineage, sta1, sta2, components, mov_stack)
+            if format == "dataframe":
+                return ds.to_dataframe()
+            return ds
 
         return self._load_pair_comp_movstack(
             root, lineage, xr_get_wct_dtt, pair, components, mov_stack)
@@ -662,6 +751,7 @@ class MSNoiseResult:
         self,
         seed_id: Optional[str] = None,
         day: Optional[str] = None,
+        format: str = "dataframe",
     ):
         """Load daily PSD results.
 
@@ -671,10 +761,12 @@ class MSNoiseResult:
             SEED identifier ``"NET.STA.LOC.CHAN"``.  If None, all channels.
         day:
             Date string ``"YYYY-MM-DD"``.  If None, all days.
+        format:
+            ``"dataframe"`` (default) or ``"xarray"``.
 
         Returns
         -------
-        If all args specified: :class:`~pandas.DataFrame`.
+        If all args specified: result in requested format.
         Otherwise: dict keyed by ``(seed_id, day)``.
         """
         from .api import xr_load_psd
@@ -685,6 +777,11 @@ class MSNoiseResult:
         root = self.output_folder
 
         if seed_id is not None and day is not None:
+            if format == "xarray":
+                import xarray as xr
+                path = os.path.join(root, *lineage, step_name, "_output",
+                                    "daily", seed_id, f"{day}.nc")
+                return xr.open_dataset(path)
             return xr_load_psd(root, lineage, step_name, seed_id, day)
 
         base = os.path.join(root, *lineage, step_name, "_output", "daily")
@@ -714,6 +811,7 @@ class MSNoiseResult:
     def get_psd_rms(
         self,
         seed_id: Optional[str] = None,
+        format: str = "dataframe",
     ):
         """Load PSD RMS results.
 
@@ -721,10 +819,12 @@ class MSNoiseResult:
         ----------
         seed_id:
             SEED identifier ``"NET.STA.LOC.CHAN"``.  If None, all channels.
+        format:
+            ``"dataframe"`` (default) or ``"xarray"``.
 
         Returns
         -------
-        If specified: :class:`~pandas.DataFrame`.
+        If specified: result in requested format.
         Otherwise: dict keyed by ``seed_id``.
         """
         from .api import xr_load_rms
@@ -735,6 +835,11 @@ class MSNoiseResult:
         root = self.output_folder
 
         if seed_id is not None:
+            if format == "xarray":
+                import xarray as xr
+                path = os.path.join(root, *lineage, step_name, "_output",
+                                    seed_id, "RMS.nc")
+                return xr.open_dataset(path)
             return xr_load_rms(root, lineage, step_name, seed_id)
 
         base = os.path.join(root, *lineage, step_name, "_output")
@@ -807,7 +912,13 @@ class MSNoiseResult:
 # ------------------------------------------------------------------ #
 
 def _upstream_lineage_for_step(db, step) -> list[str]:
-    """Walk WorkflowLinks upstream from *step* to build the full lineage name list."""
+    """Walk WorkflowLinks upstream from *step* to build all full lineage name lists.
+
+    Returns a list of lineage name lists (one per distinct upstream path).
+    In a simple single-configset workflow this returns exactly one list.
+    In a multi-configset DAG (multiple incoming links to one step), all
+    paths are enumerated.
+    """
     from .api import get_workflow_links
     from .msnoise_table_def import declare_tables
 
@@ -815,21 +926,29 @@ def _upstream_lineage_for_step(db, step) -> list[str]:
     WorkflowStep = schema.WorkflowStep
 
     links = get_workflow_links(db)
-    parent_map = {lnk.to_step_id: lnk.from_step_id for lnk in links}
+    # Build multi-map: to_step_id → [from_step_id, ...]
+    parent_map: dict[int, list[int]] = {}
+    for lnk in links:
+        parent_map.setdefault(lnk.to_step_id, []).append(lnk.from_step_id)
 
-    path = [step.step_name]
-    current_id = step.step_id
-    visited = set()
-    while current_id in parent_map:
-        if current_id in visited:
-            break
-        visited.add(current_id)
-        parent_id = parent_map[current_id]
-        parent_step = db.query(WorkflowStep).filter(
-            WorkflowStep.step_id == parent_id).first()
-        if parent_step is None or parent_step.category == "global":
-            break
-        path.insert(0, parent_step.step_name)
-        current_id = parent_id
+    def _walk(step_id, visited) -> list[list[str]]:
+        """Recursively walk upstream, returning all root→current paths."""
+        step_obj = db.query(WorkflowStep).filter(
+            WorkflowStep.step_id == step_id).first()
+        if step_obj is None or step_obj.category == "global":
+            return [[]]
+        if step_id in visited:
+            return [[step_obj.step_name]]
+        visited = visited | {step_id}
+        parent_ids = parent_map.get(step_id, [])
+        if not parent_ids:
+            return [[step_obj.step_name]]
+        paths = []
+        for parent_id in parent_ids:
+            for upstream_path in _walk(parent_id, visited):
+                paths.append(upstream_path + [step_obj.step_name])
+        return paths
 
-    return path if len(path) >= 1 else []
+    all_paths = _walk(step.step_id, set())
+    # Filter out single-element paths (just the step itself, no real upstream)
+    return [p for p in all_paths if p]
