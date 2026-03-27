@@ -29,7 +29,7 @@ import xarray as xr
 
 from .api import (
     connect, get_logger, is_next_job_for_step, get_next_lineage_batch,
-    get_station_pairs, get_interstation_distance,
+    get_station_pairs, get_interstation_distance, extend_days,
     xr_load_wct, xr_save_wct_dtt, massive_update_job,
     compute_wct_dtt, get_wct_avgcoh,
 )
@@ -155,11 +155,13 @@ def main(loglevel="INFO"):
                     continue
                 freqs_subset = freqs[freq_inx]
 
-                times_np   = times.astype("datetime64[D]")
-                to_search  = np.array(list(days), dtype="datetime64[D]")
-                day_min    = to_search.min()
-                day_max    = to_search.max() + np.timedelta64(1, "D")
-                valid_mask = (times_np >= day_min) & (times_np < day_max)
+                # Use extend_days to handle label="right" resampling:
+                # daily mov_stack stamps are at midnight of the *next* day,
+                # so we extend the search window by one extra day.
+                to_search = extend_days(days)  # pandas DatetimeIndex + 1 extra day
+                times_np  = times.astype("datetime64[D]")
+                to_search_d = np.array(to_search, dtype="datetime64[D]")
+                valid_mask  = np.isin(times_np, to_search_d)
 
                 dates_out = []
                 dtt_rows = []

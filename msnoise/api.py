@@ -4259,7 +4259,8 @@ def compute_dvv(session, root, lineage, mov_stack, pairs=None, components=None, 
                 continue
 
             try:
-                dtt = xr_get_dtt(root, lineage, s1, s2, comp, mov_stack)
+                dtt = xr_get_dtt(root, lineage, s1, s2, comp, mov_stack,
+                                 format="dataframe")
                 all.append(dtt)
             except FileNotFoundError:
                 traceback.print_exc()
