@@ -4706,7 +4706,8 @@ def xr_save_rms(root, lineage, step_name, seed_id, dataframe):
     times = pd.DatetimeIndex(dataframe.index)
 
     if os.path.isfile(fn):
-        existing = xr_load_rms(root, lineage, step_name, seed_id)
+        existing = xr_load_rms(root, lineage, step_name, seed_id,
+                               format="dataframe")
         if existing is not None:
             existing = existing[~existing.index.isin(times)]
             dataframe = pd.concat([existing, dataframe]).sort_index()

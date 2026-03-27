@@ -455,11 +455,11 @@ class MSNoiseResult:
         def _apply_format(ds):
             if format == "dataframe":
                 import pandas as pd_ref
-                # REF is a 1D array (taxis,) representing the reference waveform
                 da = ds.REF
-                return pd_ref.DataFrame(
-                    da.values.reshape(1, -1),
-                    columns=da.coords["taxis"].values,
+                return pd_ref.Series(
+                    da.values,
+                    index=da.coords["taxis"].values,
+                    name="REF",
                 )
             return ds
 

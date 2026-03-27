@@ -1165,7 +1165,7 @@ def test_120020_msnoise_result_get_ccf_xarray():
 
 @pytest.mark.order(120021)
 def test_120021_msnoise_result_get_ref_dataframe():
-    """MSNoiseResult.get_ref returns DataFrame when format='dataframe'."""
+    """MSNoiseResult.get_ref returns Series when format='dataframe' (REF is 1D)."""
     db = connect()
     from ..results import MSNoiseResult
     import pandas as pd
@@ -1175,8 +1175,8 @@ def test_120021_msnoise_result_get_ref_dataframe():
     if not all_refs:
         pytest.skip("No REF data available")
     pair_k, comp_k = next(iter(all_refs))
-    df = r.get_ref(pair_k, comp_k, format="dataframe")
-    assert isinstance(df, pd.DataFrame)
+    s = r.get_ref(pair_k, comp_k, format="dataframe")
+    assert isinstance(s, pd.Series)
     db.close()
 
 
