@@ -2,6 +2,8 @@
 import logging
 import os
 import sys
+import collections
+import pickle
 
 from logbook import Logger, StreamHandler
 

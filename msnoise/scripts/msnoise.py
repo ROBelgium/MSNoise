@@ -19,9 +19,9 @@ except ImportError:
 
 
 from .. import MSNoiseError, DBConfigNotFoundError
-from ....db import connect, get_logger
-from ....config import (delete_config_set, get_config, get_config_set_details, list_config_sets)
-from ....stations import update_station
+from ..db import connect, get_logger
+from ..config import (delete_config_set, get_config, get_config_set_details, list_config_sets)
+from ..stations import update_station
 
 from ..msnoise_table_def import DataAvailability
 
