@@ -528,10 +528,10 @@ def db_dump(format):
             with engine.connect() as conn:
                 rows = conn.execute(table.select()).all()
             df = pd.DataFrame(rows)
-            logger.info("Dumping table %s to %s.csv" % (table.name, table.name))
+            click.echo("Dumping table %s to %s.csv" % (table.name, table.name))
             df.to_csv("%s.csv" % table.name, index=False)
     else:
-        logger.error("Currently only the csv format is supported, sorry.")
+        click.echo("Currently only the csv format is supported, sorry.", err=True)
 
 
 @db.command(name="import")
