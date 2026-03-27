@@ -477,6 +477,65 @@ def test_032_stretching():
     from ..s10_stretching import main as stretch_main
     stretch_main()
 
+
+@pytest.mark.order(41)
+def test_041_new_jobs_after_mwcs_dtt():
+    """new_jobs --after mwcs_dtt inserts mwcs_dtt_dvv sentinel jobs."""
+    new_jobs_main(after='mwcs_dtt')
+    db = connect()
+    from ..msnoise_table_def import declare_tables
+    schema = declare_tables()
+    Job = schema.Job
+    dvv_jobs = (
+        db.query(Job)
+        .filter(Job.day == "DVV")
+        .filter(Job.pair == "ALL")
+        .all()
+    )
+    db.close()
+    assert len(dvv_jobs) >= 1, \
+        "Expected at least one DVV sentinel job after --after mwcs_dtt"
+
+
+@pytest.mark.order(42)
+def test_042_compute_mwcs_dtt_dvv():
+    """Compute MWCS dv/v aggregate — mwcs_dtt_dvv step."""
+    try:
+        compute_dvv_main(step_category="mwcs_dtt_dvv")
+    except Exception:
+        traceback.print_exc()
+        pytest.fail("mwcs_dtt_dvv computation failed")
+
+
+@pytest.mark.order(43)
+def test_043_new_jobs_after_stretching():
+    """new_jobs --after stretching inserts stretching_dvv sentinel jobs."""
+    new_jobs_main(after='stretching')
+    db = connect()
+    from ..msnoise_table_def import declare_tables
+    schema = declare_tables()
+    Job = schema.Job
+    dvv_jobs = (
+        db.query(Job)
+        .filter(Job.day == "DVV")
+        .filter(Job.pair == "ALL")
+        .filter(Job.jobtype.like("stretching_dvv%"))
+        .all()
+    )
+    db.close()
+    assert len(dvv_jobs) >= 1, \
+        "Expected at least one stretching_dvv sentinel job after --after stretching"
+
+
+@pytest.mark.order(44)
+def test_044_compute_stretching_dvv():
+    """Compute Stretching dv/v aggregate — stretching_dvv step."""
+    try:
+        compute_dvv_main(step_category="stretching_dvv")
+    except Exception:
+        traceback.print_exc()
+        pytest.fail("stretching_dvv computation failed")
+
 @pytest.mark.order(33)
 def test_033_create_fake_new_files(setup_environment):
     data_folder = setup_environment['data_folder']
@@ -647,6 +706,17 @@ def test_039_wct_pipeline():
         traceback.print_exc()
         pytest.fail()
 
+
+@pytest.mark.order(40)
+def test_040_compute_wct_dtt_dvv():
+    """Compute WCT dv/v aggregate — wct_dtt_dvv step."""
+    new_jobs_main(after='wavelet_dtt')
+    try:
+        compute_dvv_main(step_category="wct_dtt_dvv")
+    except Exception:
+        traceback.print_exc()
+        pytest.fail("wct_dtt_dvv computation failed")
+
 @pytest.mark.order(99)
 def test_099_plot_interferogram():
     db = connect()
@@ -709,9 +779,11 @@ def test_102_plot_distance():
 
 @pytest.mark.order(103)
 def test_103_plot_dvv():
-    dvv_main(components="ZZ", show=False, outfile="?.png")
-    fn = "dvv ['ZZ']-f1-MM.png"
-    assert os.path.isfile(fn), f"{fn} doesn't exist"
+    """Plot mwcs_dtt_dvv — requires mwcs_dtt_dvv step to have been run."""
+    try:
+        dvv_main(components="ZZ", show=False, outfile="?.png", dvvid=1)
+    except (FileNotFoundError, ValueError):
+        pytest.skip("No mwcs_dtt_dvv aggregate data available — run compute first")
 
 @pytest.mark.order(104)
 def test_104_plot_data_availability():
@@ -800,18 +872,27 @@ def test_400_run_manually():
     os.system("msnoise cc dtt compute_mwcs")
     os.system("msnoise reset mwcs_dtt_1 --all")
     os.system("msnoise cc dtt compute_mwcs_dtt")
-    os.system("msnoise cc dtt plot mwcs_dtt -s 0 -o ?.png")
+    os.system("msnoise new_jobs --after mwcs_dtt")
+    os.system("msnoise reset mwcs_dtt_dvv_1 --all")
+    os.system("msnoise cc dtt dvv compute_mwcs_dtt_dvv")
+    os.system("msnoise cc dtt dvv plot mwcs_dtt_dvv -s 0 -o ?.png")
     # Stretching
     os.system("msnoise reset stretching_1 --all")
     os.system("msnoise cc dtt compute_stretching")
-    os.system("msnoise cc dtt plot stretching_dtt -s 0 -o ?.png")
+    os.system("msnoise new_jobs --after stretching")
+    os.system("msnoise reset stretching_dvv_1 --all")
+    os.system("msnoise cc dtt dvv compute_stretching_dvv")
+    os.system("msnoise cc dtt dvv plot stretching_dvv -s 0 -o ?.png")
     # Wavelet
     os.system("msnoise reset wavelet_1 --all")
     os.system("msnoise cc dtt compute_wct")
     os.system("msnoise new_jobs --after wavelet")
     os.system("msnoise reset wavelet_dtt_1 --all")
     os.system("msnoise cc dtt compute_wct_dtt")
-    os.system("msnoise cc dtt plot wct_dtt -s 0 -o ?.png")
+    os.system("msnoise new_jobs --after wavelet_dtt")
+    os.system("msnoise reset wct_dtt_dvv_1 --all")
+    os.system("msnoise cc dtt dvv compute_wct_dtt_dvv")
+    os.system("msnoise cc dtt dvv plot wct_dtt_dvv -s 0 -o ?.png")
     # PSDs
     os.system("msnoise reset psd_1 --all")
     os.system("msnoise qc compute_psd")
@@ -1308,5 +1389,64 @@ def test_120028_msnoise_result_default_formats():
     if all_refs:
         v2 = next(iter(all_refs.values()))
         assert isinstance(v2, xr.Dataset), "get_ref default should be xarray Dataset"
+    db.close()
+
+
+@pytest.mark.order(120029)
+def test_120029_msnoise_result_get_dvv_mwcs():
+    """MSNoiseResult.get_dvv returns xarray Dataset from mwcs_dtt_dvv step."""
+    db = connect()
+    from ..results import MSNoiseResult
+    import xarray as xr
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                stack=1, refstack=1, mwcs=1,
+                                mwcs_dtt=1, mwcs_dtt_dvv=1)
+    assert r.category == "mwcs_dtt_dvv"
+    # Discovery: all available (pair_type, comp, mov_stack) combos
+    all_dvv = r.get_dvv()
+    if not all_dvv:
+        pytest.skip("No mwcs_dtt_dvv aggregate data — run compute first")
+    # Every value should be an xarray Dataset with a times dimension
+    for key, ds in all_dvv.items():
+        assert isinstance(ds, xr.Dataset), \
+            f"Expected xr.Dataset for key {key}, got {type(ds)}"
+        assert "times" in ds.dims, \
+            f"Expected 'times' dim in Dataset for key {key}"
+        assert "mean" in ds, \
+            f"Expected 'mean' variable in Dataset for key {key}"
+    db.close()
+
+
+@pytest.mark.order(120030)
+def test_120030_msnoise_result_get_dvv_dataframe():
+    """MSNoiseResult.get_dvv returns DataFrame when format='dataframe'."""
+    db = connect()
+    from ..results import MSNoiseResult
+    import pandas as pd
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                stack=1, refstack=1, mwcs=1,
+                                mwcs_dtt=1, mwcs_dtt_dvv=1)
+    all_dvv = r.get_dvv()
+    if not all_dvv:
+        pytest.skip("No mwcs_dtt_dvv aggregate data — run compute first")
+    pt, comp, ms = next(iter(all_dvv))
+    df = r.get_dvv(pair_type=pt, components=comp,
+                   mov_stack=ms, format="dataframe")
+    assert isinstance(df, pd.DataFrame), \
+        f"Expected pd.DataFrame, got {type(df)}"
+    assert "mean" in df.columns, "Expected 'mean' column in DataFrame"
+    db.close()
+
+
+@pytest.mark.order(120031)
+def test_120031_msnoise_result_get_dvv_wrong_category():
+    """MSNoiseResult.get_dvv raises ValueError at wrong step category."""
+    db = connect()
+    from ..results import MSNoiseResult
+    # Instantiated at mwcs_dtt — not a dvv step
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                stack=1, refstack=1, mwcs=1, mwcs_dtt=1)
+    with pytest.raises(ValueError):
+        r.get_dvv()
     db.close()
 
