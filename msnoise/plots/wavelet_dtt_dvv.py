@@ -126,7 +126,6 @@ def _plot_heatmap(result, mov_stack, comp, logger):
               .droplevel(0, axis=1))
     full_idx = dtt_df.index
     freqs = dtt_df.columns.astype(float)
-    data = np.ma.masked_invalid(dtt_df.values)
 
     fig, axes = plt.subplots(3, 1, figsize=(14, 10), sharex=True)
     variables = [("dtt", "dt/t", "RdBu_r", None, None),

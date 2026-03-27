@@ -737,7 +737,7 @@ def delete_set(set_name, set_number, confirm):
             click.echo(f"  - {detail['name']}: {detail['value']}")
 
         if not confirm:
-            if not click.confirm(f"\nAre you sure you want to delete this config set?"):
+            if not click.confirm("\nAre you sure you want to delete this config set?"):
                 click.echo("Deletion cancelled.")
                 return
 

@@ -264,7 +264,7 @@ class MSNoiseResult:
         links = (
             self._db.query(WorkflowLink)
             .filter(WorkflowLink.from_step_id == terminal_step.step_id)
-            .filter(WorkflowLink.is_active == True)
+            .filter(WorkflowLink.is_active.is_(True))
             .all()
         )
 

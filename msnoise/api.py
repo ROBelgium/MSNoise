@@ -19,7 +19,7 @@ import xarray as xr
 
 from . import DBConfigNotFoundError
 from .msnoise_table_def import (Job, Station, Config, DataAvailability,
-                                WorkflowStep, WorkflowLink,
+                                WorkflowStep,
                                 WORKFLOW_CHAINS, WORKFLOW_ORDER)
 
 
@@ -167,8 +167,9 @@ def read_db_inifile(inifile=None):
     try:
         # New ini file with prefix support
         tech, hostname, database, username, password, prefix = pickle.load(f)
-    except:
+    except Exception:
         # Old ini file without prefix
+        f.seek(0)
         tech, hostname, database, username, password = pickle.load(f)
         prefix = ""
     f.close()
@@ -667,7 +668,7 @@ def get_stations(session, all=False, net=None, format="raw"):
         else:
             stations = q.order_by(Station.net).order_by(Station.sta).all()
     else:
-        stations = q.filter(Station.used == True).order_by(Station.net).\
+        stations = q.filter(Station.used.is_(True)).order_by(Station.net).\
             order_by(Station.sta)
         if net is not None:
             stations = stations.filter(Station.net == net).\
@@ -1055,7 +1056,7 @@ def get_workflow_steps(session):
     schema = declare_tables()
 
     return session.query(schema.WorkflowStep) \
-        .filter(schema.WorkflowStep.is_active == True) \
+        .filter(schema.WorkflowStep.is_active.is_(True)) \
         .order_by(schema.WorkflowStep.step_name).all()
 
 
@@ -1065,7 +1066,7 @@ def get_workflow_links(session):
     schema = declare_tables()
 
     return session.query(schema.WorkflowLink) \
-        .filter(schema.WorkflowLink.is_active == True).all()
+        .filter(schema.WorkflowLink.is_active.is_(True)).all()
 
 
 def get_workflow_graph(session):
@@ -1157,7 +1158,7 @@ def get_step_successors(session, step_id):
     return session.query(schema.WorkflowStep) \
         .join(schema.WorkflowLink, schema.WorkflowStep.step_id == schema.WorkflowLink.to_step_id) \
         .filter(schema.WorkflowLink.from_step_id == step_id) \
-        .filter(schema.WorkflowLink.is_active == True).all()
+        .filter(schema.WorkflowLink.is_active.is_(True)).all()
 
 
 def get_first_runnable_steps_per_branch(session, source_step_id, skip_categories=None):
@@ -1214,7 +1215,7 @@ def _get_step_predecessors(session, step_id):
     return session.query(schema.WorkflowStep) \
         .join(schema.WorkflowLink, schema.WorkflowStep.step_id == schema.WorkflowLink.from_step_id) \
         .filter(schema.WorkflowLink.to_step_id == step_id) \
-        .filter(schema.WorkflowLink.is_active == True).all()
+        .filter(schema.WorkflowLink.is_active.is_(True)).all()
 
 
 def get_upstream_steps_for_step_id(session, step_id, topo_order=True, include_self=False):
@@ -1563,7 +1564,7 @@ def massive_update_job(session, jobs, flag="D"):
             session.bulk_update_mappings(Job, mappings)
             session.commit()
             updated = True
-        except:
+        except Exception:
             time.sleep(np.random.random())
             pass
     return
@@ -2793,7 +2794,7 @@ def wavg(group, dttname, errname):
     w = 1. / group[errname]
     try:
         wavg = (d * w).sum() / w.sum()
-    except:
+    except Exception:
         wavg = d.mean()
     return wavg
 
@@ -3476,7 +3477,7 @@ def get_results(session, station1, station2, filterid, components, dates,
             stack_data[j, :] = read(daystack, format=export_format)[0].data[:]
             lastday = str(date)
             i += 1
-        except:
+        except Exception:
             # traceback.print_exc()
             pass
 
@@ -3897,7 +3898,6 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
     # corr or autocorr, then this sanitize should not occur.
     if len(data) != 1 and sanitize:
         threshold = 0.99
-        npts = data.shape[1]
         corr = data.mean(axis=0)
         corrcoefs = np.array([np.corrcoef(di, corr)[1][0] for di in data])
         toolarge = np.where(corrcoefs >= threshold)[0]
@@ -4086,7 +4086,7 @@ def _export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
         cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
     try:
         os.makedirs(os.path.split(filename)[0], exist_ok=True)
-    except:
+    except Exception:
         pass
     filename += ".SAC"
     mytrace = Trace(data=corr)
@@ -4112,7 +4112,7 @@ def _export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
     from obspy import Trace, Stream
     try:
         os.makedirs(os.path.split(filename)[0], exist_ok=True)
-    except:
+    except Exception:
         pass
     filename += ".MSEED"
     maxlag = params.maxlag
@@ -4571,7 +4571,7 @@ def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=Tru
                 else:
                     try:
                         ppsd.add_npz(file)
-                    except:
+                    except Exception:
                         pass
     if not ppsd:
         return None

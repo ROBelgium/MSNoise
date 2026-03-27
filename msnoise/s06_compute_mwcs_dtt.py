@@ -9,7 +9,6 @@ from .api import (
     get_interstation_distance,
     get_logger,
     get_next_lineage_batch,
-    get_params,
     get_station_pairs,
     is_next_job_for_step,
     massive_update_job,
@@ -22,7 +21,6 @@ def main(loglevel="INFO"):
     logger = get_logger('msnoise.mwcs_dtt', loglevel, with_pid=True)
     logger.info('*** Starting: Compute DT/T ***')
     db = connect()
-    orig_params = get_params(db)
 
     # start, end, datelist = build_movstack_datelist(db)
 
@@ -56,8 +54,6 @@ def main(loglevel="INFO"):
 
         mov_stacks = params.mov_stack
 
-        goal_sampling_rate = params.cc_sampling_rate
-        maxlag = params.maxlag
 
         netsta1, netsta2 = pair.split(':')
         station1, station2 = pair.split(":")
@@ -165,9 +161,12 @@ def main(loglevel="INFO"):
                     # Mean coherence over the valid lag window (tindex)
                     mcoh = float(np.nanmean(cohArray[tindex])) if len(tindex) else 0.0
 
-                    m_vals.append(m);     em_vals.append(em)
-                    a_vals.append(a);     ea_vals.append(ea)
-                    m0_vals.append(m0);   em0_vals.append(em0)
+                    m_vals.append(m)
+                    em_vals.append(em)
+                    a_vals.append(a)
+                    ea_vals.append(ea)
+                    m0_vals.append(m0)
+                    em0_vals.append(em0)
                     mcoh_vals.append(mcoh)
                     out_times.append(times[i])
 

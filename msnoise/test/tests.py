@@ -1417,6 +1417,10 @@ def test_120029_msnoise_result_get_dvv_mwcs():
             f"Expected 'times' dim in Dataset for key {key}"
         assert "mean" in ds, \
             f"Expected 'mean' variable in Dataset for key {key}"
+        assert "weighted_mean" in ds, \
+            f"Expected 'weighted_mean' in Dataset for key {key} (dvv_weighted_mean=Y)"
+        assert "trimmed_mean" in ds, \
+            f"Expected 'trimmed_mean' in Dataset for key {key} (dvv_trimmed_mean=Y)"
     db.close()
 
 
