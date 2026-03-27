@@ -4691,6 +4691,30 @@ def psd_ppsd_to_dataframe(ppsd):
     return pd.DataFrame(data, index=ind_times, columns=ppsd.period_bin_centers)
 
 
+def psd_ppsd_to_dataset(ppsd):
+    """Convert an ObsPy PPSD object to an :class:`xarray.Dataset`.
+
+    Builds the same data as :func:`psd_ppsd_to_dataframe` but returns an
+    ``xr.Dataset`` with a ``PSD`` variable of dims ``(times, periods)`` —
+    ready to pass directly to :func:`xr_save_psd` without a DataFrame
+    round-trip.
+
+    :param ppsd: :class:`~obspy.signal.spectral_estimation.PPSD` object.
+    :returns: :class:`xarray.Dataset`.
+    """
+    from obspy import UTCDateTime
+    times = np.array([UTCDateTime(t).datetime for t in ppsd.current_times_used])
+    periods = np.asarray(ppsd.period_bin_centers, dtype=float)
+    data = np.asarray(ppsd._binned_psds, dtype=float)
+    da = xr.DataArray(
+        data,
+        coords=[times, periods],
+        dims=["times", "periods"],
+        name="PSD",
+    )
+    return da.to_dataset()
+
+
 def xr_save_psd(root, lineage, step_name, seed_id, day, dataframe):
     """Save a daily PSD result to a NetCDF file.
 

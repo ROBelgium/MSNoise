@@ -68,7 +68,7 @@ from .api import (
     get_next_lineage_batch,
     massive_update_job,
     preload_instrument_responses,
-    psd_ppsd_to_dataframe,
+    psd_ppsd_to_dataset,
     to_sds,
     xr_save_psd,
 )
@@ -203,13 +203,13 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                     del ppsd
                     continue
 
-                df = psd_ppsd_to_dataframe(ppsd)
+                ds = psd_ppsd_to_dataset(ppsd)
                 seed_id = (f"{tr.stats.network}.{tr.stats.station}"
                            f".{tr.stats.location}.{tr.stats.channel}")
 
                 try:
                     xr_save_psd(output_folder, lineage, step_name,
-                                seed_id, job.day, df)
+                                seed_id, job.day, ds)
                     logger.debug(f"Saved PSD NC for {seed_id} {job.day}")
                 except Exception:
                     logger.error(f"Failed saving PSD NC for {seed_id} {job.day}")
