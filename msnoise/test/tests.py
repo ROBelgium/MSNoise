@@ -45,6 +45,7 @@ from ..plots.wavelet_dtt_dvv import main as wavelet_dtt_dvv_main
 from ..s02_preprocessing import main as preprocess_main
 from ..s08_compute_wct import main as compute_wct_main
 from ..s09_compute_wct_dtt import main as wavelet_dtt_main
+from ..results import MSNoiseResult
 
 global logger
 logger = logging.getLogger('matplotlib')
@@ -364,6 +365,37 @@ def test_015_check_cc_files():
     db.close()
 
 
+@pytest.mark.order(18)
+def test_015b_check_keep_all_cc_files():
+    """Verify that keep_all per-window CCF NetCDF files exist under _output/all/."""
+    db = connect()
+    output_folder = get_config(db, 'output_folder') or 'OUTPUT'
+    cc_params = get_config_set_details(db, 'cc', 1, format='AttribDict')
+    keep_all = cc_params.keep_all
+    if str(keep_all).upper() != 'Y':
+        pytest.skip("keep_all is not enabled — skipping keep_all file check")
+    components_to_compute = cc_params.components_to_compute.split(',')
+    filter_steps = [s for s in get_workflow_steps(db) if s.category == "filter"]
+    found_any = False
+    for filter_step in filter_steps:
+        for components in components_to_compute:
+            for (sta1, sta2) in get_station_pairs(db):
+                for loc1 in sta1.locs():
+                    for loc2 in sta2.locs():
+                        sta1_id = f"{sta1.net}.{sta1.sta}.{loc1}"
+                        sta2_id = f"{sta2.net}.{sta2.sta}.{loc2}"
+                        path = os.path.join(
+                            output_folder, "preprocess_1", "cc_1",
+                            filter_step.step_name, "_output", "all",
+                            components, f"{sta1_id}_{sta2_id}",
+                        )
+                        files = glob.glob(os.path.join(path, "*.nc"))
+                        assert len(files) > 0,                             f"No keep_all NetCDF files found under {path}"
+                        found_any = True
+    assert found_any, "No station pairs found to check keep_all files"
+    db.close()
+
+
 @pytest.mark.order(19)
 def test_017_reset_cc_jobs():
     db = connect()
@@ -405,8 +437,27 @@ def test_023_stack():
     assert counts_ref.get('D', 0) >= 1, \
         f"Expected at least 1 done refstack_1 job, got: {counts_ref}"
 
-    # Re-run with wiener filter enabled
+    # Capture plain-stack CCF for comparison
+    result_plain = MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"])
+    pairs_plain = result_plain.list(category="stack")
+    assert len(pairs_plain) > 0, "No plain-stack CCF results found"
+
+    # Re-run with Wiener filter enabled
     update_config(db, 'wienerfilt', 'Y', category='stack', set_number=1)
+    reset_jobs(db, "stack_1", alljobs=True)
+    stack_mov('mov')
+
+    # Verify Wiener output differs from plain stack
+    result_wiener = MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"])
+    for sta1, sta2, comp, ms in pairs_plain[:1]:  # spot-check first pair
+        import numpy as np
+        plain_ccf  = result_plain.get_ccf(sta1, sta2, comp, mov_stack=ms).values
+        wiener_ccf = result_wiener.get_ccf(sta1, sta2, comp, mov_stack=ms).values
+        assert not np.allclose(plain_ccf, wiener_ccf, equal_nan=True), \
+            "Wiener-filtered CCF is identical to plain CCF — filter had no effect"
+
+    # REVERT: disable Wiener so downstream tests use standard processing
+    update_config(db, 'wienerfilt', 'N', category='stack', set_number=1)
     reset_jobs(db, "stack_1", alljobs=True)
     stack_mov('mov')
     reset_jobs(db, "refstack_1", alljobs=True)
@@ -476,6 +527,32 @@ def test_032_stretching():
     # stretching jobs were created by new_jobs_main(after='refstack') in test_025
     from ..s10_stretching import main as stretch_main
     stretch_main()
+
+    # Verify stretching NetCDF output exists for at least one pair
+    db = connect()
+    output_folder = get_config(db, 'output_folder') or 'OUTPUT'
+    filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
+    found = False
+    for filter_step in filter_steps:
+        for sta1, sta2 in get_station_pairs(db):
+            for loc1 in sta1.locs():
+                for loc2 in sta2.locs():
+                    sta1_id = f"{sta1.net}.{sta1.sta}.{loc1}"
+                    sta2_id = f"{sta2.net}.{sta2.sta}.{loc2}"
+                    # stretching output lives at: stack_1/stretching_1/_output/<ms>/<comp>/<sta1>_<sta2>.nc
+                    path = os.path.join(
+                        output_folder, "preprocess_1", "cc_1",
+                        filter_step.step_name, "stack_1", "stretching_1",
+                        "_output"
+                    )
+                    files = glob.glob(os.path.join(path, "**", f"{sta1_id}_{sta2_id}.nc"), recursive=True)
+                    if files:
+                        found = True
+                        break
+            if found: break
+        if found: break
+    assert found, f"No stretching NetCDF output found under {output_folder}"
+    db.close()
 
 
 @pytest.mark.order(41)
@@ -787,6 +864,28 @@ def test_103_plot_dvv():
     # The outfile substitution replaces ? with "dvv ZZ-f<id>-mm<ms>"
     fn = glob.glob("dvv ZZ-f*-mm*.png")
     assert len(fn) >= 1, "Expected at least one dvv plot PNG file"
+
+@pytest.mark.order(103)
+def test_103b_plot_stretching_dvv():
+    """Plot stretching_dvv — requires stretching_dvv step to have run."""
+    from ..plots.stretching_dvv import main as stretching_dvv_main
+    try:
+        stretching_dvv_main(components="ZZ", show=False, outfile="?.png", dvvid=1)
+    except (FileNotFoundError, ValueError):
+        pytest.skip("No stretching_dvv aggregate data available")
+    fn = glob.glob("stretching_dvv ZZ-f*-mm*.png")
+    assert len(fn) >= 1, "Expected at least one stretching_dvv plot PNG"
+
+@pytest.mark.order(103)
+def test_103c_plot_wavelet_dtt_dvv():
+    """Plot wavelet_dtt_dvv — requires wavelet_dtt_dvv step to have run."""
+    try:
+        wavelet_dtt_dvv_main(filterid=1, wctid=1, dttid=1, components="ZZ",
+                             show=False, outfile="?.png", dvvid=1)
+    except (FileNotFoundError, ValueError):
+        pytest.skip("No wavelet_dtt_dvv aggregate data available")
+    fn = glob.glob("wavelet_dtt_dvv ZZ-f*-mm*.png")
+    assert len(fn) >= 1, "Expected at least one wavelet_dtt_dvv plot PNG"
 
 @pytest.mark.order(104)
 def test_104_plot_data_availability():
