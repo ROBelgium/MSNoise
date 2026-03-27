@@ -756,7 +756,7 @@ def get_filter_steps_for_cc_step(session, cc_step_id):
     :param cc_step_id: The step_id of the CC step
     :return: List of filter workflow steps that are successors of the CC step
     """
-    from .api import get_step_successors
+    from ..api import get_step_successors
 
     # Get all steps that are successors of the CC step
     successor_steps = get_step_successors(session, cc_step_id)
