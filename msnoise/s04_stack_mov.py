@@ -14,7 +14,7 @@ from .api import (
     get_logger,
     get_next_lineage_batch,
     get_params,
-    get_results_all,
+    xr_load_ccf_for_stack,
     get_t_axis,
     is_next_job_for_step,
     massive_update_job,
@@ -149,21 +149,18 @@ def main(stype, loglevel="INFO"):
             excess_days = sorted(set(excess_days))
 
             if params.cc.keep_all:
-                c = get_results_all(db, params.output_folder, lineage_names,
-                                    sta1, sta2, components, all_days, format="xarray",
-                                    params=params)
+                c = xr_load_ccf_for_stack(params.output_folder, lineage_names,
+                                          sta1, sta2, components, all_days)
                 if not len(c):
                     logger.warning("No data found for %s-%s" % (sta1, sta2))
                     continue
-                c = c.sortby('times')
                 dr = c.resample(times="%is" % params.cc.corr_duration).mean()
 
             else:
                 logger.warning("keep_all=N is unsupported in lineage workflow; "
-                               "falling back to get_results_all")
-                c = get_results_all(db, params.output_folder, lineage_names,
-                                    sta1, sta2, components, all_days, format="xarray",
-                                    params=params).sortby('times')
+                               "falling back to keep_days daily stacks")
+                c = xr_load_ccf_for_stack(params.output_folder, lineage_names,
+                                          sta1, sta2, components, all_days)
                 dr = c.resample(times="1D").mean()
 
             is_valid, message = validate_stack_data(c, "moving")

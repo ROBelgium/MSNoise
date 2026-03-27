@@ -51,7 +51,7 @@ from .api import (
     get_params,
     get_next_lineage_batch,
     is_next_job_for_step,
-    get_results_all,
+    xr_load_ccf_for_stack,
     massive_update_job,
     build_ref_datelist,
     refstack_is_rolling,
@@ -146,20 +146,18 @@ def main(loglevel="INFO"):
             start, end, datelist = build_ref_datelist(params)
 
             if params.cc.keep_all:
-                c = get_results_all(
-                    db, params.output_folder, lineage_names_cc,
+                c = xr_load_ccf_for_stack(
+                    params.output_folder, lineage_names_cc,
                     sta1, sta2, components, datelist,
-                    format="xarray", params=params,
                 )
             else:
                 logger.warning(
                     "keep_all=N is unsupported in lineage workflow; "
-                    "falling back to get_results_all"
+                    "falling back to keep_days daily stacks"
                 )
-                c = get_results_all(
-                    db, params.output_folder, lineage_names_cc,
+                c = xr_load_ccf_for_stack(
+                    params.output_folder, lineage_names_cc,
                     sta1, sta2, components, datelist,
-                    format="xarray", params=params,
                 )
 
             is_valid, message = validate_stack_data(c, "reference")

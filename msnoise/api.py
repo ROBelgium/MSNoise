@@ -3490,6 +3490,67 @@ def get_results(session, station1, station2, filterid, components, dates,
         "MSNoiseResult.get_ccf() to read CCF data from the current NetCDF pipeline."
     )
 
+def xr_load_ccf_for_stack(root, lineage_names, station1, station2, components, dates):
+    """Load per-day CCF data for stacking — the higher-level replacement for ``get_results_all``.
+
+    Reads the daily CCF NetCDF files written by :func:`~msnoise.s03_compute_no_rotation`
+    for the requested station pair, component and date list.  Tries ``keep_all``
+    (per-window, ``_output/all/``) first; falls back to ``keep_days``
+    (daily stacks, ``_output/daily/``) if the former are absent.
+
+    Path layout (written by s03)::
+
+        <root> / *cc_lineage / filter_step / _output / all|daily / <comp> / <sta1>_<sta2> / <date>.nc
+
+    :param root: Output folder (``params.output_folder``).
+    :param lineage_names: Full lineage name list including the filter step,
+        e.g. ``["preprocess_1", "cc_1", "filter_1", "stack_1"]``.
+    :param station1: First station SEED id ``NET.STA.LOC``.
+    :param station2: Second station SEED id ``NET.STA.LOC``.
+    :param components: Component pair string e.g. ``"ZZ"``.
+    :param dates: Iterable of ``datetime.date`` or ISO date strings.
+    :returns: :class:`xarray.Dataset` with variable ``CCF`` and dims
+        ``(times, taxis)``, sorted by ``times``.  Empty Dataset if no data found.
+    """
+    # Derive cc_lineage and filter_step from lineage_names
+    cc_idx = next(
+        (i for i, n in enumerate(lineage_names) if n.startswith("cc_")), None
+    )
+    if cc_idx is None or cc_idx + 1 >= len(lineage_names):
+        return xr.Dataset()
+    cc_lineage = lineage_names[:cc_idx + 1]   # e.g. ['preprocess_1', 'cc_1']
+    filter_step = lineage_names[cc_idx + 1]   # e.g. 'filter_1'
+
+    das = []
+    for date in dates:
+        date_str = date if isinstance(date, str) else date.strftime('%Y-%m-%d')
+        try:
+            da = xr_get_ccf_all(root, cc_lineage, filter_step,
+                                station1, station2, components, date_str)
+            das.append(da)
+        except FileNotFoundError:
+            pass
+
+    if not das:
+        # Fallback: daily stacks from keep_days (xr_save_ccf_daily)
+        for date in dates:
+            date_str = date if isinstance(date, str) else date.strftime('%Y-%m-%d')
+            try:
+                da = xr_get_ccf_daily(root, cc_lineage, filter_step,
+                                      station1, station2, components, date_str)
+                t = pd.Timestamp(date_str)
+                da = da.expand_dims({"times": [t]})
+                das.append(da)
+            except FileNotFoundError:
+                pass
+
+    if not das:
+        return xr.Dataset()
+    combined = xr.concat(das, dim="times").sortby("times")
+    return combined.to_dataset(name="CCF")
+
+
+
 def get_results_all(session, root, lineage_names, station1, station2, components, dates,
                     format="dataframe", params=None):
     """
@@ -3507,7 +3568,14 @@ def get_results_all(session, root, lineage_names, station1, station2, components
     :rtype: :class:`pandas.DataFrame`
     :return: All CCF results in a :class:`pandas.DataFrame`, where the index
         is the time of the CCF and the columns are the times in the coda.
+
+    .. deprecated::
+        Use :func:`xr_load_ccf_for_stack` instead.
     """
+    warnings.warn(
+        "get_results_all() is deprecated; use xr_load_ccf_for_stack() instead.",
+        DeprecationWarning, stacklevel=2
+    )
 
     # Path written by s03: root / *cc_upstream / cc_step / filter_step / _output / ...
     # lineage_names is the full lineage e.g. ['preprocess_1','cc_1','filter_1','stack_1',...]
