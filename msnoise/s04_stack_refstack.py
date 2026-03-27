@@ -26,7 +26,6 @@ Configuration parameters (from the ``refstack`` configset):
 * ``ref_end``
 * ``stack_method``
 * ``pws_timegate`` / ``pws_power``  (Mode A + pws only)
-* ``export_format`` / ``sac_format``  (Mode A only)
 
 To run this step:
 

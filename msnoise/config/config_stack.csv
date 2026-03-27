@@ -6,5 +6,3 @@ mov_stack,"(('1D','1D'))","A list of two parameters: the time to ""roll"" over (
 wienerfilt,N,Apply wiener filter before stacking? Y[N],bool,Y/N
 wiener_mlen,24h,Smoothing along date axis (time delta),str,
 wiener_nlen,0.5s,Smoothing along lag time axis (time delta),str,
-export_format,MSEED,Export stacks in which format(s) ?,str,SAC/MSEED/BOTH
-sac_format,doublets,Format for SAC stacks ?,str,doublets/clarke

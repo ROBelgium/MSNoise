@@ -3372,6 +3372,45 @@ def xr_get_ccf(root, lineage, station1, station2, components, mov_stack, taxis, 
     return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
 
 
+
+def xr_save_ccf_daily(root, lineage, step_name, station1, station2, components, date, taxis, corr):
+    """Save a single daily-stacked CCF as a per-day NetCDF file.
+
+    One file per calendar day — safe for concurrent workers since each worker
+    owns exactly one day.
+
+    Path layout::
+
+        <root>/<lineage>/<step_name>/_output/daily/<components>/<sta1>_<sta2>/<YYYY-MM-DD>.nc
+
+    :param corr: 1-D numpy array of the stacked CCF.
+    :param taxis: 1-D lag-time axis array.
+    :param date: ``datetime.date`` or ISO string ``"YYYY-MM-DD"``.
+    """
+    path = os.path.join(root, *lineage, step_name, "_output",
+                        "daily", components,
+                        f"{station1}_{station2}")
+    os.makedirs(path, exist_ok=True)
+    fn = os.path.join(path, f"{date}.nc")
+    da = xr.DataArray(corr, coords=[taxis], dims=["taxis"], name="CCF")
+    da.to_netcdf(fn, mode="w")
+
+
+def xr_get_ccf_daily(root, lineage, step_name, station1, station2, components, date):
+    """Load a single daily-stacked CCF written by :func:`xr_save_ccf_daily`.
+
+    :returns: :class:`xarray.DataArray` with dim ``taxis``.
+    :raises FileNotFoundError: if the NetCDF file does not exist.
+    """
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                      "daily", components,
+                      f"{station1}_{station2}", f"{date}.nc")
+    if not os.path.isfile(fn):
+        raise FileNotFoundError(fn)
+    ds = xr.load_dataset(fn)
+    return ds["CCF"]
+
+
 def xr_save_ref(root, lineage, step_name, station1, station2, components, taxis, new, overwrite=False):
     path = os.path.join(root, *lineage, step_name, "_output",
                         "REF", "%s" % components)
@@ -3445,64 +3484,11 @@ def get_results(session, station1, station2, filterid, components, dates,
         "get_results() is deprecated; use xr_get_ccf() or MSNoiseResult.get_ccf() instead.",
         DeprecationWarning, stacklevel=2
     )
-    from obspy import read
-    if not params:
-        export_format = get_config(session, 'export_format')
-        extension = get_extension(export_format)
-    else:
-        export_format = params.stack.export_format
-        extension = get_extension(params.stack.export_format)
-    if export_format == "BOTH":
-        export_format = "MSEED"
-
-    stack_data = np.zeros((len(dates), get_maxlag_samples(session))) * np.nan
-    i = 0
-    base = os.path.join("STACKS", "%02i" % filterid,
-                        "%03i_DAYS" % mov_stack, components,
-                        "%s_%s" % (station1, station2), "%s") + extension
-    logging.debug("Reading files... in %s" % base)
-    lastday = dates[0]
-    for j, date in enumerate(dates):
-
-        if isinstance(date, str):
-            daystack = base % str(date)
-        else:
-            daystack = base % date.strftime('%Y-%m-%d')
-
-        try:
-            stack_data[j, :] = read(daystack, format=export_format)[0].data[:]
-            lastday = str(date)
-            i += 1
-        except Exception:
-            # traceback.print_exc()
-            pass
-
-    if format == "matrix":
-        return i, stack_data
-
-    elif format == "dataframe":
-        taxis = get_t_axis(session)
-        return pd.DataFrame(stack_data, index=pd.DatetimeIndex(dates),
-                            columns=taxis).loc[:lastday]
-    elif format == "xarray":
-        taxis = get_t_axis(session)
-        times = pd.DatetimeIndex(dates)
-        dr = xr.DataArray(stack_data, coords=[times, taxis],
-                          dims=["times", "taxis"]).dropna("times", how="all")
-        dr.name = "CCF"
-        return dr.to_dataset()
-
-    elif format == "stack":
-        logging.debug("Stacking...")
-
-        corr = stack(stack_data, params.stack.stack_method, params.stack.pws_timegate,
-                     params.stack.pws_power, params.goal_sampling_rate)
-
-        if i > 0:
-            return i, corr
-        else:
-            return 0, None
-
+    raise NotImplementedError(
+        "get_results() previously read MSEED/SAC files from the legacy STACKS/ folder. "
+        "That export format has been removed. Use xr_get_ccf() or "
+        "MSNoiseResult.get_ccf() to read CCF data from the current NetCDF pipeline."
+    )
 
 def get_results_all(session, root, lineage_names, station1, station2, components, dates,
                     format="dataframe", params=None):
@@ -3523,36 +3509,28 @@ def get_results_all(session, root, lineage_names, station1, station2, components
         is the time of the CCF and the columns are the times in the coda.
     """
 
-    path = os.path.join(root, *lineage_names, "_output", "all", components,  station1, station2)
-    results = []
+    # Read per-day NetCDF files written by xr_save_ccf_all.
+    # Requires the step_name to reconstruct the path — use lineage_names[-1].
+    step_name = lineage_names[-1]
+    das = []
     for date in dates:
-        if isinstance(date, str):
-            fname = os.path.join(path, date+".h5")
-        else:
-            fname = os.path.join(path, date.strftime('%Y-%m-%d.h5'))
-        if os.path.isfile(fname):
-            df = pd.read_hdf(fname, 'data', parse_dates=True)
-            df.index = pd.to_datetime(df.index)
-            results.append(df)
+        date_str = date if isinstance(date, str) else date.strftime('%Y-%m-%d')
+        try:
+            da = xr_get_ccf_all(root, lineage_names[:-1], step_name,
+                                station1, station2, components, date_str)
+            das.append(da)
+        except FileNotFoundError:
+            continue
 
-    if len(results) > 0:
-        result = pd.concat(results)
-        del results
-        if format == "dataframe":
-            return result
-        elif format == "xarray":
-            taxis = get_t_axis(params)
-            times = result.index
-            dr = xr.DataArray(result, coords=[times, taxis],
-                              dims=["times", "taxis"]).dropna("times", how="all")
-            dr.name = "CCF"
-            dr = dr.sortby('times')
-            return dr.to_dataset()
-    else:
+    if das:
+        combined = xr.concat(das, dim="times")
+        combined = combined.sortby("times")
         if format == "xarray":
-            return xr.Dataset()
+            return combined.to_dataset(name="CCF")
         else:
-            return pd.DataFrame()
+            return combined.to_dataframe(name="CCF").unstack("taxis")
+    else:
+        return xr.Dataset() if format == "xarray" else pd.DataFrame()
 
 # Some helper functions
 
@@ -3930,214 +3908,77 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
     return corr
 
 
-def get_extension(export_format):
-    warnings.warn("get_extension() is deprecated and will be removed in a future MSNoise release.", DeprecationWarning, stacklevel=2)
-    if export_format == "BOTH":
-        return ".MSEED"
-    elif export_format == "SAC":
-        return ".SAC"
-    elif export_format == "MSEED":
-        return ".MSEED"
-    else:
-        return ".MSEED"
+def xr_save_ccf_all(root, lineage, step_name, station1, station2,
+                    components, date, window_times, taxis, corrs):
+    """Save all windowed CCFs for one day as a single NetCDF file.
 
+    Replaces the legacy HDF5-based ``export_allcorr``.  One file per calendar
+    day — safe for concurrent workers since each worker owns exactly one day.
 
-def export_allcorr(session, ccfid, data, base_folder=None, params=None, t_axis=None):
-    if base_folder is None:
-        # Legacy behaviour:
-        output_folder = get_config(session, 'output_folder')
-        base_folder = output_folder
-    else:
-        # If params.output_folder is an absolute project root you want to respect,
-        # you can anchor relative base_folder under it:
-        if params is not None and hasattr(params, "output_folder") and not os.path.isabs(base_folder):
-            base_folder = os.path.join(params.output_folder, base_folder)
+    Path layout::
 
-    station1, station2, components, filterid, date = ccfid.split('+')
+        <root>/<lineage>/<step_name>/_output/all/<components>/<sta1>_<sta2>/<date>.nc
 
-    path = os.path.join(
-        base_folder,
-        filterid,
-        '_output',
-        'all',
-        components,
-        station1, station2
+    :param window_times: 1-D array of window start times (datetime strings or
+        datetime objects) — the ``times`` dimension.
+    :param taxis: 1-D lag-time axis array — the ``taxis`` dimension.
+    :param corrs: 2-D numpy array ``(n_windows, n_taxis)`` of CCF data.
+    """
+    path = os.path.join(root, *lineage, step_name, "_output",
+                        "all", components,
+                        f"{station1}_{station2}")
+    os.makedirs(path, exist_ok=True)
+    fn = os.path.join(path, f"{date}.nc")
+    times = pd.to_datetime(window_times)
+    da = xr.DataArray(
+        corrs,
+        coords=[times, taxis],
+        dims=["times", "taxis"],
+        name="CCF",
     )
-    if not os.path.isdir(path):
-        os.makedirs(path, exist_ok=True)
-
-    df = pd.DataFrame().from_dict(data).T
-    df.columns = t_axis
-    df.to_hdf(os.path.join(path, date+'.h5'), key='data')
-    del df
-    return
+    da.to_netcdf(fn, mode="w")
 
 
-def add_corr(session, station1, station2, filterid, date, time, duration,
-             components, CF, sampling_rate, day=False, ncorr=0, params=None, base_folder=None):
+def xr_get_ccf_all(root, lineage, step_name, station1, station2,
+                   components, date):
+    """Load all windowed CCFs for one day written by :func:`xr_save_ccf_all`.
+
+    :returns: :class:`xarray.DataArray` with dims ``(times, taxis)``.
+    :raises FileNotFoundError: if the NetCDF file does not exist.
     """
-    Adds a CCF to the data archive on disk.
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                      "all", components,
+                      f"{station1}_{station2}", f"{date}.nc")
+    if not os.path.isfile(fn):
+        raise FileNotFoundError(fn)
+    ds = xr.load_dataset(fn)
+    return ds["CCF"]
 
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA.LOC)
-    :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA.LOC)
-    :type filterid: int
-    :param filterid: The ID (ref) of the filter
-    :type date: datetime.date or str
-    :param date: The date of the CCF
-    :type time: datetime.time or str
-    :param time: The time of the CCF
-    :type duration: float
-    :param duration: The total duration of the exported CCF
-    :type components: str
-    :param components: The name of the components used (ZZ, ZR, ...)
-    :type sampling_rate: float
-    :param sampling_rate: The sampling rate of the exported CCF
-    :type day: bool
-    :param day: Whether this function is called to export a daily stack (True)
-        or each CCF (when keep_all parameter is set to True in the
-        configuration). Defaults to True.
-    :type ncorr: int
-    :param ncorr: Number of CCF that have been stacked for this CCF.
-    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
-    :param params: A dictionnary of MSNoise config parameters as returned by
-        :func:`get_params`.
+
+
+def save_daily_ccf(root, lineage, step_name, station1, station2,
+                   components, date, corr, taxis):
+    """Save a daily-stacked CCF to NetCDF using :func:`xr_save_ccf_daily`.
+
+    Replaces the legacy :func:`add_corr` / ``_export_mseed`` / ``_export_sac``
+    pipeline.  Output lives at::
+
+        <root>/<lineage>/<step_name>/_output/daily/<components>/<sta1>_<sta2>/<date>.nc
+
+    :param root: Output folder (``params.output_folder``).
+    :param lineage: List of step-name strings for the lineage path.
+    :param step_name: Current step name (e.g. ``"cc_1"``).
+    :param station1: First station SEED id ``NET.STA.LOC``.
+    :param station2: Second station SEED id ``NET.STA.LOC``.
+    :param components: Component pair string e.g. ``"ZZ"``.
+    :param date: Calendar date (``datetime.date`` or ISO string).
+    :param corr: 1-D numpy array, the stacked CCF.
+    :param taxis: 1-D lag-time axis array.
     """
-    from obspy import Stream, Trace
-    output_folder = params.output_folder
-    export_format = params.stack.export_format
-    sac, mseed = False, False
-    if export_format == "BOTH":
-        mseed = True
-        sac = True
-    elif export_format == "SAC":
-        sac = True
-    elif export_format == "MSEED":
-        mseed = True
-
-    if day:
-        if base_folder is None:
-            # Legacy behaviour:
-            path = os.path.join(
-                "STACKS", "%02i" % filterid, "001_DAYS", components,
-                          "%s_%s" % (station1, station2), str(date)
-            )
-        else:
-            # Workflow-aware behaviour:
-            if params is not None and hasattr(params, "output_folder") and not os.path.isabs(base_folder):
-                base_folder = os.path.join(params.output_folder, base_folder)
-
-            path = os.path.join(
-                base_folder,
-                filterid,
-                '_output',
-                'daily',
-                components,
-                station1, station2,
-                str(date),
-            )
-        pair = "%s:%s" % (station1, station2)
-        if mseed:
-            _export_mseed(session, path, pair, components, filterid, CF,
-                         ncorr, params=params)
-        if sac:
-            _export_sac(session, path, pair, components, filterid, CF,
-                       ncorr, params=params)
-
-    else:
-        file = '%s.cc' % time
-        path = os.path.join(output_folder, filterid, station1,
-                            station2, components, date)
-        if not os.path.isdir(path):
-            os.makedirs(path, exist_ok=True)
-
-        t = Trace()
-        t.data = CF
-        t.stats.sampling_rate = sampling_rate
-        t.stats.starttime = -float(get_config(session, 'maxlag'))
-        t.stats.components = components
-        # if ncorr != 0:
-            # t.stats.location = "%02i"%ncorr
-        st = Stream(traces=[t, ])
-        st.write(os.path.join(path, file), format='mseed')
-        del t, st
+    xr_save_ccf_daily(root, lineage, step_name, station1, station2,
+                      components, date, taxis, corr)
 
 
-def _export_sac(db, filename, pair, components, filterid, corr, ncorr=0,
-               sac_format=None, maxlag=None, cc_sampling_rate=None,
-               params=None):
-    from obspy.core.util.attribdict import AttribDict
-    from obspy import Stream, Trace
-    maxlag = params.cc.maxlag
-    cc_sampling_rate = params.goal_sampling_rate
-    sac_format = params.stack.sac_format
-    if sac_format is None:
-        sac_format = get_config(db, "sac_format")
-    if maxlag is None:
-        maxlag = float(get_config(db, "maxlag"))
-    if cc_sampling_rate is None:
-        cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-    try:
-        os.makedirs(os.path.split(filename)[0], exist_ok=True)
-    except Exception:
-        pass
-    filename += ".SAC"
-    mytrace = Trace(data=corr)
-    mytrace.stats['station'] = pair
-    mytrace.stats['sampling_rate'] = cc_sampling_rate
-    if maxlag:
-        mytrace.stats.starttime = -maxlag
-    mytrace.stats.sac = AttribDict()
-    mytrace.stats.sac.depmin = np.min(corr)
-    mytrace.stats.sac.depmax = np.max(corr)
-    mytrace.stats.sac.depmen = np.mean(corr)
-    mytrace.stats.sac.scale = 1
-    mytrace.stats.sac.npts = len(corr)
-
-    st = Stream(traces=[mytrace, ])
-    st.write(filename, format='SAC')
-    del st
-    return
-
-
-def _export_mseed(db, filename, pair, components, filterid, corr, ncorr=0,
-                 maxlag=None, cc_sampling_rate=None, params=None):
-    from obspy import Trace, Stream
-    try:
-        os.makedirs(os.path.split(filename)[0], exist_ok=True)
-    except Exception:
-        pass
-    filename += ".MSEED"
-    maxlag = params.cc.maxlag
-    cc_sampling_rate = params.cc.cc_sampling_rate
-    if maxlag is None:
-        maxlag = float(get_config(db, "maxlag"))
-    if cc_sampling_rate is None:
-        cc_sampling_rate = float(get_config(db, "cc_sampling_rate"))
-
-    mytrace = Trace(data=corr)
-    mytrace.stats['station'] = pair[:11]
-    mytrace.stats['sampling_rate'] = cc_sampling_rate
-    mytrace.stats['start_time'] = -maxlag
-    mytrace.stats['location'] = "%02i" % ncorr
-
-    st = Stream(traces=[mytrace, ])
-    st.write(filename, format='MSEED')
-    del st
-    return
-
-
-
-
-
-
-# ============================================================
-# Section 13b — DVV Aggregate I/O + Aggregation Helpers
-# ============================================================
 
 
 def _classify_pair_type(sta1: str, sta2: str, component: str = "") -> str:

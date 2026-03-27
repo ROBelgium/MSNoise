@@ -191,9 +191,9 @@ import numpy as np
 import matplotlib.mlab as mlab
 
 from .api import (
-    add_corr,
+    save_daily_ccf,
     connect,
-    export_allcorr,
+    xr_save_ccf_all,
     extend_days,
     get_config_set_details,
     get_filter_steps_for_cc_step,
@@ -624,10 +624,22 @@ def main(loglevel="INFO"):
             del psds
 
         if params.cc.keep_all:
-            # Root folder for "all windows" output:
-            cc_all_base = os.path.join(*lineage_names, step.step_name)
-            for ccfid in allcorr.keys():
-                export_allcorr(db, ccfid, allcorr[ccfid], base_folder=cc_all_base, params=params, t_axis=t_axis)
+            for ccfid, windows in allcorr.items():
+                station1, station2, components, filterid, date = ccfid.split('+')
+                window_times = list(windows.keys())
+                corrs = np.asarray(list(windows.values()))
+                xr_save_ccf_all(
+                    root=params.output_folder,
+                    lineage=lineage_names,
+                    step_name=step.step_name,
+                    station1=station1,
+                    station2=station2,
+                    components=components,
+                    date=date,
+                    window_times=window_times,
+                    taxis=t_axis,
+                    corrs=corrs,
+                )
 
         if params.cc.keep_days:
             # Root folder for "daily stacks" output:
@@ -648,14 +660,17 @@ def main(loglevel="INFO"):
                     continue
                 thisdate = goal_day
                 thistime = "0_0"
-                add_corr(
-                    db, station1, station2, filter_name,
-                    thisdate, thistime, params.cc.corr_duration,
-                    components, corr,
-                    params.cc.cc_sampling_rate, day=True,
-                    ncorr=corrs.shape[0],
-                    params=params,
-                    base_folder=cc_daily_base)
+                save_daily_ccf(
+                    root=params.output_folder,
+                    lineage=lineage_names,
+                    step_name=step.step_name,
+                    station1=station1,
+                    station2=station2,
+                    components=components,
+                    date=thisdate,
+                    corr=corr,
+                    taxis=t_axis,
+                )
 
         # THIS SHOULD BE IN THE API
         massive_update_job(db, jobs, "D")

@@ -19,5 +19,3 @@ cc_type_single_station_AC,CC,Auto-Correlation type,str,
 cc_type_single_station_SC,CC,Cross-Correlation type for Cross-Components,str,
 keep_all,Y,Keep all cross-corr (length: ``corr_duration``),bool,Y/N
 keep_days,Y,Keep all daily cross-corr,bool,Y/N
-export_format,MSEED,Export stacks in which format(s) ?,str,SAC/MSEED/BOTH
-sac_format,doublets,Format for SAC stacks ?,str,doublets/clarke
