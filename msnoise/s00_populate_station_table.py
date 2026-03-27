@@ -125,7 +125,7 @@ def main(loglevel="INFO"):
             sys.path.append(os.getcwd())
             from custom import populate
             stationdict = populate(data_folder)
-        except:
+        except Exception:
             traceback.print_exc()
             logging.error("No file named custom.py in the %s folder" % os.getcwd())
             return

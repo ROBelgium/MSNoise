@@ -78,7 +78,6 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
     dtt_minlag= dtt_params.mwcs_dtt.dtt_minlag
     dtt_width = dtt_params.mwcs_dtt.dtt_width
     minCoh    = dtt_params.mwcs_dtt.dtt_mincoh
-    maxErr    = dtt_params.mwcs_dtt.dtt_maxerr
     maxDt     = dtt_params.mwcs_dtt.dtt_maxdtt
     maxlag    = dtt_params.cc.maxlag
 

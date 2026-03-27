@@ -13,29 +13,20 @@ Key Features:
 """
 
 import datetime
-import logging
 import os
-import sys
-import traceback
-from collections import OrderedDict
 
 from flask import Flask, request, redirect, url_for, flash, jsonify, render_template_string
 from flask_admin import Admin, BaseView, expose, AdminIndexView
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.actions import action
-from flask_admin.form import Select2Widget
-from flask_admin.model import typefmt
-from flask_admin import helpers as admin_helpers
-from flask_babel import Babel, gettext, ngettext, lazy_gettext
+from flask_babel import Babel, gettext, ngettext
 from markupsafe import Markup
 SafeMarkup = Markup
-from sqlalchemy import and_, or_, func, desc, asc
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import func
 from wtforms import Form, StringField, TextAreaField, SelectField, BooleanField, IntegerField, FloatField
-from wtforms.validators import DataRequired, Optional, NumberRange, ValidationError
-from wtforms.widgets import TextArea, Select, CheckboxInput, NumberInput
+from wtforms.validators import Optional
 
-from .api import connect, get_config, get_logger
+from .api import connect, get_logger
 from .api import get_config_categories_definition
 from .msnoise_table_def import declare_tables, WORKFLOW_CHAINS as _WC_FULL
 # Flatten the richer msnoise_table_def format to {category: [next_step, ...]}
@@ -95,7 +86,7 @@ def job_dependencies(job_id):
     """API endpoint for job dependencies"""
     try:
         db = connect()
-        job = db.query(Job).filter(Job.ref == job_id).first()
+        job = db.query(schema.Job).filter(schema.Job.ref == job_id).first()
 
         if not job:
             return jsonify({'error': 'Job not found'}), 404
@@ -112,11 +103,11 @@ def job_dependencies(job_id):
             # prefix so multi-configset branches don't bleed into each other.
             for link in job.workflow_step.incoming_links:
                 if link.is_active:
-                    pred_jobs = db.query(Job).filter(
-                        Job.day == job.day,
-                        Job.pair == job.pair,
-                        Job.step_id == link.from_step_id,
-                        Job.lineage == job_lineage.rsplit('/', 1)[0] if '/' in job_lineage else Job.lineage != None,
+                    pred_jobs = db.query(schema.Job).filter(
+                        schema.Job.day == job.day,
+                        schema.Job.pair == job.pair,
+                        schema.Job.step_id == link.from_step_id,
+                        schema.Job.lineage == job_lineage.rsplit('/', 1)[0] if '/' in job_lineage else schema.Job.lineage != None,
                     ).all()
 
                     for pred_job in pred_jobs:
@@ -129,11 +120,11 @@ def job_dependencies(job_id):
             # Get successor jobs — match by lineage that starts with current
             for link in job.workflow_step.outgoing_links:
                 if link.is_active:
-                    succ_jobs = db.query(Job).filter(
-                        Job.day == job.day,
-                        Job.pair == job.pair,
-                        Job.step_id == link.to_step_id,
-                        Job.lineage.startswith(job_lineage + '/') if job_lineage else Job.lineage != None,
+                    succ_jobs = db.query(schema.Job).filter(
+                        schema.Job.day == job.day,
+                        schema.Job.pair == job.pair,
+                        schema.Job.step_id == link.to_step_id,
+                        schema.Job.lineage.startswith(job_lineage + '/') if job_lineage else schema.Job.lineage != None,
                     ).all()
 
                     for succ_job in succ_jobs:
@@ -190,7 +181,7 @@ class MSNoiseAdminIndexView(AdminIndexView):
         # Get basic statistics
         stats = {}
         try:
-            stats['stations'] = db_session.query(schema.Station).filter(schema.Station.used == True).count()
+            stats['stations'] = db_session.query(schema.Station).filter(schema.Station.used.is_(True)).count()
             # stats['filters'] = db_session.query(schema.Filter).filter(schema.Filter.used == True).count()
             # stats['workflow_steps'] = db_session.query(schema.WorkflowSteps).filter(schema.WorkflowSteps.used == True).count()
             stats['jobs_total'] = db_session.query(schema.Job).count()
@@ -415,7 +406,6 @@ class JobView(BaseModelView):
     @action('reset_jobs', 'Reset Selected Jobs', 'Are you sure you want to reset the selected jobs?')
     def action_reset_jobs(self, ids):
         try:
-            from datetime import datetime
             query = self.session.query(self.model).filter(self.model.ref.in_(ids))
             count = 0
             for job in query.all():
@@ -434,7 +424,6 @@ class JobView(BaseModelView):
     @action('mark_done', 'Mark as Done', 'Are you sure you want to mark the selected jobs as done?')
     def action_mark_done(self, ids):
         try:
-            from datetime import datetime
             query = self.session.query(self.model).filter(self.model.ref.in_(ids))
             count = 0
             for job in query.all():
@@ -453,7 +442,6 @@ class JobView(BaseModelView):
     @action('mark_todo', 'Mark as Todo', 'Are you sure you want to mark the selected jobs as todo?')
     def action_mark_todo(self, ids):
         try:
-            from datetime import datetime
             query = self.session.query(self.model).filter(self.model.ref.in_(ids))
             count = 0
             for job in query.all():
@@ -500,12 +488,6 @@ class DataAvailabilityView(BaseModelView):
     def __init__(self, session, *args, **kwargs):
         super(DataAvailabilityView, self).__init__(schema.DataAvailability, session, *args, **kwargs)
 
-from flask_admin import BaseView, expose
-from flask_admin.form import BaseForm
-from flask import request, redirect, url_for, flash
-from wtforms import Form, StringField, FloatField, IntegerField, BooleanField, SelectField, TextAreaField
-from wtforms.validators import DataRequired, Optional
-import datetime
 
 class ConfigSetView(BaseView):
     """
@@ -736,7 +718,7 @@ class ConfigSetView(BaseView):
                 ).all()
 
                 if not source_configs:
-                    flash(f'Source configuration set not found', 'error')
+                    flash('Source configuration set not found', 'error')
                     return redirect(url_for('.index'))
 
                 # Copy configs
@@ -937,7 +919,7 @@ class WorkflowLinkView(BaseModelView):
 
     def _step_choices(self):
         steps = self.session.query(schema.WorkflowStep).filter(
-            schema.WorkflowStep.is_active == True
+            schema.WorkflowStep.is_active.is_(True)
         ).order_by(schema.WorkflowStep.step_name).all()
         return steps
 
@@ -1042,7 +1024,7 @@ class WorkflowBuilderView(BaseView):
         description = request.form.get('description')
 
         try:
-            step = create_workflow_step(self.session, step_name, category, set_number, description)
+            create_workflow_step(self.session, step_name, category, set_number, description)
             flash(f'Workflow step "{step_name}" created successfully', 'success')
         except Exception as e:
             flash(f'Error creating workflow step: {str(e)}', 'error')
@@ -1059,7 +1041,7 @@ class WorkflowBuilderView(BaseView):
         link_type = request.form.get('link_type', 'default')
 
         try:
-            link = create_workflow_link(self.session, from_step_id, to_step_id, link_type)
+            create_workflow_link(self.session, from_step_id, to_step_id, link_type)
             flash('Workflow link created successfully', 'success')
         except Exception as e:
             flash(f'Error creating workflow link: {str(e)}', 'error')
@@ -1173,11 +1155,6 @@ MSNOISE_INDEX_TEMPLATE = """
 {% endblock %}
 """
 
-import csv
-import os
-from flask import request, redirect, url_for, flash, render_template_string, render_template
-from flask_admin import BaseView, expose
-from wtforms import Form, SelectField, StringField, TextAreaField, IntegerField, validators
 
 
 # ============================================================================
@@ -1233,7 +1210,7 @@ def main(port=5099):
     logger.info("Starting MSNoise Admin Interface")
 
     # Create admin interface
-    admin = create_admin_app()
+    create_admin_app()
 
     # Configure Flask app
     app.config['TEMPLATES_AUTO_RELOAD'] = True

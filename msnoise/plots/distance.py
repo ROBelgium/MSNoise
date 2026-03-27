@@ -40,7 +40,6 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
 
     cc_sampling_rate = float(params.cc.cc_sampling_rate)
     maxlag = float(params.cc.maxlag)
-    output_folder = params.output_folder or 'OUTPUT'
     taxis = np.linspace(-maxlag, maxlag, int(2 * maxlag * cc_sampling_rate) + 1)
 
     pairs = get_station_pairs(db, used=1)

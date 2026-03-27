@@ -90,7 +90,6 @@ from .api import (
     getCoherence,
     get_logger,
     get_next_lineage_batch,
-    get_params,
     get_t_axis,
     get_window,
     is_next_job_for_step,
@@ -107,8 +106,6 @@ def main(loglevel="INFO"):
     logger.info('*** Starting: Compute MWCS ***')
 
     db = connect()
-    orig_params = get_params(db)
-
     logger.debug('Ready to compute')
     # Then we compute the jobs
 
@@ -138,7 +135,6 @@ def main(loglevel="INFO"):
         mov_stacks = params.mov_stack
 
         goal_sampling_rate = params.cc.cc_sampling_rate
-        maxlag = params.cc.maxlag
 
         logger.info(
             "There are MWCS jobs for some days to recompute for %s" % pair)
@@ -152,7 +148,6 @@ def main(loglevel="INFO"):
             n = next_fast_len(len(a))
             return whiten(a, n, 1./params.cc.cc_sampling_rate,
                           freqmin, freqmax, returntime=True)
-        ref_name = pair.replace(':', '_')
         station1, station2 = pair.split(":")
 
         if station1 == station2:

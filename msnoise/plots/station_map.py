@@ -88,7 +88,7 @@ def main(show=True, outfile=None):
     m.ax = ax
     try:
         m.shadedrelief()
-    except:
+    except Exception:
         traceback.print_exc()
     m.scatter(x, y, 50, marker='v', color='r')
     for sta in stations:

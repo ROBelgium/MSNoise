@@ -37,7 +37,6 @@ def main(loglevel="INFO"):
         jobs          = batch["jobs"]
         step          = batch["step"]
         params        = batch["params"]
-        lineage_names = batch["lineage_names"]
         days          = batch["days"]
 
         goal_day  = days[0]

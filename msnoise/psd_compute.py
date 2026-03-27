@@ -94,7 +94,6 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         jobs          = batch["jobs"]
         step          = batch["step"]
         params        = batch["params"]
-        days          = batch["days"]
 
         step_name     = step.step_name
         output_folder = params.output_folder

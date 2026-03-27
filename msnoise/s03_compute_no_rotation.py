@@ -46,7 +46,6 @@ this step:
 * |components_to_compute|
 * |components_to_compute_single_station|  | *new in 1.6*
 * |cc_sampling_rate|
-* |analysis_duration|
 * |overlap|
 * |maxlag|
 * |corr_duration|
@@ -181,7 +180,6 @@ could occur with SQLite.
 
 """
 #TODO docstring
-import sys
 import itertools
 import logging
 import os
@@ -194,17 +192,13 @@ from .api import (
     save_daily_ccf,
     connect,
     xr_save_ccf_all,
-    extend_days,
     get_config_set_details,
     get_filter_steps_for_cc_step,
     get_logger,
     get_next_lineage_batch,
-    get_params,
     get_t_axis,
     is_next_job_for_step,
     massive_update_job,
-    nextpow2,
-    preload_instrument_responses,
     stack,
     update_job,
     winsorizing,
@@ -213,17 +207,13 @@ from .move2obspy import myCorr2
 from .move2obspy import whiten2
 from .move2obspy import pcc_xcorr
 
-from .preprocessing import preprocess
 
-from scipy.stats import scoreatpercentile
-import concurrent
 
 import scipy.signal
 import scipy.fft as sf
 from scipy.fft import next_fast_len
 from obspy.signal.filter import bandpass
-from obspy import read
-from obspy.core import AttribDict, Stream
+from obspy import read, Stream
 
 
 def main(loglevel="INFO"):
@@ -239,7 +229,6 @@ def main(loglevel="INFO"):
     #     sys.exit()
 
     # Get Configuration
-    orig_params = get_params(db)
     # filters = get_filters(db, all=False)
     # logger.info("Will compute [%s] for different stations" % " ".join(params.components_to_compute))
     # logger.info("Will compute [%s] for single stations" % " ".join(params.components_to_compute_single_station))
@@ -266,7 +255,6 @@ def main(loglevel="INFO"):
 
         jobs = batch["jobs"]
         pair = batch["pair"]
-        days = batch["days"]
         params = batch["params"]
         lineage_names_upstream = batch["lineage_names_upstream"]
         lineage_names = batch["lineage_names"]  # full: e.g. [preprocess_1, cc_1]

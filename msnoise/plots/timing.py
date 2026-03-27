@@ -122,7 +122,6 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
         plt.sca(ax)
 
         pair_series = []
-        err_series  = []
 
         for (s1, s2) in all_pairs:
             try:

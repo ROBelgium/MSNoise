@@ -19,7 +19,6 @@ Example:
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num, DateFormatter
-from matplotlib.widgets import Cursor
 
 from obspy.signal.filter import bandpass
 
@@ -110,7 +109,6 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
     plt.title(title)
     fig.autofmt_xdate()
     plt.tight_layout()
-    cursor = Cursor(ax, useblit=True, color='black', linewidth=1.2)
     if outfile:
         if outfile.startswith("?"):
             pair = pair.replace(':', '-')

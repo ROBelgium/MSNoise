@@ -33,7 +33,6 @@ import datetime
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.widgets import Cursor
 from obspy.signal.filter import bandpass
 
 from ..api import (
@@ -73,7 +72,6 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
     pair = "_".join([sta1, sta2])
     try:
         stack_total = result.get_ccf(f"{sta1}:{sta2}", components, mov_stack, format="dataframe")
-        t = stack_total.columns.values
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
         return
@@ -122,7 +120,6 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
         title += ", Re-filtered (%.2f - %.2f Hz)" % (freqmin, freqmax)
     ax.set_title(title)
 
-    cursor = Cursor(ax, useblit=True, color='red', linewidth=1.2)
     if outfile:
         if outfile.startswith("?"):
             pair = pair.replace(':', '-')

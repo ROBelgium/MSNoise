@@ -36,7 +36,6 @@ import datetime
 import numpy as np
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Cursor
 
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
@@ -135,7 +134,6 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
     else:
         plt.xlim(-params.cc.maxlag, params.cc.maxlag)
     ax.fmt_ydata = mdates.DateFormatter('%Y-%m-%d')
-    cursor = Cursor(ax, useblit=True, color='red', linewidth=1.2)
     plt.tight_layout()
     if outfile:
         if outfile.startswith("?"):

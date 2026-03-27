@@ -1,5 +1,4 @@
 name,default,definition,type,possible_values
-analysis_duration,86400.0,Duration of the Analysis in seconds (this shouldn't be changed for now),float,
 cc_sampling_rate,20.0,Sampling Rate for the CrossCorrelation (in Hz),float,
 cc_normalisation,NO,"Normalisation method for individual `corr_duration`) CCFs, default is not normalized (NO), but can be normalized based on the power of the two traces (POW), or by the maximum (MAX) or absolute maximum (ABSMAX) of the CCF",str,NO/POW/MAX/ABSMAX
 maxlag,120.0,Maximum lag (in seconds),float,

@@ -33,7 +33,6 @@ def myCorr(data, maxlag, plot=False, nfft=None):
         nfft = fshape[0]
 
     normalized = True
-    allCpl = False
 
     maxlag = np.round(maxlag)
 

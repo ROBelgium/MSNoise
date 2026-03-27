@@ -40,7 +40,7 @@ from obspy.core import UTCDateTime, Stream, read
 
 try:
     from scikits.samplerate import resample
-except:
+except Exception:
     pass
 
 from .api import *
@@ -92,7 +92,6 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
     logger.debug('*** Starting: preprocessing ***')
     datafiles = {}
     output = Stream()
-    MULTIPLEX = False
     MULTIPLEX_files = {}
     db = connect()
     for station in stations:
@@ -110,7 +109,6 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                 fullpath = os.path.join(file.path, file.file)
                 datafiles[station][file.chan[-1]].append(fullpath)
             else:
-                MULTIPLEX = True
                 logger.debug("Mutliplex mode, reading the files")
                 fullpath = os.path.join(file.path, file.file)
                 multiplexed = sorted(glob.glob(fullpath))
@@ -151,7 +149,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                                       station=sta,
                                       format=params.global_.archive_format or None)
                             # print("done in", time.time()-t)
-                        except:
+                        except Exception:
                             logger.debug("ERROR reading file %s" % file)
                             traceback.print_exc()
                             # TODO add traceback (optional?)
@@ -189,7 +187,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                 #     # HACK not super clean... should find a way to prevent the
                 #     # same trace id with different sps to occur
                 #     stream.merge(method=1, interpolation_samples=3, fill_value=None)
-                # except:
+                # except Exception:
                 #     logger.debug("Error while merging...")
                 #     traceback.print_exc()
                 #     continue
@@ -214,7 +212,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                                     stream[gap[0]] = stream[gap[0]].__add__(stream[gap[1]], method=1,
                                                                             fill_value="interpolate")
                                     stream.remove(stream[gap[1]])
-                                except:
+                                except Exception:
                                     stream.remove(stream[gap[1]])
 
                                 break
@@ -291,7 +289,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                         stream.attach_response(responses)
                         stream.remove_response(pre_filt=params.preprocess.response_prefilt,
                                                taper=False)
-                    except:
+                    except Exception:
                         logger.error("Bad or no instrument response "
                                      "information for %s, skipping" %
                                      stream[0].id)

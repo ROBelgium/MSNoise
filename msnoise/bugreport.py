@@ -7,13 +7,12 @@ import importlib
 
 def ispresent(module, how=None):
     try:
-        mod = __import__(module)
         ver = importlib.metadata.version(module)
         if ver:
             return "[X] %s: %s"%(module, ver)
         else:
             return "[X] %s: present (no version)"%module
-    except:
+    except Exception:
         return "[ ] %s: not found"% (module)
 
 

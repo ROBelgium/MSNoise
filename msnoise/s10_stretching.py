@@ -143,7 +143,6 @@ def main(loglevel="INFO"):
     params = get_params(db)
     time.sleep(np.random.random() * 5)
 
-    smoothing_half_win = 5
     while is_next_job_for_step(db, step_category="stretching"):
         logger.debug("Getting the next batch")
         batch = get_next_lineage_batch(db, step_category="stretching", group_by="pair_lineage", loglevel=loglevel)
@@ -167,7 +166,6 @@ def main(loglevel="INFO"):
         root = params.output_folder
         mov_stacks = params.mov_stack
         goal_sampling_rate = params.cc.cc_sampling_rate
-        maxlag = params.cc.maxlag
 
         netsta1, netsta2 = pair.split(':')
         station1, station2 = pair.split(":")
@@ -177,7 +175,6 @@ def main(loglevel="INFO"):
             components_to_compute = params.components_to_compute
         
         for components in components_to_compute:
-            ref_name = pair.replace(':', '_')
             station1, station2 = pair.split(":")
             rolling_mode = refstack_is_rolling(params)
             if not rolling_mode:
@@ -213,7 +210,6 @@ def main(loglevel="INFO"):
             ref_stretched, deltas = stretch_mat_creation(ref,str_range=str_range, nstr=nstr)
 
             for mov_stack in mov_stacks:
-                output = []
                 #alldays = []
                 #alldeltas = []
                 #allcoefs = []
@@ -233,7 +229,7 @@ def main(loglevel="INFO"):
                 data = data.dropna()
 
                 if rolling_mode:
-                    ref_rolling = compute_rolling_ref(
+                    ref_rolling = compute_rolling_ref(  # noqa: F841 — computed but not yet used in loop
                         data, int(params.refstack.ref_begin), int(params.refstack.ref_end)
                     )
 
@@ -248,7 +244,6 @@ def main(loglevel="INFO"):
 
                 data_values = data.values
                 num_days = data_values.shape[0]
-                num_stretch = ref_stretched.shape[0]
 
                 # Normalizing the data for correlation
                 data_norm = (data_values - data_values.mean(axis=1, keepdims=True)) / data_values.std(axis=1, keepdims=True)

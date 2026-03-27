@@ -846,41 +846,6 @@ def get_interstation_distance(station1, station2, coordinates="DEG"):
 # DATA AVAILABILITY
 
 
-def azimuth(coordinates, x0, y0, x1, y1):
-    """
-    Returns the azimuth between two coordinate sets.
-
-    :type coordinates: str
-    :param coordinates: {'DEG', 'UTM', 'MIX'}
-    :type x0: float
-    :param x0: X coordinate of station 1
-    :type y0: float
-    :param y0: Y coordinate of station 1
-    :type x1: float
-    :param x1: X coordinate of station 2
-    :type y1: float
-    :param y1: Y coordinate of station 2
-
-    :rtype: float
-    :returns: The azimuth in degrees
-    """
-    warnings.warn("azimuth() is deprecated and will be removed in a future MSNoise release.", DeprecationWarning, stacklevel=2)
-    from obspy.geodetics import gps2dist_azimuth
-    if coordinates == "DEG":
-        dist, azim, bazim = gps2dist_azimuth(y0, x0, y1, x1)
-        return azim
-    elif coordinates == 'UTM':
-        if (np.isclose(y0, y1) & np.isclose(x0, x1)):
-            return 0
-        else:
-            azim = 90. - np.arctan2((y1 - y0), (x1 - x0)) * 180. / np.pi
-            return azim % 360
-    else:
-        logging.warning("Please consider having a single coordinate system for"
-                        " all stations")
-        return 0
-
-
 # ============================================================
 # Section 3 — Data Availability
 # ============================================================
@@ -1426,18 +1391,6 @@ def create_workflow_links_from_steps(session):
 # Job management functions for workflow-aware jobs
 
 
-def get_workflow_step_config(session, step_name):
-    """Return the :class:`WorkflowStep` for *step_name*, or ``None``.
-
-    :param session: Active SQLAlchemy session.
-    :param step_name: Exact step name string, e.g. ``"preprocess_1"``.
-    """
-    for step in get_workflow_steps(session):
-        if step.step_name == step_name:
-            return step
-    return None
-
-
 # ============================================================
 # Section 5 — Jobs
 # ============================================================
@@ -1603,28 +1556,6 @@ def reset_jobs(session, jobtype, alljobs=False, reset_i=True, reset_e=True):
         if flags:
             session.execute(q.where(Job.flag.in_(flags)).values(flag='T'))
     session.commit()
-
-
-def get_job_types(session, jobtype):
-    """Return job counts grouped by flag for a given ``jobtype`` string.
-
-    Works with the v2 workflow model where ``jobtype`` is a step name such
-    as ``"cc_1"``.  Returns a list of ``(count, flag)`` tuples, matching the
-    interface expected by the test suite.
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object
-    :type jobtype: str
-    :param jobtype: Step name to query (e.g. ``"cc_1"``)
-    :rtype: list of (int, str)
-    :returns: List of (count, flag) pairs
-    """
-    from sqlalchemy import func
-    rows = (session.query(func.count(Job.flag), Job.flag)
-            .filter(Job.jobtype == jobtype)
-            .group_by(Job.flag)
-            .all())
-    return rows
 
 
 # ── Workflow-aware job API ──────────────────────────────────
@@ -1811,10 +1742,6 @@ def get_filter_steps_for_cc_step(session, cc_step_id):
     filter_steps = [step for step in successor_steps if step.category == "filter"]
 
     return filter_steps
-
-
-def lineage_to_string(lineage_steps):
-    return "/".join(s.step_name for s in lineage_steps if s.step_name)
 
 
 def lineage_str_to_step_names(lineage_str, sep="/"):
@@ -2073,43 +2000,6 @@ def resolve_lineage_params(session, lineage_names):
 # ============================================================
 
 
-def resolve_lineage_from_ids(session, params, preprocess_id=1, cc_id=None,
-                              filter_id=None, stack_id=None, refstack_id=None,
-                              mwcs_id=None, mwcs_dtt_id=None,
-                              stretching_id=None, wavelet_id=None,
-                              wavelet_dtt_id=None):
-    """Build a lineage name list from integer step-set IDs and resolve params.
-
-    Constructs step-name strings (e.g. ``"preprocess_1"``, ``"cc_2"``) from
-    the supplied integer IDs in workflow order, then delegates to
-    :func:`resolve_lineage_params` to merge all step configurations.
-    Only IDs that are not ``None`` are included.
-
-    :returns: ``(lineage_steps, lineage_names, merged_params)`` - same tuple
-        as :func:`get_merged_params_for_lineage`.
-    """
-    parts = [f"preprocess_{preprocess_id}"]
-    if cc_id is not None:
-        parts.append(f"cc_{cc_id}")
-    if filter_id is not None:
-        parts.append(f"filter_{filter_id}")
-    if stack_id is not None:
-        parts.append(f"stack_{stack_id}")
-    if refstack_id is not None:
-        parts.append(f"refstack_{refstack_id}")
-    if mwcs_id is not None:
-        parts.append(f"mwcs_{mwcs_id}")
-    if mwcs_dtt_id is not None:
-        parts.append(f"mwcs_dtt_{mwcs_dtt_id}")
-    if stretching_id is not None:
-        parts.append(f"stretching_{stretching_id}")
-    if wavelet_id is not None:
-        parts.append(f"wavelet_{wavelet_id}")
-    if wavelet_dtt_id is not None:
-        parts.append(f"wavelet_dtt_{wavelet_dtt_id}")
-    return resolve_lineage_params(session, parts)
-
-
 # ============================================================
 # Lineage enumeration helpers
 # ============================================================
@@ -2205,61 +2095,6 @@ def get_next_lineage_batch(
     }
 
 
-def get_stack_lineage_for_filter(session, filterid):
-    """Get the full lineage path through a specific filter step to its downstream stack.
-
-    Traverses the workflow graph upstream from ``filter_{filterid}`` to the root
-    preprocess step, then appends the stack step that is immediately downstream of
-    the filter.  Returns a list of step names suitable for use as the *lineage*
-    argument to :func:`xr_get_ref`, :func:`xr_get_ccf`, etc.
-
-    Example for the default single-pipeline::
-
-        get_stack_lineage_for_filter(db, 1)
-        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1']
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :type filterid: int
-    :param filterid: The filter set_number (e.g. 1 for filter_1).
-    :rtype: list of str
-    """
-    steps = get_workflow_steps(session)
-    links = get_workflow_links(session)
-    step_map = {s.step_id: s for s in steps}
-
-    filter_step = next(
-        (s for s in steps if s.category == 'filter' and s.set_number == filterid),
-        None,
-    )
-    if filter_step is None:
-        return []
-
-    # Walk upstream from filter to the root step, skipping global config steps
-    parent_map = {link.to_step_id: link.from_step_id for link in links}
-    path = [filter_step.step_name]
-    current_id = filter_step.step_id
-    visited = set()
-    while current_id in parent_map:
-        if current_id in visited:
-            break  # guard against cycles
-        visited.add(current_id)
-        parent_id = parent_map[current_id]
-        parent_step = step_map[parent_id]
-        if parent_step.category != 'global':
-            path.insert(0, parent_step.step_name)
-        current_id = parent_id
-
-    # Append the stack step immediately downstream of this filter (if any)
-    for link in links:
-        if link.from_step_id == filter_step.step_id:
-            child = step_map.get(link.to_step_id)
-            if child and child.category == 'stack':
-                path.append(child.step_name)
-                break
-
-    return path
-
-
 def get_refstack_lineage_for_filter(session, filterid, refstack_set_number=1):
     """Get the full lineage path through a filter step down to its refstack.
 
@@ -2280,7 +2115,7 @@ def get_refstack_lineage_for_filter(session, filterid, refstack_set_number=1):
     :param refstack_set_number: Which refstack set to use (default 1).
     :rtype: list of str
     """
-    path = get_stack_lineage_for_filter(session, filterid)
+    path = _get_stack_lineage_for_filter(session, filterid)
     if not path:
         return path
 
@@ -2346,24 +2181,6 @@ def get_t_axis(params):
     """
     samples = int(2 * params.cc.maxlag * params.cc.cc_sampling_rate) + 1
     return np.linspace(-params.cc.maxlag, params.cc.maxlag, samples)
-
-
-def get_maxlag_samples(maxlag, cc_sampling_rate):
-    """
-    Returns the length of the CC functions. Gets the maxlag and sampling rate
-    from the database.
-
-
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-
-    :rtype: int
-    :returns: the length of the CCF in samples
-    """
-    warnings.warn("get_maxlag_samples() is deprecated; use int(2*maxlag*cc_sampling_rate)+1 directly.", DeprecationWarning, stacklevel=2)
-
-    return int(2*maxlag*cc_sampling_rate)+1
 
 
 def build_ref_datelist(params, session=None):
@@ -2752,73 +2569,6 @@ def prepare_abs_positive_fft(line, sampling_rate):
     return freq[idx], val[idx]
 
 
-def wavg_wstd(data, errors):
-    """Weighted average and weighted standard deviation of equal-length arrays.
-
-    :param data: 1-D array of measurement values.
-    :param errors: 1-D array of measurement errors (zeros replaced by ``1e-6``).
-    :returns: ``(weighted_mean, weighted_std)`` as floats.
-    """
-    warnings.warn("wavg_wstd() is deprecated; use aggregate_dvv_pairs() for network dv/v statistics.", DeprecationWarning, stacklevel=2)
-    errors = np.where(errors == 0, 1e-6, errors)
-    w = 1.0 / errors
-    wavg = (data * w).sum() / w.sum()
-    N = len(np.nonzero(w)[0])
-    wstd = np.sqrt(np.sum(w * (data - wavg) ** 2) / ((N - 1) * np.sum(w) / N))
-    return wavg, wstd
-
-
-def wavg(group, dttname, errname):
-    """
-    Calculate the weighted average of a given group using the provided parameters.
-
-    :param group: A pandas DataFrame or Series representing the group of data.
-    :param dttname: The name of the column containing the data to be averaged.
-    :param errname: The name of the column containing the error for each data point.
-    :return: The weighted average of the data.
-
-    """
-    warnings.warn("wavg() is deprecated; use aggregate_dvv_pairs() for network dv/v statistics.", DeprecationWarning, stacklevel=2)
-    d = group[dttname]
-    group.loc[group[errname] == 0,errname] = 1e-6
-    w = 1. / group[errname]
-    try:
-        wavg = (d * w).sum() / w.sum()
-    except Exception:
-        wavg = d.mean()
-    return wavg
-
-
-def wstd(group, dttname, errname):
-    """
-    :param group: A dictionary containing data for different groups.
-    :param dttname: The key in the `group` dictionary that corresponds to the data array.
-    :param errname: The key in the `group` dictionary that corresponds to the error array.
-    :return: The weighted standard deviation of the data array.
-
-    This method calculates the weighted standard deviation of the data array specified by `dttname` in the `group` dictionary.
-    The weights are derived from the error array specified by `errname` in the `group` dictionary.
-
-    The weighted standard deviation is computed using the following formula:
-        wstd = sqrt(sum(w * (d - wavg) ** 2) / ((N - 1) * sum(w) / N))
-    where:
-        - d is the data array specified by `dttname` in the `group` dictionary.
-        - w is the weight array derived from the error array specified by `errname` in the `group` dictionary.
-        - wavg is the weighted average of the data array.
-        - N is the number of non-zero weights.
-
-    Note: This method uses the `np` module from NumPy.
-    """
-    warnings.warn("wstd() is deprecated; use aggregate_dvv_pairs() for network dv/v statistics.", DeprecationWarning, stacklevel=2)
-    d = group[dttname]
-    group.loc[group[errname] == 0,errname] = 1e-6
-    w = 1. / group[errname]
-    wavg = (d * w).sum() / w.sum()
-    N = len(np.nonzero(w.values)[0])
-    wstd = np.sqrt(np.sum(w * (d - wavg) ** 2) / ((N - 1) * np.sum(w) / N))
-    return wstd
-
-
 def _get_wavgwstd(data, dttname, errname):
     """
     Calculate the weighted average and weighted standard deviation for a given data.
@@ -2836,8 +2586,8 @@ def _get_wavgwstd(data, dttname, errname):
     :rtype: tuple
     """
     grouped = data.groupby(level=0)
-    g = grouped.apply(wavg, dttname=dttname, errname=errname)
-    h = grouped.apply(wstd, dttname=dttname, errname=errname)
+    g = grouped.apply(_wavg, dttname=dttname, errname=errname)
+    h = grouped.apply(_wstd, dttname=dttname, errname=errname)
     return g, h
 
 
@@ -3333,6 +3083,119 @@ def _xr_save_and_close(dataset, fn):
 # ── CCF ─────────────────────────────────────────────────────
 
 
+def _get_stack_lineage_for_filter(session, filterid):
+    """Get the full lineage path through a specific filter step to its downstream stack.
+
+    Traverses the workflow graph upstream from ``filter_{filterid}`` to the root
+    preprocess step, then appends the stack step that is immediately downstream of
+    the filter.  Returns a list of step names suitable for use as the *lineage*
+    argument to :func:`xr_get_ref`, :func:`xr_get_ccf`, etc.
+
+    Example for the default single-pipeline::
+
+        get_stack_lineage_for_filter(db, 1)
+        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1']
+
+    :type session: :class:`sqlalchemy.orm.session.Session`
+    :type filterid: int
+    :param filterid: The filter set_number (e.g. 1 for filter_1).
+    :rtype: list of str
+    """
+    steps = get_workflow_steps(session)
+    links = get_workflow_links(session)
+    step_map = {s.step_id: s for s in steps}
+
+    filter_step = next(
+        (s for s in steps if s.category == 'filter' and s.set_number == filterid),
+        None,
+    )
+    if filter_step is None:
+        return []
+
+    # Walk upstream from filter to the root step, skipping global config steps
+    parent_map = {link.to_step_id: link.from_step_id for link in links}
+    path = [filter_step.step_name]
+    current_id = filter_step.step_id
+    visited = set()
+    while current_id in parent_map:
+        if current_id in visited:
+            break  # guard against cycles
+        visited.add(current_id)
+        parent_id = parent_map[current_id]
+        parent_step = step_map[parent_id]
+        if parent_step.category != 'global':
+            path.insert(0, parent_step.step_name)
+        current_id = parent_id
+
+    # Append the stack step immediately downstream of this filter (if any)
+    for link in links:
+        if link.from_step_id == filter_step.step_id:
+            child = step_map.get(link.to_step_id)
+            if child and child.category == 'stack':
+                path.append(child.step_name)
+                break
+
+    return path
+
+def _wavg(group, dttname, errname):
+    """
+    Calculate the weighted average of a given group using the provided parameters.
+
+    :param group: A pandas DataFrame or Series representing the group of data.
+    :param dttname: The name of the column containing the data to be averaged.
+    :param errname: The name of the column containing the error for each data point.
+    :return: The weighted average of the data.
+
+    """
+    warnings.warn("wavg() is deprecated; use aggregate_dvv_pairs() for network dv/v statistics.", DeprecationWarning, stacklevel=2)
+    d = group[dttname]
+    group.loc[group[errname] == 0,errname] = 1e-6
+    w = 1. / group[errname]
+    try:
+        wavg = (d * w).sum() / w.sum()
+    except Exception:
+        wavg = d.mean()
+    return wavg
+
+def _wstd(group, dttname, errname):
+    """
+    :param group: A dictionary containing data for different groups.
+    :param dttname: The key in the `group` dictionary that corresponds to the data array.
+    :param errname: The key in the `group` dictionary that corresponds to the error array.
+    :return: The weighted standard deviation of the data array.
+
+    This method calculates the weighted standard deviation of the data array specified by `dttname` in the `group` dictionary.
+    The weights are derived from the error array specified by `errname` in the `group` dictionary.
+
+    The weighted standard deviation is computed using the following formula:
+        wstd = sqrt(sum(w * (d - wavg) ** 2) / ((N - 1) * sum(w) / N))
+    where:
+        - d is the data array specified by `dttname` in the `group` dictionary.
+        - w is the weight array derived from the error array specified by `errname` in the `group` dictionary.
+        - wavg is the weighted average of the data array.
+        - N is the number of non-zero weights.
+
+    Note: This method uses the `np` module from NumPy.
+    """
+    warnings.warn("wstd() is deprecated; use aggregate_dvv_pairs() for network dv/v statistics.", DeprecationWarning, stacklevel=2)
+    d = group[dttname]
+    group.loc[group[errname] == 0,errname] = 1e-6
+    w = 1. / group[errname]
+    wavg = (d * w).sum() / w.sum()
+    N = len(np.nonzero(w.values)[0])
+    wstd = np.sqrt(np.sum(w * (d - wavg) ** 2) / ((N - 1) * np.sum(w) / N))
+    return wstd
+
+def _psd_dfrms(a):
+    """Integrate a PSD Series over its period axis using the trapezoid rule.
+
+    :param a: :class:`pandas.Series` whose index is period values.
+    :returns: Square-root of the integrated power (RMS-equivalent).
+    """
+    warnings.warn("psd_dfrms() is deprecated and will be removed in a future MSNoise release.", DeprecationWarning, stacklevel=2)
+    return np.sqrt(np.trapezoid(a.values, a.index))
+
+
 def xr_save_ccf(root, lineage, step_name, station1, station2, components, mov_stack, taxis, new, overwrite=False):
     path = os.path.join(root, *lineage, step_name, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
@@ -3450,46 +3313,6 @@ def xr_get_ref(root, lineage, station1, station2, components, taxis, ignore_netw
     data = _xr_create_or_open(fullpath, taxis, name="REF")
     return data
 
-
-def get_results(session, station1, station2, filterid, components, dates,
-                mov_stack=1, format="stack", params=None):
-    """
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA.LOC)
-    :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA.LOC)
-    :type filterid: int
-    :param filterid: The ID (ref) of the filter
-    :type components: str
-    :param components: The name of the components used (ZZ, ZR, ...)
-    :type dates: list
-    :param dates: List of TODO datetime.datetime
-    :type mov_stack: int
-    :param mov_stack: Moving window stack.
-    :type format: str
-    :param format: Either ``stack``: the data will be stacked according to
-        the parameters passed with ``params`` or ``matrix``: to get a 2D
-        array of CCF.
-    :type params: dict, :class:`obspy.core.util.attribdict.AttribDict`
-    :param params: A dictionnary of MSNoise config parameters as returned by
-        :func:`get_params`.
-    :rtype: :class:`numpy.ndarray`
-    :return: Either a 1D CCF (if format is ``stack`` or a 2D array (if format=
-        ``matrix``).
-    """
-    warnings.warn(
-        "get_results() is deprecated; use xr_get_ccf() or MSNoiseResult.get_ccf() instead.",
-        DeprecationWarning, stacklevel=2
-    )
-    raise NotImplementedError(
-        "get_results() previously read MSEED/SAC files from the legacy STACKS/ folder. "
-        "That export format has been removed. Use xr_get_ccf() or "
-        "MSNoiseResult.get_ccf() to read CCF data from the current NetCDF pipeline."
-    )
-
 def xr_load_ccf_for_stack(root, lineage_names, station1, station2, components, dates):
     """Load per-day CCF data for stacking — the higher-level replacement for ``get_results_all``.
 
@@ -3548,79 +3371,6 @@ def xr_load_ccf_for_stack(root, lineage_names, station1, station2, components, d
         return xr.Dataset()
     combined = xr.concat(das, dim="times").sortby("times")
     return combined.to_dataset(name="CCF")
-
-
-
-def get_results_all(session, root, lineage_names, station1, station2, components, dates,
-                    format="dataframe", params=None):
-    """
-    :type session: :class:`sqlalchemy.orm.session.Session`
-    :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
-        obtained by :func:`connect`
-    :type station1: str
-    :param station1: The name of station 1 (formatted NET.STA.LOC)
-    :type station2: str
-    :param station2: The name of station 2 (formatted NET.STA.LOC)
-    :type components: str
-    :param components: The name of the components used (ZZ, ZR, ...)
-    :type dates: list
-    :param dates: List of TODO datetime.datetime
-    :rtype: :class:`pandas.DataFrame`
-    :return: All CCF results in a :class:`pandas.DataFrame`, where the index
-        is the time of the CCF and the columns are the times in the coda.
-
-    .. deprecated::
-        Use :func:`xr_load_ccf_for_stack` instead.
-    """
-    warnings.warn(
-        "get_results_all() is deprecated; use xr_load_ccf_for_stack() instead.",
-        DeprecationWarning, stacklevel=2
-    )
-
-    # Path written by s03: root / *cc_upstream / cc_step / filter_step / _output / ...
-    # lineage_names is the full lineage e.g. ['preprocess_1','cc_1','filter_1','stack_1',...]
-    # cc_upstream = everything up to and including the cc step
-    # filter_step = the step immediately after the cc step
-    cc_idx = next(
-        (i for i, n in enumerate(lineage_names) if n.startswith("cc_")), None
-    )
-    if cc_idx is None or cc_idx + 1 >= len(lineage_names):
-        return xr.Dataset() if format == "xarray" else pd.DataFrame()
-    cc_lineage = lineage_names[:cc_idx + 1]   # e.g. ['preprocess_1', 'cc_1']
-    filter_step = lineage_names[cc_idx + 1]   # e.g. 'filter_1'
-
-    das = []
-    for date in dates:
-        date_str = date if isinstance(date, str) else date.strftime('%Y-%m-%d')
-        try:
-            da = xr_get_ccf_all(root, cc_lineage, filter_step,
-                                station1, station2, components, date_str)
-            das.append(da)
-        except FileNotFoundError:
-            continue
-
-    if not das:
-        # Fallback: daily stacks from keep_days (xr_save_ccf_daily)
-        for date in dates:
-            date_str = date if isinstance(date, str) else date.strftime('%Y-%m-%d')
-            try:
-                da = xr_get_ccf_daily(root, cc_lineage, filter_step,
-                                      station1, station2, components, date_str)
-                t = pd.Timestamp(date_str)
-                da = da.expand_dims({"times": [t]})
-                das.append(da)
-            except FileNotFoundError:
-                continue
-
-    if das:
-        combined = xr.concat(das, dim="times")
-        combined = combined.sortby("times")
-        if format == "xarray":
-            return combined.to_dataset(name="CCF")
-        else:
-            return combined.to_dataframe(name="CCF").unstack("taxis")
-    else:
-        return xr.Dataset() if format == "xarray" else pd.DataFrame()
 
 # Some helper functions
 
@@ -4419,16 +4169,6 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
 # ============================================================
 
 
-def psd_dfrms(a):
-    """Integrate a PSD Series over its period axis using the trapezoid rule.
-
-    :param a: :class:`pandas.Series` whose index is period values.
-    :returns: Square-root of the integrated power (RMS-equivalent).
-    """
-    warnings.warn("psd_dfrms() is deprecated and will be removed in a future MSNoise release.", DeprecationWarning, stacklevel=2)
-    return np.sqrt(np.trapezoid(a.values, a.index))
-
-
 def psd_rms(s, f):
     """Compute RMS from a power spectrum array and frequency array.
 
@@ -4458,14 +4198,14 @@ def psd_df_rms(d, freqs, output="VEL"):
         w2f = 2.0 * np.pi * f
         amp = 10.0 ** (spec / 10.0)
         if output == "ACC":
-            RMS[f"{fmin:.1f}-{fmax:.1f}"] = amp.apply(psd_dfrms, axis=1)
+            RMS[f"{fmin:.1f}-{fmax:.1f}"] = amp.apply(_psd_dfrms, axis=1)
         elif output == "VEL":
             vamp = amp / w2f ** 2
-            RMS[f"{fmin:.1f}-{fmax:.1f}"] = vamp.apply(psd_dfrms, axis=1)
+            RMS[f"{fmin:.1f}-{fmax:.1f}"] = vamp.apply(_psd_dfrms, axis=1)
         else:
             vamp = amp / w2f ** 2
             damp = vamp / w2f ** 2
-            RMS[f"{fmin:.1f}-{fmax:.1f}"] = damp.apply(psd_dfrms, axis=1)
+            RMS[f"{fmin:.1f}-{fmax:.1f}"] = damp.apply(_psd_dfrms, axis=1)
     return pd.DataFrame(RMS, index=d.index)
 
 

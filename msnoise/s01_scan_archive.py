@@ -62,7 +62,6 @@ This command can also scan folders recursively:
 
 import datetime
 import glob
-import logging
 import multiprocessing
 import os
 import random

@@ -48,7 +48,6 @@ import pandas as pd
 from .api import (
     connect,
     get_logger,
-    get_params,
     get_next_lineage_batch,
     is_next_job_for_step,
     xr_load_ccf_for_stack,
@@ -69,8 +68,6 @@ def main(loglevel="INFO"):
     logger.info("*** Starting: Compute REF Stack (refstack) ***")
 
     db = connect()
-    orig_params = get_params(db)
-
     while is_next_job_for_step(db, step_category="refstack"):
         logger.info("Getting the next refstack job")
 

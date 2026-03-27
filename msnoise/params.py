@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import datetime
 from collections import OrderedDict
-from typing import Optional
+from obspy.core.util.attribdict import AttribDict
 
 
 class LayeredParams:
@@ -216,8 +216,6 @@ class LayeredParams:
         reproducibility checks.
         """
         import yaml
-        from obspy.core import AttribDict
-
         with open(path, encoding="utf-8") as fh:
             doc = yaml.safe_load(fh)
 
@@ -277,8 +275,6 @@ def _build_layered_params(
         *lineage_steps*.
     :returns: :class:`LayeredParams` with one layer per category.
     """
-    from obspy.core import AttribDict
-
     p = LayeredParams()
     p._set_lineage_names(lineage_names)
 

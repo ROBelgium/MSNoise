@@ -5,11 +5,11 @@ and improved workflow chain management using PrefixerBase and declare_tables.
 
 import datetime
 from collections import namedtuple
-from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, \
-    DateTime, Text, ForeignKey, Table, UniqueConstraint, Index, Enum, REAL, TIMESTAMP, CheckConstraint
+from sqlalchemy import Column, Integer, String, Float, Boolean, \
+    DateTime, Text, ForeignKey, UniqueConstraint, Index, Enum, REAL, TIMESTAMP, CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
-from sqlalchemy.orm import relationship, sessionmaker, backref
-from sqlalchemy.sql import func, text
+from sqlalchemy.orm import relationship, backref  # noqa: F401 — backref used in relationship()
+from sqlalchemy.sql import text
 # from .api import read_prefix
 
 WORKFLOW_CHAINS = {

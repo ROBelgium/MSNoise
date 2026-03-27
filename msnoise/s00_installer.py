@@ -35,7 +35,6 @@ To run this script:
     solution.
 """
 
-import argparse
 import logging
 import os
 import sys
@@ -49,7 +48,6 @@ try:
 except ImportError:
     import pickle as cPickle
 
-from .default import default
 from .msnoise_table_def import declare_tables
 
 
@@ -104,7 +102,7 @@ def create_indices(session, prefix):
         session.execute("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
                         "jobtype)" % prefix)
         session.commit()
-    except:
+    except Exception:
         logging.info("It looks like the v1.5 'job_index' is already in the DB")
         session.rollback()
 
@@ -112,7 +110,7 @@ def create_indices(session, prefix):
         session.execute("CREATE INDEX job_index2 ON %sjobs (jobtype, flag)"
                         % prefix)
         session.commit()
-    except:
+    except Exception:
         logging.info("It looks like the v1.6 'job_index2' is already in the DB")
         session.rollback()
 
@@ -120,7 +118,7 @@ def create_indices(session, prefix):
         session.execute("CREATE UNIQUE INDEX da_index ON %sdata_availability ("
                         "path, file, net, sta, comp)" % prefix)
         session.commit()
-    except:
+    except Exception:
         logging.info("It looks like the v1.5 'da_index' is already in the DB")
         session.rollback()
 

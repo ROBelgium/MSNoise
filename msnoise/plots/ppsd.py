@@ -12,19 +12,14 @@ Example:
 
 """
 
-import glob
 import logging
-import os
 
 import matplotlib.pyplot as plt
-from matplotlib.dates import date2num
 from matplotlib.gridspec import GridSpec
-from obspy import read_inventory, UTCDateTime
-from obspy.signal import PPSD
+from obspy import UTCDateTime
 from ..api import (
     build_movstack_datelist,
     connect,
-    get_config,
     get_logger,
     psd_ppsd_to_dataframe,
     psd_read_results,
@@ -37,10 +32,8 @@ def main(net, sta, loc, chan, time_of_weekday=None, period_lim=None, show=False,
                         with_pid=True)
     db = connect()
     logging.debug('Preloading all instrument response')
-    response_files = glob.glob(os.path.join(get_config(db, 'response_path'),"%s.%s.*.*"%(net, sta)))
 
     start, end, datelist = build_movstack_datelist(db)
-    first = True
     ppsd = psd_read_results(net, sta, loc, chan, datelist)
 
     if not ppsd:

@@ -396,7 +396,7 @@ def db_da_stations_update_loc_chan(ctx):
         sta.used_channel_names = ",".join(chans)
         try:
             session.commit()
-        except:
+        except Exception:
             traceback.print_exc()
 
 @db.command(name="execute")
@@ -454,7 +454,7 @@ def db_upgrade():
         try:
             db.add(Config(name=name, value=default[name].default))
             db.commit()
-        except:
+        except Exception:
             db.rollback()
             # print("Passing %s: already in DB" % name)
             continue
@@ -463,7 +463,7 @@ def db_upgrade():
                    "jobtype)" %
                    prefix))
         db.commit()
-    except:
+    except Exception:
         logging.info("It looks like the v1.5 'job_index' is already in the DB")
         db.rollback()
 
@@ -471,7 +471,7 @@ def db_upgrade():
         db.execute(text("CREATE INDEX job_index2 ON %sjobs (jobtype, flag)" %
                    prefix))
         db.commit()
-    except:
+    except Exception:
         logging.info("It looks like the v1.6 'job_index2' is already in the DB")
         db.rollback()
 
@@ -480,7 +480,7 @@ def db_upgrade():
                    "file, net, sta, loc, chan)" %
                    prefix))
         db.commit()
-    except:
+    except Exception:
         logging.info("It looks like the v1.5 'da_index' is already in the DB")
         db.rollback()
 
@@ -627,7 +627,7 @@ def config_sync():
             lon = float(coords["longitude"].values[0])
             lat = float(coords["latitude"].values[0])
             elevation = float(coords["elevation"].values[0])
-        except:
+        except Exception:
             logging.warning(
                 'Problem getting coordinates for '
                 '"%s": %s' % (id, str(coords)))

@@ -1,31 +1,25 @@
+import numpy as np
 """
 TODO
 """
 
-import argparse
 import math
 import time
 import datetime
-import scipy.signal
 import pandas as pd
 from .api import (
     connect,
-    extend_days,
     get_logger,
     get_next_lineage_batch,
-    get_params,
     xr_load_ccf_for_stack,
     get_t_axis,
     is_next_job_for_step,
     massive_update_job,
-    stack,
     validate_stack_data,
     xr_save_ccf,
 )
-from .wiener import *
-from obspy.core import AttribDict
+from .wiener import wiener_filt
 
-import matplotlib.pyplot as plt
 
 
 def main(stype, loglevel="INFO"):
@@ -42,8 +36,6 @@ def main(stype, loglevel="INFO"):
     logger = get_logger('msnoise.stack', loglevel, with_pid=True)
     logger.debug('Starting the %s stack' % stype)
     db = connect()
-
-    orig_params = get_params(db)
 
 
     while is_next_job_for_step(db, step_category="stack"):

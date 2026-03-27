@@ -1,10 +1,4 @@
-import numpy as np
-from scipy.signal import wiener, butter, filtfilt
-import glob
-import os
-import matplotlib.pyplot as plt
-from obspy import Stream, read, Trace
-from concurrent.futures import ProcessPoolExecutor
+from scipy.signal import wiener
 
 def find_segments(data, gap_threshold):
 

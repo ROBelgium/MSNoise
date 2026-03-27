@@ -44,13 +44,10 @@ from .api import (
     filter_within_daterange,
     get_config,
     get_config_set_details,
-    get_first_runnable_steps_per_branch,
     get_lineages_to_step_id,
     get_logger,
     get_new_files,
-    get_params,
     get_stations,
-    get_step_successors,
     get_workflow_steps,
     lineage_str_to_step_names,
     mark_data_availability,
@@ -92,13 +89,13 @@ def propagate_stack_jobs_from_cc_done(session):
 
     cc_steps = (
         session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.is_active.is_(True))
         .filter(WorkflowStep.category.in_(sorted(cc_category_names)))
         .all()
     )
     stack_steps = (
         session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.is_active.is_(True))
         .filter(WorkflowStep.category.in_(sorted(stack_category_names)))
         .all()
     )
@@ -253,7 +250,7 @@ def propagate_refstack_jobs_from_stack_done(session):
 
     stack_steps = (
         session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.is_active.is_(True))
         .filter(WorkflowStep.category == "stack")
         .all()
     )
@@ -267,7 +264,7 @@ def propagate_refstack_jobs_from_stack_done(session):
             session.query(WorkflowStep)
             .join(schema.WorkflowLink, schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
             .filter(schema.WorkflowLink.from_step_id == stack_step.step_id)
-            .filter(schema.WorkflowLink.is_active == True)
+            .filter(schema.WorkflowLink.is_active.is_(True))
             .filter(WorkflowStep.category == "refstack")
             .all()
         )
@@ -355,7 +352,7 @@ def propagate_mwcs_jobs_from_refstack_done(session):
 
     refstack_steps = (
         session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.is_active.is_(True))
         .filter(WorkflowStep.category == "refstack")
         .all()
     )
@@ -369,7 +366,7 @@ def propagate_mwcs_jobs_from_refstack_done(session):
             session.query(WorkflowStep)
             .join(schema.WorkflowLink, schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
             .filter(schema.WorkflowLink.from_step_id == ref_step.step_id)
-            .filter(schema.WorkflowLink.is_active == True)
+            .filter(schema.WorkflowLink.is_active.is_(True))
             .filter(WorkflowStep.category.in_(["mwcs", "stretching", "wavelet"]))
             .all()
         )
@@ -380,7 +377,7 @@ def propagate_mwcs_jobs_from_refstack_done(session):
             session.query(WorkflowStep)
             .join(schema.WorkflowLink, schema.WorkflowLink.from_step_id == WorkflowStep.step_id)
             .filter(schema.WorkflowLink.to_step_id == ref_step.step_id)
-            .filter(schema.WorkflowLink.is_active == True)
+            .filter(schema.WorkflowLink.is_active.is_(True))
             .filter(WorkflowStep.category == "stack")
             .all()
         )
@@ -477,7 +474,7 @@ def propagate_dvv_jobs_from_dtt_done(session, source_category: str) -> int:
     # Find all active parent DTT steps
     parent_steps = (
         session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.is_active.is_(True))
         .filter(WorkflowStep.category == source_category)
         .all()
     )
@@ -489,7 +486,7 @@ def propagate_dvv_jobs_from_dtt_done(session, source_category: str) -> int:
             .join(schema.WorkflowLink,
                   schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
             .filter(schema.WorkflowLink.from_step_id == parent_step.step_id)
-            .filter(schema.WorkflowLink.is_active == True)
+            .filter(schema.WorkflowLink.is_active.is_(True))
             .filter(WorkflowStep.category == target_category)
             .all()
         )
@@ -721,7 +718,7 @@ def propagate_psd_rms_jobs_from_psd_done(session):
 
     psd_steps = (
         session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.is_active.is_(True))
         .filter(WorkflowStep.category == "psd")
         .all()
     )
@@ -737,7 +734,7 @@ def propagate_psd_rms_jobs_from_psd_done(session):
             .join(schema.WorkflowLink,
                   schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
             .filter(schema.WorkflowLink.from_step_id == psd_step.step_id)
-            .filter(schema.WorkflowLink.is_active == True)
+            .filter(schema.WorkflowLink.is_active.is_(True))
             .filter(WorkflowStep.category == "psd_rms")
             .all()
         )
@@ -800,15 +797,15 @@ def propagate_first_runnable_from_category(session, source_category, skip_catego
         skip_categories = {"filter"}
 
     from .msnoise_table_def import declare_tables
-    from .api import get_workflow_steps, get_first_runnable_steps_per_branch
 
     schema = declare_tables()
+    from .api import get_first_runnable_steps_per_branch
     WorkflowStep = schema.WorkflowStep
 
     parent_steps = (
         session.query(WorkflowStep)
         .filter(WorkflowStep.category == source_category)
-        .filter(WorkflowStep.is_active == True)
+        .filter(WorkflowStep.is_active.is_(True))
         .all()
     )
 
@@ -838,7 +835,7 @@ def create_cc_jobs_from_preprocess(session):
     corresponding CC jobs based on workflow links and CC step configurations.
     """
     from .msnoise_table_def import declare_tables
-    from .api import get_workflow_steps, get_step_successors, get_config_set_details
+    from .api import get_step_successors, get_config_set_details
 
     schema = declare_tables()
     Job = schema.Job
@@ -849,7 +846,7 @@ def create_cc_jobs_from_preprocess(session):
     # Get all preprocess steps
     preprocess_steps = session.query(WorkflowStep) \
         .filter(WorkflowStep.category == "preprocess") \
-        .filter(WorkflowStep.is_active == True) \
+        .filter(WorkflowStep.is_active.is_(True)) \
         .all()
 
     all_jobs = []
