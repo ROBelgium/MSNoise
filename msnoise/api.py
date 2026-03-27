@@ -4507,6 +4507,327 @@ def compute_dtt_wct(session, root, lineage, mov_stack,
 
 
 # ============================================================
+# Section 13b — DVV Aggregate I/O + Aggregation Helpers
+# ============================================================
+
+
+def _classify_pair_type(sta1: str, sta2: str) -> str:
+    """Classify a station pair as CC, SC, or AC.
+
+    :param sta1: First station SEED id ``NET.STA.LOC``.
+    :param sta2: Second station SEED id ``NET.STA.LOC``.
+    :returns: ``"AC"`` if the two ids are identical (true autocorrelation),
+        ``"SC"`` if they share ``NET.STA`` but differ in ``LOC``,
+        ``"CC"`` for all other (cross-correlation) pairs.
+    """
+    if sta1 == sta2:
+        return "AC"
+    parts1 = sta1.split(".")
+    parts2 = sta2.split(".")
+    if len(parts1) >= 2 and len(parts2) >= 2 and parts1[:2] == parts2[:2]:
+        return "SC"
+    return "CC"
+
+
+def _dvv_column_spec(parent_category: str, pair_type: str, params) -> tuple:
+    """Return ``(dv_col, err_col, quality_col)`` for the given parent category.
+
+    For ``mwcs_dtt``, the columns depend on the pair type and user config
+    (smart defaults: CC→free-intercept m/em, SC/AC→forced-zero m0/em0).
+    For ``stretching`` and ``wct_dtt`` the columns are fixed.
+
+    :param parent_category: ``"mwcs_dtt"``, ``"stretching"``, or ``"wct_dtt"``.
+    :param pair_type: ``"CC"``, ``"SC"``, ``"AC"``, or ``"ALL"``.
+    :param params: Params object from :func:`get_params`.
+    :returns: Tuple ``(dv_col, err_col, quality_col)`` where any of the
+        quality columns may be ``None`` if not available.
+    """
+    if parent_category == "mwcs_dtt":
+        pt = pair_type if pair_type in ("CC", "SC", "AC") else "CC"
+        pt_lower = pt.lower()
+        dv_col  = getattr(params, f"dvv_{pt_lower}_value",  "m" if pt == "CC" else "m0")
+        err_col = getattr(params, f"dvv_{pt_lower}_error", "em" if pt == "CC" else "em0")
+        return dv_col, err_col, "mcoh"
+    elif parent_category == "stretching":
+        return "Delta", "Error", "Coeff"
+    elif parent_category == "wct_dtt":
+        # WCT stores dtt/err/coh per frequency; scalar extracted separately
+        return "dtt", "err", "coh"
+    else:
+        raise ValueError(f"Unknown parent_category: {parent_category!r}")
+
+
+def _freq_average_wct(ds, freqmin: float, freqmax: float,
+                       quality_min: float, freq_agg: str = "mean"):
+    """Collapse the ``(times, frequency)`` WCT-DTT Dataset to scalar time series.
+
+    Selects the frequency band ``[freqmin, freqmax]``, masks cells where
+    ``coh < quality_min``, then collapses the frequency axis using *freq_agg*.
+
+    :param ds: :class:`xarray.Dataset` with variables ``dtt``, ``err``, ``coh``
+        and dims ``(times, frequency)``.
+    :param freqmin: Lower frequency bound (Hz).
+    :param freqmax: Upper frequency bound (Hz).
+    :param quality_min: Minimum coherence; cells below are set to NaN.
+    :param freq_agg: ``"mean"`` or ``"median"`` over the frequency axis.
+    :returns: Tuple ``(dv_da, err_da)`` — two 1-D :class:`xarray.DataArray`
+        with dim ``times``.
+    :raises ValueError: if no frequencies fall within [freqmin, freqmax].
+    """
+    freqs = ds.coords["frequency"].values
+    mask_freq = (freqs >= freqmin) & (freqs <= freqmax)
+    if not mask_freq.any():
+        raise ValueError(
+            f"No frequencies in [{freqmin}, {freqmax}] Hz in WCT-DTT output. "
+            f"Available: {freqs.min():.3f}–{freqs.max():.3f} Hz"
+        )
+    dtt_sel = ds["dtt"].isel(frequency=mask_freq)
+    err_sel = ds["err"].isel(frequency=mask_freq)
+    coh_sel = ds["coh"].isel(frequency=mask_freq)
+
+    # Mask low-coherence cells
+    bad = coh_sel < quality_min
+    dtt_sel = dtt_sel.where(~bad)
+    err_sel = err_sel.where(~bad)
+
+    # Collapse frequency axis
+    if freq_agg == "median":
+        dv_da  = dtt_sel.median(dim="frequency")
+        err_da = err_sel.median(dim="frequency")
+    else:
+        dv_da  = dtt_sel.mean(dim="frequency")
+        err_da = err_sel.mean(dim="frequency")
+
+    return dv_da, err_da
+
+
+def xr_save_dvv_agg(root, lineage, step_name, mov_stack,
+                    pair_type: str, component: str, dataset):
+    """Save a DVV aggregate result to a NetCDF file.
+
+    Path layout::
+
+        <root>/<lineage>/<step_name>/_output/<mov_stack>/dvv_<pair_type>_<component>.nc
+
+    :param dataset: :class:`xarray.Dataset` with dim ``times`` and stat
+        variables as built by :func:`aggregate_dvv_pairs`.
+    """
+    ms_str = "%s_%s" % (mov_stack[0], mov_stack[1])
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                      ms_str, f"dvv_{pair_type}_{component}.nc")
+    os.makedirs(os.path.dirname(fn), exist_ok=True)
+    dataset.to_netcdf(fn, mode="w")
+
+
+def xr_get_dvv_agg(root, lineage, step_name, mov_stack,
+                   pair_type: str, component: str, format: str = "dataset"):
+    """Load a DVV aggregate result from a NetCDF file.
+
+    :param format: ``"dataset"`` (default) or ``"dataframe"``.
+    :raises FileNotFoundError: if the file does not exist.
+    """
+    ms_str = "%s_%s" % (mov_stack[0], mov_stack[1])
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                      ms_str, f"dvv_{pair_type}_{component}.nc")
+    if not os.path.isfile(fn):
+        raise FileNotFoundError(fn)
+    ds = xr.load_dataset(fn)
+    if format == "dataframe":
+        return ds.to_dataframe()
+    return ds
+
+
+def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
+                        parent_category: str, mov_stack, component: str,
+                        pair_type: str, pairs, params) -> xr.Dataset:
+    """Aggregate per-pair DTT/STR/WCT-DTT results into network-level dv/v statistics.
+
+    Reads all per-pair output files for the given ``(mov_stack, component)``
+    combination, extracts the appropriate dv/v and error columns per pair type,
+    applies quality filtering, then computes across-pair statistics at each
+    time step.
+
+    :param root: Output folder root.
+    :param parent_lineage: Lineage name list up to and including the parent
+        DTT step (e.g. ``["preprocess_1", ..., "mwcs_dtt_1"]``).
+    :param parent_step_name: Step name of the parent DTT step.
+    :param parent_category: ``"mwcs_dtt"``, ``"stretching"``, or ``"wct_dtt"``.
+    :param mov_stack: Tuple ``(window, step)`` e.g. ``("1D", "1D")``.
+    :param component: Component string e.g. ``"ZZ"``.
+    :param pair_type: ``"CC"``, ``"SC"``, ``"AC"``, or ``"ALL"``.
+    :param pairs: Iterable of ``(sta1, sta2)`` SEED-id string tuples.
+    :param params: Params object from :func:`get_params`.
+    :returns: :class:`xarray.Dataset` with dim ``times`` and stat variables.
+    :raises ValueError: if no data files are found for the given combination.
+    """
+    dv_col, err_col, quality_col = _dvv_column_spec(
+        parent_category, pair_type, params)
+
+    quality_min    = float(getattr(params, "dvv_quality_min", 0.0))
+    do_weighted    = str(getattr(params, "dvv_weighted_mean", "Y")).upper() == "Y"
+    do_trimmed     = str(getattr(params, "dvv_trimmed_mean", "Y")).upper() == "Y"
+    trim_sigma     = float(getattr(params, "dvv_trim_limit", 3.0))
+    out_percent    = str(getattr(params, "dvv_output_percent", "Y")).upper() == "Y"
+    percentile_str = getattr(params, "dvv_percentiles", "5,25,75,95")
+    percentiles    = [float(p) for p in str(percentile_str).split(",") if p.strip()]
+
+    # WCT-specific params
+    if parent_category == "wct_dtt":
+        wct_freqmin  = float(getattr(params, "dvv_freqmin", 0.1))
+        wct_freqmax  = float(getattr(params, "dvv_freqmax", 2.0))
+        wct_freq_agg = str(getattr(params, "dvv_freq_agg", "mean"))
+
+    # ── 1. Collect per-pair 1-D time series ─────────────────────────────
+    pair_dvv  = []   # list of (times_array, dv_array, err_array)
+
+    for sta1, sta2 in pairs:
+        # Filter by pair_type
+        pt = _classify_pair_type(sta1, sta2)
+        if pair_type != "ALL" and pt != pair_type:
+            continue
+
+        try:
+            if parent_category == "mwcs_dtt":
+                ds = xr_get_dtt(root, parent_lineage, sta1, sta2,
+                                 component, mov_stack, format="dataset")
+                da_dv  = ds["DTT"].sel(keys=dv_col)
+                da_err = ds["DTT"].sel(keys=err_col)
+                if quality_col in ds["DTT"].coords["keys"].values:
+                    da_q = ds["DTT"].sel(keys=quality_col)
+                    bad = da_q < quality_min
+                    da_dv  = da_dv.where(~bad)
+                    da_err = da_err.where(~bad)
+
+            elif parent_category == "stretching":
+                ds = _xr_get_stretching(root, parent_lineage, sta1, sta2,
+                                         component, mov_stack, format="dataset")
+                da_dv  = ds["STR"].sel(keys=dv_col)
+                da_err = ds["STR"].sel(keys=err_col)
+                if quality_col:
+                    da_q = ds["STR"].sel(keys=quality_col)
+                    bad = da_q < quality_min
+                    da_dv  = da_dv.where(~bad)
+                    da_err = da_err.where(~bad)
+                # Convert Delta → dv/v: dv/v = Delta - 1
+                da_dv = da_dv - 1.0
+
+            elif parent_category == "wct_dtt":
+                ds = xr_get_wct_dtt(root, parent_lineage, sta1, sta2,
+                                     component, mov_stack)
+                da_dv, da_err = _freq_average_wct(
+                    ds, wct_freqmin, wct_freqmax, quality_min, wct_freq_agg)
+
+        except FileNotFoundError:
+            continue
+        except Exception:
+            continue
+
+        if out_percent:
+            da_dv = da_dv * 100.0
+
+        times = da_dv.coords["times"].values
+        dv    = da_dv.values.astype(float)
+        err   = da_err.values.astype(float)
+        pair_dvv.append((times, dv, err))
+
+    if not pair_dvv:
+        raise ValueError(
+            f"No data found for parent={parent_category} "
+            f"step={parent_step_name} mov_stack={mov_stack} "
+            f"component={component} pair_type={pair_type}"
+        )
+
+    # ── 2. Build (pairs × times) arrays on a common time axis ───────────
+    all_times_sorted = np.array(sorted({t for times, _, _ in pair_dvv
+                                         for t in times}),
+                                dtype="datetime64[ns]")
+    n_t = len(all_times_sorted)
+    n_p = len(pair_dvv)
+
+    dv_mat  = np.full((n_p, n_t), np.nan)
+    err_mat = np.full((n_p, n_t), np.nan)
+
+    time_idx = {t: i for i, t in enumerate(all_times_sorted)}
+    for p, (times, dv, err) in enumerate(pair_dvv):
+        for ti, t in enumerate(times):
+            key = np.datetime64(t, "ns")
+            if key in time_idx:
+                j = time_idx[key]
+                dv_mat[p, j]  = dv[ti]
+                err_mat[p, j] = err[ti]
+
+    # ── 3. Compute statistics across pairs at each time step ─────────────
+    # n_pairs: count of non-NaN pairs per time step
+    n_pairs = np.sum(~np.isnan(dv_mat), axis=0).astype(float)
+
+    mean_dv   = np.nanmean(dv_mat, axis=0)
+    std_dv    = np.nanstd(dv_mat, axis=0, ddof=1)
+    median_dv = np.nanmedian(dv_mat, axis=0)
+
+    data_vars = {
+        "mean":     ("times", mean_dv),
+        "std":      ("times", std_dv),
+        "median":   ("times", median_dv),
+        "n_pairs":  ("times", n_pairs),
+    }
+
+    # Percentiles
+    for pct in percentiles:
+        key = f"q{int(pct):02d}"
+        pct_vals = np.nanpercentile(dv_mat, pct, axis=0)
+        data_vars[key] = ("times", pct_vals)
+
+    # Weighted mean/std
+    if do_weighted:
+        w_mat = np.where(err_mat > 0, 1.0 / err_mat**2, 0.0)
+        w_sum = np.nansum(w_mat, axis=0)
+        w_sum_safe = np.where(w_sum > 0, w_sum, np.nan)
+        wmean = np.nansum(w_mat * np.nan_to_num(dv_mat), axis=0) / w_sum_safe
+        # weighted std
+        wvar  = np.nansum(w_mat * (np.nan_to_num(dv_mat) - wmean[None, :])**2,
+                           axis=0) / w_sum_safe
+        wstd  = np.sqrt(wvar)
+        data_vars["weighted_mean"] = ("times", wmean)
+        data_vars["weighted_std"]  = ("times", wstd)
+
+    # Trimmed mean/std (sigma-based: remove pairs > trim_sigma*std from mean)
+    if do_trimmed:
+        tmean = np.full(n_t, np.nan)
+        tstd  = np.full(n_t, np.nan)
+        for j in range(n_t):
+            col = dv_mat[:, j]
+            valid = col[~np.isnan(col)]
+            if len(valid) < 2:
+                tmean[j] = np.nan if len(valid) == 0 else valid[0]
+                tstd[j]  = np.nan
+                continue
+            mu = np.mean(valid)
+            sigma = np.std(valid, ddof=1)
+            kept = valid[np.abs(valid - mu) <= trim_sigma * sigma]
+            tmean[j] = np.mean(kept) if len(kept) > 0 else np.nan
+            tstd[j]  = np.std(kept, ddof=1) if len(kept) > 1 else np.nan
+        data_vars["trimmed_mean"] = ("times", tmean)
+        data_vars["trimmed_std"]  = ("times", tstd)
+
+    # ── 4. Build output Dataset ──────────────────────────────────────────
+    ds_out = xr.Dataset(
+        {k: xr.DataArray(v[1], dims=["times"],
+                          coords={"times": all_times_sorted})
+         for k, v in data_vars.items()},
+        attrs={
+            "parent_category": parent_category,
+            "parent_step":     parent_step_name,
+            "pair_type":       pair_type,
+            "component":       component,
+            "mov_stack":       "%s_%s" % (mov_stack[0], mov_stack[1]),
+            "dvv_unit":        "percent" if out_percent else "fraction",
+            "created":         str(np.datetime64("now")),
+        }
+    )
+    return ds_out
+
+
+# ============================================================
 # Section 14 — PSD and HDF
 # ============================================================
 
