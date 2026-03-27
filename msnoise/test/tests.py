@@ -1028,106 +1028,70 @@ def test_302_compute_rms():
         pytest.fail("PSD RMS computation failed")
 
 @pytest.mark.order(400)
-def test_400_run_manually():
-    """End-to-end re-run of the full pipeline using Python API directly.
+def test_400_run_manually(setup_environment):
+    """End-to-end CLI test: re-run full pipeline using Click CliRunner.
 
-    Resets and re-runs every step from stack to PSD-RMS, verifying the
-    pipeline completes without error when driven programmatically.
-    Uses Python main() functions — no subprocess — so test database
-    state is shared and no hanging processes can occur.
+    Unlike tests 1–120031 which call Python main() functions directly,
+    this test exercises the CLI command dispatch layer — argument parsing,
+    group routing, context passing — using Click's CliRunner so the test
+    database is shared (no external subprocess spawning).
     """
-    db = connect()
+    runner = setup_environment['runner']
+
+    def run(args, label=None):
+        """Invoke CLI and assert success."""
+        result = runner.invoke(msnoise_script.cli, args.split(), obj={})
+        assert result.exit_code == 0, (
+            f"msnoise {args} failed (exit {result.exit_code}):\n{result.output}"
+        )
+        return result
 
     # ── MOV stack ────────────────────────────────────────────────────────────
-    reset_jobs(db, 'stack_1', alljobs=True)
-    db.close()
-    stack_mov('mov')
+    run("reset stack_1 --all")
+    run("cc stack -m")
 
     # ── Refstack ─────────────────────────────────────────────────────────────
-    new_jobs_main(after='stack')
-    db = connect()
-    reset_jobs(db, 'refstack_1', alljobs=True)
-    db.close()
-    new_jobs_main(after='stack')
-    stack_refstack_main()
+    run("new_jobs --after stack")
+    run("reset refstack_1 --all")
+    run("new_jobs --after stack")
+    run("cc stack_refstack")
 
     # ── Propagate refstack → downstream ──────────────────────────────────────
-    new_jobs_main(after='refstack')
+    run("new_jobs --after refstack")
 
     # ── MWCS ─────────────────────────────────────────────────────────────────
-    db = connect()
-    reset_jobs(db, 'mwcs_1', alljobs=True)
-    db.close()
-    compute_mwcs_main()
-
-    db = connect()
-    reset_jobs(db, 'mwcs_dtt_1', alljobs=True)
-    db.close()
-    new_jobs_main(after='mwcs')
-    compute_dtt_main()
-
-    new_jobs_main(after='mwcs_dtt')
-    db = connect()
-    reset_jobs(db, 'mwcs_dtt_dvv_1', alljobs=True)
-    db.close()
-    compute_dvv_main(step_category='mwcs_dtt_dvv')
-    try:
-        from ..plots.mwcs_dtt_dvv import main as dvv_mwcs_main
-        dvv_mwcs_main(show=False, outfile='?.png')
-    except Exception:
-        pass  # plot is best-effort
+    run("reset mwcs_1 --all")
+    run("cc dtt compute_mwcs")
+    run("reset mwcs_dtt_1 --all")
+    run("new_jobs --after mwcs")
+    run("cc dtt compute_mwcs_dtt")
+    run("new_jobs --after mwcs_dtt")
+    run("reset mwcs_dtt_dvv_1 --all")
+    run("cc dtt dvv compute_mwcs_dtt_dvv")
 
     # ── Stretching ───────────────────────────────────────────────────────────
-    db = connect()
-    reset_jobs(db, 'stretching_1', alljobs=True)
-    db.close()
-    from ..s10_stretching import main as stretch_main
-    stretch_main()
-
-    new_jobs_main(after='stretching')
-    db = connect()
-    reset_jobs(db, 'stretching_dvv_1', alljobs=True)
-    db.close()
-    compute_dvv_main(step_category='stretching_dvv')
-    try:
-        from ..plots.stretching_dvv import main as stretching_dvv_main
-        stretching_dvv_main(show=False, outfile='?.png')
-    except Exception:
-        pass
+    run("reset stretching_1 --all")
+    run("cc dtt compute_stretching")
+    run("new_jobs --after stretching")
+    run("reset stretching_dvv_1 --all")
+    run("cc dtt dvv compute_stretching_dvv")
 
     # ── Wavelet (WCT) ────────────────────────────────────────────────────────
-    db = connect()
-    reset_jobs(db, 'wavelet_1', alljobs=True)
-    db.close()
-    compute_wct_main()
-
-    new_jobs_main(after='wavelet')
-    db = connect()
-    reset_jobs(db, 'wavelet_dtt_1', alljobs=True)
-    db.close()
-    wavelet_dtt_main()
-
-    new_jobs_main(after='wavelet_dtt')
-    db = connect()
-    reset_jobs(db, 'wavelet_dtt_dvv_1', alljobs=True)
-    db.close()
-    compute_dvv_main(step_category='wavelet_dtt_dvv')
-    try:
-        wavelet_dtt_dvv_main(show=False, outfile='?.png')
-    except Exception:
-        pass
+    run("reset wavelet_1 --all")
+    run("cc dtt compute_wct")
+    run("new_jobs --after wavelet")
+    run("reset wavelet_dtt_1 --all")
+    run("cc dtt compute_wct_dtt")
+    run("new_jobs --after wavelet_dtt")
+    run("reset wavelet_dtt_dvv_1 --all")
+    run("cc dtt dvv compute_wavelet_dtt_dvv")
 
     # ── PSDs ─────────────────────────────────────────────────────────────────
-    db = connect()
-    reset_jobs(db, 'psd_1', alljobs=True)
-    db.close()
-    psd_compute_main()
-
-    new_jobs_main(after='psd')
-    db = connect()
-    reset_jobs(db, 'psd_rms_1', alljobs=True)
-    db.close()
-    compute_rms_main()
+    run("reset psd_1 --all")
+    run("qc compute_psd")
+    run("new_jobs --after psd")
+    run("reset psd_rms_1 --all")
+    run("qc compute_psd_rms")
 
 
 def test_99210_crondays_positive_float():
