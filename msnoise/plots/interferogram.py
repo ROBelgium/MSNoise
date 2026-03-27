@@ -19,7 +19,7 @@ Example:
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num, DateFormatter
-from matplotlib.widgets import Cursor  # noqa: F401 — used interactively in GUI
+from matplotlib.widgets import Cursor
 
 from obspy.signal.filter import bandpass
 
@@ -122,6 +122,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
         logger.info("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
+        cursor = Cursor(ax, useblit=True, color='red', linewidth=1)  # noqa: F841
         plt.show()
     else:
         plt.close()

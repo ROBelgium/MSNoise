@@ -38,7 +38,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
 from pandas.plotting import register_matplotlib_converters
-from matplotlib.widgets import Cursor  # noqa: F401 — used interactively in GUI
+from matplotlib.widgets import Cursor
 register_matplotlib_converters()
 
 from obspy.signal.filter import envelope as obspy_envelope
@@ -149,6 +149,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
         logger.info("output to: %s" % outfile)
         plt.savefig(outfile)
     if show:
+        cursor = Cursor(ax, useblit=True, color='red', linewidth=1)  # noqa: F841
         plt.show()
     else:
         plt.close()
