@@ -142,6 +142,8 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
                             )
                             datasets.append(ds)
                         except ValueError:
+                            import traceback
+                            traceback.print_exc()
                             logger.debug(
                                 f"No data for mov_stack={mov_stack} "
                                 f"comp={c} pair_type={pt} — skipping"

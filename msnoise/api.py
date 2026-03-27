@@ -4301,15 +4301,17 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
     dv_col, err_col, quality_col = _dvv_column_spec(
         parent_category, pair_type, params)
 
-    # xr_save_dtt/stretching/wct_dtt write files to:
-    #   root / *lineage_upstream / step_name / _output / …
-    # where lineage_upstream is lineage_names_upstream of the *DTT* job
-    # (i.e. everything above the DTT step) and step_name is the DTT step name.
-    #
-    # The DVV job's lineage_names_upstream ends with parent_step_name
-    # (e.g. "mwcs_dtt_1") — that is the lineage_upstream of the DTT job,
-    # so we must append parent_step_name to reconstruct the full save path.
-    dtt_lineage = list(parent_lineage) + [parent_step_name]
+    # All xr_get_* functions expect *lineage to already end with the step name,
+    # e.g. [..., "mwcs_dtt_1"].  parent_lineage = lineage_names_upstream of the
+    # DVV job, which strips the DVV step and ends with the DTT step name —
+    # exactly what the getters need.  No adjustment required.
+    dtt_lineage = list(parent_lineage)
+    # after building dtt_lineage in aggregate_dvv_pairs (api.py), add:
+    import os
+    print("DEBUG dtt_lineage:", dtt_lineage)
+    print("DEBUG root:", root)
+    print("DEBUG would look for:", os.path.join(root, *dtt_lineage, "_output",
+                                                f"{mov_stack[0]}_{mov_stack[1]}", component))
 
     quality_min    = float(getattr(params, "dvv_quality_min", 0.0))
     do_weighted    = str(getattr(params, "dvv_weighted_mean", "Y")).upper() == "Y"
@@ -4390,7 +4392,8 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
         raise ValueError(
             f"No data found for parent={parent_category} "
             f"step={parent_step_name} mov_stack={mov_stack} "
-            f"component={component} pair_type={pair_type}"
+            f"component={component} pair_type={pair_type} "
+            f"in folder={dtt_lineage}"
         )
 
     # ── 2. Build (pairs × times) arrays on a common time axis ───────────
