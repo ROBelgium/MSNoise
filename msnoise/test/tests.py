@@ -764,7 +764,7 @@ def test_036_wct_dtt_param_update():
   
 @pytest.mark.order(37)
 def test_037_validate_stack_data():
-    from ..signal import validate_stack_data
+    from ..core.signal import validate_stack_data
     import xarray as xr
     import numpy as np
     import pandas as pd
@@ -820,7 +820,7 @@ def test_037_validate_stack_data():
     
 @pytest.mark.order(38)
 def test_038_stack_validation_handling():
-    from ..signal import validate_stack_data
+    from ..core.signal import validate_stack_data
     import xarray as xr
     import numpy as np
     import pandas as pd
@@ -1212,7 +1212,7 @@ def test_20000_invoke_script(setup_environment):
 def test_110000_lineage_str_to_steps_strict():
     """lineage_str_to_steps raises on missing step when strict=True."""
     db = connect()
-    from ..workflow import lineage_str_to_steps
+    from ..core.workflow import lineage_str_to_steps
     with pytest.raises(Exception):
         lineage_str_to_steps(db, "preprocess_1/nonexistent_99", strict=True)
     db.close()
@@ -1222,7 +1222,7 @@ def test_110000_lineage_str_to_steps_strict():
 def test_110001_lineage_str_to_steps_permissive():
     """lineage_str_to_steps returns partial list when strict=False."""
     db = connect()
-    from ..workflow import lineage_str_to_steps
+    from ..core.workflow import lineage_str_to_steps
     steps = lineage_str_to_steps(db, "preprocess_1/nonexistent_99", strict=False)
     # Should return whatever steps were resolved, not raise
     assert isinstance(steps, list)
@@ -1233,8 +1233,8 @@ def test_110001_lineage_str_to_steps_permissive():
 def test_110002_lineage_str_to_steps_valid():
     """lineage_str_to_steps resolves a valid lineage correctly."""
     db = connect()
-    from ..workflow import lineage_str_to_steps
-    from ..workflow import get_workflow_steps
+    from ..core.workflow import lineage_str_to_steps
+    from ..core.workflow import get_workflow_steps
     # Build a lineage string from real steps
     steps = get_workflow_steps(db)
     preprocess = next((s for s in steps if s.category == 'preprocess'), None)
@@ -1251,10 +1251,10 @@ def test_110002_lineage_str_to_steps_valid():
 def test_110010_get_merged_params_overrides():
     """get_merged_params_for_lineage: later configsets override earlier."""
     db = connect()
-    from ..config import get_merged_params_for_lineage
-    from ..config import get_params
-    from ..workflow import lineage_str_to_steps
-    from ..workflow import get_workflow_steps
+    from ..core.config import get_merged_params_for_lineage
+    from ..core.config import get_params
+    from ..core.workflow import lineage_str_to_steps
+    from ..core.workflow import get_workflow_steps
     orig_params = get_params(db)
     steps = get_workflow_steps(db)
     # Find a filter step
@@ -1276,10 +1276,10 @@ def test_110010_get_merged_params_overrides():
 def test_110011_get_merged_params_components_split():
     """get_merged_params_for_lineage splits components_to_compute into a list."""
     db = connect()
-    from ..config import get_merged_params_for_lineage
-    from ..config import get_params
-    from ..workflow import lineage_str_to_steps
-    from ..workflow import get_workflow_steps
+    from ..core.config import get_merged_params_for_lineage
+    from ..core.config import get_params
+    from ..core.workflow import lineage_str_to_steps
+    from ..core.workflow import get_workflow_steps
     orig_params = get_params(db)
     steps = get_workflow_steps(db)
     cc_steps = [s for s in steps if s.category == 'cc']
@@ -1300,7 +1300,7 @@ def test_110011_get_merged_params_components_split():
 def test_110020_get_done_lineages_for_category():
     """get_done_lineages_for_category returns done lineages after pipeline run."""
     db = connect()
-    from ..workflow import get_done_lineages_for_category
+    from ..core.workflow import get_done_lineages_for_category
     lineages = get_done_lineages_for_category(db, 'cc')
     assert isinstance(lineages, list)
     assert len(lineages) >= 1, "Expected at least one done CC lineage"
@@ -1314,7 +1314,7 @@ def test_110020_get_done_lineages_for_category():
 def test_110021_get_done_lineages_deduplicates():
     """get_done_lineages_for_category deduplicates lineage strings."""
     db = connect()
-    from ..workflow import get_done_lineages_for_category
+    from ..core.workflow import get_done_lineages_for_category
     lineages = get_done_lineages_for_category(db, 'cc')
     # Convert to frozensets for dedup check
     as_tuples = [tuple(lin) for lin in lineages]

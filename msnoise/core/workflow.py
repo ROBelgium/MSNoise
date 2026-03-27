@@ -13,7 +13,7 @@ from ..msnoise_table_def import (Job, WorkflowStep, DataAvailability,
 
 def get_workflow_steps(session):
     """Get all steps in a workflow"""
-    from .msnoise_table_def import declare_tables
+    from ..msnoise_table_def import declare_tables
     schema = declare_tables()
 
     return session.query(schema.WorkflowStep) \
@@ -24,7 +24,7 @@ def get_workflow_steps(session):
 
 def get_workflow_links(session):
     """Get all links in a workflow"""
-    from .msnoise_table_def import declare_tables
+    from ..msnoise_table_def import declare_tables
     schema = declare_tables()
 
     return session.query(schema.WorkflowLink) \
@@ -74,7 +74,7 @@ def get_workflow_graph(session):
 
 def create_workflow_step(session, step_name, category, set_number, description=None):
     """Create a new workflow step"""
-    from .msnoise_table_def import declare_tables
+    from ..msnoise_table_def import declare_tables
     schema = declare_tables()
 
     step = schema.WorkflowStep(
@@ -92,7 +92,7 @@ def create_workflow_step(session, step_name, category, set_number, description=N
 
 def create_workflow_link(session, from_step_id, to_step_id, link_type="default"):
     """Create a link between two workflow steps"""
-    from .msnoise_table_def import declare_tables
+    from ..msnoise_table_def import declare_tables
     schema = declare_tables()
 
     # Check if link already exists
@@ -118,7 +118,7 @@ def create_workflow_link(session, from_step_id, to_step_id, link_type="default")
 
 def get_step_successors(session, step_id):
     """Get all steps that this step feeds into"""
-    from .msnoise_table_def import declare_tables
+    from ..msnoise_table_def import declare_tables
     schema = declare_tables()
 
     return session.query(schema.WorkflowStep) \
@@ -177,7 +177,7 @@ def get_first_runnable_steps_per_branch(session, source_step_id, skip_categories
 
 def _get_step_predecessors(session, step_id):
     """Get all steps that feed into this step"""
-    from .msnoise_table_def import declare_tables
+    from ..msnoise_table_def import declare_tables
     schema = declare_tables()
 
     return session.query(schema.WorkflowStep) \
@@ -244,7 +244,7 @@ def create_workflow_steps_from_config_sets(session):
     Returns:
         tuple: (created_count, existing_count, error_message)
     """
-    from .msnoise_table_def import declare_tables
+    from ..msnoise_table_def import declare_tables
 
     schema = declare_tables()
 
@@ -307,7 +307,7 @@ def create_workflow_links_from_steps(session):
     Returns:
         tuple: (created_count, existing_count, error_message)
     """
-    from .msnoise_table_def import declare_tables
+    from ..msnoise_table_def import declare_tables
 
     schema = declare_tables()
 
@@ -601,7 +601,7 @@ def get_next_job_for_step(
       - "pair_lineage": claim all jobs for the selected (step_id, jobtype, pair, lineage)
       - "day_lineage": claim all jobs for the selected (step_id, jobtype, day, lineage)
     """
-    from .msnoise_table_def import declare_tables
+    from ..msnoise_table_def import declare_tables
     from sqlalchemy import update
 
     schema = declare_tables()
@@ -700,7 +700,7 @@ def is_next_job_for_step(session, step_category="preprocess", flag='T'):
     :rtype: bool
     :returns: True if at least one Job matches the criteria, False otherwise.
     """
-    from .msnoise_table_def import declare_tables
+    from ..msnoise_table_def import declare_tables
 
     schema = declare_tables()
     Job = schema.Job

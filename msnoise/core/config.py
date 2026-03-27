@@ -205,7 +205,7 @@ def delete_config_set(session, set_name, set_number):
     """
     try:
         from sqlalchemy import func
-        from .msnoise_table_def import Config
+        from ..msnoise_table_def import Config
 
         # Validate input parameters
         if not isinstance(set_number, int) or set_number < 1:
@@ -257,7 +257,7 @@ def list_config_sets(session, set_name=None):
     """
     try:
         from sqlalchemy import func
-        from .msnoise_table_def import Config
+        from ..msnoise_table_def import Config
 
         query = session.query(
             Config.category,
@@ -302,7 +302,7 @@ def get_config_set_details(session, set_name, set_number, format="list"):
     :returns: List of config entries in the set
     """
     try:
-        from .msnoise_table_def import Config
+        from ..msnoise_table_def import Config
 
         configs = session.query(Config).filter(
             Config.category == set_name,
@@ -372,7 +372,7 @@ def get_config_categories_definition():
 def get_config_sets_organized(session):
     """Get configuration sets organized by category in the standard order"""
     from sqlalchemy import func
-    from . import msnoise_table_def as schema
+    from .. import msnoise_table_def as schema
 
     # Get category definitions
     category_order = get_config_categories_definition()
@@ -468,7 +468,7 @@ def get_params(session):
     # TODO: this could be populated automatically from defauts iff defaults
     # would mention types
     from obspy.core.util.attribdict import AttribDict
-    from .default import default
+    from ..default import default
     s = session
     params = AttribDict()
     for name in default.keys():
@@ -602,7 +602,7 @@ def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
 
     Returns ``(lineage, lineage_names, LayeredParams)``.
     """
-    from .params import _build_layered_params
+    from ..params import _build_layered_params
 
     lineage = [s for s in lineage if s.category not in {"global"}]
     lineage_names = [s.step_name for s in lineage]

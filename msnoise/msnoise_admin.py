@@ -72,7 +72,7 @@ def root_redirect_to_admin():
 def job_stats():
     """API endpoint for job statistics"""
     try:
-        from .workflow import get_workflow_job_counts
+        from .core.workflow import get_workflow_job_counts
         db = connect()
 
         stats = get_workflow_job_counts(db)
@@ -504,7 +504,7 @@ class ConfigSetView(BaseView):
         """Display all configuration sets grouped by category"""
 
         """Display all configuration sets grouped by category"""
-        from .config import get_config_sets_organized
+        from .core.config import get_config_sets_organized
 
         ordered_categories = get_config_sets_organized(self.session)
 
@@ -516,7 +516,7 @@ class ConfigSetView(BaseView):
     def create_set(self, category):
         """Create a new configuration set for a category"""
 
-        from .config import create_config_set
+        from .core.config import create_config_set
         set_number = create_config_set(self.session, category)
 
 
@@ -1005,7 +1005,7 @@ class WorkflowBuilderView(BaseView):
     @expose('/')
     def index(self):
         """Display workflow builder interface"""
-        from .workflow import get_workflow_graph
+        from .core.workflow import get_workflow_graph
 
         # Get workflow graph data
         graph_data = get_workflow_graph(self.session)
@@ -1016,7 +1016,7 @@ class WorkflowBuilderView(BaseView):
     @expose('/create_step', methods=['POST'])
     def create_step(self):
         """Create a new workflow step"""
-        from .workflow import create_workflow_step
+        from .core.workflow import create_workflow_step
 
         step_name = request.form.get('step_name')
         category = request.form.get('category')
@@ -1034,7 +1034,7 @@ class WorkflowBuilderView(BaseView):
     @expose('/create_link', methods=['POST'])
     def create_link(self):
         """Create a new workflow link"""
-        from .workflow import create_workflow_link
+        from .core.workflow import create_workflow_link
 
         from_step_id = int(request.form.get('from_step_id'))
         to_step_id = int(request.form.get('to_step_id'))
@@ -1051,7 +1051,7 @@ class WorkflowBuilderView(BaseView):
     @expose('/create_steps_from_configs', methods=['POST'])
     def create_steps_from_configs(self):
         """Create workflow steps automatically from all existing config sets"""
-        from .workflow import create_workflow_steps_from_config_sets
+        from .core.workflow import create_workflow_steps_from_config_sets
 
         created_count, existing_count, error_message = create_workflow_steps_from_config_sets(
             self.session
@@ -1072,7 +1072,7 @@ class WorkflowBuilderView(BaseView):
     @expose('/create_links_from_steps', methods=['POST'])
     def create_links_from_steps(self):
         """Create workflow links automatically from existing workflow steps"""
-        from .workflow import create_workflow_links_from_steps
+        from .core.workflow import create_workflow_links_from_steps
 
         created_count, existing_count, error_message = create_workflow_links_from_steps(
             self.session

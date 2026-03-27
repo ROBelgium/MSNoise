@@ -398,7 +398,7 @@ segment.
     #     from sf.helper import next_fast_len
     # except ImportError:
     #     from obspy.signal.util import next_pow_2 as next_fast_len
-    from .signal import nextpow2
+    from .core.signal import nextpow2
     padd = int(2 ** (nextpow2(window_length_samples) + 2))
     # padd = next_fast_len(window_length_samples)
     count = 0

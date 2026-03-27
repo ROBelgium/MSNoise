@@ -787,7 +787,7 @@ def propagate_first_runnable_from_category(session, source_category, skip_catego
     from .msnoise_table_def import declare_tables
 
     schema = declare_tables()
-    from .workflow import get_first_runnable_steps_per_branch
+    from .core.workflow import get_first_runnable_steps_per_branch
     WorkflowStep = schema.WorkflowStep
 
     parent_steps = (
@@ -823,8 +823,8 @@ def create_cc_jobs_from_preprocess(session):
     corresponding CC jobs based on workflow links and CC step configurations.
     """
     from .msnoise_table_def import declare_tables
-    from .config import get_config_set_details
-    from .workflow import get_step_successors
+    from .core.config import get_config_set_details
+    from .core.workflow import get_step_successors
 
     schema = declare_tables()
     Job = schema.Job
