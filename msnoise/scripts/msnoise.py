@@ -1161,11 +1161,8 @@ def plot():
 @plot.command(name='data_availability')
 @click.option('-c', '--chan', default="?HZ", help="Channel, you can use the ? wildcard, e.g. '?HZ' (default) or "
                                                   "'HH?', etc.")
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
-                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
-              default=None, type=str)
+@show_option
+@outfile_option
 @click.pass_context
 def plot_data_availability(ctx, chan, show, outfile):
     """Plots the Data Availability vs time"""
@@ -1179,11 +1176,8 @@ def plot_data_availability(ctx, chan, show, outfile):
 
 
 @plot.command(name='station_map')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
-                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
-              default=None, type=str)
+@show_option
+@outfile_option
 @click.pass_context
 def plot_station_map(ctx, show, outfile):
     """Plots the station map (very very basic)"""
@@ -1329,6 +1323,18 @@ full_options  = common_options(stack_options, comp_option)
 mwcs_options = common_options(stack_options, mwcsid_option, comp_option)
 mwcsdtt_options = common_options(mwcs_options, mwcsdttid_option)
 
+# Shared plot options — reused across all plot commands
+show_option    = click.option('-s', '--show', default=True, type=bool,
+                               help='Show figure interactively?')
+outfile_option = click.option('-o', '--outfile', default=None, type=str,
+                               help='Output filename (?=auto). Supports any matplotlib format, '
+                                    'e.g. ?.pdf for PDF with automatic naming.')
+pair_type_option = click.option('-p', '--pair_type', default="CC",
+                                 type=click.Choice(["CC", "SC", "AC"]),
+                                 help='Pair type to plot (CC/SC/AC). Default: CC')
+dvvid_option   = click.option('-D', '--dvvid', default=1,
+                               help='DVV aggregate config set number')
+
 
 # DTT-side lineage options (preprocess → cc → filter → stack → mwcs → mwcs_dtt)
 mwcsid_option  = click.option('-w', '--mwcsid',  default=1, help='MWCS step set number')
@@ -1346,11 +1352,8 @@ dtt_lineage_options = common_options(
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-a', '--ampli', default=1.0, help='Amplification of the individual lines on the vertical axis ('
                                                  'default=1)')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
-                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
-              default=None, type=str)
+@show_option
+@outfile_option
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
@@ -1377,11 +1380,8 @@ def cc_plot_distance(ctx, filterid, comp, ampli, show, outfile, refilter,
 @click.argument('sta1')
 @click.argument('sta2')
 @full_options
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
-                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
-              default=None, type=str)
+@show_option
+@outfile_option
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
@@ -1413,11 +1413,8 @@ def cc_plot_interferogram(ctx, sta1, sta2,  preprocessid, ccid, filterid, stacki
                                                  'default=1)')
 @click.option('-S', '--seismic', is_flag=True, help='Seismic style: fill the space between the zero and the positive '
                                                     'wiggles')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
-                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
-              default=None, type=str)
+@show_option
+@outfile_option
 @click.option('-e', '--envelope', is_flag=True, help='Plot envelope instead of '
                                                      'time series')
 @click.option('-r', '--refilter', default=None,
@@ -1453,11 +1450,8 @@ def cc_plot_ccftime(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid, stac
 @full_options
 @click.option('-a', '--ampli', default=5.0, help='Amplification of the individual lines on the vertical axis ('
                                                  'default=1)')
-@click.option('-s', '--show', help='Show interactively?',
-              default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format, but can be anything '
-                                      'matplotlib outputs, e.g. ?.pdf will save to PDF with an automatic file naming.',
-              default=None, type=str)
+@show_option
+@outfile_option
 @click.option('-r', '--refilter', default=None,
               help='Refilter CCFs before plotting (e.g. 4:8 for filtering CCFs '
                    'between 4.0 and 8.0 Hz. This will update the plot title.')
@@ -1566,13 +1560,11 @@ def dtt_dvv_plot():
 
 @dtt_dvv_plot.command(name="mwcs_dvv")
 @mwcsdtt_options
-@click.option('-D', '--dvvid', default=1, help='MWCS-DTT-DVV aggregate config set number')
+@dvvid_option
 @click.option('-M', '--dttname', default="m", help='DTT column: m (slope) or m0 (zero-intercept slope)')
-@click.option('-p', '--pair_type', default="CC", type=click.Choice(["CC", "SC", "AC"]),
-              help='Pair type to plot (CC/SC/AC). Default: CC')
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto). Defaults to PNG format.',
-              default=None, type=str)
+@pair_type_option
+@show_option
+@outfile_option
 @click.pass_context
 def dtt_dvv_plot_mwcs(ctx, preprocessid, ccid, filterid, stackid, stackid_item,
                       refstackid, mwcsid, mwcsdttid, dvvid, comp, dttname, pair_type, show, outfile):
@@ -1590,13 +1582,12 @@ def dtt_dvv_plot_mwcs(ctx, preprocessid, ccid, filterid, stackid, stackid_item,
 @dtt_dvv_plot.command(name="stretching_dvv")
 @click.option('-f', '--filterid', default=1, help='Filter ID')
 @click.option('-S', '--stretchingid', default=1, help='Stretching config set number')
-@click.option('-D', '--dvvid', default=1, help='Stretching DVV aggregate config set number')
+@dvvid_option
 @click.option('-c', '--comp', default="ZZ", help='Components (ZZ, ZE, NZ, 1E,...). Defaults to ZZ')
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stack (1-based index, 0=all)')
-@click.option('-p', '--pair_type', default="CC", type=click.Choice(["CC", "SC", "AC"]),
-              help='Pair type to plot (CC/SC/AC). Default: CC')
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)', default=None, type=str)
+@pair_type_option
+@show_option
+@outfile_option
 @click.pass_context
 def dtt_dvv_plot_stretching(ctx, mov_stack, comp, filterid, stretchingid,
                              dvvid, pair_type, show, outfile):
@@ -1617,16 +1608,15 @@ def dtt_dvv_plot_stretching(ctx, mov_stack, comp, filterid, stretchingid,
 @click.option('-m', '--mov_stack', default=0, help='Plot specific mov stack (1-based index, 0=all)')
 @click.option('-w', '--wctid', default=1, help='WCT config set number')
 @click.option('-d', '--dttid', default=1, help='WCT-DTT config set number')
-@click.option('-D', '--dvvid', default=1, help='WCT-DTT-DVV aggregate config set number')
-@click.option('-p', '--pair_type', default="CC", type=click.Choice(["CC", "SC", "AC"]),
-              help='Pair type to plot (CC/SC/AC). Default: CC')
+@dvvid_option
+@pair_type_option
 @click.option('-v', '--visualize', default="timeseries",
               type=click.Choice(["timeseries", "heatmap"]),
               help='Plot style: timeseries (uses dvv aggregate) or heatmap (uses per-pair data)')
 @click.option('-r', '--ranges', default="[0.5, 1.0], [1.0, 2.0], [2.0, 4.0]",
               help='Frequency ranges for band averaging (first range used for timeseries)')
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto)', default=None, type=str)
+@show_option
+@outfile_option
 @click.pass_context
 def dtt_dvv_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, dvvid,
                      pair_type, visualize, ranges, show, outfile):
@@ -1647,8 +1637,8 @@ def dtt_dvv_plot_wct(ctx, filterid, comp, mov_stack, wctid, dttid, dvvid,
 @click.argument('sta1')
 @click.argument('sta2')
 @dtt_lineage_options
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto).', default=None, type=str)
+@show_option
+@outfile_option
 @click.pass_context
 def dtt_plot_mwcs(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid,
                   stackid_item, refstackid, mwcsid, dttid, comp, show, outfile):
@@ -1672,8 +1662,8 @@ def dtt_plot_mwcs(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid,
 @click.argument('sta2')
 @click.argument('day')
 @dtt_lineage_options
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto).', default=None, type=str)
+@show_option
+@outfile_option
 @click.pass_context
 def dtt_plot_dtt(ctx, sta1, sta2, day, preprocessid, ccid, filterid,
                  stackid, stackid_item, mwcsid, dttid, comp, show, outfile):
@@ -1701,8 +1691,8 @@ def dtt_plot_dtt(ctx, sta1, sta2, day, preprocessid, ccid, filterid,
               help='Highlight a specific pair (NET.STA.LOC:NET.STA.LOC)', multiple=True)
 @click.option('-M', '--dttname', default="m",
               help='DTT column: m (slope=dt/t) or m0 (zero-intercept)')
-@click.option('-s', '--show', help='Show interactively?', default=True, type=bool)
-@click.option('-o', '--outfile', help='Output filename (?=auto).', default=None, type=str)
+@show_option
+@outfile_option
 @click.pass_context
 def dtt_plot_mwcs_timing(ctx, mov_stack, comp, dttname, filterid, mwcsid, dttid,
                          pair, show, outfile):
