@@ -4301,23 +4301,15 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
     dv_col, err_col, quality_col = _dvv_column_spec(
         parent_category, pair_type, params)
 
-    # The DTT/stretching/wct_dtt getters follow the same convention as all
-    # other xr_get_* functions: the file lives at
-    #   root / *lineage / _output / …
-    # where *lineage already ends with the step name (e.g. "mwcs_dtt_1").
-    # aggregate_dvv_pairs receives parent_lineage that ends one level *above*
-    # the DTT step (it is lineage_names_upstream of the DVV job, which strips
-    # the DVV step name but still ends with e.g. "mwcs_dtt_1").  We therefore
-    # pass parent_lineage as-is — it already contains the step name as its
-    # last element, matching what results.py/_lineage_through produces.
-    # However, the lineage stored on the DVV job was built as:
-    #   parent_lineage_str + "/" + dvv_step_name
-    # so lineage_names_upstream (= lineage_names[:-1]) strips dvv_step_name
-    # and correctly ends with parent_step_name.  Verify this assumption and
-    # append parent_step_name only when it is missing (safety guard).
-    dtt_lineage = list(parent_lineage)
-    if not dtt_lineage or dtt_lineage[-1] != parent_step_name:
-        dtt_lineage = dtt_lineage + [parent_step_name]
+    # xr_save_dtt/stretching/wct_dtt write files to:
+    #   root / *lineage_upstream / step_name / _output / …
+    # where lineage_upstream is lineage_names_upstream of the *DTT* job
+    # (i.e. everything above the DTT step) and step_name is the DTT step name.
+    #
+    # The DVV job's lineage_names_upstream ends with parent_step_name
+    # (e.g. "mwcs_dtt_1") — that is the lineage_upstream of the DTT job,
+    # so we must append parent_step_name to reconstruct the full save path.
+    dtt_lineage = list(parent_lineage) + [parent_step_name]
 
     quality_min    = float(getattr(params, "dvv_quality_min", 0.0))
     do_weighted    = str(getattr(params, "dvv_weighted_mean", "Y")).upper() == "Y"
@@ -4350,7 +4342,7 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                 da_err = ds["DTT"].sel(keys=err_col)
                 if quality_col in ds["DTT"].coords["keys"].values:
                     da_q = ds["DTT"].sel(keys=quality_col)
-                    bad = da_q < quality_min
+                    bad = (da_q < quality_min).values  # numpy bool array avoids xarray coord mismatch
                     da_dv  = da_dv.where(~bad)
                     da_err = da_err.where(~bad)
 
@@ -4361,7 +4353,7 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                 da_err = ds["STR"].sel(keys=err_col)
                 if quality_col:
                     da_q = ds["STR"].sel(keys=quality_col)
-                    bad = da_q < quality_min
+                    bad = (da_q < quality_min).values  # numpy bool array avoids xarray coord mismatch
                     da_dv  = da_dv.where(~bad)
                     da_err = da_err.where(~bad)
                 # Convert Delta → dv/v: dv/v = Delta - 1
@@ -4379,8 +4371,11 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                 f"(lineage={dtt_lineage}, mov_stack={mov_stack}): {e}")
             continue
         except Exception as e:
+            import traceback
             logging.getLogger("msnoise").warning(
-                f"Error reading {sta1}:{sta2}/{component}: {e}")
+                f"Error reading {sta1}:{sta2}/{component}: {e}\n"
+                + traceback.format_exc()
+            )
             continue
 
         if out_percent:
