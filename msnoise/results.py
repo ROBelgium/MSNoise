@@ -44,9 +44,12 @@ _STEP_PREFIXES = [
     "refstack",
     "mwcs",
     "mwcs_dtt",
+    "mwcs_dtt_dvv",
     "stretching",
+    "stretching_dvv",
     "wavelet",
     "wavelet_dtt",
+    "wct_dtt_dvv",
 ]
 
 # Map step-name prefix → keyword argument name used in from_ids()
@@ -117,9 +120,12 @@ class MSNoiseResult:
         refstack: Optional[int] = None,
         mwcs: Optional[int] = None,
         mwcs_dtt: Optional[int] = None,
+        mwcs_dtt_dvv: Optional[int] = None,
         stretching: Optional[int] = None,
+        stretching_dvv: Optional[int] = None,
         wavelet: Optional[int] = None,
         wavelet_dtt: Optional[int] = None,
+        wct_dtt_dvv: Optional[int] = None,
     ) -> "MSNoiseResult":
         """Build from integer configset IDs, stopping at the last non-None step.
 
@@ -139,20 +145,28 @@ class MSNoiseResult:
             # MWCS-DTT branch
             r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
                                        stack=1, refstack=1, mwcs=1, mwcs_dtt=1)
+
+            # MWCS DVV aggregate
+            r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                       stack=1, refstack=1, mwcs=1,
+                                       mwcs_dtt=1, mwcs_dtt_dvv=1)
         """
         kwargs = {
-            "preprocess": preprocess,
-            "cc": cc,
-            "psd": psd,
-            "psd_rms": psd_rms,
-            "filter": filter,
-            "stack": stack,
-            "refstack": refstack,
-            "mwcs": mwcs,
-            "mwcs_dtt": mwcs_dtt,
-            "stretching": stretching,
-            "wavelet": wavelet,
-            "wavelet_dtt": wavelet_dtt,
+            "preprocess":    preprocess,
+            "cc":            cc,
+            "psd":           psd,
+            "psd_rms":       psd_rms,
+            "filter":        filter,
+            "stack":         stack,
+            "refstack":      refstack,
+            "mwcs":          mwcs,
+            "mwcs_dtt":      mwcs_dtt,
+            "mwcs_dtt_dvv":  mwcs_dtt_dvv,
+            "stretching":    stretching,
+            "stretching_dvv":stretching_dvv,
+            "wavelet":       wavelet,
+            "wavelet_dtt":   wavelet_dtt,
+            "wct_dtt_dvv":   wct_dtt_dvv,
         }
         parts = []
         for prefix in _STEP_PREFIXES:
@@ -605,58 +619,89 @@ class MSNoiseResult:
 
     def get_dvv(
         self,
+        pair_type: str = "ALL",
         components: Optional[str] = None,
         mov_stack: Optional[tuple] = None,
         format: str = "xarray",
     ):
-        """Load network-aggregated dv/v results.
+        """Load pre-aggregated network dv/v statistics.
+
+        The :class:`MSNoiseResult` must be instantiated at a DVV aggregate step
+        (``mwcs_dtt_dvv``, ``stretching_dvv``, or ``wct_dtt_dvv``).
 
         Parameters
         ----------
+        pair_type:
+            ``"ALL"`` (default), ``"CC"``, ``"SC"``, or ``"AC"``.
+        components:
+            Component string e.g. ``"ZZ"`` or ``"ALL"``.  If *None*, all
+            available components are returned.
+        mov_stack:
+            Moving-stack tuple e.g. ``("1D", "1D")``.  If *None*, all
+            available mov_stacks are returned.
         format:
-            ``"xarray"`` (default) or ``"dataframe"``.
+            ``"xarray"`` (default) returns an :class:`xarray.Dataset`.
+            ``"dataframe"`` returns a :class:`~pandas.DataFrame`.
 
         Returns
         -------
-        If all args specified: result in requested format.
-        Otherwise: dict keyed by ``(components, mov_stack)``.
+        If *components* and *mov_stack* are both specified: result in
+        requested format.
+        Otherwise: dict keyed by ``(pair_type, components, mov_stack)``.
         """
-        from .api import xr_get_dvv
+        from .api import xr_get_dvv_agg
 
-        self._require_category("mwcs_dtt")
-        lineage = self._lineage_through("mwcs_dtt")
-        root = self.output_folder
-        api_fmt = "dataset" if format == "xarray" else "dataframe"
+        DVV_CATEGORIES = ("mwcs_dtt_dvv", "stretching_dvv", "wct_dtt_dvv")
+        self._require_category(*DVV_CATEGORIES)
+
+        # Resolve the DVV step name and its lineage
+        dvv_cat = self.category
+        lineage   = self._lineage_through(dvv_cat)
+        step_name = self._step_name_for(dvv_cat)
+        root      = self.output_folder
+        api_fmt   = "dataset" if format == "xarray" else "dataframe"
 
         if components is not None and mov_stack is not None:
-            return xr_get_dvv(root, lineage, components, mov_stack, format=api_fmt)
+            return xr_get_dvv_agg(root, lineage, step_name,
+                                   mov_stack, pair_type, components,
+                                   format=api_fmt)
 
-        base = os.path.join(root, *lineage, "_output")
+        # Discovery mode — find all available (pair_type, component, mov_stack)
+        base = os.path.join(root, *lineage, step_name, "_output")
         results = {}
-        mov_stacks = (
-            ["%s_%s" % (mov_stack[0], mov_stack[1])] if mov_stack is not None
-            else [os.path.basename(p)
-                  for p in self._discover(os.path.join(base, "*"))
+
+        ms_dirs = (
+            [os.path.join(base, "%s_%s" % (mov_stack[0], mov_stack[1]))]
+            if mov_stack is not None
+            else [p for p in self._discover(os.path.join(base, "*"))
                   if os.path.isdir(p)]
         )
-        for ms_str in mov_stacks:
+        for ms_dir in ms_dirs:
+            ms_str   = os.path.basename(ms_dir)
             ms_tuple = tuple(ms_str.split("_", 1))
-            nc_dir = os.path.join(base, ms_str)
-            comp_files = (
-                self._discover(os.path.join(nc_dir, f"{components}.nc"))
-                if components is not None
-                else self._discover(os.path.join(nc_dir, "*.nc"))
-            )
-            for fpath in comp_files:
-                comp_key = os.path.splitext(os.path.basename(fpath))[0]
+            pattern  = f"dvv_{pair_type}_*.nc" if components is None else \
+                       f"dvv_{pair_type}_{components}.nc"
+            for nc_file in self._discover(os.path.join(ms_dir, pattern)):
+                fname = os.path.splitext(os.path.basename(nc_file))[0]
+                # dvv_CC_ZZ  →  parts = ["dvv", "CC", "ZZ"]
+                parts = fname.split("_", 2)
+                if len(parts) < 3:
+                    continue
+                _, pt, comp = parts
                 try:
-                    results[(comp_key, ms_tuple)] = xr_get_dvv(
-                        root, lineage, comp_key, ms_tuple, format=api_fmt)
+                    results[(pt, comp, ms_tuple)] = xr_get_dvv_agg(
+                        root, lineage, step_name,
+                        ms_tuple, pt, comp, format=api_fmt)
                 except (FileNotFoundError, Exception):
                     pass
 
+        # Simplify keys when specific dimensions are constrained
+        if components is not None and mov_stack is not None:
+            return {k[0]: v for k, v in results.items()}   # keyed by pair_type
         if components is not None:
-            return {k[1]: v for k, v in results.items()}
+            return {(k[0], k[2]): v for k, v in results.items()}
+        if mov_stack is not None:
+            return {(k[0], k[1]): v for k, v in results.items()}
         return results
 
     def get_wct(
