@@ -30,24 +30,24 @@ class OrderedGroup(click.Group):
         return self.commands.keys()
 
 
-def run_threaded(main_func, ctx, **kwargs):
+def run_threaded(main_func, ctx, *args, **kwargs):
     """Run *main_func* once (threads=1) or in parallel worker processes.
 
     Reads ``MSNOISE_threads``, ``MSNOISE_threadsdelay`` and
     ``MSNOISE_verbosity`` from *ctx.obj* so callers don't have to repeat
-    that boilerplate.  Any extra keyword arguments are forwarded to
-    *main_func* alongside ``loglevel``.
+    that boilerplate.  Any positional *args* and extra keyword arguments
+    are forwarded to *main_func* alongside ``loglevel``.
     """
     threads  = ctx.obj['MSNOISE_threads']
     delay    = ctx.obj['MSNOISE_threadsdelay']
     loglevel = ctx.obj['MSNOISE_verbosity']
     if threads == 1:
-        main_func(loglevel=loglevel, **kwargs)
+        main_func(*args, loglevel=loglevel, **kwargs)
     else:
         from multiprocessing import Process
         processes = []
         for i in range(threads):
-            p = Process(target=main_func,
+            p = Process(target=main_func, args=args,
                         kwargs={"loglevel": loglevel, **kwargs})
             p.start()
             processes.append(p)
@@ -1257,10 +1257,6 @@ def cc_stack(ctx, ref, mov, step):
     Computes the STACK jobs.
     """
     click.secho('Lets STACK !', fg='green')
-    from msnoise.unused.s04_stack2 import main
-    threads = ctx.obj['MSNOISE_threads']
-    delay = ctx.obj['MSNOISE_threadsdelay']
-    loglevel = ctx.obj['MSNOISE_verbosity']
 
     if ref:
         click.secho(
@@ -1274,34 +1270,11 @@ def cc_stack(ctx, ref, mov, step):
                     "simultaneously, please run them one after the other.")
         sys.exit()
 
-    if threads == 1:
-        if mov:
-            from ..s04_stack_mov import main
-            main('mov', loglevel=loglevel)
-        if step:
-            main('step', loglevel=loglevel)
-    else:
-        from multiprocessing import Process
-        processes = []
-        if mov:
-            from ..s04_stack_mov import main
-            for i in range(threads):
-                p = Process(target=main, args=["mov",],
-                            kwargs={"loglevel": loglevel})
-                p.start()
-                processes.append(p)
-                time.sleep(delay)
-        for p in processes:
-            p.join()
-        if step:
-            for i in range(threads):
-                p = Process(target=main, args=["step",],
-                            kwargs={"loglevel": loglevel})
-                p.start()
-                processes.append(p)
-                time.sleep(delay)
-        for p in processes:
-            p.join()
+    from ..s04_stack_mov import main
+    if mov:
+        run_threaded(main, ctx, 'mov')
+    if step:
+        run_threaded(main, ctx, 'step')
 
 
 @cc.command(name="stack_refstack")

@@ -35,7 +35,7 @@ from .api import (
 )
 
 
-def main(loglevel="INFO", batch_size=None):
+def main(loglevel="INFO"):
     """
     Main function to compute dv/v from WCT results using a lineage-based approach.
 
