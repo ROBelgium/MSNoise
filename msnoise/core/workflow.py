@@ -446,6 +446,21 @@ def _lineage_id_for(session, lineage_str):
     return row.lineage_id if row else None
 
 
+def _lineage_str_from_id(session, lineage_id):
+    """Resolve *lineage_id* back to the lineage string.  Returns None if not found.
+
+    Checks identity map first (no SQL), falls back to a no_autoflush query.
+    """
+    if lineage_id is None:
+        return None
+    for obj in session.identity_map.values():
+        if isinstance(obj, Lineage) and obj.lineage_id == lineage_id:
+            return obj.lineage_str
+    with session.no_autoflush:
+        row = session.query(Lineage).filter(Lineage.lineage_id == lineage_id).first()
+    return row.lineage_str if row else None
+
+
 # ============================================================
 
 
@@ -1112,9 +1127,13 @@ def get_next_lineage_batch(
         return None
 
     pair = jobs[0].pair
-    lineage_str = jobs[0].lineage  # resolved via association_proxy
+    # Use _lineage_str_from_id to safely resolve after session.commit() expiry
+    lineage_str = _lineage_str_from_id(db, jobs[0].lineage_id)
     if not lineage_str:
-        raise ValueError(f"{step_category.upper()} jobs must have a non-empty lineage (v2 assumption)")
+        raise ValueError(
+            f"{step_category.upper()} jobs must have a non-empty lineage "
+            f"(lineage_id={jobs[0].lineage_id!r})"
+        )
 
     refs = [job.ref for job in jobs]
     days = [job.day for job in jobs]

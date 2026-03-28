@@ -58,9 +58,10 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         first_job = jobs[0]
         net, sta, loc = first_job.pair.split(".")
 
-        # job.lineage = upstream psd step name e.g. "psd_1"
-        # Output hierarchy: OUTPUT/psd_1/psd_rms_1/_output/<seed_id>/RMS.nc
-        psd_step_name = first_job.lineage or "psd_1"
+        # Resolve lineage string from FK (safe after session.commit expiry)
+        from .core.workflow import _lineage_str_from_id
+        _psd_lineage_str = _lineage_str_from_id(db, first_job.lineage_id)
+        psd_step_name = _psd_lineage_str or "psd_1"
         lineage       = [psd_step_name]
         step_name     = step.step_name
 

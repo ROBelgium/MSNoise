@@ -1,4 +1,5 @@
 from .msnoise_table_def import Lineage
+from sqlalchemy.orm import aliased
 """ This script searches the database for files flagged "N"ew or "M"odified.
 For each date in the configured range, it checks if other stations are
 available and defines the new jobs to be processed.  Only jobs within the
@@ -747,13 +748,14 @@ def propagate_psd_rms_jobs_from_psd_done(session):
                 # psd_compute_rms knows which NC output folder to read.
                 lineage = psd_step.step_name
 
+                _LinAlias = aliased(Lineage)
                 existing = (
                     session.query(Job.ref)
                     .filter(Job.step_id == psd_rms_step.step_id)
                     .filter(Job.day == psd_job.day)
                     .filter(Job.pair == psd_job.pair)
-                    .join(Job.lineage_ref)
-                    .filter(Lineage.lineage_str == lineage)
+                    .join(_LinAlias, Job.lineage_id == _LinAlias.lineage_id)
+                    .filter(_LinAlias.lineage_str == lineage)
                     .first()
                 )
                 if existing:
