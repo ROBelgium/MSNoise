@@ -1460,7 +1460,11 @@ def build_ref_datelist(params, session=None):
         if session is None:
             session = connect()
         start = session.query(DataAvailability).order_by(
-            DataAvailability.starttime).first().starttime.date()
+            DataAvailability.starttime).first()
+        if start:
+            start = start.starttime.date()
+        else:
+            start = datetime.date(1970, 1, 1)
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
     else:
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()

@@ -196,9 +196,18 @@ def fetch_and_preprocess(
     for job in jobs:
         net, sta, loc = job.pair.split(".")
         station_map[job.pair] = job
-        for comp in comps:
-            chan = f"HH{comp}"   # TODO: use actual channel from station config
-            bulk.append((net, sta, loc, chan, t1, t2))
+        # FDSN uses "" for empty location; MSNoise stores "--" as the placeholder
+        fdsn_loc = "" if loc == "--" else loc
+        # Use the station's configured channel names — no wildcards, no guessing
+        station_obj = get_station(db, net, sta)
+        chans = station_obj.chans() if station_obj and station_obj.chans() else []
+        if chans:
+            for chan in chans:
+                bulk.append((net, sta, fdsn_loc, chan, t1, t2))
+        else:
+            # Fallback: request all channels for the configured components
+            for comp in comps:
+                bulk.append((net, sta, fdsn_loc, f"*{comp}", t1, t2))
 
     log.info(f"FDSN bulk fetch: {len(jobs)} stations, {len(bulk)} channels, "
              f"day={goal_day}, source={ds.name!r}")
@@ -231,7 +240,13 @@ def fetch_and_preprocess(
 
     for sid, job in station_map.items():
         net, sta, loc = sid.split(".")
-        sta_stream = raw_stream.select(network=net, station=sta, location=loc)
+        # FDSN returns "" for empty location; MSNoise stores "--"
+        fdsn_loc = "" if loc == "--" else loc
+        sta_stream = raw_stream.select(network=net, station=sta, location=fdsn_loc)
+        # Normalise "" → "--" in the fetched stream to match MSNoise convention
+        for tr in sta_stream:
+            if tr.stats.location == "":
+                tr.stats.location = "--"
 
         if not sta_stream:
             log.warning(f"Station {sid} absent from FDSN bulk response — marking Failed")
