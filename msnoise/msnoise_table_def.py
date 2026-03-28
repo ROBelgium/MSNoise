@@ -134,7 +134,7 @@ def declare_tables(prefix=None):
     # Define the namedtuple to return
     sqlschema = namedtuple('SQLSchema', ['Base', 'PrefixerBase',
         'Job', 'Station', 'Config', 'DataAvailability', 'WorkflowStep', 'WorkflowLink',
-        'Lineage'])
+        'Lineage', 'DataSource'])
 
     # Create the SQLAlchemy base and subclass it to prefix the table names
     Base = declarative_base()
@@ -460,6 +460,59 @@ def declare_tables(prefix=None):
 
     ########################################################################
 
+    class DataSource(PrefixerBase):
+        """
+        DataSource Object — defines where raw waveform data comes from.
+
+        :type ref: int
+        :param ref: Primary key
+        :type name: str
+        :param name: Human label e.g. "local", "IRIS", "GEOFON", "EIDA"
+        :type uri: str
+        :param uri: Data location. Schemes:
+            - bare path or ``sds:///path`` → local SDS archive
+            - ``fdsn://http://...``         → FDSN web service
+            - ``eida://http://...``         → EIDA routing client
+        :type data_structure: str
+        :param data_structure: SDS sub-path format for local/SDS sources
+            (e.g. "SDS", "BUD"). Ignored for FDSN/EIDA.
+        :type auth_env: str
+        :param auth_env: Environment variable prefix for credentials.
+            Worker looks up ``{auth_env}_FDSN_USER``,
+            ``{auth_env}_FDSN_PASSWORD``, ``{auth_env}_FDSN_TOKEN``.
+            Default "MSNOISE".
+        """
+        __incomplete_tablename__ = "data_sources"
+
+        ref = Column(Integer, primary_key=True, autoincrement=True)
+        name = Column(String(64), nullable=False, unique=True)
+        uri = Column(String(512), nullable=False, default="")
+        data_structure = Column(String(64), nullable=False, default="SDS")
+        auth_env = Column(String(64), nullable=False, default="MSNOISE")
+
+        __table_args__ = (
+            Index('idx_datasource_name', 'name'),
+        )
+
+        def __init__(self, name=None, uri="", data_structure="SDS",
+                     auth_env="MSNOISE", **kwargs):
+            self.name = name
+            self.uri = uri
+            self.data_structure = data_structure
+            self.auth_env = auth_env
+            for key, val in kwargs.items():
+                setattr(self, key, val)
+
+        def __str__(self):
+            return f"DataSource({self.name!r}, uri={self.uri!r})"
+
+        def __repr__(self):
+            return (f"DataSource(name={self.name!r}, uri={self.uri!r}, "
+                    f"data_structure={self.data_structure!r}, "
+                    f"auth_env={self.auth_env!r})")
+
+    ########################################################################
+
     class Station(PrefixerBase):
         """
         Station Object
@@ -494,15 +547,18 @@ def declare_tables(prefix=None):
         altitude = Column(Float)
         coordinates = Column(Enum('DEG', 'UTM', name="coordinate_type"))
         used = Column(Boolean, default=True)
+        data_source_id = Column(Integer, ForeignKey(f"{prefix}data_sources.ref"), nullable=True)
+        # NULL → use project default DataSource (id=1)
 
         __table_args__ = (
             UniqueConstraint('net', 'sta', name='_station_unique'),
+            Index('idx_station_datasource', 'data_source_id'),
             Index('idx_station_net', 'net'),
             Index('idx_station_used', 'used'),
         )
 
-        def __init__(self, net=None, sta=None, X=None, Y=None, altitude=None, 
-                     coordinates=None, used=True, **kwargs):
+        def __init__(self, net=None, sta=None, X=None, Y=None, altitude=None,
+                     coordinates=None, used=True, data_source_id=None, **kwargs):
             """Initialize station"""
             self.net = net
             self.sta = sta
@@ -511,6 +567,7 @@ def declare_tables(prefix=None):
             self.altitude = altitude
             self.coordinates = coordinates
             self.used = used
+            self.data_source_id = data_source_id
             for key, val in kwargs.items():
                 setattr(self, key, val)
 
@@ -567,8 +624,10 @@ def declare_tables(prefix=None):
         sta = Column(String(10))
         loc = Column(String(10))
         chan = Column(String(20))
-        path = Column(String(255))
+        path = Column(String(512))
+        # Path RELATIVE to DataSource.uri — reconstruct full path at runtime
         file = Column(String(255))
+        data_source_id = Column(Integer, ForeignKey(f"{prefix}data_sources.ref"), nullable=True)
         starttime = Column(DateTime)
         endtime = Column(DateTime)
         data_duration = Column(Float)
@@ -581,11 +640,12 @@ def declare_tables(prefix=None):
             Index('idx_da_net_sta', 'net', 'sta'),
             Index('idx_da_time', 'starttime', 'endtime'),
             Index('idx_da_flag', 'flag'),
+            Index('idx_da_datasource', 'data_source_id'),
         )
 
-        def __init__(self, net=None, sta=None, loc=None, chan=None, path=None, file=None, 
-                     starttime=None, endtime=None, data_duration=None, gaps_duration=None, 
-                     samplerate=None, flag=None, **kwargs):
+        def __init__(self, net=None, sta=None, loc=None, chan=None, path=None, file=None,
+                     starttime=None, endtime=None, data_duration=None, gaps_duration=None,
+                     samplerate=None, flag=None, data_source_id=None, **kwargs):
             """Initialize data availability record"""
             self.net = net
             self.sta = sta
@@ -599,6 +659,7 @@ def declare_tables(prefix=None):
             self.gaps_duration = gaps_duration
             self.samplerate = samplerate
             self.flag = flag
+            self.data_source_id = data_source_id
             for key, val in kwargs.items():
                 setattr(self, key, val)
 
@@ -709,10 +770,10 @@ def declare_tables(prefix=None):
     # Return the schema namedtuple
     return sqlschema(Base, PrefixerBase,
                      Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink,
-                     Lineage)
+                     Lineage, DataSource)
     # end of declare_tables()
 
-Base, PrefixerBase, Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink, Lineage = declare_tables()
+Base, PrefixerBase, Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink, Lineage, DataSource = declare_tables()
 
 
 

@@ -20,6 +20,6 @@ from .core.db import connect  # noqa: F401
 from .core import *  # noqa: F401,F403
 
 from .msnoise_table_def import (  # noqa: F401
-    Job, Station, Config, DataAvailability, WorkflowStep,
+    Job, Station, Config, DataAvailability, WorkflowStep, DataSource,
     WORKFLOW_CHAINS, WORKFLOW_ORDER,
 )

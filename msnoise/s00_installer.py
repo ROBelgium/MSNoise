@@ -246,6 +246,18 @@ def main(tech=None, hostname=None, username=None, password=None,
                       "cannot continue")
         return 1
 
+    # Create the default DataSource (id=1, local SDS archive)
+    DataSource = schema.DataSource
+    default_source = DataSource(
+        name="local",
+        uri="",
+        data_structure="SDS",
+        auth_env="MSNOISE",
+    )
+    session.add(default_source)
+    session.commit()
+    logging.info("Created default DataSource 'local' (id=1)")
+
     create_indices(session, prefix)
 
     session.close()
