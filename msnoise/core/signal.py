@@ -557,24 +557,73 @@ def to_sds(stats,year, jday):
 
 
 def save_preprocessed_streams(stream, output_dir, step_name, goal_day):
-    """Write a preprocessed Stream to disk in workflow-aware path structure.
+    """Write preprocessed traces to per-station files.
 
-    Creates ``<output_dir>/<step_name>/_output/`` and writes
-    ``<goal_day>.mseed``.
+    Output layout::
+
+        <output_dir>/<step_name>/_output/<goal_day>/<NET.STA.LOC>.mseed
+
+    One file per station (all channels for that station in the same file).
+    This is concurrency-safe: each station writes its own file with no
+    shared state between parallel workers.
 
     :param stream: :class:`~obspy.core.stream.Stream` to write.
+    :param output_dir: Base output directory (``params.global_.output_folder``).
+    :param step_name: Workflow step name (e.g. ``"preprocess_1"``).
+    :param goal_day: Processing date string (``YYYY-MM-DD``).
+    :returns: List of written file paths (one per station).
+    """
+    from obspy import Stream as _Stream
+    day_dir = os.path.join(output_dir, step_name, "_output", goal_day)
+    os.makedirs(day_dir, exist_ok=True)
+
+    # Group traces by NET.STA.LOC
+    by_station = {}
+    for tr in stream:
+        sid = f"{tr.stats.network}.{tr.stats.station}.{tr.stats.location}"
+        by_station.setdefault(sid, _Stream())
+        tr.data = tr.data.astype(np.float32)
+        by_station[sid].append(tr)
+
+    saved = []
+    for sid, st in by_station.items():
+        output_path = os.path.join(day_dir, f"{sid}.mseed")
+        st.write(output_path, format="MSEED")
+        saved.append(output_path)
+
+    return saved
+
+
+def get_preprocessed_stream(output_dir, step_name, goal_day, stations):
+    """Read per-station preprocessed files and return a merged Stream.
+
+    Counterpart to :func:`save_preprocessed_streams`.  Reads only the
+    station files needed for *stations* (a list of ``"NET.STA.LOC"``
+    strings) and returns them merged into a single
+    :class:`~obspy.core.stream.Stream`.
+
+    Missing station files are silently skipped (the cc worker checks
+    for empty streams downstream).
+
     :param output_dir: Base output directory.
     :param step_name: Workflow step name (e.g. ``"preprocess_1"``).
     :param goal_day: Processing date string (``YYYY-MM-DD``).
-    :returns: List containing the single saved file path.
+    :param stations: List of ``"NET.STA.LOC"`` strings to load.
+    :returns: :class:`~obspy.core.stream.Stream`.
     """
-    workflow_dir = os.path.join(output_dir, step_name, "_output")
-    os.makedirs(workflow_dir, exist_ok=True)
-    output_path = os.path.join(workflow_dir, f"{goal_day}.mseed")
-    for tr in stream:
-        tr.data = tr.data.astype(np.float32)
-    stream.write(output_path, format="MSEED")
-    return [output_path]
+    from obspy import Stream as _Stream, read as _read
+    day_dir = os.path.join(output_dir, step_name, "_output", goal_day)
+    merged = _Stream()
+    for sid in stations:
+        fpath = os.path.join(day_dir, f"{sid}.mseed")
+        if os.path.isfile(fpath):
+            merged += _read(fpath)
+        else:
+            import logging as _log
+            _log.getLogger("msnoise.signal").debug(
+                f"Preprocessed file not found: {fpath}"
+            )
+    return merged
 
 
 

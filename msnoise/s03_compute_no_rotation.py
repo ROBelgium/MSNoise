@@ -191,7 +191,7 @@ import matplotlib.mlab as mlab
 from .core.db import connect, get_logger
 from .core.config import get_config_set_details
 from .core.workflow import (get_filter_steps_for_cc_step, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, update_job)
-from .core.signal import stack, winsorizing
+from .core.signal import stack, winsorizing, get_preprocessed_stream
 from .core.io import save_daily_ccf, xr_save_ccf_all
 from .move2obspy import myCorr2
 from .move2obspy import whiten2
@@ -274,13 +274,14 @@ def main(loglevel="INFO"):
                      (goal_day, len(pairs), len(stations)))
         jt = time.time()
 
-        preprocess_filename = os.path.join(params.global_.output_folder, *lineage_names_upstream, "_output", "%s.mseed" % goal_day)
-        stream = read(preprocess_filename)
-
-        # Filter the stream for only necessary net.sta.loc
-        allowed = {tuple(s.split(".")) for s in stations}  # (net, sta, loc)
-        stream = Stream(tr for tr in stream
-                        if (tr.stats.network, tr.stats.station, tr.stats.location) in allowed)
+        # Read per-station preprocessed files — one file per NET.STA.LOC
+        # under _output/<goal_day>/<NET.STA.LOC>.mseed (v2 layout).
+        _preprocess_step = lineage_names_upstream[-1] if lineage_names_upstream else ""
+        _preprocess_out  = os.path.join(params.global_.output_folder,
+                                        *lineage_names_upstream[:-1])
+        stream = get_preprocessed_stream(
+            _preprocess_out, _preprocess_step, goal_day, stations
+        )
         # TODO PREPROCESS IF THE "PREPROCESS_ON_THE_FLY" config?
         # comps = np.unique(comps)
         # with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
