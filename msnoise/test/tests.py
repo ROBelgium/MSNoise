@@ -895,10 +895,13 @@ def test_033b_compute_second_day():
 
 @pytest.mark.order(47)
 def test_034_instrument_response(setup_environment):
+    # TODO THIS TEST DOESN'T WORK
+    # TODO IT'S NOT RECOMPUTING THE PREPROCESSING STEP :-)
     db = connect()
     response_path = setup_environment['response_path']
     update_config(db, 'response_path', response_path)
     update_config(db, 'remove_response', "Y")
+    reset_jobs(db, 'cc_1', alljobs=True)
     db.close()
     test_013_s03compute_cc()
 
@@ -1029,8 +1032,14 @@ def test_039_wct_pipeline():
     try:
         # WCT jobs were created by new_jobs_main(after='refstack') in test_025
         # (stretching already has its own test_032)
+        db = connect()
+        reset_jobs(db, 'wavelet_1', alljobs=True)
+        db.close()
         compute_wct_main()
         new_jobs_main(after='wavelet')
+        db = connect()
+        reset_jobs(db, 'wavelet_dtt_1', alljobs=True)
+        db.close()
         wavelet_dtt_main()
     except:
         traceback.print_exc()
