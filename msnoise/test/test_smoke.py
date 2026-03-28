@@ -81,8 +81,6 @@ def smoke_db(tmp_path_factory):
                             data_structure="SDS", auth_env="MSNOISE")
     db.add(default_ds)
     db.commit()
-    # Keep data_folder config for backward-compat code paths that still read it
-    update_config(db, "data_folder",    str(tmp / "data"))
     update_config(db, "output_folder",  root)
     update_config(db, "sampling_rate",  "1")
     update_config(db, "channels",       "HHZ")

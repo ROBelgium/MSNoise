@@ -146,11 +146,15 @@ def info_folders(db):
     click.echo('')
     click.echo('Configuration:')
 
-    data_folder = get_config(db, "data_folder")
-    if os.path.isdir(data_folder):
-        click.echo(" - %s exists" % data_folder)
+    from ..core.stations import get_default_data_source
+    _ds = get_default_data_source(db)
+    data_folder = _ds.uri or ""
+    if data_folder and os.path.isdir(data_folder):
+        click.echo(" - DataSource '%s': %s exists" % (_ds.name, data_folder))
+    elif data_folder:
+        click.secho(" - DataSource '%s': %s does not exist !" % (_ds.name, data_folder), fg='red')
     else:
-        click.secho(" - %s does not exists !" % data_folder, fg='red')
+        click.secho(" - DataSource '%s': no URI configured" % _ds.name, fg='yellow')
 
     output_folder = get_config(db, "output_folder")
     if os.path.isdir(output_folder):

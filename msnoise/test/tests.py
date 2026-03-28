@@ -262,8 +262,6 @@ def test_003_set_and_config(setup_environment):
     data_folder = setup_environment['data_folder']
     response_path = setup_environment['response_path']
     totests = [
-        ['data_folder', data_folder],
-        ['data_structure', 'PDF'],
         ['network', 'YA'],
         ['response_path', response_path]
     ]

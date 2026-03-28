@@ -260,7 +260,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                             _ = MULTIPLEX_files[fn]
                         else:
                             # print("Reading %s" % fn)
-                            _ = read(fn, format=params.global_.archive_format or None)
+                            _ = read(fn, format=getattr(params.global_, 'archive_format', None) or None)
                             traces = []
                             for tr in _:
                                 if "%s.%s" % (tr.stats.network, tr.stats.station) in stations and tr.stats.channel[-1] in comps:
@@ -289,7 +289,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                                       starttime=UTCDateTime(gd),
                                       endtime=UTCDateTime(gd)+86400,
                                       station=sta,
-                                      format=params.global_.archive_format or None)
+                                      format=getattr(params.global_, 'archive_format', None) or None)
                             # print("done in", time.time()-t)
                         except Exception:
                             logger.debug("ERROR reading file %s" % file)

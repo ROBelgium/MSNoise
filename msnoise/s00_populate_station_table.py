@@ -3,7 +3,7 @@ This script is responsible for rapidly scanning the data archive,
 identifying the Networks/Stations and inserting them in the *stations* table in
 the database.
 
-The ``data_folder`` (as defined in the config) is scanned following the
+The ``DataSource.uri`` (default DataSource) is scanned following the
 ``data_structure``. Possible values for the data_structure are defined in
 *data_structures.py*:
 
@@ -93,8 +93,10 @@ def main(loglevel="INFO"):
                         with_pid=True)
     db = connect()
     logger.info("Populating the Station table")
-    data_folder = get_config(db, 'data_folder', category="global", set_number=1)
-    data_structure = get_config(db, 'data_structure', category="global", set_number=1)
+    from .core.stations import get_default_data_source
+    _ds = get_default_data_source(db)
+    data_folder = _ds.uri or ""
+    data_structure = _ds.data_structure or "SDS"
     network_override = get_config(db, 'network', category="global", set_number=1)
 
     if data_structure in ["SDS", "IDDS"]:

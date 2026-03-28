@@ -494,7 +494,7 @@ class DataSourceView(BaseModelView):
     ``{auth_env}_FDSN_TOKEN``.
     """
 
-    column_list        = ['ref', 'name', 'uri', 'data_structure', 'auth_env']
+    column_list        = ['ref', 'name', 'uri', 'data_structure', 'archive_format', 'auth_env']
     column_searchable_list = ['name', 'uri']
     column_sortable_list   = ['ref', 'name']
     column_labels      = {
@@ -507,9 +507,10 @@ class DataSourceView(BaseModelView):
     column_descriptions = {
         'uri':            'Bare path, sds:///path, fdsn://http://..., or eida://http://...',
         'data_structure': 'SDS sub-path format for local sources (SDS, BUD, etc.)',
+        'archive_format': 'Force ObsPy read format for local/SDS sources (empty = auto-detect)',
         'auth_env':       'Prefix for env vars: {prefix}_FDSN_USER, {prefix}_FDSN_TOKEN',
     }
-    form_columns = ['name', 'uri', 'data_structure', 'auth_env']
+    form_columns = ['name', 'uri', 'data_structure', 'archive_format', 'auth_env']
 
     def __init__(self, session, *args, **kwargs):
         from .msnoise_table_def import DataSource
@@ -540,7 +541,8 @@ class StationXMLImportView(BaseView):
         # after the session is closed (avoids DetachedInstanceError).
         data_sources = [
             {"ref": ds.ref, "name": ds.name, "uri": ds.uri,
-             "data_structure": ds.data_structure, "auth_env": ds.auth_env}
+             "data_structure": ds.data_structure, "archive_format": ds.archive_format,
+             "auth_env": ds.auth_env}
             for ds in list_data_sources(db)
         ]
 

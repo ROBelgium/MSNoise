@@ -489,17 +489,20 @@ def declare_tables(prefix=None):
         uri = Column(String(512), nullable=False, default="")
         data_structure = Column(String(64), nullable=False, default="SDS")
         auth_env = Column(String(64), nullable=False, default="MSNOISE")
+        archive_format = Column(String(32), nullable=True, default=None)
+        # Force ObsPy read format for local/SDS sources (None = auto-detect)
 
         __table_args__ = (
             Index('idx_datasource_name', 'name'),
         )
 
         def __init__(self, name=None, uri="", data_structure="SDS",
-                     auth_env="MSNOISE", **kwargs):
+                     auth_env="MSNOISE", archive_format=None, **kwargs):
             self.name = name
             self.uri = uri
             self.data_structure = data_structure
             self.auth_env = auth_env
+            self.archive_format = archive_format
             for key, val in kwargs.items():
                 setattr(self, key, val)
 
@@ -509,7 +512,8 @@ def declare_tables(prefix=None):
         def __repr__(self):
             return (f"DataSource(name={self.name!r}, uri={self.uri!r}, "
                     f"data_structure={self.data_structure!r}, "
-                    f"auth_env={self.auth_env!r})")
+                    f"auth_env={self.auth_env!r}, "
+                    f"archive_format={self.archive_format!r})")
 
     ########################################################################
 

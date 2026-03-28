@@ -560,7 +560,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
             api.get_config(db, 'startdate', category='global', set_number=1),'%Y-%m-%d').date()
     enddate = datetime.datetime.strptime(
             api.get_config(db, 'enddate', category='global', set_number=1), '%Y-%m-%d').date()
-    archive_format = api.get_config(db, 'archive_format', category='global', set_number=1)
+    archive_format = default_ds.archive_format or ""
 
     # Scanning is agnostic of downstream sampling rate — files that don't meet
     # the target rate are filtered at preprocessing time, not here. Using 0.0
@@ -588,9 +588,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
         from .core.stations import get_default_data_source
         default_ds = get_default_data_source(db)
         ds_uri = default_ds.uri or ""
-        data_folder = os.path.realpath(ds_uri) if ds_uri else os.path.realpath(
-            api.get_config(db, 'data_folder', category='global', set_number=1)
-        )
+        data_folder = os.path.realpath(ds_uri) if ds_uri else os.getcwd()
         ds_structure = default_ds.data_structure or "SDS"
 
         # Set module-level globals so worker processes (forked) inherit them
