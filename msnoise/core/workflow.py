@@ -507,9 +507,30 @@ def propagate_downstream(session, batch: dict) -> int:
         return n_cc
 
     if category == "stack":
-        # Creates day="REF" sentinel jobs per pair
-        from ..s02_new_jobs import propagate_refstack_jobs_from_stack_done
-        return propagate_refstack_jobs_from_stack_done(session)
+        # Two things happen when stack completes:
+        #
+        # 1. Create a day="REF" sentinel per pair so refstack can check
+        #    whether the reference window needs recomputing.
+        #
+        # 2. ALSO directly create mwcs/stretching/wavelet T jobs for the
+        #    new (pair, day) tuples in this batch.  These jobs can run
+        #    immediately if the reference is already up-to-date (the
+        #    common daily-operations case where new days fall outside the
+        #    fixed ref_begin..ref_end window).
+        #
+        # Refstack will check whether any Done stack days fall inside
+        # ref_begin..ref_end.  If none do, it marks the REF job Done
+        # without recomputing — the mwcs jobs created here are already
+        # waiting.  If the window IS affected, refstack recomputes the
+        # reference and propagate_downstream fires again from refstack,
+        # bumping existing mwcs T jobs (idempotent) or creating new ones.
+        from ..s02_new_jobs import (propagate_refstack_jobs_from_stack_done,
+                                     propagate_mwcs_jobs_from_refstack_done)
+        total  = propagate_refstack_jobs_from_stack_done(session)
+        # Direct propagation for the new days — bypasses the refstack gate
+        # when the reference is already up-to-date.
+        total += propagate_mwcs_jobs_from_refstack_done(session)
+        return total
 
     if category == "refstack":
         # Looks up MOV stack days and creates per-(pair,day) mwcs/str/wct jobs
