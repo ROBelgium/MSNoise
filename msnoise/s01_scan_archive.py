@@ -88,6 +88,11 @@ from . import data_structures
 # that are called before main() has a chance to configure a logger.
 logger = api.get_logger('msnoise.scan_archive', loglevel="INFO")
 
+# Module-level DataSource context — set by main() before spawning workers.
+# Workers inherit these via fork so no serialisation needed.
+_data_source_root = ""   # DataSource.uri (absolute path); used to make DA paths relative
+_data_source_id   = None # DataSource.ref; stored on DA rows
+
 
 def update_availability(db, folder, basename, data):
     """
@@ -121,14 +126,20 @@ def update_availability(db, folder, basename, data):
         loc = "--"
     sta = trace.stats.station.upper()
     chan = trace.stats.channel.upper()
-    path = folder.replace('\\', '/')
+    abs_path = folder.replace('\\', '/')
+    # Store path relative to DataSource.uri so archives are portable
+    if _data_source_root and abs_path.startswith(_data_source_root):
+        path = abs_path[len(_data_source_root):].lstrip('/')
+    else:
+        path = abs_path  # fallback: store as-is (forced_path or unmapped root)
     starttime = starttime.datetime.replace(microsecond=0)
     endtime = endtime.datetime.replace(microsecond=0)
 
     return api.update_data_availability(db, net, sta, loc, chan, path, basename,
                                         starttime, endtime, data_duration,
                                         gaps_duration,
-                                        data[0].stats.sampling_rate)
+                                        data[0].stats.sampling_rate,
+                                        data_source_id=_data_source_id)
 
 
 def process_stream(db, folder, basename, stream, id_, startdate, enddate,
@@ -573,20 +584,30 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
                    - datetime.datetime(1970, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)).total_seconds()
     stations = []
     if forced_path is None:
-        data_folder = os.path.realpath(api.get_config(db, 'data_folder', category='global', set_number=1))
-        logger.debug('Will search for files in folder: %s' % data_folder)
-        logger.debug('Will search for channels: %s' % (
-            api.get_config(db, 'channels', category='global', set_number=1).split(',')
-        ))
+        # Look up the default DataSource (id=1) for URI and data_structure
+        from .core.stations import get_default_data_source
+        default_ds = get_default_data_source(db)
+        ds_uri = default_ds.uri or ""
+        data_folder = os.path.realpath(ds_uri) if ds_uri else os.path.realpath(
+            api.get_config(db, 'data_folder', category='global', set_number=1)
+        )
+        ds_structure = default_ds.data_structure or "SDS"
+
+        # Set module-level globals so worker processes (forked) inherit them
+        global _data_source_root, _data_source_id
+        _data_source_root = data_folder
+        _data_source_id   = default_ds.ref
+
+        logger.debug('Will search for files in folder: %s (DataSource %r id=%s)'
+                     % (data_folder, default_ds.name, default_ds.ref))
         channels = api.get_config(db, 'channels', category='global', set_number=1).split(',')
         logger.debug('Will search for channels: %s' % channels)
         stations = api.get_stations(db, all=False)
-        rawpath = get_data_structure(api.get_config(db, 'data_structure', category='global', set_number=1))
+        rawpath = get_data_structure(ds_structure)
         if rawpath is None:
             raise FatalError("Cannot read configured data_structure '%s'"
                              "anywhere (tried file custom.py in folder '%s')."
-                             % (api.get_config(db, 'data_structure', category='global', set_number=1),
-                                os.getcwd()))
+                             % (ds_structure, os.getcwd()))
 
         if not os.path.isdir(data_folder):
             raise FatalError("Cannot find directory '{}'. Aborting."

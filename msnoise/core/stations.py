@@ -215,7 +215,7 @@ def get_interstation_distance(station1, station2, coordinates="DEG"):
 
 def update_data_availability(session, net, sta, loc, chan, path, file, starttime,
                              endtime, data_duration, gaps_duration,
-                             samplerate):
+                             samplerate, data_source_id=None):
     """
     Updates a DataAvailability object in the database
 
@@ -229,7 +229,8 @@ def update_data_availability(session, net, sta, loc, chan, path, file, starttime
     :type chan: str
     :param chan: The component (channel)
     :type path: str
-    :param path: The full path to the folder containing the file
+    :param path: Path to the folder containing the file, **relative** to
+        ``DataSource.uri``.
     :type file: str
     :param file: The name of the file
     :type starttime: datetime.datetime
@@ -242,6 +243,8 @@ def update_data_availability(session, net, sta, loc, chan, path, file, starttime
     :param gaps_duration: Cumulative duration of gaps in the file
     :type samplerate: float
     :param samplerate: Sample rate of the data in the file (in Hz)
+    :type data_source_id: int or None
+    :param data_source_id: FK to DataSource. ``None`` → project default.
     """
 
     data = session.query(DataAvailability).\
@@ -254,7 +257,8 @@ def update_data_availability(session, net, sta, loc, chan, path, file, starttime
     if data is None:
         flag = "N"
         data = DataAvailability(net, sta, loc, chan, path, file, starttime, endtime,
-                                data_duration, gaps_duration, samplerate, flag)
+                                data_duration, gaps_duration, samplerate, flag,
+                                data_source_id=data_source_id)
         session.add(data)
         toreturn = 1
     else:
@@ -276,6 +280,8 @@ def update_data_availability(session, net, sta, loc, chan, path, file, starttime
             data.gaps_duration = gaps_duration
             data.samplerate = samplerate
             data.flag = "M"
+            if data_source_id is not None:
+                data.data_source_id = data_source_id
             toreturn = -1
         else:
             toreturn = 0
