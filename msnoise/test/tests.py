@@ -554,7 +554,7 @@ def test_016_lineage_normalisation():
     n_lin  = db.query(Lineage).count()
     n_jobs = db.query(JobTable).filter(JobTable.lineage_id.isnot(None)).count()
     assert n_lin < n_jobs,         f"Expected fewer Lineage rows ({n_lin}) than jobs ({n_jobs})"
-    print(f"  {n_lin} unique lineage strings → {n_jobs} jobs")
+    print(f"  {n_lin} unique lineage strings --> {n_jobs} jobs")
     db.close()
 
 

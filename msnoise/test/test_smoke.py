@@ -670,7 +670,7 @@ def test_smoke_18_lineage_normalisation(smoke_db):
     n_jobs = db.query(_s18.Job).count()
     assert n_lin >= 1
     assert n_lin < n_jobs, f"Expected Lineage ({n_lin}) < Jobs ({n_jobs})"
-    print(f"  Lineage rows: {n_lin}, Job rows: {n_jobs} ✓")
+    print(f"  Lineage rows: {n_lin}, Job rows: {n_jobs} [x]")
 
 
 @pytest.mark.order(19)
@@ -785,7 +785,7 @@ def test_smoke_24_no_lineage_dupes_after_day3(smoke_db):
     n_lin  = db.query(_s24.Lineage).count()
     n_jobs = db.query(_s24.Job).count()
     assert n_lin < n_jobs
-    print(f"  Lineage rows: {n_lin}, Job rows: {n_jobs} ✓")
+    print(f"  Lineage rows: {n_lin}, Job rows: {n_jobs} [x]")
 
 
 @pytest.mark.order(25)
