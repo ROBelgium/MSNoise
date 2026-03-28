@@ -953,13 +953,19 @@ def create_station_pairs(stations):
     """
     Create station pairs for cross-station correlation.
 
+    Station pairs are always sorted alphabetically (sta1 < sta2) to ensure
+    consistent pair naming regardless of processing order — this is MSNoise's
+    convention throughout the codebase.
+
     :param stations: List of station identifiers (NET.STA.LOC format)
     :return: List of station pairs
     """
     pairs = []
-    for i in range(len(stations)):
-        for j in range(i + 1, len(stations)):
-            pair = f"{stations[i]}:{stations[j]}"
+    sorted_stations = sorted(stations)
+    for i in range(len(sorted_stations)):
+        for j in range(i + 1, len(sorted_stations)):
+            sta1, sta2 = sorted_stations[i], sorted_stations[j]
+            pair = f"{sta1}:{sta2}"
             pairs.append(pair)
     return pairs
 

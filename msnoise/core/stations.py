@@ -565,12 +565,14 @@ def import_stationxml(session, path_or_url, data_source_id=None):
     """Import stations from a StationXML file or URL.
 
     Parses the inventory with ObsPy and creates or updates
-    :class:`~msnoise.msnoise_table_def.Station` rows. Sets
-    ``data_source_id`` on each imported station.
+    :class:`~msnoise.msnoise_table_def.Station` rows.  Also populates
+    ``used_location_codes`` and ``used_channel_names`` from the channel-level
+    inventory (requires ``level=channel`` in FDSN queries).  Empty location
+    codes are stored as ``"--"`` (MSNoise convention).
 
     :param session: SQLAlchemy session.
     :param path_or_url: Path to a local StationXML file, or a URL
-        (e.g. an FDSN station web service query URL).
+        (e.g. an FDSN station web service query URL with ``level=channel``).
     :param data_source_id: DataSource to assign to imported stations.
         ``None`` → project default (``DataSource.ref=1``).
     :returns: Tuple ``(created, updated)`` counts.
@@ -588,6 +590,14 @@ def import_stationxml(session, path_or_url, data_source_id=None):
             X = station.longitude
             Y = station.latitude
             alt = station.elevation
+
+            # Collect unique location codes and channel names from channel list.
+            # Empty location code → "--" (MSNoise convention).
+            locs  = sorted({ch.location_code or "--" for ch in station.channels})
+            chans = sorted({ch.code for ch in station.channels})
+            loc_str  = ",".join(locs)  if locs  else None
+            chan_str = ",".join(chans) if chans else None
+
             existing = get_station(session, net, sta)
             if existing is None:
                 new_sta = Station(
@@ -597,9 +607,17 @@ def import_stationxml(session, path_or_url, data_source_id=None):
                     used=True,
                     data_source_id=data_source_id,
                 )
+                if loc_str is not None:
+                    new_sta.used_location_codes = loc_str
+                if chan_str is not None:
+                    new_sta.used_channel_names = chan_str
                 session.add(new_sta)
                 created += 1
-                logger.debug(f"  Created station {net}.{sta}")
+                logger.debug(
+                    f"  Created station {net}.{sta}"
+                    + (f" locs={loc_str}" if loc_str else "")
+                    + (f" chans={chan_str}" if chan_str else "")
+                )
             else:
                 existing.X = X
                 existing.Y = Y
@@ -607,8 +625,16 @@ def import_stationxml(session, path_or_url, data_source_id=None):
                 existing.coordinates = "DEG"
                 if data_source_id is not None:
                     existing.data_source_id = data_source_id
+                if loc_str is not None:
+                    existing.used_location_codes = loc_str
+                if chan_str is not None:
+                    existing.used_channel_names = chan_str
                 updated += 1
-                logger.debug(f"  Updated station {net}.{sta}")
+                logger.debug(
+                    f"  Updated station {net}.{sta}"
+                    + (f" locs={loc_str}" if loc_str else "")
+                    + (f" chans={chan_str}" if chan_str else "")
+                )
     session.commit()
     logger.info(f"StationXML import done: {created} created, {updated} updated")
     return created, updated
