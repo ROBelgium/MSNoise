@@ -86,7 +86,7 @@ def _log_test_name(request):
 @pytest.fixture(autouse=True)
 def _print_test_name(request):
     """Print the running test name to stdout (visible with pytest -s)."""
-    print(f"\n{'─'*60}\n▶ {request.node.name}\n{'─'*60}", flush=True)
+    print(f"\n{'-'*60}\n> {request.node.name}\n{'-'*60}", flush=True)
     yield
 
 

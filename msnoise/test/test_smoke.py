@@ -45,7 +45,7 @@ import xarray as xr
 
 @pytest.fixture(autouse=True)
 def _print_test_name(request):
-    print(f"\n{'─'*60}\n▶ {request.node.name}\n{'─'*60}", flush=True)
+    print(f"\n{'-'*60}\n> {request.node.name}\n{'-'*60}", flush=True)
     yield
 
 
