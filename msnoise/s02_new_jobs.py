@@ -975,14 +975,13 @@ def main(init=False, nocc=False, after=False):
 
         params = get_params(db)
         if not params.hpc:
-            logger.warning(
-                f"new_jobs --after {source_category} called but hpc=False. "
-                "In default (non-HPC) mode, propagation is handled automatically "
-                "by worker scripts via propagate_downstream(). "
-                "This --after call is a no-op. Set hpc=Y to enable manual propagation."
+            logger.debug(
+                f"new_jobs --after {source_category}: hpc=False, propagation is "
+                "normally handled inline by worker scripts via propagate_downstream(). "
+                "Running anyway for compatibility (e.g. manual re-runs, tests)."
             )
-            db.close()
-            return
+            # Fall through — run the propagation. In hpc=False mode this is
+            # a reconciliation pass; inline workers already handle the hot path.
 
         # Optional validation: ensure it's a known config-set type/category
         allowed_categories = {
