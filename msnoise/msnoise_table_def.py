@@ -674,17 +674,21 @@ def _deduplicate_lineage_rows(session, flush_context, instances):
     fires, avoiding a UNIQUE constraint violation.
     """
     new_lineages = [obj for obj in session.new if isinstance(obj, Lineage)]
-    for pending in new_lineages:
-        existing = (
-            session.query(Lineage)
-            .filter(Lineage.lineage_str == pending.lineage_str)
-            .first()
-        )
-        if existing is not None and existing is not pending:
-            for job in list(pending.jobs):
-                job.lineage_ref = existing
-                job.lineage_id  = existing.lineage_id
-            session.expunge(pending)
+    if not new_lineages:
+        return
+    # Use no_autoflush to prevent re-entrant flush while querying
+    with session.no_autoflush:
+        for pending in new_lineages:
+            existing = (
+                session.query(Lineage)
+                .filter(Lineage.lineage_str == pending.lineage_str)
+                .first()
+            )
+            if existing is not None and existing is not pending:
+                for job in list(pending.jobs):
+                    job.lineage_ref = existing
+                    job.lineage_id  = existing.lineage_id
+                session.expunge(pending)
 
 
 

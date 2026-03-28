@@ -942,9 +942,11 @@ def get_done_lineages_for_category(session, category):
     :rtype: list[list[str]]
     :returns: Sorted list of unique lineage-name lists.
     """
+    from sqlalchemy.orm import aliased
+    Lin = aliased(Lineage)
     rows = (
-        session.query(Lineage.lineage_str)
-        .join(Job, Job.lineage_id == Lineage.lineage_id)
+        session.query(Lin.lineage_str)
+        .join(Job, Job.lineage_id == Lin.lineage_id)
         .join(Job.workflow_step)
         .filter(WorkflowStep.category == category)
         .filter(Job.flag == "D")

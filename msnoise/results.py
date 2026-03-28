@@ -171,18 +171,26 @@ class MSNoiseResult:
             or _category_present(_METHOD_CATEGORIES[name], self._present_categories)
         ]
 
-    def __getattr__(self, name: str):
+    def __getattribute__(self, name: str):
+        """Gate registered methods whose required category is absent from the lineage.
+
+        Must use __getattribute__ (not __getattr__) because the get_* methods
+        ARE defined on the class — __getattr__ is only the fallback for missing
+        attributes and would never be called for them.
+        """
         if name in _METHOD_CATEGORIES:
+            present = object.__getattribute__(self, "_present_categories")
             required = _METHOD_CATEGORIES[name]
-            req_str = (" or ".join(sorted(required))
-                       if isinstance(required, frozenset) else repr(required))
-            present_str = (", ".join(sorted(self._present_categories)) or "(none)")
-            raise AttributeError(
-                f"{name!r} requires {req_str} in the lineage, "
-                f"but this result only covers: {present_str}. "
-                f"Use .branches() to navigate to a downstream step."
-            )
-        raise AttributeError(f"{type(self).__name__!r} has no attribute {name!r}")
+            if not _category_present(required, present):
+                req_str = (" or ".join(sorted(required))
+                           if isinstance(required, frozenset) else repr(required))
+                present_str = ", ".join(sorted(present)) or "(none)"
+                raise AttributeError(
+                    f"{name!r} requires {req_str} in the lineage, "
+                    f"but this result only covers: {present_str}. "
+                    f"Use .branches() to navigate to a downstream step."
+                )
+        return object.__getattribute__(self, name)
 
     # ── navigation ────────────────────────────────────────────────────────────
 
@@ -220,12 +228,14 @@ class MSNoiseResult:
             child_names = self.lineage_names + [child_step.step_name]
             if not include_empty:
                 from .msnoise_table_def import Lineage as _Lineage
+                from sqlalchemy.orm import aliased as _aliased
+                _lin_alias = _aliased(_Lineage)
                 _lin_str = "/".join(child_names)
                 has_done = (
                     self._db.query(Job.ref)
                     .filter(Job.step_id == child_step.step_id)
-                    .join(Job.lineage_ref)
-                    .filter(_Lineage.lineage_str == _lin_str)
+                    .join(_lin_alias, Job.lineage_id == _lin_alias.lineage_id)
+                    .filter(_lin_alias.lineage_str == _lin_str)
                     .filter(Job.flag == "D")
                     .first()
                 )
