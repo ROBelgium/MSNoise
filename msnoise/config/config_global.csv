@@ -1,7 +1,5 @@
 name,default,definition,type,possible_values
 response_path,inventory,"Instrument correction file(s) location (path relative to db.ini), defaults to './inventory', i.e. a subfolder in the current project folder. All files in that folder will be parsed.",str,
-network,*,Network to analyse,str,
-channels,*,"Channels need to match the value (ex: [&ast;], &ast;Z, BH&ast;, HHZ,...)",str,
 startdate,1970-01-01,Start Date to process: [1970-01-01]='since beginning of the archive',str,
 enddate,2100-01-01,End Date to process: [2100-01-01]='No end',str,
 crondays,1,"Number of days to monitor with scan_archive, typically used in cron (should be a float representing a number of days, or a string designating weeks, days, and/or hours using the format 'Xw Xd Xh')",str,

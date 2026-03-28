@@ -473,7 +473,7 @@ def update_data_source(session, id, **kwargs):
     ds = get_data_source(session, id=id)
     if ds is None:
         raise ValueError(f"DataSource with id={id} not found")
-    allowed = {"name", "uri", "data_structure", "auth_env", "archive_format"}
+    allowed = {"name", "uri", "data_structure", "auth_env", "archive_format", "network_code", "channels"}
     for key, val in kwargs.items():
         if key not in allowed:
             raise ValueError(f"Unknown DataSource field: {key!r}")

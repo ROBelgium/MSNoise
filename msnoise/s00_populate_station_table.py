@@ -97,7 +97,7 @@ def main(loglevel="INFO"):
     _ds = get_default_data_source(db)
     data_folder = _ds.uri or ""
     data_structure = _ds.data_structure or "SDS"
-    network_override = get_config(db, 'network', category="global", set_number=1)
+    network_override = _ds.network_code or "*"
 
     if data_structure in ["SDS", "IDDS"]:
         datalist = sorted(glob.glob(os.path.join(data_folder, "*", "*", "*")))

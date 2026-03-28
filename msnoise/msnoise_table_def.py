@@ -491,18 +491,25 @@ def declare_tables(prefix=None):
         auth_env = Column(String(64), nullable=False, default="MSNOISE")
         archive_format = Column(String(32), nullable=True, default=None)
         # Force ObsPy read format for local/SDS sources (None = auto-detect)
+        network_code = Column(String(20), nullable=False, default="*")
+        # Network override for PDF/custom structures ("*" = any)
+        channels = Column(String(200), nullable=False, default="*")
+        # Comma-separated channel filter for scan_archive ("*" = all)
 
         __table_args__ = (
             Index('idx_datasource_name', 'name'),
         )
 
         def __init__(self, name=None, uri="", data_structure="SDS",
-                     auth_env="MSNOISE", archive_format=None, **kwargs):
+                     auth_env="MSNOISE", archive_format=None,
+                     network_code="*", channels="*", **kwargs):
             self.name = name
             self.uri = uri
             self.data_structure = data_structure
             self.auth_env = auth_env
             self.archive_format = archive_format
+            self.network_code = network_code
+            self.channels = channels
             for key, val in kwargs.items():
                 setattr(self, key, val)
 

@@ -598,7 +598,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
 
         logger.debug('Will search for files in folder: %s (DataSource %r id=%s)'
                      % (data_folder, default_ds.name, default_ds.ref))
-        channels = api.get_config(db, 'channels', category='global', set_number=1).split(',')
+        channels = [c.strip() for c in (default_ds.channels or "*").split(',')]
         logger.debug('Will search for channels: %s' % channels)
         stations = api.get_stations(db, all=False)
         rawpath = get_data_structure(ds_structure)

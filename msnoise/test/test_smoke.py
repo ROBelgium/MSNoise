@@ -78,12 +78,12 @@ def smoke_db(tmp_path_factory):
     root = str(tmp / "OUTPUT")
     # Create the default DataSource row (normally done by the installer)
     default_ds = DataSource(name="local", uri=str(tmp / "data"),
-                            data_structure="SDS", auth_env="MSNOISE")
+                            data_structure="SDS", auth_env="MSNOISE",
+                            network_code="YA", channels="HHZ")
     db.add(default_ds)
     db.commit()
     update_config(db, "output_folder",  root)
     update_config(db, "sampling_rate",  "1")
-    update_config(db, "channels",       "HHZ")
     update_config(db, "startdate",      "2010-09-01")
     update_config(db, "enddate",        "2010-09-02")
     update_config(db, "maxlag",            "2",  category="cc",      set_number=1)

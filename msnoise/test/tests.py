@@ -262,13 +262,16 @@ def test_003_set_and_config(setup_environment):
     data_folder = setup_environment['data_folder']
     response_path = setup_environment['response_path']
     totests = [
-        ['network', 'YA'],
         ['response_path', response_path]
     ]
     for key, value in totests:
         update_config(db, name=key, value=value, category='global', set_number=1)
         config_value = get_config(db, name=key, category='global', set_number=1)
         assert config_value == value, f"Configuration parameter {key} did not set correctly."
+    # Set network code and channels on the default DataSource
+    from ..core.stations import update_data_source
+    update_data_source(db, id=1, uri=os.path.realpath(data_folder),
+                       data_structure='PDF', network_code='YA', channels='HHZ')
 
     # Set the default DataSource URI and data_structure (v2 path)
     from ..core.stations import update_data_source
