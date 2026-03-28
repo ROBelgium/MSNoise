@@ -540,16 +540,26 @@ def massive_insert_job(session, jobs):
     :type jobs: list[dict]
     :param jobs: Job records to insert.
     """
+    # Resolve lineage strings to IDs before bulk insert
+    # (bulk_insert_mappings bypasses ORM events so we must do this explicitly)
+    _lin_cache: dict = {}
+    def _resolve(lin_str):
+        if lin_str is None:
+            return None
+        if lin_str not in _lin_cache:
+            _lin_cache[lin_str] = _get_or_create_lineage_id(session, lin_str)
+        return _lin_cache[lin_str]
+
     job_records = [
         {
-            'day':      j['day'],
-            'pair':     j['pair'],
-            'jobtype':  j['jobtype'],
-            'step_id':  j.get('step_id'),
-            'priority': j.get('priority', 0),
-            'flag':     j['flag'],
-            'lastmod':  j['lastmod'],
-            'lineage':  j.get('lineage'),
+            'day':        j['day'],
+            'pair':       j['pair'],
+            'jobtype':    j['jobtype'],
+            'step_id':    j.get('step_id'),
+            'priority':   j.get('priority', 0),
+            'flag':       j['flag'],
+            'lastmod':    j['lastmod'],
+            'lineage_id': _resolve(j.get('lineage')),
         }
         for j in jobs
     ]

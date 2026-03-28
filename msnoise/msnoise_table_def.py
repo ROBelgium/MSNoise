@@ -364,6 +364,34 @@ def declare_tables(prefix=None):
             """The lineage string, resolved through the Lineage FK."""
             return self.lineage_ref.lineage_str if self.lineage_ref else None
 
+        @lineage.setter
+        def lineage(self, value):
+            """Set lineage by string.
+
+            If the object is already attached to a session, resolves
+            immediately via ``_get_or_create_lineage_id``.  Otherwise
+            stores the string in ``_pending_lineage_str`` for resolution
+            by the ``before_insert`` event registered at module level.
+            """
+            if value is None:
+                self.lineage_id = None
+                self.lineage_ref = None
+                self._pending_lineage_str = None
+                return
+            from sqlalchemy.orm import object_session
+            session = object_session(self)
+            if session is not None:
+                from msnoise.core.workflow import _get_or_create_lineage_id
+                with session.no_autoflush:
+                    lid = _get_or_create_lineage_id(session, value)
+                if lid is not None:
+                    self.lineage_id = lid
+                else:
+                    self._pending_lineage_str = value
+            else:
+                # Not yet in a session — defer resolution to before_insert
+                self._pending_lineage_str = value
+
 
         __table_args__ = (
             # Updated unique constraint to include workflow context
@@ -655,6 +683,55 @@ def declare_tables(prefix=None):
     # end of declare_tables()
 
 Base, PrefixerBase, Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink, Lineage = declare_tables()
+
+
+from sqlalchemy import event as _sa_event
+
+
+@_sa_event.listens_for(Job, "before_insert", propagate=True)
+def _resolve_pending_lineage(mapper, connection, target):
+    """Resolve _pending_lineage_str to lineage_id just before INSERT.
+
+    Uses raw SQL via *connection* (not the ORM session) to avoid
+    re-entering the flush cycle.
+    """
+    pending = getattr(target, "_pending_lineage_str", None)
+    if not pending:
+        return
+
+    from sqlalchemy import text as _text
+
+    # Determine the lineages table name (handles prefix)
+    lin_table = mapper.persist_selectable.metadata.tables.get("lineages")
+    if lin_table is None:
+        # Try to find a prefixed variant
+        for tname, t in mapper.persist_selectable.metadata.tables.items():
+            if tname.endswith("lineages"):
+                lin_table = t
+                break
+    if lin_table is None:
+        return
+
+    tname = lin_table.name
+
+    # Try SELECT first
+    row = connection.execute(
+        _text(f"SELECT lineage_id FROM {tname} WHERE lineage_str = :s"),
+        {"s": pending}
+    ).fetchone()
+
+    if row is not None:
+        target.lineage_id = row[0]
+    else:
+        # INSERT and get the generated ID
+        result = connection.execute(
+            _text(f"INSERT INTO {tname} (lineage_str) VALUES (:s)"),
+            {"s": pending}
+        )
+        target.lineage_id = result.lastrowid
+
+    target._pending_lineage_str = None
+
 
 
 
