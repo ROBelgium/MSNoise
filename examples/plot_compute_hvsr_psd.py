@@ -17,7 +17,7 @@ import pandas as pd
 
 plt.style.use("ggplot")
 
-from msnoise.api import connect
+from msnoise.core.db import connect
 from msnoise.results import MSNoiseResult
 
 
@@ -25,9 +25,7 @@ from msnoise.results import MSNoiseResult
 db = connect()
 
 # Build a result object at the psd step
-result = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
-params = result.params
-
+result = MSNoiseResult.from_ids(db, preprocess=1, psd=1)
 
 def convert_to_velocity(df):
     df = df.resample("30Min").mean()

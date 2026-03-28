@@ -22,7 +22,7 @@ import pandas as pd
 
 plt.style.use("ggplot")
 
-from msnoise.api import connect
+from msnoise.core.db import connect
 from msnoise.results import MSNoiseResult
 
 
