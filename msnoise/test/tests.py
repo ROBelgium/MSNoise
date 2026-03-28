@@ -4,6 +4,7 @@ import logging
 import os
 import shutil
 import traceback
+import logging as _logging
 from click.testing import CliRunner
 from obspy import read
 import tempfile
@@ -69,6 +70,46 @@ global logger
 logger = logging.getLogger('matplotlib')
 # set WARNING for Matplotlib
 logger.setLevel(logging.CRITICAL)
+
+
+_test_logger = _logging.getLogger("msnoise.test")
+
+
+@pytest.fixture(autouse=True)
+def _log_test_name(request):
+    """Log the current test name at INFO so it appears in msnoise log output."""
+    _test_logger.info(f">>> TEST START: {request.node.name}")
+    yield
+    _test_logger.info(f"<<< TEST END:   {request.node.name}")
+
+
+def _assert_jobs_todo(db, step_name: str, min_count: int = 1, msg: str = ""):
+    """Assert at least *min_count* Todo jobs exist for *step_name*."""
+    from ..msnoise_table_def import WorkflowStep, Job as _Job
+    step = db.query(WorkflowStep).filter(
+        WorkflowStep.step_name == step_name).first()
+    if step is None:
+        pytest.fail(f"Step {step_name!r} not found in workflow")
+    n = (db.query(_Job).filter(_Job.step_id == step.step_id)
+         .filter(_Job.flag == "T").count())
+    assert n >= min_count, (
+        f"{msg or step_name}: expected >= {min_count} Todo jobs, got {n}")
+    return n
+
+
+def _assert_jobs_done(db, step_name: str, min_count: int = 1, msg: str = ""):
+    """Assert at least *min_count* Done jobs exist for *step_name*."""
+    from ..msnoise_table_def import WorkflowStep, Job as _Job
+    step = db.query(WorkflowStep).filter(
+        WorkflowStep.step_name == step_name).first()
+    if step is None:
+        pytest.fail(f"Step {step_name!r} not found in workflow")
+    n = (db.query(_Job).filter(_Job.step_id == step.step_id)
+         .filter(_Job.flag == "D").count())
+    assert n >= min_count, (
+        f"{msg or step_name}: expected >= {min_count} Done jobs, got {n}")
+    return n
+
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_environment():
@@ -346,11 +387,17 @@ def test_012_reset_jobs():
 
 @pytest.mark.order(16)
 def test_013_s03compute_cc():
+    db = connect()
+    _assert_jobs_todo(db, 'cc_1', msg='CC jobs must be Todo before compute_cc')
+    db.close()
     try:
         compute_cc_main()
     except:
         traceback.print_exc()
         pytest.fail()
+    db = connect()
+    _assert_jobs_done(db, 'cc_1', msg='CC jobs must be Done after compute_cc')
+    db.close()
 
 @pytest.mark.order(17)
 def test_014_check_done_jobs():

@@ -468,7 +468,7 @@ class MSNoiseResult:
         """Load DVV aggregate results. Requires a DVV step in lineage."""
         from .core.io import xr_get_dvv_agg
         dvv_cat   = self.category
-        lineage   = self._lineage_through(dvv_cat)
+        lineage   = self._lineage_upstream_of(dvv_cat)  # upstream, excl. dvv step
         step_name = self._step_name_for(dvv_cat)
         root      = self.output_folder
         fmt       = "dataset" if format == "xarray" else "dataframe"
