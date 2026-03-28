@@ -1,27 +1,22 @@
-"""MSNoise public API — compatibility shim.
+"""MSNoise API compatibility module.
 
-.. deprecated::
-    This module is retained for third-party code written against earlier
-    MSNoise versions.  New code should import from ``msnoise.core``::
+The only symbol most code needs is ``connect`` — the universal entry point::
 
-        from msnoise.core.db      import connect, get_logger
-        from msnoise.core.config  import get_config, get_params, build_plot_outfile
-        from msnoise.core.stations import get_stations, get_station_pairs
-        from msnoise.core.workflow import get_next_lineage_batch, reset_jobs
-        from msnoise.core.signal  import stack, winsorizing, xwt
-        from msnoise.core.io      import xr_save_ccf, xr_get_ccf, aggregate_dvv_pairs
+    from msnoise.api import connect
+    # or equivalently:
+    from msnoise import connect
+    # or directly:
+    from msnoise.core.db import connect
 
-Internal MSNoise code imports directly from ``msnoise.core.*``.
+All other symbols are re-exported here for backward compatibility with code
+written against earlier MSNoise versions.  New code should import directly
+from the appropriate ``msnoise.core.*`` submodule.
 """
-import warnings as _warnings
 
-_warnings.warn(
-    "Importing from msnoise.api is deprecated. "
-    "Import directly from msnoise.core.db / .config / .stations / .workflow / .signal / .io",
-    DeprecationWarning,
-    stacklevel=2,
-)
+# The one symbol worth importing from here
+from .core.db import connect  # noqa: F401
 
+# Full backward-compat re-export (no deprecation — just convenience)
 from .core import *  # noqa: F401,F403
 
 from .msnoise_table_def import (  # noqa: F401
