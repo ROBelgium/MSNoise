@@ -1,0 +1,82 @@
+name: Smoke test suite
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 0 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  smoke_tests:
+    runs-on: ${{ matrix.os }}
+    if: |
+      !contains(github.event.head_commit.message, '+ONLYDOCS') &&
+      !contains(github.event.head_commit.message, '+NOSMOKE')
+    strategy:
+      matrix:
+        python-version: ['3.13', '3.14']
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            label: linux-64
+            prefix: /usr/share/miniconda3/envs/test
+
+          - os: macos-latest
+            label: osx-64
+            prefix: /Users/runner/miniconda3/envs/test
+
+          - os: windows-latest
+            label: win-64
+            prefix: C:\Miniconda3\envs\test
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - uses: conda-incubator/setup-miniconda@v3.3.0
+        with:
+          activate-environment: test${{ matrix.python-version }}
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/cache@v5
+        with:
+          path: ${{ matrix.prefix }}${{ matrix.python-version }}
+          key: ${{ matrix.label }}-conda-py${{ matrix.python-version }}-${{ hashFiles('.github/environment.yml') }}-${{ steps.date.outputs.date }}-${{ env.CACHE_NUMBER }}
+          restore-keys: |
+            ${{ matrix.label }}-conda-py${{ matrix.python-version }}-${{ hashFiles('.github/environment.yml') }}-
+            ${{ matrix.label }}-conda-py${{ matrix.python-version }}-
+        env:
+          CACHE_NUMBER: 1
+        id: cache
+
+      - name: Update environment
+        run: conda env update -n test${{ matrix.python-version }} -f .github/environment.yml
+        if: steps.cache.outputs.cache-hit != 'true'
+
+      - name: Install MSNoise
+        shell: bash -l {0}
+        run: |
+          pip install -e .
+
+      - name: Smoke test suite
+        shell: bash -l {0}
+        run: |
+          pytest -s --cov msnoise msnoise/test/test_smoke.py --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
