@@ -570,7 +570,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
         # does not work correctly with naive datetime representing UTC.
         # (See the official doc for datetime.timestamp())
         mintime = (datetime.datetime.now(datetime.timezone.utc) - modification_delta
-                   - datetime.datetime(1970, 1, 1, 0, 0)).total_seconds()
+                   - datetime.datetime(1970, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)).total_seconds()
     stations = []
     if forced_path is None:
         data_folder = os.path.realpath(api.get_config(db, 'data_folder', category='global', set_number=1))
