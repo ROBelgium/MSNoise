@@ -1313,9 +1313,9 @@ def cc_stack_refstack(ctx):
 
     Reads ref_begin/ref_end from the refstack configset:
 
-    - Absolute date / 1970-01-01  → Mode A: writes a mean REF file to disk.
+    - Absolute date / 1970-01-01  -> Mode A: writes a mean REF file to disk.
 
-    - Negative integer (e.g. -5)  → Mode B: no file written; rolling reference
+    - Negative integer (e.g. -5)  -> Mode B: no file written; rolling reference
       computed on-the-fly inside the MWCS/stretching/WCT workers.
     """
     from ..s04_stack_refstack import main
@@ -1362,7 +1362,7 @@ mwcsdtt_options = common_options(mwcs_options, mwcsdttid_option)
 
 
 
-# DTT-side lineage options (preprocess → cc → filter → stack → mwcs → mwcs_dtt)
+# DTT-side lineage options (preprocess -> cc -> filter -> stack -> mwcs -> mwcs_dtt)
 mwcsid_option  = click.option('-w', '--mwcsid',  default=1, help='MWCS step set number')
 dttid_option   = click.option('-d', '--dttid',   default=1, help='MWCS-DTT step set number')
 # Full DTT lineage bundle: preprocess / cc / filter / stack / stack_item / mwcs / dtt / comp
@@ -1942,7 +1942,7 @@ def utils_export_params(ctx, lineage, preprocessid, ccid, filterid, stackid,
 
     out_path = output or f"params_{lin_str.replace('/', '_')}.yaml"
     params.to_yaml(out_path)
-    click.echo(f"Exported params for lineage '{lin_str}' → {out_path}")
+    click.echo(f"Exported params for lineage '{lin_str}' -> {out_path}")
     db.close()
 
 
