@@ -399,14 +399,11 @@ def test_010b_preprocess():
 
 @pytest.mark.order(13)
 def test_010c_propagate_preprocess():
-    """new_jobs --after preprocess creates cc_1 T jobs."""
-    try:
-        new_jobs_main(after='preprocess')
-    except:
-        traceback.print_exc()
-        pytest.fail()
+    """Assert cc_1 T jobs exist after preprocess (inline propagation in hpc=False)."""
+    # In hpc=False mode propagate_downstream fires inside the preprocess worker,
+    # so cc T jobs already exist — new_jobs --after is a no-op.  Just assert.
     db = connect()
-    _assert_min_jobs(db, 'cc_1', 'T', 1, 'propagate preprocess→cc must create T jobs')
+    _assert_min_jobs(db, 'cc_1', 'T', 1, 'preprocess worker must have propagated cc T jobs')
     db.close()
 
 
@@ -584,10 +581,10 @@ def test_023a_stack_config():
 
 @pytest.mark.order(21)
 def test_023b_new_jobs_after_cc():
-    """new_jobs --after cc creates stack_1 T jobs."""
-    new_jobs_main(after='cc')
+    """Assert stack_1 T jobs exist after cc (inline propagation in hpc=False)."""
+    # cc worker calls propagate_downstream inline — stack T jobs already exist.
     db = connect()
-    _assert_min_jobs(db, 'stack_1', 'T', 1, 'new_jobs --after cc must create stack T jobs')
+    _assert_min_jobs(db, 'stack_1', 'T', 1, 'cc worker must have propagated stack T jobs')
     db.close()
 
 
@@ -605,10 +602,10 @@ def test_023c_stack_mov():
 
 @pytest.mark.order(21)
 def test_023d_new_jobs_after_stack_and_refstack():
-    """Propagate stack→refstack and run refstack."""
-    new_jobs_main(after='stack')
+    """Assert refstack_1 T jobs exist after stack (inline propagation), then run refstack."""
+    # stack worker calls propagate_downstream inline — refstack T jobs already exist.
     db = connect()
-    _assert_min_jobs(db, 'refstack_1', 'T', 1, 'new_jobs --after stack must create refstack T jobs')
+    _assert_min_jobs(db, 'refstack_1', 'T', 1, 'stack worker must have propagated refstack T jobs')
     db.close()
     stack_refstack_main()
     db = connect()
@@ -667,12 +664,11 @@ def test_024_mwcs_param_update():
 
 @pytest.mark.order(23)
 def test_025_mwcs():
-    # after='refstack' creates mwcs/stretching/wavelet day jobs
-    # (stack jobs trigger refstack jobs; refstack completion triggers dvv jobs)
-    new_jobs_main(after='refstack')
+    # refstack worker calls propagate_downstream inline (dual propagation):
+    # mwcs/stretching/wavelet T jobs were already created by the stack worker.
     db = connect()
     assert is_next_job_for_step(db, step_category='mwcs'), \
-        "No mwcs jobs created after refstack propagation"
+        "No mwcs T jobs found — stack/refstack inline propagation must have failed"
     db.close()
     compute_mwcs_main()
 
@@ -690,7 +686,7 @@ def test_026_mwcs_dtt_param_update():
 
 @pytest.mark.order(27)
 def test_027_dtt():
-    new_jobs_main(after='mwcs')
+    # mwcs worker propagates inline → mwcs_dtt T jobs already exist.
     compute_dtt_main()
 
 # @pytest.mark.order(28)
@@ -732,8 +728,8 @@ def test_032_stretching():
 
 @pytest.mark.order(55)
 def test_041_new_jobs_after_mwcs_dtt():
-    """new_jobs --after mwcs_dtt inserts mwcs_dtt_dvv sentinel jobs."""
-    new_jobs_main(after='mwcs_dtt')
+    """Assert mwcs_dtt_dvv DVV sentinel exists (inline propagation in hpc=False)."""
+    # mwcs_dtt worker propagates inline → DVV sentinel already exists.
     db = connect()
     from ..msnoise_table_def import declare_tables
     schema = declare_tables()
@@ -773,8 +769,8 @@ def test_042_compute_mwcs_dtt_dvv():
 
 @pytest.mark.order(57)
 def test_043_new_jobs_after_stretching():
-    """new_jobs --after stretching inserts stretching_dvv sentinel jobs."""
-    new_jobs_main(after='stretching')
+    """Assert stretching_dvv DVV sentinel exists (inline propagation in hpc=False)."""
+    # stretching worker propagates inline → DVV sentinel already exists.
     db = connect()
     from ..msnoise_table_def import declare_tables
     schema = declare_tables()
@@ -829,9 +825,9 @@ def test_033_create_fake_new_files(setup_environment):
         traceback.print_exc()
         pytest.fail()
 
-    new_jobs_main()
-    preprocess_main()
-    new_jobs_main(after='preprocess')
+    new_jobs_main()       # seeds new preprocess T jobs from DA scan
+    preprocess_main()     # runs preprocess; propagates cc T jobs inline
+    # new_jobs(after='preprocess') not needed — preprocess worker propagated inline
     db = connect()
     jobs = get_job_types(db, 'cc_1')
     counts = {flag: count for count, flag in jobs}
@@ -853,19 +849,22 @@ def test_033b_compute_second_day():
     compute_cc_main()
 
     # ── Stack day 2 ──────────────────────────────────────────────────────────
-    new_jobs_main(after='cc')
+    # cc worker propagated stack T jobs inline — no new_jobs needed
     stack_mov('mov')
 
-    # ── Refstack: reset so it re-integrates both days into the REF ──────────
+    # ── Refstack: MUST reset — both days are now in ref_begin..ref_end window.
+    # The REF sentinel was already marked Done by stack propagation (window
+    # check passed with 1 day). Now that day 2 is stacked we need a full
+    # recompute of the REF stack integrating both days.
     reset_jobs(db, 'refstack_1', alljobs=True)
     db.close()
-    new_jobs_main(after='stack')
+    # stack worker propagated refstack T jobs inline — no new_jobs needed
     stack_refstack_main()
 
     # ── MWCS day 2 ───────────────────────────────────────────────────────────
-    new_jobs_main(after='refstack')
+    # refstack dual-propagation already created mwcs/str/wct T jobs inline
     compute_mwcs_main()
-    new_jobs_main(after='mwcs')
+    # mwcs worker propagated mwcs_dtt T jobs inline
     compute_dtt_main()
 
     # ── Stretching day 2 ─────────────────────────────────────────────────────
@@ -874,7 +873,7 @@ def test_033b_compute_second_day():
 
     # ── WCT day 2 ────────────────────────────────────────────────────────────
     compute_wct_main()
-    new_jobs_main(after='wavelet')
+    # wct worker propagated wct_dtt T jobs inline
     wavelet_dtt_main()
 
     # ── Verify 2 days in MWCS output ─────────────────────────────────────────
@@ -1030,7 +1029,7 @@ def test_038_stack_validation_handling():
 @pytest.mark.order(53)
 def test_040_compute_wavelet_dtt_dvv():
     """Compute WCT dv/v aggregate — wavelet_dtt_dvv step."""
-    new_jobs_main(after='wavelet_dtt')
+    # wct_dtt worker propagated wavelet_dtt_dvv sentinel inline
     try:
         compute_dvv_main(step_category="wavelet_dtt_dvv")
     except Exception:
@@ -1322,8 +1321,8 @@ def test_301_compute_psd():
 
 @pytest.mark.order(302)
 def test_302_compute_rms():
+    # psd worker propagated psd_rms T jobs inline
     try:
-        new_jobs_main(after='psd')
         compute_rms_main()
     except:
         traceback.print_exc()
