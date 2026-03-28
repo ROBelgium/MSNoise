@@ -272,9 +272,10 @@ def test_003_set_and_config(setup_environment):
         config_value = get_config(db, name=key, category='global', set_number=1)
         assert config_value == value, f"Configuration parameter {key} did not set correctly."
 
-    # Set the default DataSource URI to the data folder (v2 path)
+    # Set the default DataSource URI and data_structure (v2 path)
     from ..core.stations import update_data_source
-    update_data_source(db, id=1, uri=os.path.realpath(data_folder))
+    update_data_source(db, id=1, uri=os.path.realpath(data_folder),
+                       data_structure='PDF')
 
     update_config(db, 'components_to_compute', 'ZZ', category='cc', set_number=1)
 
