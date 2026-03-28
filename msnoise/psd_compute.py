@@ -89,7 +89,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         params        = batch["params"]
 
         step_name     = step.step_name
-        output_folder = params.output_folder
+        output_folder = params.global_.output_folder
 
         psd_components = params.psd.psd_components
         ppsd_length    = params.psd.psd_ppsd_length

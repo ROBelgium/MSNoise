@@ -28,7 +28,7 @@ result = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
 params = result.params
 
 # Get the first mov_stack configured:
-mov_stack = params.mov_stack[0]
+mov_stack = params.stack.mov_stack[0]
 
 # Get the CCF for two stations, filter 1, ZZ component, first mov_stack:
 ccf = result.get_ccf(pair="PF.FJS.00:PF.FOR.00", components="ZZ",
@@ -54,7 +54,7 @@ if "SPHINX_DOC_BUILD" in os.environ:
         os.chdir(os.environ["MSNOISE_DOC"])
 
 # Get the last mov_stack configured:
-mov_stack = params.mov_stack[-1]
+mov_stack = params.stack.mov_stack[-1]
 
 ccf = result.get_ccf(pair="PF.FJS.00:PF.FOR.00", components="ZZ",
                      mov_stack=mov_stack, format="xarray")

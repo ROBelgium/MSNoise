@@ -114,7 +114,7 @@ class MSNoiseResult:
         self._db = db
         self.lineage_names: list = list(lineage_names)
         _, _, self.params = resolve_lineage_params(db, lineage_names)
-        self.output_folder: str = self.params.output_folder
+        self.output_folder: str = self.params.global_.output_folder
         self.category: str = _step_prefix(lineage_names[-1]) if lineage_names else ""
         self._present_categories: frozenset = frozenset(
             _step_prefix(n) for n in lineage_names

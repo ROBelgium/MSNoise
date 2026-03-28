@@ -38,7 +38,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
     :param ccid: Cross-correlation step set number.
     :param filterid: Filter step set number.
     :param stackid: Stack step set number.
-    :param stackid_item: 1-based index into ``params.mov_stack``.
+    :param stackid_item: 1-based index into ``params.stack.mov_stack``.
     :param mwcsid: MWCS step set number.
     :param mwcsdttid: MWCS-DTT step set number (used for DTT lag window params).
     :param components: Component pair string (e.g. ``'ZZ'``).
@@ -62,7 +62,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
                                     refstack=refstackid, mwcs=mwcsid)
     params = result.params
 
-    mov_stack = params.mov_stack[stackid_item-1]
+    mov_stack = params.stack.mov_stack[stackid_item-1]
 
     if sta2 < sta1:
         logger.error("Stations STA1 STA2 should be sorted alphabetically")

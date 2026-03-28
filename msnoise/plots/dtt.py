@@ -37,7 +37,7 @@ def main(sta1, sta2, filterid=1, components="ZZ", day=None,
     :param preprocessid: Preprocessing step set number.
     :param ccid: CC step set number.
     :param stackid: Stack step set number.
-    :param stackid_item: 1-based index into ``params.mov_stack``.
+    :param stackid_item: 1-based index into ``params.stack.mov_stack``.
     :param mwcsid: MWCS step set number.
     :param mwcsdttid: MWCS-DTT step set number.
     :param show: Display interactively.
@@ -59,7 +59,7 @@ def main(sta1, sta2, filterid=1, components="ZZ", day=None,
                                          filter=filterid, stack=stackid,
                                          refstack=1, mwcs=mwcsid)
     params = mwcs_result.params
-    mov_stack = params.mov_stack[stackid_item - 1]
+    mov_stack = params.stack.mov_stack[stackid_item - 1]
 
     # DTT result — for regression lines
     dtt_result = MSNoiseResult.from_ids(db, preprocess=preprocessid, cc=ccid,

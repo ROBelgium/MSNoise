@@ -40,7 +40,7 @@ def main(loglevel="INFO"):
 
         goal_day  = days[0]
         step_name = step.step_name
-        output_dir = params.output_folder
+        output_dir = params.global_.output_folder
 
         logger.info(f"Processing {len(jobs)} jobs for step '{step_name}' on {goal_day}")
 

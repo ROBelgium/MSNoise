@@ -50,7 +50,7 @@ def main(stype, loglevel="INFO"):
 
         taxis = get_t_axis(params)
 
-        mov_stacks = params.mov_stack
+        mov_stacks = params.stack.mov_stack
         wiener_mlen = params.stack.wiener_mlen
         wiener_nlen = params.stack.wiener_nlen
         wienerfilt = params.stack.wienerfilt
@@ -70,7 +70,7 @@ def main(stype, loglevel="INFO"):
             "There are STACKS jobs for some days to recompute for %s" % pair)
 
         sta1, sta2 = pair.split(':')
-        for components in params.components_to_compute:
+        for components in params.cc.components_to_compute:
             logger.info('Processing %s-%s MOV stack' % (pair, components))
 
             # Calculate the maximum mov_rolling value (in days)
@@ -134,7 +134,7 @@ def main(stype, loglevel="INFO"):
             excess_days = sorted(set(excess_days))
 
             if params.cc.keep_all:
-                c = xr_load_ccf_for_stack(params.output_folder, lineage_names,
+                c = xr_load_ccf_for_stack(params.global_.output_folder, lineage_names,
                                           sta1, sta2, components, all_days)
                 if not len(c):
                     logger.warning("No data found for %s-%s" % (sta1, sta2))
@@ -144,7 +144,7 @@ def main(stype, loglevel="INFO"):
             else:
                 logger.warning("keep_all=N is unsupported in lineage workflow; "
                                "falling back to keep_days daily stacks")
-                c = xr_load_ccf_for_stack(params.output_folder, lineage_names,
+                c = xr_load_ccf_for_stack(params.global_.output_folder, lineage_names,
                                           sta1, sta2, components, all_days)
                 dr = c.resample(times="1D").mean()
 
@@ -187,7 +187,7 @@ def main(stype, loglevel="INFO"):
                 mask = xx.times.dt.floor('D').isin(excess_dates)
                 xx_cleaned = xx.where(~mask, drop=True) #remove days not associated with current jobs
 
-                xr_save_ccf(params.output_folder, lineage_names, step.step_name,
+                xr_save_ccf(params.global_.output_folder, lineage_names, step.step_name,
                             sta1, sta2, components, mov_stack, taxis, xx_cleaned, overwrite=False)
                 del xx, xx_cleaned
 

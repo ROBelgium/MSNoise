@@ -68,7 +68,6 @@ could occur with SQLite.
 """
 
 from .core.db import connect, get_logger
-from .core.config import get_params
 from .core.stations import get_interstation_distance, get_station
 from .core.workflow import (compute_rolling_ref, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, refstack_is_rolling)
 from .core.io import xr_get_ccf, xr_get_ref, xr_save_stretching
@@ -129,7 +128,6 @@ def main(loglevel="INFO"):
     logger.info('*** Starting: Compute Stretching ***')
 
     db = connect()
-    params = get_params(db)
     time.sleep(np.random.random() * 5)
 
     while is_next_job_for_step(db, step_category="stretching"):
@@ -152,16 +150,16 @@ def main(loglevel="INFO"):
 
         logger.info(f"New Stretching Job: pair={pair} n_days={len(days)} lineage={lineage_str}")
 
-        root = params.output_folder
-        mov_stacks = params.mov_stack
+        root = params.global_.output_folder
+        mov_stacks = params.stack.mov_stack
         goal_sampling_rate = params.cc.cc_sampling_rate
 
         netsta1, netsta2 = pair.split(':')
         station1, station2 = pair.split(":")
         if station1 == station2:
-            components_to_compute = params.components_to_compute_single_station
+            components_to_compute = params.cc.components_to_compute_single_station
         else:
-            components_to_compute = params.components_to_compute
+            components_to_compute = params.cc.components_to_compute
         
         for components in components_to_compute:
             station1, station2 = pair.split(":")

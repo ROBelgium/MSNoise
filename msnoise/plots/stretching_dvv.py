@@ -27,7 +27,7 @@ def main(mov_stackid=None, components="ZZ", pair_type="CC", filterid=1, stretchi
     Requires the ``stretching_dvv`` step to have been run first
     (``msnoise dtt compute_stretching_dvv``).
 
-    :param mov_stackid: 1-based index into ``params.mov_stack``.
+    :param mov_stackid: 1-based index into ``params.stack.mov_stack``.
         ``None`` or ``0`` plots all moving-stack windows.
     :param components: Component pair string, comma-separated for multiple.
     :param filterid: Filter set number.
@@ -72,9 +72,9 @@ def main(mov_stackid=None, components="ZZ", pair_type="CC", filterid=1, stretchi
     params = result.params
 
     if mov_stackid and mov_stackid != 0:
-        mov_stacks = [params.mov_stack[mov_stackid - 1]]
+        mov_stacks = [params.stack.mov_stack[mov_stackid - 1]]
     else:
-        mov_stacks = params.mov_stack
+        mov_stacks = params.stack.mov_stack
 
     comp_list = [c.strip() for c in components.split(",")]
 

@@ -455,41 +455,31 @@ def get_config_sets_organized(session):
 
 
 def get_params(session):
-    """Get config parameters from the database.
+    """Get global config parameters as a single-layer :class:`~msnoise.params.LayeredParams`.
+
+    Access via ``params.global_.<key>`` e.g. ``params.global_.hpc``.
+    For full pipeline params (per-step config included), use
+    :func:`get_merged_params_for_lineage` instead.
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
-
-    :rtype: :class:`obspy.core.util.attribdict.AttribDict`
-    :returns: a Param object containing the parameters
+    :rtype: :class:`~msnoise.params.LayeredParams`
     """
-    # TODO: this could be populated automatically from defauts iff defaults
-    # would mention types
     from obspy.core.util.attribdict import AttribDict
     from ..default import default
+    from ..params import LayeredParams
     s = session
-    params = AttribDict()
+    global_attrib = AttribDict()
     for name in default.keys():
         itemtype = default[name].type
         if itemtype is bool:
-            params[name] = get_config(s, name, isbool=True)
+            global_attrib[name] = get_config(s, name, isbool=True)
         else:
-            params[name] = itemtype(get_config(s, name))
-
-    # TODO remove reference to goal_sampling_rate
-    # params.goal_sampling_rate = params.cc.cc_sampling_rate
-    # params.min30 = params.cc.corr_duration * params.goal_sampling_rate
-    # params.components_to_compute = get_components_to_compute(s)
-    # params.components_to_compute_single_station = get_components_to_compute_single_station(s)
-    # params.all_components = np.unique(params.components_to_compute_single_station + \
-    #                         params.components_to_compute)
-
-    # if not isinstance(params.mov_stack[0], tuple):
-    #     params.mov_stack = [params.mov_stack, ]
-    # else:
-    #     params.mov_stack = params.mov_stack
-    return params
+            global_attrib[name] = itemtype(get_config(s, name))
+    p = LayeredParams()
+    p._add_layer("global", global_attrib)
+    return p
 
 
 
@@ -607,8 +597,14 @@ def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
     lineage_names = [s.step_name for s in lineage]
     lineage_cfgs = [_load_step_config(db, s) for s in lineage]
 
+    # orig_params is now a single-layer LayeredParams; unwrap the global AttribDict
+    global_attrib = (
+        orig_params.global_
+        if hasattr(orig_params, "_layers")
+        else orig_params  # backward compat if raw AttribDict passed
+    )
     params = _build_layered_params(
-        global_attrib=orig_params,
+        global_attrib=global_attrib,
         lineage_steps=lineage,
         lineage_names=lineage_names,
         step_configs=lineage_cfgs,

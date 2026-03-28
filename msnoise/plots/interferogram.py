@@ -39,7 +39,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
     result = MSNoiseResult.from_ids(db, preprocess=preprocessid, cc=ccid,
                                     filter=filterid, stack=stackid)
     params = result.params
-    mov_stack = params.mov_stack[stackid_item - 1]
+    mov_stack = params.stack.mov_stack[stackid_item - 1]
     start, end, datelist = build_movstack_datelist(db)
 
     if refilter:

@@ -1238,7 +1238,7 @@ def resolve_lineage_params(session, lineage_names):
 
         lineage_names = get_done_lineages_for_category(db, 'mwcs_dtt')[0]
         _, _, params = resolve_lineage_params(db, lineage_names)
-        mov_stack = params.mov_stack[0]
+        mov_stack = params.stack.mov_stack[0]
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param lineage_names: Ordered list of step-name strings, e.g.

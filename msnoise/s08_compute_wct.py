@@ -74,7 +74,7 @@ def main(loglevel="INFO"):
         lineage_names_mov = batch["lineage_names_mov"]
         lineage_str = batch["lineage_str"]
         step = batch["step"]
-        root = params.output_folder
+        root = params.global_.output_folder
 
         logger.info(f"New WCT Job: pair={pair} n_days={len(days)} lineage={lineage_str}")
 
@@ -83,11 +83,11 @@ def main(loglevel="INFO"):
         station1, station2 = pair.split(":")
 
         if station1 == station2:
-            components_to_compute = params.components_to_compute_single_station
+            components_to_compute = params.cc.components_to_compute_single_station
         else:
-            components_to_compute = params.components_to_compute
+            components_to_compute = params.cc.components_to_compute
 
-        mov_stacks = params.mov_stack
+        mov_stacks = params.stack.mov_stack
         goal_sampling_rate = params.cc.cc_sampling_rate
 
         # Filter frequency range from the wavelet step config

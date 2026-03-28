@@ -349,7 +349,7 @@ def xr_load_ccf_for_stack(root, lineage_names, station1, station2, components, d
 
         <root> / *cc_lineage / filter_step / _output / all|daily / <comp> / <sta1>_<sta2> / <date>.nc
 
-    :param root: Output folder (``params.output_folder``).
+    :param root: Output folder (``params.global_.output_folder``).
     :param lineage_names: Full lineage name list including the filter step,
         e.g. ``["preprocess_1", "cc_1", "filter_1", "stack_1"]``.
     :param station1: First station SEED id ``NET.STA.LOC``.
@@ -754,7 +754,7 @@ def save_daily_ccf(root, lineage, step_name, station1, station2,
 
         <root>/<lineage>/<step_name>/_output/daily/<components>/<sta1>_<sta2>/<date>.nc
 
-    :param root: Output folder (``params.output_folder``).
+    :param root: Output folder (``params.global_.output_folder``).
     :param lineage: List of step-name strings for the lineage path.
     :param step_name: Current step name (e.g. ``"cc_1"``).
     :param station1: First station SEED id ``NET.STA.LOC``.

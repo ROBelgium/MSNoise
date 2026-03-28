@@ -34,7 +34,7 @@ result = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=2, stack=1)
 params = result.params
 
 # Get the first mov_stack configured:
-mov_stack = params.mov_stack[0]
+mov_stack = params.stack.mov_stack[0]
 
 # Get the autocorrelation CCFs (ZZ, EE, NN) for station PF.FJS.00
 ZZ = result.get_ccf(pair="PF.FJS.00:PF.FJS.00", components="ZZ",

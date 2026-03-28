@@ -28,7 +28,7 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
          show=False, outfile=None, loglevel="INFO"):
     """Plot per-pair and network-mean dt/t timeseries.
 
-    :param mov_stackid: 1-based index into ``params.mov_stack`` (0/None = all).
+    :param mov_stackid: 1-based index into ``params.stack.mov_stack`` (0/None = all).
     :param dttname: DTT column to display: ``'m'`` (slope = dt/t) or
         ``'m0'`` (zero-intercept slope).
     :param components: Component pair string.
@@ -79,9 +79,9 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
     build_movstack_datelist(db)
 
     if mov_stackid and mov_stackid != 0:
-        mov_stacks = [params.mov_stack[mov_stackid - 1]]
+        mov_stacks = [params.stack.mov_stack[mov_stackid - 1]]
     else:
-        mov_stacks = params.mov_stack
+        mov_stacks = params.stack.mov_stack
 
     # ------------------------------------------------------------------ #
     # Filter frequency bounds for title                                    #

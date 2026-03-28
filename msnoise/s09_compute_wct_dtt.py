@@ -83,7 +83,7 @@ def main(loglevel="INFO"):
         lineage_names = batch["lineage_names_upstream"]
         lineage_str = batch["lineage_str"]
         step = batch["step"]
-        root = params.output_folder
+        root = params.global_.output_folder
 
         logger.info(
             f"New WCT DTT Job: pair={pair} n_days={len(days)} lineage={lineage_str}"
@@ -91,11 +91,11 @@ def main(loglevel="INFO"):
 
         station1, station2 = pair.split(":")
         components_to_compute = (
-            params.components_to_compute_single_station
+            params.cc.components_to_compute_single_station
             if station1 == station2
-            else params.components_to_compute
+            else params.cc.components_to_compute
         )
-        mov_stacks = params.mov_stack
+        mov_stacks = params.stack.mov_stack
 
         # DVV computation parameters from the wavelet_dtt step config.
         # Fall back to wavelet-step freq bounds when dtt-specific bounds are unset.

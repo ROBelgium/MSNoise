@@ -32,7 +32,7 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
     (``msnoise dtt dvv compute_mwcs_dtt_dvv``).
 
     :param dvvid: ``mwcs_dtt_dvv`` config set number.
-    :param stackid_item: 1-based index into ``params.mov_stack``.
+    :param stackid_item: 1-based index into ``params.stack.mov_stack``.
         ``None`` or ``0`` plots all moving-stack windows.
     :param dttname: Ignored (kept for CLI compat). The aggregate always shows
         all available statistics (mean, weighted_mean, trimmed_mean, median).
@@ -55,9 +55,9 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
     logger.info("Using lineage: %s" % "/".join(result.lineage_names))
 
     if stackid_item and stackid_item != 0:
-        mov_stacks = [params.mov_stack[stackid_item - 1]]
+        mov_stacks = [params.stack.mov_stack[stackid_item - 1]]
     else:
-        mov_stacks = params.mov_stack
+        mov_stacks = params.stack.mov_stack
 
     comp_list = [c.strip() for c in components.split(",")]
 

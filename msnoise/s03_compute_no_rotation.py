@@ -220,10 +220,10 @@ def main(loglevel="INFO"):
 
     # Get Configuration
     # filters = get_filters(db, all=False)
-    # logger.info("Will compute [%s] for different stations" % " ".join(params.components_to_compute))
-    # logger.info("Will compute [%s] for single stations" % " ".join(params.components_to_compute_single_station))
+    # logger.info("Will compute [%s] for different stations" % " ".join(params.cc.components_to_compute))
+    # logger.info("Will compute [%s] for single stations" % " ".join(params.cc.components_to_compute_single_station))
 
-    # if "R" in ''.join(params.components_to_compute) or "T" in ''.join(params.components_to_compute):
+    # if "R" in ''.join(params.cc.components_to_compute) or "T" in ''.join(params.cc.components_to_compute):
     #     logger.info("You seem to have configured R and/or T components, thus rotations ARE needed. You should therefore use the 'msnoise compute_cc_rot' instead.")
     #     return()
     #
@@ -274,7 +274,7 @@ def main(loglevel="INFO"):
                      (goal_day, len(pairs), len(stations)))
         jt = time.time()
 
-        preprocess_filename = os.path.join(params.output_folder, *lineage_names_upstream, "_output", "%s.mseed" % goal_day)
+        preprocess_filename = os.path.join(params.global_.output_folder, *lineage_names_upstream, "_output", "%s.mseed" % goal_day)
         stream = read(preprocess_filename)
 
         # Filter the stream for only necessary net.sta.loc
@@ -406,7 +406,7 @@ def main(loglevel="INFO"):
                 # Standard operator for CC
                 cc_index = []
                 if filter.CC:
-                    if len(params.components_to_compute):
+                    if len(params.cc.components_to_compute):
                         for sta1, sta2 in itertools.combinations(names, 2):
                             n1, s1, l1, c1 = sta1
                             n2, s2, l2, c2 = sta2
@@ -416,7 +416,7 @@ def main(loglevel="INFO"):
                             if pair not in pairs:
                                 continue
                             comp = "%s%s" % (c1[-1], c2[-1])
-                            if comp in params.components_to_compute:
+                            if comp in params.cc.components_to_compute:
                                 cc_index.append(
                                     ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
                                     names.index(sta1), names.index(sta2)])
@@ -425,7 +425,7 @@ def main(loglevel="INFO"):
                 single_station_pair_index_sc = []
                 single_station_pair_index_ac = []
 
-                if len(params.components_to_compute_single_station):
+                if len(params.cc.components_to_compute_single_station):
                     for sta1, sta2 in itertools.combinations_with_replacement(names, 2):
                         n1, s1, l1, c1 = sta1
                         n2, s2, l2, c2 = sta2
@@ -435,7 +435,7 @@ def main(loglevel="INFO"):
                         if pair not in pairs:
                             continue
                         comp = "%s%s" % (c1[-1], c2[-1])
-                        if comp in params.components_to_compute_single_station:
+                        if comp in params.cc.components_to_compute_single_station:
                             if filter.AC and c1[-1] == c2[-1]:
                                 single_station_pair_index_ac.append(
                                     ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
@@ -446,7 +446,7 @@ def main(loglevel="INFO"):
                                 single_station_pair_index_sc.append(
                                     ["%s.%s.%s_%s.%s.%s_%s" % (n1, s1, l1, n2, s2, l2, comp),
                                     names.index(sta1), names.index(sta2)])
-                        if comp[::-1] in params.components_to_compute_single_station:
+                        if comp[::-1] in params.cc.components_to_compute_single_station:
                             if filter.SC and c1[-1] != c2[-1]:
                                 # If the components are different, we can just
                                 # process them using the default CC code (should warn)
@@ -608,7 +608,7 @@ def main(loglevel="INFO"):
                 window_times = list(windows.keys())
                 corrs = np.asarray(list(windows.values()))
                 xr_save_ccf_all(
-                    root=params.output_folder,
+                    root=params.global_.output_folder,
                     lineage=lineage_names,
                     step_name=filterid,  # filterid from ccfid = filter step name e.g. 'filter_1'
                     station1=station1,
@@ -638,7 +638,7 @@ def main(loglevel="INFO"):
                 thisdate = goal_day
                 thistime = "0_0"
                 save_daily_ccf(
-                    root=params.output_folder,
+                    root=params.global_.output_folder,
                     lineage=lineage_names,
                     step_name=filter_name,  # filter_name from ccfid = filter step name e.g. 'filter_1'
                     station1=station1,

@@ -1575,7 +1575,7 @@ def test_110011_get_merged_params_components_split():
         pytest.skip("Could not resolve CC lineage")
     _, _, params = get_merged_params_for_lineage(db, orig_params, {}, lineage_steps)
     if hasattr(params, 'components_to_compute'):
-        assert isinstance(params.components_to_compute, list), \
+        assert isinstance(params.cc.components_to_compute, list), \
             "components_to_compute should be a list after merging"
     db.close()
 

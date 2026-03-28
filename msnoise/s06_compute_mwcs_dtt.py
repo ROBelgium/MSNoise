@@ -44,15 +44,15 @@ def main(loglevel="INFO"):
 
         logger.info(f"New MWCS-DTT Job: pair={pair} n_days={len(days)} lineage={lineage_str}")
 
-        mov_stacks = params.mov_stack
+        mov_stacks = params.stack.mov_stack
 
 
         netsta1, netsta2 = pair.split(':')
         station1, station2 = pair.split(":")
         if station1 == station2:
-            components_to_compute = params.components_to_compute_single_station
+            components_to_compute = params.cc.components_to_compute_single_station
         else:
-            components_to_compute = params.components_to_compute
+            components_to_compute = params.cc.components_to_compute
             
         n1, s1, l1 = netsta1.split(".")
         n2, s2, l2 = netsta2.split(".")
@@ -64,7 +64,7 @@ def main(loglevel="INFO"):
         for components in components_to_compute:
             for mov_stack in mov_stacks:
                 try:
-                    ds = xr_get_mwcs(params.output_folder, lineage_names,
+                    ds = xr_get_mwcs(params.global_.output_folder, lineage_names,
                                      station1, station2, components, mov_stack)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
@@ -182,7 +182,7 @@ def main(loglevel="INFO"):
                         )
                     }
                 )
-                xr_save_dtt(params.output_folder, lineage_names, step.step_name,
+                xr_save_dtt(params.global_.output_folder, lineage_names, step.step_name,
                             station1, station2, components, mov_stack, ds_out)
 
         massive_update_job(db, jobs, "D")

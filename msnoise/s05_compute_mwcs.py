@@ -119,7 +119,7 @@ def main(loglevel="INFO"):
 
         logger.info(f"New MWCS Job: pair={pair} n_days={len(days)} lineage={lineage_str}")
 
-        mov_stacks = params.mov_stack
+        mov_stacks = params.stack.mov_stack
 
         goal_sampling_rate = params.cc.cc_sampling_rate
 
@@ -138,16 +138,16 @@ def main(loglevel="INFO"):
         station1, station2 = pair.split(":")
 
         if station1 == station2:
-            components_to_compute = params.components_to_compute_single_station
+            components_to_compute = params.cc.components_to_compute_single_station
         else:
-            components_to_compute = params.components_to_compute
+            components_to_compute = params.cc.components_to_compute
 
         for components in components_to_compute:
             rolling_mode = refstack_is_rolling(params)
             if not rolling_mode:
                 # Mode A: load fixed REF from disk (under refstack_M folder)
                 try:
-                    ref = xr_get_ref(params.output_folder, lineage_names,
+                    ref = xr_get_ref(params.global_.output_folder, lineage_names,
                                      station1, station2, components, taxis)
                     ref = ref.REF.values
                 except FileNotFoundError as fullpath:
@@ -160,7 +160,7 @@ def main(loglevel="INFO"):
             for mov_stack in mov_stacks:
                 output = []
                 try:
-                    data = xr_get_ccf(params.output_folder, lineage_names_mov,
+                    data = xr_get_ccf(params.global_.output_folder, lineage_names_mov,
                                       station1, station2, components, mov_stack, taxis,
                                       format="dataframe")
                 except FileNotFoundError as fullpath:
@@ -341,7 +341,7 @@ def main(loglevel="INFO"):
                         )
                     }
                 )
-                xr_save_mwcs(params.output_folder, lineage_names, step.step_name,
+                xr_save_mwcs(params.global_.output_folder, lineage_names, step.step_name,
                               station1, station2, components, mov_stack, taxis, ds_out)
                 del data, output, ds_out
 

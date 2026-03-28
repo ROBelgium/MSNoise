@@ -14,12 +14,6 @@ Usage::
     params.filter.freqmin      # → float  (different from params.mwcs.freqmin)
     params.mwcs_dtt.dtt_minlag # → float
 
-    # Cross-step convenience properties (most compute steps need these)
-    params.output_folder                         # from global
-    params.mov_stack                             # from stack
-    params.components_to_compute                 # from cc
-    params.components_to_compute_single_station  # from cc
-
     # Dynamic innermost-layer access (used in aggregate_dvv_pairs)
     params.category          # → "mwcs_dtt_dvv"
     params.category_layer    # → AttribDict for that category
@@ -44,15 +38,6 @@ class LayeredParams:
     Attributes on ``LayeredParams`` itself delegate to the appropriate layer;
     there is no flat merged view and no silent key collision.
     """
-
-    # Keys whose category is fixed regardless of which step is running.
-    # These are surfaced as top-level properties for convenience.
-    _FIXED_PROPERTIES = {
-        "output_folder": "global",
-        "mov_stack": "stack",
-        "components_to_compute": "cc",
-        "components_to_compute_single_station": "cc",
-    }
 
     # ------------------------------------------------------------------ #
     # Construction                                                         #
@@ -83,15 +68,19 @@ class LayeredParams:
         """``params.<category>`` returns the AttribDict for that layer.
 
         ``params.global_`` maps to the ``"global"`` layer (avoids the Python
-        keyword).
+        keyword ``global``).
+
+        No fallback search across layers — access must be explicit.
+        Use ``params.global_.hpc``, ``params.cc.freqmin``, etc.
         """
         layers = object.__getattribute__(self, "_layers")
-        # global_ → "global"
         lookup = "global" if name == "global_" else name
         if lookup in layers:
             return layers[lookup]
         raise AttributeError(
             f"LayeredParams has no category {name!r}. "
+            f"Use params.global_.<key> for global config, or "
+            f"params.<category>.<key> for step config. "
             f"Available categories: {list(layers)}"
         )
 
@@ -149,26 +138,6 @@ class LayeredParams:
     def categories(self) -> list[str]:
         """Ordered list of all category names in this params object."""
         return list(object.__getattribute__(self, "_layers"))
-
-    @property
-    def output_folder(self) -> str:
-        """Output folder path — always read from the ``global`` layer."""
-        return self._layers["global"].output_folder
-
-    @property
-    def mov_stack(self):
-        """Moving-stack list — always read from the ``stack`` layer."""
-        return self._layers["stack"].mov_stack
-
-    @property
-    def components_to_compute(self) -> list[str]:
-        """Components between stations — always read from the ``cc`` layer."""
-        return self._layers["cc"].components_to_compute
-
-    @property
-    def components_to_compute_single_station(self) -> list[str]:
-        """Single-station components — always read from the ``cc`` layer."""
-        return self._layers["cc"].components_to_compute_single_station
 
     # ------------------------------------------------------------------ #
     # Inspection / serialisation helpers                                   #

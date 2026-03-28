@@ -235,9 +235,9 @@ def main(mov_stackid=0, components="ZZ", pair_type="CC", filterid=1, wctid=1, dt
     build_movstack_datelist(db)
 
     if mov_stackid and mov_stackid != 0:
-        mov_stacks = [params.mov_stack[mov_stackid - 1]]
+        mov_stacks = [params.stack.mov_stack[mov_stackid - 1]]
     else:
-        mov_stacks = params.mov_stack
+        mov_stacks = params.stack.mov_stack
 
     comp_list = [c.strip() for c in components.split(",")]
 

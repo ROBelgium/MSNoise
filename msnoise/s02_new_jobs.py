@@ -974,7 +974,7 @@ def main(init=False, nocc=False, after=False):
         source_category = str(after).strip().lower()
 
         params = get_params(db)
-        if not params.hpc:
+        if not params.global_.hpc:
             logger.debug(
                 f"new_jobs --after {source_category}: hpc=False, propagation is "
                 "normally handled inline by worker scripts via propagate_downstream(). "
@@ -1162,7 +1162,7 @@ def main(init=False, nocc=False, after=False):
     # In hpc=False mode: preprocess workers call propagate_downstream() inline.
     if not nocc:
         _params = get_params(db)
-        if _params.hpc:
+        if _params.global_.hpc:
             logger.info('Creating CC jobs from completed preprocess jobs')
             cc_jobs, cc_count = create_cc_jobs_from_preprocess(db)
             if cc_jobs:

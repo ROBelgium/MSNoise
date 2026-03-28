@@ -76,7 +76,7 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
         # dvv_lineage = lineage up to but not including the dvv step itself.
         # The parent DTT step is the last entry in that list.
         dvv_lineage   = batch["lineage_names_upstream"]
-        root          = params.output_folder
+        root          = params.global_.output_folder
         dvv_step_name = step.step_name
 
         if not dvv_lineage:
@@ -103,8 +103,8 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
                     ))
 
         all_components = [c for c in np.unique(
-            params.components_to_compute
-            + params.components_to_compute_single_station
+            params.cc.components_to_compute
+            + params.cc.components_to_compute_single_station
         ) if c]  # drop empty strings
 
         split_pair_type  = params.category_layer.dvv_split_pair_type
@@ -115,7 +115,7 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
         pair_types  = ["CC", "SC", "AC"] if split_pair_type  else ["ALL"]
         comp_groups = list(all_components) if split_components else ["ALL"]
 
-        mov_stacks = params.mov_stack
+        mov_stacks = params.stack.mov_stack
 
         for mov_stack in mov_stacks:
             for pt in pair_types:

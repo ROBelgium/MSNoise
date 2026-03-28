@@ -180,7 +180,7 @@ def main(loglevel="INFO"):
             )
             logger.info("Wiener filter enabled for REF stack")
 
-        for components in params.components_to_compute:
+        for components in params.cc.components_to_compute:
             logger.info(
                 f"Processing {pair}-{components} REF stack (Mode A, "
                 f"ref_begin={params.refstack.ref_begin}, ref_end={params.refstack.ref_end})"
@@ -190,7 +190,7 @@ def main(loglevel="INFO"):
 
             if params.cc.keep_all:
                 c = xr_load_ccf_for_stack(
-                    params.output_folder, lineage_names_cc,
+                    params.global_.output_folder, lineage_names_cc,
                     sta1, sta2, components, datelist,
                 )
             else:
@@ -199,7 +199,7 @@ def main(loglevel="INFO"):
                     "falling back to keep_days daily stacks"
                 )
                 c = xr_load_ccf_for_stack(
-                    params.output_folder, lineage_names_cc,
+                    params.global_.output_folder, lineage_names_cc,
                     sta1, sta2, components, datelist,
                 )
 
@@ -223,14 +223,14 @@ def main(loglevel="INFO"):
             ref_stack = c.mean(dim="times")
 
             xr_save_ref(
-                params.output_folder,
+                params.global_.output_folder,
                 lineage_names,    # ends with stack_N
                 step.step_name,   # refstack_M  — becomes the step sub-folder
                 sta1, sta2, components, taxis, ref_stack,
             )
             logger.info(
                 f"REF stack written: "
-                f"{params.output_folder}/"
+                f"{params.global_.output_folder}/"
                 f"{'/'.join(lineage_names)}/{step.step_name}/_output/REF/"
                 f"{components}/{sta1}_{sta2}.nc"
             )
