@@ -991,8 +991,12 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                     bad = (da_q < quality_min).values  # numpy bool; scalar 'keys' coord on da_dv/da_q
                     da_dv  = da_dv.copy(data=np.where(bad, np.nan, da_dv.values))
                     da_err = da_err.copy(data=np.where(bad, np.nan, da_err.values))
-                # Convert Delta → dv/v: dv/v = Delta - 1
-                da_dv = da_dv - 1.0
+                # Convert Delta → dv/v.
+                # strvec = 1 + epsilon where epsilon ∈ [-range, +range].
+                # strvec > 1 means the reference was stretched to match
+                # the current trace → current is SLOWER → dv/v < 0.
+                # Therefore: dv/v = -(Delta - 1) = 1 - Delta
+                da_dv = 1.0 - da_dv
 
             elif parent_category == "wavelet_dtt":
                 ds = xr_get_wct_dtt(root, dtt_lineage, sta1, sta2,
