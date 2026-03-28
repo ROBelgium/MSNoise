@@ -1374,12 +1374,17 @@ def test_120003_msnoise_result_list():
 
 @pytest.mark.order(120004)
 def test_120004_msnoise_result_require_category_raises():
-    """MSNoiseResult raises ValueError when accessing wrong step."""
+    """MSNoiseResult raises AttributeError when accessing a method whose
+    required category is absent from the lineage."""
     db = connect()
     from ..results import MSNoiseResult
     r = MSNoiseResult.from_ids(db, preprocess=1, cc=1)
-    with pytest.raises(ValueError, match="does not include"):
-        r.get_ref()   # needs refstack, not present in lineage
+    # get_ref requires 'refstack' — not present in preprocess/cc lineage
+    with pytest.raises(AttributeError, match="requires category"):
+        r.get_ref()
+    # hasattr must return False for absent-category methods
+    assert not hasattr(r, "get_ref"), "get_ref should not be visible at cc level"
+    assert not hasattr(r, "get_mwcs"), "get_mwcs should not be visible at cc level"
     db.close()
 
 
@@ -1400,6 +1405,39 @@ def test_120005_msnoise_result_branches():
             assert child.lineage_names[:-1] == r.lineage_names
     db.close()
 
+
+@pytest.mark.order(120006)
+def test_120006_msnoise_result_dynamic_visibility():
+    """Methods for absent categories are invisible and inaccessible."""
+    db = connect()
+    from ..results import MSNoiseResult
+
+    # Stack-level result: only get_ccf should be visible
+    r_stack = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
+    visible = [m for m in dir(r_stack) if m.startswith("get_")]
+    assert "get_ccf" in visible,  "get_ccf must be visible at stack level"
+    assert "get_ref" not in visible,  "get_ref must not be visible at stack level"
+    assert "get_mwcs" not in visible, "get_mwcs must not be visible at stack level"
+    assert "get_dvv" not in visible,  "get_dvv must not be visible at stack level"
+    assert not hasattr(r_stack, "get_mwcs"), "hasattr(get_mwcs) must be False at stack level"
+
+    # Refstack-level result: get_ccf + get_ref visible, mwcs still not
+    r_ref = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                   stack=1, refstack=1)
+    visible_ref = [m for m in dir(r_ref) if m.startswith("get_")]
+    assert "get_ccf" in visible_ref
+    assert "get_ref" in visible_ref
+    assert "get_mwcs" not in visible_ref
+
+    # Error message is informative
+    try:
+        r_stack.get_mwcs()
+        pytest.fail("Expected AttributeError")
+    except AttributeError as e:
+        assert "mwcs" in str(e)
+        assert "branches()" in str(e)
+
+    db.close()
 
 @pytest.mark.order(120010)
 def test_120010_msnoise_result_get_ccf():
@@ -1663,14 +1701,75 @@ def test_120030_msnoise_result_get_dvv_dataframe():
 
 
 @pytest.mark.order(120031)
-def test_120031_msnoise_result_get_dvv_wrong_category():
-    """MSNoiseResult.get_dvv raises ValueError at wrong step category."""
+def test_120031_msnoise_result_gating_raises():
+    """Methods for absent categories raise AttributeError, not ValueError."""
     db = connect()
     from ..results import MSNoiseResult
-    # Instantiated at mwcs_dtt — not a dvv step
+    # Stack-level result — no mwcs/dvv in lineage
     r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                               stack=1, refstack=1)
+    with pytest.raises(AttributeError) as exc_info:
+        r.get_mwcs()
+    assert "mwcs" in str(exc_info.value).lower()
+    assert "branches" in str(exc_info.value).lower(), \
+        "Error message should suggest .branches()"
+
+    # mwcs_dtt result — get_dvv not yet reachable
+    r2 = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
                                 stack=1, refstack=1, mwcs=1, mwcs_dtt=1)
-    with pytest.raises(ValueError):
-        r.get_dvv()
+    with pytest.raises(AttributeError):
+        r2.get_dvv()
+    db.close()
+
+
+@pytest.mark.order(120032)
+def test_120032_msnoise_result_dir_gating():
+    """__dir__ only exposes methods whose categories are in the lineage."""
+    db = connect()
+    from ..results import MSNoiseResult
+
+    # Stack-level result
+    r_stack = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
+    d_stack = dir(r_stack)
+    assert "get_ccf" in d_stack,   "get_ccf should be visible at stack level"
+    assert "get_ref" not in d_stack, "get_ref needs refstack — should be hidden"
+    assert "get_mwcs" not in d_stack, "get_mwcs needs mwcs — should be hidden"
+
+    # Refstack-level result
+    r_ref = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                   stack=1, refstack=1)
+    d_ref = dir(r_ref)
+    assert "get_ccf" in d_ref
+    assert "get_ref" in d_ref,  "get_ref should be visible at refstack level"
+    assert "get_mwcs" not in d_ref, "get_mwcs still needs mwcs step"
+
+    # MWCS result
+    r_mwcs = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                    stack=1, refstack=1, mwcs=1)
+    d_mwcs = dir(r_mwcs)
+    assert "get_mwcs" in d_mwcs,    "get_mwcs should be visible at mwcs level"
+    assert "get_mwcs_dtt" not in d_mwcs, "get_mwcs_dtt still needs mwcs_dtt"
+
+    db.close()
+
+
+@pytest.mark.order(120033)
+def test_120033_msnoise_result_hasattr_gating():
+    """hasattr() respects dynamic gating — False for absent categories."""
+    db = connect()
+    from ..results import MSNoiseResult
+
+    r_stack = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
+    assert hasattr(r_stack, "get_ccf"),    "get_ccf should be accessible"
+    assert not hasattr(r_stack, "get_ref"), "get_ref should be hidden"
+    assert not hasattr(r_stack, "get_mwcs"), "get_mwcs should be hidden"
+    assert not hasattr(r_stack, "get_dvv"),  "get_dvv should be hidden"
+
+    r_mwcs = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                    stack=1, refstack=1, mwcs=1)
+    assert hasattr(r_mwcs, "get_mwcs"),        "get_mwcs accessible at mwcs level"
+    assert not hasattr(r_mwcs, "get_mwcs_dtt"), "get_mwcs_dtt needs mwcs_dtt step"
+    assert not hasattr(r_mwcs, "get_dvv"),      "get_dvv needs dvv step"
+
     db.close()
 

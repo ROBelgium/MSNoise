@@ -1,10 +1,15 @@
 """
 MSNoiseResult — user-facing class for loading computed results.
 
+Methods are dynamically gated: only methods whose required category is present
+in the lineage are exposed.  Accessing a method whose category is absent raises
+``AttributeError`` with a clear message, and the method is absent from ``dir()``
+and tab-completion.
+
 Typical notebook usage::
 
     from msnoise.results import MSNoiseResult
-    from msnoisedb import connect
+    from msnoise.core.db import connect
 
     db = connect()
 
@@ -12,11 +17,9 @@ Typical notebook usage::
     result = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
                                     stack=1, refstack=1)
 
-    # Load a CCF for a specific pair / component / mov_stack
-    df = result.get_ccf("YA.UV05.00:YA.UV06.00", "ZZ", ("6h", "6h"))
-
-    # Omit any argument to get back a dict of all matches
-    all_ccfs = result.get_ccf()   # {(pair, comp, mov_stack): DataFrame}
+    # Only methods valid for this lineage are visible
+    result.get_ccf(...)   # works — stack is in lineage
+    result.get_mwcs(...)  # AttributeError — mwcs not in lineage
 
     # Discover downstream branches (e.g. mwcs_1, stretching_1, wavelet_1)
     for branch in result.branches():
@@ -33,181 +36,122 @@ import glob
 import os
 from typing import Optional
 
-# WORKFLOW_ORDER defines the canonical step-name prefixes and their processing order.
+# ── Step prefix registry ───────────────────────────────────────────────────────
+
 _STEP_PREFIXES = [
-    "preprocess",
-    "cc",
-    "psd",
-    "psd_rms",
-    "filter",
-    "stack",
-    "refstack",
-    "mwcs",
-    "mwcs_dtt",
-    "mwcs_dtt_dvv",
-    "stretching",
-    "stretching_dvv",
-    "wavelet",
-    "wavelet_dtt",
-    "wavelet_dtt_dvv",
+    "preprocess", "cc", "psd", "psd_rms", "filter", "stack", "refstack",
+    "mwcs", "mwcs_dtt", "mwcs_dtt_dvv",
+    "stretching", "stretching_dvv",
+    "wavelet", "wavelet_dtt", "wavelet_dtt_dvv",
 ]
 
-# Map step-name prefix → keyword argument name used in from_ids()
 _PREFIX_TO_KWARG = {p: p for p in _STEP_PREFIXES}
 
 
 def _step_prefix(step_name: str) -> str:
-    """Return the category prefix of a step name, e.g. 'mwcs_dtt_1' → 'mwcs_dtt'."""
+    """Return the category prefix of a step name, e.g. 'mwcs_dtt_1' -> 'mwcs_dtt'."""
     for prefix in sorted(_STEP_PREFIXES, key=len, reverse=True):
         if step_name.startswith(prefix + "_"):
             return prefix
     raise ValueError(f"Cannot determine category prefix for step name {step_name!r}")
 
 
-class MSNoiseResult:
-    """A resolved pipeline branch with convenience data-loading methods.
+# ── Dynamic method gating ──────────────────────────────────────────────────────
 
-    Do not instantiate directly — use the class-method constructors
-    :meth:`from_ids`, :meth:`from_names`, or :meth:`list`.
+# Registry: method_name -> required category (str) or frozenset of alternatives
+_METHOD_CATEGORIES: dict = {}
+
+
+def _lineage_method(category):
+    """Decorator: register a method as requiring *category* in the lineage.
+
+    Pass a list to mean "any of these categories satisfies the requirement"
+    (used for get_dvv which serves three DVV step types).
+    """
+    required = frozenset(category) if isinstance(category, list) else category
+
+    def decorator(fn):
+        _METHOD_CATEGORIES[fn.__name__] = required
+        return fn
+
+    return decorator
+
+
+def _category_present(required, present: frozenset) -> bool:
+    """Return True if *required* is satisfied by the *present* category set."""
+    if isinstance(required, frozenset):
+        return bool(required & present)
+    return required in present
+
+
+# ── MSNoiseResult ──────────────────────────────────────────────────────────────
+
+class MSNoiseResult:
+    """A resolved pipeline branch with dynamically gated data-loading methods.
+
+    Only ``get_*`` methods whose required step category appears in
+    ``lineage_names`` are accessible.  Accessing a gated method raises
+    ``AttributeError`` with a helpful message and the method does not appear
+    in ``dir()`` or tab-completion.
+
+    Do not instantiate directly — use :meth:`from_ids`, :meth:`from_names`,
+    or :meth:`list`.
 
     Attributes
     ----------
     lineage_names : list[str]
-        Ordered step-name strings from root to terminal step,
-        e.g. ``['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']``.
+        Ordered step-name strings, e.g.
+        ``['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']``.
     category : str
         Category of the terminal step, e.g. ``'refstack'``.
-    params : AttribDict
+    params : LayeredParams
         Merged configuration parameters for this lineage.
     output_folder : str
-        Root output folder (``params.output_folder``).
+        Root output folder.
     """
 
-    # ------------------------------------------------------------------ #
-    # Construction                                                         #
-    # ------------------------------------------------------------------ #
-
-    def __init__(self, db, lineage_names: list[str]):
+    def __init__(self, db, lineage_names: list):
         from .core.workflow import resolve_lineage_params
         self._db = db
-        self.lineage_names: list[str] = list(lineage_names)
+        self.lineage_names: list = list(lineage_names)
         _, _, self.params = resolve_lineage_params(db, lineage_names)
         self.output_folder: str = self.params.output_folder
         self.category: str = _step_prefix(lineage_names[-1]) if lineage_names else ""
+        self._present_categories: frozenset = frozenset(
+            _step_prefix(n) for n in lineage_names
+        )
+
+    # ── constructors ──────────────────────────────────────────────────────────
 
     @classmethod
-    def from_names(cls, db, names: list[str]) -> "MSNoiseResult":
-        """Build from an explicit list of step-name strings.
-
-        Example::
-
-            r = MSNoiseResult.from_names(
-                db, ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']
-            )
-        """
+    def from_names(cls, db, names: list) -> "MSNoiseResult":
+        """Build from an explicit list of step-name strings."""
         return cls(db, names)
 
     @classmethod
-    def from_ids(
-        cls,
-        db,
-        preprocess: Optional[int] = None,
-        cc: Optional[int] = None,
-        psd: Optional[int] = None,
-        psd_rms: Optional[int] = None,
-        filter: Optional[int] = None,
-        stack: Optional[int] = None,
-        refstack: Optional[int] = None,
-        mwcs: Optional[int] = None,
-        mwcs_dtt: Optional[int] = None,
-        mwcs_dtt_dvv: Optional[int] = None,
-        stretching: Optional[int] = None,
-        stretching_dvv: Optional[int] = None,
-        wavelet: Optional[int] = None,
-        wavelet_dtt: Optional[int] = None,
-        wavelet_dtt_dvv: Optional[int] = None,
-    ) -> "MSNoiseResult":
-        """Build from integer configset IDs, stopping at the last non-None step.
-
-        Only the steps you specify are included in the lineage.  Steps are
-        added in canonical workflow order regardless of the keyword order you
-        use.
-
-        Example::
-
-            # CC branch up to refstack
-            r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
-                                       stack=1, refstack=1)
-
-            # PSD branch
-            r = MSNoiseResult.from_ids(db, psd=1, psd_rms=1)
-
-            # MWCS-DTT branch
-            r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
-                                       stack=1, refstack=1, mwcs=1, mwcs_dtt=1)
-
-            # MWCS DVV aggregate
-            r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
-                                       stack=1, refstack=1, mwcs=1,
-                                       mwcs_dtt=1, mwcs_dtt_dvv=1)
-        """
-        kwargs = {
-            "preprocess":    preprocess,
-            "cc":            cc,
-            "psd":           psd,
-            "psd_rms":       psd_rms,
-            "filter":        filter,
-            "stack":         stack,
-            "refstack":      refstack,
-            "mwcs":          mwcs,
-            "mwcs_dtt":      mwcs_dtt,
-            "mwcs_dtt_dvv":  mwcs_dtt_dvv,
-            "stretching":    stretching,
-            "stretching_dvv":stretching_dvv,
-            "wavelet":       wavelet,
-            "wavelet_dtt":   wavelet_dtt,
-            "wavelet_dtt_dvv":   wavelet_dtt_dvv,
-        }
-        parts = []
-        for prefix in _STEP_PREFIXES:
-            val = kwargs.get(prefix)
-            if val is not None:
-                parts.append(f"{prefix}_{val}")
+    def from_ids(cls, db, preprocess=None, cc=None, psd=None, psd_rms=None,
+                 filter=None, stack=None, refstack=None, mwcs=None,
+                 mwcs_dtt=None, mwcs_dtt_dvv=None, stretching=None,
+                 stretching_dvv=None, wavelet=None, wavelet_dtt=None,
+                 wavelet_dtt_dvv=None) -> "MSNoiseResult":
+        """Build from integer configset IDs in canonical workflow order."""
+        kwargs = dict(preprocess=preprocess, cc=cc, psd=psd, psd_rms=psd_rms,
+                      filter=filter, stack=stack, refstack=refstack, mwcs=mwcs,
+                      mwcs_dtt=mwcs_dtt, mwcs_dtt_dvv=mwcs_dtt_dvv,
+                      stretching=stretching, stretching_dvv=stretching_dvv,
+                      wavelet=wavelet, wavelet_dtt=wavelet_dtt,
+                      wavelet_dtt_dvv=wavelet_dtt_dvv)
+        parts = [f"{p}_{v}" for p in _STEP_PREFIXES if (v := kwargs.get(p)) is not None]
         if not parts:
             raise ValueError("At least one step ID must be provided.")
         return cls(db, parts)
 
     @classmethod
-    def list(
-        cls,
-        db,
-        category: str,
-        include_empty: bool = False,
-    ) -> list["MSNoiseResult"]:
-        """Return all done :class:`MSNoiseResult` objects for a step category.
-
-        Wraps :func:`~msnoise.api.get_done_lineages_for_category`.
-
-        Parameters
-        ----------
-        category:
-            Step category to query, e.g. ``'mwcs_dtt'``, ``'stretching'``.
-        include_empty:
-            If True, also include lineages that have no done jobs (useful for
-            inspecting configured-but-unrun branches).  Default False.
-
-        Example::
-
-            for r in MSNoiseResult.list(db, 'mwcs_dtt'):
-                print(r.lineage_names)
-        """
+    def list(cls, db, category: str, include_empty: bool = False) -> list:
+        """Return all done MSNoiseResult objects for a step category."""
         from .core.workflow import get_done_lineages_for_category, get_workflow_steps
-
         results = []
-
         if include_empty:
-            # Return all active workflow steps of this category,
-            # enumerating ALL distinct upstream paths (handles multi-configset DAGs).
             for step in get_workflow_steps(db):
                 if step.category == category:
                     for names in _upstream_lineage_for_step(db, step):
@@ -216,58 +160,55 @@ class MSNoiseResult:
         else:
             for names in get_done_lineages_for_category(db, category):
                 results.append(cls(db, names))
-
         return results
 
-    # ------------------------------------------------------------------ #
-    # Navigation                                                           #
-    # ------------------------------------------------------------------ #
+    # ── dynamic gating ────────────────────────────────────────────────────────
 
-    def branches(self, include_empty: bool = False) -> list["MSNoiseResult"]:
-        """Return downstream :class:`MSNoiseResult` objects one step below.
+    def __dir__(self) -> list:
+        base = super().__dir__()
+        return [
+            name for name in base
+            if name not in _METHOD_CATEGORIES
+            or _category_present(_METHOD_CATEGORIES[name], self._present_categories)
+        ]
 
-        Follows active :class:`~msnoise.msnoise_table_def.WorkflowLink` rows
-        from the terminal step of this lineage.  By default only returns
-        branches that have at least one Done job.
+    def __getattr__(self, name: str):
+        if name in _METHOD_CATEGORIES:
+            required = _METHOD_CATEGORIES[name]
+            req_str = (" or ".join(sorted(required))
+                       if isinstance(required, frozenset) else repr(required))
+            present_str = (", ".join(sorted(self._present_categories)) or "(none)")
+            raise AttributeError(
+                f"{name!r} requires {req_str} in the lineage, "
+                f"but this result only covers: {present_str}. "
+                f"Use .branches() to navigate to a downstream step."
+            )
+        raise AttributeError(f"{type(self).__name__!r} has no attribute {name!r}")
 
-        Parameters
-        ----------
-        include_empty:
-            If True, return branches even if no jobs are done yet.
+    # ── navigation ────────────────────────────────────────────────────────────
 
-        Example::
-
-            refstack_result = MSNoiseResult.from_ids(db, preprocess=1, cc=1,
-                                                      filter=1, stack=1, refstack=1)
-            for branch in refstack_result.branches():
-                # branch.category is 'mwcs', 'stretching', or 'wavelet'
-                print(branch.category, branch.lineage_names[-1])
-        """
+    def branches(self, include_empty: bool = False) -> list:
+        """Return downstream MSNoiseResult objects one step below this lineage."""
         from .msnoise_table_def import declare_tables
-
         schema = declare_tables()
         Job = schema.Job
         WorkflowStep = schema.WorkflowStep
         WorkflowLink = schema.WorkflowLink
 
-        # Find the WorkflowStep for the terminal step of our lineage
-        terminal_name = self.lineage_names[-1]
         terminal_step = (
             self._db.query(WorkflowStep)
-            .filter(WorkflowStep.step_name == terminal_name)
+            .filter(WorkflowStep.step_name == self.lineage_names[-1])
             .first()
         )
         if terminal_step is None:
             return []
 
-        # Follow outgoing active links
         links = (
             self._db.query(WorkflowLink)
             .filter(WorkflowLink.from_step_id == terminal_step.step_id)
             .filter(WorkflowLink.is_active.is_(True))
             .all()
         )
-
         results = []
         for link in links:
             child_step = (
@@ -277,50 +218,31 @@ class MSNoiseResult:
             )
             if child_step is None:
                 continue
-
-            # Build child lineage = current lineage + child step name
             child_names = self.lineage_names + [child_step.step_name]
-            child_lineage_str = "/".join(child_names)
-
             if not include_empty:
-                # Check at least one Done job exists for this lineage+step
                 has_done = (
                     self._db.query(Job.ref)
                     .filter(Job.step_id == child_step.step_id)
-                    .filter(Job.lineage == child_lineage_str)
+                    .filter(Job.lineage == "/".join(child_names))
                     .filter(Job.flag == "D")
                     .first()
                 )
                 if has_done is None:
                     continue
-
             results.append(MSNoiseResult(self._db, child_names))
-
         return results
 
     def __repr__(self) -> str:
+        valid = [m for m in sorted(_METHOD_CATEGORIES) if m in dir(self)]
         return (
             f"MSNoiseResult(category={self.category!r}, "
-            f"lineage={'/'.join(self.lineage_names)!r})"
+            f"lineage={'/'.join(self.lineage_names)!r}, "
+            f"available_methods={valid})"
         )
 
-    # ------------------------------------------------------------------ #
-    # Internal helpers                                                     #
-    # ------------------------------------------------------------------ #
+    # ── internal helpers ──────────────────────────────────────────────────────
 
-    def _require_category(self, *categories: str) -> None:
-        """Raise ValueError if the lineage doesn't reach any of the given categories."""
-        present = {_step_prefix(n) for n in self.lineage_names}
-        for cat in categories:
-            if cat not in present:
-                tip = "call .branches() to reach downstream steps"
-                raise ValueError(
-                    f"Lineage {'/'.join(self.lineage_names)!r} does not include "
-                    f"a '{cat}' step. {tip}."
-                )
-
-    def _lineage_upstream_of(self, category: str) -> list[str]:
-        """Return lineage_names up to but not including the step of *category*."""
+    def _lineage_upstream_of(self, category: str) -> list:
         result = []
         for name in self.lineage_names:
             if _step_prefix(name) == category:
@@ -328,8 +250,7 @@ class MSNoiseResult:
             result.append(name)
         return result
 
-    def _lineage_through(self, category: str) -> list[str]:
-        """Return lineage_names up to and including the step of *category*."""
+    def _lineage_through(self, category: str) -> list:
         result = []
         for name in self.lineage_names:
             result.append(name)
@@ -338,563 +259,19 @@ class MSNoiseResult:
         return result
 
     def _step_name_for(self, category: str) -> str:
-        """Return the step name for a given category in this lineage."""
         for name in self.lineage_names:
             if _step_prefix(name) == category:
                 return name
         raise ValueError(f"No '{category}' step in lineage.")
 
-    def _discover(self, path_pattern: str) -> list[str]:
-        """Glob *path_pattern* and return sorted unique matches."""
+    def _discover(self, path_pattern: str) -> list:
         return sorted(set(glob.glob(path_pattern)))
-
-    # ------------------------------------------------------------------ #
-    # Load methods                                                         #
-    # ------------------------------------------------------------------ #
-
-    def get_ccf(
-        self,
-        pair: Optional[str] = None,
-        components: Optional[str] = None,
-        mov_stack: Optional[tuple] = None,
-        format: str = "xarray",
-    ):
-        """Load cross-correlation functions from the stack step output.
-
-        Parameters
-        ----------
-        pair:
-            Station pair string ``"NET.STA.LOC:NET.STA.LOC"``.
-            If None, all pairs are returned.
-        components:
-            Component string e.g. ``"ZZ"``.  If None, all components returned.
-        mov_stack:
-            Moving-stack tuple e.g. ``("6h", "6h")``.  If None, all stacks returned.
-        format:
-            ``"xarray"`` (default) or ``"dataframe"``.
-
-        Returns
-        -------
-        If all args are specified: a :class:`~pandas.DataFrame`.
-        Otherwise: a dict keyed by ``(pair, components, mov_stack)``.
-        """
-        from .core.io import xr_get_ccf
-        from .core.workflow import get_t_axis
-
-        self._require_category("stack")
-        # CCFs live under the stack step folder
-        lineage = self._lineage_through("stack")
-        taxis = get_t_axis(self.params)
-        root = self.output_folder
-
-        if pair is not None and components is not None and mov_stack is not None:
-            sta1, sta2 = pair.split(":")
-            return xr_get_ccf(root, lineage, sta1, sta2, components,
-                               mov_stack, taxis, format=format)
-
-        # Discovery mode — glob the output tree
-        base = os.path.join(root, *lineage, "_output")
-        results = {}
-
-        # Resolve wildcards
-        mov_stacks = (
-            ["%s_%s" % (mov_stack[0], mov_stack[1])] if mov_stack is not None
-            else [os.path.basename(p)
-                  for p in self._discover(os.path.join(base, "*"))
-                  if os.path.isdir(p)]
-        )
-        comps = (
-            [components] if components is not None
-            else None  # resolved per mov_stack below
-        )
-
-        for ms_str in mov_stacks:
-            ms_tuple = tuple(ms_str.split("_", 1))
-            comp_list = (
-                comps if comps is not None
-                else [os.path.basename(p)
-                      for p in self._discover(os.path.join(base, ms_str, "*"))
-                      if os.path.isdir(p)]
-            )
-            for comp in comp_list:
-                nc_dir = os.path.join(base, ms_str, comp)
-                if pair is not None:
-                    sta1, sta2 = pair.split(":")
-                    files = self._discover(
-                        os.path.join(nc_dir, f"{sta1}_{sta2}.nc"))
-                else:
-                    files = self._discover(os.path.join(nc_dir, "*.nc"))
-
-                for fpath in files:
-                    fname = os.path.splitext(os.path.basename(fpath))[0]
-                    sta1, sta2 = fname.split("_", 1)
-                    pair_key = f"{sta1}:{sta2}"
-                    try:
-                        df = xr_get_ccf(root, lineage, sta1, sta2, comp,
-                                        ms_tuple, taxis, format=format)
-                        results[(pair_key, comp, ms_tuple)] = df
-                    except (FileNotFoundError, Exception):
-                        pass
-
-        if pair is not None and components is not None and mov_stack is None:
-            # Simplify key to just mov_stack
-            return {k[2]: v for k, v in results.items()}
-        return results
-
-    def get_ref(
-        self,
-        pair: Optional[str] = None,
-        components: Optional[str] = None,
-        format: str = "xarray",
-    ):
-        """Load reference stack from the refstack step output.
-
-        Parameters
-        ----------
-        format:
-            ``"xarray"`` (default) returns an :class:`xarray.Dataset`.
-            ``"dataframe"`` calls ``.CCF.to_dataframe()`` on the Dataset.
-
-        Returns
-        -------
-        If all args specified: result in requested format.
-        Otherwise: dict keyed by ``(pair, components)``.
-        """
-        from .core.io import xr_get_ref
-        from .core.workflow import get_t_axis
-
-        self._require_category("refstack")
-        lineage = self._lineage_through("refstack")
-        taxis = get_t_axis(self.params)
-        root = self.output_folder
-
-        def _apply_format(ds):
-            if format == "dataframe":
-                import pandas as pd_ref
-                da = ds.REF
-                return pd_ref.Series(
-                    da.values,
-                    index=da.coords["taxis"].values,
-                    name="REF",
-                )
-            return ds
-
-        if pair is not None and components is not None:
-            sta1, sta2 = pair.split(":")
-            return _apply_format(xr_get_ref(root, lineage, sta1, sta2, components, taxis))
-
-        base = os.path.join(root, *lineage, "_output", "REF")
-        results = {}
-        comp_list = ([components] if components is not None
-                     else [os.path.basename(p)
-                            for p in self._discover(os.path.join(base, "*"))
-                            if os.path.isdir(p)])
-
-        for comp in comp_list:
-            nc_dir = os.path.join(base, comp)
-            files = (
-                self._discover(os.path.join(nc_dir, f"{pair.replace(':','_')}.nc"))
-                if pair is not None
-                else self._discover(os.path.join(nc_dir, "*.nc"))
-            )
-            for fpath in files:
-                fname = os.path.splitext(os.path.basename(fpath))[0]
-                sta1, sta2 = fname.split("_", 1)
-                pair_key = f"{sta1}:{sta2}"
-                try:
-                    ds = xr_get_ref(root, lineage, sta1, sta2, comp, taxis)
-                    results[(pair_key, comp)] = _apply_format(ds)
-                except (FileNotFoundError, Exception):
-                    pass
-
-        if pair is not None:
-            return {k[1]: v for k, v in results.items()}
-        return results
-
-    def get_mwcs(
-        self,
-        pair: Optional[str] = None,
-        components: Optional[str] = None,
-        mov_stack: Optional[tuple] = None,
-        format: str = "xarray",
-    ):
-        """Load MWCS results.
-
-        Parameters
-        ----------
-        format:
-            ``"xarray"`` (default) or ``"dataframe"``.
-
-        Returns
-        -------
-        If all args specified: result in requested format.
-        Otherwise: dict keyed by ``(pair, components, mov_stack)``.
-        """
-        from .core.io import xr_get_mwcs
-
-        self._require_category("mwcs")
-        lineage = self._lineage_through("mwcs")
-        root = self.output_folder
-        api_fmt = "dataset" if format == "xarray" else "dataframe"
-
-        if pair is not None and components is not None and mov_stack is not None:
-            sta1, sta2 = pair.split(":")
-            return xr_get_mwcs(root, lineage, sta1, sta2, components, mov_stack,
-                               format=api_fmt)
-
-        return self._load_pair_comp_movstack(
-            root, lineage,
-            lambda *a, **kw: xr_get_mwcs(*a, format=api_fmt, **kw),
-            pair, components, mov_stack)
-
-    def get_mwcs_dtt(
-        self,
-        pair: Optional[str] = None,
-        components: Optional[str] = None,
-        mov_stack: Optional[tuple] = None,
-        format: str = "xarray",
-    ):
-        """Load MWCS-DTT (dt/t) results.
-
-        Parameters
-        ----------
-        format:
-            ``"xarray"`` (default) or ``"dataframe"``.
-
-        Returns
-        -------
-        If all args specified: result in requested format.
-        Otherwise: dict keyed by ``(pair, components, mov_stack)``.
-        """
-        from .core.io import xr_get_dtt
-
-        self._require_category("mwcs_dtt")
-        lineage = self._lineage_through("mwcs_dtt")
-        root = self.output_folder
-        api_fmt = "dataset" if format == "xarray" else "dataframe"
-
-        if pair is not None and components is not None and mov_stack is not None:
-            sta1, sta2 = pair.split(":")
-            return xr_get_dtt(root, lineage, sta1, sta2, components, mov_stack,
-                              format=api_fmt)
-
-        return self._load_pair_comp_movstack(
-            root, lineage,
-            lambda *a, **kw: xr_get_dtt(*a, format=api_fmt, **kw),
-            pair, components, mov_stack)
-
-    def get_stretching(
-        self,
-        pair: Optional[str] = None,
-        components: Optional[str] = None,
-        mov_stack: Optional[tuple] = None,
-        format: str = "xarray",
-    ):
-        """Load stretching results.
-
-        Parameters
-        ----------
-        format:
-            ``"xarray"`` (default) or ``"dataframe"``.
-
-        Returns
-        -------
-        If all args specified: result in requested format.
-        Otherwise: dict keyed by ``(pair, components, mov_stack)``.
-        """
-        from .core.io import _xr_get_stretching
-
-        self._require_category("stretching")
-        lineage = self._lineage_through("stretching")
-        root = self.output_folder
-        api_fmt = "dataset" if format == "xarray" else "dataframe"
-
-        if pair is not None and components is not None and mov_stack is not None:
-            sta1, sta2 = pair.split(":")
-            return _xr_get_stretching(root, lineage, sta1, sta2,
-                                      components, mov_stack, format=api_fmt)
-
-        return self._load_pair_comp_movstack(
-            root, lineage,
-            lambda *a, **kw: _xr_get_stretching(*a, format=api_fmt, **kw),
-            pair, components, mov_stack)
-
-    def get_dvv(
-        self,
-        pair_type: str = "ALL",
-        components: Optional[str] = None,
-        mov_stack: Optional[tuple] = None,
-        format: str = "xarray",
-    ):
-        """Load pre-aggregated network dv/v statistics.
-
-        The :class:`MSNoiseResult` must be instantiated at a DVV aggregate step
-        (``mwcs_dtt_dvv``, ``stretching_dvv``, or ``wavelet_dtt_dvv``).
-
-        Parameters
-        ----------
-        pair_type:
-            ``"ALL"`` (default), ``"CC"``, ``"SC"``, or ``"AC"``.
-        components:
-            Component string e.g. ``"ZZ"`` or ``"ALL"``.  If *None*, all
-            available components are returned.
-        mov_stack:
-            Moving-stack tuple e.g. ``("1D", "1D")``.  If *None*, all
-            available mov_stacks are returned.
-        format:
-            ``"xarray"`` (default) returns an :class:`xarray.Dataset`.
-            ``"dataframe"`` returns a :class:`~pandas.DataFrame`.
-
-        Returns
-        -------
-        If *components* and *mov_stack* are both specified: result in
-        requested format.
-        Otherwise: dict keyed by ``(pair_type, components, mov_stack)``.
-        """
-        from .core.io import xr_get_dvv_agg
-
-        DVV_CATEGORIES = ("mwcs_dtt_dvv", "stretching_dvv", "wavelet_dtt_dvv")
-        present = {_step_prefix(n) for n in self.lineage_names}
-        if not any(cat in present for cat in DVV_CATEGORIES):
-            raise ValueError(
-                f"Lineage {'/'.join(self.lineage_names)!r} does not include "
-                f"any DVV aggregate step "
-                f"({', '.join(DVV_CATEGORIES)}). "
-                "Run the appropriate dvv compute step first."
-            )
-
-        # Resolve the DVV step name and its lineage
-        dvv_cat = self.category
-        lineage   = self._lineage_through(dvv_cat)
-        step_name = self._step_name_for(dvv_cat)
-        root      = self.output_folder
-        api_fmt   = "dataset" if format == "xarray" else "dataframe"
-
-        if components is not None and mov_stack is not None:
-            return xr_get_dvv_agg(root, lineage, step_name,
-                                   mov_stack, pair_type, components,
-                                   format=api_fmt)
-
-        # Discovery mode — find all available (pair_type, component, mov_stack)
-        base = os.path.join(root, *lineage, step_name, "_output")
-        results = {}
-
-        ms_dirs = (
-            [os.path.join(base, "%s_%s" % (mov_stack[0], mov_stack[1]))]
-            if mov_stack is not None
-            else [p for p in self._discover(os.path.join(base, "*"))
-                  if os.path.isdir(p)]
-        )
-        for ms_dir in ms_dirs:
-            ms_str   = os.path.basename(ms_dir)
-            ms_tuple = tuple(ms_str.split("_", 1))
-            pattern  = f"dvv_{pair_type}_*.nc" if components is None else \
-                       f"dvv_{pair_type}_{components}.nc"
-            for nc_file in self._discover(os.path.join(ms_dir, pattern)):
-                fname = os.path.splitext(os.path.basename(nc_file))[0]
-                # dvv_CC_ZZ  →  parts = ["dvv", "CC", "ZZ"]
-                parts = fname.split("_", 2)
-                if len(parts) < 3:
-                    continue
-                _, pt, comp = parts
-                try:
-                    results[(pt, comp, ms_tuple)] = xr_get_dvv_agg(
-                        root, lineage, step_name,
-                        ms_tuple, pt, comp, format=api_fmt)
-                except (FileNotFoundError, Exception):
-                    pass
-
-        # Simplify keys when specific dimensions are constrained
-        if components is not None and mov_stack is not None:
-            return {k[0]: v for k, v in results.items()}   # keyed by pair_type
-        if components is not None:
-            return {(k[0], k[2]): v for k, v in results.items()}
-        if mov_stack is not None:
-            return {(k[0], k[1]): v for k, v in results.items()}
-        return results
-
-    def get_wct(
-        self,
-        pair: Optional[str] = None,
-        components: Optional[str] = None,
-        mov_stack: Optional[tuple] = None,
-        format: str = "xarray",
-    ):
-        """Load Wavelet Coherence Transform results.
-
-        Parameters
-        ----------
-        format:
-            ``"xarray"`` (default) returns an :class:`xarray.Dataset`.
-            ``"dataframe"`` flattens to a :class:`~pandas.DataFrame`.
-
-        Returns
-        -------
-        If all args specified: result in requested format.
-        Otherwise: dict keyed by ``(pair, components, mov_stack)``.
-        """
-        from .core.io import xr_load_wct
-
-        self._require_category("wavelet")
-        lineage = self._lineage_through("wavelet")
-        root = self.output_folder
-
-        if pair is not None and components is not None and mov_stack is not None:
-            sta1, sta2 = pair.split(":")
-            ds = xr_load_wct(root, lineage, sta1, sta2, components, mov_stack)
-            if format == "dataframe":
-                return ds.to_dataframe()
-            return ds
-
-        return self._load_pair_comp_movstack(
-            root, lineage, xr_load_wct, pair, components, mov_stack)
-
-    def get_wct_dtt(
-        self,
-        pair: Optional[str] = None,
-        components: Optional[str] = None,
-        mov_stack: Optional[tuple] = None,
-        format: str = "xarray",
-    ):
-        """Load WCT dt/t results.
-
-        Parameters
-        ----------
-        format:
-            ``"xarray"`` (default) returns an :class:`xarray.Dataset`.
-            ``"dataframe"`` flattens to a :class:`~pandas.DataFrame`.
-
-        Returns
-        -------
-        If all args specified: result in requested format.
-        Otherwise: dict keyed by ``(pair, components, mov_stack)``.
-        """
-        from .core.io import xr_get_wct_dtt
-
-        self._require_category("wavelet_dtt")
-        lineage = self._lineage_through("wavelet_dtt")
-        root = self.output_folder
-
-        if pair is not None and components is not None and mov_stack is not None:
-            sta1, sta2 = pair.split(":")
-            ds = xr_get_wct_dtt(root, lineage, sta1, sta2, components, mov_stack)
-            if format == "dataframe":
-                return ds.to_dataframe()
-            return ds
-
-        return self._load_pair_comp_movstack(
-            root, lineage, xr_get_wct_dtt, pair, components, mov_stack)
-
-    def get_psd(
-        self,
-        seed_id: Optional[str] = None,
-        day: Optional[str] = None,
-        format: str = "xarray",
-    ):
-        """Load daily PSD results.
-
-        Parameters
-        ----------
-        seed_id:
-            SEED identifier ``"NET.STA.LOC.CHAN"``.  If None, all channels.
-        day:
-            Date string ``"YYYY-MM-DD"``.  If None, all days.
-        format:
-            ``"xarray"`` (default) or ``"dataframe"``.
-
-        Returns
-        -------
-        If all args specified: result in requested format.
-        Otherwise: dict keyed by ``(seed_id, day)``.
-        """
-        from .core.io import xr_load_psd
-
-        self._require_category("psd")
-        step_name = self._step_name_for("psd")
-        lineage = self._lineage_upstream_of("psd")
-        root = self.output_folder
-        api_fmt = "dataset" if format == "xarray" else "dataframe"
-
-        if seed_id is not None and day is not None:
-            return xr_load_psd(root, lineage, step_name, seed_id, day,
-                               format=api_fmt)
-
-        base = os.path.join(root, *lineage, step_name, "_output", "daily")
-        results = {}
-        seed_ids = (
-            [seed_id] if seed_id is not None
-            else [os.path.basename(p)
-                  for p in self._discover(os.path.join(base, "*"))
-                  if os.path.isdir(p)]
-        )
-        for sid in seed_ids:
-            day_files = (
-                self._discover(os.path.join(base, sid, f"{day}.nc"))
-                if day is not None
-                else self._discover(os.path.join(base, sid, "*.nc"))
-            )
-            for fpath in day_files:
-                day_key = os.path.splitext(os.path.basename(fpath))[0]
-                result = xr_load_psd(root, lineage, step_name, sid, day_key,
-                                     format=api_fmt)
-                if result is not None:
-                    results[(sid, day_key)] = result
-
-        if seed_id is not None:
-            return {k[1]: v for k, v in results.items()}
-        return results
-
-    def get_psd_rms(
-        self,
-        seed_id: Optional[str] = None,
-        format: str = "xarray",
-    ):
-        """Load PSD RMS results.
-
-        Parameters
-        ----------
-        seed_id:
-            SEED identifier ``"NET.STA.LOC.CHAN"``.  If None, all channels.
-        format:
-            ``"xarray"`` (default) or ``"dataframe"``.
-
-        Returns
-        -------
-        If specified: result in requested format.
-        Otherwise: dict keyed by ``seed_id``.
-        """
-        from .core.io import xr_load_rms
-
-        self._require_category("psd_rms")
-        step_name = self._step_name_for("psd_rms")
-        lineage = self._lineage_upstream_of("psd_rms")
-        root = self.output_folder
-        api_fmt = "dataset" if format == "xarray" else "dataframe"
-
-        if seed_id is not None:
-            return xr_load_rms(root, lineage, step_name, seed_id, format=api_fmt)
-
-        base = os.path.join(root, *lineage, step_name, "_output")
-        results = {}
-        for sid_dir in self._discover(os.path.join(base, "*")):
-            if not os.path.isdir(sid_dir):
-                continue
-            sid = os.path.basename(sid_dir)
-            result = xr_load_rms(root, lineage, step_name, sid, format=api_fmt)
-            if result is not None:
-                results[sid] = result
-        return results
-
-    # ------------------------------------------------------------------ #
-    # Shared discovery helper                                              #
-    # ------------------------------------------------------------------ #
 
     def _load_pair_comp_movstack(self, root, lineage, loader_fn,
                                   pair, components, mov_stack):
-        """Generic discovery+load for functions with (root, lineage, sta1, sta2, comp, mov_stack) signature."""
+        """Generic discovery+load for (root, lineage, sta1, sta2, comp, ms) loaders."""
         base = os.path.join(root, *lineage, "_output")
         results = {}
-
         mov_stacks = (
             ["%s_%s" % (mov_stack[0], mov_stack[1])] if mov_stack is not None
             else [os.path.basename(p)
@@ -911,25 +288,20 @@ class MSNoiseResult:
             )
             for comp in comp_list:
                 nc_dir = os.path.join(base, ms_str, comp)
-                if pair is not None:
-                    sta1, sta2 = pair.split(":")
-                    files = self._discover(
-                        os.path.join(nc_dir, f"{sta1}_{sta2}.nc"))
-                else:
-                    files = self._discover(os.path.join(nc_dir, "*.nc"))
-
+                files = (
+                    self._discover(os.path.join(nc_dir, f"{pair.split(':')[0]}_{pair.split(':')[1]}.nc"))
+                    if pair is not None
+                    else self._discover(os.path.join(nc_dir, "*.nc"))
+                )
                 for fpath in files:
                     fname = os.path.splitext(os.path.basename(fpath))[0]
                     sta1, sta2 = fname.split("_", 1)
                     pair_key = f"{sta1}:{sta2}"
                     try:
-                        data = loader_fn(root, lineage, sta1, sta2,
-                                         comp, ms_tuple)
+                        data = loader_fn(root, lineage, sta1, sta2, comp, ms_tuple)
                         results[(pair_key, comp, ms_tuple)] = data
-                    except (FileNotFoundError, Exception):
+                    except Exception:
                         pass
-
-        # Simplify keys when only one dimension is wildcarded
         if pair is not None and components is not None:
             return {k[2]: v for k, v in results.items()}
         if pair is not None and mov_stack is not None:
@@ -938,33 +310,284 @@ class MSNoiseResult:
             return {k[0]: v for k, v in results.items()}
         return results
 
+    # ── load methods (gated by @_lineage_method) ──────────────────────────────
 
-# ------------------------------------------------------------------ #
-# Module-level helper                                                  #
-# ------------------------------------------------------------------ #
+    @_lineage_method("stack")
+    def get_ccf(self, pair=None, components=None, mov_stack=None, format="xarray"):
+        """Load CCFs from the stack step. Requires 'stack' in lineage."""
+        from .core.io import xr_get_ccf
+        from .core.workflow import get_t_axis
 
-def _upstream_lineage_for_step(db, step) -> list[str]:
-    """Walk WorkflowLinks upstream from *step* to build all full lineage name lists.
+        lineage = self._lineage_through("stack")
+        taxis = get_t_axis(self.params)
+        root = self.output_folder
 
-    Returns a list of lineage name lists (one per distinct upstream path).
-    In a simple single-configset workflow this returns exactly one list.
-    In a multi-configset DAG (multiple incoming links to one step), all
-    paths are enumerated.
-    """
+        if pair is not None and components is not None and mov_stack is not None:
+            sta1, sta2 = pair.split(":")
+            return xr_get_ccf(root, lineage, sta1, sta2, components,
+                               mov_stack, taxis, format=format)
+
+        base = os.path.join(root, *lineage, "_output")
+        results = {}
+        mov_stacks = (
+            ["%s_%s" % (mov_stack[0], mov_stack[1])] if mov_stack is not None
+            else [os.path.basename(p)
+                  for p in self._discover(os.path.join(base, "*")) if os.path.isdir(p)]
+        )
+        comps = [components] if components is not None else None
+        for ms_str in mov_stacks:
+            ms_tuple = tuple(ms_str.split("_", 1))
+            comp_list = (comps if comps is not None
+                         else [os.path.basename(p)
+                               for p in self._discover(os.path.join(base, ms_str, "*"))
+                               if os.path.isdir(p)])
+            for comp in comp_list:
+                nc_dir = os.path.join(base, ms_str, comp)
+                files = (
+                    self._discover(os.path.join(nc_dir, f"{pair.split(':')[0]}_{pair.split(':')[1]}.nc"))
+                    if pair is not None
+                    else self._discover(os.path.join(nc_dir, "*.nc"))
+                )
+                for fpath in files:
+                    fname = os.path.splitext(os.path.basename(fpath))[0]
+                    sta1, sta2 = fname.split("_", 1)
+                    pair_key = f"{sta1}:{sta2}"
+                    try:
+                        df = xr_get_ccf(root, lineage, sta1, sta2, comp,
+                                        ms_tuple, taxis, format=format)
+                        results[(pair_key, comp, ms_tuple)] = df
+                    except Exception:
+                        pass
+        if pair is not None and components is not None and mov_stack is None:
+            return {k[2]: v for k, v in results.items()}
+        return results
+
+    @_lineage_method("refstack")
+    def get_ref(self, pair=None, components=None, format="xarray"):
+        """Load reference stacks. Requires 'refstack' in lineage."""
+        from .core.io import xr_get_ref
+        from .core.workflow import get_t_axis
+
+        lineage = self._lineage_through("refstack")
+        taxis = get_t_axis(self.params)
+        root = self.output_folder
+
+        def _fmt(ds):
+            if format == "dataframe":
+                import pandas as pd
+                da = ds.REF
+                return pd.Series(da.values, index=da.coords["taxis"].values, name="REF")
+            return ds
+
+        if pair is not None and components is not None:
+            sta1, sta2 = pair.split(":")
+            return _fmt(xr_get_ref(root, lineage, sta1, sta2, components, taxis))
+
+        base = os.path.join(root, *lineage, "_output", "REF")
+        results = {}
+        comp_list = (
+            [components] if components is not None
+            else [os.path.basename(p)
+                  for p in self._discover(os.path.join(base, "*")) if os.path.isdir(p)]
+        )
+        for comp in comp_list:
+            nc_dir = os.path.join(base, comp)
+            files = (
+                self._discover(os.path.join(nc_dir, f"{pair.replace(':','_')}.nc"))
+                if pair is not None
+                else self._discover(os.path.join(nc_dir, "*.nc"))
+            )
+            for fpath in files:
+                fname = os.path.splitext(os.path.basename(fpath))[0]
+                sta1, sta2 = fname.split("_", 1)
+                try:
+                    ds = xr_get_ref(root, lineage, sta1, sta2, comp, taxis)
+                    results[(f"{sta1}:{sta2}", comp)] = _fmt(ds)
+                except Exception:
+                    pass
+        if pair is not None:
+            return {k[1]: v for k, v in results.items()}
+        return results
+
+    @_lineage_method("mwcs")
+    def get_mwcs(self, pair=None, components=None, mov_stack=None, format="xarray"):
+        """Load MWCS results. Requires 'mwcs' in lineage."""
+        from .core.io import xr_get_mwcs
+        lineage = self._lineage_through("mwcs")
+        root = self.output_folder
+        fmt = "dataset" if format == "xarray" else "dataframe"
+        if pair is not None and components is not None and mov_stack is not None:
+            sta1, sta2 = pair.split(":")
+            return xr_get_mwcs(root, lineage, sta1, sta2, components, mov_stack, format=fmt)
+        return self._load_pair_comp_movstack(
+            root, lineage, lambda *a, **kw: xr_get_mwcs(*a, format=fmt, **kw),
+            pair, components, mov_stack)
+
+    @_lineage_method("mwcs_dtt")
+    def get_mwcs_dtt(self, pair=None, components=None, mov_stack=None, format="xarray"):
+        """Load MWCS-DTT results. Requires 'mwcs_dtt' in lineage."""
+        from .core.io import xr_get_dtt
+        lineage = self._lineage_through("mwcs_dtt")
+        root = self.output_folder
+        fmt = "dataset" if format == "xarray" else "dataframe"
+        if pair is not None and components is not None and mov_stack is not None:
+            sta1, sta2 = pair.split(":")
+            return xr_get_dtt(root, lineage, sta1, sta2, components, mov_stack, format=fmt)
+        return self._load_pair_comp_movstack(
+            root, lineage, lambda *a, **kw: xr_get_dtt(*a, format=fmt, **kw),
+            pair, components, mov_stack)
+
+    @_lineage_method("stretching")
+    def get_stretching(self, pair=None, components=None, mov_stack=None, format="xarray"):
+        """Load stretching results. Requires 'stretching' in lineage."""
+        from .core.io import _xr_get_stretching
+        lineage = self._lineage_through("stretching")
+        root = self.output_folder
+        fmt = "dataset" if format == "xarray" else "dataframe"
+        if pair is not None and components is not None and mov_stack is not None:
+            sta1, sta2 = pair.split(":")
+            return _xr_get_stretching(root, lineage, sta1, sta2, components, mov_stack, format=fmt)
+        return self._load_pair_comp_movstack(
+            root, lineage, lambda *a, **kw: _xr_get_stretching(*a, format=fmt, **kw),
+            pair, components, mov_stack)
+
+    @_lineage_method(["mwcs_dtt_dvv", "stretching_dvv", "wavelet_dtt_dvv"])
+    def get_dvv(self, pair_type="ALL", components=None, mov_stack=None, format="xarray"):
+        """Load DVV aggregate results. Requires a DVV step in lineage."""
+        from .core.io import xr_get_dvv_agg
+        dvv_cat   = self.category
+        lineage   = self._lineage_through(dvv_cat)
+        step_name = self._step_name_for(dvv_cat)
+        root      = self.output_folder
+        fmt       = "dataset" if format == "xarray" else "dataframe"
+        if components is not None and mov_stack is not None:
+            return xr_get_dvv_agg(root, lineage, step_name, mov_stack,
+                                   pair_type, components, format=fmt)
+        base = os.path.join(root, *lineage, step_name, "_output")
+        results = {}
+        ms_dirs = (
+            [os.path.join(base, "%s_%s" % (mov_stack[0], mov_stack[1]))]
+            if mov_stack is not None
+            else [p for p in self._discover(os.path.join(base, "*")) if os.path.isdir(p)]
+        )
+        for ms_dir in ms_dirs:
+            ms_str   = os.path.basename(ms_dir)
+            ms_tuple = tuple(ms_str.split("_", 1))
+            pattern  = (f"dvv_{pair_type}_*.nc" if components is None
+                        else f"dvv_{pair_type}_{components}.nc")
+            for nc_file in self._discover(os.path.join(ms_dir, pattern)):
+                fname = os.path.splitext(os.path.basename(nc_file))[0]
+                parts = fname.split("_", 2)
+                if len(parts) < 3:
+                    continue
+                _, pt, comp = parts
+                try:
+                    results[(pt, comp, ms_tuple)] = xr_get_dvv_agg(
+                        root, lineage, step_name, ms_tuple, pt, comp, format=fmt)
+                except Exception:
+                    pass
+        if components is not None and mov_stack is not None:
+            return {k[0]: v for k, v in results.items()}
+        if components is not None:
+            return {(k[0], k[2]): v for k, v in results.items()}
+        if mov_stack is not None:
+            return {(k[0], k[1]): v for k, v in results.items()}
+        return results
+
+    @_lineage_method("wavelet")
+    def get_wct(self, pair=None, components=None, mov_stack=None, format="xarray"):
+        """Load WCT results. Requires 'wavelet' in lineage."""
+        from .core.io import xr_load_wct
+        lineage = self._lineage_through("wavelet")
+        root = self.output_folder
+        if pair is not None and components is not None and mov_stack is not None:
+            sta1, sta2 = pair.split(":")
+            ds = xr_load_wct(root, lineage, sta1, sta2, components, mov_stack)
+            return ds.to_dataframe() if format == "dataframe" else ds
+        return self._load_pair_comp_movstack(root, lineage, xr_load_wct,
+                                              pair, components, mov_stack)
+
+    @_lineage_method("wavelet_dtt")
+    def get_wct_dtt(self, pair=None, components=None, mov_stack=None, format="xarray"):
+        """Load WCT dt/t results. Requires 'wavelet_dtt' in lineage."""
+        from .core.io import xr_get_wct_dtt
+        lineage = self._lineage_through("wavelet_dtt")
+        root = self.output_folder
+        if pair is not None and components is not None and mov_stack is not None:
+            sta1, sta2 = pair.split(":")
+            ds = xr_get_wct_dtt(root, lineage, sta1, sta2, components, mov_stack)
+            return ds.to_dataframe() if format == "dataframe" else ds
+        return self._load_pair_comp_movstack(root, lineage, xr_get_wct_dtt,
+                                              pair, components, mov_stack)
+
+    @_lineage_method("psd")
+    def get_psd(self, seed_id=None, day=None, format="xarray"):
+        """Load PSD results. Requires 'psd' in lineage."""
+        from .core.io import xr_load_psd
+        step_name = self._step_name_for("psd")
+        lineage   = self._lineage_upstream_of("psd")
+        root      = self.output_folder
+        fmt       = "dataset" if format == "xarray" else "dataframe"
+        if seed_id is not None and day is not None:
+            return xr_load_psd(root, lineage, step_name, seed_id, day, format=fmt)
+        base = os.path.join(root, *lineage, step_name, "_output", "daily")
+        results = {}
+        seed_ids = (
+            [seed_id] if seed_id is not None
+            else [os.path.basename(p)
+                  for p in self._discover(os.path.join(base, "*")) if os.path.isdir(p)]
+        )
+        for sid in seed_ids:
+            day_files = (
+                self._discover(os.path.join(base, sid, f"{day}.nc"))
+                if day is not None
+                else self._discover(os.path.join(base, sid, "*.nc"))
+            )
+            for fpath in day_files:
+                day_key = os.path.splitext(os.path.basename(fpath))[0]
+                r = xr_load_psd(root, lineage, step_name, sid, day_key, format=fmt)
+                if r is not None:
+                    results[(sid, day_key)] = r
+        if seed_id is not None:
+            return {k[1]: v for k, v in results.items()}
+        return results
+
+    @_lineage_method("psd_rms")
+    def get_psd_rms(self, seed_id=None, format="xarray"):
+        """Load PSD RMS results. Requires 'psd_rms' in lineage."""
+        from .core.io import xr_load_rms
+        step_name = self._step_name_for("psd_rms")
+        lineage   = self._lineage_upstream_of("psd_rms")
+        root      = self.output_folder
+        fmt       = "dataset" if format == "xarray" else "dataframe"
+        if seed_id is not None:
+            return xr_load_rms(root, lineage, step_name, seed_id, format=fmt)
+        base = os.path.join(root, *lineage, step_name, "_output")
+        results = {}
+        for sid_dir in self._discover(os.path.join(base, "*")):
+            if not os.path.isdir(sid_dir):
+                continue
+            sid = os.path.basename(sid_dir)
+            r = xr_load_rms(root, lineage, step_name, sid, format=fmt)
+            if r is not None:
+                results[sid] = r
+        return results
+
+
+# ── module-level helper ────────────────────────────────────────────────────────
+
+def _upstream_lineage_for_step(db, step) -> list:
+    """Walk WorkflowLinks upstream from *step*, return all root-to-step paths."""
     from .core.workflow import get_workflow_links
     from .msnoise_table_def import declare_tables
-
     schema = declare_tables()
     WorkflowStep = schema.WorkflowStep
-
     links = get_workflow_links(db)
-    # Build multi-map: to_step_id → [from_step_id, ...]
-    parent_map: dict[int, list[int]] = {}
+    parent_map: dict = {}
     for lnk in links:
         parent_map.setdefault(lnk.to_step_id, []).append(lnk.from_step_id)
 
-    def _walk(step_id, visited) -> list[list[str]]:
-        """Recursively walk upstream, returning all root→current paths."""
+    def _walk(step_id, visited):
         step_obj = db.query(WorkflowStep).filter(
             WorkflowStep.step_id == step_id).first()
         if step_obj is None or step_obj.category == "global":
@@ -981,6 +604,4 @@ def _upstream_lineage_for_step(db, step) -> list[str]:
                 paths.append(upstream_path + [step_obj.step_name])
         return paths
 
-    all_paths = _walk(step.step_id, set())
-    # Filter out single-element paths (just the step itself, no real upstream)
-    return [p for p in all_paths if p]
+    return [p for p in _walk(step.step_id, set()) if p]
