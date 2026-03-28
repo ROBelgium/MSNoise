@@ -11,3 +11,6 @@ crondays,1,"Number of days to monitor with scan_archive, typically used in cron 
 plugins,,Comma separated list of plugin names. Plugins names should be importable Python modules.,str,
 hpc,N,Is MSNoise going to run on an HPC?,bool,Y/N
 output_folder,OUTPUT,Folder in which all the results will be output (base of the folder structure),str,
+fdsn_retries,3,Number of retry attempts for transient FDSN/EIDA network errors (timeout etc),int,
+fdsn_min_coverage,0.5,Minimum fraction of the requested time window that must be returned by FDSN/EIDA for the job to succeed (0.0-1.0),float,
+fdsn_keep_raw,N,"Y: cache raw fetched waveforms to _output/raw/<date>/ for re-use by other preprocess configsets without re-fetching",bool,Y/N
