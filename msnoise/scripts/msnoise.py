@@ -2130,12 +2130,13 @@ def create_preprocess_jobs_cmd(date, date_range, set_number):
 
             if is_remote_source(ds.uri):
                 # FDSN/EIDA — create job unconditionally
-                # Use NET.STA.LOC (pick first loc or empty)
                 locs = station.locs() or [""]
                 for loc in locs:
                     pair = f"{station.net}.{station.sta}.{loc}"
                     update_job(db, goal_day, pair, pre_step.step_name, "T",
-                               step_id=pre_step.step_id, commit=False)
+                               step_id=pre_step.step_id,
+                               lineage=pre_step.step_name,
+                               commit=False)
                     created += 1
             else:
                 # Local/SDS — only create if DA records exist for this day
@@ -2147,7 +2148,9 @@ def create_preprocess_jobs_cmd(date, date_range, set_number):
                     if da_records:
                         pair = f"{station.net}.{station.sta}.{loc}"
                         update_job(db, goal_day, pair, pre_step.step_name, "T",
-                                   step_id=pre_step.step_id, commit=False)
+                                   step_id=pre_step.step_id,
+                                   lineage=pre_step.step_name,
+                                   commit=False)
                         created += 1
                     else:
                         skipped += 1
