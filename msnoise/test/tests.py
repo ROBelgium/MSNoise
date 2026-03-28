@@ -414,6 +414,33 @@ def test_015b_check_keep_all_cc_files():
     db.close()
 
 
+@pytest.mark.order(18)
+def test_015c_check_cc_float32_encoding():
+    """Saved CC NetCDF files use float32 encoding, not float64."""
+    import xarray as xr
+    db = connect()
+    output_folder = get_config(db, 'output_folder') or 'OUTPUT'
+    filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
+    checked = 0
+    for filter_step in filter_steps:
+        nc_files = glob.glob(os.path.join(
+            output_folder, "preprocess_1", "cc_1",
+            filter_step.step_name, "_output", "daily",
+            "**", "*.nc"), recursive=True)
+        for nc in nc_files[:3]:
+            ds = xr.open_dataset(nc)
+            for var in ds.data_vars:
+                assert ds[var].dtype != "float64", (
+                    f"{nc}: variable '{var}' is float64 — "
+                    f"expected float32 (check _xr_save_and_close encoding)")
+            ds.close()
+            checked += 1
+    db.close()
+    if checked == 0:
+        pytest.skip("No CC NetCDF files found to verify encoding")
+
+
+
 @pytest.mark.order(19)
 def test_017_reset_cc_jobs():
     db = connect()

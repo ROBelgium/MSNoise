@@ -709,7 +709,8 @@ class MSNoiseResult:
                 "components":      comp,
                 "mov_stack":       ms_str,
             })
-            ds.to_netcdf(out_path)
+            from .core.io import _f32_encoding
+            ds.to_netcdf(out_path, encoding=_f32_encoding(ds))
             written.append(out_path)
 
         return written

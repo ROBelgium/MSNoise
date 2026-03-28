@@ -9,6 +9,31 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+# ── NetCDF encoding presets ───────────────────────────────────────────────────
+#
+# All float data variables are stored as float32 with zlib level-4 compression.
+# float32 provides ~7 significant decimal digits — far exceeding measurement
+# noise in any ambient-noise application — while reducing file size ~4–5×
+# compared to uncompressed float64.
+#
+# Times (datetime64) and string/integer coordinates use their natural dtype.
+
+_ZLIB_LEVEL = 4
+_F32_OPTS   = {"dtype": "float32", "zlib": True, "complevel": _ZLIB_LEVEL}
+
+
+def _f32_encoding(ds):
+    """Build a float32+zlib encoding dict for all float data variables in *ds*."""
+    enc = {}
+    for var in ds.data_vars:
+        da = ds[var]
+        if da.dtype.kind == "f":           # float32 or float64
+            enc[var] = _F32_OPTS.copy()
+        elif da.dtype.kind in ("i", "u"):  # integers (e.g. n_pairs)
+            enc[var] = {"zlib": True, "complevel": _ZLIB_LEVEL}
+    return enc
+
+
 def _get_wavgwstd(data, dttname, errname):
     """
     Calculate the weighted average and weighted standard deviation for a given data.
@@ -117,10 +142,12 @@ def _xr_insert_or_update(dataset, new):
 
 
 
-def _xr_save_and_close(dataset, fn):
+def _xr_save_and_close(dataset, fn, encoding=None):
+    """Write *dataset* to *fn* with float32+zlib encoding by default."""
     if not os.path.isdir(os.path.split(fn)[0]):
         os.makedirs(os.path.split(fn)[0], exist_ok=True)
-    dataset.to_netcdf(fn, mode="w")
+    enc = encoding if encoding is not None else _f32_encoding(dataset)
+    dataset.to_netcdf(fn, mode="w", encoding=enc, engine="netcdf4")
     dataset.close()
     del dataset
 
@@ -249,7 +276,7 @@ def xr_save_ccf_daily(root, lineage, step_name, station1, station2, components, 
     os.makedirs(path, exist_ok=True)
     fn = os.path.join(path, f"{date}.nc")
     da = xr.DataArray(corr, coords=[taxis], dims=["taxis"], name="CCF")
-    da.to_netcdf(fn, mode="w")
+    _xr_save_and_close(da.to_dataset(name=da.name or "CCF"), fn)
 
 
 
@@ -696,7 +723,7 @@ def xr_save_ccf_all(root, lineage, step_name, station1, station2,
         dims=["times", "taxis"],
         name="CCF",
     )
-    da.to_netcdf(fn, mode="w")
+    _xr_save_and_close(da.to_dataset(name=da.name or "CCF"), fn)
 
 
 
@@ -863,7 +890,7 @@ def xr_save_dvv_agg(root, lineage, step_name, mov_stack,
     fn = os.path.join(root, *lineage, step_name, "_output",
                       ms_str, f"dvv_{pair_type}_{component}.nc")
     os.makedirs(os.path.dirname(fn), exist_ok=True)
-    dataset.to_netcdf(fn, mode="w")
+    _xr_save_and_close(dataset, fn)
 
 
 
@@ -1229,7 +1256,7 @@ def xr_save_psd(root, lineage, step_name, seed_id, day, dataset):
         seed_id, f"{day_str}.nc",
     )
     os.makedirs(os.path.dirname(fn), exist_ok=True)
-    dataset.to_netcdf(fn, mode="w")
+    _xr_save_and_close(dataset, fn)
 
 
 
@@ -1281,9 +1308,9 @@ def xr_save_rms(root, lineage, step_name, seed_id, dataframe):
         if os.path.isfile(fn):
             existing_ds = xr.load_dataset(fn)
             merged = _xr_insert_or_update(existing_ds, dataframe)
-            merged.to_netcdf(fn, mode="w")
+            _xr_save_and_close(merged, fn)
         else:
-            dataframe.to_netcdf(fn, mode="w")
+            _xr_save_and_close(dataframe, fn)
         return
 
     # ── DataFrame path (legacy compat) ─────────────────────────────────
@@ -1305,7 +1332,7 @@ def xr_save_rms(root, lineage, step_name, seed_id, dataframe):
         dims=["times", "bands"],
         name="RMS",
     )
-    da.to_dataset().to_netcdf(fn, mode="w")
+    _xr_save_and_close(da.to_dataset(name=da.name or "data"), fn)
 
 
 
