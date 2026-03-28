@@ -37,6 +37,7 @@ import sys
 import traceback
 
 from obspy.core import UTCDateTime, Stream, read
+from .core.stations import get_waveform_path
 
 try:
     from scikits.samplerate import resample
@@ -114,11 +115,11 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
             if file.sta != "MULTIPLEX":
                 if file.chan[-1] not in comps:
                     continue
-                fullpath = os.path.join(file.path, file.file)
+                fullpath = get_waveform_path(db, file)
                 datafiles[station][file.chan[-1]].append(fullpath)
             else:
                 logger.debug("Mutliplex mode, reading the files")
-                fullpath = os.path.join(file.path, file.file)
+                fullpath = get_waveform_path(db, file)
                 multiplexed = sorted(glob.glob(fullpath))
                 for comp in comps:
                     for fn in multiplexed:

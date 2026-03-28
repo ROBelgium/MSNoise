@@ -613,3 +613,22 @@ def import_stationxml(session, path_or_url, data_source_id=None):
     logger.info(f"StationXML import done: {created} created, {updated} updated")
     return created, updated
 
+def get_waveform_path(session, da):
+    """Reconstruct the full absolute path for a DataAvailability record.
+
+    Joins ``DataSource.uri`` with ``da.path`` and ``da.file``.  If the DA
+    record has no ``data_source_id`` (legacy or NULL), falls back to treating
+    ``da.path`` as an absolute path (backward-compatible behaviour).
+
+    :param session: SQLAlchemy session.
+    :param da: :class:`~msnoise.msnoise_table_def.DataAvailability` ORM object.
+    :returns: Absolute path string to the waveform file.
+    """
+    import os
+    if da.data_source_id is not None:
+        ds = get_data_source(session, id=da.data_source_id)
+    else:
+        ds = get_default_data_source(session)
+    root = ds.uri if ds and ds.uri else ""
+    return os.path.join(root, da.path, da.file) if root else os.path.join(da.path, da.file)
+
