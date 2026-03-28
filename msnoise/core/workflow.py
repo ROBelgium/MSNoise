@@ -9,7 +9,7 @@ from .db import connect, get_logger
 from .config import (get_config, get_config_set_details,
                      get_merged_params_for_lineage, get_params)
 from ..msnoise_table_def import (Job, WorkflowStep, DataAvailability,
-                                WORKFLOW_CHAINS, WORKFLOW_ORDER)
+                                WORKFLOW_CHAINS, WORKFLOW_ORDER, Lineage)
 
 def get_workflow_steps(session):
     """Get all steps in a workflow"""
@@ -436,11 +436,14 @@ def update_job(session, day, pair, jobtype, flag,
         job = session.query(Job).filter(text("ref=:ref")).params(ref=ref).first()
     else:
         job = (session.query(Job)
-               .filter(text("day=:day"))
-               .filter(text("pair=:pair"))
-               .filter(text("jobtype=:jobtype"))
-               .filter(text("lineage=:lineage"))
-               .params(day=day, pair=pair, jobtype=jobtype, lineage=lineage)
+               .filter(Job.day == day)
+               .filter(Job.pair == pair)
+               .filter(Job.jobtype == jobtype)
+               .outerjoin(Job.lineage_ref)
+               .filter(
+                   Lineage.lineage_str == lineage if lineage is not None
+                   else Job.lineage_id.is_(None)
+               )
                .first())
 
     if job is None:
@@ -637,17 +640,17 @@ def get_next_job_for_step(
 
     if group_by == "day":
         batch_q = batch_q.filter(Job.day == seed_job.day)
-        batch_q = batch_q.order_by(Job.pair.asc(), Job.lineage.asc())
+        batch_q = batch_q.order_by(Job.pair.asc(), Job.lineage_id.asc())
     elif group_by == "pair":
         batch_q = batch_q.filter(Job.pair == seed_job.pair)
-        batch_q = batch_q.order_by(Job.day.asc(), Job.lineage.asc())
+        batch_q = batch_q.order_by(Job.day.asc(), Job.lineage_id.asc())
     elif group_by == "pair_lineage":
-        batch_q = batch_q.filter(Job.pair == seed_job.pair).filter(Job.lineage == seed_job.lineage)
+        batch_q = batch_q.filter(Job.pair == seed_job.pair).filter(Job.lineage_id == seed_job.lineage_id)
         batch_q = batch_q.order_by(Job.day.asc())
         if limit_days is not None:
             batch_q = batch_q.limit(int(limit_days))
     elif group_by == "day_lineage":
-        batch_q = batch_q.filter(Job.day == seed_job.day).filter(Job.lineage == seed_job.lineage)
+        batch_q = batch_q.filter(Job.day == seed_job.day).filter(Job.lineage_id == seed_job.lineage_id)
         batch_q = batch_q.order_by(Job.pair.asc())
     else:
         raise ValueError(f"Unsupported group_by={group_by!r}")
@@ -669,13 +672,13 @@ def get_next_job_for_step(
     elif group_by == "pair":
         upd = upd.where(Job.pair == seed_job.pair)
     elif group_by == "pair_lineage":
-        upd = upd.where(Job.pair == seed_job.pair).where(Job.lineage == seed_job.lineage)
+        upd = upd.where(Job.pair == seed_job.pair).where(Job.lineage_id == seed_job.lineage_id)
         if limit_days is not None:
             # Note: SQL UPDATE with LIMIT is not portable. Keep limit_days for SELECT batching only.
             # The UPDATE still claims the whole (pair, lineage) batch.
             pass
     else:  # "day_lineage"
-        upd = upd.where(Job.day == seed_job.day).where(Job.lineage == seed_job.lineage)
+        upd = upd.where(Job.day == seed_job.day).where(Job.lineage_id == seed_job.lineage_id)
 
     session.execute(upd.values(flag="I"))
     session.commit()
@@ -940,11 +943,11 @@ def get_done_lineages_for_category(session, category):
     :returns: Sorted list of unique lineage-name lists.
     """
     rows = (
-        session.query(Job.lineage)
+        session.query(Lineage.lineage_str)
+        .join(Job, Job.lineage_id == Lineage.lineage_id)
         .join(Job.workflow_step)
         .filter(WorkflowStep.category == category)
         .filter(Job.flag == "D")
-        .filter(Job.lineage.isnot(None))
         .distinct()
         .all()
     )
@@ -1043,7 +1046,7 @@ def get_next_lineage_batch(
         return None
 
     pair = jobs[0].pair
-    lineage_str = getattr(jobs[0], "lineage", None)
+    lineage_str = jobs[0].lineage  # resolved via association_proxy
     if not lineage_str:
         raise ValueError(f"{step_category.upper()} jobs must have a non-empty lineage (v2 assumption)")
 

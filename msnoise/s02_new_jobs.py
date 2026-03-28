@@ -1,3 +1,4 @@
+from .msnoise_table_def import Lineage
 """ This script searches the database for files flagged "N"ew or "M"odified.
 For each date in the configured range, it checks if other stations are
 available and defines the new jobs to be processed.  Only jobs within the
@@ -483,7 +484,8 @@ def propagate_dvv_jobs_from_dtt_done(session, source_category: str) -> int:
 
         # Collect unique lineages from DONE parent jobs (any pair, any day)
         done_lineages = (
-            session.query(Job.lineage)
+            session.query(Lineage.lineage_str)
+            .join(Job, Job.lineage_id == Lineage.lineage_id)
             .filter(Job.step_id == parent_step.step_id)
             .filter(Job.flag == "D")
             .distinct()
@@ -750,7 +752,8 @@ def propagate_psd_rms_jobs_from_psd_done(session):
                     .filter(Job.step_id == psd_rms_step.step_id)
                     .filter(Job.day == psd_job.day)
                     .filter(Job.pair == psd_job.pair)
-                    .filter(Job.lineage == lineage)
+                    .join(Job.lineage_ref)
+                    .filter(Lineage.lineage_str == lineage)
                     .first()
                 )
                 if existing:

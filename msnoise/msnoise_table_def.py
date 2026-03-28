@@ -8,7 +8,8 @@ from collections import namedtuple
 from sqlalchemy import Column, Integer, String, Float, Boolean, \
     DateTime, Text, ForeignKey, UniqueConstraint, Index, Enum, REAL, TIMESTAMP, CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
-from sqlalchemy.orm import relationship, backref  # noqa: F401 — backref used in relationship()
+from sqlalchemy.orm import relationship, backref  # noqa: F401
+from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.sql import text
 # from .api import read_prefix
 
@@ -133,7 +134,8 @@ def declare_tables(prefix=None):
 
     # Define the namedtuple to return
     sqlschema = namedtuple('SQLSchema', ['Base', 'PrefixerBase',
-        'Job', 'Station', 'Config', 'DataAvailability', 'WorkflowStep', 'WorkflowLink',])
+        'Job', 'Station', 'Config', 'DataAvailability', 'WorkflowStep', 'WorkflowLink',
+        'Lineage'])
 
     # Create the SQLAlchemy base and subclass it to prefix the table names
     Base = declarative_base()
@@ -287,6 +289,30 @@ def declare_tables(prefix=None):
 
     ########################################################################
 
+    class Lineage(PrefixerBase):
+        """Normalised lineage-string table.
+
+        Each distinct lineage path (e.g.
+        ``"preprocess_1/cc_1/filter_1/stack_1/refstack_1/mwcs_1/mwcs_dtt_1"``)
+        is stored exactly once.  :class:`Job` rows reference it via a small
+        integer foreign key instead of repeating the full string across
+        potentially millions of rows (~20× storage saving for the column).
+
+        :attr lineage_id: Auto-incremented primary key.
+        :attr lineage_str: Slash-separated step-name path, unique.
+        """
+        __incomplete_tablename__ = "lineages"
+
+        lineage_id  = Column(Integer, primary_key=True, autoincrement=True)
+        lineage_str = Column(String(512), nullable=False, unique=True)
+
+        def __init__(self, lineage_str: str):
+            self.lineage_str = lineage_str
+
+        def __repr__(self):
+            return f"<Lineage({self.lineage_id}: {self.lineage_str!r})>"
+
+
     class Job(PrefixerBase):
         """
         Enhanced Job Object with workflow support
@@ -321,17 +347,29 @@ def declare_tables(prefix=None):
         # New workflow-aware fields
         step_id = Column(Integer, ForeignKey(f"{prefix}workflow_steps.step_id"), nullable=False)
 
-        # Enhanced fields
-        lineage = Column(String(255), nullable=True)
+        # Normalised lineage FK (String column replaced by integer reference)
+        lineage_id  = Column(Integer,
+                             ForeignKey(f"{prefix}lineages.lineage_id"),
+                             nullable=True, index=True)
         jobtype = Column(String(50))  # Now derived from step info, but kept for compatibility
         priority = Column(Integer, default=0)  # Job priority
 
         # Relationships
         workflow_step = relationship("WorkflowStep", backref="jobs")
+        lineage_ref   = relationship("Lineage",
+                                     foreign_keys=[lineage_id],
+                                     backref="jobs")
+        # association_proxy: job.lineage = "pre_1/cc_1/..." creates a
+        # Lineage row via the creator; the before_flush event (registered
+        # at module level below) deduplicates against existing rows.
+        lineage = association_proxy(
+            "lineage_ref", "lineage_str",
+            creator=lambda s: Lineage(lineage_str=s),
+        )
 
         __table_args__ = (
             # Updated unique constraint to include workflow context
-            Index('job_index', "day", "pair", "step_id", "lineage", unique=True),
+            Index('job_index', "day", "pair", "step_id", "lineage_id", unique=True),
             Index('job_index2', "flag", "step_id", "priority", unique=False),
             # Legacy index for backward compatibility
             Index('job_legacy_index', "day", "pair", "jobtype", unique=False),
@@ -614,10 +652,40 @@ def declare_tables(prefix=None):
 
     # Return the schema namedtuple
     return sqlschema(Base, PrefixerBase,
-                     Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink)
+                     Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink,
+                     Lineage)
     # end of declare_tables()
 
-Base, PrefixerBase, Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink = declare_tables()
+Base, PrefixerBase, Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink, Lineage = declare_tables()
+
+
+from sqlalchemy import event as _sa_event
+from sqlalchemy.orm import Session as _Session
+
+
+@_sa_event.listens_for(_Session, "before_flush")
+def _deduplicate_lineage_rows(session, flush_context, instances):
+    """Replace any pending duplicate Lineage rows with the existing DB row.
+
+    When ``job.lineage = 'pre_1/cc_1/...'`` is set via the association_proxy,
+    SQLAlchemy creates a new ``Lineage(lineage_str=...)`` object.  If that
+    string already exists in the DB (or in the session identity map), this
+    hook swaps the pending object for the existing one before the INSERT
+    fires, avoiding a UNIQUE constraint violation.
+    """
+    new_lineages = [obj for obj in session.new if isinstance(obj, Lineage)]
+    for pending in new_lineages:
+        existing = (
+            session.query(Lineage)
+            .filter(Lineage.lineage_str == pending.lineage_str)
+            .first()
+        )
+        if existing is not None and existing is not pending:
+            for job in list(pending.jobs):
+                job.lineage_ref = existing
+                job.lineage_id  = existing.lineage_id
+            session.expunge(pending)
+
 
 
 # Helper functions for configuration management

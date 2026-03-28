@@ -219,10 +219,13 @@ class MSNoiseResult:
                 continue
             child_names = self.lineage_names + [child_step.step_name]
             if not include_empty:
+                from .msnoise_table_def import Lineage as _Lineage
+                _lin_str = "/".join(child_names)
                 has_done = (
                     self._db.query(Job.ref)
                     .filter(Job.step_id == child_step.step_id)
-                    .filter(Job.lineage == "/".join(child_names))
+                    .join(Job.lineage_ref)
+                    .filter(_Lineage.lineage_str == _lin_str)
                     .filter(Job.flag == "D")
                     .first()
                 )

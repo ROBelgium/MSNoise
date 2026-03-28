@@ -441,6 +441,36 @@ def test_015c_check_cc_float32_encoding():
 
 
 
+@pytest.mark.order(18)
+def test_016_lineage_normalisation():
+    """Lineage strings are stored as FK integer IDs in the Lineage table."""
+    from ..msnoise_table_def import Lineage
+    db = connect()
+
+    # At least some jobs must have a lineage_id set
+    from ..msnoise_table_def import Job as JobTable
+    jobs_with_lin = (
+        db.query(JobTable)
+        .filter(JobTable.lineage_id.isnot(None))
+        .limit(5).all()
+    )
+    assert len(jobs_with_lin) >= 1, "Expected jobs with lineage_id set"
+
+    # Instance-level .lineage property must resolve to a slash-separated string
+    for job in jobs_with_lin:
+        lin = job.lineage   # resolved via association_proxy
+        assert lin is not None, "job.lineage returned None"
+        assert "/" in lin, f"Lineage string looks wrong: {lin!r}"
+
+    # Number of distinct Lineage rows must be << total jobs
+    n_lin  = db.query(Lineage).count()
+    n_jobs = db.query(JobTable).filter(JobTable.lineage_id.isnot(None)).count()
+    assert n_lin < n_jobs,         f"Expected fewer Lineage rows ({n_lin}) than jobs ({n_jobs})"
+    print(f"  {n_lin} unique lineage strings → {n_jobs} jobs")
+    db.close()
+
+
+
 @pytest.mark.order(19)
 def test_017_reset_cc_jobs():
     db = connect()
