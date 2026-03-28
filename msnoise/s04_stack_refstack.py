@@ -220,13 +220,17 @@ def main(loglevel="INFO"):
             if wienerfilt:
                 c = wiener_filt(c, wiener_M, wiener_N, gap_threshold)
 
-            ref_stack = c.mean(dim="times")
+            # c is a Dataset with variable "CCF" (dims: times, taxis)
+            # mean over times → Dataset with variable "CCF" (dim: taxis)
+            # xr_save_ref expects a "REF"-named DataArray/Dataset,
+            # so extract and rename before saving.
+            ref_stack = c["CCF"].mean(dim="times").rename("REF")
 
             xr_save_ref(
                 params.global_.output_folder,
                 lineage_names,    # ends with stack_N
                 step.step_name,   # refstack_M  — becomes the step sub-folder
-                sta1, sta2, components, taxis, ref_stack,
+                sta1, sta2, components, taxis, ref_stack.to_dataset(),
             )
             logger.info(
                 f"REF stack written: "
