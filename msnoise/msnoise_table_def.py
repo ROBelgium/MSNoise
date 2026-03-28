@@ -409,7 +409,7 @@ def declare_tables(prefix=None):
             self.flag = flag
             self.step_id = step_id
             self.priority = priority
-            self.lastmod = lastmod or datetime.datetime.utcnow()
+            self.lastmod = lastmod or datetime.datetime.now(datetime.timezone.utc)
 
             # Handle jobtype - derive from step if not provided
             if jobtype is not None:
@@ -626,8 +626,8 @@ def declare_tables(prefix=None):
         # Metadata
         description = Column(String(200), nullable=True)
         is_active = Column(Boolean, default=True)
-        created_at = Column(DateTime, default=datetime.datetime.utcnow)
-        updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+        created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+        updated_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
 
         # Constraints
         __table_args__ = (
@@ -661,7 +661,7 @@ def declare_tables(prefix=None):
         # Metadata
         link_type = Column(String(20), default="default")  # For different types of connections
         is_active = Column(Boolean, default=True)
-        created_at = Column(DateTime, default=datetime.datetime.utcnow)
+        created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
         # Relationships
         from_step = relationship("WorkflowStep", foreign_keys=[from_step_id], backref="outgoing_links")
@@ -753,7 +753,7 @@ def set_config(session, name, value, category='global', set_number=None,
         session.add(param)
     
     param.value = str(value)
-    param.updated_at = datetime.datetime.utcnow()
+    param.updated_at = datetime.datetime.now(datetime.timezone.utc)
     param.validate_value()
     session.commit()
     return param

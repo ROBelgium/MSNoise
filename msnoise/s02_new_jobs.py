@@ -69,7 +69,7 @@ def propagate_stack_jobs_from_cc_done(session):
     Job = schema.Job
     WorkflowStep = schema.WorkflowStep
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     created = 0
     bumped = 0
 
@@ -234,7 +234,7 @@ def propagate_refstack_jobs_from_stack_done(session):
     Job = schema.Job
     WorkflowStep = schema.WorkflowStep
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     created = 0
     bumped = 0
 
@@ -337,7 +337,7 @@ def propagate_mwcs_jobs_from_refstack_done(session):
     Job = schema.Job
     WorkflowStep = schema.WorkflowStep
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     created = 0
 
     refstack_steps = (
@@ -458,7 +458,7 @@ def propagate_dvv_jobs_from_dtt_done(session, source_category: str) -> int:
     Job = schema.Job
     WorkflowStep = schema.WorkflowStep
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     created = 0
 
     # Find all active parent DTT steps
@@ -547,7 +547,7 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
     schema = declare_tables()
     Job = schema.Job
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     created = 0
 
     done_parent_jobs = (
@@ -704,7 +704,7 @@ def propagate_psd_rms_jobs_from_psd_done(session):
     Job = schema.Job
     WorkflowStep = schema.WorkflowStep
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     created = 0
 
     psd_steps = (
@@ -846,7 +846,7 @@ def create_cc_jobs_from_preprocess(session):
     all_jobs = []
     crap_all_jobs_text = []
     count = 0
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
 
     for preprocess_step in preprocess_steps:
         logger.debug(f'Processing preprocess step: {preprocess_step.step_name}')
@@ -1094,7 +1094,7 @@ def main(init=False, nocc=False, after=False):
     crap_all_jobs_text = []
     updated_days = []
     nfs = get_new_files(db)
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     start_date, end_date, datelist = build_movstack_datelist(db)
     count = 0
     # Create jobs for single-station workflow steps (PSD, etc.)

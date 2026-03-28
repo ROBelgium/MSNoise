@@ -413,7 +413,7 @@ class JobView(BaseModelView):
             count = 0
             for job in query.all():
                 job.flag = 'T'
-                job.lastmod = datetime.utcnow()
+                job.lastmod = datetime.datetime.now(datetime.timezone.utc)
                 count += 1
             self.session.commit()
             flash(ngettext('Job was successfully reset.',
@@ -431,7 +431,7 @@ class JobView(BaseModelView):
             count = 0
             for job in query.all():
                 job.flag = 'D'
-                job.lastmod = datetime.utcnow()
+                job.lastmod = datetime.datetime.now(datetime.timezone.utc)
                 count += 1
             self.session.commit()
             flash(ngettext('Job was successfully marked as done.',
@@ -449,7 +449,7 @@ class JobView(BaseModelView):
             count = 0
             for job in query.all():
                 job.flag = 'T'
-                job.lastmod = datetime.utcnow()
+                job.lastmod = datetime.datetime.now(datetime.timezone.utc)
                 count += 1
             self.session.commit()
             flash(ngettext('Job was successfully marked as todo.',

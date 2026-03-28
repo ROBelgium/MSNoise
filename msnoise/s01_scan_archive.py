@@ -569,7 +569,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
         # Note: avoid datetime.timestamp() below as it is python3 only *and*
         # does not work correctly with naive datetime representing UTC.
         # (See the official doc for datetime.timestamp())
-        mintime = (datetime.datetime.utcnow() - modification_delta
+        mintime = (datetime.datetime.now(datetime.timezone.utc) - modification_delta
                    - datetime.datetime(1970, 1, 1, 0, 0)).total_seconds()
     stations = []
     if forced_path is None:
@@ -595,7 +595,7 @@ def main(init=False, threads=1, crondays=None, forced_path=None,
                 data_folder,
                 rawpath,
                 range(startdate.year,
-                      min(datetime.datetime.utcnow().year, enddate.year) + 1),
+                      min(datetime.datetime.now(datetime.timezone.utc).year, enddate.year) + 1),
                 stations,
                 channels)
         # logger.debug('Folders to glob: %s' % ','.join(folders_to_glob))

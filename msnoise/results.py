@@ -691,7 +691,7 @@ class MSNoiseResult:
         lin_str     = "/".join(self.lineage_names)
         lin_tag     = lineage_to_plot_tag(self.lineage_names)
         params_yaml = self.params.to_yaml_string()
-        generated   = datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        generated   = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds") + "Z"
 
         is_dir = os.path.isdir(path) or not path.endswith(".nc")
         written = []

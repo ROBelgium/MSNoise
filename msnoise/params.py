@@ -194,7 +194,7 @@ class LayeredParams:
 
         doc = {
             "msnoise_params_version": 1,
-            "generated": datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds") + "Z",
             "lineage": "/".join(names),
         }
         for cat, layer in layers.items():

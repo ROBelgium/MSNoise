@@ -571,7 +571,7 @@ def propagate_downstream(session, batch: dict) -> int:
         .all()
     )
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
 
     for succ in successors:
         # Collect worker steps reachable through pass-throughs
@@ -697,7 +697,7 @@ def update_job(session, day, pair, jobtype, flag,
         job.step_id = step_id
         job.priority = priority
         job.flag = flag
-        job.lastmod = datetime.datetime.utcnow()
+        job.lastmod = datetime.datetime.now(datetime.timezone.utc)
         job.lineage_id = _lineage_id
         session.add(job)
     else:
@@ -706,7 +706,7 @@ def update_job(session, day, pair, jobtype, flag,
             job.flag = flag
         job.step_id = step_id
         job.priority = priority
-        job.lastmod = datetime.datetime.utcnow()
+        job.lastmod = datetime.datetime.now(datetime.timezone.utc)
         job.lineage_id = _lineage_id
 
     if commit:
