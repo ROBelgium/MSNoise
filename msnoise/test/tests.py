@@ -1328,14 +1328,14 @@ def test_202_config_set_unknown_param(setup_environment):
 def test_203_config_set_param(setup_environment):
     runner = setup_environment['runner']
 
-    result = runner.invoke(msnoise_script.config_set, ['channels=XXX'])
+    result = runner.invoke(msnoise_script.config_set, ['response_path=XXX'])
     assert result.exit_code == 0
 
-    result = runner.invoke(msnoise_script.config_get, ['channels'])
+    result = runner.invoke(msnoise_script.config_get, ['response_path'])
     assert result.exit_code == 0
     assert 'XXX' in result.output
 
-    result = runner.invoke(msnoise_script.config_set, ['channels=*'])
+    result = runner.invoke(msnoise_script.config_set, ['response_path=none'])
     assert result.exit_code == 0
 
 @pytest.mark.order(301)
