@@ -195,6 +195,14 @@ def test_001_S01installer(setup_environment):
     except:
         traceback.print_exc()
         pytest.fail()
+    # Installer must create the default DataSource (id=1)
+    db = connect()
+    from ..msnoise_table_def import DataSource
+    ds = db.query(DataSource).filter(DataSource.ref == 1).first()
+    assert ds is not None, "Installer must create default DataSource (id=1)"
+    assert ds.name == "local"
+    assert ds.data_structure == "SDS"
+    db.close()
 
 
 @pytest.mark.order(2)
@@ -264,6 +272,9 @@ def test_003_set_and_config(setup_environment):
         config_value = get_config(db, name=key, category='global', set_number=1)
         assert config_value == value, f"Configuration parameter {key} did not set correctly."
 
+    # Set the default DataSource URI to the data folder (v2 path)
+    from ..core.stations import update_data_source
+    update_data_source(db, id=1, uri=os.path.realpath(data_folder))
 
     update_config(db, 'components_to_compute', 'ZZ', category='cc', set_number=1)
 
@@ -345,11 +356,24 @@ def test_008_scan_archive(setup_environment):
         traceback.print_exc()
         pytest.fail()
 
-
     runner = setup_environment['runner']
     result = runner.invoke(msnoise_script.db_da_stations_update_loc_chan)
     assert result.exit_code == 0, f"Command failed with exit code {result.exit_code}"
-    # Optionally, add more assertions to check specific outputs in result.output
+
+    # Verify DA rows have data_source_id=1 and relative paths
+    db = connect()
+    data_folder = os.path.realpath(setup_environment['data_folder'])
+    from ..msnoise_table_def import DataAvailability
+    das = db.query(DataAvailability).all()
+    assert len(das) > 0, "scan_archive must populate DataAvailability"
+    for da in das:
+        assert da.data_source_id == 1, (
+            f"DA row {da} must have data_source_id=1, got {da.data_source_id}"
+        )
+        assert not da.path.startswith(data_folder), (
+            f"DA path must be relative, got absolute: {da.path!r}"
+        )
+    db.close()
 
 
 @pytest.mark.order(11)
@@ -2067,10 +2091,25 @@ def test_120034_msnoise_result_export_dvv():
             assert os.path.isfile(fpath), f"File missing: {fpath}"
             ds = xr.open_dataset(fpath)
 
-            # All 7 required global attributes
+            # All 9 required global attributes (7 original + 2 DataSource provenance)
             for attr in ("lineage", "msnoise_params", "msnoise_version",
-                         "generated", "pair_type", "components", "mov_stack"):
+                         "generated", "pair_type", "components", "mov_stack",
+                         "data_sources", "stations"):
                 assert attr in ds.attrs, f"Missing attribute: {attr!r}"
+
+            # data_sources must be valid YAML listing at least the local source
+            import yaml as _yaml
+            ds_list = _yaml.safe_load(ds.attrs["data_sources"])
+            assert isinstance(ds_list, list) and len(ds_list) >= 1, \
+                "data_sources must be a non-empty list"
+            assert ds_list[0]["name"] == "local", \
+                f"Expected 'local' DataSource, got {ds_list[0]}"
+            assert "password" not in ds.attrs["data_sources"], \
+                "Credentials must not appear in data_sources export"
+
+            # stations must be valid YAML
+            sta_list = _yaml.safe_load(ds.attrs["stations"]) or []
+            assert isinstance(sta_list, list), "stations must be a list"
 
             # lineage round-trips exactly
             assert ds.attrs["lineage"] == "/".join(r.lineage_names),                 "Lineage attribute mismatch"

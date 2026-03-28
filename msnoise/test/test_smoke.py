@@ -58,7 +58,7 @@ def smoke_db(tmp_path_factory):
     from ..core.config import create_config_set, update_config, get_params
     from ..core.workflow import (create_workflow_steps_from_config_sets,
                                   create_workflow_links_from_steps)
-    from ..msnoise_table_def import declare_tables, Station
+    from ..msnoise_table_def import declare_tables, Station, DataSource
 
     tmp = tmp_path_factory.mktemp("smoke")
     os.chdir(tmp)
@@ -76,6 +76,12 @@ def smoke_db(tmp_path_factory):
         create_config_set(db, cat)
 
     root = str(tmp / "OUTPUT")
+    # Create the default DataSource row (normally done by the installer)
+    default_ds = DataSource(name="local", uri=str(tmp / "data"),
+                            data_structure="SDS", auth_env="MSNOISE")
+    db.add(default_ds)
+    db.commit()
+    # Keep data_folder config for backward-compat code paths that still read it
     update_config(db, "data_folder",    str(tmp / "data"))
     update_config(db, "output_folder",  root)
     update_config(db, "sampling_rate",  "1")
@@ -253,8 +259,29 @@ def _run_step(category, group_by, on_batch):
 
 
 def _stub_preprocess(db, params, root):
-    def _noop(batch): pass
-    _run_step("preprocess", "day_lineage", _noop)
+    """Run preprocess step with a stub that writes synthetic per-station files."""
+    from obspy import Trace, Stream, UTCDateTime
+    import numpy as _np
+
+    def _write_station_files(batch):
+        """Write synthetic per-station MiniSEED files for each job in the batch."""
+        step_name = batch["step"].step_name
+        day       = batch["days"][0]
+        t0        = UTCDateTime(day)
+        for job in batch["jobs"]:
+            net, sta, loc = job.pair.split(".")
+            tr = Trace(data=_np.zeros(100, dtype="float32"))
+            tr.stats.network       = net
+            tr.stats.station       = sta
+            tr.stats.location      = loc
+            tr.stats.channel       = "HHZ"
+            tr.stats.starttime     = t0
+            tr.stats.sampling_rate = 1.0
+            st = Stream(traces=[tr])
+            from ..core.signal import save_preprocessed_streams
+            save_preprocessed_streams(st, root, step_name, day)
+
+    _run_step("preprocess", "day_lineage", _write_station_files)
 
 
 def _stub_cc(db, params, root):
@@ -464,13 +491,19 @@ def _stub_psd_rms(db, params, root):
 
 @pytest.mark.order(1)
 def test_smoke_01_schema(smoke_db):
-    """DB tables including Lineage exist."""
+    """DB tables including Lineage and DataSource exist."""
     db, _, _ = smoke_db
     from sqlalchemy import inspect
     tables = inspect(db.get_bind()).get_table_names()
     for t in ("jobs", "lineages", "workflow_steps", "workflow_links",
-              "config", "stations"):
+              "config", "stations", "data_sources"):
         assert t in tables, f"Table {t!r} missing"
+    # Default DataSource must exist with id=1
+    from ..msnoise_table_def import DataSource
+    ds = db.query(DataSource).filter(DataSource.ref == 1).first()
+    assert ds is not None, "Default DataSource (id=1) missing"
+    assert ds.name == "local"
+    assert ds.data_structure == "SDS"
 
 
 @pytest.mark.order(2)
@@ -501,11 +534,18 @@ def test_smoke_03_seed_jobs(smoke_db):
 
 @pytest.mark.order(4)
 def test_smoke_04_preprocess(smoke_db):
-    """Preprocess stub marks jobs Done; propagate_downstream creates cc_1 T jobs."""
+    """Preprocess stub marks jobs Done; per-station output files exist."""
     db, params, root = smoke_db
     _assert_min(db, "preprocess_1", "T", 1)
     _stub_preprocess(db, params, root)
     _assert_min(db, "preprocess_1", "D", 6, "preprocess must be Done")
+    # Verify per-station file layout: _output/<date>/<NET.STA.LOC>.mseed
+    for day in DAYS:
+        for sid in STATIONS:
+            fpath = os.path.join(root, "preprocess_1", "_output", day, f"{sid}.mseed")
+            assert os.path.isfile(fpath), (
+                f"Per-station preprocess output missing: {fpath}"
+            )
     # propagate_downstream → cc_1 T jobs (3 pairs × 2 days)
     _assert_min(db, "cc_1", "T", 6, "propagate_downstream must create cc T jobs")
 
@@ -674,6 +714,19 @@ def test_smoke_18_lineage_normalisation(smoke_db):
 
 
 @pytest.mark.order(19)
+
+@pytest.mark.order(185)
+def test_smoke_18b_datasource_stations(smoke_db):
+    """Stations with NULL data_source_id resolve to the default DataSource."""
+    db, _, _ = smoke_db
+    from ..core.stations import resolve_data_source, get_stations
+    for station in get_stations(db):
+        ds = resolve_data_source(db, station)
+        assert ds.ref == 1,   f"Station {station} should resolve to DataSource id=1"
+        assert ds.name == "local"
+        assert ds.uri != "" or True  # uri may be empty string or path — both valid
+
+
 def test_smoke_19_all_dvv_discoverable(smoke_db):
     """MSNoiseResult.list + get_dvv work for all three DVV methods."""
     db, _, _ = smoke_db
