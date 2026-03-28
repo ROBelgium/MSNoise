@@ -1824,28 +1824,38 @@ def utils_bugreport(ctx, sys, modules, env, all):
 
 @utils.command(name="test")
 @click.option('-p', '--prefix', default="", help='Prefix for tables')
-@click.option('--tech', default=1, help='Test using (1) SQLite or (2) MariaDB (you need to start that server before!)')
-@click.option('-c', '--content', default=False, is_flag=True)
-def utils_test(prefix, tech, content):
-    """Runs the test suite in a temporary folder"""
+@click.option('--tech', default=1, help='Test using (1) SQLite or (2) MariaDB')
+@click.option('-c', '--content', default=False, is_flag=True,
+              help='Run content tests instead of standard tests')
+@click.option('--fast', default=False, is_flag=True,
+              help='Run the fast smoke test suite (no real data needed)')
+def utils_test(prefix, tech, content, fast):
+    """Runs the test suite in a temporary folder.
+
+    Use --fast for a quick smoke test that exercises the full workflow
+    lifecycle using stub compute functions (no seismic data required,
+    completes in < 30 seconds).
+    """
     import matplotlib.pyplot as plt
     import pytest
     plt.switch_backend("agg")
 
-    # Prepare environment variables for the test session
     os.environ["PREFIX"] = prefix
     os.environ["TECH"] = str(tech)
 
-    # Determine which test suite to run
-    test_module = 'content_tests' if content else 'tests'
+    test_dir = os.path.join(os.path.dirname(__file__), '..', 'test')
 
-    # Construct the path to the test module
-    test_path = os.path.join(os.path.dirname(__file__), '..', 'test', f'{test_module}.py')
+    if fast:
+        test_path = os.path.join(test_dir, 'test_smoke.py')
+        args = ['-s', '-v', '--log-cli-level=WARNING', test_path]
+    elif content:
+        test_path = os.path.join(test_dir, 'content_tests.py')
+        args = ['-s', test_path]
+    else:
+        test_path = os.path.join(test_dir, 'tests.py')
+        args = ['-s', '--log-cli-level=WARNING', test_path]
 
-    # Run pytest on the selected test module
-    exit_code = pytest.main(['-s', test_path])
-
-    # Handle the exit code as needed
+    exit_code = pytest.main(args)
     if exit_code != 0:
         print("Tests failed.")
 
