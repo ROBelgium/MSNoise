@@ -508,7 +508,7 @@ def propagate_dvv_jobs_from_dtt_done(session, source_category: str) -> int:
                     session.query(Job)
                     .filter(Job.step_id == dvv_step.step_id)
                     .filter(Job.day == "DVV")
-                    .filter(Job.lineage == dvv_lineage_str)
+                    .filter(Job.lineage_id == _lineage_id_for(session, dvv_lineage_str))
                     .first()
                 )
                 if existing:

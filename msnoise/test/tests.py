@@ -1075,16 +1075,19 @@ def test_106_plot_dvv_comparison():
     if not found:
         pytest.skip("No DVV results available — pipeline not fully run")
 
-    PAIR_TYPE = "CC"
+    # dvv_split_pair_type=Y (default) saves dvv_CC_ZZ.nc;
+    # dvv_split_pair_type=N saves dvv_ALL_ZZ.nc. Try both.
     all_keys = set()
     raw = {}
     for cat, result in found.items():
-        data = result.get_dvv(pair_type=PAIR_TYPE)
-        filtered = {(comp, ms): ds
-                    for (pt, comp, ms), ds in data.items()
-                    if pt == PAIR_TYPE}
-        raw[cat] = filtered
-        all_keys |= set(filtered.keys())
+        for try_pt in ("CC", "ALL"):
+            data = result.get_dvv(pair_type=try_pt)
+            filtered = {(comp, ms): ds
+                        for (pt, comp, ms), ds in data.items()}
+            if filtered:
+                raw[cat] = filtered
+                all_keys |= set(filtered.keys())
+                break
 
     assert len(all_keys) >= 1, "Expected at least one (comp, mov_stack) combination"
 
