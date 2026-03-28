@@ -60,7 +60,7 @@ dependencies = [
     "pooch",
     "pycwt",              # required for wavelet coherence step (s08_compute_wct)
     "tables",             # PyTables: backend for pd.read_hdf/to_hdf in get_results_all and export_allcorr
-]
+    "netcdf4"]
 
 [project.optional-dependencies]
 doc = [

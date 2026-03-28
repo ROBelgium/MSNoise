@@ -28,6 +28,7 @@ dependencies:
   - pytest-order
   - pytest-cov
   - coverage
+  - netCDF4
   - pip:
       - git+https://github.com/regeirk/pycwt
       - click-command-tree
