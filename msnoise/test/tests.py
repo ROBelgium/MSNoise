@@ -83,32 +83,45 @@ def _log_test_name(request):
     _test_logger.info(f"<<< TEST END:   {request.node.name}")
 
 
-def _assert_jobs_todo(db, step_name: str, min_count: int = 1, msg: str = ""):
-    """Assert at least *min_count* Todo jobs exist for *step_name*."""
+@pytest.fixture(autouse=True)
+def _print_test_name(request):
+    """Print the running test name to stdout (visible with pytest -s)."""
+    print(f"\n{'─'*60}\n▶ {request.node.name}\n{'─'*60}", flush=True)
+    yield
+
+
+def _job_counts(db, step_name: str) -> dict:
+    """Return {flag: count} for *step_name* jobs."""
     from ..msnoise_table_def import WorkflowStep, Job as _Job
     step = db.query(WorkflowStep).filter(
         WorkflowStep.step_name == step_name).first()
     if step is None:
-        pytest.fail(f"Step {step_name!r} not found in workflow")
-    n = (db.query(_Job).filter(_Job.step_id == step.step_id)
-         .filter(_Job.flag == "T").count())
-    assert n >= min_count, (
-        f"{msg or step_name}: expected >= {min_count} Todo jobs, got {n}")
-    return n
+        return {}
+    rows = (db.query(_Job.flag, _Job.ref)
+              .filter(_Job.step_id == step.step_id)
+              .all())
+    counts = {}
+    for flag, _ in rows:
+        counts[flag] = counts.get(flag, 0) + 1
+    return counts
 
 
-def _assert_jobs_done(db, step_name: str, min_count: int = 1, msg: str = ""):
-    """Assert at least *min_count* Done jobs exist for *step_name*."""
-    from ..msnoise_table_def import WorkflowStep, Job as _Job
-    step = db.query(WorkflowStep).filter(
-        WorkflowStep.step_name == step_name).first()
-    if step is None:
-        pytest.fail(f"Step {step_name!r} not found in workflow")
-    n = (db.query(_Job).filter(_Job.step_id == step.step_id)
-         .filter(_Job.flag == "D").count())
-    assert n >= min_count, (
-        f"{msg or step_name}: expected >= {min_count} Done jobs, got {n}")
-    return n
+def _assert_n_jobs(db, step_name: str, flag: str, expected: int, msg: str = ""):
+    """Assert exactly *expected* jobs have *flag* for *step_name*."""
+    counts = _job_counts(db, step_name)
+    n = counts.get(flag, 0)
+    assert n == expected, (
+        f"{msg or step_name}: expected {expected} '{flag}' jobs, got {n} "
+        f"(all flags: {counts})")
+
+
+def _assert_min_jobs(db, step_name: str, flag: str, min_n: int = 1, msg: str = ""):
+    """Assert at least *min_n* jobs have *flag* for *step_name*."""
+    counts = _job_counts(db, step_name)
+    n = counts.get(flag, 0)
+    assert n >= min_n, (
+        f"{msg or step_name}: expected >= {min_n} '{flag}' jobs, got {n} "
+        f"(all flags: {counts})")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -357,20 +370,44 @@ def test_009_control_data_availability():
 
 @pytest.mark.order(12)
 def test_010_new_jobs():
+    """new_jobs() creates preprocess_1 T jobs (one per station/day)."""
     try:
         new_jobs_main()
     except:
         traceback.print_exc()
         pytest.fail()
+    db = connect()
+    _assert_min_jobs(db, 'preprocess_1', 'T', 1, 'new_jobs must create preprocess T jobs')
+    db.close()
 
+# NOTE: same order number = runs in file order (intentional sibling group)
 @pytest.mark.order(13)
-def test_010b_preprocess_and_propagate():
+def test_010b_preprocess():
+    """Preprocess runs and marks preprocess_1 jobs Done."""
+    db = connect()
+    _assert_min_jobs(db, 'preprocess_1', 'T', 1, 'Need T preprocess jobs before preprocess')
+    db.close()
     try:
         preprocess_main()
+    except:
+        traceback.print_exc()
+        pytest.fail()
+    db = connect()
+    _assert_min_jobs(db, 'preprocess_1', 'D', 1, 'preprocess_1 jobs must be Done after preprocess')
+    db.close()
+
+
+@pytest.mark.order(13)
+def test_010c_propagate_preprocess():
+    """new_jobs --after preprocess creates cc_1 T jobs."""
+    try:
         new_jobs_main(after='preprocess')
     except:
         traceback.print_exc()
         pytest.fail()
+    db = connect()
+    _assert_min_jobs(db, 'cc_1', 'T', 1, 'propagate preprocess→cc must create T jobs')
+    db.close()
 
 
 @pytest.mark.order(14)
@@ -387,8 +424,9 @@ def test_012_reset_jobs():
 
 @pytest.mark.order(16)
 def test_013_s03compute_cc():
+    """compute_cc runs all cc_1 T jobs and marks them Done."""
     db = connect()
-    _assert_jobs_todo(db, 'cc_1', msg='CC jobs must be Todo before compute_cc')
+    _assert_min_jobs(db, 'cc_1', 'T', 1, 'Need T cc jobs before compute_cc')
     db.close()
     try:
         compute_cc_main()
@@ -396,7 +434,7 @@ def test_013_s03compute_cc():
         traceback.print_exc()
         pytest.fail()
     db = connect()
-    _assert_jobs_done(db, 'cc_1', msg='CC jobs must be Done after compute_cc')
+    _assert_min_jobs(db, 'cc_1', 'D', 1, 'cc_1 jobs must be Done after compute_cc')
     db.close()
 
 @pytest.mark.order(17)
@@ -407,6 +445,7 @@ def test_014_check_done_jobs():
     assert counts.get('D', 0) == 3, f"Expected 3 done CC jobs, got: {counts}"
     db.close()
 
+# NOTE: same order number = runs in file order (intentional sibling group)
 @pytest.mark.order(18)
 def test_015_check_cc_files():
     db = connect()
@@ -530,48 +569,71 @@ def test_017_reset_cc_jobs():
 def test_018_recompute_cc():
     test_013_s03compute_cc()
 
+# NOTE: same order number = runs in file order (intentional sibling group)
 @pytest.mark.order(21)
-def test_023_stack():
+def test_023a_stack_config():
+    """Configure stack/refstack parameters."""
     db = connect()
-    # Configure MOV stack (no more ref_begin/ref_end here — moved to refstack)
     update_config(db, 'mov_stack', "(('6h','6h'),('1D','1D'))", category='stack', set_number=1)
-    # startdate/enddate belong to global configset
     update_config(db, 'startdate', '2009-01-01', category='global', set_number=1)
     update_config(db, 'enddate', '2011-01-01', category='global', set_number=1)
-
-    # Configure the refstack_1 configset (ref_begin/ref_end now live here)
     update_config(db, 'ref_begin', '2009-01-01', category='refstack', set_number=1)
     update_config(db, 'ref_end', '2011-01-01', category='refstack', set_number=1)
     db.close()
 
-    # Propagate CC→stack (MOV day jobs)
+
+@pytest.mark.order(21)
+def test_023b_new_jobs_after_cc():
+    """new_jobs --after cc creates stack_1 T jobs."""
     new_jobs_main(after='cc')
     db = connect()
+    _assert_min_jobs(db, 'stack_1', 'T', 1, 'new_jobs --after cc must create stack T jobs')
+    db.close()
 
-    # Run MOV stack
+
+@pytest.mark.order(21)
+def test_023c_stack_mov():
+    """stack_mov processes stack_1 T jobs → Done."""
+    db = connect()
+    _assert_min_jobs(db, 'stack_1', 'T', 1, 'Need T stack jobs before stack_mov')
+    db.close()
     stack_mov('mov')
+    db = connect()
+    _assert_min_jobs(db, 'stack_1', 'D', 1, 'stack_1 jobs must be Done after stack_mov')
+    db.close()
 
-    # Propagate stack→refstack (REF jobs) then run refstack
+
+@pytest.mark.order(21)
+def test_023d_new_jobs_after_stack_and_refstack():
+    """Propagate stack→refstack and run refstack."""
     new_jobs_main(after='stack')
+    db = connect()
+    _assert_min_jobs(db, 'refstack_1', 'T', 1, 'new_jobs --after stack must create refstack T jobs')
+    db.close()
     stack_refstack_main()
+    db = connect()
+    _assert_min_jobs(db, 'refstack_1', 'D', 1, 'refstack_1 must be Done after stack_refstack')
+    db.close()
 
-    # Verify refstack_1 REF job is done
+
+@pytest.mark.order(21)
+def test_023_stack():
+    """Verify CCF data and test Wiener filter (combines legacy assertions)."""
+    db = connect()
+    # Verify refstack done
     jobs_ref = get_job_types(db, 'refstack_1')
     counts_ref = {flag: count for count, flag in jobs_ref}
     assert counts_ref.get('D', 0) >= 1, \
         f"Expected at least 1 done refstack_1 job, got: {counts_ref}"
 
-    # Capture plain-stack CCF for comparison — discovery mode returns {(pair, comp, ms): data}
     result_plain = MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"])
     ccfs_plain = result_plain.get_ccf()
     assert len(ccfs_plain) > 0, "No plain-stack CCF results found"
 
-    # Re-run with Wiener filter enabled
+    # Test Wiener filter
     update_config(db, 'wienerfilt', 'Y', category='stack', set_number=1)
     reset_jobs(db, "stack_1", alljobs=True)
     stack_mov('mov')
-
-    # Verify Wiener output differs from plain stack — spot-check first entry
     result_wiener = MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"])
     ccfs_wiener = result_wiener.get_ccf()
     first_key = next(iter(ccfs_plain))
@@ -582,13 +644,12 @@ def test_023_stack():
         assert not np.allclose(plain_vals, wiener_vals.values, equal_nan=True), \
             "Wiener-filtered CCF is identical to plain CCF — filter had no effect"
 
-    # REVERT: disable Wiener so downstream tests use standard processing
+    # Revert Wiener for downstream tests
     update_config(db, 'wienerfilt', 'N', category='stack', set_number=1)
     reset_jobs(db, "stack_1", alljobs=True)
     stack_mov('mov')
     reset_jobs(db, "refstack_1", alljobs=True)
     stack_refstack_main()
-
     db.close()
 
 
@@ -751,7 +812,7 @@ def test_044_compute_stretching_dvv():
         break
     db.close()
 
-@pytest.mark.order(33)
+@pytest.mark.order(45)
 def test_033_create_fake_new_files(setup_environment):
     data_folder = setup_environment['data_folder']
     for f in sorted(glob.glob(os.path.join(data_folder, "2010", "*", "HHZ.D", "*"))):
@@ -778,7 +839,7 @@ def test_033_create_fake_new_files(setup_environment):
     assert counts.get('T', 0) == 3, f"Expected 3 todo cc_1 jobs, got: {counts}"
     db.close()
 
-@pytest.mark.order(33)
+@pytest.mark.order(46)
 def test_033b_compute_second_day():
     """Propagate the second day's CC jobs through the full pipeline.
 
@@ -832,7 +893,7 @@ def test_033b_compute_second_day():
         f"Expected >= 2 time steps in MWCS output after 2 days of data, got {n_times}"
     db.close()
 
-@pytest.mark.order(34)
+@pytest.mark.order(47)
 def test_034_instrument_response(setup_environment):
     db = connect()
     response_path = setup_environment['response_path']
@@ -842,7 +903,7 @@ def test_034_instrument_response(setup_environment):
     test_013_s03compute_cc()
 
 
-@pytest.mark.order(35)
+@pytest.mark.order(48)
 def test_035_wct_param_update():
     """Test updating and retrieving wavelet configset parameters."""
     db = connect()
@@ -855,7 +916,7 @@ def test_035_wct_param_update():
     assert details['wct_freqmax'] == '2.0'
     db.close()
 
-@pytest.mark.order(36)
+@pytest.mark.order(49)
 def test_036_wct_dtt_param_update():
     """Test updating and retrieving wavelet_dtt configset parameters."""
     db = connect()
@@ -868,7 +929,7 @@ def test_036_wct_dtt_param_update():
     assert details['wct_mincoh'] == '0.5'
     db.close()
   
-@pytest.mark.order(37)
+@pytest.mark.order(50)
 def test_037_validate_stack_data():
     from ..core.signal import validate_stack_data
     import xarray as xr
@@ -924,7 +985,7 @@ def test_037_validate_stack_data():
     assert is_valid
     assert message == "OK"
     
-@pytest.mark.order(38)
+@pytest.mark.order(51)
 def test_038_stack_validation_handling():
     from ..core.signal import validate_stack_data
     import xarray as xr
@@ -963,7 +1024,7 @@ def test_038_stack_validation_handling():
                 if "Warning" in message:
                     logger.warning(f"{sta1}:{sta2}-{components}-{filterid}: {message}")
 
-@pytest.mark.order(39)
+@pytest.mark.order(52)
 def test_039_wct_pipeline():
     try:
         # WCT jobs were created by new_jobs_main(after='refstack') in test_025
@@ -976,7 +1037,7 @@ def test_039_wct_pipeline():
         pytest.fail()
 
 
-@pytest.mark.order(40)
+@pytest.mark.order(53)
 def test_040_compute_wavelet_dtt_dvv():
     """Compute WCT dv/v aggregate — wavelet_dtt_dvv step."""
     new_jobs_main(after='wavelet_dtt')
@@ -1046,6 +1107,7 @@ def test_102_plot_distance():
     fn = glob.glob("distance__*ZZ*_refilter.png")
     assert len(fn) >= 1, "distance refilter plot doesn't exist"
 
+# NOTE: same order number = runs in file order (intentional sibling group)
 @pytest.mark.order(103)
 def test_103_plot_dvv():
     """Plot mwcs_dtt_dvv — requires mwcs_dtt_dvv step to have been run."""
@@ -1422,7 +1484,7 @@ def test_100000_msnoise_admin():
         #     assert response.status_code == 200, f"Error following route {route}"
 
 
-@pytest.mark.order(200000)
+@pytest.mark.order(999999)
 def test_20000_invoke_script(setup_environment):
     runner = setup_environment['runner']
 
@@ -2039,7 +2101,7 @@ def test_120034_msnoise_result_export_dvv():
 
 
 
-@pytest.mark.order(120033)
+@pytest.mark.order(120035)
 def test_120033_msnoise_result_hasattr_gating():
     """hasattr() respects dynamic gating — False for absent categories."""
     db = connect()
