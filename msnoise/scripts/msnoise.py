@@ -2048,6 +2048,117 @@ def utils_export_dvv(ctx, lineage, preprocessid, ccid, filterid, stackid,
 
 
 
+
+@utils.command(name="create_preprocess_jobs")
+@click.option("--date", default=None, type=str,
+              help="Single date to create jobs for (YYYY-MM-DD).")
+@click.option("--date_range", nargs=2, default=(None, None), type=str,
+              metavar="START END",
+              help="Date range: START END (inclusive, YYYY-MM-DD).")
+@click.option("--set-number", default=1, type=int,
+              help="Preprocess config set number (default 1).")
+def create_preprocess_jobs_cmd(date, date_range, set_number):
+    """Create preprocess T jobs for FDSN/EIDA sources (bypasses scan_archive).
+
+    For local/SDS sources, only creates jobs where DataAvailability records
+    already exist for the requested date(s).  For FDSN/EIDA sources, creates
+    jobs for all active stations regardless (the preprocess worker fetches on
+    demand).
+
+    Examples::
+
+        msnoise utils create_preprocess_jobs --date 2026-03-28
+
+        msnoise utils create_preprocess_jobs --date_range 2026-01-01 2026-03-28
+    """
+    import datetime
+    from ..core.db import connect
+    from ..core.stations import (get_stations, resolve_data_source,
+                                 get_data_availability)
+    from ..core.fdsn import is_remote_source
+    from ..core.workflow import get_workflow_steps, is_next_job_for_step
+    from ..core.config import get_config
+    from ..s02_new_jobs import update_job
+
+    if not date and not any(date_range):
+        raise click.UsageError("Provide --date or --date_range START END.")
+    if date and any(date_range):
+        raise click.UsageError("Provide --date OR --date_range, not both.")
+
+    # Build date list
+    if date:
+        dates = [date]
+    else:
+        start = datetime.date.fromisoformat(date_range[0])
+        end   = datetime.date.fromisoformat(date_range[1])
+        dates = []
+        cur = start
+        while cur <= end:
+            dates.append(cur.isoformat())
+            cur += datetime.timedelta(days=1)
+
+    db = connect()
+
+    # Find the preprocess step
+    steps = get_workflow_steps(db)
+    pre_step = next(
+        (s for s in steps
+         if s.category == "preprocess" and s.set_number == set_number),
+        None
+    )
+    if pre_step is None:
+        click.echo(f"No preprocess step with set_number={set_number} found.", err=True)
+        db.close()
+        return
+
+    stations = list(get_stations(db, all=False))
+    if not stations:
+        click.echo("No active stations found.", err=True)
+        db.close()
+        return
+
+    created = 0
+    skipped = 0
+
+    for goal_day in dates:
+        gd = datetime.datetime.strptime(goal_day, "%Y-%m-%d")
+        gd_end = gd + datetime.timedelta(seconds=86401)
+
+        for station in stations:
+            sid = f"{station.net}.{station.sta}"
+            ds  = resolve_data_source(db, station)
+
+            if is_remote_source(ds.uri):
+                # FDSN/EIDA — create job unconditionally
+                # Use NET.STA.LOC (pick first loc or empty)
+                locs = station.locs() or [""]
+                for loc in locs:
+                    pair = f"{station.net}.{station.sta}.{loc}"
+                    update_job(db, goal_day, pair, pre_step.step_name, "T",
+                               step_id=pre_step.step_id, commit=False)
+                    created += 1
+            else:
+                # Local/SDS — only create if DA records exist for this day
+                for loc in (station.locs() or [""]):
+                    da_records = get_data_availability(
+                        db, net=station.net, sta=station.sta,
+                        loc=loc, starttime=gd, endtime=gd_end
+                    )
+                    if da_records:
+                        pair = f"{station.net}.{station.sta}.{loc}"
+                        update_job(db, goal_day, pair, pre_step.step_name, "T",
+                                   step_id=pre_step.step_id, commit=False)
+                        created += 1
+                    else:
+                        skipped += 1
+
+        db.commit()
+
+    click.echo(f"Created {created} preprocess T job(s) across {len(dates)} day(s) "
+               f"({skipped} skipped — no DA records for local sources).")
+    db.close()
+
+
 def run():
     try:
         cli(obj={})
