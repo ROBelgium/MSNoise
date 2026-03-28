@@ -998,6 +998,130 @@ def test_105_db_dump(setup_environment):
 #    assert os.path.isfile(fn), f"{fn} doesn't exist"
 
 
+@pytest.mark.order(106)
+def test_106_plot_dvv_comparison():
+    """Run the DVV comparison example — verifies it produces at least one output file."""
+    import glob
+    # The example discovers results and saves dvv_comparison__*.png files
+    # Run it in-process by importing and exercising the core logic directly
+    db = connect()
+    from ..results import MSNoiseResult
+
+    # Discover all three DVV categories
+    found = {}
+    for cat in ("mwcs_dtt_dvv", "stretching_dvv", "wavelet_dtt_dvv"):
+        results = MSNoiseResult.list(db, cat)
+        if results:
+            found[cat] = results[0]
+
+    if not found:
+        pytest.skip("No DVV results available — pipeline not fully run")
+
+    PAIR_TYPE = "CC"
+    all_keys = set()
+    raw = {}
+    for cat, result in found.items():
+        data = result.get_dvv(pair_type=PAIR_TYPE)
+        filtered = {(comp, ms): ds
+                    for (pt, comp, ms), ds in data.items()
+                    if pt == PAIR_TYPE}
+        raw[cat] = filtered
+        all_keys |= set(filtered.keys())
+
+    assert len(all_keys) >= 1, "Expected at least one (comp, mov_stack) combination"
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
+    import pandas as pd
+    from ..core.config import lineage_to_plot_tag, build_plot_outfile
+
+    METHOD_STYLE = {
+        "mwcs_dtt_dvv":    dict(color="#1f77b4", label="MWCS",       lw=1.8, zorder=3),
+        "stretching_dvv":  dict(color="#d62728", label="Stretching", lw=1.8, zorder=2),
+        "wavelet_dtt_dvv": dict(color="#2ca02c", label="WCT",        lw=1.8, zorder=1),
+    }
+
+    saved = []
+    for comp, ms in sorted(all_keys):
+        series = {}
+        for cat in ("mwcs_dtt_dvv", "stretching_dvv", "wavelet_dtt_dvv"):
+            if cat not in raw or (comp, ms) not in raw[cat]:
+                continue
+            ds = raw[cat][(comp, ms)]
+            if "mean" not in ds:
+                continue
+            mean_da = ds["mean"]
+            std_da  = ds.get("std", ds.get("weighted_std", None))
+            times   = pd.DatetimeIndex(mean_da.coords["times"].values)
+            mean_s  = pd.Series(mean_da.values * 100.0, index=times)
+            std_s   = (pd.Series(std_da.values * 100.0, index=times)
+                       if std_da is not None else None)
+            series[cat] = (mean_s, std_s)
+
+        if not series:
+            continue
+
+        fig = plt.figure(figsize=(12, 7))
+        gs  = gridspec.GridSpec(2, 1, height_ratios=[3, 1], hspace=0.08)
+        ax_dvv = fig.add_subplot(gs[0])
+        ax_res = fig.add_subplot(gs[1], sharex=ax_dvv)
+
+        reference_s = None
+        for cat, (mean_s, std_s) in series.items():
+            style = METHOD_STYLE[cat]
+            ax_dvv.plot(mean_s.index, mean_s.values,
+                        color=style["color"], lw=style["lw"], label=style["label"])
+            if std_s is not None:
+                ax_dvv.fill_between(mean_s.index,
+                                    mean_s.values - std_s.values,
+                                    mean_s.values + std_s.values,
+                                    color=style["color"], alpha=0.15)
+            if reference_s is None:
+                reference_s = mean_s
+
+        ax_dvv.axhline(0, color="k", lw=0.8, ls="--", alpha=0.5)
+        ax_dvv.set_ylabel("dv/v (%)")
+        ax_dvv.set_title(f"dv/v comparison | comp={comp} | mov_stack={ms[0]}-{ms[1]}")
+        ax_dvv.legend(loc="upper right")
+        ax_dvv.tick_params(labelbottom=False)
+
+        ref_label = METHOD_STYLE[next(iter(series))]["label"]
+        for cat, (mean_s, _) in series.items():
+            if mean_s is reference_s:
+                continue
+            style = METHOD_STYLE[cat]
+            common = reference_s.index.intersection(mean_s.index)
+            if len(common):
+                resid = reference_s.loc[common] - mean_s.loc[common]
+                ax_res.plot(resid.index, resid.values,
+                            color=style["color"], lw=1.4,
+                            label=f"{ref_label} − {style['label']}")
+
+        ax_res.axhline(0, color="k", lw=0.8, ls="--", alpha=0.5)
+        ax_res.set_ylabel("Residual (%)")
+        ax_res.set_xlabel("Date")
+        ax_res.legend(loc="upper right", fontsize=8)
+        fig.autofmt_xdate()
+
+        first_result = next(iter(found.values()))
+        outfile = build_plot_outfile(
+            "?.png", "dvv_comparison",
+            first_result.lineage_names,
+            components=comp, mov_stack=ms,
+        )
+        plt.savefig(outfile, dpi=100, bbox_inches="tight")
+        plt.close(fig)
+        saved.append(outfile)
+
+    db.close()
+    assert len(saved) >= 1, "Expected at least one dvv_comparison plot to be saved"
+    for fn in saved:
+        assert os.path.isfile(fn), f"Output file missing: {fn}"
+
+
+
 @pytest.mark.order(201)
 def test_201_config_get_unknown_param(setup_environment):
     runner = setup_environment['runner']
