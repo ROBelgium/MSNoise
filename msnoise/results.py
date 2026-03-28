@@ -693,6 +693,22 @@ class MSNoiseResult:
         params_yaml = self.params.to_yaml_string()
         generated   = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds") + "Z"
 
+        # Collect station IDs from all pairs active in this project.
+        # We use all station pairs rather than trying to parse pair names
+        # from DVV output coordinates — this is more robust and captures
+        # the full set of stations that contributed to the result.
+        from .core.stations import get_station_pairs
+        _station_ids = set()
+        try:
+            for _sta1, _sta2 in get_station_pairs(self._db):
+                _station_ids.add(f"{_sta1.net}.{_sta1.sta}")
+                _station_ids.add(f"{_sta2.net}.{_sta2.sta}")
+        except Exception:
+            pass  # non-fatal — provenance blocks will be empty if this fails
+        data_sources_yaml, stations_yaml = _build_datasource_provenance(
+            self._db, sorted(_station_ids)
+        )
+
         is_dir = os.path.isdir(path) or not path.endswith(".nc")
         written = []
 
@@ -714,13 +730,15 @@ class MSNoiseResult:
 
             ds = ds.copy()
             ds.attrs.update({
-                "lineage":         lin_str,
-                "msnoise_params":  params_yaml,
-                "msnoise_version": _version,
-                "generated":       generated,
-                "pair_type":       pt,
-                "components":      comp,
-                "mov_stack":       ms_str,
+                "lineage":          lin_str,
+                "msnoise_params":   params_yaml,
+                "msnoise_version":  _version,
+                "generated":        generated,
+                "pair_type":        pt,
+                "components":       comp,
+                "mov_stack":        ms_str,
+                "data_sources":     data_sources_yaml,
+                "stations":         stations_yaml,
             })
             from .core.io import _f32_encoding
             ds.to_netcdf(out_path, encoding=_f32_encoding(ds))
@@ -731,6 +749,64 @@ class MSNoiseResult:
 
 
 # ── module-level helper ────────────────────────────────────────────────────────
+
+
+def _build_datasource_provenance(db, station_ids: list) -> tuple:
+    """Build data_sources and stations provenance dicts for export.
+
+    :param db: SQLAlchemy session.
+    :param station_ids: List of ``"NET.STA"`` strings involved in the result.
+    :returns: Tuple ``(data_sources_yaml, stations_yaml)`` — YAML strings.
+    """
+    import yaml
+    from .core.stations import resolve_data_source, get_station
+    from .msnoise_table_def import declare_tables
+
+    schema = declare_tables()
+    Station = schema.Station
+
+    # Collect unique stations
+    stations_data = []
+    sources_seen  = {}
+
+    for sid in sorted(set(station_ids)):
+        parts = sid.split(".")
+        net, sta = parts[0], parts[1]
+        station = get_station(db, net, sta)
+        if station is None:
+            continue
+        ds = resolve_data_source(db, station)
+
+        if ds.ref not in sources_seen:
+            sources_seen[ds.ref] = {
+                "id":             ds.ref,
+                "name":           ds.name,
+                "uri":            ds.uri,
+                "data_structure": ds.data_structure,
+                "auth_env":       ds.auth_env,
+                # credentials are never exported
+            }
+
+        stations_data.append({
+            "net":            station.net,
+            "sta":            station.sta,
+            "X":              station.X,
+            "Y":              station.Y,
+            "altitude":       station.altitude,
+            "coordinates":    station.coordinates,
+            "data_source_id": ds.ref,
+        })
+
+    data_sources_yaml = yaml.dump(
+        list(sources_seen.values()),
+        default_flow_style=False, sort_keys=False, allow_unicode=True
+    )
+    stations_yaml = yaml.dump(
+        stations_data,
+        default_flow_style=False, sort_keys=False, allow_unicode=True
+    )
+    return data_sources_yaml, stations_yaml
+
 
 def _upstream_lineage_for_step(db, step) -> list:
     """Walk WorkflowLinks upstream from *step*, return all root-to-step paths."""
