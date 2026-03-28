@@ -126,8 +126,8 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
     plt.title(title)
     plt.scatter(0, [start, ], alpha=0)
     plt.xlabel("Time Lag (s)")
-    plt.ylim(start-datetime.timedelta(days=10),
-             end+datetime.timedelta(days=10))
+    plt.ylim(stack_total.index[0]-10,
+             stack_total.index[-1]+10)
     if "xlim" in kwargs:
         plt.xlim(kwargs["xlim"][0],kwargs["xlim"][1])
     else:
