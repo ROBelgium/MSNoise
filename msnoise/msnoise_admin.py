@@ -536,7 +536,13 @@ class StationXMLImportView(BaseView):
 
         result = None
         db = connect()
-        data_sources = list_data_sources(db)
+        # Convert to plain dicts immediately so Jinja2 can access attributes
+        # after the session is closed (avoids DetachedInstanceError).
+        data_sources = [
+            {"ref": ds.ref, "name": ds.name, "uri": ds.uri,
+             "data_structure": ds.data_structure, "auth_env": ds.auth_env}
+            for ds in list_data_sources(db)
+        ]
 
         if request.method == 'POST':
             url    = request.form.get('url', '').strip()
