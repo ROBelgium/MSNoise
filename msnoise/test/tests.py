@@ -77,7 +77,8 @@ _test_logger = _logging.getLogger("msnoise.test")
 
 @pytest.fixture(autouse=True)
 def _log_test_name(request):
-    """Log the current test name at INFO so it appears in msnoise log output."""
+    """Print test name to stdout (visible with pytest -s / msnoise utils test)."""
+    print(f"\n{'='*60}\nTEST: {request.node.name}\n{'='*60}", flush=True)
     _test_logger.info(f">>> TEST START: {request.node.name}")
     yield
     _test_logger.info(f"<<< TEST END:   {request.node.name}")
