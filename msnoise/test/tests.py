@@ -1337,6 +1337,10 @@ def test_203_config_set_param(setup_environment):
 
     result = runner.invoke(msnoise_script.config_set, ['response_path=none'])
     assert result.exit_code == 0
+    # Restore response_path so subsequent PSD tests find the correct folder
+    response_path = setup_environment['response_path']
+    result = runner.invoke(msnoise_script.config_set, [f'response_path={response_path}'])
+    assert result.exit_code == 0
 
 @pytest.mark.order(301)
 def test_301_compute_psd():
