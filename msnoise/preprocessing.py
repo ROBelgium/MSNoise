@@ -57,6 +57,139 @@ import os
 import numpy as np
 logger = logbook.Logger(__name__)
 
+
+def apply_preprocessing_to_stream(stream, params, responses=None, logger=None):
+    """Apply MSNoise signal-processing pipeline to a raw ObsPy Stream.
+
+    This is the core preprocessing logic extracted from :func:`preprocess` so
+    it can be used for both local-archive and FDSN/EIDA data paths.
+
+    Operations applied (in order):
+
+    1. Phase-shift alignment
+    2. Gap detection and filling (up to ``preprocess_max_gap`` samples)
+    3. Sampling-rate check and down-sampling (Resample / Decimate / Lanczos)
+    4. Detrend, taper, highpass / lowpass filter
+    5. Instrument response removal (if ``remove_response`` is set)
+
+    :param stream: Raw :class:`~obspy.core.stream.Stream` for **one station**.
+    :param params: :class:`~msnoise.params.LayeredParams` for this lineage.
+    :param responses: ObsPy :class:`~obspy.core.inventory.Inventory` for
+        instrument response removal, or ``None``.
+    :param logger: Python logger (defaults to ``msnoise.preprocessing``).
+    :returns: Processed :class:`~obspy.core.stream.Stream`, or an empty stream
+        if the data could not be processed.
+    """
+    import sys
+    import numpy as np
+    from obspy import Stream as _Stream
+    from .core.signal import check_and_phase_shift, getGaps
+
+    if logger is None:
+        logger = get_logger("msnoise.preprocessing", "INFO")
+
+    if not stream:
+        return _Stream()
+
+    # 1. Phase-shift alignment
+    for i, trace in enumerate(stream):
+        stream[i] = check_and_phase_shift(
+            trace, params.preprocess.preprocess_taper_length)
+
+    # 2. Gap detection and filling
+    gaps = getGaps(stream)
+    if gaps:
+        logger.debug(f" found {len(gaps)} gap(s)")
+        max_gap = (params.preprocess.preprocess_max_gap
+                   * stream[0].stats.sampling_rate)
+        while gaps:
+            too_long = 0
+            for gap in gaps:
+                if int(gap[-1]) <= max_gap:
+                    try:
+                        stream[gap[0]] = stream[gap[0]].__add__(
+                            stream[gap[1]], method=1,
+                            fill_value="interpolate")
+                        stream.remove(stream[gap[1]])
+                    except Exception:
+                        stream.remove(stream[gap[1]])
+                    break
+                else:
+                    too_long += 1
+            if too_long == len(gaps):
+                break
+            gaps = getGaps(stream)
+
+    stream = stream.split()
+
+    # 3. Sampling-rate check
+    for tr in list(stream):
+        if tr.stats.sampling_rate < (params.preprocess.cc_sampling_rate - 1):
+            logger.warning(
+                f"Trace {tr.id} sampling rate {tr.stats.sampling_rate} < "
+                f"cc_sampling_rate {params.preprocess.cc_sampling_rate}, removing")
+            stream.remove(tr)
+
+    taper_length = params.preprocess.preprocess_taper_length
+    for tr in list(stream):
+        if tr.stats.npts < (4 * taper_length * tr.stats.sampling_rate):
+            stream.remove(tr)
+        else:
+            tr.detrend(type="demean")
+            tr.detrend(type="linear")
+            tr.taper(max_percentage=None, max_length=taper_length)
+
+    if not stream:
+        return _Stream()
+
+    # 4. Filter and downsample
+    for trace in stream:
+        trace.filter("highpass",
+                     freq=params.preprocess.preprocess_highpass,
+                     zerophase=True, corners=4)
+        if trace.stats.sampling_rate != params.preprocess.cc_sampling_rate:
+            trace.filter("lowpass",
+                         freq=params.preprocess.preprocess_lowpass,
+                         zerophase=True, corners=8)
+            method = params.preprocess.resampling_method
+            if method == "Resample":
+                trace.data = resample(
+                    trace.data,
+                    params.preprocess.cc_sampling_rate / trace.stats.sampling_rate,
+                    "sinc_fastest")
+            elif method == "Decimate":
+                factor = trace.stats.sampling_rate / params.preprocess.cc_sampling_rate
+                if int(factor) != factor:
+                    logger.warning(
+                        f"{trace.id}: cannot decimate by non-integer factor {factor}")
+                    sys.exit()
+                trace.data = trace.data[::int(factor)]
+            elif method == "Lanczos":
+                trace.data = np.array(trace.data)
+                trace.interpolate(
+                    method="lanczos",
+                    sampling_rate=params.preprocess.cc_sampling_rate,
+                    a=1.0)
+            trace.stats.sampling_rate = params.preprocess.cc_sampling_rate
+
+    # 5. Instrument response removal
+    if params.preprocess.remove_response and responses is not None:
+        try:
+            stream.attach_response(responses)
+            stream.remove_response(
+                pre_filt=params.preprocess.response_prefilt, taper=False)
+        except Exception as exc:
+            logger.error(
+                f"Bad or no instrument response for {stream[0].id}: {exc}")
+            return _Stream()
+
+    for tr in stream:
+        tr.data = tr.data.astype(float)
+        if tr.stats.location == "":
+            tr.stats.location = "--"
+
+    return stream
+
 def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO", logger='msnoise.compute_cc_norot_child'):
     """
     Fetches data for each ``stations`` and each ``comps`` using the

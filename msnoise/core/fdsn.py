@@ -80,9 +80,9 @@ def build_client(ds):
 
     if scheme == "fdsn":
         from obspy.clients.fdsn import Client
-        base_url = urlsplit(ds.uri)._replace(scheme="https").geturl()
-        # strip the "fdsn://" prefix → actual HTTP(S) URL
-        base_url = ds.uri[len("fdsn://"):]
+        # Strip "fdsn://" prefix — handle both fdsn://http://... and fdsn:///http://...
+        raw = ds.uri[len("fdsn://"):]
+        base_url = raw.lstrip("/")  # remove any leading slashes from triple-slash forms
         kwargs = {}
         if auth["user"] and auth["password"]:
             kwargs["user"] = auth["user"]
@@ -93,7 +93,8 @@ def build_client(ds):
 
     if scheme == "eida":
         from obspy.clients.fdsn import RoutingClient
-        base_url = ds.uri[len("eida://"):]
+        raw = ds.uri[len("eida://"):]
+        base_url = raw.lstrip("/")
         kwargs = {}
         if auth["token"]:
             kwargs["eida_token"] = auth["token"]
@@ -167,7 +168,7 @@ def fetch_and_preprocess(
     from obspy import UTCDateTime, Stream
     from obspy.clients.fdsn.header import FDSNNoDataException
     from .stations import resolve_data_source, get_station
-    from ..preprocessing import _apply_preprocessing  # see note below
+    from ..preprocessing import apply_preprocessing_to_stream
 
     log = logging.getLogger(f"msnoise.fdsn.fetch")
 
@@ -245,8 +246,17 @@ def fetch_and_preprocess(
                 f"proceeding with available data"
             )
 
-        out_stream += sta_stream
-        done_jobs.append(job)
+        # Apply the full preprocessing pipeline (taper, filter, resample,
+        # optional response removal) — same as the local-archive path.
+        processed = apply_preprocessing_to_stream(
+            sta_stream, params, responses=responses, logger=log
+        )
+        if processed:
+            out_stream += processed
+            done_jobs.append(job)
+        else:
+            log.warning(f"{sid}: preprocessing produced empty stream — marking Failed")
+            failed_jobs.append(job)
 
     return out_stream, done_jobs, failed_jobs
 
