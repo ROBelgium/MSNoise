@@ -2,10 +2,12 @@
 import itertools
 import logging
 
+logger = logging.getLogger('msnoise.stations')
+
 import numpy as np
 
 from .config import get_config
-from ..msnoise_table_def import Station, DataAvailability
+from ..msnoise_table_def import Station, DataAvailability, DataSource
 
 def get_stations(session, all=False, net=None, format="raw"):
     """Get Stations from the database.
@@ -373,3 +375,235 @@ def mark_data_availability(session, net, sta, flag):
         values(flag=flag)
     session.execute(stmt)
     session.commit()
+
+
+# ============================================================
+# DataSource management
+# ============================================================
+
+def add_data_source(session, name, uri="", data_structure="SDS",
+                    auth_env="MSNOISE"):
+    """Add a new :class:`~msnoise.msnoise_table_def.DataSource` to the database.
+
+    :param session: SQLAlchemy session.
+    :param name: Human label e.g. ``"local"``, ``"IRIS"``, ``"EIDA"``.
+    :param uri: Data location URI. Schemes:
+        - bare path or ``sds:///path`` → local SDS archive
+        - ``fdsn://http://...``         → FDSN web service
+        - ``eida://http://...``         → EIDA routing client
+    :param data_structure: SDS sub-path format for local sources (default ``"SDS"``).
+        Ignored for FDSN/EIDA.
+    :param auth_env: Environment variable prefix for credentials
+        (default ``"MSNOISE"``). Worker looks up
+        ``{auth_env}_FDSN_USER``, ``{auth_env}_FDSN_PASSWORD``,
+        ``{auth_env}_FDSN_TOKEN``.
+    :returns: The created :class:`~msnoise.msnoise_table_def.DataSource` object.
+    """
+    from ..msnoise_table_def import DataSource
+    ds = DataSource(name=name, uri=uri, data_structure=data_structure,
+                    auth_env=auth_env)
+    session.add(ds)
+    session.commit()
+    session.refresh(ds)
+    logger.info(f"Added DataSource {name!r} (id={ds.ref}, uri={uri!r})")
+    return ds
+
+
+def get_data_source(session, id=None, name=None):
+    """Retrieve a :class:`~msnoise.msnoise_table_def.DataSource` by id or name.
+
+    :param session: SQLAlchemy session.
+    :param id: Primary key of the DataSource.
+    :param name: Human label of the DataSource.
+    :returns: :class:`~msnoise.msnoise_table_def.DataSource` or ``None``.
+    :raises ValueError: If neither *id* nor *name* is provided.
+    """
+    from ..msnoise_table_def import DataSource
+    if id is not None:
+        return session.query(DataSource).filter(DataSource.ref == id).first()
+    if name is not None:
+        return session.query(DataSource).filter(DataSource.name == name).first()
+    raise ValueError("Provide either id or name")
+
+
+def get_default_data_source(session):
+    """Return the project default :class:`~msnoise.msnoise_table_def.DataSource`.
+
+    The default is the ``DataSource`` with ``ref=1`` (created by the installer).
+
+    :param session: SQLAlchemy session.
+    :returns: :class:`~msnoise.msnoise_table_def.DataSource`.
+    :raises RuntimeError: If no DataSource exists (installer not run).
+    """
+    from ..msnoise_table_def import DataSource
+    ds = session.query(DataSource).filter(DataSource.ref == 1).first()
+    if ds is None:
+        raise RuntimeError(
+            "No default DataSource found (ref=1). Has the installer been run?"
+        )
+    return ds
+
+
+def list_data_sources(session):
+    """Return all :class:`~msnoise.msnoise_table_def.DataSource` rows.
+
+    :param session: SQLAlchemy session.
+    :returns: List of :class:`~msnoise.msnoise_table_def.DataSource`.
+    """
+    from ..msnoise_table_def import DataSource
+    return session.query(DataSource).order_by(DataSource.ref).all()
+
+
+def update_data_source(session, id, **kwargs):
+    """Update fields on an existing :class:`~msnoise.msnoise_table_def.DataSource`.
+
+    :param session: SQLAlchemy session.
+    :param id: Primary key of the DataSource to update.
+    :param kwargs: Fields to update: ``name``, ``uri``, ``data_structure``,
+        ``auth_env``.
+    :returns: Updated :class:`~msnoise.msnoise_table_def.DataSource`.
+    :raises ValueError: If the DataSource does not exist.
+    """
+    ds = get_data_source(session, id=id)
+    if ds is None:
+        raise ValueError(f"DataSource with id={id} not found")
+    allowed = {"name", "uri", "data_structure", "auth_env"}
+    for key, val in kwargs.items():
+        if key not in allowed:
+            raise ValueError(f"Unknown DataSource field: {key!r}")
+        setattr(ds, key, val)
+    session.commit()
+    logger.info(f"Updated DataSource id={id}: {kwargs}")
+    return ds
+
+
+def resolve_data_source(session, station):
+    """Return the effective :class:`~msnoise.msnoise_table_def.DataSource` for
+    a station.
+
+    If the station has ``data_source_id`` set, that DataSource is returned.
+    Otherwise the project default (``ref=1``) is used.
+
+    :param session: SQLAlchemy session.
+    :param station: :class:`~msnoise.msnoise_table_def.Station` ORM object.
+    :returns: :class:`~msnoise.msnoise_table_def.DataSource`.
+    """
+    if station.data_source_id is not None:
+        return get_data_source(session, id=station.data_source_id)
+    return get_default_data_source(session)
+
+
+# ============================================================
+# Station ↔ DataSource assignment
+# ============================================================
+
+def set_station_source(session, net, sta, data_source_id):
+    """Assign a specific :class:`~msnoise.msnoise_table_def.DataSource` to a station.
+
+    :param session: SQLAlchemy session.
+    :param net: Network code.
+    :param sta: Station code.
+    :param data_source_id: Primary key of the DataSource to assign.
+        Pass ``None`` to revert to the project default.
+    :raises ValueError: If the station or DataSource does not exist.
+    """
+    from ..msnoise_table_def import DataSource
+    station = get_station(session, net, sta)
+    if station is None:
+        raise ValueError(f"Station {net}.{sta} not found")
+    if data_source_id is not None:
+        ds = session.query(DataSource).filter(
+            DataSource.ref == data_source_id).first()
+        if ds is None:
+            raise ValueError(f"DataSource with id={data_source_id} not found")
+    station.data_source_id = data_source_id
+    session.commit()
+    logger.info(f"Set {net}.{sta} → DataSource id={data_source_id}")
+
+
+def set_network_source(session, net, data_source_id):
+    """Assign a DataSource to all stations of a network.
+
+    :param session: SQLAlchemy session.
+    :param net: Network code.
+    :param data_source_id: Primary key of the DataSource. ``None`` reverts to default.
+    """
+    stations = session.query(Station).filter(Station.net == net).all()
+    if not stations:
+        raise ValueError(f"No stations found for network {net!r}")
+    for sta in stations:
+        sta.data_source_id = data_source_id
+    session.commit()
+    logger.info(
+        f"Set all {len(stations)} stations of network {net!r} "
+        f"→ DataSource id={data_source_id}"
+    )
+
+
+def set_all_stations_source(session, data_source_id):
+    """Assign a DataSource to every station in the database.
+
+    :param session: SQLAlchemy session.
+    :param data_source_id: Primary key of the DataSource. ``None`` reverts all to default.
+    """
+    n = session.query(Station).update({"data_source_id": data_source_id})
+    session.commit()
+    logger.info(f"Set all {n} stations → DataSource id={data_source_id}")
+
+
+# ============================================================
+# StationXML import
+# ============================================================
+
+def import_stationxml(session, path_or_url, data_source_id=None):
+    """Import stations from a StationXML file or URL.
+
+    Parses the inventory with ObsPy and creates or updates
+    :class:`~msnoise.msnoise_table_def.Station` rows. Sets
+    ``data_source_id`` on each imported station.
+
+    :param session: SQLAlchemy session.
+    :param path_or_url: Path to a local StationXML file, or a URL
+        (e.g. an FDSN station web service query URL).
+    :param data_source_id: DataSource to assign to imported stations.
+        ``None`` → project default (``DataSource.ref=1``).
+    :returns: Tuple ``(created, updated)`` counts.
+    """
+    from obspy import read_inventory
+    logger.info(f"Importing StationXML from {path_or_url!r}")
+    inv = read_inventory(path_or_url)
+
+    created = 0
+    updated = 0
+    for network in inv:
+        for station in network:
+            net = network.code
+            sta = station.code
+            X = station.longitude
+            Y = station.latitude
+            alt = station.elevation
+            existing = get_station(session, net, sta)
+            if existing is None:
+                new_sta = Station(
+                    net=net, sta=sta,
+                    X=X, Y=Y, altitude=alt,
+                    coordinates="DEG",
+                    used=True,
+                    data_source_id=data_source_id,
+                )
+                session.add(new_sta)
+                created += 1
+                logger.debug(f"  Created station {net}.{sta}")
+            else:
+                existing.X = X
+                existing.Y = Y
+                existing.altitude = alt
+                existing.coordinates = "DEG"
+                if data_source_id is not None:
+                    existing.data_source_id = data_source_id
+                updated += 1
+                logger.debug(f"  Updated station {net}.{sta}")
+    session.commit()
+    logger.info(f"StationXML import done: {created} created, {updated} updated")
+    return created, updated
+
