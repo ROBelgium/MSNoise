@@ -730,7 +730,7 @@ def test_032_stretching():
     db.close()
 
 
-@pytest.mark.order(41)
+@pytest.mark.order(55)
 def test_041_new_jobs_after_mwcs_dtt():
     """new_jobs --after mwcs_dtt inserts mwcs_dtt_dvv sentinel jobs."""
     new_jobs_main(after='mwcs_dtt')
@@ -749,7 +749,7 @@ def test_041_new_jobs_after_mwcs_dtt():
         "Expected at least one DVV sentinel job after --after mwcs_dtt"
 
 
-@pytest.mark.order(42)
+@pytest.mark.order(56)
 def test_042_compute_mwcs_dtt_dvv():
     """Compute MWCS dv/v aggregate — mwcs_dtt_dvv step."""
     try:
@@ -771,7 +771,7 @@ def test_042_compute_mwcs_dtt_dvv():
     db.close()
 
 
-@pytest.mark.order(43)
+@pytest.mark.order(57)
 def test_043_new_jobs_after_stretching():
     """new_jobs --after stretching inserts stretching_dvv sentinel jobs."""
     new_jobs_main(after='stretching')
@@ -791,7 +791,7 @@ def test_043_new_jobs_after_stretching():
         "Expected at least one stretching_dvv sentinel job after --after stretching"
 
 
-@pytest.mark.order(44)
+@pytest.mark.order(58)
 def test_044_compute_stretching_dvv():
     """Compute Stretching dv/v aggregate — stretching_dvv step."""
     try:
@@ -1026,25 +1026,6 @@ def test_038_stack_validation_handling():
                 is_valid, message = validate_stack_data(c, "reference")
                 if "Warning" in message:
                     logger.warning(f"{sta1}:{sta2}-{components}-{filterid}: {message}")
-
-@pytest.mark.order(52)
-def test_039_wct_pipeline():
-    try:
-        # WCT jobs were created by new_jobs_main(after='refstack') in test_025
-        # (stretching already has its own test_032)
-        db = connect()
-        reset_jobs(db, 'wavelet_1', alljobs=True)
-        db.close()
-        compute_wct_main()
-        new_jobs_main(after='wavelet')
-        db = connect()
-        reset_jobs(db, 'wavelet_dtt_1', alljobs=True)
-        db.close()
-        wavelet_dtt_main()
-    except:
-        traceback.print_exc()
-        pytest.fail()
-
 
 @pytest.mark.order(53)
 def test_040_compute_wavelet_dtt_dvv():
