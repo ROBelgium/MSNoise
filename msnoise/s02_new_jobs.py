@@ -42,7 +42,7 @@ import datetime
 from .core.db import connect, get_logger
 from .core.config import get_config, get_config_set_details
 from .core.stations import get_new_files, get_stations, mark_data_availability
-from .core.workflow import (build_movstack_datelist, filter_within_daterange, get_lineages_to_step_id, get_workflow_steps, lineage_str_to_step_names, massive_insert_job, update_job)
+from .core.workflow import (build_movstack_datelist, _lineage_id_for, filter_within_daterange, get_lineages_to_step_id, get_workflow_steps, lineage_str_to_step_names, massive_insert_job, update_job)
 import pandas as pd
 
 
@@ -144,7 +144,7 @@ def propagate_stack_jobs_from_cc_done(session):
             .filter(Job.jobtype == stack_step.step_name)
             .filter(Job.day == day_value)
             .filter(Job.pair == pair_value)
-            .filter(Job.lineage == lineage_to_stack)
+            .filter(Job.lineage_id == _lineage_id_for(session, lineage_to_stack))
             .first()
         )
         if existing is not None:
@@ -293,7 +293,7 @@ def propagate_refstack_jobs_from_stack_done(session):
                     .filter(Job.step_id == ref_step.step_id)
                     .filter(Job.day == "REF")
                     .filter(Job.pair == pair)
-                    .filter(Job.lineage == refstack_lineage)
+                    .filter(Job.lineage_id == _lineage_id_for(session, refstack_lineage))
                     .first()
                 )
                 if existing is not None:
@@ -407,7 +407,7 @@ def propagate_mwcs_jobs_from_refstack_done(session):
                             .filter(Job.step_id == dvv_step.step_id)
                             .filter(Job.day == day)
                             .filter(Job.pair == pair)
-                            .filter(Job.lineage == dvv_lineage)
+                            .filter(Job.lineage_id == _lineage_id_for(session, dvv_lineage))
                             .first()
                         )
                         if existing:
@@ -657,7 +657,7 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
                 .filter(Job.step_id == child_step.step_id)
                 .filter(Job.day == pj.day)
                 .filter(Job.pair == pj.pair)
-                .filter(Job.lineage == child_lineage)
+                .filter(Job.lineage_id == _lineage_id_for(session, child_lineage))
                 .first()
             )
             if exists:

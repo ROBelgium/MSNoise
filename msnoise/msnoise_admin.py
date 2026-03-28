@@ -103,11 +103,14 @@ def job_dependencies(job_id):
             # prefix so multi-configset branches don't bleed into each other.
             for link in job.workflow_step.incoming_links:
                 if link.is_active:
+                    from .core.workflow import _lineage_id_for
+                    _pred_lin = job_lineage.rsplit('/', 1)[0] if '/' in job_lineage else None
+                    _pred_lin_id = _lineage_id_for(db, _pred_lin) if _pred_lin else None
                     pred_jobs = db.query(schema.Job).filter(
                         schema.Job.day == job.day,
                         schema.Job.pair == job.pair,
                         schema.Job.step_id == link.from_step_id,
-                        schema.Job.lineage == job_lineage.rsplit('/', 1)[0] if '/' in job_lineage else schema.Job.lineage != None,
+                        schema.Job.lineage_id == _pred_lin_id if _pred_lin_id is not None else schema.Job.lineage_id.isnot(None),
                     ).all()
 
                     for pred_job in pred_jobs:

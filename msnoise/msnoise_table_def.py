@@ -9,7 +9,6 @@ from sqlalchemy import Column, Integer, String, Float, Boolean, \
     DateTime, Text, ForeignKey, UniqueConstraint, Index, Enum, REAL, TIMESTAMP, CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm import relationship, backref  # noqa: F401
-from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.sql import text
 # from .api import read_prefix
 
@@ -359,13 +358,12 @@ def declare_tables(prefix=None):
         lineage_ref   = relationship("Lineage",
                                      foreign_keys=[lineage_id],
                                      backref="jobs")
-        # association_proxy: job.lineage = "pre_1/cc_1/..." creates a
-        # Lineage row via the creator; the before_flush event (registered
-        # at module level below) deduplicates against existing rows.
-        lineage = association_proxy(
-            "lineage_ref", "lineage_str",
-            creator=lambda s: Lineage(lineage_str=s),
-        )
+
+        @property
+        def lineage(self):
+            """The lineage string, resolved through the Lineage FK."""
+            return self.lineage_ref.lineage_str if self.lineage_ref else None
+
 
         __table_args__ = (
             # Updated unique constraint to include workflow context
@@ -659,47 +657,6 @@ def declare_tables(prefix=None):
 Base, PrefixerBase, Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink, Lineage = declare_tables()
 
 
-from sqlalchemy import event as _sa_event
-from sqlalchemy.orm import Session as _Session
-
-
-@_sa_event.listens_for(_Session, "before_flush")
-def _deduplicate_lineage_rows(session, flush_context, instances):
-    """Deduplicate pending Lineage rows against already-loaded session objects.
-
-    Uses the session identity map and the ``session.new`` set only — no SQL
-    queries are issued, so there is no risk of re-entrant autoflush.
-
-    Strategy:
-    1. Build a dict of lineage_str → Lineage from objects *already persistent*
-       in the session (identity map) plus other pending new objects.
-    2. For each new Lineage whose string is already represented, remap any
-       Job referencing it to the canonical object and expunge the duplicate.
-    """
-    new_lineages = [obj for obj in session.new if isinstance(obj, Lineage)]
-    if not new_lineages:
-        return
-
-    # Collect canonical Lineage objects visible without a query:
-    # persistent objects in the identity map
-    canonical: dict = {}
-    for key, obj in session.identity_map.items():
-        if isinstance(obj, Lineage):
-            canonical[obj.lineage_str] = obj
-
-    # Also consider other new (not-yet-flushed) Lineage objects — first one wins
-    for obj in list(session.new):
-        if isinstance(obj, Lineage) and obj.lineage_str not in canonical:
-            canonical[obj.lineage_str] = obj
-
-    for pending in new_lineages:
-        canon = canonical.get(pending.lineage_str)
-        if canon is not None and canon is not pending:
-            # Remap all Jobs pointing at the duplicate to the canonical object
-            for job in list(pending.jobs):
-                job.lineage_ref = canon
-                job.lineage_id  = canon.lineage_id
-            session.expunge(pending)
 
 
 

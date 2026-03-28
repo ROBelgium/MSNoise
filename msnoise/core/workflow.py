@@ -395,19 +395,55 @@ def create_workflow_links_from_steps(session):
 def _get_or_create_lineage_id(session, lineage_str):
     """Return the lineage_id for *lineage_str*, creating a Lineage row if needed.
 
-    Uses ``session.no_autoflush`` to avoid triggering autoflush during the
-    lookup query, which could cause re-entrant flush issues.
+    Checks (in order):
+    1. Already-loaded persistent objects in the session identity map.
+    2. Pending new objects in session.new (not yet flushed).
+    3. DB query wrapped in no_autoflush.
+    This avoids UNIQUE constraint violations from duplicate inserts.
     """
     if lineage_str is None:
         return None
+
+    # 1. Check identity map (persistent rows already loaded this session)
+    for obj in session.identity_map.values():
+        if isinstance(obj, Lineage) and obj.lineage_str == lineage_str:
+            return obj.lineage_id
+
+    # 2. Check pending new objects (added but not yet flushed)
+    for obj in list(session.new):
+        if isinstance(obj, Lineage) and obj.lineage_str == lineage_str:
+            # Already pending — flush to get its ID, then return it
+            session.flush()
+            return obj.lineage_id
+
+    # 3. Query the DB (no_autoflush prevents re-entrant flush)
     with session.no_autoflush:
         row = session.query(Lineage).filter(
             Lineage.lineage_str == lineage_str).first()
-    if row is None:
-        row = Lineage(lineage_str=lineage_str)
-        session.add(row)
-        session.flush()
+    if row is not None:
+        return row.lineage_id
+
+    # 4. Truly new — insert and flush to get the generated ID
+    row = Lineage(lineage_str=lineage_str)
+    session.add(row)
+    session.flush()
     return row.lineage_id
+
+
+def _lineage_id_for(session, lineage_str):
+    """Return lineage_id for *lineage_str* without creating, or None."""
+    if lineage_str is None:
+        return None
+    for obj in session.identity_map.values():
+        if isinstance(obj, Lineage) and obj.lineage_str == lineage_str:
+            return obj.lineage_id
+    for obj in list(session.new):
+        if isinstance(obj, Lineage) and obj.lineage_str == lineage_str:
+            return obj.lineage_id  # may be None if not yet flushed
+    with session.no_autoflush:
+        row = session.query(Lineage).filter(
+            Lineage.lineage_str == lineage_str).first()
+    return row.lineage_id if row else None
 
 
 # ============================================================
@@ -473,7 +509,7 @@ def update_job(session, day, pair, jobtype, flag,
         job.priority = priority
         job.flag = flag
         job.lastmod = datetime.datetime.utcnow()
-        job.lineage = lineage
+        job.lineage_id = _lineage_id
         session.add(job)
     else:
         # Never demote a Done job back to Todo
@@ -482,7 +518,7 @@ def update_job(session, day, pair, jobtype, flag,
         job.step_id = step_id
         job.priority = priority
         job.lastmod = datetime.datetime.utcnow()
-        job.lineage = lineage
+        job.lineage_id = _lineage_id
 
     if commit:
         session.commit()
