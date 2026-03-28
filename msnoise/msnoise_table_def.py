@@ -676,6 +676,36 @@ def declare_tables(prefix=None):
         def __repr__(self):
             return f"<WorkflowLink({self.from_step_id} -> {self.to_step_id})>"
 
+    # Register before_insert on THIS call's Job class so the event
+    # always targets the class actually used by active sessions.
+    from sqlalchemy import event as _event, text as _text
+
+    @_event.listens_for(Job, "before_insert", propagate=True)
+    def _resolve_pending_lineage(mapper, connection, target):
+        """Resolve _pending_lineage_str → lineage_id via raw SQL before INSERT."""
+        pending = getattr(target, "_pending_lineage_str", None)
+        if not pending:
+            return
+        # Determine lineages table name (handles prefix)
+        lin_table = mapper.persist_selectable.metadata.tables.get(
+            f"{prefix}lineages" if prefix else "lineages")
+        if lin_table is None:
+            return
+        tname = lin_table.name
+        row = connection.execute(
+            _text(f"SELECT lineage_id FROM {tname} WHERE lineage_str = :s"),
+            {"s": pending}
+        ).fetchone()
+        if row is not None:
+            target.lineage_id = row[0]
+        else:
+            result = connection.execute(
+                _text(f"INSERT INTO {tname} (lineage_str) VALUES (:s)"),
+                {"s": pending}
+            )
+            target.lineage_id = result.lastrowid
+        target._pending_lineage_str = None
+
     # Return the schema namedtuple
     return sqlschema(Base, PrefixerBase,
                      Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink,
@@ -684,53 +714,6 @@ def declare_tables(prefix=None):
 
 Base, PrefixerBase, Job, Station, Config, DataAvailability, WorkflowStep, WorkflowLink, Lineage = declare_tables()
 
-
-from sqlalchemy import event as _sa_event
-
-
-@_sa_event.listens_for(Job, "before_insert", propagate=True)
-def _resolve_pending_lineage(mapper, connection, target):
-    """Resolve _pending_lineage_str to lineage_id just before INSERT.
-
-    Uses raw SQL via *connection* (not the ORM session) to avoid
-    re-entering the flush cycle.
-    """
-    pending = getattr(target, "_pending_lineage_str", None)
-    if not pending:
-        return
-
-    from sqlalchemy import text as _text
-
-    # Determine the lineages table name (handles prefix)
-    lin_table = mapper.persist_selectable.metadata.tables.get("lineages")
-    if lin_table is None:
-        # Try to find a prefixed variant
-        for tname, t in mapper.persist_selectable.metadata.tables.items():
-            if tname.endswith("lineages"):
-                lin_table = t
-                break
-    if lin_table is None:
-        return
-
-    tname = lin_table.name
-
-    # Try SELECT first
-    row = connection.execute(
-        _text(f"SELECT lineage_id FROM {tname} WHERE lineage_str = :s"),
-        {"s": pending}
-    ).fetchone()
-
-    if row is not None:
-        target.lineage_id = row[0]
-    else:
-        # INSERT and get the generated ID
-        result = connection.execute(
-            _text(f"INSERT INTO {tname} (lineage_str) VALUES (:s)"),
-            {"s": pending}
-        )
-        target.lineage_id = result.lastrowid
-
-    target._pending_lineage_str = None
 
 
 
