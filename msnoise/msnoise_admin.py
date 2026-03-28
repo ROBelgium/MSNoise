@@ -328,13 +328,17 @@ class ConfigView(BaseModelView):
 class StationView(BaseModelView):
     """Simplified station management"""
 
-    column_list = ['ref', 'net', 'sta', 'X', 'Y', 'altitude', 'coordinates', 'used']
+    column_list = ['ref', 'net', 'sta', 'X', 'Y', 'altitude', 'coordinates',
+                   'used', 'data_source_id']
     column_searchable_list = ['net', 'sta']
-    column_filters = ['net', 'coordinates', 'used']
-    column_sortable_list = ['ref', 'net', 'sta', 'X', 'Y', 'used']
+    column_filters = ['net', 'coordinates', 'used', 'data_source_id']
+    column_sortable_list = ['ref', 'net', 'sta', 'X', 'Y', 'used', 'data_source_id']
+    column_labels = {'data_source_id': 'DataSource'}
+    column_descriptions = {'data_source_id': 'NULL = project default (DataSource id=1)'}
 
     form_columns = ['net', 'sta', 'X', 'Y', 'altitude', 'coordinates',
-                    'used_location_codes', 'used_channel_names', 'used']
+                    'used_location_codes', 'used_channel_names', 'used',
+                    'data_source_id']
 
     def __init__(self, session, *args, **kwargs):
         super(StationView, self).__init__(schema.Station, session, *args, **kwargs)
@@ -474,6 +478,103 @@ class JobView(BaseModelView):
             stats[flag] = count
 
         return stats
+
+
+
+class DataSourceView(BaseModelView):
+    """CRUD view for DataSource — defines where raw waveform data comes from.
+
+    URI schemes supported:
+    - bare path or ``sds:///path``  → local SDS archive
+    - ``fdsn://http://...``          → FDSN web service
+    - ``eida://http://...``          → EIDA routing client
+
+    Auth credentials are **never** stored here — use environment variables
+    ``{auth_env}_FDSN_USER``, ``{auth_env}_FDSN_PASSWORD``,
+    ``{auth_env}_FDSN_TOKEN``.
+    """
+
+    column_list        = ['ref', 'name', 'uri', 'data_structure', 'auth_env']
+    column_searchable_list = ['name', 'uri']
+    column_sortable_list   = ['ref', 'name']
+    column_labels      = {
+        'ref':            'ID',
+        'name':           'Name',
+        'uri':            'URI',
+        'data_structure': 'Data Structure',
+        'auth_env':       'Auth Env Prefix',
+    }
+    column_descriptions = {
+        'uri':            'Bare path, sds:///path, fdsn://http://..., or eida://http://...',
+        'data_structure': 'SDS sub-path format for local sources (SDS, BUD, etc.)',
+        'auth_env':       'Prefix for env vars: {prefix}_FDSN_USER, {prefix}_FDSN_TOKEN',
+    }
+    form_columns = ['name', 'uri', 'data_structure', 'auth_env']
+
+    def __init__(self, session, *args, **kwargs):
+        from .msnoise_table_def import DataSource
+        super(DataSourceView, self).__init__(DataSource, session, *args, **kwargs)
+
+    def after_model_change(self, form, model, is_created):
+        action = 'Created' if is_created else 'Updated'
+        flash(f"{action} DataSource {model.name!r} (id={model.ref})", 'success')
+
+
+
+class StationXMLImportView(BaseView):
+    """Import stations from a StationXML file or URL.
+
+    Parses the inventory with ObsPy and creates or updates Station rows.
+    Optionally assigns the imported stations to a specific DataSource.
+    """
+
+    @expose('/', methods=['GET', 'POST'])
+    def index(self):
+        from flask import request
+        from .core.stations import import_stationxml, list_data_sources
+        from .core.db import connect
+
+        result = None
+        db = connect()
+        data_sources = list_data_sources(db)
+
+        if request.method == 'POST':
+            url    = request.form.get('url', '').strip()
+            ds_id  = request.form.get('data_source_id') or None
+            if ds_id:
+                ds_id = int(ds_id)
+            file_obj = request.files.get('file')
+
+            try:
+                if file_obj and file_obj.filename:
+                    import tempfile, os as _os
+                    suffix = _os.path.splitext(file_obj.filename)[1] or '.xml'
+                    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                        file_obj.save(tmp.name)
+                        created, updated = import_stationxml(db, tmp.name,
+                                                              data_source_id=ds_id)
+                    _os.unlink(tmp.name)
+                elif url:
+                    created, updated = import_stationxml(db, url, data_source_id=ds_id)
+                else:
+                    db.close()
+                    return self.render('admin/import_stationxml.html',
+                                       data_sources=data_sources,
+                                       result={'cls': 'warning',
+                                               'msg': 'Provide a URL or upload a file.'})
+                result = {
+                    'cls': 'success',
+                    'msg': f'Import complete: {created} station(s) created, {updated} updated.'
+                }
+            except Exception as exc:
+                result = {'cls': 'danger', 'msg': f'Import failed: {exc}'}
+            finally:
+                db.close()
+        else:
+            db.close()
+
+        return self.render('admin/import_stationxml.html',
+                           data_sources=data_sources, result=result)
 
 class DataAvailabilityView(BaseModelView):
     """Simplified data availability management"""
@@ -1180,7 +1281,9 @@ def create_admin_app():
     # admin.add_view(FilterView(db_session, name='Filters', category='Configuration'))
 
     admin.add_view(ConfigSetView(db_session, name='Configuration Sets', endpoint='config_sets', category='Configuration'))
+    admin.add_view(DataSourceView(db_session, name='Data Sources', endpoint='data_sources', category='Configuration'))
     admin.add_view(StationView(db_session, name='Stations', category='Configuration'))
+    admin.add_view(StationXMLImportView(name='Import StationXML', endpoint='import_stationxml', category='Configuration'))
     admin.add_view(DataAvailabilityView(db_session, name='Data Availability', category='Data'))
 
     # Add workflow views

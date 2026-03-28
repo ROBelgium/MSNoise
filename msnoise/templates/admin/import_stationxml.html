@@ -1,0 +1,83 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8">
+            <h2>Import StationXML</h2>
+            <p class="text-muted">
+                Parse a StationXML file or FDSN station service URL and create or update
+                <strong>Station</strong> rows. Optionally assign imported stations to a
+                specific DataSource.
+            </p>
+
+            {% if result %}
+            <div class="alert alert-{{ result.cls }}">{{ result.msg }}</div>
+            {% endif %}
+
+            <form method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>FDSN Station URL</label>
+                    <input type="text" name="url" class="form-control"
+                           placeholder="http://service.iris.edu/fdsnws/station/1/query?network=YA&level=station">
+                    <small class="form-text text-muted">
+                        Any URL that ObsPy's <code>read_inventory()</code> can fetch.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label>— or — Upload StationXML file</label>
+                    <input type="file" name="file" class="form-control-file" accept=".xml,.stationxml">
+                </div>
+
+                <div class="form-group">
+                    <label>Assign DataSource</label>
+                    <select name="data_source_id" class="form-control">
+                        <option value="">— project default (id=1) —</option>
+                        {% for ds in data_sources %}
+                        <option value="{{ ds.ref }}">
+                            {{ ds.ref }}: {{ ds.name }}
+                            {% if ds.uri %}({{ ds.uri }}){% else %}(local){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">
+                        Stations will inherit this DataSource. Leave blank to use the
+                        project default (<code>DataSource.id = 1</code>).
+                    </small>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa fa-upload"></i> Import
+                </button>
+                <a href="{{ url_for('station.index_view') }}" class="btn btn-default">
+                    View Stations
+                </a>
+            </form>
+        </div>
+
+        <div class="col-md-4">
+            <div class="panel panel-info">
+                <div class="panel-heading"><strong>Current DataSources</strong></div>
+                <div class="panel-body">
+                    <table class="table table-condensed">
+                        <thead><tr><th>ID</th><th>Name</th><th>URI</th></tr></thead>
+                        <tbody>
+                        {% for ds in data_sources %}
+                        <tr>
+                            <td>{{ ds.ref }}</td>
+                            <td>{{ ds.name }}</td>
+                            <td><small>{{ ds.uri or '(local)' }}</small></td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    <a href="{{ url_for('data_sources.index_view') }}" class="btn btn-xs btn-default">
+                        Manage DataSources
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
