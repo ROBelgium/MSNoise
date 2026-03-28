@@ -1001,7 +1001,6 @@ def test_105_db_dump(setup_environment):
 @pytest.mark.order(106)
 def test_106_plot_dvv_comparison():
     """Run the DVV comparison example — verifies it produces at least one output file."""
-    import glob
     # The example discovers results and saves dvv_comparison__*.png files
     # Run it in-process by importing and exercising the core logic directly
     db = connect()
@@ -1035,7 +1034,7 @@ def test_106_plot_dvv_comparison():
     import matplotlib.pyplot as plt
     import matplotlib.gridspec as gridspec
     import pandas as pd
-    from ..core.config import lineage_to_plot_tag, build_plot_outfile
+    from ..core.config import build_plot_outfile
 
     METHOD_STYLE = {
         "mwcs_dtt_dvv":    dict(color="#1f77b4", label="MWCS",       lw=1.8, zorder=3),
@@ -1875,6 +1874,60 @@ def test_120032_msnoise_result_dir_gating():
     assert "get_mwcs_dtt" not in d_mwcs, "get_mwcs_dtt still needs mwcs_dtt"
 
     db.close()
+
+
+@pytest.mark.order(120034)
+def test_120034_msnoise_result_export_dvv():
+    """export_dvv writes NetCDF with all 7 provenance attributes."""
+    import tempfile
+    import xarray as xr
+    try:
+        import yaml
+    except ImportError:
+        pytest.skip("pyyaml not installed")
+
+    db = connect()
+    from ..results import MSNoiseResult
+
+    results = MSNoiseResult.list(db, "mwcs_dtt_dvv")
+    if not results:
+        pytest.skip("No mwcs_dtt_dvv results — run full pipeline first")
+
+    r = results[0]
+
+    # export_dvv must be visible (lineage includes mwcs_dtt_dvv)
+    assert hasattr(r, "export_dvv"), "export_dvv should be visible on dvv result"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        written = r.export_dvv(tmpdir, pair_type="CC")
+        assert len(written) >= 1, "Expected at least one exported file"
+
+        for fpath in written:
+            assert os.path.isfile(fpath), f"File missing: {fpath}"
+            ds = xr.open_dataset(fpath)
+
+            # All 7 required global attributes
+            for attr in ("lineage", "msnoise_params", "msnoise_version",
+                         "generated", "pair_type", "components", "mov_stack"):
+                assert attr in ds.attrs, f"Missing attribute: {attr!r}"
+
+            # lineage round-trips exactly
+            assert ds.attrs["lineage"] == "/".join(r.lineage_names),                 "Lineage attribute mismatch"
+
+            # YAML parses and contains at least the global config block
+            params = yaml.safe_load(ds.attrs["msnoise_params"])
+            assert isinstance(params, dict), "msnoise_params is not valid YAML"
+            assert "lineage" in params, "YAML missing 'lineage' key"
+            assert "global" in params,  "YAML missing global config block"
+
+            # Dataset must have times dimension and at least a mean variable
+            assert "times" in ds.dims,       "Missing 'times' dimension"
+            assert "mean" in ds.data_vars,   "Missing 'mean' variable"
+            assert len(ds.times) >= 1,       "No time steps in exported dataset"
+
+            ds.close()
+    db.close()
+
 
 
 @pytest.mark.order(120033)

@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import glob
 import os
-from typing import Optional
 
 # ── Step prefix registry ───────────────────────────────────────────────────────
 
@@ -572,6 +571,149 @@ class MSNoiseResult:
             if r is not None:
                 results[sid] = r
         return results
+
+    # ── export ────────────────────────────────────────────────────────────────
+
+    @_lineage_method(["mwcs_dtt_dvv", "stretching_dvv", "wavelet_dtt_dvv"])
+    def export_dvv(
+        self,
+        path: str,
+        pair_type: str = "CC",
+        components: str = None,
+        mov_stack: tuple = None,
+    ) -> list:
+        """Export dv/v time series bundled with full parameter provenance.
+
+        Writes one NetCDF file per ``(components, mov_stack)`` combination.
+        Each file embeds the dv/v statistics (``mean``, ``std``, ``median``,
+        ``n_pairs``, and any weighted / trimmed variants) plus global
+        attributes for full reproducibility:
+
+        ``lineage``
+            Slash-separated step-name path.
+        ``msnoise_params``
+            Full YAML dump of :attr:`params` — one block per config category.
+            Load offline with ``yaml.safe_load(ds.attrs["msnoise_params"])``.
+        ``msnoise_version``
+            Package version string.
+        ``generated``
+            ISO-8601 UTC timestamp.
+        ``pair_type``, ``components``, ``mov_stack``
+            Provenance of the specific slice exported.
+
+        Parameters
+        ----------
+        path:
+            Output directory (created if absent) **or** a full ``.nc`` path.
+            When a directory is given, files are named
+            ``dvv_<pair_type>_<comp>__<lineage_tag>__m<ms>.nc``.
+            A full path requires exactly one ``(components, mov_stack)`` to be
+            specified.
+        pair_type:
+            Pair-type filter (default ``"CC"``).
+        components:
+            Component string, e.g. ``"ZZ"``.  ``None`` exports all found.
+        mov_stack:
+            Tuple ``(window, step)``.  ``None`` exports all found.
+
+        Returns
+        -------
+        list of str
+            Paths of files written.
+
+        Example::
+
+            db = connect()
+            r = MSNoiseResult.list(db, "mwcs_dtt_dvv")[0]
+            written = r.export_dvv("exports/", pair_type="CC")
+            for f in written:
+                print(f)
+                # dvv_CC_ZZ__pre1-cc1-f1-stk1-ref1-mwcs1-dtt1-dvv1__m1D-1D.nc
+
+            # Reload and inspect provenance
+            import xarray as xr, yaml
+            ds = xr.open_dataset(written[0])
+            params = yaml.safe_load(ds.attrs["msnoise_params"])
+            print(params["mwcs"]["mwcs_wlen"])
+        """
+        import datetime
+        try:
+            import msnoise as _ms
+            _version = _ms.__version__
+        except Exception:
+            _version = "unknown"
+
+        from .core.config import lineage_to_plot_tag
+
+        # Collect datasets via get_dvv (dict keyed by (pt, comp, ms))
+        raw = self.get_dvv(pair_type=pair_type, components=components,
+                           mov_stack=mov_stack)
+
+        # Normalise to {(pt, comp, ms_tuple): ds}
+        datasets = {}
+        if isinstance(raw, dict):
+            for key, ds in raw.items():
+                if len(key) == 3:
+                    datasets[key] = ds
+                elif len(key) == 2:
+                    # get_dvv collapsed one dimension
+                    if mov_stack is not None:
+                        pt, comp_k = key
+                        datasets[(pt, comp_k, mov_stack)] = ds
+                    else:
+                        pt, ms_k = key
+                        datasets[(pt, pair_type, ms_k)] = ds
+        elif hasattr(raw, "times"):
+            # Single xr.Dataset returned when both components and mov_stack given
+            datasets[(pair_type,
+                      components or "unknown",
+                      mov_stack or ("?", "?"))] = raw
+
+        if not datasets:
+            raise FileNotFoundError(
+                f"No dv/v data found for pair_type={pair_type!r}, "
+                f"components={components!r}, mov_stack={mov_stack!r}."
+            )
+
+        lin_str     = "/".join(self.lineage_names)
+        lin_tag     = lineage_to_plot_tag(self.lineage_names)
+        params_yaml = self.params.to_yaml_string()
+        generated   = datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+        is_dir = os.path.isdir(path) or not path.endswith(".nc")
+        written = []
+
+        for (pt, comp, ms), ds in sorted(datasets.items()):
+            ms_str = (f"{ms[0]}_{ms[1]}" if isinstance(ms, (tuple, list))
+                      else str(ms))
+
+            if is_dir:
+                os.makedirs(path, exist_ok=True)
+                fname    = f"dvv_{pt}_{comp}__{lin_tag}__m{ms_str}.nc"
+                out_path = os.path.join(path, fname)
+            else:
+                if len(datasets) > 1:
+                    raise ValueError(
+                        "A full file path can only be used when exactly one "
+                        "(components, mov_stack) combination is selected."
+                    )
+                out_path = path
+
+            ds = ds.copy()
+            ds.attrs.update({
+                "lineage":         lin_str,
+                "msnoise_params":  params_yaml,
+                "msnoise_version": _version,
+                "generated":       generated,
+                "pair_type":       pt,
+                "components":      comp,
+                "mov_stack":       ms_str,
+            })
+            ds.to_netcdf(out_path)
+            written.append(out_path)
+
+        return written
+
 
 
 # ── module-level helper ────────────────────────────────────────────────────────

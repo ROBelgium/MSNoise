@@ -1933,6 +1933,110 @@ def utils_export_params(ctx, lineage, preprocessid, ccid, filterid, stackid,
 
 
 
+@utils.command(name="export-dvv")
+@click.option("-l", "--lineage", default=None, type=str,
+              help="Slash-separated lineage string ending at a DVV step")
+@click.option("-p",   "--preprocessid",    default=1,    type=int)
+@click.option("-cc",  "--ccid",            default=1,    type=int)
+@click.option("-f",   "--filterid",        default=1,    type=int)
+@click.option("-s",   "--stackid",         default=1,    type=int)
+@click.option("-r",   "--refstackid",      default=1,    type=int)
+@click.option("-m",   "--mwcsid",          default=None, type=int)
+@click.option("-md",  "--mwcsdttid",       default=None, type=int)
+@click.option("-mdd", "--mwcsdvvid",       default=None, type=int)
+@click.option("-S",   "--stretchingid",    default=None, type=int)
+@click.option("-sd",  "--stretchingdvvid", default=None, type=int)
+@click.option("-W",   "--wctid",           default=None, type=int)
+@click.option("-wd",  "--wctdttid",        default=None, type=int)
+@click.option("-wdv", "--waveletdvvid",    default=None, type=int)
+@click.option("--pair-type",  default="CC", show_default=True)
+@click.option("--components", default=None, type=str,
+              help="Component to export (e.g. ZZ). Default: all.")
+@click.option("--mov-stack",  default=None, type=str,
+              help="Moving stack as window_step (e.g. 1D_1D). Default: all.")
+@click.option("-o", "--output", default=".", type=str, show_default=True,
+              help="Output directory (or full .nc path for a single export)")
+@click.pass_context
+def utils_export_dvv(ctx, lineage, preprocessid, ccid, filterid, stackid,
+                     refstackid, mwcsid, mwcsdttid, mwcsdvvid,
+                     stretchingid, stretchingdvvid, wctid, wctdttid,
+                     waveletdvvid, pair_type, components, mov_stack, output):
+    """Export dv/v time series as NetCDF with embedded parameter provenance.
+
+    Each output file contains dv/v statistics (mean, std, median, n_pairs,
+    weighted/trimmed variants) on a ``times`` dimension, with the complete
+    processing parameter chain embedded as a global YAML attribute for full
+    reproducibility.
+
+    Either supply --lineage as a slash-separated string ending at a DVV step,
+    or build it from individual step IDs.
+
+    Examples::
+
+        # MWCS dv/v, all components and mov_stacks, output to current directory
+        msnoise utils export-dvv -p 1 -cc 1 -f 1 -s 1 -r 1 -m 1 -md 1 -mdd 1
+
+        # Stretching dv/v, ZZ only, custom output directory
+        msnoise utils export-dvv -p 1 -cc 1 -f 1 -s 1 -r 1 -S 1 -sd 1 \
+            --components ZZ --output /data/release/
+
+        # Using a lineage string
+        msnoise utils export-dvv \
+            --lineage preprocess_1/cc_1/filter_1/stack_1/refstack_1/mwcs_1/mwcs_dtt_1/mwcs_dtt_dvv_1
+
+        # Reload the result in Python
+        # >>> import xarray as xr, yaml
+        # >>> ds = xr.open_dataset("dvv_CC_ZZ__pre1-...nc")
+        # >>> params = yaml.safe_load(ds.attrs["msnoise_params"])
+        # >>> print(params["mwcs"]["mwcs_wlen"])
+    """
+    from ..core.db import connect
+    from ..core.workflow import lineage_str_to_steps
+    from ..results import MSNoiseResult
+
+    db = connect()
+
+    if lineage:
+        lin_str = lineage
+    else:
+        parts = [f"preprocess_{preprocessid}", f"cc_{ccid}",
+                 f"filter_{filterid}", f"stack_{stackid}",
+                 f"refstack_{refstackid}"]
+        if mwcsid:          parts.append(f"mwcs_{mwcsid}")
+        if mwcsdttid:       parts.append(f"mwcs_dtt_{mwcsdttid}")
+        if mwcsdvvid:       parts.append(f"mwcs_dtt_dvv_{mwcsdvvid}")
+        if stretchingid:    parts.append(f"stretching_{stretchingid}")
+        if stretchingdvvid: parts.append(f"stretching_dvv_{stretchingdvvid}")
+        if wctid:           parts.append(f"wavelet_{wctid}")
+        if wctdttid:        parts.append(f"wavelet_dtt_{wctdttid}")
+        if waveletdvvid:    parts.append(f"wavelet_dtt_dvv_{waveletdvvid}")
+        lin_str = "/".join(parts)
+
+    steps      = lineage_str_to_steps(db, lin_str, sep="/", strict=False)
+    step_names = [s.step_name for s in steps]
+    result     = MSNoiseResult(db, step_names)
+
+    ms_tuple = None
+    if mov_stack:
+        parts_ms = mov_stack.split("_", 1)
+        if len(parts_ms) == 2:
+            ms_tuple = tuple(parts_ms)
+        else:
+            raise click.BadParameter(
+                f"--mov-stack must be window_step (e.g. 1D_1D), got {mov_stack!r}")
+
+    written = result.export_dvv(
+        output,
+        pair_type=pair_type,
+        components=components,
+        mov_stack=ms_tuple,
+    )
+    for fpath in written:
+        click.echo(f"Written: {fpath}")
+    db.close()
+
+
+
 
 def run():
     try:
