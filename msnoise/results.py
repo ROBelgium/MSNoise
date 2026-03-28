@@ -186,7 +186,7 @@ class MSNoiseResult:
                            if isinstance(required, frozenset) else repr(required))
                 present_str = ", ".join(sorted(present)) or "(none)"
                 raise AttributeError(
-                    f"{name!r} requires {req_str} in the lineage, "
+                    f"{name!r} requires category {req_str} in the lineage, "
                     f"but this result only covers: {present_str}. "
                     f"Use .branches() to navigate to a downstream step."
                 )

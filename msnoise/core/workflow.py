@@ -392,6 +392,24 @@ def create_workflow_links_from_steps(session):
     except Exception as e:
         return 0, 0, str(e)
 
+def _get_or_create_lineage_id(session, lineage_str):
+    """Return the lineage_id for *lineage_str*, creating a Lineage row if needed.
+
+    Uses ``session.no_autoflush`` to avoid triggering autoflush during the
+    lookup query, which could cause re-entrant flush issues.
+    """
+    if lineage_str is None:
+        return None
+    with session.no_autoflush:
+        row = session.query(Lineage).filter(
+            Lineage.lineage_str == lineage_str).first()
+    if row is None:
+        row = Lineage(lineage_str=lineage_str)
+        session.add(row)
+        session.flush()
+    return row.lineage_id
+
+
 # ============================================================
 
 
@@ -435,13 +453,13 @@ def update_job(session, day, pair, jobtype, flag,
     if ref:
         job = session.query(Job).filter(text("ref=:ref")).params(ref=ref).first()
     else:
+        _lineage_id = _get_or_create_lineage_id(session, lineage)
         job = (session.query(Job)
                .filter(Job.day == day)
                .filter(Job.pair == pair)
                .filter(Job.jobtype == jobtype)
-               .outerjoin(Job.lineage_ref)
                .filter(
-                   Lineage.lineage_str == lineage if lineage is not None
+                   Job.lineage_id == _lineage_id if _lineage_id is not None
                    else Job.lineage_id.is_(None)
                )
                .first())

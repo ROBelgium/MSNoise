@@ -665,30 +665,41 @@ from sqlalchemy.orm import Session as _Session
 
 @_sa_event.listens_for(_Session, "before_flush")
 def _deduplicate_lineage_rows(session, flush_context, instances):
-    """Replace any pending duplicate Lineage rows with the existing DB row.
+    """Deduplicate pending Lineage rows against already-loaded session objects.
 
-    When ``job.lineage = 'pre_1/cc_1/...'`` is set via the association_proxy,
-    SQLAlchemy creates a new ``Lineage(lineage_str=...)`` object.  If that
-    string already exists in the DB (or in the session identity map), this
-    hook swaps the pending object for the existing one before the INSERT
-    fires, avoiding a UNIQUE constraint violation.
+    Uses the session identity map and the ``session.new`` set only — no SQL
+    queries are issued, so there is no risk of re-entrant autoflush.
+
+    Strategy:
+    1. Build a dict of lineage_str → Lineage from objects *already persistent*
+       in the session (identity map) plus other pending new objects.
+    2. For each new Lineage whose string is already represented, remap any
+       Job referencing it to the canonical object and expunge the duplicate.
     """
     new_lineages = [obj for obj in session.new if isinstance(obj, Lineage)]
     if not new_lineages:
         return
-    # Use no_autoflush to prevent re-entrant flush while querying
-    with session.no_autoflush:
-        for pending in new_lineages:
-            existing = (
-                session.query(Lineage)
-                .filter(Lineage.lineage_str == pending.lineage_str)
-                .first()
-            )
-            if existing is not None and existing is not pending:
-                for job in list(pending.jobs):
-                    job.lineage_ref = existing
-                    job.lineage_id  = existing.lineage_id
-                session.expunge(pending)
+
+    # Collect canonical Lineage objects visible without a query:
+    # persistent objects in the identity map
+    canonical: dict = {}
+    for key, obj in session.identity_map.items():
+        if isinstance(obj, Lineage):
+            canonical[obj.lineage_str] = obj
+
+    # Also consider other new (not-yet-flushed) Lineage objects — first one wins
+    for obj in list(session.new):
+        if isinstance(obj, Lineage) and obj.lineage_str not in canonical:
+            canonical[obj.lineage_str] = obj
+
+    for pending in new_lineages:
+        canon = canonical.get(pending.lineage_str)
+        if canon is not None and canon is not pending:
+            # Remap all Jobs pointing at the duplicate to the canonical object
+            for job in list(pending.jobs):
+                job.lineage_ref = canon
+                job.lineage_id  = canon.lineage_id
+            session.expunge(pending)
 
 
 
