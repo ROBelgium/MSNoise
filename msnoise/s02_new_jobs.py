@@ -41,7 +41,7 @@ should be run after the ``msnoise compute_cc`` step in order to create the
 import datetime
 
 from .core.db import connect, get_logger
-from .core.config import get_config, get_config_set_details
+from .core.config import get_config, get_config_set_details, get_params
 from .core.stations import get_new_files, get_stations, mark_data_availability
 from .core.workflow import (build_movstack_datelist, _lineage_id_for, filter_within_daterange, get_lineages_to_step_id, get_workflow_steps, lineage_str_to_step_names, massive_insert_job, update_job)
 import pandas as pd
@@ -973,6 +973,17 @@ def main(init=False, nocc=False, after=False):
     if after:
         source_category = str(after).strip().lower()
 
+        params = get_params(db)
+        if not params.hpc:
+            logger.warning(
+                f"new_jobs --after {source_category} called but hpc=False. "
+                "In default (non-HPC) mode, propagation is handled automatically "
+                "by worker scripts via propagate_downstream(). "
+                "This --after call is a no-op. Set hpc=Y to enable manual propagation."
+            )
+            db.close()
+            return
+
         # Optional validation: ensure it's a known config-set type/category
         allowed_categories = {
             "global", "preprocess", "psd", "psd_rms", "cc", "filter",
@@ -1148,23 +1159,28 @@ def main(init=False, nocc=False, after=False):
     logger.info("Inserted %i jobs" % count)
     logger.info('*** Finished: New Jobs (Workflow-aware) ***')
 
+    # In hpc=True mode: propagate preprocess→cc explicitly.
+    # In hpc=False mode: preprocess workers call propagate_downstream() inline.
     if not nocc:
-        logger.info('Creating CC jobs from completed preprocess jobs')
-        cc_jobs, cc_count = create_cc_jobs_from_preprocess(db)
-
-        if cc_jobs:
-            logger.debug(f'Inserting/Updating {len(cc_jobs)} CC jobs')
-            if init:
-                massive_insert_job(db, cc_jobs)
-            else:
-                for job in cc_jobs:
-                    update_job(db, job['day'], job['pair'],
-                                        job['jobtype'], job['flag'],
-                                        step_id=job.get('step_id'),
-                                        priority=job.get('priority', 0),
-                                        lineage=job.get('lineage'),  # <-- NEW
-                                        commit=False)
-            db.commit()
-            logger.info(f"Created {cc_count} CC jobs")
+        _params = get_params(db)
+        if _params.hpc:
+            logger.info('Creating CC jobs from completed preprocess jobs')
+            cc_jobs, cc_count = create_cc_jobs_from_preprocess(db)
+            if cc_jobs:
+                logger.debug(f'Inserting/Updating {len(cc_jobs)} CC jobs')
+                if init:
+                    massive_insert_job(db, cc_jobs)
+                else:
+                    for job in cc_jobs:
+                        update_job(db, job['day'], job['pair'],
+                                            job['jobtype'], job['flag'],
+                                            step_id=job.get('step_id'),
+                                            priority=job.get('priority', 0),
+                                            lineage=job.get('lineage'),
+                                            commit=False)
+                db.commit()
+                logger.info(f"Created {cc_count} CC jobs")
+        else:
+            logger.debug('hpc=False: preprocess→cc propagation handled by propagate_downstream()')
 
     return count

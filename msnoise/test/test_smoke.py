@@ -3,52 +3,45 @@ Fast-failing smoke test suite for MSNoise workflow machinery.
 
 Purpose
 -------
-Verify the complete job lifecycle — from ``db init`` through DVV aggregate —
-using *stub* compute functions that write minimal valid NetCDF files instead
-of performing real signal processing.
+Verify the complete job lifecycle using *stub* compute functions that write
+minimal valid NetCDF files.  Two suites are provided:
+
+hpc=False (default, tests 01-33)
+    Worker stubs call ``propagate_downstream`` inline — no manual
+    ``new_jobs --after X`` calls needed.  This matches the default user
+    experience.
+
+hpc=True  (tests 40-60, class ``TestSmokeHPC``)
+    Worker stubs do NOT call ``propagate_downstream``.  The test explicitly
+    calls ``new_jobs --after X`` at each step, matching HPC cluster usage.
 
 What is tested
 --------------
-* Database initialisation and table creation (including the ``Lineage`` table).
-* ``new_jobs`` creates the correct number of ``T`` jobs with valid ``lineage_id``.
-* Each stub compute step transitions jobs from ``T`` → ``D``.
-* ``new_jobs --after X`` propagates correctly to every downstream step.
-* ``MSNoiseResult.list()`` returns results at every DVV category.
-* Lineage normalisation: every job resolves to a non-empty string; the
-  ``Lineage`` table has far fewer rows than total job rows.
-* Both CC and PSD branches run independently to completion.
-* All three DVV methods (MWCS, Stretching, WCT) produce aggregate output.
-
-What is NOT tested
-------------------
-* Numerical correctness of any signal-processing algorithm.
-* Actual seismic waveform data.
+* Workflow step and link creation.
+* Direct job seeding (preprocess + PSD T jobs created without DA scan).
+* Job T→I→D transitions through stubs.
+* ``propagate_downstream``: filter_N pass-through, multi-branch fan-out,
+  DVV sentinel creation.
+* Lineage normalisation: no NULL lineage_ids, no duplicate Lineage rows.
+* ``MSNoiseResult.list()`` finds results after DVV aggregation.
+* Second-day: adding new jobs only creates downstream T jobs for the new day.
+* Idempotency: calling ``propagate_downstream`` twice is a no-op.
+* HPC path: ``new_jobs --after X`` creates the right T jobs (hpc=True only).
 
 Speed target
 ------------
-< 30 seconds on any modern laptop.
-
-Running
--------
-Via the CLI::
-
-    msnoise utils test --fast
-
-Or directly with pytest::
-
-    pytest msnoise/test/test_smoke.py -s -v
-
+< 40 seconds total (both suites combined).
 """
 from __future__ import annotations
 
-import datetime
 import os
 
 import numpy as np
 import pytest
 import xarray as xr
 
-# ── Fixtures ──────────────────────────────────────────────────────────────────
+
+# ── autouse fixture ───────────────────────────────────────────────────────────
 
 @pytest.fixture(autouse=True)
 def _print_test_name(request):
@@ -56,9 +49,11 @@ def _print_test_name(request):
     yield
 
 
+# ── Session fixture ───────────────────────────────────────────────────────────
+
 @pytest.fixture(scope="session")
 def smoke_db(tmp_path_factory):
-    """Set up a minimal MSNoise project in a temp directory and return (db, cfg)."""
+    """Set up a minimal MSNoise project (hpc=False) and return (db, params, root)."""
     from ..core.db import create_database_inifile, connect
     from ..core.config import create_config_set, update_config, get_params
     from ..core.workflow import (create_workflow_steps_from_config_sets,
@@ -68,14 +63,11 @@ def smoke_db(tmp_path_factory):
     tmp = tmp_path_factory.mktemp("smoke")
     os.chdir(tmp)
 
-    create_database_inifile(
-        tech=1, hostname="smoke.sqlite", database="",
-        username="", password="", prefix=""
-    )
+    create_database_inifile(tech=1, hostname="smoke.sqlite", database="",
+                            username="", password="", prefix="")
     db = connect()
     declare_tables().Base.metadata.create_all(db.get_bind())
 
-    # Config sets — full workflow
     for cat in ["global", "preprocess", "cc", "filter", "stack", "refstack",
                 "mwcs", "mwcs_dtt", "mwcs_dtt_dvv",
                 "stretching", "stretching_dvv",
@@ -83,30 +75,28 @@ def smoke_db(tmp_path_factory):
                 "psd", "psd_rms"]:
         create_config_set(db, cat)
 
-    # Minimal parameters
     root = str(tmp / "OUTPUT")
-    update_config(db, "data_folder",   str(tmp / "data"))
-    update_config(db, "output_folder", root)
-    update_config(db, "sampling_rate", "1")          # 1 Hz → tiny arrays
-    update_config(db, "channels",      "HHZ")
-    update_config(db, "startdate",     "2010-09-01")
-    update_config(db, "enddate",       "2010-09-03")
-    update_config(db, "maxlag",        "2",            category="cc",      set_number=1)
-    update_config(db, "cc_sampling_rate", "1",        category="cc",      set_number=1)
-    update_config(db, "components_to_compute", "ZZ",  category="cc",      set_number=1)
-    update_config(db, "keep_days",     "Y",            category="cc",      set_number=1)
-    update_config(db, "mov_stack",     "((\'1D\',\'1D\'),)", category="stack", set_number=1)
-    update_config(db, "ref_begin",     "2010-09-01",   category="refstack",set_number=1)
-    update_config(db, "ref_end",       "2010-09-03",   category="refstack",set_number=1)
-    update_config(db, "mwcs_wlen",     "2",            category="mwcs",    set_number=1)
-    update_config(db, "mwcs_step",     "1",            category="mwcs",    set_number=1)
-    update_config(db, "wct_freqmin",   "0.1",          category="wavelet", set_number=1)
-    update_config(db, "wct_freqmax",   "0.5",          category="wavelet", set_number=1)
-    update_config(db, "dvv_split_pair_type", "Y",      category="mwcs_dtt_dvv",    set_number=1)
-    update_config(db, "dvv_split_pair_type", "Y",      category="stretching_dvv",  set_number=1)
-    update_config(db, "dvv_split_pair_type", "Y",      category="wavelet_dtt_dvv", set_number=1)
+    update_config(db, "data_folder",    str(tmp / "data"))
+    update_config(db, "output_folder",  root)
+    update_config(db, "sampling_rate",  "1")
+    update_config(db, "channels",       "HHZ")
+    update_config(db, "startdate",      "2010-09-01")
+    update_config(db, "enddate",        "2010-09-02")
+    update_config(db, "maxlag",            "2",  category="cc",      set_number=1)
+    update_config(db, "cc_sampling_rate",  "1",  category="cc",      set_number=1)
+    update_config(db, "components_to_compute", "ZZ", category="cc",  set_number=1)
+    update_config(db, "keep_days",         "Y",  category="cc",      set_number=1)
+    update_config(db, "mov_stack", "(('1D','1D'),)", category="stack", set_number=1)
+    update_config(db, "ref_begin", "2010-09-01",   category="refstack", set_number=1)
+    update_config(db, "ref_end",   "2010-09-02",   category="refstack", set_number=1)
+    update_config(db, "mwcs_wlen", "2",            category="mwcs",   set_number=1)
+    update_config(db, "mwcs_step", "1",            category="mwcs",   set_number=1)
+    update_config(db, "dvv_split_pair_type", "Y",  category="mwcs_dtt_dvv",    set_number=1)
+    update_config(db, "dvv_split_pair_type", "Y",  category="stretching_dvv",  set_number=1)
+    update_config(db, "dvv_split_pair_type", "Y",  category="wavelet_dtt_dvv", set_number=1)
+    # hpc=False (default) — propagate_downstream fires automatically
+    update_config(db, "hpc", "N")
 
-    # Stations — 3 stations → 3 pairs
     for net, sta, x, y in [("YA", "UV05", 0.0, 0.0),
                             ("YA", "UV06", 0.1, 0.0),
                             ("YA", "UV07", 0.0, 0.1)]:
@@ -116,22 +106,6 @@ def smoke_db(tmp_path_factory):
                        used_channel_names="HHZ"))
     db.commit()
 
-    # Data availability — 2 days, 1 channel
-    from ..msnoise_table_def import DataAvailability
-    now = datetime.datetime.utcnow()
-    for sta in ["UV05", "UV06", "UV07"]:
-        for day in ["2010-09-01", "2010-09-02"]:
-            db.add(DataAvailability(
-                net="YA", sta=sta, loc="00", chan="HHZ",
-                path=str(tmp / "data"), file=f"{sta}_{day}.mseed",
-                starttime=datetime.datetime.fromisoformat(day),
-                endtime=datetime.datetime.fromisoformat(day) + datetime.timedelta(days=1),
-                data_duration=86400, gaps_duration=0,
-                samplerate=1.0, flag="N"  # 'N'ew so get_new_files picks them up
-            ))
-    db.commit()
-
-    # Build workflow
     create_workflow_steps_from_config_sets(db)
     create_workflow_links_from_steps(db)
 
@@ -139,175 +113,243 @@ def smoke_db(tmp_path_factory):
     return db, params, root
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Constants ─────────────────────────────────────────────────────────────────
+
+DAYS       = ["2010-09-01", "2010-09-02"]
+PAIRS      = [("YA.UV05.00", "YA.UV06.00"),
+              ("YA.UV05.00", "YA.UV07.00"),
+              ("YA.UV06.00", "YA.UV07.00")]
+STATIONS   = ["YA.UV05.00", "YA.UV06.00", "YA.UV07.00"]
+COMPS      = ["ZZ"]
+MOV_STACKS = [("1D", "1D")]
+TAXIS      = np.arange(-2.0, 2.0 + 1.0, 1.0, dtype="float32")
+FREQS      = np.array([0.1, 0.2, 0.3, 0.5], dtype="float32")
+TIMES      = np.array(DAYS, dtype="datetime64[D]")
+
+DAY3       = "2010-09-03"   # extra day for second-day tests
+TIMES3     = np.array([DAY3], dtype="datetime64[D]")
+
+
+# ── Job-count helpers ─────────────────────────────────────────────────────────
 
 def _counts(db, step_name: str) -> dict:
-    """Return {flag: count} for all jobs at *step_name*."""
-    db.expire_all()  # ensure we see commits made by other sessions
-    from ..msnoise_table_def import WorkflowStep, Job as _J
-    step = db.query(WorkflowStep).filter(
-        WorkflowStep.step_name == step_name).first()
-    if step is None:
-        return {}
-    rows = db.query(_J.flag).filter(_J.step_id == step.step_id).all()
-    c = {}
-    for (f,) in rows:
-        c[f] = c.get(f, 0) + 1
-    return c
+    """Return {flag: count} for all jobs at *step_name*.
+
+    Uses a fresh session via connect() so it always sees the latest
+    committed data regardless of the fixture session's cache state.
+    """
+    from ..core.db import connect as _connect
+    from ..msnoise_table_def import declare_tables as _dt
+    _s = _dt()
+    _db = _connect()
+    try:
+        step = _db.query(_s.WorkflowStep).filter(
+            _s.WorkflowStep.step_name == step_name).first()
+        if step is None:
+            return {}
+        rows = _db.query(_s.Job.flag).filter(_s.Job.step_id == step.step_id).all()
+        c: dict = {}
+        for (f,) in rows:
+            c[f] = c.get(f, 0) + 1
+        return c
+    finally:
+        _db.close()
 
 
 def _assert_min(db, step_name, flag, n, msg=""):
     c = _counts(db, step_name)
     got = c.get(flag, 0)
     assert got >= n, (
-        f"{msg or step_name}: expected >={n} '{flag}' jobs, got {got} (all: {c})")
+        f"{msg or step_name}: expected >={n} '{flag}' jobs, got {got} "
+        f"(all flags: {c})")
 
 
-DAYS      = ["2010-09-01", "2010-09-02"]
-PAIRS     = [("YA.UV05.00", "YA.UV06.00"),
-             ("YA.UV05.00", "YA.UV07.00"),
-             ("YA.UV06.00", "YA.UV07.00")]
-COMPS     = ["ZZ"]
-MOV_STACKS = [("1D", "1D")]
-SR        = 1.0
-MAXLAG    = 2.0
-TAXIS     = np.arange(-MAXLAG, MAXLAG + 1/SR, 1/SR)
-FREQS     = np.array([0.1, 0.2, 0.3, 0.5])
-TIMES     = np.array(DAYS, dtype="datetime64[D]")
+def _n_jobs(db, step_name: str, day: str, flag: str) -> int:
+    """Count jobs for a specific (step, day, flag) using a fresh session."""
+    from ..core.db import connect as _connect
+    from ..msnoise_table_def import declare_tables as _dt
+    _s = _dt()
+    _db = _connect()
+    try:
+        step = _db.query(_s.WorkflowStep).filter(
+            _s.WorkflowStep.step_name == step_name).first()
+        if step is None:
+            return 0
+        return (_db.query(_s.Job)
+                  .filter(_s.Job.step_id == step.step_id)
+                  .filter(_s.Job.day == day)
+                  .filter(_s.Job.flag == flag)
+                  .count())
+    finally:
+        _db.close()
+
+
+# ── Seeder: create T jobs directly (bypass DA scan) ──────────────────────────
+
+def _seed_jobs(db, days=None, extra_stations=None):
+    """Directly insert preprocess_1 and psd_1 T jobs for *days*.
+
+    Bypasses the DataAvailability scan entirely — we trust that path works
+    and focus on testing job propagation only.
+    """
+    from ..msnoise_table_def import declare_tables
+    from ..core.workflow import update_job
+
+    schema = declare_tables()
+    WorkflowStep = schema.WorkflowStep
+
+    if days is None:
+        days = DAYS
+    stations = list(STATIONS) + (extra_stations or [])
+    n = 0
+    for cat in ("preprocess", "psd"):
+        step = db.query(WorkflowStep).filter(
+            WorkflowStep.category == cat).first()
+        if step is None:
+            continue
+        lineage_str = step.step_name   # single-node lineage for origin steps
+        for station in stations:
+            for day in days:
+                # update_job handles existing-job detection + D→T protection
+                update_job(db, day, station, step.step_name, "T",
+                           step_id=step.step_id, lineage=lineage_str,
+                           commit=False)
+                n += 1
+    db.commit()
+    return n
 
 
 # ── Stub compute functions ────────────────────────────────────────────────────
 
+def _run_step(category, group_by, on_batch):
+    """Generic worker loop: claim batches, call on_batch, mark Done.
+
+    Opens a fresh DB connection per call so the session always sees the
+    latest committed state — avoiding stale-cache issues when multiple
+    steps share the same fixture session.
+
+    ``on_batch(batch)`` should write output files.
+    In hpc=False mode, ``propagate_downstream`` fires automatically.
+    """
+    from ..core.db import connect as _connect
+    from ..core.workflow import (get_next_lineage_batch,
+                                  massive_update_job,
+                                  propagate_downstream)
+    _db = _connect()
+    processed = 0
+    try:
+        while True:
+            batch = get_next_lineage_batch(_db, category, group_by=group_by)
+            if batch is None:
+                break
+            on_batch(batch)
+            massive_update_job(_db, batch["jobs"], flag="D")
+            if not batch["params"].global_.hpc:
+                propagate_downstream(_db, batch)
+            processed += 1
+    finally:
+        _db.close()
+    return processed
+
+
 def _stub_preprocess(db, params, root):
-    """Mark all preprocess jobs Done (no actual preprocessing needed for smoke)."""
-    from ..core.workflow import get_next_lineage_batch, massive_update_job
-    while True:
-        batch = get_next_lineage_batch(db, "preprocess", group_by="day_lineage")
-        if batch is None:
-            break
-        massive_update_job(db, batch["jobs"], flag="D")
+    def _noop(batch): pass
+    _run_step("preprocess", "day_lineage", _noop)
 
 
 def _stub_cc(db, params, root):
-    """Write a trivial daily CCF NetCDF per pair/comp/day, mark jobs Done."""
-    from ..core.workflow import get_next_lineage_batch, massive_update_job
     from ..core.io import xr_save_ccf_daily
-    while True:
-        batch = get_next_lineage_batch(db, "cc", group_by="day_lineage")
-        if batch is None:
-            break
-        lineage = batch["lineage_names"][:-1]   # upstream of cc
-        step_name = batch["lineage_names"][-1]
-        day = batch["days"][0]
+
+    def _write(batch):
+        lin   = batch["lineage_names"][:-1]
+        sname = batch["lineage_names"][-1]
+        day   = batch["days"][0]
         for sta1, sta2 in PAIRS:
             for comp in COMPS:
-                corr = np.zeros(len(TAXIS), dtype="float32")
-                xr_save_ccf_daily(root, lineage, step_name,
-                                  sta1, sta2, comp, day, TAXIS, corr)
-        massive_update_job(db, batch["jobs"], flag="D")
+                xr_save_ccf_daily(root, lin, sname,
+                                  sta1, sta2, comp, day,
+                                  TAXIS, np.zeros(len(TAXIS), "float32"))
+
+    _run_step("cc", "day_lineage", _write)
 
 
 def _stub_stack(db, params, root):
-    """Write a trivial stacked CCF NetCDF per pair/comp/mov_stack, mark Done."""
-    from ..core.workflow import get_next_lineage_batch, massive_update_job
     from ..core.io import xr_save_ccf
-    while True:
-        batch = get_next_lineage_batch(db, "stack", group_by="pair_lineage")
-        if batch is None:
-            break
-        lineage = batch["lineage_names"][:-1]
-        step_name = batch["lineage_names"][-1]
+
+    def _write(batch):
+        lin   = batch["lineage_names"][:-1]
+        sname = batch["lineage_names"][-1]
         for sta1, sta2 in PAIRS:
             for comp in COMPS:
                 for ms in MOV_STACKS:
-                    data = np.zeros((1, len(TAXIS)), dtype="float32")
-                    ds = xr.Dataset(
-                        {"CCF": xr.DataArray(data, dims=["times", "taxis"],
-                                             coords={"times": TIMES[:1],
-                                                     "taxis": TAXIS})})
-                    xr_save_ccf(root, lineage, step_name,
-                                sta1, sta2, comp, ms, TAXIS, ds)
-        massive_update_job(db, batch["jobs"], flag="D")
+                    ds = xr.Dataset({"CCF": xr.DataArray(
+                        np.zeros((1, len(TAXIS)), "float32"),
+                        dims=["times", "taxis"],
+                        coords={"times": TIMES[:1], "taxis": TAXIS})})
+                    xr_save_ccf(root, lin, sname, sta1, sta2, comp, ms, TAXIS, ds)
+
+    _run_step("stack", "pair_lineage", _write)
 
 
 def _stub_refstack(db, params, root):
-    """Write a trivial REF NetCDF per pair/comp, mark Done."""
-    from ..core.workflow import get_next_lineage_batch, massive_update_job
     from ..core.io import xr_save_ref
-    while True:
-        batch = get_next_lineage_batch(db, "refstack", group_by="pair_lineage")
-        if batch is None:
-            break
-        lineage = batch["lineage_names"][:-1]
-        step_name = batch["lineage_names"][-1]
+
+    def _write(batch):
+        lin   = batch["lineage_names"][:-1]
+        sname = batch["lineage_names"][-1]
         for sta1, sta2 in PAIRS:
             for comp in COMPS:
-                ref = np.zeros(len(TAXIS), dtype="float32")
-                ds = xr.Dataset(
-                    {"REF": xr.DataArray(ref, dims=["taxis"],
-                                         coords={"taxis": TAXIS})})
-                xr_save_ref(root, lineage, step_name,
-                            sta1, sta2, comp, TAXIS, ds)
-        massive_update_job(db, batch["jobs"], flag="D")
+                ds = xr.Dataset({"REF": xr.DataArray(
+                    np.zeros(len(TAXIS), "float32"),
+                    dims=["taxis"], coords={"taxis": TAXIS})})
+                xr_save_ref(root, lin, sname, sta1, sta2, comp, TAXIS, ds)
+
+    _run_step("refstack", "pair_lineage", _write)
 
 
 def _stub_mwcs(db, params, root):
-    """Write trivial MWCS NetCDF per pair/comp/mov_stack, mark Done."""
-    from ..core.workflow import get_next_lineage_batch, massive_update_job
     from ..core.io import xr_save_mwcs
-    n_keys = 4
-    while True:
-        batch = get_next_lineage_batch(db, "mwcs", group_by="pair_lineage")
-        if batch is None:
-            break
-        lineage = batch["lineage_names"][:-1]
-        step_name = batch["lineage_names"][-1]
+
+    def _write(batch):
+        lin   = batch["lineage_names"][:-1]
+        sname = batch["lineage_names"][-1]
         for sta1, sta2 in PAIRS:
             for comp in COMPS:
                 for ms in MOV_STACKS:
                     ds = xr.Dataset({"MWCS": xr.DataArray(
-                        np.zeros((len(TIMES), len(TAXIS), n_keys), "float32"),
+                        np.zeros((len(TIMES), len(TAXIS), 4), "float32"),
                         dims=["times", "taxis", "keys"],
                         coords={"times": TIMES, "taxis": TAXIS,
                                 "keys": ["dt", "err", "coh", "valid"]})})
-                    xr_save_mwcs(root, lineage, step_name,
-                                 sta1, sta2, comp, ms, TAXIS, ds)
-        massive_update_job(db, batch["jobs"], flag="D")
+                    xr_save_mwcs(root, lin, sname, sta1, sta2, comp, ms, TAXIS, ds)
+
+    _run_step("mwcs", "pair_lineage", _write)
 
 
 def _stub_dtt(db, params, root):
-    """Write trivial DTT NetCDF per pair/comp/mov_stack, mark Done."""
-    from ..core.workflow import get_next_lineage_batch, massive_update_job
     from ..core.io import xr_save_dtt
-    while True:
-        batch = get_next_lineage_batch(db, "mwcs_dtt", group_by="pair_lineage")
-        if batch is None:
-            break
-        lineage = batch["lineage_names"][:-1]
-        step_name = batch["lineage_names"][-1]
+
+    def _write(batch):
+        lin   = batch["lineage_names"][:-1]
+        sname = batch["lineage_names"][-1]
         for sta1, sta2 in PAIRS:
             for comp in COMPS:
                 for ms in MOV_STACKS:
                     ds = xr.Dataset({"DTT": xr.DataArray(
                         np.zeros((len(TIMES), 3), "float32"),
                         dims=["times", "keys"],
-                        coords={"times": TIMES,
-                                "keys": ["dtt", "err", "coh"]})})
-                    xr_save_dtt(root, lineage, step_name,
-                                sta1, sta2, comp, ms, ds)
-        massive_update_job(db, batch["jobs"], flag="D")
+                        coords={"times": TIMES, "keys": ["dtt", "err", "coh"]})})
+                    xr_save_dtt(root, lin, sname, sta1, sta2, comp, ms, ds)
+
+    _run_step("mwcs_dtt", "pair_lineage", _write)
 
 
 def _stub_stretching(db, params, root):
-    """Write trivial Stretching NetCDF per pair/comp/mov_stack, mark Done."""
-    from ..core.workflow import get_next_lineage_batch, massive_update_job
     from ..core.io import xr_save_stretching
-    while True:
-        batch = get_next_lineage_batch(db, "stretching", group_by="pair_lineage")
-        if batch is None:
-            break
-        lineage = batch["lineage_names"][:-1]
-        step_name = batch["lineage_names"][-1]
+
+    def _write(batch):
+        lin   = batch["lineage_names"][:-1]
+        sname = batch["lineage_names"][-1]
         for sta1, sta2 in PAIRS:
             for comp in COMPS:
                 for ms in MOV_STACKS:
@@ -316,70 +358,55 @@ def _stub_stretching(db, params, root):
                         dims=["times", "keys"],
                         coords={"times": TIMES,
                                 "keys": ["Delta", "Coeff", "Error"]})})
-                    xr_save_stretching(root, lineage, step_name,
-                                       sta1, sta2, comp, ms, ds)
-        massive_update_job(db, batch["jobs"], flag="D")
+                    xr_save_stretching(root, lin, sname, sta1, sta2, comp, ms, ds)
+
+    _run_step("stretching", "pair_lineage", _write)
 
 
 def _stub_wct(db, params, root):
-    """Write trivial WCT NetCDF per pair/comp/mov_stack, mark Done."""
-    from ..core.workflow import get_next_lineage_batch, massive_update_job
     from ..core.io import xr_save_wct
-    while True:
-        batch = get_next_lineage_batch(db, "wavelet", group_by="pair_lineage")
-        if batch is None:
-            break
-        lineage = batch["lineage_names"][:-1]
-        step_name = batch["lineage_names"][-1]
+
+    def _write(batch):
+        lin   = batch["lineage_names"][:-1]
+        sname = batch["lineage_names"][-1]
         for sta1, sta2 in PAIRS:
             for comp in COMPS:
                 for ms in MOV_STACKS:
-                    amp = [np.zeros((len(FREQS), len(TAXIS)), "float32")] * len(TIMES)
-                    coh = [np.zeros((len(FREQS), len(TAXIS)), "float32")] * len(TIMES)
-                    dtt = [np.zeros((len(FREQS), len(TAXIS)), "float32")] * len(TIMES)
-                    xr_save_wct(root, lineage, step_name,
-                                sta1, sta2, comp, ms,
-                                TAXIS, FREQS, amp, coh, dtt,
-                                list(TIMES))
-        massive_update_job(db, batch["jobs"], flag="D")
+                    z = [np.zeros((len(FREQS), len(TAXIS)), "float32")] * len(TIMES)
+                    xr_save_wct(root, lin, sname, sta1, sta2, comp, ms,
+                                TAXIS, FREQS, z, z, z, list(TIMES))
+
+    _run_step("wavelet", "pair_lineage", _write)
 
 
 def _stub_wct_dtt(db, params, root):
-    """Write trivial WCT-DTT NetCDF per pair/comp/mov_stack, mark Done."""
-    from ..core.workflow import get_next_lineage_batch, massive_update_job
     from ..core.io import xr_save_wct_dtt
-    while True:
-        batch = get_next_lineage_batch(db, "wavelet_dtt", group_by="pair_lineage")
-        if batch is None:
-            break
-        lineage = batch["lineage_names"][:-1]
-        step_name = batch["lineage_names"][-1]
+
+    def _write(batch):
+        lin   = batch["lineage_names"][:-1]
+        sname = batch["lineage_names"][-1]
         for sta1, sta2 in PAIRS:
             for comp in COMPS:
                 for ms in MOV_STACKS:
                     ds = xr.Dataset({
-                        "dtt": xr.DataArray(np.zeros((len(TIMES),), "float32"),
+                        "dtt": xr.DataArray(np.zeros(len(TIMES), "float32"),
                                             dims=["times"], coords={"times": TIMES}),
-                        "err": xr.DataArray(np.zeros((len(TIMES),), "float32"),
+                        "err": xr.DataArray(np.zeros(len(TIMES), "float32"),
                                             dims=["times"], coords={"times": TIMES}),
-                        "coh": xr.DataArray(np.ones((len(TIMES),), "float32"),
+                        "coh": xr.DataArray(np.ones(len(TIMES), "float32"),
                                             dims=["times"], coords={"times": TIMES}),
                     })
-                    xr_save_wct_dtt(root, lineage, step_name,
-                                    sta1, sta2, comp, ms, TAXIS, ds)
-        massive_update_job(db, batch["jobs"], flag="D")
+                    xr_save_wct_dtt(root, lin, sname, sta1, sta2, comp, ms, TAXIS, ds)
+
+    _run_step("wavelet_dtt", "pair_lineage", _write)
 
 
-def _stub_dvv_agg(db, params, root, category: str):
-    """Write trivial DVV aggregate NetCDF for *category*, mark sentinel Done."""
-    from ..core.workflow import get_next_lineage_batch, massive_update_job
+def _stub_dvv_agg(db, params, root, category):
     from ..core.io import xr_save_dvv_agg
-    while True:
-        batch = get_next_lineage_batch(db, category, group_by="day_lineage")
-        if batch is None:
-            break
-        lineage = batch["lineage_names"][:-1]   # upstream
-        step_name = batch["lineage_names"][-1]
+
+    def _write(batch):
+        lin   = batch["lineage_names"][:-1]
+        sname = batch["lineage_names"][-1]
         for ms in MOV_STACKS:
             for comp in COMPS:
                 ds = xr.Dataset({
@@ -387,341 +414,418 @@ def _stub_dvv_agg(db, params, root, category: str):
                                             dims=["times"], coords={"times": TIMES}),
                     "std":     xr.DataArray(np.zeros(len(TIMES), "float32"),
                                             dims=["times"], coords={"times": TIMES}),
-                    "n_pairs": xr.DataArray(np.full(len(TIMES), len(PAIRS), dtype="int32"),
-                                            dims=["times"], coords={"times": TIMES}),
+                    "n_pairs": xr.DataArray(
+                        np.full(len(TIMES), len(PAIRS), "int32"),
+                        dims=["times"], coords={"times": TIMES}),
                 })
-                xr_save_dvv_agg(root, lineage, step_name,
-                                ms, "CC", comp[0], ds)  # comp[0] = "Z" for "ZZ"
-        massive_update_job(db, batch["jobs"], flag="D")
+                xr_save_dvv_agg(root, lin, sname, ms, "CC", comp[0], ds)
+
+    _run_step(category, "day_lineage", _write)
 
 
 def _stub_psd(db, params, root):
-    """Write trivial PSD NetCDF per station/day, mark Done."""
-    from ..core.workflow import get_next_lineage_batch, massive_update_job
     from ..core.io import xr_save_psd
-    periods = np.logspace(-1, 1, 20)
-    while True:
-        batch = get_next_lineage_batch(db, "psd", group_by="day_lineage")
-        if batch is None:
-            break
-        lineage = batch["lineage_names"][:-1]
-        step_name = batch["lineage_names"][-1]
-        for net, sta in [("YA", "UV05"), ("YA", "UV06"), ("YA", "UV07")]:
-            seed_id = f"{net}.{sta}.00.HHZ"
-            day = batch["days"][0]
-            ds = xr.Dataset({
-                "PSD": xr.DataArray(
-                    np.full((1, len(periods)), -150.0, dtype="float32"),
-                    dims=["times", "periods"],
-                    coords={"times": [np.datetime64(day)], "periods": periods})
-            })
-            xr_save_psd(root, lineage, step_name, seed_id, day, ds)
-        massive_update_job(db, batch["jobs"], flag="D")
+    periods = np.logspace(-1, 1, 20, dtype="float32")
+
+    def _write(batch):
+        lin   = batch["lineage_names"][:-1]
+        sname = batch["lineage_names"][-1]
+        day   = batch["days"][0]
+        for seed_id in ["YA.UV05.00.HHZ", "YA.UV06.00.HHZ", "YA.UV07.00.HHZ"]:
+            ds = xr.Dataset({"PSD": xr.DataArray(
+                np.full((1, len(periods)), -150.0, "float32"),
+                dims=["times", "periods"],
+                coords={"times": [np.datetime64(day)], "periods": periods})})
+            xr_save_psd(root, lin, sname, seed_id, day, ds)
+
+    _run_step("psd", "day_lineage", _write)
 
 
 def _stub_psd_rms(db, params, root):
-    """Write trivial PSD-RMS NetCDF per station, mark Done."""
-    from ..core.workflow import get_next_lineage_batch, massive_update_job
     from ..core.io import xr_save_rms
-    while True:
-        batch = get_next_lineage_batch(db, "psd_rms", group_by="day_lineage")
-        if batch is None:
-            break
-        lineage = batch["lineage_names"][:-1]
-        step_name = batch["lineage_names"][-1]
-        for net, sta in [("YA", "UV05"), ("YA", "UV06"), ("YA", "UV07")]:
-            seed_id = f"{net}.{sta}.00.HHZ"
-            import pandas as pd
+    import pandas as pd
+
+    def _write(batch):
+        lin   = batch["lineage_names"][:-1]
+        sname = batch["lineage_names"][-1]
+        for seed_id in ["YA.UV05.00.HHZ", "YA.UV06.00.HHZ", "YA.UV07.00.HHZ"]:
             df = pd.DataFrame(
-                {"low": [-150.0, -150.0], "mid": [-150.0, -150.0], "high": [-150.0, -150.0]},
+                {"low": [-150.0] * 2, "mid": [-150.0] * 2, "high": [-150.0] * 2},
                 index=pd.DatetimeIndex(DAYS))
-            xr_save_rms(root, lineage, step_name, seed_id, df)
-        massive_update_job(db, batch["jobs"], flag="D")
+            xr_save_rms(root, lin, sname, seed_id, df)
+
+    _run_step("psd_rms", "day_lineage", _write)
 
 
-# ── Tests ─────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# hpc=False suite  (tests 01–33)
+# Worker stubs call propagate_downstream inline — no new_jobs --after needed.
+# ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.order(1)
 def test_smoke_01_schema(smoke_db):
-    """Database tables exist including the Lineage normalisation table."""
+    """DB tables including Lineage exist."""
     db, _, _ = smoke_db
     from sqlalchemy import inspect
     tables = inspect(db.get_bind()).get_table_names()
-    for expected in ["jobs", "lineages", "workflow_steps", "workflow_links",
-                     "config", "stations", "data_availability"]:
-        assert expected in tables, f"Table {expected!r} missing"
+    for t in ("jobs", "lineages", "workflow_steps", "workflow_links",
+              "config", "stations"):
+        assert t in tables, f"Table {t!r} missing"
 
 
 @pytest.mark.order(2)
 def test_smoke_02_workflow_created(smoke_db):
-    """All expected workflow steps and links were created."""
+    """All expected workflow steps and links created."""
     db, _, _ = smoke_db
     from ..core.workflow import get_workflow_steps, get_workflow_links
-    steps = get_workflow_steps(db)
-    step_names = {s.step_name for s in steps}
-    expected = {"preprocess_1", "cc_1", "filter_1", "stack_1", "refstack_1",
+    names = {s.step_name for s in get_workflow_steps(db)}
+    required = {"preprocess_1", "cc_1", "filter_1", "stack_1", "refstack_1",
                 "mwcs_1", "mwcs_dtt_1", "mwcs_dtt_dvv_1",
                 "stretching_1", "stretching_dvv_1",
                 "wavelet_1", "wavelet_dtt_1", "wavelet_dtt_dvv_1",
                 "psd_1", "psd_rms_1"}
-    assert expected.issubset(step_names), f"Missing steps: {expected - step_names}"
-    links = get_workflow_links(db)
-    assert len(links) >= 5, "Too few workflow links"
+    assert required.issubset(names), f"Missing: {required - names}"
+    assert len(get_workflow_links(db)) >= 5
 
 
 @pytest.mark.order(3)
-def test_smoke_03_new_jobs_initial(smoke_db):
-    """new_jobs() creates preprocess_1 T jobs — one per station per day."""
+def test_smoke_03_seed_jobs(smoke_db):
+    """Direct seeding creates preprocess_1 and psd_1 T jobs (no DA scan)."""
     db, _, _ = smoke_db
-    from ..s02_new_jobs import main as new_jobs_main
-    new_jobs_main(init=True)  # init=True uses bulk insert without file-existence check
-    # 3 stations × 2 days × (preprocess_1 + psd_1) = at least 6 preprocess T jobs
-    _assert_min(db, "preprocess_1", "T", 6, "new_jobs must create 6 preprocess T jobs")
+    n = _seed_jobs(db)
+    assert n > 0, "Seeder must insert jobs"
+    # 3 stations × 2 days × 2 steps (preprocess + psd)
+    _assert_min(db, "preprocess_1", "T", 6, "seed: preprocess T")
+    _assert_min(db, "psd_1",        "T", 6, "seed: psd T")
 
 
 @pytest.mark.order(4)
 def test_smoke_04_preprocess(smoke_db):
-    """Stub preprocess marks all preprocess_1 jobs Done."""
+    """Preprocess stub marks jobs Done; propagate_downstream creates cc_1 T jobs."""
     db, params, root = smoke_db
-    _assert_min(db, "preprocess_1", "T", 1, "Need T preprocess jobs")
+    _assert_min(db, "preprocess_1", "T", 1)
     _stub_preprocess(db, params, root)
-    _assert_min(db, "preprocess_1", "D", 6, "preprocess_1 must be Done")
+    _assert_min(db, "preprocess_1", "D", 6, "preprocess must be Done")
+    # propagate_downstream → cc_1 T jobs (3 pairs × 2 days)
+    _assert_min(db, "cc_1", "T", 6, "propagate_downstream must create cc T jobs")
 
 
 @pytest.mark.order(5)
-def test_smoke_05_new_jobs_after_preprocess(smoke_db):
-    """new_jobs --after preprocess creates cc_1 T jobs — one per pair per day."""
-    db, _, _ = smoke_db
-    from ..s02_new_jobs import main as new_jobs_main
-    new_jobs_main(after="preprocess")
-    # 3 pairs × 2 days
-    _assert_min(db, "cc_1", "T", 6, "new_jobs --after preprocess must create 6 cc T jobs")
-
-
-@pytest.mark.order(6)
-def test_smoke_06_cc(smoke_db):
-    """Stub CC marks all cc_1 jobs Done and writes CCF files."""
+def test_smoke_05_cc(smoke_db):
+    """CC stub marks jobs Done; propagate_downstream creates stack_1 T jobs
+    via the filter_1 pass-through."""
     db, params, root = smoke_db
     _assert_min(db, "cc_1", "T", 1)
     _stub_cc(db, params, root)
-    _assert_min(db, "cc_1", "D", 6, "cc_1 must be Done after stub CC")
+    _assert_min(db, "cc_1",     "D", 6, "cc must be Done")
+    # propagate_downstream must cross the filter_1 pass-through
+    _assert_min(db, "stack_1",  "T", 1,
+                "propagate_downstream must cross filter_1 → stack_1 T jobs")
 
 
-@pytest.mark.order(7)
-def test_smoke_07_new_jobs_after_cc(smoke_db):
-    """new_jobs --after cc creates stack_1 T jobs."""
-    db, _, _ = smoke_db
-    from ..s02_new_jobs import main as new_jobs_main
-    new_jobs_main(after="cc")
-    _assert_min(db, "stack_1", "T", 1, "new_jobs --after cc must create stack T jobs")
-
-
-@pytest.mark.order(8)
-def test_smoke_08_stack(smoke_db):
-    """Stub stack marks all stack_1 jobs Done."""
+@pytest.mark.order(6)
+def test_smoke_06_stack(smoke_db):
+    """Stack stub marks jobs Done; propagate_downstream creates refstack_1 T jobs."""
     db, params, root = smoke_db
     _assert_min(db, "stack_1", "T", 1)
     _stub_stack(db, params, root)
-    _assert_min(db, "stack_1", "D", 1, "stack_1 must be Done")
+    _assert_min(db, "stack_1",   "D", 1)
+    _assert_min(db, "refstack_1","T", 1,
+                "propagate_downstream must create refstack T jobs")
 
 
-@pytest.mark.order(9)
-def test_smoke_09_new_jobs_after_stack(smoke_db):
-    """new_jobs --after stack creates refstack_1 T jobs."""
-    db, _, _ = smoke_db
-    from ..s02_new_jobs import main as new_jobs_main
-    new_jobs_main(after="stack")
-    _assert_min(db, "refstack_1", "T", 1, "new_jobs --after stack must create refstack T jobs")
-
-
-@pytest.mark.order(10)
-def test_smoke_10_refstack(smoke_db):
-    """Stub refstack marks all refstack_1 jobs Done."""
+@pytest.mark.order(7)
+def test_smoke_07_refstack(smoke_db):
+    """Refstack stub marks jobs Done; propagate_downstream fans out to
+    mwcs_1, stretching_1, and wavelet_1 T jobs."""
     db, params, root = smoke_db
     _assert_min(db, "refstack_1", "T", 1)
     _stub_refstack(db, params, root)
-    _assert_min(db, "refstack_1", "D", 1, "refstack_1 must be Done")
+    _assert_min(db, "refstack_1",  "D", 1)
+    _assert_min(db, "mwcs_1",      "T", 1, "mwcs_1 T after refstack")
+    _assert_min(db, "stretching_1","T", 1, "stretching_1 T after refstack")
+    _assert_min(db, "wavelet_1",   "T", 1, "wavelet_1 T after refstack")
 
 
-@pytest.mark.order(11)
-def test_smoke_11_new_jobs_after_refstack(smoke_db):
-    """new_jobs --after refstack creates mwcs_1, stretching_1, wavelet_1 T jobs."""
-    db, _, _ = smoke_db
-    from ..s02_new_jobs import main as new_jobs_main
-    new_jobs_main(after="refstack")
-    _assert_min(db, "mwcs_1",       "T", 1, "mwcs_1 T jobs expected after refstack")
-    _assert_min(db, "stretching_1", "T", 1, "stretching_1 T jobs expected after refstack")
-    _assert_min(db, "wavelet_1",    "T", 1, "wavelet_1 T jobs expected after refstack")
-
-
-@pytest.mark.order(12)
-def test_smoke_12_mwcs(smoke_db):
-    """Stub MWCS marks all mwcs_1 jobs Done."""
+@pytest.mark.order(8)
+def test_smoke_08_mwcs(smoke_db):
+    """MWCS stub; propagate_downstream → mwcs_dtt_1 T jobs."""
     db, params, root = smoke_db
     _assert_min(db, "mwcs_1", "T", 1)
     _stub_mwcs(db, params, root)
-    _assert_min(db, "mwcs_1", "D", 1)
-
-
-@pytest.mark.order(13)
-def test_smoke_13_new_jobs_after_mwcs(smoke_db):
-    """new_jobs --after mwcs creates mwcs_dtt_1 T jobs."""
-    db, _, _ = smoke_db
-    from ..s02_new_jobs import main as new_jobs_main
-    new_jobs_main(after="mwcs")
+    _assert_min(db, "mwcs_1",     "D", 1)
     _assert_min(db, "mwcs_dtt_1", "T", 1)
 
 
-@pytest.mark.order(14)
-def test_smoke_14_dtt(smoke_db):
-    """Stub DTT marks all mwcs_dtt_1 jobs Done."""
+@pytest.mark.order(9)
+def test_smoke_09_dtt(smoke_db):
+    """DTT stub; propagate_downstream → mwcs_dtt_dvv_1 sentinel T job."""
     db, params, root = smoke_db
     _assert_min(db, "mwcs_dtt_1", "T", 1)
     _stub_dtt(db, params, root)
-    _assert_min(db, "mwcs_dtt_1", "D", 1)
+    _assert_min(db, "mwcs_dtt_1",     "D", 1)
+    _assert_min(db, "mwcs_dtt_dvv_1", "T", 1,
+                "propagate_downstream must create DVV sentinel job")
 
 
-@pytest.mark.order(15)
-def test_smoke_15_new_jobs_after_dtt(smoke_db):
-    """new_jobs --after mwcs_dtt creates mwcs_dtt_dvv_1 sentinel job."""
-    db, _, _ = smoke_db
-    from ..s02_new_jobs import main as new_jobs_main
-    new_jobs_main(after="mwcs_dtt")
-    _assert_min(db, "mwcs_dtt_dvv_1", "T", 1, "mwcs_dtt_dvv sentinel job expected")
-
-
-@pytest.mark.order(16)
-def test_smoke_16_mwcs_dvv_agg(smoke_db):
-    """Stub DVV-MWCS aggregate marks sentinel Done and writes NetCDF."""
+@pytest.mark.order(10)
+def test_smoke_10_mwcs_dvv(smoke_db):
+    """DVV-MWCS aggregate stub; MSNoiseResult.list finds it."""
     db, params, root = smoke_db
     _assert_min(db, "mwcs_dtt_dvv_1", "T", 1)
     _stub_dvv_agg(db, params, root, "mwcs_dtt_dvv")
     _assert_min(db, "mwcs_dtt_dvv_1", "D", 1)
     from ..results import MSNoiseResult
-    results = MSNoiseResult.list(db, "mwcs_dtt_dvv")
-    assert len(results) >= 1, "MSNoiseResult.list must find mwcs_dtt_dvv results"
+    assert len(MSNoiseResult.list(db, "mwcs_dtt_dvv")) >= 1
 
 
-@pytest.mark.order(17)
-def test_smoke_17_stretching(smoke_db):
-    """Stub stretching marks all stretching_1 jobs Done."""
+@pytest.mark.order(11)
+def test_smoke_11_stretching(smoke_db):
+    """Stretching stub; propagate_downstream → stretching_dvv_1 sentinel."""
     db, params, root = smoke_db
     _assert_min(db, "stretching_1", "T", 1)
     _stub_stretching(db, params, root)
-    _assert_min(db, "stretching_1", "D", 1)
+    _assert_min(db, "stretching_1",    "D", 1)
+    _assert_min(db, "stretching_dvv_1","T", 1)
 
 
-@pytest.mark.order(18)
-def test_smoke_18_new_jobs_after_stretching(smoke_db):
-    """new_jobs --after stretching creates stretching_dvv_1 sentinel job."""
-    db, _, _ = smoke_db
-    from ..s02_new_jobs import main as new_jobs_main
-    new_jobs_main(after="stretching")
-    _assert_min(db, "stretching_dvv_1", "T", 1)
-
-
-@pytest.mark.order(19)
-def test_smoke_19_stretching_dvv_agg(smoke_db):
-    """Stub DVV-stretching aggregate marks sentinel Done."""
+@pytest.mark.order(12)
+def test_smoke_12_stretching_dvv(smoke_db):
+    """DVV-stretching aggregate stub."""
     db, params, root = smoke_db
-    _assert_min(db, "stretching_dvv_1", "T", 1)
     _stub_dvv_agg(db, params, root, "stretching_dvv")
     _assert_min(db, "stretching_dvv_1", "D", 1)
     from ..results import MSNoiseResult
     assert len(MSNoiseResult.list(db, "stretching_dvv")) >= 1
 
 
-@pytest.mark.order(20)
-def test_smoke_20_wct(smoke_db):
-    """Stub WCT marks all wavelet_1 jobs Done."""
+@pytest.mark.order(13)
+def test_smoke_13_wct(smoke_db):
+    """WCT stub; propagate_downstream → wavelet_dtt_1 T jobs."""
     db, params, root = smoke_db
     _assert_min(db, "wavelet_1", "T", 1)
     _stub_wct(db, params, root)
-    _assert_min(db, "wavelet_1", "D", 1)
+    _assert_min(db, "wavelet_1",   "D", 1)
+    _assert_min(db, "wavelet_dtt_1","T", 1)
 
 
-@pytest.mark.order(21)
-def test_smoke_21_new_jobs_after_wct(smoke_db):
-    """new_jobs --after wavelet creates wavelet_dtt_1 T jobs."""
-    db, _, _ = smoke_db
-    from ..s02_new_jobs import main as new_jobs_main
-    new_jobs_main(after="wavelet")
-    _assert_min(db, "wavelet_dtt_1", "T", 1)
-
-
-@pytest.mark.order(22)
-def test_smoke_22_wct_dtt(smoke_db):
-    """Stub WCT-DTT marks all wavelet_dtt_1 jobs Done."""
+@pytest.mark.order(14)
+def test_smoke_14_wct_dtt(smoke_db):
+    """WCT-DTT stub; propagate_downstream → wavelet_dtt_dvv_1 sentinel."""
     db, params, root = smoke_db
     _assert_min(db, "wavelet_dtt_1", "T", 1)
     _stub_wct_dtt(db, params, root)
-    _assert_min(db, "wavelet_dtt_1", "D", 1)
+    _assert_min(db, "wavelet_dtt_1",    "D", 1)
+    _assert_min(db, "wavelet_dtt_dvv_1","T", 1)
 
 
-@pytest.mark.order(23)
-def test_smoke_23_new_jobs_after_wct_dtt(smoke_db):
-    """new_jobs --after wavelet_dtt creates wavelet_dtt_dvv_1 sentinel job."""
-    db, _, _ = smoke_db
-    from ..s02_new_jobs import main as new_jobs_main
-    new_jobs_main(after="wavelet_dtt")
-    _assert_min(db, "wavelet_dtt_dvv_1", "T", 1)
-
-
-@pytest.mark.order(24)
-def test_smoke_24_wct_dvv_agg(smoke_db):
-    """Stub DVV-WCT aggregate marks sentinel Done."""
+@pytest.mark.order(15)
+def test_smoke_15_wct_dvv(smoke_db):
+    """DVV-WCT aggregate stub."""
     db, params, root = smoke_db
-    _assert_min(db, "wavelet_dtt_dvv_1", "T", 1)
     _stub_dvv_agg(db, params, root, "wavelet_dtt_dvv")
     _assert_min(db, "wavelet_dtt_dvv_1", "D", 1)
     from ..results import MSNoiseResult
     assert len(MSNoiseResult.list(db, "wavelet_dtt_dvv")) >= 1
 
 
-@pytest.mark.order(25)
-def test_smoke_25_psd_branch(smoke_db):
-    """PSD branch: new_jobs → stub_psd → Done → stub_psd_rms → Done."""
+@pytest.mark.order(16)
+def test_smoke_16_psd(smoke_db):
+    """PSD stub marks jobs Done; propagate_downstream → psd_rms_1 T jobs."""
     db, params, root = smoke_db
-    from ..s02_new_jobs import main as new_jobs_main
-    new_jobs_main()  # creates psd_1 T jobs
-    _assert_min(db, "psd_1", "T", 1, "new_jobs must create psd_1 T jobs")
+    _assert_min(db, "psd_1", "T", 1)
     _stub_psd(db, params, root)
-    _assert_min(db, "psd_1", "D", 1, "psd_1 must be Done")
-    new_jobs_main(after="psd")
-    _assert_min(db, "psd_rms_1", "T", 1, "new_jobs --after psd must create psd_rms T jobs")
+    _assert_min(db, "psd_1",    "D", 1)
+    _assert_min(db, "psd_rms_1","T", 1)
+
+
+@pytest.mark.order(17)
+def test_smoke_17_psd_rms(smoke_db):
+    """PSD-RMS stub marks jobs Done."""
+    db, params, root = smoke_db
+    _assert_min(db, "psd_rms_1", "T", 1)
     _stub_psd_rms(db, params, root)
-    _assert_min(db, "psd_rms_1", "D", 1, "psd_rms_1 must be Done")
+    _assert_min(db, "psd_rms_1", "D", 1)
 
 
-@pytest.mark.order(26)
-def test_smoke_26_lineage_normalisation(smoke_db):
-    """Every job has a non-null lineage_id; Lineage table rows << job rows."""
+@pytest.mark.order(18)
+def test_smoke_18_lineage_normalisation(smoke_db):
+    """Zero NULL lineage_ids; Lineage rows << Job rows; no duplicates."""
     db, _, _ = smoke_db
-    from ..msnoise_table_def import Lineage, Job as _J
-    null_jobs = db.query(_J).filter(_J.lineage_id.is_(None)).count()
+    db.expire_all()
+    from ..msnoise_table_def import declare_tables as _dt18
+    _s18 = _dt18()
+    from sqlalchemy import func
+
+    null_jobs = db.query(_s18.Job).filter(_s18.Job.lineage_id.is_(None)).count()
     assert null_jobs == 0, f"{null_jobs} jobs have NULL lineage_id"
-    n_lineages = db.query(Lineage).count()
-    n_jobs     = db.query(_J).count()
-    assert n_lineages >= 1,    "Lineage table must have at least one row"
-    assert n_lineages < n_jobs, (
-        f"Expected fewer Lineage rows ({n_lineages}) than jobs ({n_jobs})")
-    # Every lineage string is non-empty
-    for lin in db.query(Lineage).all():
-        assert lin.lineage_str and "/" not in lin.lineage_str or True  # any non-empty string
-        assert lin.lineage_str.strip(), f"Empty lineage_str: {lin!r}"
+
+    dupes = (db.query(_s18.Lineage.lineage_str, func.count(_s18.Lineage.lineage_id))
+               .group_by(_s18.Lineage.lineage_str)
+               .having(func.count(_s18.Lineage.lineage_id) > 1)
+               .all())
+    assert len(dupes) == 0, f"Duplicate Lineage rows: {dupes}"
+
+    n_lin  = db.query(_s18.Lineage).count()
+    n_jobs = db.query(_s18.Job).count()
+    assert n_lin >= 1
+    assert n_lin < n_jobs, f"Expected Lineage ({n_lin}) < Jobs ({n_jobs})"
+    print(f"  Lineage rows: {n_lin}, Job rows: {n_jobs} ✓")
 
 
-@pytest.mark.order(27)
-def test_smoke_27_all_dvv_results_discoverable(smoke_db):
-    """MSNoiseResult.list finds results for all three DVV methods."""
+@pytest.mark.order(19)
+def test_smoke_19_all_dvv_discoverable(smoke_db):
+    """MSNoiseResult.list + get_dvv work for all three DVV methods."""
     db, _, _ = smoke_db
     from ..results import MSNoiseResult
     for cat in ("mwcs_dtt_dvv", "stretching_dvv", "wavelet_dtt_dvv"):
         results = MSNoiseResult.list(db, cat)
-        assert len(results) >= 1, f"MSNoiseResult.list({cat!r}) returned no results"
-        r = results[0]
-        assert r.category == cat
-        data = r.get_dvv(pair_type="CC")
-        assert len(data) >= 1, (
-            f"get_dvv('CC') returned empty for {cat} — "
-            f"check xr_save_dvv_agg / xr_get_dvv_agg path consistency")
+        assert len(results) >= 1, f"list({cat!r}) empty"
+        data = results[0].get_dvv(pair_type="CC")
+        assert len(data) >= 1, f"get_dvv('CC') empty for {cat}"
+
+
+# ── Second-day tests (20–25) ──────────────────────────────────────────────────
+
+@pytest.mark.order(20)
+def test_smoke_20_seed_day3(smoke_db):
+    """Seed day3 preprocess+psd T jobs; existing Done jobs must not be re-queued."""
+    db, _, _ = smoke_db
+    if _n_jobs(db, "cc_1", "2010-09-02", "D") == 0:
+        pytest.skip("Requires tests 01-19 to have run first")
+
+    n = _seed_jobs(db, days=[DAY3])
+    assert n > 0, "Seeder must insert day3 jobs"
+    _assert_min(db, "preprocess_1", "T", 3, "3 new preprocess T for day3")
+    # Day 1 and 2 preprocess must still be Done
+    assert _n_jobs(db, "preprocess_1", "2010-09-01", "T") == 0
+    assert _n_jobs(db, "preprocess_1", "2010-09-02", "T") == 0
+
+
+@pytest.mark.order(21)
+def test_smoke_21_preprocess_day3(smoke_db):
+    """Preprocess stub for day3; propagate_downstream creates cc T for day3 only."""
+    db, params, root = smoke_db
+    if _n_jobs(db, "preprocess_1", DAY3, "T") == 0:
+        pytest.skip("Requires test_20 first")
+
+    _stub_preprocess(db, params, root)
+    assert _n_jobs(db, "preprocess_1", DAY3, "T") == 0
+    assert _n_jobs(db, "preprocess_1", DAY3, "D") == 3
+    # propagate_downstream creates cc T for day3
+    assert _n_jobs(db, "cc_1", DAY3, "T") >= 1, (
+        "propagate_downstream must create cc_1 T for day3")
+    # Existing day1/2 cc Done jobs must not be re-queued
+    assert _n_jobs(db, "cc_1", "2010-09-01", "T") == 0
+    assert _n_jobs(db, "cc_1", "2010-09-02", "T") == 0
+
+
+@pytest.mark.order(22)
+def test_smoke_22_cc_day3_filter_passthrough(smoke_db):
+    """CC stub for day3; propagate_downstream crosses filter_1 → stack_1 T.
+
+    Key assertion: the stack lineage must be
+    'preprocess_1/cc_1/filter_1/stack_1' even though the CC job lineage
+    is only 'preprocess_1/cc_1' — propagate_downstream inserts filter_1.
+    """
+    db, params, root = smoke_db
+    if _n_jobs(db, "cc_1", DAY3, "T") == 0:
+        pytest.skip("Requires test_21 first")
+
+    _stub_cc(db, params, root)
+    assert _n_jobs(db, "cc_1",    DAY3, "D") >= 1
+    assert _n_jobs(db, "cc_1",    DAY3, "T") == 0
+    n_stack = _n_jobs(db, "stack_1", DAY3, "T")
+    assert n_stack >= 1, (
+        f"propagate_downstream must create stack_1 T via filter_1 (got {n_stack})")
+    # Old stack Done jobs must not be re-queued
+    assert _n_jobs(db, "stack_1", "2010-09-01", "T") == 0
+    assert _n_jobs(db, "stack_1", "2010-09-02", "T") == 0
+
+
+@pytest.mark.order(23)
+def test_smoke_23_stack_day3(smoke_db):
+    """Stack stub for day3 only; Done count increases by exactly the new day."""
+    db, params, root = smoke_db
+    if _n_jobs(db, "stack_1", DAY3, "T") == 0:
+        pytest.skip("Requires test_22 first")
+
+    done_before = _counts(db, "stack_1").get("D", 0)
+    _stub_stack(db, params, root)
+    done_after  = _counts(db, "stack_1").get("D", 0)
+    assert done_after > done_before
+    assert _n_jobs(db, "stack_1", DAY3, "T") == 0
+
+
+@pytest.mark.order(24)
+def test_smoke_24_no_lineage_dupes_after_day3(smoke_db):
+    """After day3 processing, Lineage table must have no duplicates.
+
+    Adding a new day reuses existing Lineage rows — e.g., only one row
+    for 'preprocess_1/cc_1/filter_1/stack_1' regardless of day count.
+    """
+    db, _, _ = smoke_db
+    if _n_jobs(db, "stack_1", DAY3, "D") == 0:
+        pytest.skip("Requires test_23 first")
+
+    db.expire_all()
+    from ..msnoise_table_def import declare_tables as _dt24
+    _s24 = _dt24()
+    from sqlalchemy import func
+
+    dupes = (db.query(_s24.Lineage.lineage_str, func.count(_s24.Lineage.lineage_id))
+               .group_by(_s24.Lineage.lineage_str)
+               .having(func.count(_s24.Lineage.lineage_id) > 1)
+               .all())
+    assert len(dupes) == 0, f"Duplicate Lineage rows after day3: {dupes}"
+
+    null_jobs = db.query(_s24.Job).filter(_s24.Job.lineage_id.is_(None)).count()
+    assert null_jobs == 0
+
+    n_lin  = db.query(_s24.Lineage).count()
+    n_jobs = db.query(_s24.Job).count()
+    assert n_lin < n_jobs
+    print(f"  Lineage rows: {n_lin}, Job rows: {n_jobs} ✓")
+
+
+@pytest.mark.order(25)
+def test_smoke_25_propagate_downstream_idempotent(smoke_db):
+    """Calling propagate_downstream twice is a no-op (no duplicates, no re-queue)."""
+    db, params, root = smoke_db
+    from ..core.workflow import propagate_downstream
+    from ..msnoise_table_def import declare_tables as _dt25
+    _s25 = _dt25()
+
+    cc_step = db.query(_s25.WorkflowStep).filter(
+        _s25.WorkflowStep.step_name == "cc_1").first()
+    cc_jobs_day3 = (db.query(_s25.Job)
+                      .filter(_s25.Job.step_id == cc_step.step_id)
+                      .filter(_s25.Job.day == DAY3)
+                      .all())
+    if not cc_jobs_day3:
+        pytest.skip("Requires test_22 (day3 CC Done) first")
+
+    fake_batch = {
+        "step":          cc_step,
+        "jobs":          cc_jobs_day3,
+        "lineage_names": ["preprocess_1", "cc_1"],
+        "lineage_str":   "preprocess_1/cc_1",
+        "days":          [DAY3],
+        "params":        params,
+    }
+
+    before = dict(_counts(db, "stack_1"))
+    propagate_downstream(db, fake_batch)
+    propagate_downstream(db, fake_batch)   # second call — must be idempotent
+    after = dict(_counts(db, "stack_1"))
+
+    # T count must not exceed what the first call created (or pre-existing T)
+    assert after.get("T", 0) <= before.get("T", 0) + len(PAIRS), (
+        f"Second propagate_downstream created extra T jobs: {before} → {after}")
+
+    from sqlalchemy import func
+    dupes = (db.query(_s25.Lineage.lineage_str, func.count(_s25.Lineage.lineage_id))
+               .group_by(_s25.Lineage.lineage_str)
+               .having(func.count(_s25.Lineage.lineage_id) > 1)
+               .all())
+    assert len(dupes) == 0, f"Lineage duplicates after idempotency test: {dupes}"

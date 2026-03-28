@@ -5,7 +5,7 @@ import xarray as xr
 from obspy.signal.regression import linear_regression
 from .core.db import connect, get_logger
 from .core.stations import get_interstation_distance, get_station_pairs
-from .core.workflow import (extend_days, get_next_lineage_batch, is_next_job_for_step, massive_update_job)
+from .core.workflow import (extend_days, get_next_lineage_batch, is_next_job_for_step, massive_update_job, propagate_downstream)
 from .core.io import xr_get_mwcs, xr_save_dtt
 
 
@@ -186,5 +186,7 @@ def main(loglevel="INFO"):
                             station1, station2, components, mov_stack, ds_out)
 
         massive_update_job(db, jobs, "D")
+        if not batch["params"].global_.hpc:
+            propagate_downstream(db, batch)
 
     logger.info('*** Finished: Compute DTT ***')

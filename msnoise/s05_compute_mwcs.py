@@ -84,7 +84,7 @@ import scipy.optimize
 import scipy.signal
 
 from .core.db import connect, get_logger
-from .core.workflow import (compute_rolling_ref, extend_days, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, refstack_is_rolling)
+from .core.workflow import (compute_rolling_ref, extend_days, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, refstack_is_rolling)
 from .core.signal import getCoherence, get_window, nextpow2
 from .core.io import xr_get_ccf, xr_get_ref, xr_save_mwcs
 
@@ -346,7 +346,8 @@ def main(loglevel="INFO"):
                 del data, output, ds_out
 
         massive_update_job(db, jobs, "D")
-        # if not params.global_.hpc:
+        if not batch["params"].global_.hpc:
+            propagate_downstream(db, batch)
         #     for job in jobs:
         #         update_job(db, job.day, job.pair, 'DTT', 'T')
     logger.info('*** Finished: Compute MWCS ***')

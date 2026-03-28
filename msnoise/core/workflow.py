@@ -461,7 +461,160 @@ def _lineage_str_from_id(session, lineage_id):
     return row.lineage_str if row else None
 
 
-# ============================================================
+def propagate_downstream(session, batch: dict) -> int:
+    """Propagate a just-completed batch to all immediate downstream worker steps.
+
+    Called immediately after :func:`massive_update_job` marks a batch Done,
+    **only when** ``params.global_.hpc`` is ``False`` (the default).  In HPC
+    mode the operator runs ``msnoise new_jobs --after <category>`` manually.
+
+    Delegates to the specialised ``propagate_*`` functions from
+    ``s02_new_jobs`` for transitions that require non-trivial logic (fan-outs,
+    sentinel jobs, etc.).  For simple pair-preserving transitions it performs a
+    targeted bulk upsert keyed on the batch's exact (pair, day) tuples.
+
+    Parameters
+    ----------
+    session : sqlalchemy.orm.Session
+    batch : dict
+        Return value of :func:`get_next_lineage_batch`.
+
+    Returns
+    -------
+    int
+        Total jobs created or bumped to T.
+    """
+    completed_step  = batch["step"]
+    category        = completed_step.category
+    total           = 0
+
+    # ── Special transitions: delegate to existing propagate_* functions ──────
+    # These functions are already correct, tested, and handle all the edge cases
+    # (sentinel jobs, fan-outs, day="REF" semantics, etc.).
+
+    if category == "preprocess":
+        # Fan-out: one station → many station-pairs
+        from ..s02_new_jobs import create_cc_jobs_from_preprocess
+        cc_jobs, n_cc = create_cc_jobs_from_preprocess(session)
+        for _j in cc_jobs:
+            update_job(session, _j["day"], _j["pair"],
+                       _j["jobtype"], _j["flag"],
+                       step_id=_j.get("step_id"),
+                       lineage=_j.get("lineage"),
+                       commit=False)
+        if cc_jobs:
+            session.commit()
+        return n_cc
+
+    if category == "stack":
+        # Creates day="REF" sentinel jobs per pair
+        from ..s02_new_jobs import propagate_refstack_jobs_from_stack_done
+        return propagate_refstack_jobs_from_stack_done(session)
+
+    if category == "refstack":
+        # Looks up MOV stack days and creates per-(pair,day) mwcs/str/wct jobs
+        from ..s02_new_jobs import propagate_mwcs_jobs_from_refstack_done
+        return propagate_mwcs_jobs_from_refstack_done(session)
+
+    if category in ("mwcs_dtt", "stretching", "wavelet_dtt"):
+        # DVV sentinel: day="DVV", pair="ALL"
+        from ..s02_new_jobs import propagate_dvv_jobs_from_dtt_done
+        return propagate_dvv_jobs_from_dtt_done(session, category)
+
+    if category == "psd":
+        # Single-station → single-station, simple pass-through
+        from ..s02_new_jobs import propagate_psd_rms_jobs_from_psd_done
+        return propagate_psd_rms_jobs_from_psd_done(session)
+
+    # ── Generic pair-preserving transition ────────────────────────────────────
+    # For cc→filter(→stack), mwcs→dtt, wavelet→wct_dtt, etc.
+    # The completed batch's (pair, day) tuples are used directly.
+
+    from ..msnoise_table_def import declare_tables as _dt
+    schema   = _dt()
+    Job      = schema.Job
+    WFStep   = schema.WorkflowStep
+    WFLink   = schema.WorkflowLink
+
+    completed_names = batch["lineage_names"]
+    days  = list(dict.fromkeys(batch["days"]))           # unique, order-preserving
+    pairs = list(dict.fromkeys(j.pair for j in batch["jobs"]))
+
+    PASSTHROUGH = frozenset({"filter", "global"})
+
+    successors = (
+        session.query(WFStep)
+        .join(WFLink, WFStep.step_id == WFLink.to_step_id)
+        .filter(WFLink.from_step_id == completed_step.step_id)
+        .filter(WFLink.is_active.is_(True))
+        .all()
+    )
+
+    now = datetime.datetime.utcnow()
+
+    for succ in successors:
+        # Collect worker steps reachable through pass-throughs
+        worker_targets: list = []
+
+        def _collect(step, intermediates):
+            if step.category in PASSTHROUGH:
+                nxt = (
+                    session.query(WFStep)
+                    .join(WFLink, WFStep.step_id == WFLink.to_step_id)
+                    .filter(WFLink.from_step_id == step.step_id)
+                    .filter(WFLink.is_active.is_(True))
+                    .all()
+                )
+                for ns in nxt:
+                    _collect(ns, intermediates + [step.step_name])
+            else:
+                worker_targets.append((step, intermediates))
+
+        _collect(succ, [])
+
+        for worker_step, intermediates in worker_targets:
+            downstream_names = completed_names + intermediates + [worker_step.step_name]
+            downstream_lin   = "/".join(downstream_names)
+            downstream_lid   = _get_or_create_lineage_id(session, downstream_lin)
+
+            existing = {
+                (j.pair, j.day): j
+                for j in session.query(Job)
+                .filter(Job.step_id == worker_step.step_id)
+                .filter(Job.lineage_id == downstream_lid)
+                .filter(Job.pair.in_(pairs))
+                .filter(Job.day.in_(days))
+                .all()
+            }
+
+            to_insert = []
+            for pair in pairs:
+                for day in days:
+                    ej = existing.get((pair, day))
+                    if ej is None:
+                        to_insert.append({
+                            "day":        day,
+                            "pair":       pair,
+                            "flag":       "T",
+                            "jobtype":    worker_step.step_name,
+                            "step_id":    worker_step.step_id,
+                            "priority":   getattr(worker_step, "priority", 0) or 0,
+                            "lastmod":    now,
+                            "lineage_id": downstream_lid,
+                        })
+                    elif ej.flag not in ("T", "I"):
+                        ej.flag    = "T"
+                        ej.lastmod = now
+                        total += 1
+
+            if to_insert:
+                session.bulk_insert_mappings(Job, to_insert)
+                total += len(to_insert)
+
+    if total:
+        session.commit()
+
+    return total
 
 
 def update_job(session, day, pair, jobtype, flag,

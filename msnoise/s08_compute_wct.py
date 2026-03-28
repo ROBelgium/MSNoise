@@ -44,7 +44,7 @@ could occur with SQLite.
 import time
 import numpy as np
 from .core.db import connect, get_logger
-from .core.workflow import (compute_rolling_ref, extend_days, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, refstack_is_rolling)
+from .core.workflow import (compute_rolling_ref, extend_days, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, refstack_is_rolling)
 from .core.signal import xwt
 from .core.io import xr_get_ccf, xr_get_ref, xr_save_wct
 
@@ -187,6 +187,8 @@ def main(loglevel="INFO"):
                         logger.error(f"Error saving WCT: {str(e)}")
 
         massive_update_job(db, jobs, "D")
+        if not batch["params"].global_.hpc:
+            propagate_downstream(db, batch)
 
     db.close()
     logger.info('*** Finished: Compute WCT ***')

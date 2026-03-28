@@ -190,7 +190,7 @@ import matplotlib.mlab as mlab
 
 from .core.db import connect, get_logger
 from .core.config import get_config_set_details
-from .core.workflow import (get_filter_steps_for_cc_step, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, update_job)
+from .core.workflow import (get_filter_steps_for_cc_step, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, update_job)
 from .core.signal import stack, winsorizing
 from .core.io import save_daily_ccf, xr_save_ccf_all
 from .move2obspy import myCorr2
@@ -651,9 +651,8 @@ def main(loglevel="INFO"):
 
         # THIS SHOULD BE IN THE API
         massive_update_job(db, jobs, "D")
-        # if not params.global_.hpc:
-        #     for job in jobs:
-        #         update_job(db, job.day, job.pair, 'STACK', 'T')
+        if not batch["params"].global_.hpc:
+            propagate_downstream(db, batch)
 
         logger.info("Job Finished. It took %.2f seconds (preprocess: %.2f s & "
                      "process %.2f s)" % ((time.time() - jt),

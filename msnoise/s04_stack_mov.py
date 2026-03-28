@@ -8,7 +8,7 @@ import time
 import datetime
 import pandas as pd
 from .core.db import connect, get_logger
-from .core.workflow import (get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job)
+from .core.workflow import (get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream)
 from .core.signal import validate_stack_data
 from .core.io import xr_load_ccf_for_stack, xr_save_ccf
 from .wiener import wiener_filt
@@ -192,9 +192,8 @@ def main(stype, loglevel="INFO"):
                 del xx, xx_cleaned
 
         massive_update_job(db, jobs, "D")
+        if not batch["params"].global_.hpc:
+            propagate_downstream(db, batch)
 
-        # if stype != "step" and not params.global_.hpc:
-        #     for job in jobs:
-        #         update_job(db, job.day, job.pair, 'MWCS', 'T')
-        #         update_job(db, job.day, job.pair, 'WCT', 'T')
-        #         update_job(db, job.day, job.pair, 'STR', 'T')
+        # legacy hpc comment (pre-P48):
+        # if stype != "step" and not params.global_.hpc: update MWCS/WCT/STR

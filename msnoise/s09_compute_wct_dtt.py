@@ -29,7 +29,7 @@ import xarray as xr
 
 from .core.db import connect, get_logger
 from .core.stations import get_interstation_distance, get_station_pairs
-from .core.workflow import (extend_days, get_next_lineage_batch, is_next_job_for_step, massive_update_job)
+from .core.workflow import (extend_days, get_next_lineage_batch, is_next_job_for_step, massive_update_job, propagate_downstream)
 from .core.signal import compute_wct_dtt, get_wct_avgcoh
 from .core.io import xr_load_wct, xr_save_wct_dtt
 
@@ -247,6 +247,8 @@ def main(loglevel="INFO"):
                     )
 
         massive_update_job(db, jobs, "D")
+        if not batch["params"].global_.hpc:
+            propagate_downstream(db, batch)
 
     db.close()
     logger.info('*** Finished: Compute WCT DTT ***')

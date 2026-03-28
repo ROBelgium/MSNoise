@@ -46,7 +46,7 @@ import numpy as np
 import pandas as pd
 
 from .core.db import connect, get_logger
-from .core.workflow import (build_ref_datelist, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, refstack_is_rolling)
+from .core.workflow import (build_ref_datelist, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, refstack_is_rolling)
 from .core.signal import validate_stack_data
 from .core.io import xr_load_ccf_for_stack, xr_save_ref
 from .wiener import wiener_filt
@@ -181,6 +181,8 @@ def main(loglevel="INFO"):
             )
 
         massive_update_job(db, jobs, "D")
+        if not batch["params"].global_.hpc:
+            propagate_downstream(db, batch)
         logger.info(
             f"Marked {len(jobs)} refstack job(s) as Done for pair={pair}"
         )
