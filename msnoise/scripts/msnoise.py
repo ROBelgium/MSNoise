@@ -1411,7 +1411,7 @@ def cc_plot_distance(ctx, filterid, comp, ampli, show, outfile, refilter,
                 callback=parse_extra_args)
 @click.pass_context
 def cc_plot_interferogram(ctx, sta1, sta2,  preprocessid, ccid, filterid, stackid, stackid_item,
-                    comp, show,
+                    refstackid, comp, show,
                           outfile,
                           refilter, extra_args):
     """Plots the interferogram between sta1 and sta2 (parses the CCFs)
@@ -1447,7 +1447,7 @@ def cc_plot_interferogram(ctx, sta1, sta2,  preprocessid, ccid, filterid, stacki
                 callback=parse_extra_args)
 @click.pass_context
 def cc_plot_ccftime(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid, stackid_item,
-                    comp,
+                    refstackid, comp,
                     ampli, seismic, show, outfile, envelope, refilter,
                     normalize, extra_args):
     """Plots the ccf vs time between sta1 and sta2
@@ -1481,7 +1481,7 @@ def cc_plot_ccftime(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid, stac
                 callback=parse_extra_args)
 @click.pass_context
 def cc_plot_spectime(ctx, sta1, sta2, preprocessid, ccid, filterid, stackid, stackid_item,
-                    comp, ampli, show, outfile, refilter, extra_args):
+                    refstackid, comp, ampli, show, outfile, refilter, extra_args):
     """Plots the ccf's spectrum vs time between sta1 and sta2
     STA1 and STA2 must be provided with this format: NET.STA.LOC !"""
     loglevel = ctx.obj['MSNOISE_verbosity']

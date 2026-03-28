@@ -1494,14 +1494,20 @@ def build_movstack_datelist(session):
         start = datetime.date.today() + datetime.timedelta(days=int(begin))
         end = datetime.date.today() + datetime.timedelta(days=int(end))
     elif begin == "1970-01-01": # TODO this fails when the DA is empty
-        start = session.query(DataAvailability).order_by(
-            DataAvailability.starttime).first().starttime.date()
+        try:
+            start = session.query(DataAvailability).order_by(
+                DataAvailability.starttime).first().starttime.date()
+        except Exception:
+            start = datetime.date(1970, 1, 1)
     else:
         start = datetime.datetime.strptime(begin, '%Y-%m-%d').date()
 
     if end == "2100-01-01":
-        end = session.query(DataAvailability).order_by(
-            DataAvailability.endtime.desc()).first().endtime.date()
+        try:
+            end = session.query(DataAvailability).order_by(
+                DataAvailability.endtime.desc()).first().endtime.date()
+        except Exception:
+            end = datetime.date.today()
     else:
         end = datetime.datetime.strptime(end, '%Y-%m-%d').date()
     end = min(end, datetime.date.today())
