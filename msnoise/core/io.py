@@ -902,7 +902,7 @@ def xr_get_dvv_agg(root, lineage, step_name, mov_stack,
     :raises FileNotFoundError: if the file does not exist.
     """
     ms_str = "%s_%s" % (mov_stack[0], mov_stack[1])
-    fn = os.path.join(root, *lineage, "_output",
+    fn = os.path.join(root, *lineage, step_name, "_output",
                       ms_str, f"dvv_{pair_type}_{component}.nc")
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
