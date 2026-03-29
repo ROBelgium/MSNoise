@@ -121,48 +121,75 @@ def main(loglevel="INFO"):
                 EM[row_indices, col_indices]   = 1.0
                 MCOH[row_indices, col_indices] = 0.0
 
-                # ── Row-by-row WLS regression ────────────────────────────
-                m_vals   = []
-                em_vals  = []
-                a_vals   = []
-                ea_vals  = []
-                m0_vals  = []
-                em0_vals = []
-                mcoh_vals = []   # mean coherence over valid lag window
-                out_times = []
+                # ── Vectorized WLS regression (all times at once) ────────
+                # ObsPy linear_regression minimises sum(w² * residuals²) where
+                # w = weights = 1/sigma.  Closed-form matching that exactly:
+                #   origin-forced:  m0 = sum(w²·t·y) / sum(w²·t²)
+                #   with intercept: solved via 2×2 normal equations
+                # Valid mask: EM != 1.0 (not flagged) AND MCOH != 0.0 (coherent)
+                valid_mask = (EM != 1.0) & (MCOH != 0.0)   # (n_times, n_lag)
 
-                for i in range(len(times)):
-                    errArray = EM[i]
-                    dtArray  = M[i]
-                    cohArray = MCOH[i]
+                # Weight matrix: w = 1/EM where valid, 0 elsewhere
+                w_raw = np.where(valid_mask, 1.0 / np.where(EM != 0, EM, 1.0), 0.0)
+                w_raw = np.where(np.isfinite(w_raw), w_raw, 1.0)
+                # Zero out invalid entries so they do not contribute to sums
+                w_raw = w_raw * valid_mask
 
-                    index = np.where((errArray != 1.0) & (cohArray != 0.0))[0]
-                    if len(index) < 2:
-                        continue
+                # Require at least 2 valid lag samples per time step
+                n_valid = valid_mask.sum(axis=1)             # (n_times,)
+                good = n_valid >= 2
 
-                    w = 1.0 / errArray[index]
-                    w[~np.isfinite(w)] = 1.0
-                    VecXfilt = tArray[index]
-                    VecYfilt = dtArray[index]
+                t = tArray                                    # (n_lag,)
+                y = M                                         # (n_times, n_lag)
+                w2 = w_raw ** 2                              # (n_times, n_lag)
 
-                    m, a, em, ea = linear_regression(
-                        VecXfilt, VecYfilt, w, intercept_origin=False)
-                    m0, em0 = linear_regression(
-                        VecXfilt, VecYfilt, w, intercept_origin=True)
+                # ── Origin-forced: m0 = sum(w²·t·y) / sum(w²·t²) ──────
+                Sw2t2 = (w2 * t[None, :] ** 2).sum(axis=1)  # (n_times,)
+                Sw2ty = (w2 * t[None, :] * y).sum(axis=1)
+                m0_all = np.where(Sw2t2 != 0, Sw2ty / Sw2t2, np.nan)
+                # Error: sqrt(chi2 / ((n-1) * Sw2t2))
+                res0   = y - m0_all[:, None] * t[None, :]
+                chi20  = (w2 * res0 ** 2).sum(axis=1)
+                em0_all = np.where(
+                    (Sw2t2 != 0) & (n_valid > 1),
+                    np.sqrt(np.abs(chi20) / np.maximum(n_valid - 1, 1) / np.maximum(Sw2t2, 1e-30)),
+                    np.nan,
+                )
 
-                    # Mean coherence over the valid lag window (tindex)
-                    mcoh = float(np.nanmean(cohArray[tindex])) if len(tindex) else 0.0
+                # ── With intercept: 2×2 normal equations ─────────────
+                Sw2   = w2.sum(axis=1)
+                Sw2t  = (w2 * t[None, :]).sum(axis=1)
+                Sw2y  = (w2 * y).sum(axis=1)
+                denom = Sw2 * Sw2t2 - Sw2t ** 2
+                m_all  = np.where(denom != 0, (Sw2 * Sw2ty - Sw2t * Sw2y) / denom, np.nan)
+                a_all  = np.where(denom != 0, (Sw2t2 * Sw2y - Sw2t * Sw2ty) / denom, np.nan)
+                res1   = y - m_all[:, None] * t[None, :] - a_all[:, None]
+                chi21  = (w2 * res1 ** 2).sum(axis=1)
+                scale  = np.where(
+                    (denom != 0) & (n_valid > 2),
+                    np.abs(chi21) / np.maximum(n_valid - 2, 1),
+                    np.nan,
+                )
+                em_all  = np.where(denom != 0, np.sqrt(np.abs(scale * Sw2t2 / np.maximum(denom, 1e-30))), np.nan)
+                ea_all  = np.where(denom != 0, np.sqrt(np.abs(scale * Sw2   / np.maximum(denom, 1e-30))), np.nan)
 
-                    m_vals.append(m)
-                    em_vals.append(em)
-                    a_vals.append(a)
-                    ea_vals.append(ea)
-                    m0_vals.append(m0)
-                    em0_vals.append(em0)
-                    mcoh_vals.append(mcoh)
-                    out_times.append(times[i])
+                # ── Mean coherence over valid lag window ──────────────
+                coh_sum = MCOH[:, tindex].sum(axis=1) if len(tindex) else np.zeros(len(times))
+                coh_cnt = np.maximum((MCOH[:, tindex] != 0).sum(axis=1), 1) if len(tindex) else np.ones(len(times))
+                mcoh_all = coh_sum / coh_cnt
 
-                if not out_times:
+                # ── Collect results for valid time steps ──────────────
+                out_mask   = good
+                out_times  = times[out_mask]
+                m_vals     = m_all[out_mask]
+                em_vals    = em_all[out_mask]
+                a_vals     = a_all[out_mask]
+                ea_vals    = ea_all[out_mask]
+                m0_vals    = m0_all[out_mask]
+                em0_vals   = em0_all[out_mask]
+                mcoh_vals  = mcoh_all[out_mask]
+
+                if len(out_times) == 0:
                     continue
 
                 # ── Build output Dataset ─────────────────────────────────

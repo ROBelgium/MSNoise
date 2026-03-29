@@ -160,9 +160,12 @@ def apply_preprocessing_to_stream(stream, params, responses=None, logger=None):
             elif method == "Decimate":
                 factor = trace.stats.sampling_rate / params.preprocess.cc_sampling_rate
                 if int(factor) != factor:
-                    logger.warning(
-                        f"{trace.id}: cannot decimate by non-integer factor {factor}")
-                    sys.exit()
+                    raise ValueError(
+                        f"{trace.id}: cannot decimate by non-integer factor "
+                        f"{factor} (sr={trace.stats.sampling_rate} → "
+                        f"cc_sampling_rate={params.preprocess.cc_sampling_rate}). "
+                        f"Use Resample or Lanczos instead."
+                    )
                 trace.data = trace.data[::int(factor)]
             elif method == "Lanczos":
                 trace.data = np.array(trace.data)
@@ -184,7 +187,7 @@ def apply_preprocessing_to_stream(stream, params, responses=None, logger=None):
             return _Stream()
 
     for tr in stream:
-        tr.data = tr.data.astype(float)
+        tr.data = tr.data.astype(np.float32)
         if tr.stats.location == "":
             tr.stats.location = "--"
 
@@ -308,7 +311,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                     else:
                         st = tmp
                     for tr in st:
-                        tr.data = tr.data.astype(float)
+                        tr.data = tr.data.astype(np.float32)
                         tr.stats.network = tr.stats.network.upper()
                         tr.stats.station = tr.stats.station.upper()
                         tr.stats.channel = tr.stats.channel.upper()
@@ -319,21 +322,17 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                 del traces
                 if not(len(stream)):
                     continue
-                f = io.BytesIO()
-                stream.write(f, format='MSEED')
-                f.seek(0)
-                stream = read(f, format="MSEED")
-                del f
+                try:
+                    # merge overlapping/adjacent traces only — do NOT fill gaps here.
+                    # The gap-filling loop below (getGaps) handles interpolation up
+                    # to preprocess_max_gap; larger gaps are intentionally kept split
+                    # so the CC step can detect and remove gapped windows.
+                    stream.merge(method=1, fill_value=None)
+                except Exception:
+                    logger.debug("Error while merging, continuing anyway")
+                    traceback.print_exc()
+                stream = stream.split()
                 stream.sort()
-                # try:
-                #     # HACK not super clean... should find a way to prevent the
-                #     # same trace id with different sps to occur
-                #     stream.merge(method=1, interpolation_samples=3, fill_value=None)
-                # except Exception:
-                #     logger.debug("Error while merging...")
-                #     traceback.print_exc()
-                #     continue
-                # stream = stream.split()
                 if not len(stream):
                     continue
                 logger.debug("%s Checking sample alignment" % stream[0].id)
@@ -406,11 +405,13 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                         elif params.preprocess.resampling_method == "Decimate":
                             decimation_factor = trace.stats.sampling_rate / params.preprocess.cc_sampling_rate
                             if not int(decimation_factor) == decimation_factor:
-                                logger.warning("%s CANNOT be decimated by an integer factor, consider using Resample or Lanczos methods"
-                                                " Trace sampling rate = %i ; Desired CC sampling rate = %i" %
-                                                (trace.id, trace.stats.sampling_rate, params.preprocess.cc_sampling_rate))
-                                sys.stdout.flush()
-                                sys.exit()
+                                raise ValueError(
+                                    "%s CANNOT be decimated by an integer factor, "
+                                    "consider using Resample or Lanczos. "
+                                    "Trace sampling rate = %i ; Desired CC sampling rate = %i"
+                                    % (trace.id, trace.stats.sampling_rate,
+                                       params.preprocess.cc_sampling_rate)
+                                )
                             logger.debug("%s Decimate by a factor of %i" %
                                           (trace.id, decimation_factor))
                             trace.data = trace.data[::int(decimation_factor)]
@@ -438,7 +439,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                         continue
 
                 for tr in stream:
-                    tr.data = tr.data.astype(float)
+                    tr.data = tr.data.astype(np.float32)
                     if tr.stats.location == "":
                         tr.stats.location = "--"
                 output += stream

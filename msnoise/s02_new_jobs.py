@@ -844,7 +844,7 @@ def create_cc_jobs_from_preprocess(session):
         .all()
 
     all_jobs = []
-    crap_all_jobs_text = []
+    crap_all_jobs_text = set()  # set: O(1) lookup vs O(N) list — critical at large N
     count = 0
     now = datetime.datetime.now(datetime.timezone.utc)
 
@@ -921,7 +921,7 @@ def create_cc_jobs_from_preprocess(session):
                         jobtxt = ''.join(str(x) for x in job_data.values())
                         if jobtxt not in crap_all_jobs_text:
                             all_jobs.append(job_data)
-                            crap_all_jobs_text.append(jobtxt)
+                            crap_all_jobs_text.add(jobtxt)
                             count += 1
 
                 if has_single_station:
@@ -944,7 +944,7 @@ def create_cc_jobs_from_preprocess(session):
                         jobtxt = ''.join(str(x) for x in job_data.values())
                         if jobtxt not in crap_all_jobs_text:
                             all_jobs.append(job_data)
-                            crap_all_jobs_text.append(jobtxt)
+                            crap_all_jobs_text.add(jobtxt)
                             count += 1
 
     return all_jobs, count
@@ -1097,7 +1097,7 @@ def main(init=False, nocc=False, after=False):
         return
 
     all_jobs = []
-    crap_all_jobs_text = []
+    crap_all_jobs_text = set()  # set: O(1) lookup vs O(N) list — critical at large N
     updated_days = []
     nfs = get_new_files(db)
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -1132,7 +1132,7 @@ def main(init=False, nocc=False, after=False):
                         jobtxt = ''.join(str(x) for x in job.values())
                         if jobtxt not in crap_all_jobs_text:
                             all_jobs.append(job)
-                            crap_all_jobs_text.append(jobtxt)
+                            crap_all_jobs_text.add(jobtxt)
                             count += 1
 
             if init and len(all_jobs) > 1e5:
