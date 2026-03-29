@@ -132,7 +132,7 @@ def update_station(session, net, sta, X, Y, altitude, coordinates='UTM',
 
 
 
-def get_station_pairs(session, used=None, net=None):
+def get_station_pairs(session, used=None, net=None, include_single_station=False):
     """Returns an iterator over all possible station pairs.
     If auto-correlation is configured in the database, returns N*N pairs,
     otherwise returns N*(N-1)/2 pairs.
@@ -151,7 +151,7 @@ def get_station_pairs(session, used=None, net=None):
         pairs
     """
     stations = get_stations(session, all=False, net=net)
-    if len(get_config(session, name="components_to_compute_single_station")):
+    if include_single_station:
         return itertools.combinations_with_replacement(stations, 2)
     else:
         return itertools.combinations(stations, 2)

@@ -499,7 +499,7 @@ def main(loglevel="INFO"):
                         # logger.debug("Winsorizing (clipping) data after bandpass (AC)")
                         tmp = winsorizing(tmp, params, input="timeseries")
 
-                    if params.cc_type_single_station_AC == "CC":
+                    if params.cc.cc_type_single_station_AC == "CC":
                         ffts = sf.fftn(tmp, [nfft, ], axes=[1, ])
                         energy = np.real(np.sqrt(np.mean(
                             sf.ifft(ffts, n=nfft, axis=1) ** 2,
@@ -513,7 +513,7 @@ def main(loglevel="INFO"):
                                        nfft=nfft,
                                        normalized=params.cc.cc_normalisation)
 
-                    elif params.cc_type_single_station_AC == "PCC":
+                    elif params.cc.cc_type_single_station_AC == "PCC":
                         corr = pcc_xcorr(tmp, np.ceil(params.cc.maxlag / dt),
                                          None, single_station_pair_index_ac)
                     else:
@@ -566,7 +566,7 @@ def main(loglevel="INFO"):
                         exit(1)
 
                 if len(single_station_pair_index_sc):
-                    if params.cc_type_single_station_SC == "CC":
+                    if params.cc.cc_type_single_station_SC == "CC":
                         # logger.debug("Compute SC using %s" % params.cc.cc_type)
                         ffts = sf.fftn(_data, [nfft, ], axes=[1, ])
                         if params.cc.whitening != "N":

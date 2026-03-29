@@ -180,7 +180,12 @@ def main(loglevel="INFO"):
             )
             logger.info("Wiener filter enabled for REF stack")
 
-        for components in params.cc.components_to_compute:
+        if sta1 == sta2:
+            components_to_compute = params.cc.components_to_compute_single_station
+        else:
+            components_to_compute = params.cc.components_to_compute
+
+        for components in components_to_compute:
             logger.info(
                 f"Processing {pair}-{components} REF stack (Mode A, "
                 f"ref_begin={params.refstack.ref_begin}, ref_end={params.refstack.ref_end})"

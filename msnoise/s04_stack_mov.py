@@ -70,7 +70,12 @@ def main(stype, loglevel="INFO"):
             "There are STACKS jobs for some days to recompute for %s" % pair)
 
         sta1, sta2 = pair.split(':')
-        for components in params.cc.components_to_compute:
+        if sta1 == sta2:
+            components_to_compute = params.cc.components_to_compute_single_station
+        else:
+            components_to_compute = params.cc.components_to_compute
+
+        for components in components_to_compute:
             logger.info('Processing %s-%s MOV stack' % (pair, components))
 
             # Calculate the maximum mov_rolling value (in days)

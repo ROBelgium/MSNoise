@@ -93,8 +93,9 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
 
         # Build (sta1, sta2) pairs as NET.STA.LOC strings,
         # enumerating all configured location code combinations.
+        include_single_station = len(params.cc.components_to_compute_single_station) >= 1
         all_pairs = []
-        for s1, s2 in get_station_pairs(db):
+        for s1, s2 in get_station_pairs(db, include_single_station=include_single_station):
             for loc1 in (s1.locs() or ["00"]):
                 for loc2 in (s2.locs() or ["00"]):
                     all_pairs.append((
