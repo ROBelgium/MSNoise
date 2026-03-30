@@ -993,19 +993,14 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                     bad = (da_q < quality_min).values  # numpy bool; scalar 'keys' coord on da_dv/da_q
                     da_dv  = da_dv.copy(data=np.where(bad, np.nan, da_dv.values))
                     da_err = da_err.copy(data=np.where(bad, np.nan, da_err.values))
-                # Convert Delta → dv/v.
-                # strvec = 1 + epsilon where epsilon ∈ [-range, +range].
-                # strvec > 1 means the reference was stretched to match
-                # the current trace → current is SLOWER → dv/v < 0.
-                # Therefore: dv/v = -(Delta - 1) = 1 - Delta
-                da_dv = 1.0 - da_dv
 
             elif parent_category == "wavelet_dtt":
                 ds = xr_get_wct_dtt(root, dtt_lineage, sta1, sta2,
                                      component, mov_stack)
-                # Need to be checked for the sign, probably need to be *-1 (it's dt/t)
                 da_dv, da_err = _freq_average_wct(
                     ds, wct_freqmin, wct_freqmax, quality_min, wct_freq_agg)
+                # wavelet dtt is returning dt/t -> *=-1 for dv/v
+                da_dv *= -1
 
         except FileNotFoundError as e:
             logging.getLogger("msnoise").warning(
