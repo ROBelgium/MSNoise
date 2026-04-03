@@ -1778,6 +1778,85 @@ def qc_compute_rms(ctx):
     run_threaded(main, ctx)
 
 
+@qc.command(name='plot_psd_rms')
+@click.argument('seed_ids', nargs=-1, required=False, metavar='[SEED_ID...]')
+@click.option('--psd-id', default=1, show_default=True, type=int,
+              help='Config-set number for the psd step (matches psd_N in workflow)')
+@click.option('--psd-rms-id', default=1, show_default=True, type=int,
+              help='Config-set number for the psd_rms step (matches psd_rms_N in workflow)')
+@click.option('--type', '-t', 'plot_type', default='timeseries', show_default=True,
+              type=click.Choice(['timeseries', 'clockplot', 'hourmap',
+                                  'gridmap', 'dailyplot', 'all'],
+                                case_sensitive=False),
+              help='Plot type to produce')
+@click.option('--band', '-b', default=None,
+              help='Frequency band label, e.g. "1.0-10.0" (default: first available)')
+@click.option('--scale', default=1e9, show_default=True, type=float,
+              help='Amplitude scale factor applied before display')
+@click.option('--unit', '-u', default='nm', show_default=True,
+              help='Amplitude unit label for axis/colorbar')
+@click.option('--timezone', '-z', default='UTC', show_default=True,
+              help='Time zone for local-time plots (e.g. Europe/Brussels)')
+@click.option('--day-start', default=7.0, show_default=True, type=float,
+              help='Start of daytime in decimal hours (local time), e.g. 7.0 = 07:00')
+@click.option('--day-end', default=19.0, show_default=True, type=float,
+              help='End of daytime in decimal hours (local time), e.g. 19.0 = 19:00')
+@click.option('--split-date', default=None,
+              help='ISO date (YYYY-MM-DD) for before/after split (clockplot, dailyplot)')
+@click.option('--annotate', '-a', default=None,
+              help='Event annotations as DATE=LABEL,DATE=LABEL')
+@click.option('--outfile', '-o', default=None,
+              help='Base filename for saved figure(s). Type suffix is appended.')
+@click.option('--no-show', is_flag=True, default=False,
+              help='Do not call plt.show() (useful in non-interactive environments)')
+@click.pass_context
+def qc_plot_psd_rms(ctx, seed_ids, psd_id, psd_rms_id, plot_type, band, scale, unit,
+                    timezone, day_start, day_end, split_date, annotate, outfile, no_show):
+    """Plot PSD-RMS results: time-series, clock plots, hour-maps, grid-maps.
+
+    SEED_ID can be zero or more SEED identifiers (NET.STA.LOC.CHAN).  When
+    omitted, all stations found on disk for the given psd/psd_rms lineage are
+    plotted.  Uses MSNoiseResult for lineage-correct path resolution.
+
+    \b
+        msnoise qc plot_psd_rms BE.UCC..HHZ
+        msnoise qc plot_psd_rms                           # all stations
+        msnoise qc plot_psd_rms BE.UCC..HHZ BE.MEM..HHZ --type timeseries
+        msnoise qc plot_psd_rms BE.UCC..HHZ --type clockplot --timezone Europe/Brussels
+        msnoise qc plot_psd_rms BE.UCC..HHZ --type all --outfile noise.pdf
+        msnoise qc plot_psd_rms --psd-id 2 --psd-rms-id 2 BE.UCC..HHZ
+        msnoise qc plot_psd_rms BE.UCC..HHZ --day-start 8 --day-end 20
+        msnoise qc plot_psd_rms BE.UCC..HHZ --day-start 0 --day-end 24  # disable
+    """
+    import matplotlib
+    if no_show:
+        matplotlib.use('Agg')
+    from ..plots.psd_rms import main as plot_main
+
+    annotations = {}
+    if annotate:
+        for pair in annotate.split(','):
+            date_str, _, label = pair.partition('=')
+            annotations[date_str.strip()] = label.strip()
+
+    loglevel = ctx.obj.get('LOGLEVEL', 'INFO') if ctx.obj else 'INFO'
+    plot_main(
+        seed_ids=list(seed_ids),
+        psd_id=psd_id,
+        psd_rms_id=psd_rms_id,
+        plot_type=plot_type,
+        band=band,
+        scale=scale,
+        unit=unit,
+        time_zone=timezone,
+        day_start=day_start,
+        day_end=day_end,
+        split_date=split_date,
+        annotations=annotations or None,
+        outfile=outfile,
+        show=not no_show,
+        loglevel=loglevel,
+    )
 
 
 
