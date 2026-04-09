@@ -33,7 +33,6 @@ and can be used by plugins with their own parameters. The routine returns a
 Stream object containing all the traces for all the stations/components.
 """
 
-import sys
 import traceback
 
 from obspy.core import UTCDateTime, Stream, read
@@ -47,12 +46,10 @@ except Exception:
 from .core.db import connect, get_logger
 from .core.stations import get_data_availability
 from .core.signal import check_and_phase_shift, getGaps
-import io
 import logbook
 
 import datetime
 import glob
-import os
 
 import numpy as np
 logger = logbook.Logger(__name__)
@@ -80,7 +77,6 @@ def apply_preprocessing_to_stream(stream, params, responses=None, logger=None):
     :returns: Processed :class:`~obspy.core.stream.Stream`, or an empty stream
         if the data could not be processed.
     """
-    import sys
     import numpy as np
     from obspy import Stream as _Stream
     from .core.signal import check_and_phase_shift, getGaps

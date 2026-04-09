@@ -2,12 +2,11 @@
 import itertools
 import logging
 
-logger = logging.getLogger('msnoise.stations')
-
 import numpy as np
 
-from .config import get_config
-from ..msnoise_table_def import Station, DataAvailability, DataSource
+from ..msnoise_table_def import Station, DataAvailability
+
+logger = logging.getLogger('msnoise.stations')
 
 def get_stations(session, all=False, net=None, format="raw"):
     """Get Stations from the database.

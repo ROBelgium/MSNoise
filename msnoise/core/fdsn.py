@@ -74,7 +74,6 @@ def build_client(ds):
     :param ds: :class:`~msnoise.msnoise_table_def.DataSource` ORM object.
     :returns: An ObsPy client with a ``get_waveforms_bulk`` method.
     """
-    from urllib.parse import urlsplit
     scheme = parse_datasource_scheme(ds.uri)
     auth = get_auth(ds.auth_env or "MSNOISE")
 
@@ -278,7 +277,6 @@ def fetch_and_preprocess(
 
 def _write_raw_cache(stream, output_folder, step_name, goal_day):
     """Write raw fetched stream to ``_output/raw/<date>/<NET.STA.LOC.CHAN>.mseed``."""
-    import numpy as np
     from obspy import Stream as _Stream
 
     raw_dir = os.path.join(output_folder, step_name, "_output", "raw", goal_day)

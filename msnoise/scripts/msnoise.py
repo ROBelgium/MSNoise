@@ -2159,8 +2159,7 @@ def create_preprocess_jobs_cmd(date, date_range, set_number):
     from ..core.stations import (get_stations, resolve_data_source,
                                  get_data_availability)
     from ..core.fdsn import is_remote_source
-    from ..core.workflow import get_workflow_steps, is_next_job_for_step
-    from ..core.config import get_config
+    from ..core.workflow import get_workflow_steps
     from ..s02_new_jobs import update_job
 
     if not date and not any(date_range):

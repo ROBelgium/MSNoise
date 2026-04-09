@@ -16,6 +16,7 @@ Example:
 
 import datetime
 import logging
+import re
 
 import numpy as np
 import pandas as pd
@@ -23,15 +24,13 @@ import matplotlib.dates
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num
-
 from pandas.plotting import register_matplotlib_converters
-register_matplotlib_converters()
-
-import re
 
 from ..core.db import connect, get_logger
 from ..core.stations import get_data_availability, get_stations
 from ..core.workflow import build_movstack_datelist
+
+register_matplotlib_converters()
 
 
 def main(chan, show=False, outfile=None, loglevel="INFO"):

@@ -1,11 +1,9 @@
-import numpy as np
-"""
-TODO
-"""
-
+"""Moving and reference stack computation."""
+import datetime
 import math
 import time
-import datetime
+
+import numpy as np
 import pandas as pd
 from .core.db import connect, get_logger
 from .core.workflow import (get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream)

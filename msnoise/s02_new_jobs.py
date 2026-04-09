@@ -1,5 +1,3 @@
-from .msnoise_table_def import Lineage
-from sqlalchemy.orm import aliased
 """ This script searches the database for files flagged "N"ew or "M"odified.
 For each date in the configured range, it checks if other stations are
 available and defines the new jobs to be processed.  Only jobs within the
@@ -37,14 +35,16 @@ then to be inserted manually:
 should be run after the ``msnoise compute_cc`` step in order to create the
 ``STACK`` jobs.
 """
+from .msnoise_table_def import Lineage
 
 import datetime
+
+import pandas as pd
 
 from .core.db import connect, get_logger
 from .core.config import get_config, get_config_set_details, get_params
 from .core.stations import get_new_files, get_stations, mark_data_availability
 from .core.workflow import (build_movstack_datelist, _lineage_id_for, _get_or_create_lineage_id, filter_within_daterange, get_lineages_to_step_id, get_workflow_steps, lineage_str_to_step_names, massive_insert_job, update_job)
-import pandas as pd
 
 
 # Module-level logger used by propagation functions (propagate_stack_jobs_from_cc_done, etc.)
@@ -67,7 +67,6 @@ def propagate_stack_jobs_from_cc_done(session):
     bulk SELECT to find existing STACK jobs, then bulk_insert_mappings +
     a single UPDATE … WHERE ref IN (…) for bumps.  No per-job DB round-trips.
     """
-    from sqlalchemy import tuple_
     from .msnoise_table_def import declare_tables
 
     schema = declare_tables()
@@ -409,7 +408,6 @@ def propagate_mwcs_jobs_from_refstack_done(session):
 
     Performance: fully batched — no per-job DB round-trips.
     """
-    from sqlalchemy import update as sa_update
     from .msnoise_table_def import declare_tables
 
     schema = declare_tables()

@@ -81,7 +81,6 @@ import sys
 import traceback
 
 from .core.db import connect, get_logger
-from .core.config import get_config
 from .core.stations import update_station
 
 import logging

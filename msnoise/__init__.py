@@ -21,4 +21,4 @@ class FatalError(MSNoiseError):
     pass
 
 # Convenience: connect is the universal entry point
-from .core.db import connect  # noqa: F401
+from .core.db import connect  # noqa: F401,E402

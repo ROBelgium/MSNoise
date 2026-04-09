@@ -76,7 +76,6 @@ import time
 import numpy as np
 import xarray as xr
 from obspy.signal.invsim import cosine_taper
-from obspy.signal.regression import linear_regression
 import scipy
 import scipy.fft as sf
 from scipy.fft import next_fast_len
@@ -85,7 +84,7 @@ import scipy.signal
 
 from .core.db import connect, get_logger
 from .core.workflow import (compute_rolling_ref, extend_days, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, refstack_is_rolling)
-from .core.signal import getCoherence, get_window, nextpow2
+from .core.signal import get_window, nextpow2
 from .core.io import xr_get_ccf, xr_get_ref, xr_save_mwcs
 
 def main(loglevel="INFO"):

@@ -21,7 +21,6 @@ from flask_admin.contrib.sqla import ModelView
 from flask_admin.actions import action
 from flask_babel import Babel, gettext, ngettext
 from markupsafe import Markup
-SafeMarkup = Markup
 from sqlalchemy import func
 from wtforms import Form, StringField, TextAreaField, SelectField, BooleanField, IntegerField, FloatField
 from wtforms.validators import Optional
@@ -29,6 +28,8 @@ from wtforms.validators import Optional
 from .core.db import connect, get_logger
 from .core.config import get_config_categories_definition
 from .msnoise_table_def import declare_tables, WORKFLOW_CHAINS as _WC_FULL
+
+SafeMarkup = Markup
 # Flatten the richer msnoise_table_def format to {category: [next_step, ...]}
 # which is all the admin workflow builder needs.
 WORKFLOW_CHAINS = {k: (v['next_steps'] if isinstance(v, dict) else v)
@@ -558,7 +559,8 @@ class StationXMLImportView(BaseView):
 
             try:
                 if file_obj and file_obj.filename:
-                    import tempfile, os as _os
+                    import os as _os
+                    import tempfile
                     suffix = _os.path.splitext(file_obj.filename)[1] or '.xml'
                     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                         file_obj.save(tmp.name)

@@ -32,22 +32,22 @@ It is sometimes useful to refilter the CCFs on the fly:
 
 """
 # plot interferogram
-import datetime
 import numpy as np
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
-from pandas.plotting import register_matplotlib_converters
 from matplotlib.widgets import Cursor
-register_matplotlib_converters()
-
 from obspy.signal.filter import envelope as obspy_envelope
 from obspy.signal.filter import bandpass
+from pandas.plotting import register_matplotlib_converters
+
 from ..core.db import connect, get_logger
 from ..core.config import build_plot_outfile
 from ..core.stations import check_stations_uniqueness
 from ..core.workflow import build_movstack_datelist
 from ..results import MSNoiseResult
+
+register_matplotlib_converters()
 
 
 def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=1,
