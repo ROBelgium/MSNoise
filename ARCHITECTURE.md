@@ -23,16 +23,96 @@ global_1 ──► preprocess_1 ──► cc_1 ──► filter_1 ──► stac
                                                     dvv_1
 ```
 
-**Pass-through nodes**: `filter_N` and `global_N` appear in lineage strings but have **no worker scripts** and **no jobs**. They are purely parameter namespaces. `propagate_downstream` recurses through them transparently.
+**Pass-through nodes**: `filter_N` and `global_N` appear in lineage strings but have **no worker scripts** and **no jobs**. They are purely parameter namespaces. `propagate_downstream` recurses through them transparently via `_collect()`.
+
+**Canonical category order** (from `WORKFLOW_ORDER` in `msnoise_table_def.py`):
+`global → preprocess → cc → psd → psd_rms → filter → stack → refstack → mwcs → mwcs_dtt → mwcs_dtt_dvv → stretching → stretching_dvv → wavelet → wavelet_dtt → wavelet_dtt_dvv`
 
 ---
 
-## 2. Jobs — Two Distinct Concepts
+## 2. Package Layout & Import Paths
+
+```
+msnoise/
+  __init__.py            # MSNoiseError, DBConfigNotFoundError, FatalError; re-exports connect
+  api.py                 # Backward-compat re-export of msnoise.core.*
+  core/
+    __init__.py          # Re-exports all 6 submodules via *
+    db.py                # connect, get_engine, read_db_inifile, get_logger
+    config.py            # get_config, update_config, create_config_set, get_params,
+                         # get_merged_params_for_lineage, build_plot_outfile,
+                         # lineage_to_plot_tag, get_config_categories_definition
+    stations.py          # get_stations, get_station_pairs, update_data_availability,
+                         # get_data_availability, add_data_source, get_data_source,
+                         # resolve_data_source, get_waveform_path, import_stationxml,
+                         # set_station_source, set_network_source, set_all_stations_source
+    workflow.py          # get_next_lineage_batch, propagate_downstream,
+                         # is_next_job_for_step, massive_insert_job, massive_update_job,
+                         # reset_jobs, build_ref_datelist, get_lineages_to_step_id,
+                         # _get_or_create_lineage_id, create_workflow_steps_from_config_sets,
+                         # create_workflow_links_from_steps, get_t_axis,
+                         # get_filter_steps_for_cc_step, get_refstack_lineage_for_filter
+    signal.py            # winsorizing, stack, xwt, compute_wct_dtt, get_wct_avgcoh,
+                         # preload_instrument_responses, save_preprocessed_streams,
+                         # get_preprocessed_stream, make_same_length, validate_stack_data
+    io.py                # xr_save_ccf, xr_get_ccf, xr_save_ccf_daily, xr_get_ccf_daily,
+                         # xr_save_ref, xr_get_ref, xr_load_ccf_for_stack,
+                         # xr_save_mwcs, xr_get_mwcs, xr_save_dtt, xr_get_dtt,
+                         # xr_save_stretching, xr_save_wct, xr_load_wct,
+                         # xr_save_wct_dtt, xr_get_wct_dtt,
+                         # xr_save_dvv_agg, xr_get_dvv_agg, aggregate_dvv_pairs,
+                         # xr_save_psd, xr_load_psd, xr_save_rms, xr_load_rms,
+                         # psd_rms, psd_df_rms, psd_read_results
+    fdsn.py              # parse_datasource_scheme, is_remote_source, build_client,
+                         # fetch_waveforms_bulk, fetch_and_preprocess, _write_raw_cache
+  msnoise_table_def.py   # declare_tables() → Config, Lineage, Job, DataSource,
+                         # Station, DataAvailability, WorkflowStep, WorkflowLink
+                         # WORKFLOW_CHAINS dict, WORKFLOW_ORDER list
+  params.py              # LayeredParams, _build_layered_params
+  results.py             # MSNoiseResult (high-level result reader)
+  data_structures.py     # data_structure dict (SDS/BUD/IDDS/PDF path templates)
+  move2obspy.py          # myCorr2, pcc_xcorr, whiten, whiten2, mwcs, smooth
+  preprocessing.py       # apply_preprocessing_to_stream, preprocess
+  wiener.py              # wiener_filt, find_segments
+  s01_scan_archive.py    # scan_archive main, get_archives_folders, parse_crondays
+  s02_new_jobs.py        # new_jobs main; all propagate_* functions
+  s02_preprocessing.py   # preprocess worker main
+  s03_compute_no_rotation.py  # CC computation main
+  s04_stack_mov.py       # moving stack main (stype='mov'|'ref')
+  s04_stack_refstack.py  # reference stack main
+  s05_compute_mwcs.py    # MWCS main
+  s06_compute_mwcs_dtt.py # MWCS DTT main
+  s07_compute_dvv.py     # DVV aggregate main (mwcs_dtt_dvv / stretching_dvv / wavelet_dtt_dvv)
+  s08_compute_wct.py     # Wavelet coherence main
+  s09_compute_wct_dtt.py # Wavelet DTT main
+  s10_stretching.py      # Stretching main; stretch_mat_creation
+  psd_compute.py         # PSD computation main
+  psd_compute_rms.py     # PSD RMS computation main
+  config/                # One config_<category>.csv per workflow category
+  plots/                 # ccftime, data_availability, distance, dtt, interferogram,
+                         # mwcs, mwcs_dtt_dvv, ppsd, psd_rms, spectime,
+                         # station_map, stretching_dvv, timing, wavelet_dtt_dvv
+  scripts/msnoise.py     # Full Click CLI; entry point msnoise = scripts.msnoise:run
+  msnoise_admin.py       # Flask-Admin web UI (msnoise admin)
+```
+
+**The one universal entry point**: `from msnoise.api import connect` (or `from msnoise import connect`).
+All other symbols live in `msnoise.core.*` and are re-exported through `api.py` for backward compat.
+
+---
+
+## 3. Jobs — Two Distinct Concepts
 
 ### `Job` (ORM object, `msnoise_table_def.declare_tables().Job`)
 SQLAlchemy mapped class. **Always call `declare_tables()` to get a fresh class** — do NOT use module-level imports like `from msnoise_table_def import Job` for DB queries, as multiple `declare_tables()` calls create different class objects. Use `schema = declare_tables(); Job = schema.Job`.
 
 Key columns: `ref` (PK), `day`, `pair`, `flag` (T/I/D/F), `step_id` (FK→WorkflowStep), `lineage_id` (FK→Lineage), `jobtype` (= step_name), `priority`, `lastmod`.
+
+Key `@property` fields (derived from `workflow_step` relationship — require the relationship to be loaded):
+- `job.config_category` → `workflow_step.category`
+- `job.config_set_number` → `workflow_step.set_number`
+- `job.step_name` → `workflow_step.step_name`
+- `job.lineage` → resolves `lineage_id` → `lineage_str` via the `Lineage` FK
 
 ### Job flags lifecycle
 ```
@@ -51,7 +131,7 @@ D → T  only allowed explicitly (reset) or by propagate_downstream (upstream ch
 
 ---
 
-## 3. Lineage — The Path Through the Graph
+## 4. Lineage — The Path Through the Graph
 
 Every job carries a `lineage_id` FK → `Lineage(lineage_str)`. The string is a `/`-separated path of step names from root to the current step:
 
@@ -75,7 +155,7 @@ psd_1/psd_rms_1
 
 ---
 
-## 4. Worker Script Pattern
+## 5. Worker Script Pattern
 
 Every worker script follows this canonical loop:
 
@@ -91,11 +171,13 @@ while is_next_job_for_step(db, step_category="cc"):
 ```
 
 `get_next_lineage_batch` returns a dict with:
-- `jobs`, `step`, `pair`, `lineage_str`, `lineage_names`
-- `lineage_names_upstream` = lineage_names[:-1] (for output paths — excludes current step)
-- `lineage_names_mov` = upstream with refstack_* stripped (for reading MOV CCFs)
+- `jobs`, `step`, `pair`, `lineage_str`, `lineage_steps`
+- `lineage_names` — full list including current step name
+- `lineage_names_upstream` — `lineage_names[:-1]` (for output paths — excludes current step)
+- `lineage_names_mov` — upstream with any `refstack_*` entries stripped (for reading MOV CCFs in mwcs/wct/stretching)
 - `days`, `refs`
-- `params` — LayeredParams (access global config as `params.global_.hpc`)
+- `step_params` — raw `AttribDict` for the current step's config set
+- `params` — `LayeredParams` (access global config as `params.global_.hpc`)
 
 **`group_by` parameter**:
 - `"day_lineage"` — batch all pairs for a given day+lineage (preprocess, cc, psd)
@@ -103,7 +185,7 @@ while is_next_job_for_step(db, step_category="cc"):
 
 ---
 
-## 5. `propagate_downstream` — The Dispatch Table
+## 6. `propagate_downstream` — The Dispatch Table
 
 After marking jobs Done in hpc=False mode, `propagate_downstream(session, batch)` fires.
 
@@ -131,7 +213,7 @@ This mirrors the old `stack -m` (daily) + `stack -r` (occasional) workflow witho
 | `refstack` | `propagate_mwcs_jobs_from_refstack_done` | REF just changed: re-propagate all days |
 | `mwcs_dtt`/`stretching`/`wavelet_dtt` | `propagate_dvv_jobs_from_dtt_done` | Creates `day="DVV", pair="ALL"` sentinel |
 | `psd` | `propagate_psd_rms_jobs_from_psd_done` | Simple single-station passthrough |
-| `cc` (and others) | Generic pair×day bulk upsert | Crosses filter_1 passthrough via `_collect_workers` recursion |
+| `cc` (and others) | Generic pair×day bulk upsert via `_collect()` recursion | Crosses filter_1 passthrough transparently |
 
 ### HPC mode (`hpc=Y`)
 
@@ -139,7 +221,7 @@ This mirrors the old `stack -m` (daily) + `stack -r` (occasional) workflow witho
 
 ---
 
-## 6. The REF Sentinel — When It Computes vs Skips
+## 7. The REF Sentinel — When It Computes vs Skips
 
 `s04_stack_refstack` checks on every REF job:
 
@@ -161,7 +243,7 @@ compute_ref_stack(); write_ref_file(); mark_done(); propagate_downstream()
 
 ---
 
-## 7. Output File Paths
+## 8. Output File Paths
 
 All output paths follow: `root / lineage_names_upstream / step_name / _output / ...`
 
@@ -183,18 +265,146 @@ OUTPUT / upstream_lineage / dvv_step_name / _output / 1D_1D / dvv_CC_ZZ.nc
 
 ---
 
-## 8. Config & Params
+## 9. Config & Params
 
-Config lives in DB tables, one `ConfigSet` per category (global, preprocess, cc, filter, stack, refstack, mwcs, etc.).
+Config lives in the unified `Config` table. One row per `(name, category, set_number)`. Global config has `category='global'`, `set_number=1` (legacy NULL rows are migrated to 1 by `get_config_sets_organized`).
 
-- `get_params(db)` → flat `AttribDict`. Access `params.hpc`, `params.cc_sampling_rate`, etc.
-- `get_merged_params_for_lineage(db, ...)` → `LayeredParams`. Access: `params.global_.hpc`, `params.mwcs.mwcs_wlen`, `params["stack"].mov_stack`
+Key columns on `Config`: `name`, `category`, `set_number`, `value` (always string), `param_type` ('str'/'int'/'float'/'bool'), `default_value`, `description`, `possible_values` (slash-separated).
 
-**`LayeredParams` access**: `params.global_` (underscore avoids Python keyword), `params.cc`, `params.mwcs` etc. Raises `AttributeError` for unknown categories. **NOT** `params.hpc` — that's `params.global_.hpc`.
+- `get_params(db)` → single-layer `LayeredParams`. Access `params.global_.hpc`, `params.global_.output_folder`, etc.
+- `get_merged_params_for_lineage(db, orig_params, step_params, lineage)` → `(lineage, lineage_names, LayeredParams)`. Access: `params.global_` (underscore avoids Python keyword), `params.cc`, `params.mwcs` etc.
+- `get_config_set_details(db, category, set_number, format="AttribDict")` → plain `AttribDict` for a single config set.
+
+**`LayeredParams` access**:
+- `params.global_.hpc` — global layer
+- `params["stack"].mov_stack` — dict-style also works
+- `params.category_layer` — the *current step's* layer (useful in DVV aggregation functions that receive params from the worker)
+- `params.step_name` — name of the innermost step
+- `params.lineage_names` — full list of step names in this lineage
+- `params.categories` — list of all loaded category names
+- `params.as_flat_dict()` — all params flattened (later layers win on name collision)
+- `params.to_yaml(path)` / `LayeredParams.from_yaml(path)` — serialization
+
+**NOT** `params.hpc` — that's `params.global_.hpc`.
+
+Config CSV files in `msnoise/config/config_<category>.csv` define defaults. Columns: `name`, `default`, `definition`, `type`, `possible_values`.
 
 ---
 
-## 9. Common Pitfalls
+## 10. ORM Tables
+
+All tables go through `declare_tables(prefix=None)` which returns a namespace object. **Never import ORM classes at module level for DB queries** — always:
+
+```python
+from msnoise.msnoise_table_def import declare_tables
+schema = declare_tables()
+Job = schema.Job
+```
+
+| Table | Key columns |
+|---|---|
+| `Config` | `ref`, `name`, `category`, `set_number`, `value`, `param_type`, `default_value`, `description`, `possible_values` |
+| `Lineage` | `lineage_id` (PK), `lineage_str` (unique) |
+| `Job` | `ref` (PK), `day`, `pair`, `flag`, `step_id` (FK→WorkflowStep), `lineage_id` (FK→Lineage), `jobtype`, `priority`, `lastmod` |
+| `DataSource` | `ref` (PK), `name` (unique), `uri`, `data_structure`, `auth_env`, `archive_format`, `network_code`, `channels` |
+| `Station` | `ref` (PK), `net`, `sta`, `X`, `Y`, `altitude`, `coordinates`, `used`, `data_source_id` (FK→DataSource, nullable) |
+| `DataAvailability` | `ref` (PK), `net`, `sta`, `loc`, `chan`, `path`, `file`, `starttime`, `endtime`, `data_source_id` |
+| `WorkflowStep` | `step_id` (PK), `step_name` (unique), `category`, `set_number`, `description`, `is_active` |
+| `WorkflowLink` | `link_id` (PK), `from_step_id`, `to_step_id`, `link_type`, `is_active` |
+
+`WorkflowStep` has a `UniqueConstraint('category', 'set_number')` — one step per config set.
+`Job` has `Index('job_index', 'day', 'pair', 'step_id', 'lineage_id', unique=True)`.
+
+---
+
+## 11. DataSource Abstraction
+
+Every `Station` has an optional `data_source_id` FK. NULL → use `DataSource.ref=1` (project default, created by installer).
+
+**URI schemes** (parsed by `fdsn.parse_datasource_scheme`):
+- bare path or `sds:///path` → local SDS/BUD/IDDS/PDF archive
+- `fdsn://http://...` → FDSN web service
+- `eida://http://...` → EIDA routing client
+
+**`fdsn.py` key functions**:
+- `build_client(ds)` → ObsPy `Client` or EIDA routing client from a `DataSource`
+- `fetch_waveforms_bulk(client, bulk_request, retries=3)` → `Stream`
+- `fetch_and_preprocess(...)` → fetches + preprocesses in one shot for remote sources
+- `_write_raw_cache(stream, ...)` — caches raw waveforms when `fdsn_keep_raw=Y` (global config)
+
+**Station-to-source assignment**:
+- `set_station_source(db, net, sta, data_source_id)` — per-station override
+- `set_network_source(db, net, data_source_id)` — all stations in a network
+- `set_all_stations_source(db, data_source_id)` — project-wide
+- `resolve_data_source(db, station)` — returns effective DS (station override or default)
+- `get_waveform_path(db, da)` — joins `DataSource.uri + da.path + da.file`
+
+---
+
+## 12. MSNoiseResult — High-Level Result Reader
+
+`MSNoiseResult` (`results.py`) is the user-facing class for reading computed results without needing to know file paths or lineage strings.
+
+```python
+# Construct from integer set IDs
+r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                            stack=1, refstack=1, mwcs=1, mwcs_dtt=1,
+                            mwcs_dtt_dvv=1)
+
+# List all available result sets for a category
+for r in MSNoiseResult.list(db, "mwcs_dtt"):
+    print(r)
+
+# Access results — all return xarray Dataset/DataArray by default
+ds = r.get_ccf(pair="BE.UCC--BE.MEM", components="ZZ", mov_stack=("1D","1D"))
+ds = r.get_ref(pair="BE.UCC--BE.MEM", components="ZZ")
+ds = r.get_mwcs(pair="BE.UCC--BE.MEM", components="ZZ", mov_stack=("1D","1D"))
+ds = r.get_mwcs_dtt(...)
+ds = r.get_stretching(...)
+ds = r.get_dvv(pair_type="CC", components="ZZ", mov_stack=("1D","1D"))
+ds = r.get_wct(...)
+ds = r.get_wct_dtt(...)
+ds = r.get_psd(seed_id="BE.UCC..HHZ", day="2023-01-01")
+ds = r.get_psd_rms(seed_id="BE.UCC..HHZ")
+df = r.export_dvv(...)   # returns DataFrame
+
+# Navigate branches
+for branch in r.branches():   # other lineages reachable from same root
+    print(branch)
+```
+
+**Internal helpers**:
+- `r._lineage_upstream_of(category)` — lineage list up to but NOT including `category`
+- `r._lineage_through(category)` — lineage list including `category`
+- `r._step_name_for(category)` — step_name string for a category in this lineage
+
+**DVV path rule**: `get_dvv()` uses `_lineage_upstream_of(dvv_cat)` + step_name — NOT `_lineage_through`. Using `_lineage_through` produces a doubled path `...dvv_1/dvv_1/_output/...`.
+
+---
+
+## 13. DVV Aggregation (`aggregate_dvv_pairs`)
+
+Called from `s07_compute_dvv.py`. Reads per-pair DTT/STR/WCT-DTT files and aggregates across pairs.
+
+**Output variables** in the returned `xr.Dataset` (dim: `times`):
+- Always: `mean`, `std`, `median`, `n_pairs`
+- If `dvv_output_percent=Y`: values multiplied by 100 before aggregation
+- If `dvv_weighted_mean=Y`: `weighted_mean`, `weighted_std` (weights = 1/err²)
+- If `dvv_trimmed_mean=Y`: `trimmed_mean`, `trimmed_std` (sigma-clip at `dvv_trim_limit`)
+- If `dvv_percentiles` set (comma-separated floats): `q05`, `q25`, `q50`, `q75`, `q95` etc.
+
+**Quality filtering**: pairs with `quality_col < dvv_quality_min` are masked to NaN before aggregation.
+
+**Sign convention**:
+- MWCS: `dv/v = -1 * dt/t` (sign flip applied in aggregator)
+- Stretching: `dv/v = stretching_factor - 1`
+- Wavelet: `dv/v = -1 * wct_dt/t` (sign flip applied)
+
+**WCT-specific**: frequency averaging over `[dvv_freqmin, dvv_freqmax]` via `_freq_average_wct`, method controlled by `dvv_freq_agg`.
+
+---
+
+## 14. Common Pitfalls
 
 1. **`declare_tables()` class identity**: `Job` from one call ≠ `Job` from another Python object. Always `schema = declare_tables(); Job = schema.Job`. Module-level imports work IF the module is already cached (same process), but can fail across test sessions.
 
@@ -209,3 +419,9 @@ Config lives in DB tables, one `ConfigSet` per category (global, preprocess, cc,
 6. **Preprocess→CC is a fan-out**: one preprocess job (`pair="YA.UV05.00"`) → multiple CC jobs (one per station pair). `propagate_downstream` handles this via `create_cc_jobs_from_preprocess`, NOT the generic pair×day loop. The generic loop would create CC jobs with single-station pairs (wrong).
 
 7. **`days` and `pairs` in `propagate_downstream`**: always deduplicate with `dict.fromkeys()` before iterating. The `batch["days"]` list has one entry per job, so with `group_by="day_lineage"` (3 pairs × 1 day = 3 entries), all three have the same day.
+
+8. **`params.category_layer`**: gives the config layer of the *innermost* (current) step in the LayeredParams. Used in `aggregate_dvv_pairs` to access `dvv_quality_min`, `dvv_weighted_mean`, etc. without knowing the exact category name.
+
+9. **`Config.set_number` migration**: old projects may have global config rows with `set_number=NULL`. `get_config_sets_organized()` migrates these to `set_number=1` on first call. Subsequent code always uses `set_number=1` for global config.
+
+10. **`job.config_category` / `job.config_set_number`**: these are `@property` fields that go through the `workflow_step` relationship. The relationship must be loaded (it is in normal worker flow, since `get_next_job_for_step` does a join). Do not access them on bare Job objects constructed without a session.
