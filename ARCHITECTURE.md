@@ -51,7 +51,9 @@ msnoise/
                          # reset_jobs, build_ref_datelist, get_lineages_to_step_id,
                          # _get_or_create_lineage_id, create_workflow_steps_from_config_sets,
                          # create_workflow_links_from_steps, get_t_axis,
-                         # get_filter_steps_for_cc_step, get_refstack_lineage_for_filter
+                         # get_filter_steps_for_cc_step, get_refstack_lineage_for_filter,
+                         # refstack_is_rolling, refstack_needs_recompute, extend_days,
+                         # compute_rolling_ref
     signal.py            # winsorizing, stack, xwt, compute_wct_dtt, get_wct_avgcoh,
                          # preload_instrument_responses, save_preprocessed_streams,
                          # get_preprocessed_stream, make_same_length, validate_stack_data
@@ -223,23 +225,22 @@ This mirrors the old `stack -m` (daily) + `stack -r` (occasional) workflow witho
 
 ## 7. The REF Sentinel — When It Computes vs Skips
 
-`s04_stack_refstack` checks on every REF job:
+`s04_stack_refstack` checks on every REF job using `refstack_needs_recompute()` from `core/workflow.py`:
 
 ```python
-ref_start, ref_end, _ = build_ref_datelist(params, db)
-done_stack_days = query all Done stack days for this pair
-any_in_window = any(ref_start <= day <= ref_end for day in done_stack_days)
+if not refstack_is_rolling(params):
+    if not refstack_needs_recompute(db, pair, batch["lineage_names_upstream"], params):
+        # No Done stack days fall inside ref_begin..ref_end window.
+        # Reference unchanged — mark Done without recomputation.
+        mark_done(); propagate_downstream(); continue
 
-if not any_in_window:
-    # New data outside ref window — reference unchanged
-    # Mark REF Done without computing. MWCS jobs already waiting.
-    mark_done(); propagate_downstream(); continue
-
-# New data inside window — recompute reference
+# New data inside window (or rolling mode) — recompute reference
 compute_ref_stack(); write_ref_file(); mark_done(); propagate_downstream()
 ```
 
-**Mode B (rolling ref)**: `ref_begin` is a negative integer (e.g. `"-5"` = last 5 days). No REF file written; reference computed on-the-fly in MWCS/stretching/WCT. REF job still exists as synchronization point but is always fast (no file I/O).
+`refstack_needs_recompute(session, pair, lineage_names_upstream, params)` lives in `core/workflow.py`. It queries Done stack jobs for the pair, resolves their lineage, and returns `True` if any date falls inside `[ref_begin, ref_end]`. It uses `declare_tables()` internally (not the module-level `WorkflowStep`) so it is session-safe.
+
+**Mode B (rolling ref)**: `ref_begin` is a negative integer (e.g. `"-5"` = last 5 days). No REF file written; reference computed on-the-fly in MWCS/stretching/WCT. The Mode B path marks Done and calls `propagate_downstream` immediately (in `hpc=False`) — downstream MWCS/stretching/wavelet jobs are created inline, not via `new_jobs --after refstack`.
 
 ---
 
