@@ -657,3 +657,37 @@ def get_waveform_path(session, da):
     root = ds.uri if ds and ds.uri else ""
     return os.path.join(root, da.path, da.file) if root else os.path.join(da.path, da.file)
 
+
+def read_waveforms_from_availability(session, da_records, t_start, t_end, logger=None):
+    """Read waveforms from a list of DataAvailability records into a Stream.
+
+    Builds the full path for each record via :func:`get_waveform_path`
+    (honouring the DataSource root), deduplicates paths, and reads each file
+    sliced to ``[t_start, t_end]`` using ObsPy.  Files that cannot be read
+    are silently skipped with a debug log.
+
+    This is the canonical "DA records → waveform Stream" helper that any
+    worker (PSD, future steps) should use instead of hand-rolling
+    ``os.path.join(f.path, f.file)``.
+
+    :param session: SQLAlchemy session.
+    :param da_records: Iterable of DataAvailability ORM objects.
+    :param t_start: :class:`~obspy.core.utcdatetime.UTCDateTime` start.
+    :param t_end: :class:`~obspy.core.utcdatetime.UTCDateTime` end.
+    :param logger: Optional :class:`logging.Logger`; uses module logger if None.
+    :returns: :class:`~obspy.core.stream.Stream` (may be empty).
+    """
+    import logging as _logging
+    import obspy as _obspy
+
+    _log = logger or _logging.getLogger("msnoise.stations")
+
+    paths = list(dict.fromkeys(get_waveform_path(session, da) for da in da_records))
+    st = _obspy.Stream()
+    for fpath in paths:
+        try:
+            st += _obspy.read(fpath, starttime=t_start, endtime=t_end)
+        except Exception as exc:
+            _log.debug(f"Could not read {fpath}: {exc}")
+    return st
+

@@ -145,6 +145,88 @@ def fetch_waveforms_bulk(client, bulk_request, retries=3):
 # High-level: fetch + optional raw cache + per-station result
 # ---------------------------------------------------------------------------
 
+def fetch_raw_waveforms(db, jobs, goal_day, params, t_start=None, t_end=None):
+    """Fetch raw (unprocessed) waveforms from FDSN/EIDA for a batch of stations.
+
+    Issues one ``get_waveforms_bulk`` call covering all stations in *jobs*,
+    optionally writes a raw file cache (``fdsn_keep_raw=Y``), and returns
+    the combined :class:`~obspy.core.stream.Stream`.  No preprocessing is
+    applied — the caller receives exactly what the FDSN server returns.
+
+    Use this when downstream processing needs raw data (e.g. PSD computation
+    via ObsPy PPSD, which handles its own response correction internally).
+    For pre-processing + response removal use :func:`fetch_and_preprocess`.
+
+    :param db: SQLAlchemy session.
+    :param jobs: List of Job ORM objects (all same DataSource).
+    :param goal_day: Date string ``YYYY-MM-DD``.
+    :param params: :class:`~msnoise.params.LayeredParams` for this lineage.
+    :param t_start: Optional :class:`~obspy.core.utcdatetime.UTCDateTime`
+        override for the fetch window start (default: midnight of *goal_day*).
+    :param t_end: Optional :class:`~obspy.core.utcdatetime.UTCDateTime`
+        override for the fetch window end (default: midnight + 86400 s).
+    :returns: :class:`~obspy.core.stream.Stream` (may be empty on failure).
+    """
+    from obspy import UTCDateTime, Stream
+    from obspy.clients.fdsn.header import FDSNNoDataException
+    from .stations import resolve_data_source, get_station
+
+    log = logging.getLogger("msnoise.fdsn.fetch_raw")
+
+    first_job = jobs[0]
+    net0, sta0, _ = first_job.pair.split(".")
+    ds = resolve_data_source(db, get_station(db, net0, sta0))
+
+    fdsn_keep_raw = params.global_.fdsn_keep_raw
+    retries       = int(params.global_.fdsn_retries or 3)
+    output_folder = params.global_.output_folder
+    step_name     = getattr(params, "step_name", goal_day)
+
+    t1 = t_start if t_start is not None else UTCDateTime(goal_day)
+    t2 = t_end   if t_end   is not None else t1 + 86400
+
+    # Build bulk request from station channel info
+    bulk = []
+    for job in jobs:
+        net, sta, loc = job.pair.split(".")
+        fdsn_loc = "" if loc == "--" else loc
+        station_obj = get_station(db, net, sta)
+        chans = station_obj.chans() if station_obj and station_obj.chans() else []
+        if chans:
+            for chan in chans:
+                bulk.append((net, sta, fdsn_loc, chan, t1, t2))
+        else:
+            # Fallback: wildcard per station
+            bulk.append((net, sta, fdsn_loc, "*", t1, t2))
+
+    log.info(
+        f"FDSN raw fetch: {len(jobs)} station(s), {len(bulk)} channel(s), "
+        f"day={goal_day}, source={ds.name!r}, window={t1}–{t2}"
+    )
+
+    try:
+        client = build_client(ds)
+        raw_stream = fetch_waveforms_bulk(client, bulk, retries=retries)
+    except FDSNNoDataException:
+        log.warning(f"No data from {ds.name!r} for {goal_day}")
+        return Stream()
+    except Exception as exc:
+        if "401" in str(exc) or "403" in str(exc) or "Unauthorized" in str(exc):
+            log.error(
+                f"Auth failure for DataSource {ds.name!r}. "
+                f"Check {ds.auth_env}_FDSN_USER / {ds.auth_env}_FDSN_TOKEN. "
+                f"Error: {exc}"
+            )
+        else:
+            log.error(f"FDSN raw fetch failed for {ds.name!r} on {goal_day}: {exc}")
+        return Stream()
+
+    if fdsn_keep_raw in ("Y", "y", True):
+        _write_raw_cache(raw_stream, output_folder, step_name, goal_day)
+
+    return raw_stream
+
+
 def fetch_and_preprocess(
     db, jobs, goal_day, params, responses=None, loglevel="INFO"
 ):
@@ -165,73 +247,22 @@ def fetch_and_preprocess(
         preprocessed traces for all successfully fetched stations.
     """
     from obspy import UTCDateTime, Stream
-    from obspy.clients.fdsn.header import FDSNNoDataException
-    from .stations import resolve_data_source, get_station
     from ..preprocessing import apply_preprocessing_to_stream
 
     log = logging.getLogger("msnoise.fdsn.fetch")
 
-    # Resolve DataSource from first job (all share same data_source_id in batch)
-    first_job = jobs[0]
-    net0, sta0, loc0 = first_job.pair.split(".")
-    station0 = get_station(db, net0, sta0)
-    ds = resolve_data_source(db, station0)
-
-    fdsn_keep_raw = params.global_.fdsn_keep_raw
-    retries       = int(params.global_.fdsn_retries or 3)
-    min_coverage  = float(params.global_.fdsn_min_coverage or 0.5)
-    output_folder = params.global_.output_folder
-    step_name     = params.step_name
-
+    min_coverage = float(params.global_.fdsn_min_coverage or 0.5)
     t1 = UTCDateTime(goal_day)
     t2 = t1 + 86400
 
-    # Build bulk request: one entry per (net, sta, loc, chan) per component
-    raw = params.preprocess.preprocess_components
-    comps = raw.split(',') if isinstance(raw, str) else (list(raw) if raw else ['Z'])
+    # Delegate the actual FDSN fetch (+ optional raw cache) to fetch_raw_waveforms
+    raw_stream = fetch_raw_waveforms(db, jobs, goal_day, params, t_start=t1, t_end=t2)
 
-    bulk = []
-    station_map = {}  # "NET.STA.LOC" → Job
-    for job in jobs:
-        net, sta, loc = job.pair.split(".")
-        station_map[job.pair] = job
-        # FDSN uses "" for empty location; MSNoise stores "--" as the placeholder
-        fdsn_loc = "" if loc == "--" else loc
-        # Use the station's configured channel names — no wildcards, no guessing
-        station_obj = get_station(db, net, sta)
-        chans = station_obj.chans() if station_obj and station_obj.chans() else []
-        if chans:
-            for chan in chans:
-                bulk.append((net, sta, fdsn_loc, chan, t1, t2))
-        else:
-            # Fallback: request all channels for the configured components
-            for comp in comps:
-                bulk.append((net, sta, fdsn_loc, f"*{comp}", t1, t2))
-
-    log.info(f"FDSN bulk fetch: {len(jobs)} stations, {len(bulk)} channels, "
-             f"day={goal_day}, source={ds.name!r}")
-
-    # Build client and fetch
-    try:
-        client = build_client(ds)
-        raw_stream = fetch_waveforms_bulk(client, bulk, retries=retries)
-    except FDSNNoDataException:
-        log.warning(f"No data available from {ds.name!r} for {goal_day} — marking all jobs Failed")
-        return Stream(), [], jobs
-    except Exception as exc:
-        if "401" in str(exc) or "403" in str(exc) or "Unauthorized" in str(exc):
-            log.error(
-                f"Auth failure for DataSource {ds.name!r}. "
-                f"Check {ds.auth_env}_FDSN_USER / {ds.auth_env}_FDSN_TOKEN. "
-                f"Error: {exc}"
-            )
-        else:
-            log.error(f"FDSN fetch failed for {ds.name!r} on {goal_day}: {exc}")
+    if not raw_stream:
         return Stream(), [], jobs
 
-    # Optionally write raw cache
-    if fdsn_keep_raw in ("Y", "y", True):
-        _write_raw_cache(raw_stream, output_folder, step_name, goal_day)
+    # Build station_map for splitting the combined stream per job
+    station_map = {job.pair: job for job in jobs}
 
     # Split by station, check coverage, apply preprocessing
     done_jobs, failed_jobs = [], []
@@ -239,7 +270,6 @@ def fetch_and_preprocess(
 
     for sid, job in station_map.items():
         net, sta, loc = sid.split(".")
-        # FDSN returns "" for empty location; MSNoise stores "--"
         fdsn_loc = "" if loc == "--" else loc
         sta_stream = raw_stream.select(network=net, station=sta, location=fdsn_loc)
         # Normalise "" → "--" in the fetched stream to match MSNoise convention

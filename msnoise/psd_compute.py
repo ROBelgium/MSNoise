@@ -41,7 +41,6 @@ Parallel execution:
 .. versionadded:: 2.0
 """
 
-import datetime
 import os
 import time
 import traceback
@@ -49,12 +48,12 @@ import traceback
 import matplotlib
 matplotlib.use("Agg")
 import numpy as np
-from obspy import Stream
 from obspy.core import UTCDateTime
 from obspy.signal import PPSD
 
 from .core.db import connect, get_logger
-from .core.stations import get_data_availability
+from .core.stations import get_data_availability, get_station, resolve_data_source, read_waveforms_from_availability
+from .core.fdsn import is_remote_source, fetch_raw_waveforms
 from .core.workflow import get_next_lineage_batch, is_next_job_for_step, massive_update_job, propagate_downstream
 from .core.signal import preload_instrument_responses, to_sds
 from .core.io import psd_ppsd_to_dataset, xr_save_psd
@@ -67,7 +66,6 @@ def main(loglevel="INFO", njobs_per_worker=9999):
     logger.info("*** Starting: Compute PSD ***")
 
     db = connect()
-    # Always load the response, they are needed for the PSD calculations
     responses = preload_instrument_responses(db, return_format="inventory")
 
     while is_next_job_for_step(db, step_category=CATEGORY):
@@ -93,72 +91,86 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         db_bins        = params.psd.psd_ppsd_db_bins
 
         # PSD is a root step (global → psd); there is no upstream lineage.
-        # xr_save_psd / xr_load_psd use `lineage=[]` so files land at:
-        #   <output_folder>/<step_name>/_output/daily/<seed_id>/<day>.nc
-        # The batch lineage_names (e.g. ['global_1', 'psd_1']) includes
-        # the global step which is not a real output folder — using [] is
-        # consistent with how psd_compute_rms.py reads these files.
         lineage = []
+
+        # ── Detect DataSource from the first job's station (all jobs in a
+        # day_lineage batch share the same station/datasource) ────────────────
+        first_net, first_sta, _ = jobs[0].pair.split(".")
+        first_station = get_station(db, first_net, first_sta)
+        ds = resolve_data_source(db, first_station)
+        remote = is_remote_source(ds.uri)
 
         done_jobs   = []
         failed_jobs = []
 
         for job in jobs:
             net, sta, loc = job.pair.split(".")
+            loc_clean = "" if loc == "--" else loc
             logger.debug(f"Processing {job.pair} {job.day}")
-            gd = UTCDateTime(job.day).datetime
-            # TODO ADAPT FOR DATASOURCE ! at least prepend source's folder
-            files = get_data_availability(
-                db,
-                net=net, sta=sta, loc=loc,
-                starttime=(UTCDateTime(job.day) - 1.5 * ppsd_length).datetime,
-                endtime=gd,
-            )
-            if not files:
-                logger.warning(f"No files found for {job.pair} {job.day} — marking Failed")
+
+            t_start = UTCDateTime(job.day) - 1.5 * ppsd_length
+            t_end   = UTCDateTime(job.day) + 86400
+            gd      = UTCDateTime(job.day).datetime
+
+            # ── Acquire raw waveforms ────────────────────────────────────────
+            if remote:
+                st = fetch_raw_waveforms(
+                    db, [job], job.day, params,
+                    t_start=t_start, t_end=t_end,
+                )
+                if not st:
+                    logger.warning(
+                        f"No FDSN data for {job.pair} {job.day} — marking Failed"
+                    )
+                    failed_jobs.append(job)
+                    continue
+                # Normalise "" location → "--"
+                for tr in st:
+                    if tr.stats.location == "":
+                        tr.stats.location = "--"
+            else:
+                da_records = get_data_availability(
+                    db,
+                    net=net, sta=sta, loc=loc_clean,
+                    starttime=t_start.datetime,
+                    endtime=gd,
+                )
+                if not da_records:
+                    logger.warning(
+                        f"No files in DataAvailability for {job.pair} {job.day} "
+                        f"— marking Failed"
+                    )
+                    failed_jobs.append(job)
+                    continue
+                st = read_waveforms_from_availability(
+                    db, da_records, t_start, t_end, logger=logger
+                )
+                if not st:
+                    logger.warning(
+                        f"Could not read any waveforms for {job.pair} {job.day} "
+                        f"— marking Failed"
+                    )
+                    failed_jobs.append(job)
+                    continue
+
+            # ── Normalise and merge ──────────────────────────────────────────
+            try:
+                st.merge()
+            except Exception:
+                logger.warning(f"Stream merge failed for {job.pair} {job.day}:")
+                traceback.print_exc()
                 failed_jobs.append(job)
                 continue
 
+            st = st.split()
+            for tr in st:
+                tr.stats.network = tr.stats.network.upper()
+                tr.stats.station = tr.stats.station.upper()
+                tr.stats.channel = tr.stats.channel.upper()
+
+            # ── Per-component PPSD ───────────────────────────────────────────
             job_failed = False
             for comp in psd_components:
-                toprocess = [
-                    os.path.join(f.path, f.file)
-                    for f in files
-                    if f.chan[-1] == comp
-                ]
-                if not toprocess:
-                    continue
-
-                st = Stream()
-                for fpath in np.unique(toprocess):
-                    logger.debug(f"Reading {fpath}")
-                    try:
-                        st += __import__("obspy").read(
-                            fpath,
-                            starttime=UTCDateTime(gd) - 1.5 * ppsd_length,
-                            endtime=UTCDateTime(
-                                gd + datetime.timedelta(days=1)
-                            ) - 0.001,
-                        )
-                    except Exception:
-                        logger.debug(f"Problem loading {fpath}")
-
-                if not st:
-                    continue
-
-                try:
-                    st.merge()
-                except Exception:
-                    logger.warning("Failed merging streams:")
-                    traceback.print_exc()
-                    continue
-
-                st = st.split()
-                for tr in st:
-                    tr.stats.network = tr.stats.network.upper()
-                    tr.stats.station = tr.stats.station.upper()
-                    tr.stats.channel = tr.stats.channel.upper()
-
                 sel = st.select(component=comp)
                 if not sel:
                     continue
@@ -182,26 +194,23 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                     continue
 
                 if not ppsd.times_processed:
-                    logger.debug(
-                        f"No PPSD windows for {job.pair} {comp} {job.day}"
-                    )
+                    logger.debug(f"No PPSD windows for {job.pair} {comp} {job.day}")
                     del ppsd
                     continue
 
-                ds = psd_ppsd_to_dataset(ppsd)
+                ds_nc = psd_ppsd_to_dataset(ppsd)
                 seed_id = (f"{tr.stats.network}.{tr.stats.station}"
                            f".{tr.stats.location}.{tr.stats.channel}")
 
                 try:
                     xr_save_psd(output_folder, lineage, step_name,
-                                seed_id, job.day, ds)
+                                seed_id, job.day, ds_nc)
                     logger.debug(f"Saved PSD NC for {seed_id} {job.day}")
                 except Exception:
                     logger.error(f"Failed saving PSD NC for {seed_id} {job.day}")
                     traceback.print_exc()
                     job_failed = True
 
-                # Optional PNG — path anchored under output_folder
                 try:
                     out = to_sds(tr.stats, gd.year, int(gd.strftime("%j")))
                     pngout = os.path.join(output_folder, "PSD", "PNG", out)
@@ -217,7 +226,6 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             else:
                 done_jobs.append(job)
 
-        # Batch-update all job flags in two calls instead of N commits
         if done_jobs:
             massive_update_job(db, done_jobs, "D")
             logger.debug(f"Marked {len(done_jobs)} PSD job(s) Done")
