@@ -57,6 +57,8 @@ def main(loglevel="INFO", njobs_per_worker=9999):
 
         first_job = jobs[0]
         net, sta, loc = first_job.pair.split(".")
+        if loc == "--":
+            loc = ""
 
         # Resolve lineage string from FK (safe after session.commit expiry)
         from .core.workflow import _lineage_str_from_id
