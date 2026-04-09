@@ -46,7 +46,7 @@ import numpy as np
 import pandas as pd
 
 from .core.db import connect, get_logger
-from .core.workflow import (get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, refstack_is_rolling)
+from .core.workflow import (build_ref_datelist, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, refstack_is_rolling, refstack_needs_recompute)
 from .core.signal import validate_stack_data
 from .core.io import xr_load_ccf_for_stack, xr_save_ref
 from .wiener import wiener_filt
@@ -109,42 +109,7 @@ def main(loglevel="INFO"):
         # mwcs/stretching/wavelet T jobs were already created by
         # propagate_downstream (stack category) so they can start right away.
         if not refstack_is_rolling(params):
-            from .core.workflow import build_ref_datelist
-            import datetime as _dt
-            _ref_start, _ref_end, _ = build_ref_datelist(params, db)
-            from .msnoise_table_def import declare_tables as _dts
-            _schemars = _dts()
-            _Job = _schemars.Job
-            _stack_step_id = jobs[0].step_id  # the refstack job's step
-            # Find the corresponding stack step (parent of refstack in lineage)
-            _stack_lineage_names = batch["lineage_names_upstream"]  # ends at stack_N
-            _stack_step_name = _stack_lineage_names[-1] if _stack_lineage_names else None
-            from .msnoise_table_def import WorkflowStep as _WFStep
-            _stack_step = db.query(_WFStep).filter(
-                _WFStep.step_name == _stack_step_name).first() if _stack_step_name else None
-            _in_window = False
-            if _stack_step is not None:
-                from .core.workflow import _lineage_id_for
-                _stack_lin_id = _lineage_id_for(db, "/".join(_stack_lineage_names))
-                _done_days = (
-                    db.query(_Job.day)
-                    .filter(_Job.step_id == _stack_step.step_id)
-                    .filter(_Job.pair == pair)
-                    .filter(_Job.flag == "D")
-                    .filter(_Job.day != "REF")
-                    .filter(_Job.lineage_id == _stack_lin_id)
-                    .all()
-                )
-                for (_day_str,) in _done_days:
-                    try:
-                        _day = _dt.datetime.strptime(_day_str, "%Y-%m-%d").date()
-                    except ValueError:
-                        continue
-                    if _ref_start <= _day <= _ref_end:
-                        _in_window = True
-                        break
-
-            if not _in_window:
+            if not refstack_needs_recompute(db, pair, batch["lineage_names_upstream"], params):
                 logger.info(
                     f"REF skip for {pair}: no Done stack days fall inside "
                     f"ref_begin={params.refstack.ref_begin} .. "

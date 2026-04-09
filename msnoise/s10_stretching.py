@@ -69,7 +69,7 @@ could occur with SQLite.
 
 from .core.db import connect, get_logger
 from .core.stations import get_interstation_distance, get_station
-from .core.workflow import (compute_rolling_ref, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, refstack_is_rolling)
+from .core.workflow import (compute_rolling_ref, extend_days, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, refstack_is_rolling)
 from .core.io import xr_get_ccf, xr_get_ref, xr_save_stretching
 
 import time
@@ -241,7 +241,7 @@ def main(loglevel="INFO"):
                     continue
                 logger.debug("Processing %s:%s m%s %s" % (station1, station2, mov_stack, components))
 
-                to_search = pd.to_datetime(days)
+                to_search = extend_days(days)
                 data = data[data.index.floor('d').isin(to_search)]
                 data = data.dropna()
 

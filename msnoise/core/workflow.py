@@ -1534,6 +1534,69 @@ def refstack_is_rolling(params):
 
 
 
+def refstack_needs_recompute(session, pair, lineage_names_upstream, params):
+    """Return True if the REF stack needs to be recomputed for this pair.
+
+    Queries the Done ``stack`` jobs for *pair* and checks whether any of their
+    dates fall inside the configured ``[ref_begin, ref_end]`` window.  If no
+    Done stack day falls inside the window, the reference waveform is unaffected
+    by the new data and the refstack step can skip recomputation.
+
+    Should only be called for Mode A (fixed-date) refstack jobs — always returns
+    True for rolling mode (though the caller should not reach this path then).
+
+    :param session: SQLAlchemy session.
+    :param pair: Station pair string ``"NET.STA.LOC:NET.STA.LOC"``.
+    :param lineage_names_upstream: Lineage name list ending with the stack step
+        name (i.e. ``batch["lineage_names_upstream"]``).
+    :param params: :class:`~msnoise.params.LayeredParams` for this lineage.
+    :rtype: bool
+    """
+    import datetime as _dt
+    from ..msnoise_table_def import declare_tables
+
+    ref_start, ref_end, _ = build_ref_datelist(params, session)
+
+    schema = declare_tables()
+    Job = schema.Job
+    WorkflowStep = schema.WorkflowStep
+
+    stack_step_name = lineage_names_upstream[-1] if lineage_names_upstream else None
+    if not stack_step_name:
+        return True  # can't determine — assume recompute needed
+
+    stack_step = (
+        session.query(WorkflowStep)
+        .filter(WorkflowStep.step_name == stack_step_name)
+        .first()
+    )
+    if stack_step is None:
+        return True
+
+    stack_lin_id = _lineage_id_for(session, "/".join(lineage_names_upstream))
+
+    done_days = (
+        session.query(Job.day)
+        .filter(Job.step_id == stack_step.step_id)
+        .filter(Job.pair == pair)
+        .filter(Job.flag == "D")
+        .filter(Job.day != "REF")
+        .filter(Job.lineage_id == stack_lin_id)
+        .all()
+    )
+
+    for (day_str,) in done_days:
+        try:
+            day = _dt.datetime.strptime(day_str, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if ref_start <= day <= ref_end:
+            return True
+
+    return False
+
+
+
 def compute_rolling_ref(data, ref_begin, ref_end):
     """Compute a per-index rolling reference from CCF data.
 
