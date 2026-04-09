@@ -44,7 +44,8 @@ The following parameters (modifiable via ```msnoise admin```) are used for
 this step:
 
 * |components_to_compute|
-* |components_to_compute_single_station|  | * |cc_sampling_rate|
+* |components_to_compute_single_station|
+* |cc_sampling_rate|
 * |overlap|
 * |maxlag|
 * |corr_duration|
@@ -55,12 +56,18 @@ this step:
 * |response_prefilt|
 * |preprocess_lowpass|
 * |preprocess_highpass|
-* |preprocess_max_gap|  | * |preprocess_taper_length|  | * |keep_all|
+* |preprocess_max_gap|
+* |preprocess_taper_length|
+* |keep_all|
 * |keep_days|
 * |stack_method|
 * |pws_timegate|
 * |pws_power|
-* |whitening|  | * |whitening_type|  | * |hpc| | .. automodule:: msnoise.preprocessing
+* |whitening|
+* |whitening_type|
+* |hpc|
+
+.. automodule:: msnoise.preprocessing
 
 Computing the Cross-Correlations
 --------------------------------
