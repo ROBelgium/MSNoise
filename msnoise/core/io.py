@@ -137,7 +137,7 @@ def _xr_create_or_open(fn, taxis=[], name="CCF"):
 
 
 def _xr_insert_or_update(dataset, new):
-    tt = new.merge(dataset, compat='override', combine_attrs="drop_conflicts")
+    tt = new.merge(dataset, compat='override', combine_attrs="drop_conflicts", join='outer')
     return tt.combine_first(dataset)
 
 

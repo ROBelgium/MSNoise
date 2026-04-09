@@ -7,8 +7,7 @@ import datetime
 from collections import namedtuple
 from sqlalchemy import Column, Integer, String, Float, Boolean, \
     DateTime, Text, ForeignKey, UniqueConstraint, Index, Enum, REAL, TIMESTAMP, CheckConstraint
-from sqlalchemy.ext.declarative import declarative_base, declared_attr
-from sqlalchemy.orm import relationship, backref  # noqa: F401
+from sqlalchemy.orm import declarative_base, declared_attr, relationship, backref  # noqa: F401
 from sqlalchemy.sql import text
 # from .api import read_prefix
 
