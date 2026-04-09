@@ -664,3 +664,116 @@ def psd_df_rms(d, freqs, output="VEL"):
             damp = vamp / w2f ** 2
             RMS[f"{fmin:.1f}-{fmax:.1f}"] = damp.apply(lambda a: np.sqrt(np.trapezoid(a.values, a.index)), axis=1)
     return pd.DataFrame(RMS, index=d.index)
+
+def make_same_length(st):
+    """
+    This function takes a stream of equal sampling rate and makes sure that all
+    channels have the same length and the same gaps.
+    """
+    warnings.warn("make_same_length() is deprecated and will be removed in a future MSNoise release.", DeprecationWarning, stacklevel=2)
+    from obspy import Stream
+    # Merge traces
+    st.merge()
+
+    # Initialize arrays to be filled with start+endtimes of all traces
+    starttimes = []
+    endtimes = []
+
+    # Loop over all traces of the stream
+    for tr in st:
+        # Force conversion to masked arrays
+        if not np.ma.count_masked(tr.data):
+            tr.data = np.ma.array(tr.data, mask=False)
+        # Read out start+endtimes of traces to trim
+        starttimes.append(tr.stats.starttime)
+        endtimes.append(tr.stats.endtime)
+
+    # trim stream to common starttimes
+    if max(starttimes) >= min(endtimes):
+        return Stream()
+    st.trim(max(starttimes), min(endtimes))
+
+    # get the mask of all traces, i.e. the parts where at least one trace has
+    # a gap
+
+    if len(st) < 2:
+        return st
+
+    masks=[]
+    for tr in st:
+        masks.append(tr.data.mask)
+    mask =  np.any(masks,axis=0)
+
+    # apply the mask to all traces
+    for tr in st:
+        tr.data.mask = mask
+
+    st = st.split()
+    return st
+
+# ============================================================
+
+
+def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
+          goal_sampling_rate=20.0):
+    """
+    :type data: :class:`numpy.ndarray`
+    :param data: the data to stack, each row being one CCF
+    :type stack_method: str
+    :param stack_method: either ``linear``: average of all CCF or ``pws`` to
+        compute the phase weigthed stack. If ``pws`` is selected,
+        the function expects the ``pws_timegate`` and ``pws_power``.
+    :type pws_timegate: float
+    :param pws_timegate: PWS time gate in seconds. Width of the smoothing
+         window to convolve with the PWS spectrum.
+    :type pws_power: float
+    :param pws_power: Power of the PWS weights to be applied to the CCF stack.
+    :type goal_sampling_rate: float
+    :param goal_sampling_rate: Sampling rate of the CCF array submitted
+    :rtype: :class:`numpy.array`
+    :return: the stacked CCF.
+    """
+    if len(data) == 0:
+        logging.debug("No data to stack.")
+        return []
+    data = data[~np.isnan(data).any(axis=1)]
+    sanitize = False
+    # TODO clean sanitize function, add param to config and make sure not to
+    # kill the data[i] if all data are corrcoeff >0.9 (either very stable
+    # corr or autocorr, then this sanitize should not occur.
+    if len(data) != 1 and sanitize:
+        threshold = 0.99
+        corr = data.mean(axis=0)
+        corrcoefs = np.array([np.corrcoef(di, corr)[1][0] for di in data])
+        toolarge = np.where(corrcoefs >= threshold)[0]
+        if len(toolarge):
+            data = data[np.where(corrcoefs <= threshold)[0]]
+
+    if len(data) == 0:
+        return []
+    if stack_method == "linear":
+        # logging.debug("Doing a linear stack")
+        corr = data.mean(axis=0)
+
+    elif stack_method == "pws":
+        import scipy.signal as ss
+        # logging.debug("Doing a PWS stack")
+        corr = np.zeros(data.shape[1], dtype='f8')
+        phasestack = np.zeros(data.shape[1], dtype='c8')
+        for i in range(data.shape[0]):
+            data[i] -= data[i].mean()
+        for c in data:
+            phase = np.angle(ss.hilbert(c))
+            phasestack.real += np.cos(phase)
+            phasestack.imag += np.sin(phase)
+        coh = 1. / data.shape[0] * np.abs(phasestack)
+
+        timegate_samples = int(pws_timegate * goal_sampling_rate)
+        coh = np.convolve(ss.windows.boxcar(timegate_samples) /
+                          timegate_samples, coh, 'same')
+        coh = np.power(coh, pws_power)
+        for c in data:
+            corr += c * coh
+        corr /= data.shape[0]
+
+    return corr

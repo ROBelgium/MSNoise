@@ -107,7 +107,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             net, sta, loc = job.pair.split(".")
             logger.debug(f"Processing {job.pair} {job.day}")
             gd = UTCDateTime(job.day).datetime
-
+            # TODO ADAPT FOR DATASOURCE ! at least prepend source's folder
             files = get_data_availability(
                 db,
                 net=net, sta=sta, loc=loc,
