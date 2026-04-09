@@ -67,7 +67,8 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         if loc == "--":
             loc = ""
 
-        # lineage_names_upstream ends with the upstream psd_N step name.
+        # With the corrected lineage "psd_1/psd_rms_1", lineage_names_upstream
+        # is ["psd_1"] — i.e. it correctly ends with the upstream psd step name.
         # PSD NC files are written by psd_compute.py with lineage=[], so
         # we pass psd_lineage=[] to xr_load_psd.  The psd step name is
         # the last element of lineage_names_upstream (e.g. "psd_1").
