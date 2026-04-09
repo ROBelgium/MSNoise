@@ -36,7 +36,7 @@ def main(loglevel="INFO"):
 
     while is_next_job_for_step(db, step_category=CATEGORY):
         batch = get_next_lineage_batch(db, step_category=CATEGORY,
-                                       group_by="day", loglevel=loglevel)
+                                       group_by="day_lineage", loglevel=loglevel)
         if batch is None:
             time.sleep(np.random.random())
             continue

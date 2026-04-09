@@ -62,7 +62,7 @@ from obspy.signal import PPSD
 
 from .core.db import connect, get_logger
 from .core.stations import get_data_availability
-from .core.workflow import get_next_lineage_batch, is_next_job_for_step, massive_update_job
+from .core.workflow import get_next_lineage_batch, is_next_job_for_step, massive_update_job, propagate_downstream
 from .core.signal import preload_instrument_responses, to_sds
 from .core.io import psd_ppsd_to_dataset, xr_save_psd
 
@@ -79,7 +79,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
 
     while is_next_job_for_step(db, step_category=CATEGORY):
         batch = get_next_lineage_batch(db, step_category=CATEGORY,
-                                       group_by="day", loglevel=loglevel)
+                                       group_by="day_lineage", loglevel=loglevel)
         if batch is None:
             time.sleep(np.random.random())
             continue
@@ -231,5 +231,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
         if failed_jobs:
             massive_update_job(db, failed_jobs, "F")
             logger.warning(f"Marked {len(failed_jobs)} PSD job(s) Failed")
+        if done_jobs and not params.global_.hpc:
+            propagate_downstream(db, batch)
 
     logger.info("*** Finished: Compute PSD ***")

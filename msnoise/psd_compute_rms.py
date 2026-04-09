@@ -14,70 +14,84 @@ psd_rms_frequency_ranges).
 
 .. versionchanged:: 2.1
     NC output replaces CSV.  Output path is now hierarchically below psd.
+.. versionchanged:: 2.3
+    Migrated from get_next_job_for_step to the canonical get_next_lineage_batch
+    worker loop, consistent with all other worker scripts.  output_folder and
+    step config are now sourced from the LayeredParams object returned by
+    get_next_lineage_batch instead of raw get_config / get_config_set_details
+    calls.
 """
 
+import time
 import traceback
+
+import numpy as np
 import pandas as pd
 
 from .core.db import connect, get_logger
-from .core.config import get_config, get_config_set_details
 from .core.stations import get_station
-from .core.workflow import get_next_job_for_step, is_next_job_for_step, massive_update_job
+from .core.workflow import get_next_lineage_batch, is_next_job_for_step, massive_update_job
 from .core.io import psd_df_rms, xr_load_psd, xr_save_rms
+
+CATEGORY = "psd_rms"
 
 
 def main(loglevel="INFO", njobs_per_worker=9999):
-    logger = get_logger("msnoise.psd_compute_rms", loglevel, with_pid=True)
+    logger = get_logger(f"msnoise.{CATEGORY}", loglevel, with_pid=True)
     logger.info("*** Starting: Compute PSD RMS ***")
 
     db = connect()
-    output_folder = get_config(db, "output_folder") or "OUTPUT"
 
-    while is_next_job_for_step(db, step_category="psd_rms"):
+    while is_next_job_for_step(db, step_category=CATEGORY):
         logger.debug("Getting the next batch")
-        result = get_next_job_for_step(
-            db, step_category="psd_rms", group_by="pair_lineage"
+        batch = get_next_lineage_batch(
+            db, step_category=CATEGORY, group_by="pair_lineage",
+            loglevel=loglevel,
         )
-
-        if result is None:
-            break
-        jobs, step = result
-        if not jobs:
+        if batch is None:
+            time.sleep(np.random.random())
             continue
 
-        step_config = get_config_set_details(
-            db,
-            jobs[0].config_category,
-            jobs[0].config_set_number,
-            format="AttribDict",
-        )
+        jobs   = batch["jobs"]
+        step   = batch["step"]
+        params = batch["params"]
 
-        rms_freq_ranges = step_config.psd_rms_frequency_ranges
-        rms_type        = step_config.psd_rms_type
+        output_folder = params.global_.output_folder
+        step_name     = step.step_name
+
+        rms_freq_ranges = params.psd_rms.psd_rms_frequency_ranges
+        rms_type        = params.psd_rms.psd_rms_type
 
         first_job = jobs[0]
         net, sta, loc = first_job.pair.split(".")
         if loc == "--":
             loc = ""
 
-        # Resolve lineage string from FK (safe after session.commit expiry)
-        from .core.workflow import _lineage_str_from_id
-        _psd_lineage_str = _lineage_str_from_id(db, first_job.lineage_id)
-        psd_step_name = _psd_lineage_str or "psd_1"
-        lineage       = [psd_step_name]
-        step_name     = step.step_name
+        # lineage_names_upstream ends with the upstream psd_N step name.
+        # PSD NC files are written by psd_compute.py with lineage=[], so
+        # we pass psd_lineage=[] to xr_load_psd.  The psd step name is
+        # the last element of lineage_names_upstream (e.g. "psd_1").
+        lineage_upstream = batch["lineage_names_upstream"]
+        psd_step_name    = lineage_upstream[-1] if lineage_upstream else "psd_1"
+        psd_lineage      = []   # PSD files live directly under output_folder/<step_name>/
 
-        # PSD NC files have no lineage above psd
-        psd_lineage = []
+        # RMS files live one level higher: output_folder/psd_1/psd_rms_1/_output/
+        rms_lineage = [psd_step_name]
 
         station = get_station(db, net, sta)
-        if hasattr(step_config, "psd_components"):
+        psd_components = params.psd.psd_components
+        if psd_components:
             channels = [ch for ch in station.chans()
-                        if ch[-1] in step_config.psd_components]
+                        if ch[-1] in psd_components]
         else:
             channels = list(station.chans())
 
         days = sorted({job.day for job in jobs})
+
+        logger.info(
+            f"New PSD_RMS batch: {net}.{sta}.{loc} "
+            f"n_days={len(days)} lineage={batch['lineage_str']}"
+        )
 
         for chan in channels:
             seed_id = f"{net}.{sta}.{loc}.{chan}"
@@ -87,7 +101,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
             for day in days:
                 df = xr_load_psd(
                     output_folder, psd_lineage, psd_step_name, seed_id, day,
-                    format="dataframe"
+                    format="dataframe",
                 )
                 if df is not None and not df.empty:
                     frames.append(df)
@@ -108,7 +122,7 @@ def main(loglevel="INFO", njobs_per_worker=9999):
                 continue
 
             try:
-                xr_save_rms(output_folder, lineage, step_name, seed_id, rms)
+                xr_save_rms(output_folder, rms_lineage, step_name, seed_id, rms)
                 logger.info(
                     f"Saved RMS NC for {seed_id} under "
                     f"{psd_step_name}/{step_name}/"
