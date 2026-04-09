@@ -2255,6 +2255,117 @@ def create_preprocess_jobs_cmd(date, date_range, set_number):
     db.close()
 
 
+@utils.command(name="create_psd_jobs")
+@click.option("--date", default=None, type=str,
+              help="Single date to create jobs for (YYYY-MM-DD).")
+@click.option("--date_range", nargs=2, default=(None, None), type=str,
+              metavar="START END",
+              help="Date range: START END (inclusive, YYYY-MM-DD).")
+@click.option("--set-number", default=1, type=int,
+              help="PSD config set number (default 1).")
+def create_psd_jobs_cmd(date, date_range, set_number):
+    """Create psd T jobs for FDSN/EIDA sources (bypasses scan_archive).
+
+    For FDSN/EIDA sources, creates jobs for all active stations for the
+    requested date(s) regardless of DataAvailability (the psd worker fetches
+    on demand).  For local/SDS sources, only creates jobs where
+    DataAvailability records already exist for the requested date(s).
+
+    Examples::
+
+        msnoise utils create_psd_jobs --date 2026-03-28
+
+        msnoise utils create_psd_jobs --date_range 2026-01-01 2026-03-28
+    """
+    import datetime
+    from ..core.db import connect
+    from ..core.stations import (get_stations, resolve_data_source,
+                                 get_data_availability)
+    from ..core.fdsn import is_remote_source
+    from ..core.workflow import get_workflow_steps
+    from ..s02_new_jobs import update_job
+
+    if not date and not any(date_range):
+        raise click.UsageError("Provide --date or --date_range START END.")
+    if date and any(date_range):
+        raise click.UsageError("Provide --date OR --date_range, not both.")
+
+    # Build date list
+    if date:
+        dates = [date]
+    else:
+        start = datetime.date.fromisoformat(date_range[0])
+        end   = datetime.date.fromisoformat(date_range[1])
+        dates = []
+        cur = start
+        while cur <= end:
+            dates.append(cur.isoformat())
+            cur += datetime.timedelta(days=1)
+
+    db = connect()
+
+    # Find the psd step
+    steps = get_workflow_steps(db)
+    psd_step = next(
+        (s for s in steps
+         if s.category == "psd" and s.set_number == set_number),
+        None
+    )
+    if psd_step is None:
+        click.echo(f"No psd step with set_number={set_number} found.", err=True)
+        db.close()
+        return
+
+    stations = list(get_stations(db, all=False))
+    if not stations:
+        click.echo("No active stations found.", err=True)
+        db.close()
+        return
+
+    created = 0
+    skipped = 0
+
+    for goal_day in dates:
+        gd     = datetime.datetime.strptime(goal_day, "%Y-%m-%d")
+        gd_end = gd + datetime.timedelta(seconds=86401)
+
+        for station in stations:
+            ds     = resolve_data_source(db, station)
+            locs   = station.locs() or [""]
+
+            if is_remote_source(ds.uri):
+                # FDSN/EIDA — create job unconditionally
+                for loc in locs:
+                    pair = f"{station.net}.{station.sta}.{loc}"
+                    update_job(db, goal_day, pair, psd_step.step_name, "T",
+                               step_id=psd_step.step_id,
+                               lineage=psd_step.step_name,
+                               commit=False)
+                    created += 1
+            else:
+                # Local/SDS — only create if DA records exist for this day
+                for loc in locs:
+                    da_records = get_data_availability(
+                        db, net=station.net, sta=station.sta,
+                        loc=loc, starttime=gd, endtime=gd_end
+                    )
+                    if da_records:
+                        pair = f"{station.net}.{station.sta}.{loc}"
+                        update_job(db, goal_day, pair, psd_step.step_name, "T",
+                                   step_id=psd_step.step_id,
+                                   lineage=psd_step.step_name,
+                                   commit=False)
+                        created += 1
+                    else:
+                        skipped += 1
+
+        db.commit()
+
+    click.echo(f"Created {created} psd T job(s) across {len(dates)} day(s) "
+               f"({skipped} skipped — no DA records for local sources).")
+    db.close()
+
+
 def run():
     try:
         cli(obj={})
