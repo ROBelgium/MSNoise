@@ -125,7 +125,7 @@ def _xr_create_or_open(fn, taxis=[], name="CCF"):
         coh_da = xr.DataArray(coh_data, coords=[times, taxis], dims=['times', 'frequency'])
 
         # Combine into a Dataset
-        ds = xr.Dataset({'dvv': dvv_da,'err': err_da,'coh': coh_da})
+        ds = xr.Dataset({'DTT': dvv_da, 'ERR': err_da, 'COH': coh_da})
         return ds
 
     else:
@@ -658,8 +658,8 @@ def xr_load_wct(root, lineage, station1, station2, components, mov_stack):
 def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mov_stack, taxis, dataset):
     """Save WCT-DTT results to a NetCDF file.
 
-    :param dataset: :class:`xarray.Dataset` with variables ``dtt``, ``err``,
-        ``coh`` and dims ``(times, frequency)``, as built by
+    :param dataset: :class:`xarray.Dataset` with variables ``DTT``, ``ERR``,
+        ``COH`` and dims ``(times, frequency)``, as built by
         :mod:`~msnoise.s09_compute_wct_dtt`.
     """
     fn = os.path.join(root, *lineage, step_name, "_output",
@@ -676,8 +676,8 @@ def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mo
 def xr_get_wct_dtt(root, lineage, station1, station2, components, mov_stack):
     """Load per-pair WCT dt/t results from a NetCDF file.
 
-    Returns an :class:`xarray.Dataset` with variables ``dtt``, ``err``,
-    ``coh`` each of shape ``(times, frequency)``, as written by
+    Returns an :class:`xarray.Dataset` with variables ``DTT``, ``ERR``,
+    ``COH`` each of shape ``(times, frequency)``, as written by
     :func:`xr_save_wct_dtt`.
 
     :raises FileNotFoundError: if the NetCDF file does not exist.
@@ -823,8 +823,8 @@ def _dvv_column_spec(parent_category: str, pair_type: str, params) -> tuple:
     elif parent_category == "stretching":
         return "Delta", "Error", "Coeff"
     elif parent_category == "wavelet_dtt":
-        # WCT stores dtt/err/coh per frequency; scalar extracted separately
-        return "dtt", "err", "coh"
+        # WCT stores DTT/ERR/COH per frequency; scalar extracted separately
+        return "DTT", "ERR", "COH"
     else:
         raise ValueError(f"Unknown parent_category: {parent_category!r}")
 
@@ -835,9 +835,9 @@ def _freq_average_wct(ds, freqmin: float, freqmax: float,
     """Collapse the ``(times, frequency)`` WCT-DTT Dataset to scalar time series.
 
     Selects the frequency band ``[freqmin, freqmax]``, masks cells where
-    ``coh < quality_min``, then collapses the frequency axis using *freq_agg*.
+    ``COH < quality_min``, then collapses the frequency axis using *freq_agg*.
 
-    :param ds: :class:`xarray.Dataset` with variables ``dtt``, ``err``, ``coh``
+    :param ds: :class:`xarray.Dataset` with variables ``DTT``, ``ERR``, ``COH``
         and dims ``(times, frequency)``.
     :param freqmin: Lower frequency bound (Hz).
     :param freqmax: Upper frequency bound (Hz).
@@ -854,9 +854,9 @@ def _freq_average_wct(ds, freqmin: float, freqmax: float,
             f"No frequencies in [{freqmin}, {freqmax}] Hz in WCT-DTT output. "
             f"Available: {freqs.min():.3f}–{freqs.max():.3f} Hz"
         )
-    dtt_sel = ds["dtt"].isel(frequency=mask_freq)
-    err_sel = ds["err"].isel(frequency=mask_freq)
-    coh_sel = ds["coh"].isel(frequency=mask_freq)
+    dtt_sel = ds["DTT"].isel(frequency=mask_freq)
+    err_sel = ds["ERR"].isel(frequency=mask_freq)
+    coh_sel = ds["COH"].isel(frequency=mask_freq)
 
     # Mask low-coherence cells
     bad = coh_sel < quality_min

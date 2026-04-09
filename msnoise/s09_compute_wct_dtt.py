@@ -208,19 +208,19 @@ def main(loglevel="INFO"):
                 sort_idx  = np.argsort(dates_arr)
                 ds_out = xr.Dataset(
                     {
-                        "dtt": xr.DataArray(
+                        "DTT": xr.DataArray(
                             np.array(dtt_rows)[sort_idx],
                             dims=["times", "frequency"],
                             coords={"times": dates_arr[sort_idx],
                                     "frequency": freqs_subset},
                         ),
-                        "err": xr.DataArray(
+                        "ERR": xr.DataArray(
                             np.array(err_rows)[sort_idx],
                             dims=["times", "frequency"],
                             coords={"times": dates_arr[sort_idx],
                                     "frequency": freqs_subset},
                         ),
-                        "coh": xr.DataArray(
+                        "COH": xr.DataArray(
                             np.array(coh_rows)[sort_idx],
                             dims=["times", "frequency"],
                             coords={"times": dates_arr[sort_idx],
