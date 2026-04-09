@@ -1040,48 +1040,6 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
 # ============================================================
 
 
-def psd_rms(s, f):
-    """Compute RMS from a power spectrum array and frequency array.
-
-    :param s: Power spectral density values (1-D array).
-    :param f: Frequency values (1-D array, same length as *s*).
-    :returns: Float - square-root of the integrated power.
-    """
-    return np.sqrt(np.trapezoid(s, f))
-
-
-
-def psd_df_rms(d, freqs, output="VEL"):
-    """Compute per-frequency-band RMS from a PPSD DataFrame.
-
-    :param d: :class:`pandas.DataFrame` with period columns and time index.
-    :param freqs: List of ``(fmin, fmax)`` tuples defining frequency bands.
-    :param output: Physical unit - ``"VEL"`` (default), ``"ACC"``, or ``"DISP"``.
-    :returns: :class:`pandas.DataFrame` with one column per frequency band.
-    """
-    d = d.dropna(axis=1, how="all")
-    RMS = {}
-    for fmin, fmax in freqs:
-        pmin = 1.0 / fmax
-        pmax = 1.0 / fmin
-        ix = np.where((d.columns >= pmin) & (d.columns <= pmax))[0]
-        spec = d.iloc[:, ix]
-        f = d.columns[ix]
-        w2f = 2.0 * np.pi * f
-        amp = 10.0 ** (spec / 10.0)
-        if output == "ACC":
-            RMS[f"{fmin:.1f}-{fmax:.1f}"] = amp.apply(lambda a: np.sqrt(np.trapezoid(a.values, a.index)), axis=1)
-        elif output == "VEL":
-            vamp = amp / w2f ** 2
-            RMS[f"{fmin:.1f}-{fmax:.1f}"] = vamp.apply(lambda a: np.sqrt(np.trapezoid(a.values, a.index)), axis=1)
-        else:
-            vamp = amp / w2f ** 2
-            damp = vamp / w2f ** 2
-            RMS[f"{fmin:.1f}-{fmax:.1f}"] = damp.apply(lambda a: np.sqrt(np.trapezoid(a.values, a.index)), axis=1)
-    return pd.DataFrame(RMS, index=d.index)
-
-
-
 def psd_read_results(net, sta, loc, chan, datelist, format='PPSD', use_cache=True):
     from obspy.signal import PPSD
     if loc == "--":

@@ -23,7 +23,8 @@ import pandas as pd
 from .core.db import connect, get_logger
 from .core.stations import get_station
 from .core.workflow import get_next_lineage_batch, is_next_job_for_step, massive_update_job
-from .core.io import psd_df_rms, xr_load_psd, xr_save_rms
+from .core.signal import psd_df_rms
+from .core.io import xr_load_psd, xr_save_rms
 
 CATEGORY = "psd_rms"
 

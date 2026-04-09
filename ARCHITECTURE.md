@@ -56,7 +56,8 @@ msnoise/
                          # compute_rolling_ref
     signal.py            # winsorizing, stack, xwt, compute_wct_dtt, get_wct_avgcoh,
                          # preload_instrument_responses, save_preprocessed_streams,
-                         # get_preprocessed_stream, make_same_length, validate_stack_data
+                         # get_preprocessed_stream, make_same_length, validate_stack_data,
+                         # psd_rms, psd_df_rms
     io.py                # xr_save_ccf, xr_get_ccf, xr_save_ccf_daily, xr_get_ccf_daily,
                          # xr_save_ref, xr_get_ref, xr_load_ccf_for_stack,
                          # xr_save_mwcs, xr_get_mwcs, xr_save_dtt, xr_get_dtt,
@@ -64,7 +65,7 @@ msnoise/
                          # xr_save_wct_dtt, xr_get_wct_dtt,
                          # xr_save_dvv_agg, xr_get_dvv_agg, aggregate_dvv_pairs,
                          # xr_save_psd, xr_load_psd, xr_save_rms, xr_load_rms,
-                         # psd_rms, psd_df_rms, psd_read_results
+                         # psd_ppsd_to_dataframe, psd_ppsd_to_dataset, psd_read_results
     fdsn.py              # parse_datasource_scheme, is_remote_source, build_client,
                          # fetch_waveforms_bulk, fetch_and_preprocess, _write_raw_cache
   msnoise_table_def.py   # declare_tables() → Config, Lineage, Job, DataSource,
