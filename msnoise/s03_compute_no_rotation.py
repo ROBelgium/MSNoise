@@ -201,7 +201,7 @@ from scipy.fft import next_fast_len
 from obspy.signal.filter import bandpass
 
 
-def main(loglevel="INFO"):
+def main(loglevel="INFO", chunk_size=0):
     global logger
     logger = get_logger('msnoise.cc', loglevel, with_pid=True)
     logger.info('*** Starting: Compute CC ***')
@@ -232,8 +232,12 @@ def main(loglevel="INFO"):
     # else:
     #     responses = None
     logger.debug("Checking if there are jobs to do")
+    if chunk_size > 0:
+        logger.info(f"CC chunk_size={chunk_size}: each worker claims up to {chunk_size} pairs per day")
+
     while is_next_job_for_step(db, step_category="cc"):
-        batch = get_next_lineage_batch(db, step_category="cc", group_by="day_lineage", loglevel=loglevel)
+        batch = get_next_lineage_batch(db, step_category="cc", group_by="day_lineage",
+                                       chunk_size=chunk_size, loglevel=loglevel)
         if batch is None:
             time.sleep(np.random.random())
             continue

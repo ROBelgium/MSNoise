@@ -61,16 +61,21 @@ from .core.io import psd_ppsd_to_dataset, xr_save_psd
 CATEGORY = "psd"
 
 
-def main(loglevel="INFO", njobs_per_worker=9999):
+def main(loglevel="INFO", njobs_per_worker=9999, chunk_size=0):
     logger = get_logger(f"msnoise.{CATEGORY}", loglevel, with_pid=True)
     logger.info("*** Starting: Compute PSD ***")
 
     db = connect()
     responses = preload_instrument_responses(db, return_format="inventory")
 
+    if chunk_size > 0:
+        logger.info(f"PSD chunk_size={chunk_size}: each worker claims up to {chunk_size} stations per day")
+
     while is_next_job_for_step(db, step_category=CATEGORY):
         batch = get_next_lineage_batch(db, step_category=CATEGORY,
-                                       group_by="day_lineage", loglevel=loglevel)
+                                       group_by="day_lineage",
+                                       chunk_size=chunk_size,
+                                       loglevel=loglevel)
         if batch is None:
             time.sleep(np.random.random())
             continue

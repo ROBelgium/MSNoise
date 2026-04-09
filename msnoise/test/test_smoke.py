@@ -821,6 +821,99 @@ def test_smoke_174_create_psd_jobs_cmd(smoke_db, tmp_path):
     )
 
 
+@pytest.mark.order(175)
+def test_smoke_175_cc_chunk_claim(smoke_db):
+    """chunk_size limits the number of CC jobs claimed per batch.
+
+    Seeds 3 CC T jobs for one day (3 pairs), then calls
+    get_next_lineage_batch with chunk_size=2. Asserts:
+    - At most 2 jobs are returned in the batch.
+    - The claimed jobs are marked 'I' (in-progress).
+    - At least 1 T job remains for the next worker to claim.
+    - A second call (simulating a second worker) claims the remainder.
+    """
+    db, _, _ = smoke_db
+    from ..core.db import connect as _connect
+    from ..core.workflow import (get_next_lineage_batch, massive_update_job)
+    from ..msnoise_table_def import declare_tables as _dt
+
+    _s = _dt()
+    _db = _connect()
+    try:
+        cc_step = _db.query(_s.WorkflowStep).filter(
+            _s.WorkflowStep.step_name == "cc_1").first()
+        assert cc_step is not None, "cc_1 step not found"
+
+        # Get cc lineage_id from an existing cc job
+        existing = _db.query(_s.Job).filter(
+            _s.Job.step_id == cc_step.step_id).first()
+        assert existing is not None, "No cc_1 jobs found (requires tests 04-05 to have run)"
+
+        # Reset all cc jobs to T for day 1 so we have a clean slate
+        test_day = "2010-09-01"
+        day_jobs = _db.query(_s.Job).filter(
+            _s.Job.step_id == cc_step.step_id,
+            _s.Job.day == test_day,
+        ).all()
+        if not day_jobs:
+            pytest.skip("No cc_1 jobs for 2010-09-01 (requires test_05)")
+        for j in day_jobs:
+            j.flag = "T"
+        _db.commit()
+
+        n_total = len(day_jobs)
+        assert n_total >= 3, f"Need at least 3 CC jobs for chunking test, got {n_total}"
+
+        # First worker: chunk_size=2 — must claim at most 2 jobs
+        batch1 = get_next_lineage_batch(_db, "cc", group_by="day_lineage",
+                                         chunk_size=2)
+        assert batch1 is not None, "First chunk claim returned None"
+        n_claimed = len(batch1["jobs"])
+        assert n_claimed <= 2, (
+            f"chunk_size=2 must claim at most 2 jobs, got {n_claimed}"
+        )
+        assert n_claimed >= 1, "Must claim at least 1 job"
+
+        # Claimed jobs must be marked I
+        _db.expire_all()
+        for job in batch1["jobs"]:
+            fresh = _db.query(_s.Job).filter(_s.Job.ref == job.ref).first()
+            assert fresh.flag == "I", (
+                f"Job {job.ref} should be 'I' after chunk claim, got {fresh.flag!r}"
+            )
+
+        # At least one T job must remain for the next worker
+        remaining_t = _db.query(_s.Job).filter(
+            _s.Job.step_id == cc_step.step_id,
+            _s.Job.day == test_day,
+            _s.Job.flag == "T",
+        ).count()
+        assert remaining_t >= 1, (
+            f"At least 1 T job must remain after chunk_size=2 claim "
+            f"(total={n_total}, claimed={n_claimed})"
+        )
+
+        # Second worker: claims the rest
+        batch2 = get_next_lineage_batch(_db, "cc", group_by="day_lineage",
+                                         chunk_size=2)
+        assert batch2 is not None, "Second chunk claim returned None"
+        n_claimed2 = len(batch2["jobs"])
+        assert n_claimed2 >= 1, "Second worker must claim at least 1 job"
+
+        # Together they must cover all day_jobs
+        total_claimed = n_claimed + n_claimed2
+        assert total_claimed == n_total, (
+            f"Two chunk claims should cover all {n_total} jobs, "
+            f"got {total_claimed} total"
+        )
+
+        # Restore to Done so subsequent tests see a clean state
+        massive_update_job(_db, batch1["jobs"], "D")
+        massive_update_job(_db, batch2["jobs"], "D")
+    finally:
+        _db.close()
+
+
 @pytest.mark.order(18)
 def test_smoke_18_lineage_normalisation(smoke_db):
     """Zero NULL lineage_ids; Lineage rows << Job rows; no duplicates."""

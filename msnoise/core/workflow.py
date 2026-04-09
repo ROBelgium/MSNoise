@@ -847,6 +847,7 @@ def get_next_job_for_step(
         flag="T",
         group_by="day",
         limit_days=None,
+        chunk_size=0,
 ):
     """
     Return a claimed batch of jobs for a workflow step category.
@@ -856,6 +857,15 @@ def get_next_job_for_step(
       - "pair": claim all jobs for the selected (step_id, jobtype, pair)
       - "pair_lineage": claim all jobs for the selected (step_id, jobtype, pair, lineage)
       - "day_lineage": claim all jobs for the selected (step_id, jobtype, day, lineage)
+
+    chunk_size:
+      Only applies to ``group_by="day_lineage"``.  When > 0, at most *chunk_size*
+      jobs are claimed per batch instead of the full day.  Useful for steps with
+      O(N²) work per day (CC) or large per-day station counts (PSD) so that
+      multiple workers can share the same day in parallel without write conflicts.
+
+      ``chunk_size=0`` (default) claims everything — identical to the original
+      behaviour.
     """
     from ..msnoise_table_def import declare_tables
     from sqlalchemy import update
@@ -905,6 +915,12 @@ def get_next_job_for_step(
     elif group_by == "day_lineage":
         batch_q = batch_q.filter(Job.day == seed_job.day).filter(Job.lineage_id == seed_job.lineage_id)
         batch_q = batch_q.order_by(Job.pair.asc())
+        if chunk_size > 0:
+            # Claim at most chunk_size jobs for this day.  The seed job is
+            # included in the count, so we limit to chunk_size total.
+            # Deterministic pair ordering ensures different workers claim
+            # non-overlapping subsets (each grabs the next unclaimed block).
+            batch_q = batch_q.limit(int(chunk_size))
     else:
         raise ValueError(f"Unsupported group_by={group_by!r}")
 
@@ -912,28 +928,17 @@ def get_next_job_for_step(
     if not jobs:
         return [], step
 
+    # Collect the ref IDs that were actually selected so the UPDATE is
+    # scoped to exactly these rows — critical for chunk_size correctness.
+    claimed_refs = [j.ref for j in jobs]
+
     upd = (
         update(Job)
-        .where(Job.step_id == step.step_id)
-        .where(Job.jobtype == seed_job.jobtype)
-        .where(day_filter)
-        .where(Job.flag == flag)
+        .where(Job.ref.in_(claimed_refs))
+        .values(flag="I")
+        .execution_options(synchronize_session=False)
     )
-
-    if group_by == "day":
-        upd = upd.where(Job.day == seed_job.day)
-    elif group_by == "pair":
-        upd = upd.where(Job.pair == seed_job.pair)
-    elif group_by == "pair_lineage":
-        upd = upd.where(Job.pair == seed_job.pair).where(Job.lineage_id == seed_job.lineage_id)
-        if limit_days is not None:
-            # Note: SQL UPDATE with LIMIT is not portable. Keep limit_days for SELECT batching only.
-            # The UPDATE still claims the whole (pair, lineage) batch.
-            pass
-    else:  # "day_lineage"
-        upd = upd.where(Job.day == seed_job.day).where(Job.lineage_id == seed_job.lineage_id)
-
-    session.execute(upd.values(flag="I"))
+    session.execute(upd)
     session.commit()
 
     return jobs, step
@@ -1259,6 +1264,7 @@ def get_next_lineage_batch(
         group_by="pair_lineage",
         loglevel="INFO",
         day_value=None,
+        chunk_size=0,
 ):
     """
     Standard worker prolog for lineage-aware steps.
@@ -1268,6 +1274,14 @@ def get_next_lineage_batch(
     - Loads current step config (from the job row).
     - Resolves lineage_str -> WorkflowStep objects.
     - Builds a LayeredParams for that lineage (one layer per category).
+
+    Parameters
+    ----------
+    chunk_size : int, optional
+        Passed to :func:`get_next_job_for_step`.  Only effective for
+        ``group_by="day_lineage"``.  When > 0, at most *chunk_size* jobs are
+        claimed per batch, enabling multiple workers to share the same day in
+        parallel.  Default ``0`` = claim everything (original behaviour).
 
     Returns
     -------
@@ -1294,6 +1308,7 @@ def get_next_lineage_batch(
         step_category=step_category,
         group_by=group_by,
         flag="T",
+        chunk_size=chunk_size,
         # day_value=day_value,  # enable once you add day filtering to scheduler
     )
 
