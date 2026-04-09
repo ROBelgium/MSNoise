@@ -98,6 +98,8 @@ def smoke_db(tmp_path_factory):
     update_config(db, "dvv_split_pair_type", "Y",  category="mwcs_dtt_dvv",    set_number=1)
     update_config(db, "dvv_split_pair_type", "Y",  category="stretching_dvv",  set_number=1)
     update_config(db, "dvv_split_pair_type", "Y",  category="wavelet_dtt_dvv", set_number=1)
+    update_config(db, "psd_rms_frequency_ranges", "[(1.0, 20.0)]",  category="psd_rms", set_number=1)
+    update_config(db, "psd_rms_type",             "VEL",            category="psd_rms", set_number=1)
     # hpc=False (default) — propagate_downstream fires automatically
     update_config(db, "hpc", "N")
 
@@ -414,11 +416,11 @@ def _stub_wct_dtt(db, params, root):
             for comp in COMPS:
                 for ms in MOV_STACKS:
                     ds = xr.Dataset({
-                        "dtt": xr.DataArray(np.zeros(len(TIMES), "float32"),
+                        "DTT": xr.DataArray(np.zeros(len(TIMES), "float32"),
                                             dims=["times"], coords={"times": TIMES}),
-                        "err": xr.DataArray(np.zeros(len(TIMES), "float32"),
+                        "ERR": xr.DataArray(np.zeros(len(TIMES), "float32"),
                                             dims=["times"], coords={"times": TIMES}),
-                        "coh": xr.DataArray(np.ones(len(TIMES), "float32"),
+                        "COH": xr.DataArray(np.ones(len(TIMES), "float32"),
                                             dims=["times"], coords={"times": TIMES}),
                     })
                     xr_save_wct_dtt(root, lin, sname, sta1, sta2, comp, ms, TAXIS, ds)
@@ -684,6 +686,139 @@ def test_smoke_17_psd_rms(smoke_db):
     _assert_min(db, "psd_rms_1", "T", 1)
     _stub_psd_rms(db, params, root)
     _assert_min(db, "psd_rms_1", "D", 1)
+
+
+@pytest.mark.order(171)
+def test_smoke_171_psd_rms_lineage(smoke_db):
+    """psd_rms jobs must have lineage 'psd_1/psd_rms_1' (not just 'psd_1').
+
+    This guards the root-cause fix: propagate_psd_rms_jobs_from_psd_done
+    must store lineage=psd_step/psd_rms_step so that get_next_lineage_batch
+    builds a LayeredParams with a 'psd_rms' layer.  Without this, accessing
+    params.psd_rms.* raises AttributeError.
+    """
+    db, _, _ = smoke_db
+    from ..msnoise_table_def import declare_tables as _dt
+    _s = _dt()
+    from ..core.db import connect as _connect
+    _db = _connect()
+    try:
+        psd_rms_step = _db.query(_s.WorkflowStep).filter(
+            _s.WorkflowStep.step_name == "psd_rms_1").first()
+        assert psd_rms_step is not None
+
+        jobs = _db.query(_s.Job).filter(
+            _s.Job.step_id == psd_rms_step.step_id).all()
+        assert jobs, "No psd_rms_1 jobs found"
+
+        for job in jobs:
+            lin = _db.query(_s.Lineage).filter(
+                _s.Lineage.lineage_id == job.lineage_id).first()
+            assert lin is not None, f"Job {job.ref} has no Lineage row"
+            assert "/" in lin.lineage_str, (
+                f"psd_rms job lineage {lin.lineage_str!r} must be "
+                f"'psd_1/psd_rms_1', not just the psd step name"
+            )
+            assert lin.lineage_str.endswith("/psd_rms_1"), (
+                f"psd_rms job lineage {lin.lineage_str!r} must end with /psd_rms_1"
+            )
+    finally:
+        _db.close()
+
+
+@pytest.mark.order(172)
+def test_smoke_172_psd_rms_params_layer(smoke_db):
+    """get_next_lineage_batch for psd_rms must build LayeredParams with 'psd_rms' layer.
+
+    Exercises the full params.psd_rms.* access path that psd_compute_rms.py
+    uses at runtime — verifying that the lineage fix flows through to the
+    LayeredParams construction.
+    """
+    db, _, _ = smoke_db
+    from ..core.db import connect as _connect
+    from ..core.workflow import get_next_lineage_batch
+    from ..msnoise_table_def import declare_tables as _dt
+    _s = _dt()
+
+    # Seed a fresh psd_rms T job on day1 to claim
+    _db = _connect()
+    try:
+        psd_rms_step = _db.query(_s.WorkflowStep).filter(
+            _s.WorkflowStep.step_name == "psd_rms_1").first()
+        # Reset one psd_rms job to T so get_next_lineage_batch can claim it
+        job = _db.query(_s.Job).filter(
+            _s.Job.step_id == psd_rms_step.step_id).first()
+        assert job is not None
+        job.flag = "T"
+        _db.commit()
+
+        batch = get_next_lineage_batch(_db, "psd_rms", group_by="pair_lineage")
+        assert batch is not None, "get_next_lineage_batch returned None for psd_rms"
+
+        params = batch["params"]
+        # Must have 'psd_rms' layer — accessing it must not raise AttributeError
+        try:
+            _ = params.psd_rms.psd_rms_frequency_ranges
+            _ = params.psd_rms.psd_rms_type
+        except AttributeError as e:
+            raise AssertionError(
+                f"params.psd_rms.* raised AttributeError — "
+                f"psd_rms layer missing from LayeredParams. "
+                f"Available categories: {list(params._layers)}. Error: {e}"
+            )
+
+        # Restore to Done so subsequent tests see a consistent state
+        from ..core.workflow import massive_update_job
+        massive_update_job(_db, batch["jobs"], "D")
+    finally:
+        _db.close()
+
+
+@pytest.mark.order(173)
+def test_smoke_173_get_waveform_path_datasource(smoke_db):
+    """get_waveform_path correctly prepends DataSource.uri to DA path+file."""
+    db, _, _ = smoke_db
+    from ..core.stations import get_waveform_path, get_default_data_source
+    from ..msnoise_table_def import declare_tables as _dt
+    _s = _dt()
+
+    ds = get_default_data_source(db)
+    assert ds is not None
+
+    # Construct a synthetic DA-like object to test path building
+    class _FakeDA:
+        data_source_id = ds.ref
+        path = "YA/UV05/2010/HHZ.D"
+        file = "YA.UV05..HHZ.D.2010.244"
+
+    fpath = get_waveform_path(db, _FakeDA())
+    assert fpath.startswith(ds.uri), (
+        f"Path {fpath!r} must start with DataSource.uri {ds.uri!r}"
+    )
+    assert fpath.endswith(_FakeDA.file), (
+        f"Path {fpath!r} must end with filename {_FakeDA.file!r}"
+    )
+    # Ensure no double-separator artefacts
+    assert "//" not in fpath, f"Double separator in path: {fpath!r}"
+
+
+@pytest.mark.order(174)
+def test_smoke_174_create_psd_jobs_cmd(smoke_db, tmp_path):
+    """msnoise utils create_psd_jobs creates T jobs for the correct date."""
+    db, _, _ = smoke_db
+    from click.testing import CliRunner
+    from ..scripts.msnoise import cli
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["utils", "create_psd_jobs",
+                                 "--date", "2010-09-01",
+                                 "--set-number", "1"], obj={})
+    assert result.exit_code == 0, (
+        f"create_psd_jobs failed (exit {result.exit_code}):\n{result.output}"
+    )
+    assert "psd" in result.output.lower(), (
+        f"Expected 'psd' in output, got: {result.output!r}"
+    )
 
 
 @pytest.mark.order(18)
