@@ -77,8 +77,6 @@ import time
 import numpy as np
 import pandas as pd
 import xarray as xr
-from numpy import asarray as ar
-from scipy.optimize import curve_fit
 from scipy.ndimage import map_coordinates
 
 
@@ -199,8 +197,24 @@ def main(loglevel="INFO"):
         for components in components_to_compute:
             station1, station2 = pair.split(":")
             rolling_mode = refstack_is_rolling(params)
+
+            # ── Lag window parameters (same for Mode A and Mode B) ───────────
+            if params.stretching.stretching_lag == "static":
+                minlag = params.stretching.stretching_minlag
+            else:
+                SS1 = station1.split(".")
+                SS2 = station2.split(".")
+                SS1 = get_station(db, SS1[0], SS1[1])
+                SS2 = get_station(db, SS2[0], SS2[1])
+                minlag = get_interstation_distance(SS1, SS2,
+                                                   SS1.coordinates) / params.stretching.stretching_v
+            maxlag2 = minlag + params.stretching.stretching_width
+            mid = int(params.cc.cc_sampling_rate * params.cc.maxlag)
+            str_range = params.stretching.stretching_max
+            nstr = params.stretching.stretching_nsteps
+
             if not rolling_mode:
-                # Mode A: load fixed REF from disk
+                # ── Mode A: load fixed REF from disk ─────────────────────────
                 try:
                     ref = xr_get_ref(root, lineage_names,
                                      station1, station2, components, taxis)
@@ -209,34 +223,15 @@ def main(loglevel="INFO"):
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
 
-            # zero the data outside of the minlag-maxlag timing
-            if params.stretching.stretching_lag == "static":
-                minlag = params.stretching.stretching_minlag
-            else:
-                SS1 = station1.split(".")
-                SS2 = station2.split(".")
+                # Zero data outside the lag window on the fixed reference
+                ref[mid - int(minlag * goal_sampling_rate):mid + int(minlag * goal_sampling_rate)] = 0.
+                ref[:mid - int(maxlag2 * goal_sampling_rate)] = 0.
+                ref[mid + int(maxlag2 * goal_sampling_rate):] = 0.
 
-                SS1 = get_station(db, SS1[0], SS1[1])
-                SS2 = get_station(db, SS2[0], SS2[1])
-                minlag = get_interstation_distance(SS1, SS2,
-                                                SS1.coordinates) / params.stretching.stretching_v
-            maxlag2 = minlag + params.stretching.stretching_width
-            mid = int(params.cc.cc_sampling_rate * params.cc.maxlag)
-            ref[mid - int(minlag * goal_sampling_rate):mid + int(minlag * goal_sampling_rate)] = 0.
-            ref[:mid - int(maxlag2 * goal_sampling_rate)] = 0.
-            ref[mid + int(maxlag2 * goal_sampling_rate):] = 0.
-
-            # TODO ADD the def here or in the API
-            str_range = params.stretching.stretching_max
-            nstr = params.stretching.stretching_nsteps
-            ref_stretched, deltas = stretch_mat_creation(ref,str_range=str_range, nstr=nstr)
+                # Pre-build the full stretched-reference matrix (nstr x n_samples)
+                ref_stretched, deltas = stretch_mat_creation(ref, str_range=str_range, nstr=nstr)
 
             for mov_stack in mov_stacks:
-                #alldays = []
-                #alldeltas = []
-                #allcoefs = []
-                #allerrs = []
-
                 try:
                     data = xr_get_ccf(root, lineage_names_mov,
                                       station1, station2, components, mov_stack, taxis,
@@ -250,42 +245,84 @@ def main(loglevel="INFO"):
                 data = data[data.index.floor('d').isin(to_search)]
                 data = data.dropna()
 
-                if rolling_mode:
-                    ref_rolling = compute_rolling_ref(  # noqa: F841 — computed but not yet used in loop
-                        data, int(params.refstack.ref_begin), int(params.refstack.ref_end)
-                    )
+                if not len(data):
+                    continue
 
-                # print("Whitening %s" % fn)
-                # data = pd.DataFrame(data)
-                # data = data.apply(ww, axis=1, result_type="broadcast")
-
-                data.iloc[:,mid - int(minlag * params.cc.cc_sampling_rate):mid + int(
+                # Zero lag window on current data (both modes)
+                data.iloc[:, mid - int(minlag * params.cc.cc_sampling_rate):mid + int(
                     minlag * params.cc.cc_sampling_rate)] *= 0.
-                data.iloc[:,mid - int(maxlag2 * params.cc.cc_sampling_rate)] *= 0.
-                data.iloc[:,mid + int(maxlag2 * params.cc.cc_sampling_rate):] *= 0.
+                data.iloc[:, mid - int(maxlag2 * params.cc.cc_sampling_rate)] *= 0.
+                data.iloc[:, mid + int(maxlag2 * params.cc.cc_sampling_rate):] *= 0.
 
                 data_values = data.values
                 num_days = data_values.shape[0]
 
-                # Normalizing the data for correlation
-                data_norm = (data_values - data_values.mean(axis=1, keepdims=True)) / data_values.std(axis=1, keepdims=True)
-                ref_stretched_norm = (ref_stretched - ref_stretched.mean(axis=1, keepdims=True)) / ref_stretched.std(axis=1, keepdims=True)
+                if rolling_mode:
+                    # ── Mode B: per-row rolling reference ────────────────────
+                    # compute_rolling_ref returns shape (n_times, n_samples)
+                    ref_rolling = compute_rolling_ref(
+                        data, int(params.refstack.ref_begin), int(params.refstack.ref_end)
+                    )
 
-                # Compute the correlation coefficients
-                corr_coeffs = np.dot(ref_stretched_norm, data_norm.T) / ref_stretched.shape[1]
+                    alldays_list  = []
+                    alldeltas_list = []
+                    allcoefs_list  = []
+                    allerrs_list   = []
 
-                max_corr_indices = np.argmax(corr_coeffs, axis=0)
-                max_corr_values = corr_coeffs[max_corr_indices, np.arange(num_days)]
+                    for i_row in range(num_days):
+                        ref_row = ref_rolling[i_row].copy()
+                        # Zero lag window on this row's reference
+                        ref_row[mid - int(minlag * goal_sampling_rate):mid + int(minlag * goal_sampling_rate)] = 0.
+                        ref_row[:mid - int(maxlag2 * goal_sampling_rate)] = 0.
+                        ref_row[mid + int(maxlag2 * goal_sampling_rate):] = 0.
 
-                alldays = data.index
-                alldeltas = deltas[max_corr_indices]
-                allcoefs = max_corr_values
+                        ref_str_row, deltas_row = stretch_mat_creation(
+                            ref_row, str_range=str_range, nstr=nstr
+                        )
 
-                # Vectorized error estimate: direct HWHM scan on the
-                # correlation-coefficient curve, ~134x faster than curve_fit.
-                # For each day, shift coeffs to all-positive, then walk left/right
-                # from the peak to find the half-maximum crossings.
-                allerrs = _hwhm_errors(corr_coeffs)
+                        cur = data_values[i_row]
+                        cur_std = cur.std() or 1.0
+                        cur_norm = (cur - cur.mean()) / cur_std
+                        ref_std = ref_str_row.std(axis=1, keepdims=True)
+                        ref_std = np.where(ref_std != 0, ref_std, 1.0)
+                        ref_str_norm = (ref_str_row - ref_str_row.mean(axis=1, keepdims=True)) / ref_std
+
+                        cc_row = ref_str_norm @ cur_norm / ref_str_row.shape[1]  # (nstr,)
+                        best = int(np.argmax(cc_row))
+
+                        alldays_list.append(data.index[i_row])
+                        alldeltas_list.append(deltas_row[best])
+                        allcoefs_list.append(cc_row[best])
+                        # HWHM error for this single row
+                        err = _hwhm_errors(cc_row.reshape(nstr, 1))[0]
+                        allerrs_list.append(err)
+
+                    alldays   = pd.DatetimeIndex(alldays_list)
+                    alldeltas = np.array(alldeltas_list)
+                    allcoefs  = np.array(allcoefs_list)
+                    allerrs   = np.array(allerrs_list)
+
+                else:
+                    # ── Mode A: vectorised matrix correlation ─────────────────
+                    data_std = data_values.std(axis=1, keepdims=True)
+                    data_std = np.where(data_std != 0, data_std, 1.0)
+                    data_norm = (data_values - data_values.mean(axis=1, keepdims=True)) / data_std
+                    ref_std = ref_stretched.std(axis=1, keepdims=True)
+                    ref_std = np.where(ref_std != 0, ref_std, 1.0)
+                    ref_stretched_norm = (ref_stretched - ref_stretched.mean(axis=1, keepdims=True)) / ref_std
+
+                    # Compute the correlation coefficients
+                    corr_coeffs = np.dot(ref_stretched_norm, data_norm.T) / ref_stretched.shape[1]
+
+                    max_corr_indices = np.argmax(corr_coeffs, axis=0)
+                    max_corr_values  = corr_coeffs[max_corr_indices, np.arange(num_days)]
+
+                    alldays   = data.index
+                    alldeltas = deltas[max_corr_indices]
+                    allcoefs  = max_corr_values
+                    # Vectorized error estimate: direct HWHM scan on the
+                    # correlation-coefficient curve, ~134x faster than curve_fit.
+                    allerrs   = _hwhm_errors(corr_coeffs)
                 # Build xarray Dataset directly — no DataFrame round-trip
                 ds_out = xr.Dataset(
                     {

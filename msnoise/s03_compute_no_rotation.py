@@ -190,7 +190,7 @@ import matplotlib.mlab as mlab
 
 from .core.db import connect, get_logger
 from .core.config import get_config_set_details
-from .core.workflow import (get_filter_steps_for_cc_step, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, update_job)
+from .core.workflow import (get_filter_steps_for_cc_step, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream)
 from .core.signal import stack, winsorizing, get_preprocessed_stream
 from .core.io import save_daily_ccf, xr_save_ccf_all
 from .move2obspy import myCorr2
@@ -203,7 +203,6 @@ import scipy.signal
 import scipy.fft as sf
 from scipy.fft import next_fast_len
 from obspy.signal.filter import bandpass
-from obspy import read, Stream
 
 
 def main(loglevel="INFO"):
@@ -293,8 +292,7 @@ def main(loglevel="INFO"):
         if not len(stream):
             logger.debug("Not enough data for this day !")
             logger.debug("Marking jobs 'Fail' and continuing with next !")
-            for job in jobs:
-                update_job(db, job.day, job.pair, job.jobtype, 'F', ref=job.ref)
+            massive_update_job(db, jobs, "F")
             continue
         # print '##### STREAMS ARE ALL PREPARED AT goal Hz #####'
         dt = 1. / params.cc.cc_sampling_rate
