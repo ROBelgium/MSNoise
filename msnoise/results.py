@@ -760,11 +760,6 @@ def _build_datasource_provenance(db, station_ids: list) -> tuple:
     """
     import yaml
     from .core.stations import resolve_data_source, get_station
-    from .msnoise_table_def import declare_tables
-
-    schema = declare_tables()
-    Station = schema.Station
-
     # Collect unique stations
     stations_data = []
     sources_seen  = {}

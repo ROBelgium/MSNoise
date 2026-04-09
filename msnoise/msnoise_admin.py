@@ -128,7 +128,7 @@ def job_dependencies(job_id):
                         schema.Job.day == job.day,
                         schema.Job.pair == job.pair,
                         schema.Job.step_id == link.to_step_id,
-                        schema.Job.lineage.startswith(job_lineage + '/') if job_lineage else schema.Job.lineage != None,
+                        schema.Job.lineage.startswith(job_lineage + '/') if job_lineage else schema.Job.lineage.isnot(None),
                     ).all()
 
                     for succ_job in succ_jobs:

@@ -13,9 +13,7 @@ Filter Configuration Parameters
 * ``mwcs_wlen``: Window length (in seconds) to perform MWCS
 * ``mwcs_step``: Step (in seconds) of the windowing procedure in MWCS
 
-* |hpc| | *new in 1.6*
-
-In short, both time series are sliced in several overlapping windows and
+* |hpc| | In short, both time series are sliced in several overlapping windows and
 preprocessed. The similarity of the two time-series is assessed using the
 cross-coherence between energy densities in the frequency domain. The time
 delay between the two cross correlations is found in the unwrapped phase of
@@ -63,7 +61,6 @@ will start 4 instances of the code (after 1 second delay to avoid database
 conflicts). This works both with SQLite and MySQL but be aware problems
 could occur with SQLite.
 
-.. versionadded:: 1.4
     Parallel Processing
 """
 

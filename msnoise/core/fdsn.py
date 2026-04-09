@@ -169,7 +169,7 @@ def fetch_and_preprocess(
     from .stations import resolve_data_source, get_station
     from ..preprocessing import apply_preprocessing_to_stream
 
-    log = logging.getLogger(f"msnoise.fdsn.fetch")
+    log = logging.getLogger("msnoise.fdsn.fetch")
 
     # Resolve DataSource from first job (all share same data_source_id in batch)
     first_job = jobs[0]

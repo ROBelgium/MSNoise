@@ -44,8 +44,7 @@ The following parameters (modifiable via ```msnoise admin```) are used for
 this step:
 
 * |components_to_compute|
-* |components_to_compute_single_station|  | *new in 1.6*
-* |cc_sampling_rate|
+* |components_to_compute_single_station|  | * |cc_sampling_rate|
 * |overlap|
 * |maxlag|
 * |corr_duration|
@@ -56,18 +55,12 @@ this step:
 * |response_prefilt|
 * |preprocess_lowpass|
 * |preprocess_highpass|
-* |preprocess_max_gap|  | *new in 1.6*
-* |preprocess_taper_length|  | *new in 1.6*
-* |keep_all|
+* |preprocess_max_gap|  | * |preprocess_taper_length|  | * |keep_all|
 * |keep_days|
 * |stack_method|
 * |pws_timegate|
 * |pws_power|
-* |whitening|  | *new in 1.5*
-* |whitening_type|  | *new in 1.6*
-* |hpc| | *new in 1.6*
-
-.. automodule:: msnoise.preprocessing
+* |whitening|  | * |whitening_type|  | * |hpc| | .. automodule:: msnoise.preprocessing
 
 Computing the Cross-Correlations
 --------------------------------
@@ -158,20 +151,16 @@ will start 4 instances of the code (after 1 second delay to avoid database
 conflicts). This works both with SQLite and MySQL but be aware problems
 could occur with SQLite.
 
-.. versionadded:: 1.4
     The Instrument Response removal & The Phase Weighted Stack &
     Parallel Processing
 
-.. versionadded:: 1.5
     The Obspy Lanczos resampling method, gives similar results as the
     scikits.samplerate package, thus removing the requirement for it.
     This method is defined by default.
 
-.. versionadded:: 1.5
     The preprocessing routine is separated from the compute_cc and can be called
     by external plugins.
 
-.. versionadded:: 1.6
     The compute_cc has been completely rewritten to be much faster, taking
     advantage from 2D FFT computation and in-place array modifications.
     The standard compute_cc does process CC, AC and SC in the same code. Only

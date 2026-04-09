@@ -1086,10 +1086,9 @@ def create_workflow_links(verbose):
 @click.option('-a', '--all', is_flag=True, help='Reset all jobs')
 @click.option('-r', '--rule', help='Reset job that match this SQL rule')
 def reset(jobtype, all, rule):
-    """Resets the jobs to "T"odo. JOBTYPE is the acronym of the job type.
+    """Resets the jobs to "T"odo. JOBTYPE is the step name (e.g. cc_1, stack_1).
     By default only resets jobs "I"n progress. --all resets all jobs, whatever
-    the flag value. Standard Job Types are CC, STACK, MWCS and DTT, but
-    plugins can define their own."""
+    the flag value."""
     from ..core.db import connect, read_db_inifile
     from ..core.workflow import reset_jobs
     dbini = read_db_inifile()
@@ -1098,9 +1097,6 @@ def reset(jobtype, all, rule):
     if jobtype == "DA":
         session.execute(text("UPDATE {0}data_availability SET flag='M'"
                         .format(prefix)))
-    elif jobtype != jobtype.upper():
-        logging.info("The jobtype %s is not uppercase (usually jobtypes"
-                     " are uppercase...)"%jobtype)
     reset_jobs(session, jobtype, all, rule)
     session.close()
 
@@ -2006,14 +2002,22 @@ def utils_export_params(ctx, lineage, preprocessid, ccid, filterid, stackid,
         # Build from integer IDs
         parts = [f"preprocess_{preprocessid}", f"cc_{ccid}",
                  f"filter_{filterid}", f"stack_{stackid}"]
-        if refstackid:     parts.append(f"refstack_{refstackid}")
-        if mwcsid:         parts.append(f"mwcs_{mwcsid}")
-        if mwcsdttid:      parts.append(f"mwcs_dtt_{mwcsdttid}")
-        if stretchingid:   parts.append(f"stretching_{stretchingid}")
-        if stretchingdvvid: parts.append(f"stretching_dvv_{stretchingdvvid}")
-        if wctid:          parts.append(f"wavelet_{wctid}")
-        if wctdttid:       parts.append(f"wavelet_dtt_{wctdttid}")
-        if waveletdvvid:   parts.append(f"wavelet_dtt_dvv_{waveletdvvid}")
+        if refstackid:
+            parts.append(f"refstack_{refstackid}")
+        if mwcsid:
+            parts.append(f"mwcs_{mwcsid}")
+        if mwcsdttid:
+            parts.append(f"mwcs_dtt_{mwcsdttid}")
+        if stretchingid:
+            parts.append(f"stretching_{stretchingid}")
+        if stretchingdvvid:
+            parts.append(f"stretching_dvv_{stretchingdvvid}")
+        if wctid:
+            parts.append(f"wavelet_{wctid}")
+        if wctdttid:
+            parts.append(f"wavelet_dtt_{wctdttid}")
+        if waveletdvvid:
+            parts.append(f"wavelet_dtt_dvv_{waveletdvvid}")
         lin_str = "/".join(parts)
 
     steps = lineage_str_to_steps(db, lin_str, sep="/", strict=False)
@@ -2095,14 +2099,22 @@ def utils_export_dvv(ctx, lineage, preprocessid, ccid, filterid, stackid,
         parts = [f"preprocess_{preprocessid}", f"cc_{ccid}",
                  f"filter_{filterid}", f"stack_{stackid}",
                  f"refstack_{refstackid}"]
-        if mwcsid:          parts.append(f"mwcs_{mwcsid}")
-        if mwcsdttid:       parts.append(f"mwcs_dtt_{mwcsdttid}")
-        if mwcsdvvid:       parts.append(f"mwcs_dtt_dvv_{mwcsdvvid}")
-        if stretchingid:    parts.append(f"stretching_{stretchingid}")
-        if stretchingdvvid: parts.append(f"stretching_dvv_{stretchingdvvid}")
-        if wctid:           parts.append(f"wavelet_{wctid}")
-        if wctdttid:        parts.append(f"wavelet_dtt_{wctdttid}")
-        if waveletdvvid:    parts.append(f"wavelet_dtt_dvv_{waveletdvvid}")
+        if mwcsid:
+            parts.append(f"mwcs_{mwcsid}")
+        if mwcsdttid:
+            parts.append(f"mwcs_dtt_{mwcsdttid}")
+        if mwcsdvvid:
+            parts.append(f"mwcs_dtt_dvv_{mwcsdvvid}")
+        if stretchingid:
+            parts.append(f"stretching_{stretchingid}")
+        if stretchingdvvid:
+            parts.append(f"stretching_dvv_{stretchingdvvid}")
+        if wctid:
+            parts.append(f"wavelet_{wctid}")
+        if wctdttid:
+            parts.append(f"wavelet_dtt_{wctdttid}")
+        if waveletdvvid:
+            parts.append(f"wavelet_dtt_dvv_{waveletdvvid}")
         lin_str = "/".join(parts)
 
     steps      = lineage_str_to_steps(db, lin_str, sep="/", strict=False)
@@ -2207,7 +2219,6 @@ def create_preprocess_jobs_cmd(date, date_range, set_number):
         gd_end = gd + datetime.timedelta(seconds=86401)
 
         for station in stations:
-            sid = f"{station.net}.{station.sta}"
             ds  = resolve_data_source(db, station)
 
             if is_remote_source(ds.uri):

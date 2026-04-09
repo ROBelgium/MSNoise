@@ -12,14 +12,6 @@ The NetCDF file has two dimensions: times (one row per PPSD window)
 and bands (one column per frequency band configured in
 psd_rms_frequency_ranges).
 
-.. versionchanged:: 2.1
-    NC output replaces CSV.  Output path is now hierarchically below psd.
-.. versionchanged:: 2.3
-    Migrated from get_next_job_for_step to the canonical get_next_lineage_batch
-    worker loop, consistent with all other worker scripts.  output_folder and
-    step config are now sourced from the LayeredParams object returned by
-    get_next_lineage_batch instead of raw get_config / get_config_set_details
-    calls.
 """
 
 import time

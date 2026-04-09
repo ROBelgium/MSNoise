@@ -21,7 +21,6 @@ Service:
     <iframe src="_static/station_map.html" width=800 height=400></iframe>
 
 
-.. versionadded:: 1.4 | Thanks to A. Mordret!
 
 """
 

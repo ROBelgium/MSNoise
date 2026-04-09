@@ -40,7 +40,7 @@ import os
 import sys
 from getpass import getpass
 from sqlalchemy import create_engine
-from sqlalchemy.exc import *
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import database_exists, create_database
 try:

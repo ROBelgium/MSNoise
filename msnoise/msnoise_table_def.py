@@ -315,7 +315,7 @@ def declare_tables(prefix=None):
         """
         Enhanced Job Object with workflow support
 
-        This class maintains backward compatibility while adding workflow awareness.
+        Workflow-aware job record linking a station-pair day to a WorkflowStep.
         Jobs are now linked to specific workflow steps and their associated config sets.
 
         :type ref: int
@@ -329,7 +329,7 @@ def declare_tables(prefix=None):
         :type step_id: int
         :param step_id: Foreign key to WorkflowStep table
         :type jobtype: str
-        :param jobtype: Legacy job type, now derived from step info (for backward compatibility)
+        :param jobtype: Job type string (= step_name, used as join key to WorkflowStep)
         :type priority: int
         :param priority: Job priority (higher number = higher priority)
         """
@@ -349,7 +349,7 @@ def declare_tables(prefix=None):
         lineage_id  = Column(Integer,
                              ForeignKey(f"{prefix}lineages.lineage_id"),
                              nullable=True, index=True)
-        jobtype = Column(String(50))  # Now derived from step info, but kept for compatibility
+        jobtype = Column(String(50))  # = step_name; used as join key to WorkflowStep
         priority = Column(Integer, default=0)  # Job priority
 
         # Relationships
@@ -396,8 +396,6 @@ def declare_tables(prefix=None):
             # Updated unique constraint to include workflow context
             Index('job_index', "day", "pair", "step_id", "lineage_id", unique=True),
             Index('job_index2', "flag", "step_id", "priority", unique=False),
-            # Legacy index for backward compatibility
-            Index('job_legacy_index', "day", "pair", "jobtype", unique=False),
         )
 
         def __init__(self, day=None, pair=None, flag=None,
@@ -423,13 +421,6 @@ def declare_tables(prefix=None):
                 setattr(self, key, val)
 
         @property
-        def derived_jobtype(self):
-            """Derive jobtype from workflow step information"""
-            if self.workflow_step:
-                return f"{self.workflow_step.step_name}_{self.workflow_step.set_number}"
-            return self.jobtype
-
-        @property
         def config_category(self):
             """Get the config category for this job"""
             if self.workflow_step:
@@ -451,7 +442,7 @@ def declare_tables(prefix=None):
             return None
 
         def __str__(self):
-            return f"Job({self.day}, {self.pair}, {self.derived_jobtype or self.jobtype}, {self.flag})"
+            return f"Job({self.day}, {self.pair}, {self.jobtype}, {self.flag})"
 
         def __repr__(self):
             return f"<Job(day='{self.day}', pair='{self.pair}', " \

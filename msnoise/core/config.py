@@ -386,31 +386,7 @@ def get_config_sets_organized(session):
         schema.Config.set_number
     ).all()
 
-    # Migrate legacy NULL set_number rows (written by pre-refactor code
-    # where global config had no set_number).  Fold them into set_number=1
-    # so they are accessible via the normal workflow path.  Skip if a
-    # set_number=1 row already exists for that category (no overwrite).
-    null_categories = {cat for cat, sn, _ in all_sets if sn is None}
-    existing_1 = {cat for cat, sn, _ in all_sets if sn == 1}
-    for null_cat in null_categories - existing_1:
-        session.query(schema.Config).filter(
-            schema.Config.category == null_cat,
-            schema.Config.set_number == None,  # noqa: E711
-        ).update({"set_number": 1}, synchronize_session=False)
-    if null_categories - existing_1:
-        session.commit()
-        # Re-query after migration
-        all_sets = session.query(
-            schema.Config.category,
-            schema.Config.set_number,
-            func.count(schema.Config.ref).label('param_count')
-        ).group_by(
-            schema.Config.category,
-            schema.Config.set_number
-        ).all()
-
-    # Group sets by category, skipping any remaining NULL rows (e.g.
-    # where set_number=1 already existed so migration was skipped).
+    # Group sets by category
     sets_by_category = {}
     for category, set_number, param_count in all_sets:
         if set_number is None:

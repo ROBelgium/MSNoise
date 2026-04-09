@@ -96,7 +96,7 @@ def main(mov_stackid=None, components="ZZ", pair_type="CC", filterid=1, stretchi
         for comp in comp_list:
             try:
                 ds = result.get_dvv(pair_type=pair_type, components=comp,
-                                     mov_stack=mov_stack, format="xarray")
+                                     mov_stack=mov_stack, format="dataset")
             except (FileNotFoundError, ValueError):
                 logger.warning(
                     f"No stretching_dvv data for mov_stack={mov_stack} comp={comp}. "

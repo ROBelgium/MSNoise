@@ -39,13 +39,6 @@ Parallel execution:
     $ msnoise -t 4 qc compute_psd
 
 .. versionadded:: 2.0
-.. versionchanged:: 2.1
-    Output format changed from NPZ+PNG to NetCDF.  The intermediate
-    ``psd_to_hdf`` step is no longer needed.
-.. versionchanged:: 2.2
-    Migrated to canonical get_next_lineage_batch worker loop.
-    Instrument responses are only preloaded when remove_response is set.
-    PNG output path is now relative to output_folder.
 """
 
 import datetime

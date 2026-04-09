@@ -3,7 +3,6 @@ import glob
 import logging
 import os
 import sys
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -32,29 +31,6 @@ def _f32_encoding(ds):
         elif da.dtype.kind in ("i", "u"):  # integers (e.g. n_pairs)
             enc[var] = {"zlib": True, "complevel": _ZLIB_LEVEL}
     return enc
-
-
-def _get_wavgwstd(data, dttname, errname):
-    """
-    Calculate the weighted average and weighted standard deviation for a given data.
-
-    :param data: The data to calculate the weighted average and weighted standard deviation.
-    :type data: pandas.DataFrame
-
-    :param dttname: The name of the column in the data frame containing the weights for the weighted average and weighted standard deviation calculation.
-    :type dttname: str
-
-    :param errname: The name of the column in the data frame containing the errors on the data.
-    :type errname: str
-
-    :return: A tuple containing the calculated weighted average and weighted standard deviation.
-    :rtype: tuple
-    """
-    grouped = data.groupby(level=0)
-    g = grouped.apply(_wavg, dttname=dttname, errname=errname)
-    h = grouped.apply(_wstd, dttname=dttname, errname=errname)
-    return g, h
-
 
 
 def _trim(data, dttname, limits=0.1):
@@ -152,65 +128,7 @@ def _xr_save_and_close(dataset, fn, encoding=None):
     del dataset
 
 
-def _wavg(group, dttname, errname):
-    """
-    Calculate the weighted average of a given group using the provided parameters.
 
-    :param group: A pandas DataFrame or Series representing the group of data.
-    :param dttname: The name of the column containing the data to be averaged.
-    :param errname: The name of the column containing the error for each data point.
-    :return: The weighted average of the data.
-
-    """
-    warnings.warn("wavg() is deprecated; use aggregate_dvv_pairs() for network dv/v statistics.", DeprecationWarning, stacklevel=2)
-    d = group[dttname]
-    group.loc[group[errname] == 0,errname] = 1e-6
-    w = 1. / group[errname]
-    try:
-        wavg = (d * w).sum() / w.sum()
-    except Exception:
-        wavg = d.mean()
-    return wavg
-
-
-def _wstd(group, dttname, errname):
-    """
-    :param group: A dictionary containing data for different groups.
-    :param dttname: The key in the `group` dictionary that corresponds to the data array.
-    :param errname: The key in the `group` dictionary that corresponds to the error array.
-    :return: The weighted standard deviation of the data array.
-
-    This method calculates the weighted standard deviation of the data array specified by `dttname` in the `group` dictionary.
-    The weights are derived from the error array specified by `errname` in the `group` dictionary.
-
-    The weighted standard deviation is computed using the following formula:
-        wstd = sqrt(sum(w * (d - wavg) ** 2) / ((N - 1) * sum(w) / N))
-    where:
-        - d is the data array specified by `dttname` in the `group` dictionary.
-        - w is the weight array derived from the error array specified by `errname` in the `group` dictionary.
-        - wavg is the weighted average of the data array.
-        - N is the number of non-zero weights.
-
-    Note: This method uses the `np` module from NumPy.
-    """
-    warnings.warn("wstd() is deprecated; use aggregate_dvv_pairs() for network dv/v statistics.", DeprecationWarning, stacklevel=2)
-    d = group[dttname]
-    group.loc[group[errname] == 0,errname] = 1e-6
-    w = 1. / group[errname]
-    wavg = (d * w).sum() / w.sum()
-    N = len(np.nonzero(w.values)[0])
-    wstd = np.sqrt(np.sum(w * (d - wavg) ** 2) / ((N - 1) * np.sum(w) / N))
-    return wstd
-
-
-def _psd_dfrms(a):
-    """Integrate a PSD Series over its period axis using the trapezoid rule.
-
-    :param a: :class:`pandas.Series` whose index is period values.
-    :returns: Square-root of the integrated power (RMS-equivalent).
-    """
-    warnings.warn("psd_dfrms() is deprecated and will be removed in a future MSNoise release.", DeprecationWarning, stacklevel=2)
-    return np.sqrt(np.trapezoid(a.values, a.index))
 
 
 
@@ -238,7 +156,6 @@ def xr_get_ccf(root, lineage, station1, station2, components, mov_stack, taxis, 
     format : str
         ``"dataset"`` (default) returns a :class:`xarray.DataArray` (CCF variable).
         ``"dataframe"`` returns a :class:`~pandas.DataFrame` (legacy).
-        ``"xarray"`` is an alias for ``"dataset"`` (deprecated, kept for compat).
     """
     path = os.path.join(root, *lineage, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
@@ -248,7 +165,7 @@ def xr_get_ccf(root, lineage, station1, station2, components, mov_stack, taxis, 
     if not os.path.isfile(fullpath):
         raise FileNotFoundError(fullpath)
     data = _xr_create_or_open(fullpath, taxis, name="CCF")
-    if format in ("dataset", "xarray"):
+    if format == "dataset":
         return data.CCF
     # ── DataFrame (legacy) ──────────────────────────────────────────────
     return data.CCF.to_dataframe().unstack().droplevel(0, axis=1)
@@ -1153,14 +1070,14 @@ def psd_df_rms(d, freqs, output="VEL"):
         w2f = 2.0 * np.pi * f
         amp = 10.0 ** (spec / 10.0)
         if output == "ACC":
-            RMS[f"{fmin:.1f}-{fmax:.1f}"] = amp.apply(_psd_dfrms, axis=1)
+            RMS[f"{fmin:.1f}-{fmax:.1f}"] = amp.apply(lambda a: np.sqrt(np.trapezoid(a.values, a.index)), axis=1)
         elif output == "VEL":
             vamp = amp / w2f ** 2
-            RMS[f"{fmin:.1f}-{fmax:.1f}"] = vamp.apply(_psd_dfrms, axis=1)
+            RMS[f"{fmin:.1f}-{fmax:.1f}"] = vamp.apply(lambda a: np.sqrt(np.trapezoid(a.values, a.index)), axis=1)
         else:
             vamp = amp / w2f ** 2
             damp = vamp / w2f ** 2
-            RMS[f"{fmin:.1f}-{fmax:.1f}"] = damp.apply(_psd_dfrms, axis=1)
+            RMS[f"{fmin:.1f}-{fmax:.1f}"] = damp.apply(lambda a: np.sqrt(np.trapezoid(a.values, a.index)), axis=1)
     return pd.DataFrame(RMS, index=d.index)
 
 

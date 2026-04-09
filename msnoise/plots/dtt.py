@@ -12,7 +12,6 @@ will plot MWCS scatter + DTT regression for that day:
 
 .. image:: .static/dtt.png
 
-.. versionadded:: 1.4 (Thanks to C.G. Donaldson)
 """
 
 import matplotlib.pyplot as plt

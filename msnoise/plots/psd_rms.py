@@ -26,7 +26,6 @@ Notebook usage::
     data = load_rms(r, ["BE.UCC..HHZ"])
     plot_timeseries(data, band="1.0-10.0")
 
-.. versionadded:: 2.1
 """
 
 from __future__ import annotations
@@ -462,16 +461,9 @@ def load_rms(
             from msnoise.results import MSNoiseResult
             r = MSNoiseResult.from_ids(db, psd=1, psd_rms=1)
 
-        Alternatively, a raw database session may be passed for backwards
-        compatibility; an ``MSNoiseResult`` is then constructed automatically
-        using *psd_id* / *psd_rms_id* and a :class:`DeprecationWarning` is
-        emitted.
     seed_ids:
         Optional list of SEED IDs to load (e.g. ``["BE.UCC..HHZ"]``).
         When ``None`` (default) every station found on disk is returned.
-    psd_id, psd_rms_id:
-        Config-set integers used **only** when *result* is a raw db session
-        (default ``1``).
 
     Returns
     -------
@@ -492,23 +484,7 @@ def load_rms(
     >>> data = load_rms(r)                   # all stations auto-discovered
     >>> data = load_rms(r, ["BE.UCC..HHZ"])  # single station
 
-    **Legacy -- raw db session (deprecated):**
-
-    >>> data = load_rms(db)                  # emits DeprecationWarning
-    """
-    import warnings
-    from ..results import MSNoiseResult
-
-    if not isinstance(result, MSNoiseResult):
-        warnings.warn(
-            "Passing a raw database session to load_rms() is deprecated. "
-            "Pass an MSNoiseResult instead:\n"
-            "  r = MSNoiseResult.from_ids(db, psd=1, psd_rms=1)\n"
-            "  data = load_rms(r)",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        result = MSNoiseResult.from_ids(result, psd=psd_id, psd_rms=psd_rms_id)
+"""
 
     if seed_ids is not None:
         out: dict[str, pd.DataFrame] = {}
@@ -1089,10 +1065,10 @@ def main(
         Logging level string.
     """
     from ..core.db import connect, get_logger
-    from ..results import MSNoiseResult
 
     logger = get_logger("msnoise.plots.psd_rms", loglevel)
     db = connect()
+    from ..results import MSNoiseResult
     result = MSNoiseResult.from_ids(db, psd=psd_id, psd_rms=psd_rms_id)
 
     data = load_rms(result, seed_ids if seed_ids else None)
