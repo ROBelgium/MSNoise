@@ -337,7 +337,7 @@ class MSNoiseResult:
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
             return xr_get_ccf(root, lineage, sta1, sta2, components,
-                               mov_stack, taxis, format=format)
+                               mov_stack, taxis, format="dataframe" if format == "dataframe" else "dataset")
 
         base = os.path.join(root, *lineage, "_output")
         results = {}
@@ -366,7 +366,7 @@ class MSNoiseResult:
                     pair_key = f"{sta1}:{sta2}"
                     try:
                         df = xr_get_ccf(root, lineage, sta1, sta2, comp,
-                                        ms_tuple, taxis, format=format)
+                                        ms_tuple, taxis, format="dataframe" if format == "dataframe" else "dataset")
                         results[(pair_key, comp, ms_tuple)] = df
                     except Exception:
                         pass
@@ -427,7 +427,7 @@ class MSNoiseResult:
         from .core.io import xr_get_mwcs
         lineage = self._lineage_through("mwcs")
         root = self.output_folder
-        fmt = "dataset" if format == "xarray" else "dataframe"
+        fmt = "dataframe" if format == "dataframe" else "dataset"
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
             return xr_get_mwcs(root, lineage, sta1, sta2, components, mov_stack, format=fmt)
@@ -441,7 +441,7 @@ class MSNoiseResult:
         from .core.io import xr_get_dtt
         lineage = self._lineage_through("mwcs_dtt")
         root = self.output_folder
-        fmt = "dataset" if format == "xarray" else "dataframe"
+        fmt = "dataframe" if format == "dataframe" else "dataset"
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
             return xr_get_dtt(root, lineage, sta1, sta2, components, mov_stack, format=fmt)
@@ -455,7 +455,7 @@ class MSNoiseResult:
         from .core.io import _xr_get_stretching
         lineage = self._lineage_through("stretching")
         root = self.output_folder
-        fmt = "dataset" if format == "xarray" else "dataframe"
+        fmt = "dataframe" if format == "dataframe" else "dataset"
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
             return _xr_get_stretching(root, lineage, sta1, sta2, components, mov_stack, format=fmt)
@@ -471,7 +471,7 @@ class MSNoiseResult:
         lineage   = self._lineage_upstream_of(dvv_cat)  # upstream, excl. dvv step
         step_name = self._step_name_for(dvv_cat)
         root      = self.output_folder
-        fmt       = "dataset" if format == "xarray" else "dataframe"
+        fmt       = "dataframe" if format == "dataframe" else "dataset"
         if components is not None and mov_stack is not None:
             return xr_get_dvv_agg(root, lineage, step_name, mov_stack,
                                    pair_type, components, format=fmt)
@@ -539,7 +539,7 @@ class MSNoiseResult:
         step_name = self._step_name_for("psd")
         lineage   = self._lineage_upstream_of("psd")
         root      = self.output_folder
-        fmt       = "dataset" if format == "xarray" else "dataframe"
+        fmt       = "dataframe" if format == "dataframe" else "dataset"
         if seed_id is not None and day is not None:
             return xr_load_psd(root, lineage, step_name, seed_id, day, format=fmt)
         base = os.path.join(root, *lineage, step_name, "_output", "daily")
@@ -571,7 +571,7 @@ class MSNoiseResult:
         step_name = self._step_name_for("psd_rms")
         lineage   = self._lineage_upstream_of("psd_rms")
         root      = self.output_folder
-        fmt       = "dataset" if format == "xarray" else "dataframe"
+        fmt       = "dataframe" if format == "dataframe" else "dataset"
         if seed_id is not None:
             return xr_load_rms(root, lineage, step_name, seed_id, format=fmt)
         base = os.path.join(root, *lineage, step_name, "_output")
