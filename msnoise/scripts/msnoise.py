@@ -83,21 +83,20 @@ def validate_verbosity(ctx, param, value):
 
 
 def show_config_values(db, names):
-    """
-    Show configuration value of parameters provided in the 'names' list.
-    """
-    from ..core.config import get_config
-    from ..default import default
+    """Show configuration values for the given parameter names (global set 1)."""
+    from ..msnoise_table_def import Config as _Config
     for key in names:
-        display_value = value = get_config(db, key)
-        if value == '':
-            # Use a more explicit representation of the empty string
-            display_value = "''"
-        try:
-            default_value = default[key].default
-        except KeyError:
+        row = (db.query(_Config)
+               .filter(_Config.name == key)
+               .filter(_Config.category == "global")
+               .filter(_Config.set_number == 1)
+               .first())
+        if row is None:
             click.secho("Error: unknown parameter '%s'" % key)
             continue
+        value = row.value if row.value is not None else ""
+        default_value = row.default_value if row.default_value is not None else ""
+        display_value = value if value != "" else "''"
         if value == default_value:
             click.secho("   %s: %s" % (key, display_value))
         else:
@@ -180,18 +179,22 @@ def info_folders(db):
 
 
 def info_parameters(db):
-    """
-    Show values of each configuration parameters.
-    """
-    from ..default import default
-    from ..core.config import get_config_set_details
+    """Show all configuration parameter values. Use 'msnoise config list' for full detail."""
     from ..core.workflow import get_workflow_steps
+    from ..msnoise_table_def import Config as _Config
     click.echo('')
     click.echo('Configuration values:'
             '   | Normal colour indicates that the default value is used'
             '   | Green indicates "M"odified values')
-    # TODO: add plugins params
-    show_config_values(db, default.keys())
+    global_names = [
+        row.name for row in
+        db.query(_Config.name)
+          .filter(_Config.category == "global")
+          .filter(_Config.set_number == 1)
+          .order_by(_Config.name)
+          .all()
+    ]
+    show_config_values(db, global_names)
 
     filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
     if filter_steps:
@@ -452,48 +455,103 @@ def db_execute(ctx, sql_command, outfile=None, show=True):
 
 @db.command(name="upgrade")
 def db_upgrade():
-    """Upgrade the database from previous to a new version.
-    This procedure adds new parameters with their default value
-    in the config database.
+    """Upgrade the database from a previous version.
+
+    Ensures every parameter defined in the config CSV files is present in the
+    database with its default value.  Covers all categories (global, cc, mwcs,
+    psd, …) for every config set already in the DB — not just global params.
+
+    Safe to run on an already up-to-date project: existing values are never
+    overwritten.
     """
+    import csv
+    import glob
+    import os
     from ..core.db import connect, read_db_inifile
-    from ..default import default
+
     db = connect()
     dbini = read_db_inifile()
     prefix = (dbini.prefix + '_') if dbini.prefix != '' else ''
-    for name in default.keys():
+
+    config_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "config"
+    )
+    csv_files = sorted(glob.glob(os.path.join(config_dir, "config_*.csv")))
+
+    added = 0
+    for csv_path in csv_files:
+        # Derive category name from filename: config_cc.csv → "cc"
+        category = os.path.basename(csv_path)[len("config_"):-len(".csv")]
+
+        # Find every set_number that already exists for this category in the DB
+        existing_sets = [
+            row[0] for row in
+            db.query(Config.set_number)
+              .filter(Config.category == category)
+              .distinct()
+              .all()
+        ]
+        # Global always has set 1; if no sets exist yet for other categories,
+        # there's nothing to upgrade (create_set handles first-time creation).
+        if not existing_sets:
+            if category == "global":
+                existing_sets = [1]
+            else:
+                continue
+
+        with open(csv_path, newline="", encoding="utf-8") as fh:
+            rows = list(csv.DictReader(fh))
+
+        for set_number in existing_sets:
+            for row in rows:
+                name = row["name"]
+                default_value = row.get("default", "")
+                definition = row.get("definition", "")
+                param_type = row.get("type", "str")
+                possible_values = row.get("possible_values", "")
+
+                # Only insert if the (name, category, set_number) row is absent
+                exists = (
+                    db.query(Config)
+                      .filter(Config.name == name)
+                      .filter(Config.category == category)
+                      .filter(Config.set_number == set_number)
+                      .first()
+                )
+                if exists is None:
+                    db.add(Config(
+                        name=name,
+                        category=category,
+                        set_number=set_number,
+                        value=default_value,
+                        default_value=default_value,
+                        param_type=param_type,
+                        description=definition,
+                        possible_values=possible_values,
+                        used=True,
+                    ))
+                    added += 1
+
+        db.commit()
+
+    click.echo(f"✓ DB upgrade complete: {added} new parameter(s) added across "
+               f"{len(csv_files)} categories.")
+
+    # Legacy index creation (idempotent — errors are expected on up-to-date DBs)
+    for stmt, label in [
+        (f"CREATE UNIQUE INDEX job_index ON {prefix}jobs "
+         "(day, pair, jobtype)", "v1.5 job_index"),
+        (f"CREATE INDEX job_index2 ON {prefix}jobs "
+         "(jobtype, flag)", "v1.6 job_index2"),
+        (f"CREATE UNIQUE INDEX da_index ON {prefix}data_availability "
+         "(path, file, net, sta, loc, chan)", "v1.5 da_index"),
+    ]:
         try:
-            db.add(Config(name=name, value=default[name].default))
+            db.execute(text(stmt))
             db.commit()
         except Exception:
             db.rollback()
-            # print("Passing %s: already in DB" % name)
-            continue
-    try:
-        db.execute(text("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
-                   "jobtype)" %
-                   prefix))
-        db.commit()
-    except Exception:
-        logging.info("It looks like the v1.5 'job_index' is already in the DB")
-        db.rollback()
-
-    try:
-        db.execute(text("CREATE INDEX job_index2 ON %sjobs (jobtype, flag)" %
-                   prefix))
-        db.commit()
-    except Exception:
-        logging.info("It looks like the v1.6 'job_index2' is already in the DB")
-        db.rollback()
-
-    try:
-        db.execute(text("CREATE UNIQUE INDEX da_index ON %sdata_availability (path, "
-                   "file, net, sta, loc, chan)" %
-                   prefix))
-        db.commit()
-    except Exception:
-        logging.info("It looks like the v1.5 'da_index' is already in the DB")
-        db.rollback()
 
     db.close()
 

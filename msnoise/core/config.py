@@ -509,9 +509,12 @@ def get_config_sets_organized(session):
 
 
 def get_params(session):
-    """Get global config parameters as a single-layer :class:`~msnoise.params.LayeredParams`.
+    """Build a single-layer :class:`~msnoise.params.LayeredParams` for global config.
 
-    Access via ``params.global_.<key>`` e.g. ``params.global_.hpc``.
+    Queries the ``Config`` table directly for all ``(category='global',
+    set_number=1)`` rows and casts each value to its declared ``param_type``.
+    Does **not** depend on ``default.py``.
+
     For full pipeline params (per-step config included), use
     :func:`get_merged_params_for_lineage` instead.
 
@@ -521,16 +524,32 @@ def get_params(session):
     :rtype: :class:`~msnoise.params.LayeredParams`
     """
     from obspy.core.util.attribdict import AttribDict
-    from ..default import default
     from ..params import LayeredParams
-    s = session
+
+    _BOOL_TRUE = {"y", "yes", "true", "1"}
+    _TYPE_MAP  = {"int": int, "float": float, "bool": None, "str": str, "eval": str}
+
+    rows = (
+        session.query(Config)
+        .filter(Config.category == "global")
+        .filter(Config.set_number == 1)
+        .all()
+    )
+
     global_attrib = AttribDict()
-    for name in default.keys():
-        itemtype = default[name].type
-        if itemtype is bool:
-            global_attrib[name] = get_config(s, name, isbool=True)
+    for row in rows:
+        raw   = row.value if row.value is not None else ""
+        ptype = (row.param_type or "str").lower()
+        if ptype == "bool":
+            global_attrib[row.name] = raw.strip().lower() in _BOOL_TRUE
+        elif ptype in _TYPE_MAP and _TYPE_MAP[ptype] is not None:
+            try:
+                global_attrib[row.name] = _TYPE_MAP[ptype](raw)
+            except (ValueError, TypeError):
+                global_attrib[row.name] = raw
         else:
-            global_attrib[name] = itemtype(get_config(s, name))
+            global_attrib[row.name] = raw
+
     p = LayeredParams()
     p._add_layer("global", global_attrib)
     return p
