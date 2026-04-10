@@ -84,8 +84,7 @@ def main(sta1, sta2, filterid=1, components="ZZ", day=None,
     # --- Load MWCS for the requested day ---
     logger.info(f"Loading MWCS for {sta1}-{sta2} comp={components} day={day} mov={mov_stack}")
     try:
-        mwcs_all = mwcs_result.get_mwcs(f"{sta1}:{sta2}", components, mov_stack,
-                                         format="dataframe")
+        mwcs_all = mwcs_result.get_mwcs(f"{sta1}:{sta2}", components, mov_stack)
     except FileNotFoundError as fp:
         logger.error(f"MWCS FILE DOES NOT EXIST: {fp}")
         return
@@ -103,8 +102,7 @@ def main(sta1, sta2, filterid=1, components="ZZ", day=None,
 
     # --- Load DTT regression for the requested day ---
     try:
-        dtt_all = dtt_result.get_mwcs_dtt(f"{sta1}:{sta2}", components, mov_stack,
-                                           format="dataframe")
+        dtt_all = dtt_result.get_mwcs_dtt(f"{sta1}:{sta2}", components, mov_stack)
     except FileNotFoundError as fp:
         logger.error(f"DTT FILE DOES NOT EXIST: {fp}")
         dtt_all = None

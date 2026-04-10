@@ -233,34 +233,33 @@ def main(loglevel="INFO"):
             for mov_stack in mov_stacks:
                 try:
                     data = xr_get_ccf(root, lineage_names_mov,
-                                      station1, station2, components, mov_stack, taxis,
-                                      format="dataframe")
+                                      station1, station2, components, mov_stack, taxis)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
                 logger.debug("Processing %s:%s m%s %s" % (station1, station2, mov_stack, components))
 
                 to_search = extend_days(days)
-                data = data[data.index.floor('d').isin(to_search)]
-                data = data.dropna()
+                # Filter to relevant days and drop all-NaN time steps
+                data = data.sel(times=data.times.dt.floor('D').isin(to_search))
+                data = data.dropna('times', how='all')
 
-                if not len(data):
+                if not data.sizes['times']:
                     continue
 
-                # Zero lag window on current data (both modes)
-                data.iloc[:, mid - int(minlag * params.cc.cc_sampling_rate):mid + int(
-                    minlag * params.cc.cc_sampling_rate)] *= 0.
-                data.iloc[:, mid - int(maxlag2 * params.cc.cc_sampling_rate)] *= 0.
-                data.iloc[:, mid + int(maxlag2 * params.cc.cc_sampling_rate):] *= 0.
-
-                data_values = data.values
+                # Materialise to numpy, then apply zero-lag windowing in-place
+                data_values = data.values.copy()
+                sr = int(params.cc.cc_sampling_rate)
+                data_values[:, mid - int(minlag * sr):mid + int(minlag * sr)] = 0.
+                data_values[:, mid - int(maxlag2 * sr)] = 0.
+                data_values[:, mid + int(maxlag2 * sr):] = 0.
                 num_days = data_values.shape[0]
 
                 if rolling_mode:
                     # ── Mode B: per-row rolling reference ────────────────────
                     # compute_rolling_ref returns shape (n_times, n_samples)
                     ref_rolling = compute_rolling_ref(
-                        data, int(params.refstack.ref_begin), int(params.refstack.ref_end)
+                        data_values, int(params.refstack.ref_begin), int(params.refstack.ref_end)
                     )
 
                     alldays_list  = []

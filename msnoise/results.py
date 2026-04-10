@@ -325,8 +325,12 @@ class MSNoiseResult:
     # ── load methods (gated by @_lineage_method) ──────────────────────────────
 
     @_lineage_method("stack")
-    def get_ccf(self, pair=None, components=None, mov_stack=None, format="xarray"):
-        """Load CCFs from the stack step. Requires 'stack' in lineage."""
+    def get_ccf(self, pair=None, components=None, mov_stack=None):
+        """Load CCFs from the stack step. Requires 'stack' in lineage.
+
+        :returns: :class:`xarray.DataArray` (single pair/comp/ms) or dict of
+            DataArrays keyed by ``(pair, comp, mov_stack)``.
+        """
         from .core.io import xr_get_ccf
         from .core.workflow import get_t_axis
 
@@ -336,8 +340,7 @@ class MSNoiseResult:
 
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
-            return xr_get_ccf(root, lineage, sta1, sta2, components,
-                               mov_stack, taxis, format="dataframe" if format == "dataframe" else "dataset")
+            return xr_get_ccf(root, lineage, sta1, sta2, components, mov_stack, taxis)
 
         base = os.path.join(root, *lineage, "_output")
         results = {}
@@ -365,9 +368,8 @@ class MSNoiseResult:
                     sta1, sta2 = fname.split("_", 1)
                     pair_key = f"{sta1}:{sta2}"
                     try:
-                        df = xr_get_ccf(root, lineage, sta1, sta2, comp,
-                                        ms_tuple, taxis, format="dataframe" if format == "dataframe" else "dataset")
-                        results[(pair_key, comp, ms_tuple)] = df
+                        results[(pair_key, comp, ms_tuple)] = xr_get_ccf(
+                            root, lineage, sta1, sta2, comp, ms_tuple, taxis)
                     except Exception:
                         pass
         if pair is not None and components is not None and mov_stack is None:
@@ -375,8 +377,12 @@ class MSNoiseResult:
         return results
 
     @_lineage_method("refstack")
-    def get_ref(self, pair=None, components=None, format="xarray"):
-        """Load reference stacks. Requires 'refstack' in lineage."""
+    def get_ref(self, pair=None, components=None):
+        """Load reference stacks. Requires 'refstack' in lineage.
+
+        :returns: :class:`xarray.Dataset` (single pair/comp) or dict of
+            Datasets keyed by ``(pair, comp)``.
+        """
         from .core.io import xr_get_ref
         from .core.workflow import get_t_axis
 
@@ -384,16 +390,9 @@ class MSNoiseResult:
         taxis = get_t_axis(self.params)
         root = self.output_folder
 
-        def _fmt(ds):
-            if format == "dataframe":
-                import pandas as pd
-                da = ds.REF
-                return pd.Series(da.values, index=da.coords["taxis"].values, name="REF")
-            return ds
-
         if pair is not None and components is not None:
             sta1, sta2 = pair.split(":")
-            return _fmt(xr_get_ref(root, lineage, sta1, sta2, components, taxis))
+            return xr_get_ref(root, lineage, sta1, sta2, components, taxis)
 
         base = os.path.join(root, *lineage, "_output", "REF")
         results = {}
@@ -413,8 +412,8 @@ class MSNoiseResult:
                 fname = os.path.splitext(os.path.basename(fpath))[0]
                 sta1, sta2 = fname.split("_", 1)
                 try:
-                    ds = xr_get_ref(root, lineage, sta1, sta2, comp, taxis)
-                    results[(f"{sta1}:{sta2}", comp)] = _fmt(ds)
+                    results[(f"{sta1}:{sta2}", comp)] = xr_get_ref(
+                        root, lineage, sta1, sta2, comp, taxis)
                 except Exception:
                     pass
         if pair is not None:
@@ -422,59 +421,65 @@ class MSNoiseResult:
         return results
 
     @_lineage_method("mwcs")
-    def get_mwcs(self, pair=None, components=None, mov_stack=None, format="xarray"):
-        """Load MWCS results. Requires 'mwcs' in lineage."""
+    def get_mwcs(self, pair=None, components=None, mov_stack=None):
+        """Load MWCS results. Requires 'mwcs' in lineage.
+
+        :returns: :class:`xarray.Dataset` or dict of Datasets.
+        """
         from .core.io import xr_get_mwcs
         lineage = self._lineage_through("mwcs")
         root = self.output_folder
-        fmt = "dataframe" if format == "dataframe" else "dataset"
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
-            return xr_get_mwcs(root, lineage, sta1, sta2, components, mov_stack, format=fmt)
-        return self._load_pair_comp_movstack(
-            root, lineage, lambda *a, **kw: xr_get_mwcs(*a, format=fmt, **kw),
-            pair, components, mov_stack)
+            return xr_get_mwcs(root, lineage, sta1, sta2, components, mov_stack)
+        return self._load_pair_comp_movstack(root, lineage, xr_get_mwcs,
+                                              pair, components, mov_stack)
 
     @_lineage_method("mwcs_dtt")
-    def get_mwcs_dtt(self, pair=None, components=None, mov_stack=None, format="xarray"):
-        """Load MWCS-DTT results. Requires 'mwcs_dtt' in lineage."""
+    def get_mwcs_dtt(self, pair=None, components=None, mov_stack=None):
+        """Load MWCS-DTT results. Requires 'mwcs_dtt' in lineage.
+
+        :returns: :class:`xarray.Dataset` or dict of Datasets.
+        """
         from .core.io import xr_get_dtt
         lineage = self._lineage_through("mwcs_dtt")
         root = self.output_folder
-        fmt = "dataframe" if format == "dataframe" else "dataset"
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
-            return xr_get_dtt(root, lineage, sta1, sta2, components, mov_stack, format=fmt)
-        return self._load_pair_comp_movstack(
-            root, lineage, lambda *a, **kw: xr_get_dtt(*a, format=fmt, **kw),
-            pair, components, mov_stack)
+            return xr_get_dtt(root, lineage, sta1, sta2, components, mov_stack)
+        return self._load_pair_comp_movstack(root, lineage, xr_get_dtt,
+                                              pair, components, mov_stack)
 
     @_lineage_method("stretching")
-    def get_stretching(self, pair=None, components=None, mov_stack=None, format="xarray"):
-        """Load stretching results. Requires 'stretching' in lineage."""
+    def get_stretching(self, pair=None, components=None, mov_stack=None):
+        """Load stretching results. Requires 'stretching' in lineage.
+
+        :returns: :class:`xarray.Dataset` or dict of Datasets.
+        """
         from .core.io import _xr_get_stretching
         lineage = self._lineage_through("stretching")
         root = self.output_folder
-        fmt = "dataframe" if format == "dataframe" else "dataset"
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
-            return _xr_get_stretching(root, lineage, sta1, sta2, components, mov_stack, format=fmt)
-        return self._load_pair_comp_movstack(
-            root, lineage, lambda *a, **kw: _xr_get_stretching(*a, format=fmt, **kw),
-            pair, components, mov_stack)
+            return _xr_get_stretching(root, lineage, sta1, sta2, components, mov_stack)
+        return self._load_pair_comp_movstack(root, lineage, _xr_get_stretching,
+                                              pair, components, mov_stack)
 
     @_lineage_method(["mwcs_dtt_dvv", "stretching_dvv", "wavelet_dtt_dvv"])
-    def get_dvv(self, pair_type="ALL", components=None, mov_stack=None, format="xarray"):
-        """Load DVV aggregate results. Requires a DVV step in lineage."""
+    def get_dvv(self, pair_type="ALL", components=None, mov_stack=None):
+        """Load DVV aggregate results. Requires a DVV step in lineage.
+
+        :returns: :class:`xarray.Dataset` or dict of Datasets keyed by
+            ``(pair_type, comp, mov_stack)``.
+        """
         from .core.io import xr_get_dvv_agg
         dvv_cat   = self.category
-        lineage   = self._lineage_upstream_of(dvv_cat)  # upstream, excl. dvv step
+        lineage   = self._lineage_upstream_of(dvv_cat)
         step_name = self._step_name_for(dvv_cat)
         root      = self.output_folder
-        fmt       = "dataframe" if format == "dataframe" else "dataset"
         if components is not None and mov_stack is not None:
             return xr_get_dvv_agg(root, lineage, step_name, mov_stack,
-                                   pair_type, components, format=fmt)
+                                   pair_type, components)
         base = os.path.join(root, *lineage, step_name, "_output")
         results = {}
         ms_dirs = (
@@ -495,7 +500,7 @@ class MSNoiseResult:
                 _, pt, comp = parts
                 try:
                     results[(pt, comp, ms_tuple)] = xr_get_dvv_agg(
-                        root, lineage, step_name, ms_tuple, pt, comp, format=fmt)
+                        root, lineage, step_name, ms_tuple, pt, comp)
                 except Exception:
                     pass
         if components is not None and mov_stack is not None:
@@ -507,41 +512,48 @@ class MSNoiseResult:
         return results
 
     @_lineage_method("wavelet")
-    def get_wct(self, pair=None, components=None, mov_stack=None, format="xarray"):
-        """Load WCT results. Requires 'wavelet' in lineage."""
+    def get_wct(self, pair=None, components=None, mov_stack=None):
+        """Load WCT results. Requires 'wavelet' in lineage.
+
+        :returns: :class:`xarray.Dataset` or dict of Datasets.
+        """
         from .core.io import xr_load_wct
         lineage = self._lineage_through("wavelet")
         root = self.output_folder
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
-            ds = xr_load_wct(root, lineage, sta1, sta2, components, mov_stack)
-            return ds.to_dataframe() if format == "dataframe" else ds
+            return xr_load_wct(root, lineage, sta1, sta2, components, mov_stack)
         return self._load_pair_comp_movstack(root, lineage, xr_load_wct,
                                               pair, components, mov_stack)
 
     @_lineage_method("wavelet_dtt")
-    def get_wct_dtt(self, pair=None, components=None, mov_stack=None, format="xarray"):
-        """Load WCT dt/t results. Requires 'wavelet_dtt' in lineage."""
+    def get_wct_dtt(self, pair=None, components=None, mov_stack=None):
+        """Load WCT dt/t results. Requires 'wavelet_dtt' in lineage.
+
+        :returns: :class:`xarray.Dataset` or dict of Datasets.
+        """
         from .core.io import xr_get_wct_dtt
         lineage = self._lineage_through("wavelet_dtt")
         root = self.output_folder
         if pair is not None and components is not None and mov_stack is not None:
             sta1, sta2 = pair.split(":")
-            ds = xr_get_wct_dtt(root, lineage, sta1, sta2, components, mov_stack)
-            return ds.to_dataframe() if format == "dataframe" else ds
+            return xr_get_wct_dtt(root, lineage, sta1, sta2, components, mov_stack)
         return self._load_pair_comp_movstack(root, lineage, xr_get_wct_dtt,
                                               pair, components, mov_stack)
 
     @_lineage_method("psd")
-    def get_psd(self, seed_id=None, day=None, format="xarray"):
-        """Load PSD results. Requires 'psd' in lineage."""
+    def get_psd(self, seed_id=None, day=None):
+        """Load PSD results. Requires 'psd' in lineage.
+
+        :returns: :class:`xarray.Dataset` or dict of Datasets keyed by
+            ``(seed_id, day)``.
+        """
         from .core.io import xr_load_psd
         step_name = self._step_name_for("psd")
         lineage   = self._lineage_upstream_of("psd")
         root      = self.output_folder
-        fmt       = "dataframe" if format == "dataframe" else "dataset"
         if seed_id is not None and day is not None:
-            return xr_load_psd(root, lineage, step_name, seed_id, day, format=fmt)
+            return xr_load_psd(root, lineage, step_name, seed_id, day)
         base = os.path.join(root, *lineage, step_name, "_output", "daily")
         results = {}
         seed_ids = (
@@ -557,7 +569,7 @@ class MSNoiseResult:
             )
             for fpath in day_files:
                 day_key = os.path.splitext(os.path.basename(fpath))[0]
-                r = xr_load_psd(root, lineage, step_name, sid, day_key, format=fmt)
+                r = xr_load_psd(root, lineage, step_name, sid, day_key)
                 if r is not None:
                     results[(sid, day_key)] = r
         if seed_id is not None:
@@ -565,25 +577,55 @@ class MSNoiseResult:
         return results
 
     @_lineage_method("psd_rms")
-    def get_psd_rms(self, seed_id=None, format="xarray"):
-        """Load PSD RMS results. Requires 'psd_rms' in lineage."""
+    def get_psd_rms(self, seed_id=None):
+        """Load PSD RMS results. Requires 'psd_rms' in lineage.
+
+        :returns: :class:`xarray.Dataset` or dict of Datasets keyed by
+            seed_id.
+        """
         from .core.io import xr_load_rms
         step_name = self._step_name_for("psd_rms")
         lineage   = self._lineage_upstream_of("psd_rms")
         root      = self.output_folder
-        fmt       = "dataframe" if format == "dataframe" else "dataset"
         if seed_id is not None:
-            return xr_load_rms(root, lineage, step_name, seed_id, format=fmt)
+            return xr_load_rms(root, lineage, step_name, seed_id)
         base = os.path.join(root, *lineage, step_name, "_output")
         results = {}
         for sid_dir in self._discover(os.path.join(base, "*")):
             if not os.path.isdir(sid_dir):
                 continue
             sid = os.path.basename(sid_dir)
-            r = xr_load_rms(root, lineage, step_name, sid, format=fmt)
+            r = xr_load_rms(root, lineage, step_name, sid)
             if r is not None:
                 results[sid] = r
         return results
+
+    # ── helpers ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def to_dataframe(ds):
+        """Convert an xarray Dataset or DataArray returned by any ``get_*``
+        method to a :class:`~pandas.DataFrame`.
+
+        This is the recommended escape hatch for users who need pandas
+        for custom analysis, plotting, or export.  All ``get_*`` methods
+        return xarray objects; call this helper when you need a DataFrame::
+
+            r = MSNoiseResult.from_ids(db, mwcs=1, mwcs_dtt=1)
+            ds = r.get_mwcs_dtt("BE.UCC:BE.MEM", "ZZ", ("1D", "1D"))
+            df = MSNoiseResult.to_dataframe(ds)
+
+        For Datasets with multiple variables the result is a DataFrame with a
+        :class:`~pandas.MultiIndex` on the columns.  For DataArrays the result
+        is a flat DataFrame indexed by ``times``.
+
+        :param ds: :class:`xarray.Dataset` or :class:`xarray.DataArray`.
+        :returns: :class:`~pandas.DataFrame`.
+        """
+        import xarray as xr
+        if isinstance(ds, xr.DataArray):
+            return ds.to_dataframe(name=ds.name or "value")
+        return ds.to_dataframe()
 
     # ── export ────────────────────────────────────────────────────────────────
 

@@ -95,7 +95,6 @@ def main(loglevel="INFO"):
             for day in days:
                 df = xr_load_psd(
                     output_folder, psd_lineage, psd_step_name, seed_id, day,
-                    format="dataframe",
                 )
                 if df is not None and not df.empty:
                     frames.append(df)

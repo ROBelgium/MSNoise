@@ -77,7 +77,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
 
     pair = "_".join([sta1, sta2])
     try:
-        stack_total = result.get_ccf(f"{sta1}:{sta2}", components, mov_stack, format="dataframe")
+        stack_total = result.get_ccf(f"{sta1}:{sta2}", components, mov_stack)
         t = stack_total.columns.values
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)

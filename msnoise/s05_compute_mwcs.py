@@ -159,8 +159,7 @@ def main(loglevel="INFO"):
                 output = []
                 try:
                     data = xr_get_ccf(params.global_.output_folder, lineage_names_mov,
-                                      station1, station2, components, mov_stack, taxis,
-                                      format="dataframe")
+                                      station1, station2, components, mov_stack, taxis)
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
@@ -169,9 +168,9 @@ def main(loglevel="INFO"):
                 # data = data.loc[todo]
 
                 to_search = extend_days(days)
-                # data = data[(data.index.floor('d').isin(to_search) or data.index.ceil('d').isin(to_search))]
-                data = data[data.index.floor('d').isin(to_search)]
-                data = data.dropna()
+                # Filter to relevant days and drop all-NaN time steps
+                data = data.sel(times=data.times.dt.floor('D').isin(to_search))
+                data = data.dropna('times', how='all')
 
                 if rolling_mode:
                     # Mode B: compute per-index rolling reference from MOV data
@@ -205,10 +204,11 @@ def main(loglevel="INFO"):
                 index_range = np.argwhere(
                     np.logical_and(freq_vec >= freqmin,
                                 freq_vec <= freqmax)).flatten()
-                cci = np.empty((data.shape[0], window_length_samples))
-                while maxind <= data.shape[1]:
-                    cci[:] = data.iloc[:,
-                            minind:(minind + window_length_samples)].values
+                # Materialise to numpy for the sliding-window inner loop
+                data_arr = data.values
+                cci = np.empty((data_arr.shape[0], window_length_samples))
+                while maxind <= data_arr.shape[1]:
+                    cci[:] = data_arr[:, minind:(minind + window_length_samples)]
                     scipy.signal.detrend(cci, type="linear", axis=1,
                                         overwrite_data=True)
                     for i in range(cci.shape[0]):
@@ -316,7 +316,7 @@ def main(loglevel="INFO"):
                 E_arr    = np.stack([o[2] for o in output], axis=1)
                 MCOH_arr = np.stack([o[3] for o in output], axis=1)
 
-                times_coord = data.index.values
+                times_coord = data.times.values
                 ds_out = xr.Dataset(
                     {
                         "MWCS": xr.DataArray(

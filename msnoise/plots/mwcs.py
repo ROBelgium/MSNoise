@@ -95,8 +95,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
     logger.info(f"Loading MWCS for {sta1}-{sta2} comp={components} mov_stack={mov_stack} lineage={'/'.join(result.lineage_names)}")
 
     try:
-        mwcs = result.get_mwcs(f"{sta1}:{sta2}", components, mov_stack,
-                               format="dataframe")
+        mwcs = result.get_mwcs(f"{sta1}:{sta2}", components, mov_stack)
     except FileNotFoundError as fp:
         logger.error(f"FILE DOES NOT EXIST: {fp}")
         return
