@@ -618,3 +618,25 @@ python -m pytest /path/to/msnoise/msnoise/test/test_smoke.py::test_smoke_172_psd
 18. **`__all__` must include every public function**: when adding a new public function to any `core/*.py` module, add its name to that module's `__all__` list. Missing entries silently break the `from .core import *` chain in `api.py` and `core/__init__.py`.
 
 19. **`chunk_size` is a CLI-only parameter** (not a config CSV key): pass `--chunk-size N` to `msnoise cc compute` or `msnoise qc compute_psd`. It controls how many pairs (CC) or stations (PSD) a single worker claims per day. Default 0 = claim all (original behaviour). Only effective for `group_by="day_lineage"` steps. Do NOT add it to downstream steps (stack, MWCS, stretching) — those use `pair_lineage` and write to per-pair accumulated files where concurrent writes would corrupt data.
+
+---
+
+## 17. Deferred Work & Accepted Technical Debt
+
+*Items parked as of commit `6f815e9`. Read this before starting a new session to avoid re-deciding things already decided.*
+
+### Deferred — revisit before 2.0 release
+
+**Per-day MWCS/STR/WCT output files**: currently each step writes one `(pair, mov_stack, comp).nc` file accumulating all time steps. Switching to per-day files would enable `--chunk-size` parallelism for downstream steps, but requires reworking `MSNoiseResult` readers, user notebooks, and plot scripts. **Thomas is evaluating tradeoffs** — do not implement without explicit go-ahead.
+
+**Plugin API formalisation**: the three active entry point groups (`msnoise.plugins.table_def`, `.jobtypes`, `.commands`) work today but there is no stable contract for plugin authors after the `core/` restructuring. Work needed: `msnoise/plugins/__init__.py` with stable re-exports, audit of `api.py`, new `ARCHITECTURE.md §P`, possibly `msnoise utils check-plugins`. **Revisit when the first MSNoise 2-compatible plugin is being written.**
+
+**Sphinx documentation update**: stale import paths (`msnoise.preprocessing`, `msnoise.move2obspy`), `LayeredParams` → `MSNoiseParams` throughout, new `MSNoiseResult` xarray API examples, new CLI commands (`msnoise config get/set/reset/list`, `msnoise utils import-stationxml`), plugin guide for restructured paths. **Do just before the 2.0 release announcement** — once, not incrementally.
+
+### Accepted technical debt (permanent or very long-term)
+
+| Item | Reason |
+|------|--------|
+| `pandas` in `s02_new_jobs`, `s04_stack_mov`, `s04_stack_refstack` | `pd.to_timedelta` / `pd.date_range` handle the full ISO 8601 / pandas offset string space. Stdlib replacement would be fragile for edge-case duration strings. |
+| `logbook` as logging backend in `core/db.py` | Full migration to stdlib `logging` would touch every worker script. Worth doing in a dedicated logging overhaul, not piecemeal. |
+| `s02_preprocessing.py` at top level | Contains the full preprocessing worker loop (~100 lines). Moving to `core/` would rename the CLI entrypoint. Fine as-is. |
