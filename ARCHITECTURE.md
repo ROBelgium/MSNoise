@@ -81,7 +81,6 @@ msnoise/
                          # psd_rms, psd_df_rms,       ← pure DSP; psd_df_rms takes xarray Dataset, returns Dataset
                          # make_same_length,           ← kept as public API for plugins
                          # find_segments, wiener_filt  ← Wiener filter helpers (moved from wiener.py)
-                         # to_sds moved to stations.py
     io.py                # xr_save_ccf, xr_get_ccf, xr_save_ccf_daily, xr_get_ccf_daily,
                          # xr_save_ccf_all, xr_get_ccf_all,
                          # xr_save_ref, xr_get_ref, xr_load_ccf_for_stack,
@@ -531,9 +530,18 @@ msnoise config show_set mwcs 1               # detailed view of one set
 msnoise config copy_set mwcs 1 mwcs 2        # copy set 1 → set 2
 ```
 
+**Station management**:
+```sh
+msnoise utils import-stationxml inventory.xml          # import from file
+msnoise utils import-stationxml https://fdsn.../query  # import from FDSN URL
+msnoise utils import-stationxml inventory.xml --no-save  # skip saving to response_path
+```
+
+Saves inventory to ``response_path`` automatically so instrument correction is ready.
+
 **DB utilities**:
 ```sh
-msnoise db upgrade          # add new config params to existing DB
+msnoise db upgrade          # add new config params to existing DB (all categories)
 msnoise db clean_duplicates # remove duplicate job rows
 msnoise db dump             # export DB to CSV
 ```
@@ -603,8 +611,10 @@ python -m pytest /path/to/msnoise/msnoise/test/test_smoke.py::test_smoke_172_psd
 
 14. **`xr_get_ccf` returns an in-memory DataArray**: despite using `open_dataset` internally, `xr_get_ccf` calls `.load()` + `.close()` before returning — the result is fully in-memory (not lazy-backed). Do not assume it needs `.load()` again.
 
-16. **Never import from `..api` inside `core/`**: `core/*.py` modules must import sibling modules directly (`from .workflow import X`, `from .signal import Y`). Importing via `..api` creates a circular dependency and was the root cause of the `get_step_successors` import failure. If a function in `workflow.py` needs another function from `workflow.py`, just call it directly — no import needed.
+16. **`MSNoiseParams` (formerly `LayeredParams`)**: the params object is now named `MSNoiseParams` everywhere (``params.py``, ``core/config.py``, ``core/workflow.py``, etc.). If you see `LayeredParams` anywhere it is a stale reference — update it.
 
-17. **`__all__` must include every public function**: when adding a new public function to any `core/*.py` module, add its name to that module's `__all__` list. Missing entries silently break the `from .core import *` chain in `api.py` and `core/__init__.py`.
+17. **Never import from `..api` inside `core/`**: `core/*.py` modules must import sibling modules directly (`from .workflow import X`, `from .signal import Y`). Importing via `..api` creates a circular dependency and was the root cause of the `get_step_successors` import failure. If a function in `workflow.py` needs another function from `workflow.py`, just call it directly — no import needed.
 
-15. **`chunk_size` is a CLI-only parameter** (not a config CSV key): pass `--chunk-size N` to `msnoise cc compute` or `msnoise qc compute_psd`. It controls how many pairs (CC) or stations (PSD) a single worker claims per day. Default 0 = claim all (original behaviour). Only effective for `group_by="day_lineage"` steps. Do NOT add it to downstream steps (stack, MWCS, stretching) — those use `pair_lineage` and write to per-pair accumulated files where concurrent writes would corrupt data.
+18. **`__all__` must include every public function**: when adding a new public function to any `core/*.py` module, add its name to that module's `__all__` list. Missing entries silently break the `from .core import *` chain in `api.py` and `core/__init__.py`.
+
+19. **`chunk_size` is a CLI-only parameter** (not a config CSV key): pass `--chunk-size N` to `msnoise cc compute` or `msnoise qc compute_psd`. It controls how many pairs (CC) or stations (PSD) a single worker claims per day. Default 0 = claim all (original behaviour). Only effective for `group_by="day_lineage"` steps. Do NOT add it to downstream steps (stack, MWCS, stretching) — those use `pair_lineage` and write to per-pair accumulated files where concurrent writes would corrupt data.
