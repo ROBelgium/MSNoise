@@ -43,10 +43,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import database_exists, create_database
-try:
-    import cPickle
-except ImportError:
-    import pickle as cPickle
+import pickle
 
 from .msnoise_table_def import declare_tables
 
@@ -86,7 +83,7 @@ def create_database_inifile(tech, hostname, database, username, password,
     :return: None
     """
     f = open(os.path.join(os.getcwd(), 'db.ini'), 'wb')
-    cPickle.dump([tech, hostname, database, username, password, prefix], f,
+    pickle.dump([tech, hostname, database, username, password, prefix], f,
                  protocol=2)
     f.close()
 
@@ -95,7 +92,6 @@ def create_indices(session, prefix):
     """
     Create indices in the database, using the provided sqlalchemy session.
     """
-    # TODO move those calls to a def and call it from install / msnoise.scripts
     if prefix:
         prefix += '_'
     try:

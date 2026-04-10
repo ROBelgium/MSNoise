@@ -1,6 +1,7 @@
 """MSNoise station and data-availability management."""
 
 __all__ = [
+    "ARCHIVE_STRUCTURES",
     "add_data_source",
     "check_stations_uniqueness",
     "get_data_availability",
@@ -35,6 +36,16 @@ import numpy as np
 from ..msnoise_table_def import Station, DataAvailability
 
 logger = logging.getLogger('msnoise.stations')
+
+#: Archive path templates keyed by structure name.
+#: Used by :func:`~msnoise.s01_scan_archive` and :func:`populate_stations`.
+ARCHIVE_STRUCTURES = {
+    "SDS":  "YEAR/NET/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.DAY",
+    "BUD":  "NET/STA/STA.NET.LOC.CHAN.YEAR.DAY",
+    "IDDS": "YEAR/NET/STA/CHAN.TYPE/DAY/NET.STA.LOC.CHAN.TYPE.YEAR.DAY.HOUR",
+    "PDF":  "YEAR/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.DAY",
+}
+
 
 def get_stations(session, all=False, net=None, format="raw"):
     """Get Stations from the database.

@@ -81,7 +81,7 @@ import obspy
 
 from . import api
 from . import FatalError
-from . import data_structures
+from .core.stations import ARCHIVE_STRUCTURES
 
 
 # Module-level logger used by helper functions (update_availability, etc.)
@@ -401,8 +401,8 @@ def get_data_structure(config_data_st):
 
     Returns None if the description string cannot be found.
     """
-    if config_data_st in data_structures.data_structure:
-        return data_structures.data_structure[config_data_st]
+    if config_data_st in ARCHIVE_STRUCTURES:
+        return ARCHIVE_STRUCTURES[config_data_st]
 
     if config_data_st.count('/') != 0:
         return config_data_st
