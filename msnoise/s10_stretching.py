@@ -74,7 +74,6 @@ from .core.io import xr_get_ccf, xr_get_ref, xr_save_stretching
 import time
 
 import numpy as np
-import pandas as pd
 import xarray as xr
 from scipy.ndimage import map_coordinates
 
@@ -295,7 +294,7 @@ def main(loglevel="INFO"):
                         err = _hwhm_errors(cc_row.reshape(nstr, 1))[0]
                         allerrs_list.append(err)
 
-                    alldays   = pd.DatetimeIndex(alldays_list)
+                    alldays   = np.array(alldays_list, dtype="datetime64[ns]")
                     alldeltas = np.array(alldeltas_list)
                     allcoefs  = np.array(allcoefs_list)
                     allerrs   = np.array(allerrs_list)
@@ -328,7 +327,7 @@ def main(loglevel="INFO"):
                             np.column_stack([alldeltas, allcoefs, allerrs]),
                             dims=["times", "keys"],
                             coords={
-                                "times": alldays.values,
+                                "times": alldays,
                                 "keys":  ["Delta", "Coeff", "Error"],
                             },
                         )
