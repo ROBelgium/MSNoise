@@ -23,6 +23,84 @@ _STEP_ABBREVS = {
     "psd_rms":        "rms",
 }
 
+
+def parse_config_key(key):
+    """Parse a dot-notation config key into ``(category, set_number, name)``.
+
+    Accepted forms::
+
+        output_folder            →  ("global", 1, "output_folder")   # global shorthand
+        cc.cc_sampling_rate      →  ("cc",     1, "cc_sampling_rate")
+        cc.2.cc_sampling_rate    →  ("cc",     2, "cc_sampling_rate")
+        mwcs.2.mwcs_wlen         →  ("mwcs",   2, "mwcs_wlen")
+
+    :raises ValueError: for malformed keys (too many parts, non-integer set
+        number, or bare name that is not a global parameter).
+    """
+    parts = key.split(".")
+    if len(parts) == 1:
+        # Bare name → global shorthand (e.g. "output_folder")
+        return ("global", 1, parts[0])
+    elif len(parts) == 2:
+        # category.name  → set_number=1
+        category, name = parts
+        return (category, 1, name)
+    elif len(parts) == 3:
+        # category.set_number.name
+        category, set_str, name = parts
+        try:
+            set_number = int(set_str)
+        except ValueError:
+            raise ValueError(
+                f"Invalid set number {set_str!r} in key {key!r}. "
+                "Use the form 'category.N.name' where N is an integer."
+            )
+        return (category, set_number, name)
+    else:
+        raise ValueError(
+            f"Too many parts in config key {key!r}. "
+            "Expected 'name', 'category.name', or 'category.N.name'."
+        )
+
+
+def _cast_config_value(name, value_str, param_type):
+    """Validate and cast *value_str* to the type declared for this parameter.
+
+    :param name: Parameter name (for error messages).
+    :param value_str: Raw string value from the CLI.
+    :param param_type: One of ``'str'``, ``'int'``, ``'float'``, ``'bool'``, ``'eval'``.
+    :returns: The validated string to store in the DB (always stored as string).
+    :raises ValueError: if the value is not valid for *param_type*.
+    """
+    if param_type == "bool":
+        normalised = value_str.strip().upper()
+        if normalised in ("Y", "YES", "TRUE", "1"):
+            return "Y"
+        elif normalised in ("N", "NO", "FALSE", "0"):
+            return "N"
+        else:
+            raise ValueError(
+                f"'{name}' expects a boolean (Y/N). Got {value_str!r}. "
+                "Use Y, N, True, False, 1, or 0."
+            )
+    elif param_type == "int":
+        try:
+            int(value_str)
+        except ValueError:
+            raise ValueError(
+                f"'{name}' expects an integer. Got {value_str!r}."
+            )
+    elif param_type == "float":
+        try:
+            float(value_str)
+        except ValueError:
+            raise ValueError(
+                f"'{name}' expects a float. Got {value_str!r}."
+            )
+    # 'str' and 'eval' accept any string — no further validation
+    return value_str
+
+
 def get_config(session, name=None, isbool=False, plugin=None, category='global', set_number=None):
     """Get the value of one or all config bits from the database.
 

@@ -652,57 +652,226 @@ def config_sync():
 
 
 @config.command(name='set')
-@click.argument('name_value')
-def config_set(name_value):
+@click.argument('key')
+@click.argument('value')
+@click.pass_context
+def config_set(ctx, key, value):
+    """Set a configuration parameter using dot notation.
+
+    \b
+    KEY format:
+      name                   →  global parameter (e.g. output_folder)
+      category.name          →  category set 1  (e.g. cc.cc_sampling_rate)
+      category.N.name        →  explicit set N  (e.g. mwcs.2.mwcs_wlen)
+
+    \b
+    Examples:
+      msnoise config set output_folder /data/output
+      msnoise config set cc.cc_sampling_rate 25
+      msnoise config set cc.2.cc_sampling_rate 25
+      msnoise config set mwcs.2.mwcs_wlen 10
+      msnoise config set global.hpc Y
     """
-    Set a configuration value. The argument should be of the form
-    'variable=value'.
-    """
-    from ..default import default
-    if not name_value.count("="):
-        click.echo("!! format of the set command is name=value !!")
-        return
-    name, value = name_value.split("=")
-    if name not in default:
-        click.echo("!! unknown parameter %s !!" % name)
-        return
-    from ..core.config import update_config
+    from ..core.config import parse_config_key, _cast_config_value, update_config
     from ..core.db import connect
+
+    try:
+        category, set_number, name = parse_config_key(key)
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        ctx.exit(1)
+        return
+
     db = connect()
-    update_config(db, name, value)
-    db.commit()
-    db.close()
-    click.echo("Successfully updated parameter %s = %s" % (name, value))
+    try:
+        # Look up the param_type from the DB for validation
+        row = (db.query(Config)
+               .filter(Config.name == name)
+               .filter(Config.category == category)
+               .filter(Config.set_number == set_number)
+               .first())
+        if row is None:
+            click.echo(
+                f"Error: parameter '{name}' not found in {category} set {set_number}.\n"
+                f"Use 'msnoise config list {category}' to see available parameters.",
+                err=True
+            )
+            ctx.exit(1)
+            return
+
+        try:
+            validated = _cast_config_value(name, value, row.param_type or "str")
+        except ValueError as e:
+            click.echo(f"Error: {e}", err=True)
+            ctx.exit(1)
+            return
+
+        update_config(db, name, validated, category=category, set_number=set_number)
+        db.commit()
+        click.echo(f"✓  {category}.{set_number}.{name}  =  {validated}")
+    finally:
+        db.close()
 
 
 @config.command(name='get')
-@click.argument('names', nargs=-1)
-def config_get(names):
+@click.argument('key')
+@click.pass_context
+def config_get(ctx, key):
+    """Get a configuration parameter value using dot notation.
+
+    \b
+    KEY format:
+      name                   →  global parameter
+      category.name          →  category set 1
+      category.N.name        →  explicit set N
+
+    \b
+    Examples:
+      msnoise config get output_folder
+      msnoise config get cc.cc_sampling_rate
+      msnoise config get mwcs.2.mwcs_wlen
     """
-    Display the value of the given configuration variable(s).
+    from ..core.config import parse_config_key
+    from ..core.db import connect
+
+    try:
+        category, set_number, name = parse_config_key(key)
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        ctx.exit(1)
+        return
+
+    db = connect()
+    try:
+        row = (db.query(Config)
+               .filter(Config.name == name)
+               .filter(Config.category == category)
+               .filter(Config.set_number == set_number)
+               .first())
+        if row is None:
+            click.echo(
+                f"Error: parameter '{name}' not found in {category} set {set_number}.",
+                err=True
+            )
+            ctx.exit(1)
+            return
+        default_marker = " *" if row.value != row.default_value else ""
+        click.echo(f"{category}.{set_number}.{name}  =  {row.value}{default_marker}  "
+                   f"[{row.param_type or 'str'}]  (default: {row.default_value})")
+    finally:
+        db.close()
+
+
+@config.command(name='list')
+@click.argument('filter_key', required=False, default=None,
+                metavar='[CATEGORY[.N]]')
+@click.pass_context
+def config_list(ctx, filter_key):
+    """List configuration parameters, optionally filtered.
+
+    \b
+    Examples:
+      msnoise config list              # all categories, all sets
+      msnoise config list cc           # all cc sets
+      msnoise config list mwcs.2       # mwcs set 2 only
+
+    Non-default values are marked with *.
     """
     from ..core.db import connect
+
+    # Parse the optional filter
+    filter_category = None
+    filter_set = None
+    if filter_key:
+        parts = filter_key.split(".")
+        filter_category = parts[0]
+        if len(parts) >= 2:
+            try:
+                filter_set = int(parts[1])
+            except ValueError:
+                click.echo(f"Error: invalid set number in {filter_key!r}", err=True)
+                ctx.exit(1)
+                return
+
     db = connect()
-    show_config_values(db, names)
-    db.close()
+    try:
+        q = db.query(Config).order_by(
+            Config.category, Config.set_number, Config.name)
+        if filter_category:
+            q = q.filter(Config.category == filter_category)
+        if filter_set is not None:
+            q = q.filter(Config.set_number == filter_set)
+
+        rows = q.all()
+        if not rows:
+            click.echo("No configuration parameters found.")
+            return
+
+        current_header = None
+        for row in rows:
+            header = f"{row.category}  (set {row.set_number})"
+            if header != current_header:
+                if current_header is not None:
+                    click.echo("")
+                click.echo(f"\n{header}")
+                click.echo("─" * len(header))
+                current_header = header
+
+            marker = " *" if row.value != row.default_value else "  "
+            name_col  = f"{row.name:<40}"
+            val_col   = f"{str(row.value):<20}"
+            type_col  = f"[{row.param_type or 'str'}]"
+            click.echo(f"  {name_col}{val_col}{marker} {type_col}")
+    finally:
+        db.close()
 
 
 @config.command(name='reset')
-@click.argument('names', nargs=-1)
-def config_reset(names):
+@click.argument('key')
+@click.pass_context
+def config_reset(ctx, key):
+    """Reset a configuration parameter to its default value.
+
+    \b
+    KEY format: same dot notation as 'config set'.
+
+    \b
+    Examples:
+      msnoise config reset cc.cc_sampling_rate
+      msnoise config reset mwcs.2.mwcs_wlen
     """
-    Reset the value of the given configuration variable(s) to their default.
-    """
-    from ..default import default
-    from ..core.config import update_config
+    from ..core.config import parse_config_key, update_config
     from ..core.db import connect
-    for key in names:
-        default_value = default[key].default
-        db = connect()
-        update_config(db, key, default_value)
-        # db.commit()
+
+    try:
+        category, set_number, name = parse_config_key(key)
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        ctx.exit(1)
+        return
+
+    db = connect()
+    try:
+        row = (db.query(Config)
+               .filter(Config.name == name)
+               .filter(Config.category == category)
+               .filter(Config.set_number == set_number)
+               .first())
+        if row is None:
+            click.echo(
+                f"Error: parameter '{name}' not found in {category} set {set_number}.",
+                err=True
+            )
+            ctx.exit(1)
+            return
+        update_config(db, name, row.default_value,
+                      category=category, set_number=set_number)
+        db.commit()
+        click.echo(f"✓  {category}.{set_number}.{name}  reset to  {row.default_value}")
+    finally:
         db.close()
-        click.echo("Successfully reset parameter %s = %s" % (key, default_value))
+
+
 
 @config.command()
 @click.argument('set_name')
