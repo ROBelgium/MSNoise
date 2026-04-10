@@ -323,6 +323,10 @@ Key columns on `Config`: `name`, `category`, `set_number`, `value` (always strin
 
 Config CSV files in `msnoise/config/config_<category>.csv` define defaults. Columns: `name`, `default`, `definition`, `type`, `possible_values`.
 
+**CLI config helpers** (`core/config.py`):
+- `parse_config_key(key)` → `(category, set_number, name)`. Accepts `name` (global), `category.name` (set 1), `category.N.name` (explicit set).
+- `_cast_config_value(name, value_str, param_type)` → validated string. Validates against `param_type` (`str/int/float/bool/eval`); normalises bools to `Y`/`N`. Raises `ValueError` with a clear message on bad input. Always call before `update_config()` in CLI code.
+
 ---
 
 ## 10. ORM Tables
@@ -489,6 +493,36 @@ msnoise cc dtt dvv compute_mwcs_dtt_dvv # DVV aggregate
 msnoise qc compute_psd                  # PSD
 msnoise qc compute_psd_rms              # PSD RMS
 msnoise -t 4 qc compute_psd             # parallel (4 workers)
+```
+
+**Configuration** (dot-notation, see §9):
+```sh
+# Read
+msnoise config get output_folder             # global shorthand
+msnoise config get cc.cc_sampling_rate       # category.name → set 1
+msnoise config get mwcs.2.mwcs_wlen          # explicit set number
+
+# Write (validates type before writing)
+msnoise config set output_folder /data/output
+msnoise config set cc.cc_sampling_rate 25
+msnoise config set mwcs.2.mwcs_wlen 10
+
+# Reset to default
+msnoise config reset cc.cc_sampling_rate
+msnoise config reset mwcs.2.mwcs_wlen
+
+# List / inspect
+msnoise config list                          # all categories, all sets
+msnoise config list cc                       # all cc sets
+msnoise config list mwcs.2                   # mwcs set 2 only
+                                             # * marks non-default values
+
+# Config set management
+msnoise config create_set mwcs               # add a second mwcs set
+msnoise config delete_set mwcs 2             # remove mwcs set 2
+msnoise config list_sets                     # show all category × set_number combos
+msnoise config show_set mwcs 1               # detailed view of one set
+msnoise config copy_set mwcs 1 mwcs 2        # copy set 1 → set 2
 ```
 
 **DB utilities**:
