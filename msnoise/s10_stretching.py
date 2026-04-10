@@ -261,40 +261,46 @@ def main(loglevel="INFO"):
                         data_values, int(params.refstack.ref_begin), int(params.refstack.ref_end)
                     )
 
-                    alldays_list  = []
+                    # ── Mode B: vectorise masking + normalisation, keep
+                    # per-row stretch call (each row has a different rolling ref)
+                    _sr      = int(goal_sampling_rate)
+                    _lo      = mid - int(minlag  * _sr)
+                    _hi      = mid + int(minlag  * _sr)
+                    _lo2     = mid - int(maxlag2 * _sr)
+                    _hi2     = mid + int(maxlag2 * _sr)
+
+                    # Batch zero-lag masking on all rolling refs at once
+                    refs_masked = ref_rolling.copy()
+                    refs_masked[:, _lo:_hi] = 0.
+                    refs_masked[:, :_lo2]   = 0.
+                    refs_masked[:, _hi2:]   = 0.
+
+                    # Normalise current data (all rows at once)
+                    cur_mean = data_values.mean(axis=1, keepdims=True)
+                    cur_std  = data_values.std(axis=1, keepdims=True)
+                    cur_std  = np.where(cur_std != 0, cur_std, 1.0)
+                    data_norm_all = (data_values - cur_mean) / cur_std  # (n_days, n_samples)
+
                     alldeltas_list = []
                     allcoefs_list  = []
                     allerrs_list   = []
 
                     for i_row in range(num_days):
-                        ref_row = ref_rolling[i_row].copy()
-                        # Zero lag window on this row's reference
-                        ref_row[mid - int(minlag * goal_sampling_rate):mid + int(minlag * goal_sampling_rate)] = 0.
-                        ref_row[:mid - int(maxlag2 * goal_sampling_rate)] = 0.
-                        ref_row[mid + int(maxlag2 * goal_sampling_rate):] = 0.
-
                         ref_str_row, deltas_row = stretch_mat_creation(
-                            ref_row, str_range=str_range, nstr=nstr
+                            refs_masked[i_row], str_range=str_range, nstr=nstr
                         )
-
-                        cur = data_values[i_row]
-                        cur_std = cur.std() or 1.0
-                        cur_norm = (cur - cur.mean()) / cur_std
                         ref_std = ref_str_row.std(axis=1, keepdims=True)
                         ref_std = np.where(ref_std != 0, ref_std, 1.0)
                         ref_str_norm = (ref_str_row - ref_str_row.mean(axis=1, keepdims=True)) / ref_std
 
-                        cc_row = ref_str_norm @ cur_norm / ref_str_row.shape[1]  # (nstr,)
-                        best = int(np.argmax(cc_row))
+                        cc_row = ref_str_norm @ data_norm_all[i_row] / ref_str_row.shape[1]
+                        best   = int(np.argmax(cc_row))
 
-                        alldays_list.append(data.coords["times"].values[i_row])
                         alldeltas_list.append(deltas_row[best])
                         allcoefs_list.append(cc_row[best])
-                        # HWHM error for this single row
-                        err = _hwhm_errors(cc_row.reshape(nstr, 1))[0]
-                        allerrs_list.append(err)
+                        allerrs_list.append(_hwhm_errors(cc_row.reshape(nstr, 1))[0])
 
-                    alldays   = np.array(alldays_list, dtype="datetime64[ns]")
+                    alldays   = data.coords["times"].values
                     alldeltas = np.array(alldeltas_list)
                     allcoefs  = np.array(allcoefs_list)
                     allerrs   = np.array(allerrs_list)

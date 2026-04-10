@@ -211,15 +211,13 @@ def main(loglevel="INFO"):
                     cci[:] = data_arr[:, minind:(minind + window_length_samples)]
                     scipy.signal.detrend(cci, type="linear", axis=1,
                                         overwrite_data=True)
-                    for i in range(cci.shape[0]):
-                        cci[i] *= tp
+                    cci *= tp[np.newaxis, :]  # broadcast taper over all days
 
                     if rolling_mode:
                         # Mode B: per-row reference (n_times, window_length_samples)
                         cri = ref_rolling[:, minind:(minind + window_length_samples)].copy()
                         scipy.signal.detrend(cri, type='linear', axis=1, overwrite_data=True)
-                        for _i in range(cri.shape[0]):
-                            cri[_i] *= tp
+                        cri *= tp[np.newaxis, :]  # broadcast taper over all days
                     else:
                         cri = ref[
                             minind:(minind + window_length_samples)].copy()
