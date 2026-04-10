@@ -2621,50 +2621,6 @@ def utils_import_stationxml(ctx, source, data_source_id, no_save):
 
 
 
-@utils.command(name="import-stationxml")
-@click.argument("source")
-@click.option("--data-source-id", "-d", default=None, type=int,
-              help="DataSource ID to assign to imported stations (default: project default).")
-@click.option("--no-save", is_flag=True, default=False,
-              help="Do NOT save the inventory to response_path after import.")
-@click.pass_context
-def utils_import_stationxml(ctx, source, data_source_id, no_save):
-    """Import stations from a StationXML file or FDSN URL.
-
-    SOURCE can be a local file path or a URL (e.g. an FDSN station web
-    service query with level=channel).
-
-    The parsed inventory is written to the project's ``response_path``
-    directory by default, making instrument responses immediately available
-    to the preprocessing step.  Use --no-save to skip this.
-
-    \b
-    Examples:
-      msnoise utils import-stationxml inventory.xml
-      msnoise utils import-stationxml https://eida.ethz.ch/fdsnws/station/1/query?...
-      msnoise utils import-stationxml inventory.xml --data-source-id 2 --no-save
-    """
-    from ..core.db import connect
-    from ..core.stations import import_stationxml
-
-    db = connect()
-    try:
-        created, updated, saved_path = import_stationxml(
-            db, source,
-            data_source_id=data_source_id,
-            save_to_response_path=not no_save,
-        )
-        click.echo(f"✓ Import complete: {created} station(s) created, {updated} updated.")
-        if saved_path:
-            click.echo(f"  Inventory saved to: {saved_path}")
-        elif not no_save:
-            click.echo("  (Inventory not saved — response_path not configured.)")
-    except Exception as exc:
-        click.echo(f"✗ Import failed: {exc}", err=True)
-        ctx.exit(1)
-    finally:
-        db.close()
-
 
 def run():
     try:
