@@ -13,6 +13,7 @@ __all__ = [
     "fetch_waveforms_bulk",
     "is_remote_source",
     "parse_datasource_scheme",
+    "get_auth",
 ]
 
 

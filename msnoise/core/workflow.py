@@ -31,6 +31,11 @@ __all__ = [
     "reset_jobs",
     "resolve_lineage_params",
     "update_job",
+    "filter_within_daterange",
+    "get_first_runnable_steps_per_branch",
+    "get_step_successors",
+    "get_upstream_steps_for_step_id",
+    "get_workflow_graph",
 ]
 
 import datetime
@@ -1051,7 +1056,7 @@ def get_filter_steps_for_cc_step(session, cc_step_id):
     :param cc_step_id: The step_id of the CC step
     :return: List of filter workflow steps that are successors of the CC step
     """
-    from ..api import get_step_successors
+    # get_step_successors is defined in this module — no import needed
 
     # Get all steps that are successors of the CC step
     successor_steps = get_step_successors(session, cc_step_id)
