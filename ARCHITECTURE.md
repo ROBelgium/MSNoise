@@ -12,7 +12,7 @@
 2. Read this file
 3. Run `msnoise utils test --fast` from a test project dir to confirm baseline (see §15)
 4. Never modify the DB schema or `declare_tables()` without understanding §10
-5. Patch workflow: Claude generates `git diff`-style patch → Thomas applies locally, tests, pushes → Claude pulls before next patch
+5. Patch workflow: Claude generates `git diff`-style patch → Dev applies locally, tests, pushes → Claude pulls before next patch
 
 **Key rule**: Always `git pull` before generating a patch. Never stack patches without pulling in between.
 
