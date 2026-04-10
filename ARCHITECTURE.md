@@ -77,7 +77,7 @@ msnoise/
     signal.py            # winsorizing, stack, xwt, compute_wct_dtt, get_wct_avgcoh,
                          # preload_instrument_responses, save_preprocessed_streams,
                          # get_preprocessed_stream, validate_stack_data,
-                         # psd_rms, psd_df_rms,       ← pure DSP, no file I/O
+                         # psd_rms, psd_df_rms,       ← pure DSP; psd_df_rms takes xarray Dataset, returns Dataset
                          # make_same_length            ← kept as public API for plugins
     io.py                # xr_save_ccf, xr_get_ccf, xr_save_ccf_daily, xr_get_ccf_daily,
                          # xr_save_ccf_all, xr_get_ccf_all,
@@ -429,8 +429,6 @@ for branch in r.branches():   # other lineages reachable from same root
 
 **xarray-only API** (since v2.x): The `format=` parameter has been removed from all workflow step methods (CC, stack, ref, MWCS, stretching, WCT, DVV aggregates). All `get_*` methods return xarray Dataset or DataArray objects. For pandas users:
 
-```python
-
 **Internal helpers**:
 - `r._lineage_upstream_of(category)` — lineage list up to but NOT including `category`
 - `r._lineage_through(category)` — lineage list including `category`
@@ -480,6 +478,9 @@ msnoise utils create_psd_jobs --date_range START END --set-number 1
 **Compute workers**:
 ```sh
 msnoise cc compute                       # runs s03_compute_no_rotation
+msnoise cc compute --chunk-size 50       # claim 50 pairs/day (large networks, ≥50 stations)
+msnoise -t 8 cc compute --chunk-size 50  # 8 parallel workers × 50 pairs each
+msnoise qc compute_psd --chunk-size 20   # claim 20 stations/day for PSD
 msnoise cc stack -m                      # moving stack
 msnoise cc stack_refstack                # reference stack
 msnoise cc dtt compute_mwcs             # MWCS
@@ -503,8 +504,8 @@ msnoise db dump             # export DB to CSV
 
 ```sh
 # From a project directory (with msnoise.ini):
-msnoise utils test --fast    # 31 smoke tests, ~20s — run after every patch
-msnoise utils test           # 101 full tests, ~2 min — requires test data
+msnoise utils test --fast    # 32 smoke tests, ~20s — run after every patch
+msnoise utils test           # full integration tests, ~2 min — requires test data
 
 # Direct pytest:
 cd /path/to/msnoise_project
@@ -522,6 +523,7 @@ python -m pytest /path/to/msnoise/msnoise/test/test_smoke.py::test_smoke_172_psd
 - 172: `params.psd_rms.*` accessible via `get_next_lineage_batch` (LayeredParams layer test)
 - 173: `get_waveform_path` prepends DataSource.uri correctly
 - 174: `create_psd_jobs` CLI creates T jobs
+- 175: `get_next_lineage_batch(chunk_size=2)` claims ≤2 CC jobs per day, leaves rest as T
 - 18-19: lineage normalisation, DVV discoverability
 - 185: DataSource station resolution
 - 20-25: second-day processing, filter pass-through, idempotency
@@ -553,3 +555,12 @@ python -m pytest /path/to/msnoise/msnoise/test/test_smoke.py::test_smoke_172_psd
 11. **`make_same_length` is public API**: it has a deprecation warning in its docstring but is kept in `core/signal.py` because external plugins depend on it. Do not remove it.
 
 12. **WCT-DTT variable names are uppercase**: `DTT`, `ERR`, `COH` (not `dtt`, `err`, `coh`). Test stubs must use uppercase or `xr_get_wct_dtt` will fail silently.
+
+13. **Lazy dataset handle lifetime**: all `get_*` readers in `core/io.py` use `xr.open_dataset()` (lazy). The file handle stays open until `.close()` is called or the object is garbage-collected. **Two specific readers materialise + close immediately** because their file is also a write target in the same pipeline:
+   - `xr_get_ccf` — the stacked CCF file is merged and rewritten by `xr_save_ccf` (stack worker)
+   - `xr_get_ref` — the REF file is rewritten by `xr_save_ref` (refstack worker)
+   All other lazy readers (MWCS, DTT, STR, WCT) read from files that are **never written back to by the same caller** — those handles are safe to keep lazy, but callers must `ds.close()` explicitly once done to avoid leaking handles (especially in loops over many pairs). Pattern: extract all needed `.values`, then call `ds.close()`.
+
+14. **`xr_get_ccf` returns an in-memory DataArray**: despite using `open_dataset` internally, `xr_get_ccf` calls `.load()` + `.close()` before returning — the result is fully in-memory (not lazy-backed). Do not assume it needs `.load()` again.
+
+15. **`chunk_size` is a CLI-only parameter** (not a config CSV key): pass `--chunk-size N` to `msnoise cc compute` or `msnoise qc compute_psd`. It controls how many pairs (CC) or stations (PSD) a single worker claims per day. Default 0 = claim all (original behaviour). Only effective for `group_by="day_lineage"` steps. Do NOT add it to downstream steps (stack, MWCS, stretching) — those use `pair_lineage` and write to per-pair accumulated files where concurrent writes would corrupt data.
