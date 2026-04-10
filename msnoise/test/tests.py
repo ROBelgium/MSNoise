@@ -1310,36 +1310,44 @@ def test_106_plot_dvv_comparison():
 
 @pytest.mark.order(201)
 def test_201_config_get_unknown_param(setup_environment):
+    """config get with an unknown parameter exits non-zero and reports the error."""
     runner = setup_environment['runner']
+    # Dot-notation: bare unknown name → global.1.inexistant_param → not found
     result = runner.invoke(msnoise_script.config_get, ['inexistant_param'])
-    assert result.exit_code == 0
-    assert 'unknown parameter' in result.output
+    assert result.exit_code != 0, (
+        f"Expected non-zero exit for unknown param, got 0. Output: {result.output}"
+    )
 
 
 @pytest.mark.order(202)
 def test_202_config_set_unknown_param(setup_environment):
+    """config set with an unknown parameter exits non-zero and reports the error."""
     runner = setup_environment['runner']
-    result = runner.invoke(msnoise_script.config_set, ['inexistant_param=value'])
-    assert result.exit_code == 0
-    assert 'unknown parameter' in result.output
+    # Dot-notation: bare unknown name → global.1.inexistant_param → not found
+    result = runner.invoke(msnoise_script.config_set, ['inexistant_param', 'value'])
+    assert result.exit_code != 0, (
+        f"Expected non-zero exit for unknown param, got 0. Output: {result.output}"
+    )
 
 
 @pytest.mark.order(203)
 def test_203_config_set_param(setup_environment):
+    """config set/get round-trip using dot notation."""
     runner = setup_environment['runner']
 
-    result = runner.invoke(msnoise_script.config_set, ['response_path=XXX'])
-    assert result.exit_code == 0
+    # Bare name is the global shorthand (response_path is a global parameter)
+    result = runner.invoke(msnoise_script.config_set, ['response_path', 'XXX'])
+    assert result.exit_code == 0, f"config set failed: {result.output}"
 
     result = runner.invoke(msnoise_script.config_get, ['response_path'])
-    assert result.exit_code == 0
+    assert result.exit_code == 0, f"config get failed: {result.output}"
     assert 'XXX' in result.output
 
-    result = runner.invoke(msnoise_script.config_set, ['response_path=none'])
+    result = runner.invoke(msnoise_script.config_set, ['response_path', 'none'])
     assert result.exit_code == 0
     # Restore response_path so subsequent PSD tests find the correct folder
     response_path = setup_environment['response_path']
-    result = runner.invoke(msnoise_script.config_set, [f'response_path={response_path}'])
+    result = runner.invoke(msnoise_script.config_set, ['response_path', response_path])
     assert result.exit_code == 0
 
 @pytest.mark.order(301)
