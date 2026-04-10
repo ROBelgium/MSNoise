@@ -24,6 +24,7 @@ __all__ = [
     "update_data_availability",
     "update_data_source",
     "update_station",
+    "populate_stations",
 ]
 
 import itertools
@@ -791,3 +792,73 @@ def to_sds(stats, year, jday):
     f = f.replace("JDAY", "%03i" % jday)
     f = f.replace("TYPE", "D")
     return f
+
+
+def populate_stations(db, loglevel="INFO"):
+    """Scan the default DataSource archive and populate the Station table.
+
+    Walks the archive directory according to the configured ``data_structure``
+    (SDS, BUD, IDDS, PDF, or a custom format).  Station coordinates are
+    initialised to zero — use :func:`import_stationxml` afterwards to set
+    real coordinates.
+
+    For custom data structures, a ``custom.py`` file in the current working
+    directory must export a ``populate(data_folder)`` function that returns a
+    ``{NET_STA: [net, sta, lon, lat, alt, coordinates]}`` dictionary.
+
+    :param db: SQLAlchemy session.
+    :param loglevel: Logging verbosity (default ``"INFO"``).
+    :returns: ``True`` on success.
+    """
+    import glob
+    import os
+    import sys
+    import traceback
+    import logging as _logging
+    from .db import get_logger
+
+    logger = get_logger("msnoise.db_populate", loglevel, with_pid=True)
+    logger.info("Populating the Station table")
+
+    _ds = get_default_data_source(db)
+    data_folder = _ds.uri or ""
+    data_structure = _ds.data_structure or "SDS"
+    network_override = _ds.network_code or "*"
+
+    stationdict = {}
+    if data_structure in ("SDS", "IDDS"):
+        for di in sorted(glob.glob(os.path.join(data_folder, "*", "*", "*"))):
+            sta = os.path.basename(di)
+            net = os.path.basename(os.path.dirname(di))
+            stationdict[f"{net}_{sta}"] = [net, sta, 0.0, 0.0, 0.0, "UTM"]
+    elif data_structure == "BUD":
+        for di in sorted(glob.glob(os.path.join(data_folder, "*", "*"))):
+            sta = os.path.basename(di)
+            net = os.path.basename(os.path.dirname(di))
+            stationdict[f"{net}_{sta}"] = [net, sta, 0.0, 0.0, 0.0, "UTM"]
+    elif data_structure == "PDF":
+        for di in sorted(glob.glob(os.path.join(data_folder, "*", "*"))):
+            sta = os.path.basename(di)
+            stationdict[f"{network_override}_{sta}"] = [
+                network_override, sta, 0.0, 0.0, 0.0, "UTM"]
+    else:
+        logger.warning(f"Unknown data_structure {data_structure!r} — "
+                       "trying local custom.py parser.")
+        try:
+            sys.path.insert(0, os.getcwd())
+            from custom import populate  # noqa: PLC0415
+            stationdict = populate(data_folder)
+        except Exception:
+            traceback.print_exc()
+            _logging.error("No custom.py found in %s" % os.getcwd())
+            return False
+        finally:
+            if os.getcwd() in sys.path:
+                sys.path.remove(os.getcwd())
+
+    for key, (net, sta, lon, lat, alt, coordinates) in stationdict.items():
+        logger.info(f"Adding: {net}.{sta}")
+        update_station(db, net=net, sta=sta,
+                       X=float(lon), Y=float(lat), altitude=float(alt),
+                       coordinates=coordinates)
+    return True

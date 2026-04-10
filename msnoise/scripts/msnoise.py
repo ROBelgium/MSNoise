@@ -82,25 +82,21 @@ def validate_verbosity(ctx, param, value):
     return value
 
 
-def show_config_values(db, names):
-    """Show configuration values for the given parameter names (global set 1)."""
+def show_config_values(db):
+    """Print global config values; green = modified from default."""
     from ..msnoise_table_def import Config as _Config
-    for key in names:
-        row = (db.query(_Config)
-               .filter(_Config.name == key)
-               .filter(_Config.category == "global")
-               .filter(_Config.set_number == 1)
-               .first())
-        if row is None:
-            click.secho("Error: unknown parameter '%s'" % key)
-            continue
+    rows = (db.query(_Config)
+              .filter(_Config.category == "global")
+              .filter(_Config.set_number == 1)
+              .order_by(_Config.name)
+              .all())
+    for row in rows:
         value = row.value if row.value is not None else ""
         default_value = row.default_value if row.default_value is not None else ""
         display_value = value if value != "" else "''"
-        if value == default_value:
-            click.secho("   %s: %s" % (key, display_value))
-        else:
-            click.secho(" M %s: %s" % (key, display_value), fg='green')
+        modified = value != default_value
+        line = (" M " if modified else "   ") + f"{row.name}: {display_value}"
+        click.secho(line, fg="green" if modified else None)
 
 
 def info_db_ini():
@@ -179,32 +175,10 @@ def info_folders(db):
 
 
 def info_parameters(db):
-    """Show all configuration parameter values. Use 'msnoise config list' for full detail."""
-    from ..core.workflow import get_workflow_steps
-    from ..msnoise_table_def import Config as _Config
+    """Show global config values. Use 'msnoise config list' for full per-category detail."""
     click.echo('')
-    click.echo('Configuration values:'
-            '   | Normal colour indicates that the default value is used'
-            '   | Green indicates "M"odified values')
-    global_names = [
-        row.name for row in
-        db.query(_Config.name)
-          .filter(_Config.category == "global")
-          .filter(_Config.set_number == 1)
-          .order_by(_Config.name)
-          .all()
-    ]
-    show_config_values(db, global_names)
-
-    filter_steps = [s for s in get_workflow_steps(db) if s.category == 'filter']
-    if filter_steps:
-        click.echo('')
-        click.echo('Filter configsets:')
-        for step in filter_steps:
-            details = get_config_set_details(db, 'filter', step.set_number)
-            click.echo(f'  filter_{step.set_number} ({step.step_name}):')
-            for row in details:
-                click.echo(f'    {row["name"]} = {row["value"]}')
+    click.echo('Global config  (green = modified | run "msnoise config list" for full detail)')
+    show_config_values(db)
 
 
 def info_stations(db):
@@ -1363,8 +1337,8 @@ def populate(ctx, fromda):
         logger.info("Checking the available loc ids and chans...")
         ctx.invoke(db_da_stations_update_loc_chan)
     else:
-        from ..s00_populate_station_table import main
-        main(loglevel=loglevel)
+        from ..core.stations import populate_stations
+        populate_stations(db, loglevel=loglevel)
 
 
 @cli.command(name='scan_archive')
@@ -2596,6 +2570,53 @@ def create_psd_jobs_cmd(date, date_range, set_number):
     click.echo(f"Created {created} psd T job(s) across {len(dates)} day(s) "
                f"({skipped} skipped — no DA records for local sources).")
     db.close()
+
+
+
+
+@utils.command(name="import-stationxml")
+@click.argument("source")
+@click.option("--data-source-id", "-d", default=None, type=int,
+              help="DataSource ID to assign to imported stations (default: project default).")
+@click.option("--no-save", is_flag=True, default=False,
+              help="Do NOT save the inventory to response_path after import.")
+@click.pass_context
+def utils_import_stationxml(ctx, source, data_source_id, no_save):
+    """Import stations from a StationXML file or FDSN URL.
+
+    SOURCE can be a local file path or a URL (e.g. an FDSN station web
+    service query with level=channel).
+
+    The parsed inventory is written to the project's ``response_path``
+    directory by default, making instrument responses immediately available
+    to the preprocessing step.  Use --no-save to skip this.
+
+    \b
+    Examples:
+      msnoise utils import-stationxml inventory.xml
+      msnoise utils import-stationxml https://eida.ethz.ch/fdsnws/station/1/query?...
+      msnoise utils import-stationxml inventory.xml --data-source-id 2 --no-save
+    """
+    from ..core.db import connect
+    from ..core.stations import import_stationxml
+
+    db = connect()
+    try:
+        created, updated, saved_path = import_stationxml(
+            db, source,
+            data_source_id=data_source_id,
+            save_to_response_path=not no_save,
+        )
+        click.echo(f"✓ Import complete: {created} station(s) created, {updated} updated.")
+        if saved_path:
+            click.echo(f"  Inventory saved to: {saved_path}")
+        elif not no_save:
+            click.echo("  (Inventory not saved — response_path not configured.)")
+    except Exception as exc:
+        click.echo(f"✗ Import failed: {exc}", err=True)
+        ctx.exit(1)
+    finally:
+        db.close()
 
 
 
