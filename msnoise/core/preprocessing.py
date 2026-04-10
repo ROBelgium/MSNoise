@@ -50,15 +50,14 @@ except Exception:
     pass
 
 from .db import connect, get_logger
+import logging as _logging
 from .stations import get_data_availability
 from .signal import check_and_phase_shift, getGaps
-import logbook
-
 import datetime
 import glob
 
 import numpy as np
-logger = logbook.Logger(__name__)
+logger = _logging.getLogger("msnoise.preprocessing")
 
 
 def apply_preprocessing_to_stream(stream, params, responses=None, logger=None):
@@ -76,7 +75,7 @@ def apply_preprocessing_to_stream(stream, params, responses=None, logger=None):
     5. Instrument response removal (if ``remove_response`` is set)
 
     :param stream: Raw :class:`~obspy.core.stream.Stream` for **one station**.
-    :param params: :class:`~msnoise.params.LayeredParams` for this lineage.
+    :param params: :class:`~msnoise.params.MSNoiseParams` for this lineage.
     :param responses: ObsPy :class:`~obspy.core.inventory.Inventory` for
         instrument response removal, or ``None``.
     :param logger: Python logger (defaults to ``msnoise.preprocessing``).

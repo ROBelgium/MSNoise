@@ -171,7 +171,7 @@ def fetch_raw_waveforms(db, jobs, goal_day, params, t_start=None, t_end=None):
     :param db: SQLAlchemy session.
     :param jobs: List of Job ORM objects (all same DataSource).
     :param goal_day: Date string ``YYYY-MM-DD``.
-    :param params: :class:`~msnoise.params.LayeredParams` for this lineage.
+    :param params: :class:`~msnoise.params.MSNoiseParams` for this lineage.
     :param t_start: Optional :class:`~obspy.core.utcdatetime.UTCDateTime`
         override for the fetch window start (default: midnight of *goal_day*).
     :param t_end: Optional :class:`~obspy.core.utcdatetime.UTCDateTime`
@@ -251,7 +251,7 @@ def fetch_and_preprocess(
     :param db: SQLAlchemy session.
     :param jobs: List of Job ORM objects (all same day, same DataSource).
     :param goal_day: Date string ``YYYY-MM-DD``.
-    :param params: :class:`~msnoise.params.LayeredParams` for this lineage.
+    :param params: :class:`~msnoise.params.MSNoiseParams` for this lineage.
     :param responses: ObsPy Inventory for instrument response removal, or None.
     :param loglevel: Logging level string.
     :returns: Tuple ``(stream, done_jobs, failed_jobs)`` where stream contains

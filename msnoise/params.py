@@ -1,8 +1,8 @@
 """
-MSNoise Layered Parameters
-==========================
+MSNoise Parameters
+==================
 
-:class:`LayeredParams` replaces the flat ``AttribDict`` previously returned by
+:class:`MSNoiseParams` replaces the flat ``AttribDict`` previously returned by
 :func:`~msnoise.api.get_merged_params_for_lineage`.  Each step's configuration
 lives in its own namespace, so keys that share a name across categories (e.g.
 ``freqmin`` in ``filter`` *and* ``mwcs``) never collide.
@@ -20,7 +20,7 @@ Usage::
 
     # Serialisation
     params.to_yaml("run_params.yaml")
-    p2 = LayeredParams.from_yaml("run_params.yaml")
+    p2 = MSNoiseParams.from_yaml("run_params.yaml")
 """
 
 from __future__ import annotations
@@ -30,12 +30,12 @@ from collections import OrderedDict
 from obspy.core.util.attribdict import AttribDict
 
 
-class LayeredParams:
+class MSNoiseParams:
     """Namespaced parameter container for an MSNoise lineage.
 
     Each step in the lineage contributes one layer keyed by its category
     (e.g. ``"global"``, ``"preprocess"``, ``"cc"``, ``"filter"`` …).
-    Attributes on ``LayeredParams`` itself delegate to the appropriate layer;
+    Attributes on ``MSNoiseParams`` itself delegate to the appropriate layer;
     there is no flat merged view and no silent key collision.
     """
 
@@ -78,7 +78,7 @@ class LayeredParams:
         if lookup in layers:
             return layers[lookup]
         raise AttributeError(
-            f"LayeredParams has no category {name!r}. "
+            f"MSNoiseParams has no category {name!r}. "
             f"Use params.global_.<key> for global config, or "
             f"params.<category>.<key> for step config. "
             f"Available categories: {list(layers)}"
@@ -86,7 +86,7 @@ class LayeredParams:
 
     def __setattr__(self, name: str, value) -> None:
         raise AttributeError(
-            "LayeredParams is immutable. Use _add_layer() during construction."
+            "MSNoiseParams is immutable. Use _add_layer() during construction."
         )
 
     def __getitem__(self, category: str):
@@ -95,7 +95,7 @@ class LayeredParams:
         if category in layers:
             return layers[category]
         raise KeyError(
-            f"LayeredParams has no category {category!r}. "
+            f"MSNoiseParams has no category {category!r}. "
             f"Available: {list(layers)}"
         )
 
@@ -113,7 +113,7 @@ class LayeredParams:
         """Category name of the innermost (current) step."""
         layers = object.__getattribute__(self, "_layers")
         if not layers:
-            raise RuntimeError("LayeredParams has no layers.")
+            raise RuntimeError("MSNoiseParams has no layers.")
         return next(reversed(layers))
 
     @property
@@ -125,7 +125,7 @@ class LayeredParams:
         """
         layers = object.__getattribute__(self, "_layers")
         if not layers:
-            raise RuntimeError("LayeredParams has no layers.")
+            raise RuntimeError("MSNoiseParams has no layers.")
         return layers[next(reversed(layers))]
 
     @property
@@ -178,8 +178,8 @@ class LayeredParams:
             fh.write(self.to_yaml_string())
 
     @classmethod
-    def from_yaml(cls, path: str) -> "LayeredParams":
-        """Reconstruct a :class:`LayeredParams` from a YAML file.
+    def from_yaml(cls, path: str) -> "MSNoiseParams":
+        """Reconstruct a :class:`MSNoiseParams` from a YAML file.
 
         Does *not* require a database connection — useful for offline
         reproducibility checks.
@@ -205,7 +205,7 @@ class LayeredParams:
         cats = list(object.__getattribute__(self, "_layers"))
         names = object.__getattribute__(self, "_lineage_names")
         return (
-            f"LayeredParams("
+            f"MSNoiseParams("
             f"lineage={'/'.join(names)!r}, "
             f"categories={cats})"
         )
@@ -228,13 +228,13 @@ def _attribdict_to_plain(ad) -> dict:
     return result
 
 
-def _build_layered_params(
+def _build_msnoise_params(
     global_attrib,
     lineage_steps: list,
     lineage_names: list[str],
     step_configs: list,       # list of AttribDict, one per step in lineage_steps
-) -> LayeredParams:
-    """Build a :class:`LayeredParams` from a lineage.
+) -> MSNoiseParams:
+    """Build a :class:`MSNoiseParams` from a lineage.
 
     :param global_attrib: ``AttribDict`` from :func:`~msnoise.api.get_params`.
     :param lineage_steps: List of WorkflowStep ORM objects (upstream→downstream).
@@ -242,9 +242,9 @@ def _build_layered_params(
     :param step_configs: Per-step ``AttribDict`` from
         :func:`~msnoise.api.get_config_set_details`, same order as
         *lineage_steps*.
-    :returns: :class:`LayeredParams` with one layer per category.
+    :returns: :class:`MSNoiseParams` with one layer per category.
     """
-    p = LayeredParams()
+    p = MSNoiseParams()
     p._set_lineage_names(lineage_names)
 
     # Global layer first

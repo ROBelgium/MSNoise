@@ -526,7 +526,7 @@ def get_config_sets_organized(session):
 
 
 def get_params(session):
-    """Build a single-layer :class:`~msnoise.params.LayeredParams` for global config.
+    """Build a single-layer :class:`~msnoise.params.MSNoiseParams` for global config.
 
     Queries the ``Config`` table directly for all ``(category='global',
     set_number=1)`` rows and casts each value to its declared ``param_type``.
@@ -538,10 +538,10 @@ def get_params(session):
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object, as
         obtained by :func:`connect`
-    :rtype: :class:`~msnoise.params.LayeredParams`
+    :rtype: :class:`~msnoise.params.MSNoiseParams`
     """
     from obspy.core.util.attribdict import AttribDict
-    from ..params import LayeredParams
+    from ..params import MSNoiseParams
 
     _BOOL_TRUE = {"y", "yes", "true", "1"}
     _TYPE_MAP  = {"int": int, "float": float, "bool": None, "str": str, "eval": str}
@@ -567,7 +567,7 @@ def get_params(session):
         else:
             global_attrib[row.name] = raw
 
-    p = LayeredParams()
+    p = MSNoiseParams()
     p._add_layer("global", global_attrib)
     return p
 
@@ -677,23 +677,23 @@ def _load_step_config(db, step):
 
 
 def get_merged_params_for_lineage(db, orig_params, step_params, lineage):
-    """Build a :class:`~msnoise.params.LayeredParams` for the given lineage.
+    """Build a :class:`~msnoise.params.MSNoiseParams` for the given lineage.
 
-    Returns ``(lineage, lineage_names, LayeredParams)``.
+    Returns ``(lineage, lineage_names, MSNoiseParams)``.
     """
-    from ..params import _build_layered_params
+    from ..params import _build_msnoise_params
 
     lineage = [s for s in lineage if s.category not in {"global"}]
     lineage_names = [s.step_name for s in lineage]
     lineage_cfgs = [_load_step_config(db, s) for s in lineage]
 
-    # orig_params is now a single-layer LayeredParams; unwrap the global AttribDict
+    # orig_params is now a single-layer MSNoiseParams; unwrap the global AttribDict
     global_attrib = (
         orig_params.global_
         if hasattr(orig_params, "_layers")
         else orig_params  # backward compat if raw AttribDict passed
     )
-    params = _build_layered_params(
+    params = _build_msnoise_params(
         global_attrib=global_attrib,
         lineage_steps=lineage,
         lineage_names=lineage_names,

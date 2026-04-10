@@ -39,7 +39,7 @@ import logging
 import os
 import sys
 from getpass import getpass
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import database_exists, create_database
@@ -99,24 +99,24 @@ def create_indices(session, prefix):
     if prefix:
         prefix += '_'
     try:
-        session.execute("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
-                        "jobtype)" % prefix)
+        session.execute(text("CREATE UNIQUE INDEX job_index ON %sjobs (day, pair, "
+                             "jobtype)" % prefix))
         session.commit()
     except Exception:
         logging.info("It looks like the v1.5 'job_index' is already in the DB")
         session.rollback()
 
     try:
-        session.execute("CREATE INDEX job_index2 ON %sjobs (jobtype, flag)"
-                        % prefix)
+        session.execute(text("CREATE INDEX job_index2 ON %sjobs (jobtype, flag)"
+                             % prefix))
         session.commit()
     except Exception:
         logging.info("It looks like the v1.6 'job_index2' is already in the DB")
         session.rollback()
 
     try:
-        session.execute("CREATE UNIQUE INDEX da_index ON %sdata_availability ("
-                        "path, file, net, sta, comp)" % prefix)
+        session.execute(text("CREATE UNIQUE INDEX da_index ON %sdata_availability ("
+                             "path, file, net, sta, comp)" % prefix))
         session.commit()
     except Exception:
         logging.info("It looks like the v1.5 'da_index' is already in the DB")

@@ -907,7 +907,7 @@ def propagate_psd_rms_jobs_from_psd_done(session):
 
         for psd_rms_step in psd_rms_steps:
             # Lineage must include the current psd_rms step so that
-            # get_next_lineage_batch builds LayeredParams with a 'psd_rms' layer.
+            # get_next_lineage_batch builds MSNoiseParams with a 'psd_rms' layer.
             # Pattern matches all other propagate_* functions: parent/child.
             lineage = f"{psd_step.step_name}/{psd_rms_step.step_name}"
             lineage_id = _get_or_create_lineage_id(session, lineage)

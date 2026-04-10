@@ -182,7 +182,6 @@ import os
 import time
 
 import numpy as np
-import matplotlib.mlab as mlab
 
 from .core.db import connect, get_logger
 from .core.config import get_config_set_details
@@ -370,10 +369,10 @@ def main(loglevel="INFO", chunk_size=0):
                         channel_index[netsta] = {}
                     channel_index[netsta][c1[-1]] = i
 
-                    pxx, freqs = mlab.psd(tmp[i].data,
-                                          Fs=tmp[i].stats.sampling_rate,
-                                          NFFT=nfft,
-                                          detrend='mean')
+                    freqs, pxx = scipy.signal.welch(tmp[i].data,
+                                               fs=tmp[i].stats.sampling_rate,
+                                               nperseg=nfft,
+                                               detrend='constant')
                     psds.append(np.sqrt(pxx))
                 psds = np.asarray(psds)
             else:

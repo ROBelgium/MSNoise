@@ -103,7 +103,7 @@ class MSNoiseResult:
         ``['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']``.
     category : str
         Category of the terminal step, e.g. ``'refstack'``.
-    params : LayeredParams
+    params : MSNoiseParams
         Merged configuration parameters for this lineage.
     output_folder : str
         Root output folder.

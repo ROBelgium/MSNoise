@@ -1287,7 +1287,7 @@ def resolve_lineage_params(session, lineage_names):
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param lineage_names: Ordered list of step-name strings, e.g.
         ``['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'mwcs_1', 'mwcs_dtt_1']``.
-    :rtype: tuple(list, list[str], LayeredParams)
+    :rtype: tuple(list, list[str], MSNoiseParams)
     """
     orig_params = get_params(session)
     lineage_str = "/".join(lineage_names)
@@ -1312,7 +1312,7 @@ def get_next_lineage_batch(
     - Extracts (pair, lineage_str, refs, days).
     - Loads current step config (from the job row).
     - Resolves lineage_str -> WorkflowStep objects.
-    - Builds a LayeredParams for that lineage (one layer per category).
+    - Builds a MSNoiseParams for that lineage (one layer per category).
 
     Parameters
     ----------
@@ -1332,7 +1332,7 @@ def get_next_lineage_batch(
       - lineage_names_mov      — upstream with any refstack_* entries stripped
                                  (used by mwcs/wct/stretching to find MOV CCFs)
       - refs, days
-      - step_params, params    — params is a LayeredParams instance
+      - step_params, params    — params is a MSNoiseParams instance
     or None if no jobs were claimed (caller should continue/sleep).
     """
     # Important: keep logging policy consistent with your scripts
@@ -1603,7 +1603,7 @@ def refstack_needs_recompute(session, pair, lineage_names_upstream, params):
     :param pair: Station pair string ``"NET.STA.LOC:NET.STA.LOC"``.
     :param lineage_names_upstream: Lineage name list ending with the stack step
         name (i.e. ``batch["lineage_names_upstream"]``).
-    :param params: :class:`~msnoise.params.LayeredParams` for this lineage.
+    :param params: :class:`~msnoise.params.MSNoiseParams` for this lineage.
     :rtype: bool
     """
     import datetime as _dt

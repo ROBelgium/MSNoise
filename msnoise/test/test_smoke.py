@@ -694,7 +694,7 @@ def test_smoke_171_psd_rms_lineage(smoke_db):
 
     This guards the root-cause fix: propagate_psd_rms_jobs_from_psd_done
     must store lineage=psd_step/psd_rms_step so that get_next_lineage_batch
-    builds a LayeredParams with a 'psd_rms' layer.  Without this, accessing
+    builds a MSNoiseParams with a 'psd_rms' layer.  Without this, accessing
     params.psd_rms.* raises AttributeError.
     """
     db, _, _ = smoke_db
@@ -728,11 +728,11 @@ def test_smoke_171_psd_rms_lineage(smoke_db):
 
 @pytest.mark.order(172)
 def test_smoke_172_psd_rms_params_layer(smoke_db):
-    """get_next_lineage_batch for psd_rms must build LayeredParams with 'psd_rms' layer.
+    """get_next_lineage_batch for psd_rms must build MSNoiseParams with 'psd_rms' layer.
 
     Exercises the full params.psd_rms.* access path that psd_compute_rms.py
     uses at runtime — verifying that the lineage fix flows through to the
-    LayeredParams construction.
+    MSNoiseParams construction.
     """
     db, _, _ = smoke_db
     from ..core.db import connect as _connect
@@ -763,7 +763,7 @@ def test_smoke_172_psd_rms_params_layer(smoke_db):
         except AttributeError as e:
             raise AssertionError(
                 f"params.psd_rms.* raised AttributeError — "
-                f"psd_rms layer missing from LayeredParams. "
+                f"psd_rms layer missing from MSNoiseParams. "
                 f"Available categories: {list(params._layers)}. Error: {e}"
             )
 
