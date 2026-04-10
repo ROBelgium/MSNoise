@@ -564,21 +564,24 @@ class StationXMLImportView(BaseView):
                     suffix = _os.path.splitext(file_obj.filename)[1] or '.xml'
                     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                         file_obj.save(tmp.name)
-                        created, updated = import_stationxml(db, tmp.name,
-                                                              data_source_id=ds_id)
+                        created, updated, saved_path = import_stationxml(
+                            db, tmp.name, data_source_id=ds_id,
+                            save_to_response_path=True)
                     _os.unlink(tmp.name)
                 elif url:
-                    created, updated = import_stationxml(db, url, data_source_id=ds_id)
+                    created, updated, saved_path = import_stationxml(
+                        db, url, data_source_id=ds_id,
+                        save_to_response_path=True)
                 else:
                     db.close()
                     return self.render('admin/import_stationxml.html',
                                        data_sources=data_sources,
                                        result={'cls': 'warning',
                                                'msg': 'Provide a URL or upload a file.'})
-                result = {
-                    'cls': 'success',
-                    'msg': f'Import complete: {created} station(s) created, {updated} updated.'
-                }
+                msg = f'Import complete: {created} station(s) created, {updated} updated.'
+                if saved_path:
+                    msg += f' Inventory saved to {saved_path}.'
+                result = {'cls': 'success', 'msg': msg}
             except Exception as exc:
                 result = {'cls': 'danger', 'msg': f'Import failed: {exc}'}
             finally:

@@ -587,22 +587,36 @@ def set_all_stations_source(session, data_source_id):
 # StationXML import
 # ============================================================
 
-def import_stationxml(session, path_or_url, data_source_id=None):
+def import_stationxml(session, path_or_url, data_source_id=None,
+                      save_to_response_path=True):
     """Import stations from a StationXML file or URL.
 
     Parses the inventory with ObsPy and creates or updates
     :class:`~msnoise.msnoise_table_def.Station` rows.  Also populates
     ``used_location_codes`` and ``used_channel_names`` from the channel-level
     inventory (requires ``level=channel`` in FDSN queries).  Empty location
-    codes are stored as ``"--"`` (MSNoise convention).
+    codes are stored as ``\"--\"`` (MSNoise convention).
+
+    When *save_to_response_path* is ``True`` (default), the parsed inventory is
+    written as a StationXML file into the project's ``response_path`` directory
+    (read from global config).  This makes the instrument responses immediately
+    available to the preprocessing step without any manual file copying.  The
+    file is named ``<NET>.<STA>.xml`` for single-network inventories, or
+    ``inventory_<timestamp>.xml`` when the inventory spans multiple networks.
+    Saving failures are logged as warnings but never abort the import.
 
     :param session: SQLAlchemy session.
     :param path_or_url: Path to a local StationXML file, or a URL
         (e.g. an FDSN station web service query URL with ``level=channel``).
     :param data_source_id: DataSource to assign to imported stations.
         ``None`` → project default (``DataSource.ref=1``).
-    :returns: Tuple ``(created, updated)`` counts.
+    :param save_to_response_path: Write the inventory to ``response_path``
+        after a successful import (default ``True``).
+    :returns: Tuple ``(created, updated, saved_path)`` where *saved_path* is
+        the absolute path of the written file, or ``None`` if not saved.
     """
+    import os
+    import datetime as _dt
     from obspy import read_inventory
     logger.info(f"Importing StationXML from {path_or_url!r}")
     inv = read_inventory(path_or_url)
@@ -661,6 +675,42 @@ def import_stationxml(session, path_or_url, data_source_id=None):
                     + (f" locs={loc_str}" if loc_str else "")
                     + (f" chans={chan_str}" if chan_str else "")
                 )
+    session.commit()
+    logger.info(f"StationXML import done: {created} created, {updated} updated")
+
+    # ── Optionally save inventory to response_path ────────────────────────────
+    saved_path = None
+    if save_to_response_path:
+        try:
+            from .config import get_config
+            response_path = get_config(session, "response_path",
+                                        category="global")
+            if not response_path:
+                logger.warning(
+                    "response_path not configured — StationXML not saved to disk."
+                )
+            else:
+                os.makedirs(response_path, exist_ok=True)
+                # Build a deterministic filename from the inventory contents
+                nets = list({net.code for net in inv})
+                stas = list({sta.code for net in inv for sta in net})
+                if len(nets) == 1 and len(stas) == 1:
+                    fname = f"{nets[0]}.{stas[0]}.xml"
+                elif len(nets) == 1:
+                    fname = f"{nets[0]}.xml"
+                else:
+                    ts = _dt.datetime.now(tz=_dt.timezone.utc).strftime("%Y%m%dT%H%M%S")
+                    fname = f"inventory_{ts}.xml"
+                dest = os.path.join(response_path, fname)
+                inv.write(dest, format="STATIONXML")
+                saved_path = dest
+                logger.info(f"Inventory saved to {dest!r}")
+        except Exception as exc:
+            logger.warning(
+                f"Could not save inventory to response_path: {exc}"
+            )
+
+    return created, updated, saved_path
     session.commit()
     logger.info(f"StationXML import done: {created} created, {updated} updated")
     return created, updated
