@@ -49,9 +49,9 @@ global_1 ──► preprocess_1 ──► cc_1 ──► filter_1 ──► stac
 ```
 msnoise/
   __init__.py            # MSNoiseError, DBConfigNotFoundError, FatalError; re-exports connect
-  api.py                 # Backward-compat re-export of msnoise.core.*
+  api.py                 # Public API — re-exports msnoise.core.* (respects __all__)
   core/
-    __init__.py          # Re-exports all 6 submodules via *; signal=DSP/PSD, io=file I/O
+    __init__.py          # Re-exports all 9 submodules via * (respects each module's __all__)
     db.py                # connect, get_engine, read_db_inifile, get_logger
     config.py            # get_config, update_config, create_config_set, get_params,
                          # get_merged_params_for_lineage, build_plot_outfile,
@@ -61,7 +61,8 @@ msnoise/
                          # resolve_data_source, get_waveform_path,
                          # read_waveforms_from_availability,   ← DA records → Stream
                          # import_stationxml,
-                         # set_station_source, set_network_source, set_all_stations_source
+                         # set_station_source, set_network_source, set_all_stations_source,
+                         # to_sds                     ← SDS path formatter (moved from signal.py)
     workflow.py          # get_next_lineage_batch, propagate_downstream,
                          # is_next_job_for_step, massive_insert_job, massive_update_job,
                          # update_job, reset_jobs, build_ref_datelist,
@@ -78,7 +79,9 @@ msnoise/
                          # preload_instrument_responses, save_preprocessed_streams,
                          # get_preprocessed_stream, validate_stack_data,
                          # psd_rms, psd_df_rms,       ← pure DSP; psd_df_rms takes xarray Dataset, returns Dataset
-                         # make_same_length            ← kept as public API for plugins
+                         # make_same_length,           ← kept as public API for plugins
+                         # find_segments, wiener_filt  ← Wiener filter helpers (moved from wiener.py)
+                         # to_sds moved to stations.py
     io.py                # xr_save_ccf, xr_get_ccf, xr_save_ccf_daily, xr_get_ccf_daily,
                          # xr_save_ccf_all, xr_get_ccf_all,
                          # xr_save_ref, xr_get_ref, xr_load_ccf_for_stack,
@@ -93,15 +96,16 @@ msnoise/
                          # fetch_raw_waveforms,        ← raw only, no preprocessing (for PSD)
                          # fetch_and_preprocess,       ← fetch + full preprocessing pipeline
                          # _write_raw_cache
+    compute.py           # myCorr2, whiten, whiten2, pcc_xcorr, smooth, mwcs
+                         #   ← heavy CC/MWCS math (moved from move2obspy.py)
+    preprocessing.py     # apply_preprocessing_to_stream, preprocess
+                         #   ← waveform preprocessing pipeline (moved from top-level)
   msnoise_table_def.py   # declare_tables() → Config, Lineage, Job, DataSource,
                          # Station, DataAvailability, WorkflowStep, WorkflowLink
                          # WORKFLOW_CHAINS dict, WORKFLOW_ORDER list
   params.py              # LayeredParams, _build_layered_params
   results.py             # MSNoiseResult (high-level result reader)
   data_structures.py     # data_structure dict (SDS/BUD/IDDS/PDF path templates)
-  move2obspy.py          # myCorr2, pcc_xcorr, whiten, whiten2, mwcs, smooth
-  preprocessing.py       # apply_preprocessing_to_stream, preprocess
-  wiener.py              # wiener_filt, find_segments
   s01_scan_archive.py    # scan_archive main, get_archives_folders, parse_crondays
   s02_new_jobs.py        # new_jobs main; all propagate_* functions (see §6)
   s02_preprocessing.py   # preprocess worker main
@@ -128,7 +132,9 @@ msnoise/
 ```
 
 **The one universal entry point**: `from msnoise.api import connect` (or `from msnoise import connect`).
-All other symbols live in `msnoise.core.*` and are re-exported through `api.py` for backward compat.
+All other public symbols live in `msnoise.core.*` and are re-exported through `api.py`.
+Each `core/*.py` module defines `__all__` — only listed names are exported through the star import.
+Do NOT import ORM classes (`Job`, `Config`, etc.) from `api.py` — use `declare_tables()` instead (see §10).
 
 ---
 
@@ -596,5 +602,9 @@ python -m pytest /path/to/msnoise/msnoise/test/test_smoke.py::test_smoke_172_psd
    All other lazy readers (MWCS, DTT, STR, WCT) read from files that are **never written back to by the same caller** — those handles are safe to keep lazy, but callers must `ds.close()` explicitly once done to avoid leaking handles (especially in loops over many pairs). Pattern: extract all needed `.values`, then call `ds.close()`.
 
 14. **`xr_get_ccf` returns an in-memory DataArray**: despite using `open_dataset` internally, `xr_get_ccf` calls `.load()` + `.close()` before returning — the result is fully in-memory (not lazy-backed). Do not assume it needs `.load()` again.
+
+16. **Never import from `..api` inside `core/`**: `core/*.py` modules must import sibling modules directly (`from .workflow import X`, `from .signal import Y`). Importing via `..api` creates a circular dependency and was the root cause of the `get_step_successors` import failure. If a function in `workflow.py` needs another function from `workflow.py`, just call it directly — no import needed.
+
+17. **`__all__` must include every public function**: when adding a new public function to any `core/*.py` module, add its name to that module's `__all__` list. Missing entries silently break the `from .core import *` chain in `api.py` and `core/__init__.py`.
 
 15. **`chunk_size` is a CLI-only parameter** (not a config CSV key): pass `--chunk-size N` to `msnoise cc compute` or `msnoise qc compute_psd`. It controls how many pairs (CC) or stations (PSD) a single worker claims per day. Default 0 = claim all (original behaviour). Only effective for `group_by="day_lineage"` steps. Do NOT add it to downstream steps (stack, MWCS, stretching) — those use `pair_lineage` and write to per-pair accumulated files where concurrent writes would corrupt data.
