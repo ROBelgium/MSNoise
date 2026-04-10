@@ -165,8 +165,13 @@ def xr_get_ccf(root, lineage, station1, station2, components, mov_stack, taxis):
     fullpath = os.path.join(path, fn)
     if not os.path.isfile(fullpath):
         raise FileNotFoundError(fullpath)
-    data = _xr_create_or_open(fullpath, taxis, name="CCF", lazy=True)
-    return data.CCF
+    ds = _xr_create_or_open(fullpath, taxis, name="CCF", lazy=True)
+    # Materialise and close immediately — the stacked CCF file is also a write
+    # target in xr_save_ccf (stack worker), so holding the file handle open
+    # would block concurrent writes on Windows.
+    da = ds.CCF.load()
+    ds.close()
+    return da
 
 
 

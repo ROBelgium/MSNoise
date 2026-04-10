@@ -288,7 +288,7 @@ def main(loglevel="INFO"):
                         cc_row = ref_str_norm @ cur_norm / ref_str_row.shape[1]  # (nstr,)
                         best = int(np.argmax(cc_row))
 
-                        alldays_list.append(data.index[i_row])
+                        alldays_list.append(data.coords["times"].values[i_row])
                         alldeltas_list.append(deltas_row[best])
                         allcoefs_list.append(cc_row[best])
                         # HWHM error for this single row
@@ -315,7 +315,7 @@ def main(loglevel="INFO"):
                     max_corr_indices = np.argmax(corr_coeffs, axis=0)
                     max_corr_values  = corr_coeffs[max_corr_indices, np.arange(num_days)]
 
-                    alldays   = data.index
+                    alldays   = data.coords["times"].values
                     alldeltas = deltas[max_corr_indices]
                     allcoefs  = max_corr_values
                     # Vectorized error estimate: direct HWHM scan on the

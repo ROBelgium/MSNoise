@@ -1806,7 +1806,7 @@ def test_120011_msnoise_result_get_ref():
 
 @pytest.mark.order(120020)
 def test_120020_msnoise_result_get_ccf_xarray():
-    """MSNoiseResult.get_ccf returns xarray DataArray when format='xarray'."""
+    """MSNoiseResult.get_ccf returns xarray DataArray (xarray-only API)."""
     db = connect()
     from ..results import MSNoiseResult
     import xarray as xr
@@ -1815,16 +1815,17 @@ def test_120020_msnoise_result_get_ccf_xarray():
     if not all_ccfs:
         pytest.skip("No CCF data available")
     pair_k, comp_k, ms_k = next(iter(all_ccfs))
-    da = r.get_ccf(pair_k, comp_k, ms_k, format="xarray")
+    da = r.get_ccf(pair_k, comp_k, ms_k)
     assert isinstance(da, xr.DataArray)
     db.close()
 
 
 @pytest.mark.order(120021)
 def test_120021_msnoise_result_get_ref_dataframe():
-    """MSNoiseResult.get_ref returns Series when format='dataframe' (REF is 1D)."""
+    """MSNoiseResult.get_ref returns xarray Dataset; to_dataframe() gives DataFrame."""
     db = connect()
     from ..results import MSNoiseResult
+    import xarray as xr
     import pandas as pd
     r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
                                 stack=1, refstack=1)
@@ -1832,14 +1833,17 @@ def test_120021_msnoise_result_get_ref_dataframe():
     if not all_refs:
         pytest.skip("No REF data available")
     pair_k, comp_k = next(iter(all_refs))
-    s = r.get_ref(pair_k, comp_k, format="dataframe")
-    assert isinstance(s, pd.Series)
+    ds = r.get_ref(pair_k, comp_k)
+    assert isinstance(ds, xr.Dataset)
+    # to_dataframe() is the escape hatch for pandas users
+    df = MSNoiseResult.to_dataframe(ds)
+    assert isinstance(df, pd.DataFrame)
     db.close()
 
 
 @pytest.mark.order(120022)
 def test_120022_msnoise_result_get_mwcs_both_formats():
-    """MSNoiseResult.get_mwcs returns DataFrame or xarray Dataset by format."""
+    """MSNoiseResult.get_mwcs returns xarray Dataset; to_dataframe() gives DataFrame."""
     db = connect()
     from ..results import MSNoiseResult
     import pandas as pd
@@ -1850,16 +1854,16 @@ def test_120022_msnoise_result_get_mwcs_both_formats():
     if not all_mwcs:
         pytest.skip("No MWCS data available")
     pair_k, comp_k, ms_k = next(iter(all_mwcs))
-    df = r.get_mwcs(pair_k, comp_k, ms_k, format="dataframe")
-    assert isinstance(df, pd.DataFrame)
-    ds = r.get_mwcs(pair_k, comp_k, ms_k, format="xarray")
+    ds = r.get_mwcs(pair_k, comp_k, ms_k)
     assert isinstance(ds, xr.Dataset)
+    df = MSNoiseResult.to_dataframe(ds)
+    assert isinstance(df, pd.DataFrame)
     db.close()
 
 
 @pytest.mark.order(120023)
 def test_120023_msnoise_result_get_mwcs_dtt_both_formats():
-    """MSNoiseResult.get_mwcs_dtt returns DataFrame or xarray Dataset by format."""
+    """MSNoiseResult.get_mwcs_dtt returns xarray Dataset; to_dataframe() gives DataFrame."""
     db = connect()
     from ..results import MSNoiseResult
     import pandas as pd
@@ -1870,10 +1874,10 @@ def test_120023_msnoise_result_get_mwcs_dtt_both_formats():
     if not all_dtt:
         pytest.skip("No MWCS-DTT data available")
     pair_k, comp_k, ms_k = next(iter(all_dtt))
-    df = r.get_mwcs_dtt(pair_k, comp_k, ms_k, format="dataframe")
-    assert isinstance(df, pd.DataFrame)
-    ds = r.get_mwcs_dtt(pair_k, comp_k, ms_k, format="xarray")
+    ds = r.get_mwcs_dtt(pair_k, comp_k, ms_k)
     assert isinstance(ds, xr.Dataset)
+    df = MSNoiseResult.to_dataframe(ds)
+    assert isinstance(df, pd.DataFrame)
     db.close()
 
 
