@@ -55,7 +55,7 @@ def _plot_timeseries(result, mov_stacks, comp_list,
         for comp in comp_list:
             try:
                 ds = result.get_dvv(pair_type=pair_type, components=comp,
-                                     mov_stack=mov_stack, format="dataset")
+                                     mov_stack=mov_stack)
             except (FileNotFoundError, ValueError):
                 logger.warning(
                     f"No wavelet_dtt_dvv data for mov_stack={mov_stack} comp={comp}. "

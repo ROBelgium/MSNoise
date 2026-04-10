@@ -293,9 +293,9 @@ _r = MSNoiseResult.from_ids(_db2, psd=PSD_ID, psd_rms=PSD_RMS_ID)
 OUTPUT_FOLDER = _r.output_folder
 _db2.close()
 
-# Or simply re-use the result object's get_psd_rms() with format="dataset":
+
 for sid in SEED_IDS:
-    ds = _r.get_psd_rms(seed_id=sid, format="xarray")
+    ds = _r.get_psd_rms(seed_id=sid)
     if ds is not None:
         print(f"{sid}:\n{ds}\n")
     else:

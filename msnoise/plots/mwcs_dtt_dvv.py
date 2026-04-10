@@ -75,7 +75,7 @@ def main(preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item=None, refst
         for comp in comp_list:
             try:
                 ds = result.get_dvv(pair_type=pair_type, components=comp,
-                                     mov_stack=mov_stack, format="dataset")
+                                     mov_stack=mov_stack)
             except (FileNotFoundError, ValueError):
                 logger.warning(
                     "No mwcs_dtt_dvv data for mov_stack=%s comp=%s pair_type=%s. "

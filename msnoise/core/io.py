@@ -841,7 +841,7 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
         try:
             if parent_category == "mwcs_dtt":
                 ds = xr_get_dtt(root, dtt_lineage, sta1, sta2,
-                                 component, mov_stack, format="dataset")
+                                 component, mov_stack)
                 # dv/v = -1 * dt/t estimated by compute_mwcs_dtt
                 da_dv  = -1 * ds["DTT"].sel(keys=dv_col)
                 da_err = ds["DTT"].sel(keys=err_col)
@@ -853,7 +853,7 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
 
             elif parent_category == "stretching":
                 ds = _xr_get_stretching(root, dtt_lineage, sta1, sta2,
-                                         component, mov_stack, format="dataset")
+                                         component, mov_stack)
                 # dv/v is "stretching factor - 1" because in msnoise the REF is stretched, not the current CCF.
                 da_dv  = ds["STR"].sel(keys=dv_col) - 1
                 da_err = ds["STR"].sel(keys=err_col)
