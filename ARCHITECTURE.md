@@ -390,9 +390,9 @@ else:
 
 ---
 
-## 12. MSNoiseResult — High-Level Result Reader
+## 12. MSNoiseResult — xarray-Only Result Reader (v2.x)
 
-`MSNoiseResult` (`results.py`) is the user-facing class for reading computed results without needing to know file paths or lineage strings.
+`MSNoiseResult` (`results.py`) is the user-facing class for reading computed results. **All methods return xarray Dataset or DataArray objects** (no `format=` parameter). For pandas conversion, use the static helper `MSNoiseResult.to_dataframe(ds)`.
 
 ```python
 # Construct from integer set IDs
@@ -404,26 +404,32 @@ r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
 for r in MSNoiseResult.list(db, "mwcs_dtt"):
     print(r)
 
-# Access results — format="xarray" (default) or format="dataset" both return Dataset/DataArray
-# format="dataframe" returns a pandas DataFrame
-ds = r.get_ccf(pair="BE.UCC--BE.MEM", components="ZZ", mov_stack=("1D","1D"))
+# Access results — all return xarray Dataset or DataArray
+da = r.get_ccf(pair="BE.UCC--BE.MEM", components="ZZ", mov_stack=("1D","1D"))
 ds = r.get_ref(pair="BE.UCC--BE.MEM", components="ZZ")
 ds = r.get_mwcs(pair="BE.UCC--BE.MEM", components="ZZ", mov_stack=("1D","1D"))
-ds = r.get_mwcs_dtt(...)
-ds = r.get_stretching(...)
+ds = r.get_mwcs_dtt(pair="BE.UCC--BE.MEM", components="ZZ", mov_stack=("1D","1D"))
+ds = r.get_stretching(pair="BE.UCC--BE.MEM", components="ZZ", mov_stack=("1D","1D"))
 ds = r.get_dvv(pair_type="CC", components="ZZ", mov_stack=("1D","1D"))
-ds = r.get_wct(...)
-ds = r.get_wct_dtt(...)
+ds = r.get_wct(pair="BE.UCC--BE.MEM", components="ZZ", mov_stack=("1D","1D"))
+ds = r.get_wct_dtt(pair="BE.UCC--BE.MEM", components="ZZ", mov_stack=("1D","1D"))
 ds = r.get_psd(seed_id="BE.UCC..HHZ", day="2023-01-01")
 ds = r.get_psd_rms(seed_id="BE.UCC..HHZ")
-df = r.export_dvv(...)   # returns DataFrame
+
+# Convert to pandas when needed (escape hatch for all steps)
+df = MSNoiseResult.to_dataframe(ds)
+
+# Export DVV with full provenance (NetCDF + YAML metadata)
+written = r.export_dvv("output/")   # returns list of file paths
 
 # Navigate branches
 for branch in r.branches():   # other lineages reachable from same root
     print(branch)
 ```
 
-**Format parameter**: `format="xarray"` and `format="dataset"` are equivalent (both return xarray). `format="dataframe"` returns pandas. Internal `io.py` functions only accept `"dataset"` or `"dataframe"` — `results.py` translates `"xarray"` → `"dataset"` automatically. Always use `"dataframe"` if format == `"dataframe"` else `"dataset"` for the translation.
+**xarray-only API** (since v2.x): The `format=` parameter has been removed from all workflow step methods (CC, stack, ref, MWCS, stretching, WCT, DVV aggregates). All `get_*` methods return xarray Dataset or DataArray objects. For pandas users:
+
+```python
 
 **Internal helpers**:
 - `r._lineage_upstream_of(category)` — lineage list up to but NOT including `category`
