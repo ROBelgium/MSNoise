@@ -56,10 +56,14 @@ def _trim(data, dttname, limits=0.1):
 # ── Core helpers ───────────────────────────────────────────
 
 
-def _xr_create_or_open(fn, taxis=[], name="CCF"):
+def _xr_create_or_open(fn, taxis=[], name="CCF", lazy=False):
     if os.path.isfile(fn):
-        # load_dataset works (it loads content in mem and closes, open_dataset
-        # failed, the file handle was still open and it failed later.
+        # Write paths (save functions) must use load_dataset so the file handle
+        # is fully released before _xr_save_and_close writes back to the same
+        # file.  Read-only paths pass lazy=True to get a memory-mapped dataset
+        # that avoids loading all data into RAM upfront.
+        if lazy:
+            return xr.open_dataset(fn)
         ds = xr.load_dataset(fn)
         return ds
     times = pd.date_range("2000-01-01", freq="h", periods=0)
@@ -164,7 +168,7 @@ def xr_get_ccf(root, lineage, station1, station2, components, mov_stack, taxis, 
     fullpath = os.path.join(path, fn)
     if not os.path.isfile(fullpath):
         raise FileNotFoundError(fullpath)
-    data = _xr_create_or_open(fullpath, taxis, name="CCF")
+    data = _xr_create_or_open(fullpath, taxis, name="CCF", lazy=True)
     if format == "dataset":
         return data.CCF
     # ── DataFrame (legacy) ──────────────────────────────────────────────
@@ -250,7 +254,7 @@ def xr_get_ref(root, lineage, station1, station2, components, taxis, ignore_netw
         if not os.path.isfile(fullpath):
             # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
             raise FileNotFoundError(fullpath)
-    data = _xr_create_or_open(fullpath, taxis, name="REF")
+    data = _xr_create_or_open(fullpath, taxis, name="REF", lazy=True)
     return data
 
 
@@ -351,7 +355,7 @@ def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack, format
                        "%s_%s.nc" % (station1, station2))
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
-    data = _xr_create_or_open(fn, name="MWCS")
+    data = _xr_create_or_open(fn, name="MWCS", lazy=True)
 
     if format == "dataset":
         return data
@@ -405,7 +409,7 @@ def xr_get_dtt(root, lineage, station1, station2, components, mov_stack, format=
 
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
-    dr = _xr_create_or_open(fn, taxis=[], name="DTT")
+    dr = _xr_create_or_open(fn, taxis=[], name="DTT", lazy=True)
 
     if format == "dataset":
         return dr
@@ -467,7 +471,7 @@ def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack,
     )
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
-    dr = _xr_create_or_open(fn, taxis=[], name="STR")
+    dr = _xr_create_or_open(fn, taxis=[], name="STR", lazy=True)
 
     if format == "dataset":
         return dr
@@ -566,8 +570,8 @@ def xr_load_wct(root, lineage, station1, station2, components, mov_stack):
     if not os.path.exists(fn):
         raise FileNotFoundError(f"File not found: {fn}")
 
-    # Load and return the dataset
-    ds = xr.load_dataset(fn)
+    # Load and return the dataset lazily — caller reads but never writes back
+    ds = xr.open_dataset(fn)
     return ds
 
 
@@ -608,7 +612,7 @@ def xr_get_wct_dtt(root, lineage, station1, station2, components, mov_stack):
     )
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
-    return xr.load_dataset(fn)
+    return xr.open_dataset(fn)
 
 
 
@@ -823,10 +827,11 @@ def xr_get_dvv_agg(root, lineage, step_name, mov_stack,
                       ms_str, f"dvv_{pair_type}_{component}.nc")
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
-    ds = xr.load_dataset(fn)
+    ds = xr.open_dataset(fn)
 
     if format == "dataframe":
-        return ds.to_dataframe()
+        # materialise before returning as DataFrame — lazy → eager here is fine
+        return ds.load().to_dataframe()
     return ds
 
 
@@ -1154,7 +1159,7 @@ def xr_load_psd(root, lineage, step_name, seed_id, day, format="dataset"):
     )
     if not os.path.isfile(fn):
         return None
-    ds = xr.load_dataset(fn)
+    ds = xr.open_dataset(fn)
 
     if format == "dataset":
         return ds
@@ -1226,7 +1231,7 @@ def xr_load_rms(root, lineage, step_name, seed_id, format="dataset"):
     fn = os.path.join(root, *lineage, step_name, "_output", seed_id, "RMS.nc")
     if not os.path.isfile(fn):
         return None
-    ds = xr.load_dataset(fn)
+    ds = xr.open_dataset(fn)
 
     if format == "dataset":
         return ds
