@@ -438,6 +438,24 @@ def _clockpanel(
 # Data loading
 # ---------------------------------------------------------------------------
 
+
+def _rms_ds_to_df(ds):
+    """Convert an RMS :class:`xarray.Dataset` to a :class:`~pandas.DataFrame`.
+
+    The Dataset has a single ``RMS`` variable with dims ``(times, bands)``.
+    Returns a DataFrame with a :class:`~pandas.DatetimeIndex` and one column
+    per frequency band, matching the format expected by the plot helpers.
+    """
+    if ds is None:
+        return None
+    da = ds.RMS.load()
+    import pandas as _pd
+    return _pd.DataFrame(
+        da.values,
+        index=_pd.DatetimeIndex(da.coords["times"].values),
+        columns=list(da.coords["bands"].values),
+    )
+
 def load_rms(
     result,
     seed_ids: Optional[list[str]] = None,
@@ -489,14 +507,15 @@ def load_rms(
     if seed_ids is not None:
         out: dict[str, pd.DataFrame] = {}
         for sid in seed_ids:
-            df = result.get_psd_rms(seed_id=sid, format="dataframe")
-            if df is not None and not (isinstance(df, pd.DataFrame) and df.empty):
+            _ds = result.get_psd_rms(seed_id=sid)
+            df = _rms_ds_to_df(_ds)
+            if df is not None and not df.empty:
                 out[sid] = df
         return out
 
     # No seed_ids -> auto-discover all stations on disk
-    raw = result.get_psd_rms(format="dataframe")
-    return {sid: df for sid, df in raw.items() if df is not None}
+    raw = result.get_psd_rms()
+    return {sid: _rms_ds_to_df(ds) for sid, ds in raw.items() if ds is not None}
 
 
 # ---------------------------------------------------------------------------
