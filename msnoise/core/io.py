@@ -35,7 +35,6 @@ __all__ = [
 import glob
 import logging
 import os
-import sys
 
 import numpy as np
 import pandas as pd
@@ -142,8 +141,7 @@ def _xr_create_or_open(fn, taxis=[], name="CCF", lazy=False):
         return ds
 
     else:
-        logging.error("Not implemented, name=%s invalid." % name)
-        sys.exit(1)
+        raise ValueError(f"_xr_create_or_open: unsupported name={name!r}. Expected one of CCF, REF, MWCS, STR, DTT, DVV, WCT.")
     dr.name = name
     return dr.to_dataset()
 

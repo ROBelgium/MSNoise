@@ -206,7 +206,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
     :Example:
 
     >>> from msnoise.api import connect, get_params
-    >>> from msnoise.preprocessing import preprocess
+    >>> from msnoise.core.preprocessing import preprocess
     >>> db = connect()
     >>> params = get_params(db)
     >>> responses = preload_instrument_responses(db)
