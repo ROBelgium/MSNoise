@@ -253,8 +253,13 @@ def xr_get_ref(root, lineage, station1, station2, components, taxis, ignore_netw
         if not os.path.isfile(fullpath):
             # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
             raise FileNotFoundError(fullpath)
-    data = _xr_create_or_open(fullpath, taxis, name="REF", lazy=True)
-    return data
+    ds = _xr_create_or_open(fullpath, taxis, name="REF", lazy=True)
+    # Materialise and close immediately — this file is also a write
+    # target (xr_save_ref), so holding the handle open would block
+    # concurrent writes on Windows and cause PermissionError on Linux.
+    da = ds.REF.load()
+    ds.close()
+    return xr.Dataset({"REF": da})
 
 
 def xr_load_ccf_for_stack(root, lineage_names, station1, station2, components, dates):
@@ -522,9 +527,9 @@ def xr_load_wct(root, lineage, station1, station2, components, mov_stack):
     if not os.path.exists(fn):
         raise FileNotFoundError(f"File not found: {fn}")
 
-    # Load and return the dataset lazily — caller reads but never writes back
-    ds = xr.open_dataset(fn)
-    return ds
+    # Pure read — xr_save_wct_dtt writes to a different file path,
+    # so keeping this handle lazy is safe.
+    return xr.open_dataset(fn)
 
 
 
@@ -850,6 +855,9 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                     bad = (da_q < quality_min).values  # numpy bool; scalar 'keys' coord on da_dv/da_q
                     da_dv  = da_dv.copy(data=np.where(bad, np.nan, da_dv.values))
                     da_err = da_err.copy(data=np.where(bad, np.nan, da_err.values))
+                # Materialise before closing the file handle
+                da_dv, da_err = da_dv.load(), da_err.load()
+                ds.close()
 
             elif parent_category == "stretching":
                 ds = _xr_get_stretching(root, dtt_lineage, sta1, sta2,
@@ -862,6 +870,9 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                     bad = (da_q < quality_min).values  # numpy bool; scalar 'keys' coord on da_dv/da_q
                     da_dv  = da_dv.copy(data=np.where(bad, np.nan, da_dv.values))
                     da_err = da_err.copy(data=np.where(bad, np.nan, da_err.values))
+                # Materialise before closing the file handle
+                da_dv, da_err = da_dv.load(), da_err.load()
+                ds.close()
 
             elif parent_category == "wavelet_dtt":
                 ds = xr_get_wct_dtt(root, dtt_lineage, sta1, sta2,
@@ -870,6 +881,9 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                     ds, wct_freqmin, wct_freqmax, quality_min, wct_freq_agg)
                 # wavelet dtt is returning dt/t -> *=-1 for dv/v
                 da_dv *= -1
+                # Materialise before closing the file handle
+                da_dv, da_err = da_dv.load(), da_err.load()
+                ds.close()
 
         except FileNotFoundError as e:
             logging.getLogger("msnoise").warning(

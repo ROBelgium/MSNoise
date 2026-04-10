@@ -86,6 +86,7 @@ def main(loglevel="INFO"):
                 MCOH = da.sel(keys="MCOH").values.copy()
                 tArray = da.coords["taxis"].values        # (taxis,)
                 times  = ds.coords["times"].values
+                ds.close()  # release lazy file handle — all needed data is now in numpy
 
                 # ── Lag window masking ───────────────────────────────────
                 if params.mwcs_dtt.dtt_lag == "static":

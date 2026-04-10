@@ -195,6 +195,7 @@ def main(loglevel="INFO"):
                     err_rows.append(err)
                     coh_rows.append(coh)
 
+                ds.close()
                 del ds
 
                 if not dates_out:
