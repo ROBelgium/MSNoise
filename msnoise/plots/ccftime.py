@@ -78,24 +78,26 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
     pair = "_".join([sta1, sta2])
     try:
         stack_total = result.get_ccf(f"{sta1}:{sta2}", components, mov_stack)
-        t = stack_total.columns.values
+        t = stack_total.coords["taxis"].values
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
         return
 
     # convert index to mdates
-    stack_total.index = mdates.date2num(stack_total.index.to_pydatetime())
+    # Convert times coord to matplotlib date numbers for y-axis
+    _times_num = mdates.date2num(stack_total.coords["times"].values.astype("datetime64[ms]").astype(object))
 
-    if len(stack_total) == 0:
+    if stack_total.sizes["times"] == 0:
         logger.error("No CCF found for this request")
         return
 
     if normalize == "common":
-        stack_total /= np.nanmax(stack_total)
+        stack_total = stack_total / float(np.nanmax(stack_total.values))
 
     fig, ax = plt.subplots(1, 1,figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
-    for i, line in stack_total.iterrows():
+    for idx, (i, row) in enumerate(zip(_times_num, stack_total.values)):
+        line = row.copy()
         if np.all(np.isnan(line)):
             continue
         if refilter:
@@ -126,8 +128,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
     plt.title(title)
     plt.scatter(0, [start, ], alpha=0)
     plt.xlabel("Time Lag (s)")
-    plt.ylim(stack_total.index[0]-10,
-             stack_total.index[-1]+10)
+    plt.ylim(_times_num[0]-10, _times_num[-1]+10)
     if "xlim" in kwargs:
         plt.xlim(kwargs["xlim"][0],kwargs["xlim"][1])
     else:

@@ -129,33 +129,35 @@ def main(mov_stackid=None, dttname="m", components="ZZ",
             except FileNotFoundError:
                 continue
 
-            if col not in df.columns:
+            _keys = list(df.DTT.coords["keys"].values)
+            if col not in _keys:
                 continue
 
-            ts = df[col]
+            ts = df.DTT.sel(keys=col)   # DataArray (times,)
             pair_series.append(ts)
 
             # Highlighted pairs
             pair_key = "%s:%s" % (s1, s2)
             if pair_key in highlight:
-                es = df.get(err_col)
-                ax.plot(ts.index, ts.values * -100,
+                es = df.DTT.sel(keys=err_col) if err_col in _keys else None
+                ax.plot(ts.coords["times"].values, ts.values * -100,
                         label=pair_key, alpha=0.8)
                 if es is not None:
-                    ax.fill_between(ts.index,
-                                    (ts - es) * -100,
-                                    (ts + es) * -100,
+                    ax.fill_between(ts.coords["times"].values,
+                                    (ts.values - es.values) * -100,
+                                    (ts.values + es.values) * -100,
                                     alpha=0.2)
 
         if not pair_series:
             logger.warning(f"No data for mov_stack={mov_stack} comp={components}")
             continue
 
-        import pandas as pd
-        all_df = pd.concat(pair_series, axis=1)
-        t = all_df.index
-        mean_ts   = all_df.mean(axis=1) * -100
-        median_ts = all_df.median(axis=1) * -100
+        import xarray as _xr
+        import numpy as _np
+        all_da = _xr.concat(pair_series, dim="pair")
+        t = all_da.coords["times"].values
+        mean_ts   = all_da.mean("pair").values * -100
+        median_ts = _np.nanmedian(all_da.values, axis=0) * -100
 
         ax.plot(t, mean_ts,   label="mean",   lw=1.5)
         ax.plot(t, median_ts, label="median", lw=1.5, linestyle="--")

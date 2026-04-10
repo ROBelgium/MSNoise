@@ -18,7 +18,7 @@ import time
 import traceback
 
 import numpy as np
-import pandas as pd
+import xarray as xr
 
 from .core.db import connect, get_logger
 from .core.stations import get_station
@@ -91,21 +91,21 @@ def main(loglevel="INFO"):
             seed_id = f"{net}.{sta}.{loc}.{chan}"
             logger.debug(f"Processing {seed_id}")
 
-            frames = []
+            daily_datasets = []
             for day in days:
-                df = xr_load_psd(
+                ds = xr_load_psd(
                     output_folder, psd_lineage, psd_step_name, seed_id, day,
                 )
-                if df is not None and not df.empty:
-                    frames.append(df)
+                if ds is not None:
+                    daily_datasets.append(ds)
                 else:
                     logger.debug(f"No PSD NC for {seed_id} {day}")
 
-            if not frames:
+            if not daily_datasets:
                 logger.warning(f"No PSD data found for {seed_id}")
                 continue
 
-            data = pd.concat(frames).sort_index().sort_index(axis=1)
+            data = xr.concat(daily_datasets, dim="times")
 
             try:
                 rms = psd_df_rms(data, freqs=rms_freq_ranges, output=rms_type)

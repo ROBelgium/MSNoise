@@ -75,17 +75,18 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
         return
 
-    # convert index to mdates
-    stack_total.index = mdates.date2num(stack_total.index.to_pydatetime())
+    # Convert times coord to matplotlib date numbers for y-axis
+    _times_num = mdates.date2num(stack_total.coords["times"].values.astype("datetime64[ms]").astype(object))
 
-    if len(stack_total) == 0:
+    if stack_total.sizes["times"] == 0:
         logger.error("No CCF found for this request")
         return
 
     fig, ax = plt.subplots(1, 1, figsize=(12, 9))
     plt.subplots_adjust(bottom=0.06, hspace=0.3)
 
-    for i, line in stack_total.iterrows():
+    for i, row in zip(_times_num, stack_total.values):
+        line = row.copy()
         if np.all(np.isnan(line)):
             continue
 

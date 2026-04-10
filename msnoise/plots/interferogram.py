@@ -66,15 +66,18 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1, stackid_item
     except FileNotFoundError as fullpath:
         logger.error("FILE DOES NOT EXIST: %s, exiting" % fullpath)
         return
-    xextent = (date2num(data.index[0]), date2num(data.index[-1]), -params.cc.maxlag, params.cc.maxlag)
+    _times = data.coords["times"].values.astype("datetime64[ms]").astype(object)
+    xextent = (date2num(_times[0]), date2num(_times[-1]), -params.cc.maxlag, params.cc.maxlag)
     ax = plt.subplot(111)
     # data = stack_total
     if refilter:
-        for i, d in enumerate(data):
-            data.iloc[i] = bandpass(data.iloc[i], freqmin, freqmax, params.cc.cc_sampling_rate,
+        _arr = data.values.copy()
+        for i in range(_arr.shape[0]):
+            _arr[i] = bandpass(_arr[i], freqmin, freqmax, params.cc.cc_sampling_rate,
                                zerophase=True)
-    vmax = np.nanmax(data) * 0.9
-    plt.imshow(data.T, extent=xextent, aspect="auto",
+        data = data.copy(data=_arr)
+    vmax = np.nanmax(data.values) * 0.9
+    plt.imshow(data.values.T, extent=xextent, aspect="auto",
                interpolation='none', origin='lower', cmap='seismic',
                vmin=-vmax, vmax=vmax)
     plt.ylabel("Lag Time (s)")

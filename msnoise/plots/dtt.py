@@ -89,16 +89,18 @@ def main(sta1, sta2, filterid=1, components="ZZ", day=None,
         logger.error(f"MWCS FILE DOES NOT EXIST: {fp}")
         return
 
-    import pandas as pd
-    day_ts = pd.Timestamp(day)
-    day_data = mwcs_all[mwcs_all.index.floor("D") == day_ts]
-    if day_data.empty:
+    import numpy as _np
+    _day_mask = _np.array(
+        [str(t)[:10] == day for t in mwcs_all.MWCS.coords["times"].values]
+    )
+    if not _day_mask.any():
         logger.error(f"No MWCS data found for day {day}")
         return
 
-    t   = day_data.columns.get_level_values("taxis").astype(float)
-    dt  = day_data["M"].values.squeeze()
-    err = day_data["EM"].values.squeeze()
+    _mwcs_day = mwcs_all.MWCS.isel(times=_day_mask)
+    t   = _mwcs_day.coords["taxis"].values.astype(float)
+    dt  = _mwcs_day.sel(keys="M").values.squeeze()
+    err = _mwcs_day.sel(keys="EM").values.squeeze()
 
     # --- Load DTT regression for the requested day ---
     try:
@@ -116,13 +118,16 @@ def main(sta1, sta2, filterid=1, components="ZZ", day=None,
 
     xline = np.linspace(-maxlag, maxlag, 200)
     if dtt_all is not None:
-        day_dtt = dtt_all[dtt_all.index.floor("D") == day_ts]
-        if not day_dtt.empty:
-            M   = float(day_dtt["m"].iloc[0])
-            M0  = float(day_dtt["m0"].iloc[0])
-            A   = float(day_dtt["a"].iloc[0])
-            EM  = float(day_dtt["em"].iloc[0])
-            EM0 = float(day_dtt["em0"].iloc[0])
+        _dtt_mask = _np.array(
+            [str(t)[:10] == day for t in dtt_all.DTT.coords["times"].values]
+        )
+        if _dtt_mask.any():
+            _dtt_day = dtt_all.DTT.isel(times=_dtt_mask)
+            M   = float(_dtt_day.sel(keys="m").values[0])
+            M0  = float(_dtt_day.sel(keys="m0").values[0])
+            A   = float(_dtt_day.sel(keys="a").values[0])
+            EM  = float(_dtt_day.sel(keys="em").values[0])
+            EM0 = float(_dtt_day.sel(keys="em0").values[0])
 
             ax.plot(xline, M0 * xline,             "r",   label="M0=%.4f" % M0)
             ax.plot(xline, (M0-EM0) * xline,       "r",   alpha=0.3)

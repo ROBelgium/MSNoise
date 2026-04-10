@@ -639,32 +639,47 @@ def psd_rms(s, f):
 
 
 def psd_df_rms(d, freqs, output="VEL"):
-    """Compute per-frequency-band RMS from a PPSD DataFrame.
+    """Compute per-frequency-band RMS from PSD data.
 
-    :param d: :class:`pandas.DataFrame` with period columns and time index.
+    :param d: :class:`xarray.Dataset` with a ``PSD`` variable and dims
+        ``(times, periods)``, as returned by :func:`~msnoise.core.io.xr_load_psd`.
     :param freqs: List of ``(fmin, fmax)`` tuples defining frequency bands.
     :param output: Physical unit - ``"VEL"`` (default), ``"ACC"``, or ``"DISP"``.
-    :returns: :class:`pandas.DataFrame` with one column per frequency band.
+    :returns: :class:`xarray.Dataset` with one ``RMS`` variable and dims
+        ``(times, bands)``, ready for :func:`~msnoise.core.io.xr_save_rms`.
     """
-    d = d.dropna(axis=1, how="all")
-    RMS = {}
+    import xarray as xr_mod
+    da = d.PSD.load()  # materialise — we need numpy ops
+    periods = da.coords["periods"].values.astype(float)
+    times   = da.coords["times"].values
+
+    rms_bands = {}
     for fmin, fmax in freqs:
         pmin = 1.0 / fmax
         pmax = 1.0 / fmin
-        ix = np.where((d.columns >= pmin) & (d.columns <= pmax))[0]
-        f = d.columns[ix]
-        w2f = 2.0 * np.pi * f
-        amp = 10.0 ** (d.iloc[:, ix] / 10.0)
+        ix = np.where((periods >= pmin) & (periods <= pmax))[0]
+        if ix.size == 0:
+            continue
+        f    = periods[ix]
+        w2f  = 2.0 * np.pi * f
+        amp  = 10.0 ** (da.values[:, ix] / 10.0)   # (times, n_periods)
         if output == "ACC":
-            RMS[f"{fmin:.1f}-{fmax:.1f}"] = amp.apply(lambda a: np.sqrt(np.trapezoid(a.values, a.index)), axis=1)
+            vals = np.sqrt(np.trapezoid(amp, f, axis=1))
         elif output == "VEL":
             vamp = amp / w2f ** 2
-            RMS[f"{fmin:.1f}-{fmax:.1f}"] = vamp.apply(lambda a: np.sqrt(np.trapezoid(a.values, a.index)), axis=1)
+            vals = np.sqrt(np.trapezoid(vamp, f, axis=1))
         else:
             vamp = amp / w2f ** 2
             damp = vamp / w2f ** 2
-            RMS[f"{fmin:.1f}-{fmax:.1f}"] = damp.apply(lambda a: np.sqrt(np.trapezoid(a.values, a.index)), axis=1)
-    return pd.DataFrame(RMS, index=d.index)
+            vals = np.sqrt(np.trapezoid(damp, f, axis=1))
+        rms_bands[f"{fmin:.1f}-{fmax:.1f}"] = vals
+
+    bands = list(rms_bands.keys())
+    data  = np.column_stack(list(rms_bands.values())) if bands else np.empty((len(times), 0))
+    da_rms = xr_mod.DataArray(
+        data, coords=[times, bands], dims=["times", "bands"], name="RMS"
+    )
+    return da_rms.to_dataset()
 
 def make_same_length(st):
     """

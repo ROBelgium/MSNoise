@@ -100,19 +100,21 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
         logger.error(f"FILE DOES NOT EXIST: {fp}")
         return
 
-    alldt  = mwcs["M"].resample("D").mean()
-    allcoh = mwcs["MCOH"].resample("D").mean()
+    # mwcs is a Dataset with MWCS variable (times, taxis, keys)
+    _alldt  = mwcs.MWCS.sel(keys="M").resample(times="1D").mean()
+    _allcoh = mwcs.MWCS.sel(keys="MCOH").resample(times="1D").mean()
+    _t_num  = date2num(_alldt.coords["times"].values.astype("datetime64[ms]").astype(object))
+    _taxis  = _alldt.coords["taxis"].values
 
-    xextent = (date2num(alldt.index[0]), date2num(alldt.index[-1]),
-               -maxlag, maxlag)
+    xextent = (_t_num[0], _t_num[-1], -maxlag, maxlag)
 
     gs = gridspec.GridSpec(2, 2, width_ratios=[3, 1], height_ratios=[1, 1])
     plt.figure(figsize=(12, 9))
 
     ax1 = plt.subplot(gs[0])
-    im = plt.imshow(alldt.T, extent=xextent, aspect="auto",
+    im = plt.imshow(_alldt.values.T, extent=xextent, aspect="auto",
                     interpolation="none", origin="lower", cmap=cm.seismic)
-    cscale = np.nanpercentile(alldt.values, 99)
+    cscale = np.nanpercentile(_alldt.values, 99)
     im.set_clim(-cscale, cscale)
     cb = plt.colorbar()
     cb.set_label("dt")
@@ -131,7 +133,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
     plt.setp(ax1.get_xticklabels(), visible=False)
 
     plt.subplot(gs[1], sharey=ax1)
-    plt.plot(alldt.mean(axis=0), alldt.columns, c="k")
+    plt.plot(_alldt.mean("times").values, _taxis, c="k")
     plt.grid()
     plot_lags(minlag, maxlag2)
     plt.axvline(-maxDt, c="r", ls="--")
@@ -140,7 +142,7 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
     plt.ylabel("Lag Time (s)")
 
     ax2 = plt.subplot(gs[2], sharex=ax1, sharey=ax1)
-    plt.imshow(allcoh.T, extent=xextent, aspect="auto",
+    plt.imshow(_allcoh.values.T, extent=xextent, aspect="auto",
                interpolation="none", origin="lower", cmap="hot",
                vmin=minCoh, vmax=1)
     cb = plt.colorbar()
@@ -156,10 +158,10 @@ def main(sta1, sta2, preprocessid=1, ccid=1, filterid=1, stackid=1,
     plot_lags(minlag, maxlag2)
 
     plt.subplot(gs[3], sharey=ax1)
-    m = allcoh.mean(axis=0)
-    s = allcoh.std(axis=0)
-    plt.plot(m, allcoh.columns, c="k")
-    plt.fill_betweenx(allcoh.columns, m - s, m + s, color="silver")
+    _m = _allcoh.mean("times").values
+    _s = _allcoh.std("times").values
+    plt.plot(_m, _taxis, c="k")
+    plt.fill_betweenx(_taxis, _m - _s, _m + _s, color="silver")
     plt.grid()
     plot_lags(minlag, maxlag2)
     plt.axvline(minCoh, c="r", ls="--")
