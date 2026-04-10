@@ -9,7 +9,7 @@ from .core.db import connect, get_logger
 from .core.workflow import (get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream)
 from .core.signal import validate_stack_data
 from .core.io import xr_load_ccf_for_stack, xr_save_ccf
-from .wiener import wiener_filt
+from .core.signal import wiener_filt
 
 
 

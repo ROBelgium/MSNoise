@@ -55,7 +55,8 @@ from .core.db import connect, get_logger
 from .core.stations import get_data_availability, get_station, resolve_data_source, read_waveforms_from_availability
 from .core.fdsn import is_remote_source, fetch_raw_waveforms
 from .core.workflow import get_next_lineage_batch, is_next_job_for_step, massive_update_job, propagate_downstream
-from .core.signal import preload_instrument_responses, to_sds
+from .core.signal import preload_instrument_responses
+from .core.stations import to_sds
 from .core.io import psd_ppsd_to_dataset, xr_save_psd
 
 CATEGORY = "psd"

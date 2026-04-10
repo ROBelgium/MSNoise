@@ -6,6 +6,16 @@ handling.  It is the **only** place in MSNoise that makes network calls to
 external data services.
 """
 
+__all__ = [
+    "build_client",
+    "fetch_and_preprocess",
+    "fetch_raw_waveforms",
+    "fetch_waveforms_bulk",
+    "is_remote_source",
+    "parse_datasource_scheme",
+]
+
+
 import logging
 import os
 import time
@@ -247,7 +257,7 @@ def fetch_and_preprocess(
         preprocessed traces for all successfully fetched stations.
     """
     from obspy import UTCDateTime, Stream
-    from ..preprocessing import apply_preprocessing_to_stream
+    from .preprocessing import apply_preprocessing_to_stream
 
     log = logging.getLogger("msnoise.fdsn.fetch")
 

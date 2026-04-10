@@ -16,7 +16,7 @@ from .core.workflow import get_next_lineage_batch, is_next_job_for_step, massive
 from .core.signal import preload_instrument_responses, save_preprocessed_streams
 from .core.stations import resolve_data_source, get_station
 from .core.fdsn import is_remote_source, fetch_and_preprocess
-from .preprocessing import preprocess
+from .core.preprocessing import preprocess
 
 CATEGORY = "preprocess"
 

@@ -129,7 +129,7 @@ def main(loglevel="INFO"):
         freqmax = params.mwcs.freqmax
 
         def ww(a):
-            from .move2obspy import whiten
+            from .core.compute import whiten
             n = next_fast_len(len(a))
             return whiten(a, n, 1./params.cc.cc_sampling_rate,
                           freqmin, freqmax, returntime=True)

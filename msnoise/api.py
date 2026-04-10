@@ -1,6 +1,6 @@
-"""MSNoise API compatibility module.
+"""MSNoise public API.
 
-The only symbol most code needs is ``connect`` — the universal entry point::
+The universal entry point::
 
     from msnoise.api import connect
     # or equivalently:
@@ -8,18 +8,15 @@ The only symbol most code needs is ``connect`` — the universal entry point::
     # or directly:
     from msnoise.core.db import connect
 
-All other symbols are re-exported here for backward compatibility with code
-written against earlier MSNoise versions.  New code should import directly
-from the appropriate ``msnoise.core.*`` submodule.
+All other public symbols live in ``msnoise.core.*`` and are importable from
+there directly.  This module re-exports the full ``core`` namespace for
+convenience::
+
+    from msnoise.api import get_params, get_next_lineage_batch, xr_get_ccf
 """
 
-# The one symbol worth importing from here
+# The one symbol most code needs
 from .core.db import connect  # noqa: F401
 
-# Full backward-compat re-export (no deprecation — just convenience)
+# Full core namespace re-export (respects __all__ in each submodule)
 from .core import *  # noqa: F401,F403
-
-from .msnoise_table_def import (  # noqa: F401
-    Job, Station, Config, DataAvailability, WorkflowStep, DataSource,
-    WORKFLOW_CHAINS, WORKFLOW_ORDER,
-)

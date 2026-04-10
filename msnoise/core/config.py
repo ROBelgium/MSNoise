@@ -1,4 +1,21 @@
 """MSNoise configuration management, parameter merging, and plot filename helpers."""
+
+__all__ = [
+    "build_plot_outfile",
+    "create_config_set",
+    "delete_config_set",
+    "get_config",
+    "get_config_categories_definition",
+    "get_config_set_details",
+    "get_config_sets_organized",
+    "get_merged_params_for_lineage",
+    "get_params",
+    "lineage_to_plot_tag",
+    "list_config_sets",
+    "parse_config_key",
+    "update_config",
+]
+
 import traceback
 
 from .db import get_logger

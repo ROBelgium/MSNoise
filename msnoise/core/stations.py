@@ -1,4 +1,31 @@
 """MSNoise station and data-availability management."""
+
+__all__ = [
+    "add_data_source",
+    "check_stations_uniqueness",
+    "get_data_availability",
+    "get_data_source",
+    "get_default_data_source",
+    "get_interstation_distance",
+    "get_new_files",
+    "get_station",
+    "get_station_pairs",
+    "get_stations",
+    "get_waveform_path",
+    "import_stationxml",
+    "list_data_sources",
+    "mark_data_availability",
+    "read_waveforms_from_availability",
+    "resolve_data_source",
+    "set_all_stations_source",
+    "set_network_source",
+    "set_station_source",
+    "to_sds",
+    "update_data_availability",
+    "update_data_source",
+    "update_station",
+]
+
 import itertools
 import logging
 
@@ -691,3 +718,26 @@ def read_waveforms_from_availability(session, da_records, t_start, t_end, logger
             _log.debug(f"Could not read {fpath}: {exc}")
     return st
 
+
+
+def to_sds(stats, year, jday):
+    """Build an SDS-format relative file path from ObsPy trace stats.
+
+    Returns a path string of the form::
+
+        YYYY/NET/STA/CHAN.D/NET.STA.LOC.CHAN.D.YYYY.DDD
+
+    :param stats: :class:`obspy.core.trace.Stats` object.
+    :param year: 4-digit year integer.
+    :param jday: Julian day-of-year integer (1-366).
+    :returns: Relative SDS path string.
+    """
+    SDS = "YEAR/NET/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.JDAY"
+    f = SDS.replace("YEAR", "%04i" % year)
+    f = f.replace("NET",  stats.network)
+    f = f.replace("STA",  stats.station)
+    f = f.replace("LOC",  stats.location)
+    f = f.replace("CHAN", stats.channel)
+    f = f.replace("JDAY", "%03i" % jday)
+    f = f.replace("TYPE", "D")
+    return f

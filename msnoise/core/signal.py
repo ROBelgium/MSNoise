@@ -1,4 +1,30 @@
 """MSNoise signal processing, preprocessing helpers, and stacking utilities."""
+
+__all__ = [
+    "check_and_phase_shift",
+    "compute_wct_dtt",
+    "find_segments",
+    "getCoherence",
+    "getGaps",
+    "get_preprocessed_stream",
+    "get_wavelet_type",
+    "get_wct_avgcoh",
+    "get_window",
+    "make_same_length",
+    "nextpow2",
+    "preload_instrument_responses",
+    "prepare_abs_positive_fft",
+    "psd_df_rms",
+    "psd_rms",
+    "save_preprocessed_streams",
+    "smoothCFS",
+    "stack",
+    "validate_stack_data",
+    "wiener_filt",
+    "winsorizing",
+    "xwt",
+]
+
 import copy
 import glob
 import logging
@@ -543,16 +569,7 @@ def preload_instrument_responses(session, return_format="dataframe"):
 
 
 
-def to_sds(stats,year, jday):
-    SDS="YEAR/NET/STA/CHAN.TYPE/NET.STA.LOC.CHAN.TYPE.YEAR.JDAY"
-    file=SDS.replace('YEAR', "%04i"%year)
-    file=file.replace('NET', stats.network)
-    file=file.replace('STA', stats.station)
-    file=file.replace('LOC', stats.location)
-    file=file.replace('CHAN', stats.channel)
-    file=file.replace('JDAY', "%03i"%jday)
-    file=file.replace('TYPE', "D")
-    return file
+
 
 
 
@@ -793,3 +810,58 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
         corr /= data.shape[0]
 
     return corr
+
+# ── Wiener filter helpers (moved from msnoise/wiener.py) ──────────────────
+
+def find_segments(data, gap_threshold):
+    """Identify continuous non-NaN segments in an xarray DataArray.
+
+    :param data: 2-D xarray DataArray (times × lags).
+    :param gap_threshold: Maximum index gap before treating as a new segment.
+    :returns: List of lists of row indices forming each continuous segment.
+    """
+    current_segment = []
+    continuous_segments = []
+    prev_idx = None
+
+    for i in range(data.shape[0]):
+        if not data[i, :].isnull().all():
+            if prev_idx is not None and (i - prev_idx > gap_threshold):
+                continuous_segments.append(current_segment)
+                current_segment = []
+            current_segment.append(i)
+            prev_idx = i
+        else:
+            prev_idx = None
+
+    if current_segment:
+        continuous_segments.append(current_segment)
+
+    return continuous_segments
+
+
+def wiener_filt(data, M, N, gap_threshold):
+    """Apply a 2-D Wiener filter to the CCF dataset, segment by segment.
+
+    Operates only on continuous (non-NaN) segments of the time axis to avoid
+    smearing across data gaps.
+
+    :param data: xarray Dataset containing a ``CCF`` variable (times × taxis).
+    :param M: Wiener filter window size along the time axis.
+    :param N: Wiener filter window size along the lag axis.
+    :param gap_threshold: Passed to :func:`find_segments`.
+    :returns: Copy of *data* with the filtered ``CCF`` variable.
+    """
+    from scipy.signal import wiener as _wiener
+
+    ccfs = data["CCF"]
+    segments = find_segments(ccfs, gap_threshold)
+
+    filtered_ccfs = ccfs.copy(deep=True)
+    for segment in segments:
+        segment_data = ccfs[segment, :].values
+        filtered_ccfs[segment, :] = _wiener(segment_data, (M, N))
+
+    filtered_data = data.copy(deep=True)
+    filtered_data["CCF"] = filtered_ccfs
+    return filtered_data
