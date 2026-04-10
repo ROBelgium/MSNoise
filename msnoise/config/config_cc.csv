@@ -18,3 +18,4 @@ cc_type_single_station_AC,CC,Auto-Correlation type,str,
 cc_type_single_station_SC,CC,Cross-Correlation type for Cross-Components,str,
 keep_all,Y,Keep all cross-corr (length: ``corr_duration``),bool,Y/N
 keep_days,Y,Keep all daily cross-corr,bool,Y/N
+cc_taper_fraction,0.04,Fraction of each trace to taper (cosine) before cross-correlation. Applied symmetrically to both ends. Standard seismological convention is 0.04 (4%). Range: 0.0 (no taper) to 0.5 (full Hann window).,float,

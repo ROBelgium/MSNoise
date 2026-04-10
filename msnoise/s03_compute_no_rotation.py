@@ -340,8 +340,10 @@ def main(loglevel="INFO", chunk_size=0):
             nfft = next_fast_len(tmp[0].stats.npts)
             tmp.detrend("demean")
 
-            # TODO should not hardcode 100 taper points in spectrum
-            napod = 100
+            # Spectral end-taper width: ~0.5% of nfft, minimum 50 bins.
+            # Tapers the edges of the FFT output before whitening to
+            # suppress spectral leakage at DC and Nyquist.
+            napod = max(50, nfft // 200)
 
             data = np.asarray([tr.data for tr in tmp])
             names = [tr.id.split(".") for tr in tmp]
@@ -350,8 +352,9 @@ def main(loglevel="INFO", chunk_size=0):
                 # logger.debug("Winsorizing (clipping) data before whiten")
                 data = winsorizing(data, params) #inplace
 
-            # TODO should not hardcode 4 percent!
-            wlen = int(0.04 * data.shape[1])
+            # Time-domain cosine taper fraction (config: cc_taper_fraction, default 4%).
+            # Applied symmetrically to both ends of each trace before CC.
+            wlen = int(params.cc.cc_taper_fraction * data.shape[1])
             taper_sides = scipy.signal.windows.hann(2 * wlen + 1)
             taper = np.hstack(
                 (taper_sides[:wlen], np.ones(data.shape[1] - 2 * wlen),
@@ -390,7 +393,10 @@ def main(loglevel="INFO", chunk_size=0):
                     # psds[iZ] = mm
 
             # define pairwise CCs
-            # TODO document that MASSIVE change !!
+            # Pairwise CC index: for each (sta1, sta2) combination we build
+            # a list of (i, j, component_pair) tuples so the inner FFT/IFFT
+            # loop can be fully vectorised across all pairs in one batch
+            # (see myCorr2 in core/compute.py — replaces the old per-pair loop).
 
             tmptime = tmp[0].stats.starttime.datetime
             thisdate = tmptime.strftime("%Y-%m-%d")
