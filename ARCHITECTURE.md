@@ -25,7 +25,7 @@ MSNoise uses a directed acyclic graph (DAG) of **WorkflowSteps** connected by **
 ```
 global_1 ──► preprocess_1 ──► cc_1 ──► filter_1 ──► stack_1
                                                          │
-         ──► psd_1 ──► psd_rms_1          ┌─────────────┼─────────────┐
+         ──► psd_1 ──► psd_rms_1           ┌─────────────┼─────────────┐
                                            │             │             │
                                       REF sentinel   (direct)     (direct)
                                            │             │             │
@@ -34,7 +34,7 @@ global_1 ──► preprocess_1 ──► cc_1 ──► filter_1 ──► stac
                                     (re-propagates)     │        str_dvv_1
                                                      dtt_1
                                                         │
-                                                    dvv_1
+                                                     dvv_1
 ```
 
 **Pass-through nodes**: `filter_N` and `global_N` appear in lineage strings but have **no worker scripts** and **no jobs**. They are purely parameter namespaces. `propagate_downstream` recurses through them transparently via `_collect()`.
