@@ -1745,19 +1745,16 @@ def qc():
 
 
 @qc.command(name='compute_psd')
-@click.option('-n', '--njobs_per_worker', default=9999,
-              help='Reduce this number when processing a small number of days '
-                   'but a large number of stations')
 @click.option('--chunk-size', default=0, type=int,
               help='Max stations to process per worker per day (0 = all, default). '
                    'Set >0 to share a day across multiple parallel workers '
                    'without write conflicts (recommended for >50 stations).')
 @click.pass_context
-def qc_compute_psd(ctx, njobs_per_worker, chunk_size):
+def qc_compute_psd(ctx, chunk_size):
     """Computes the PSD jobs, saves results as NetCDF files.
        Based on New or Modified files identified by the new_jobs step."""
     from ..psd_compute import main
-    run_threaded(main, ctx, njobs_per_worker=njobs_per_worker, chunk_size=chunk_size)
+    run_threaded(main, ctx, chunk_size=chunk_size)
 
 
 

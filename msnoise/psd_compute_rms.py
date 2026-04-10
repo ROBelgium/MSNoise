@@ -29,7 +29,7 @@ from .core.io import xr_load_psd, xr_save_rms
 CATEGORY = "psd_rms"
 
 
-def main(loglevel="INFO", njobs_per_worker=9999):
+def main(loglevel="INFO"):
     logger = get_logger(f"msnoise.{CATEGORY}", loglevel, with_pid=True)
     logger.info("*** Starting: Compute PSD RMS ***")
 

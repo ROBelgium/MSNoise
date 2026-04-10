@@ -61,7 +61,7 @@ from .core.io import psd_ppsd_to_dataset, xr_save_psd
 CATEGORY = "psd"
 
 
-def main(loglevel="INFO", njobs_per_worker=9999, chunk_size=0):
+def main(loglevel="INFO", chunk_size=0):
     logger = get_logger(f"msnoise.{CATEGORY}", loglevel, with_pid=True)
     logger.info("*** Starting: Compute PSD ***")
 
