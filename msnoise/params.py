@@ -257,12 +257,19 @@ def _build_msnoise_params(
             continue  # already added
 
         # Post-process cc layer: split comma-separated component strings
-        if cat == "cc":
-            for key in ("components_to_compute",
-                        "components_to_compute_single_station"):
-                val = cfg.get(key, None)
-                if val is not None and isinstance(val, str):
-                    cfg[key] = [v for v in val.split(",") if v]
+        # Split comma-separated list params into Python lists.
+        # Any category may define list params — we check by key name so
+        # plugin categories with the same params are handled automatically.
+        _LIST_PARAMS = {
+            "components_to_compute",
+            "components_to_compute_single_station",
+            "preprocess_components",
+            "psd_components",
+        }
+        for key in _LIST_PARAMS:
+            val = cfg.get(key, None)
+            if val is not None and isinstance(val, str):
+                cfg[key] = [v.strip() for v in val.split(",") if v.strip()]
 
         # Post-process stack layer: normalise mov_stack to list-of-tuples
         if cat == "stack" and hasattr(cfg, "mov_stack"):

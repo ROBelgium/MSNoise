@@ -36,20 +36,19 @@ import glob
 import os
 
 # ── Step prefix registry ───────────────────────────────────────────────────────
+# Derived from the plugin-aware workflow order so plugin categories are
+# automatically included without editing this file.
 
-_STEP_PREFIXES = [
-    "preprocess", "cc", "psd", "psd_rms", "filter", "stack", "refstack",
-    "mwcs", "mwcs_dtt", "mwcs_dtt_dvv",
-    "stretching", "stretching_dvv",
-    "wavelet", "wavelet_dtt", "wavelet_dtt_dvv",
-]
+def _get_step_prefixes():
+    from .core.workflow import get_workflow_order
+    return get_workflow_order()
 
-_PREFIX_TO_KWARG = {p: p for p in _STEP_PREFIXES}
+_PREFIX_TO_KWARG = {p: p for p in _get_step_prefixes()}
 
 
 def _step_prefix(step_name: str) -> str:
     """Return the category prefix of a step name, e.g. 'mwcs_dtt_1' -> 'mwcs_dtt'."""
-    for prefix in sorted(_STEP_PREFIXES, key=len, reverse=True):
+    for prefix in sorted(_get_step_prefixes(), key=len, reverse=True):
         if step_name.startswith(prefix + "_"):
             return prefix
     raise ValueError(f"Cannot determine category prefix for step name {step_name!r}")
@@ -140,7 +139,7 @@ class MSNoiseResult:
                       stretching=stretching, stretching_dvv=stretching_dvv,
                       wavelet=wavelet, wavelet_dtt=wavelet_dtt,
                       wavelet_dtt_dvv=wavelet_dtt_dvv)
-        parts = [f"{p}_{v}" for p in _STEP_PREFIXES if (v := kwargs.get(p)) is not None]
+        parts = [f"{p}_{v}" for p in _get_step_prefixes() if (v := kwargs.get(p)) is not None]
         if not parts:
             raise ValueError("At least one step ID must be provided.")
         return cls(db, parts)

@@ -44,7 +44,7 @@ import pandas as pd
 from .core.db import connect, get_logger
 from .core.config import get_config, get_config_set_details, get_params
 from .core.stations import get_new_files, get_stations, mark_data_availability
-from .core.workflow import (build_movstack_datelist, _lineage_id_for, _get_or_create_lineage_id, filter_within_daterange, get_lineages_to_step_id, get_workflow_steps, lineage_str_to_step_names, massive_insert_job, update_job)
+from .core.workflow import (build_movstack_datelist, _lineage_id_for, _get_or_create_lineage_id, filter_within_daterange, get_lineages_to_step_id, get_workflow_chains, get_workflow_order, get_workflow_steps, lineage_str_to_step_names, massive_insert_job, update_job)
 
 
 # Module-level logger used by propagation functions (propagate_stack_jobs_from_cc_done, etc.)
@@ -438,7 +438,9 @@ def propagate_mwcs_jobs_from_refstack_done(session):
             .join(schema.WorkflowLink, schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
             .filter(schema.WorkflowLink.from_step_id == ref_step.step_id)
             .filter(schema.WorkflowLink.is_active.is_(True))
-            .filter(WorkflowStep.category.in_(["mwcs", "stretching", "wavelet"]))
+            .filter(WorkflowStep.category.in_(
+                get_workflow_chains().get("refstack", {}).get("next_steps", [])
+            ))
             .all()
         )
         if not dvv_successors:
@@ -564,14 +566,18 @@ def propagate_dvv_jobs_from_dtt_done(session, source_category: str) -> int:
 
     Performance: fully batched — no per-job DB round-trips.
     """
-    DVV_TARGET = {
-        "mwcs_dtt":    "mwcs_dtt_dvv",
-        "stretching":  "stretching_dvv",
-        "wavelet_dtt": "wavelet_dtt_dvv",
-    }
-    target_category = DVV_TARGET.get(source_category)
+    # Derive the DVV target from the workflow topology (plugin-aware)
+    _chains = get_workflow_chains()
+    _next = _chains.get(source_category, {}).get("next_steps", [])
+    target_category = next(
+        (cat for cat in _next if _chains.get(cat, {}).get("is_terminal", False)),
+        None,
+    )
     if target_category is None:
-        raise ValueError(f"Unknown source_category {source_category!r}")
+        raise ValueError(
+            f"Unknown or non-terminal source_category {source_category!r}. "
+            f"Expected a DTT-like category with a terminal DVV successor."
+        )
 
     from sqlalchemy import update as sa_update
     from .msnoise_table_def import declare_tables
@@ -1168,12 +1174,7 @@ def main(init=False, nocc=False, after=False):
             # a reconciliation pass; inline workers already handle the hot path.
 
         # Optional validation: ensure it's a known config-set type/category
-        allowed_categories = {
-            "global", "preprocess", "psd", "psd_rms", "cc", "filter",
-            "stack", "refstack", "mwcs", "mwcs_dtt", "mwcs_dtt_dvv",
-            "stretching", "stretching_dvv",
-            "wavelet", "wavelet_dtt", "wavelet_dtt_dvv",
-        }
+        allowed_categories = set(get_workflow_order())
         if source_category not in allowed_categories:
             raise ValueError(
                 f"Invalid --after value '{after}'. Expected a config set type/category, "
@@ -1217,7 +1218,15 @@ def main(init=False, nocc=False, after=False):
             logger.info(f'Propagation from category "refstack" created {created} DVV job(s)')
             return
 
-        if source_category in ("mwcs_dtt", "stretching", "wavelet_dtt"):
+        # Fire DVV propagation for any DTT-like category whose next step is terminal
+        _chains = get_workflow_chains()
+        _dtt_categories = {
+            cat for cat, meta in _chains.items()
+            if not meta.get("is_terminal", False)
+            and any(_chains.get(n, {}).get("is_terminal", False)
+                    for n in meta.get("next_steps", []))
+        }
+        if source_category in _dtt_categories:
             created = propagate_dvv_jobs_from_dtt_done(session=db,
                                                         source_category=source_category)
             logger.info(
