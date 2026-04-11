@@ -663,6 +663,7 @@ def test_023_stack():
         assert len(ccfs_plain) > 0, "No plain-stack CCF results found"
         first_key = next(iter(ccfs_plain))
         plain_vals = ccfs_plain[first_key].values
+        ccfs_plain.close()
 
     # Test Wiener filter
     update_config(db, 'wienerfilt', 'Y', category='stack', set_number=1)
@@ -671,6 +672,7 @@ def test_023_stack():
     with MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"]) as result_wiener:
         ccfs_wiener = result_wiener.get_ccf()
         wiener_vals = ccfs_wiener.get(first_key)
+        ccfs_wiener.close()
 
     import numpy as np
 
