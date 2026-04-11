@@ -6,12 +6,12 @@
 Workflow: Power Spectral Densities
 **********************************
 
-
-This section only presents Cross-Correlation part of the workflow,
-assuming the :ref:`workflow` step has been done previously.
+This section presents the PSD quality-control pipeline, which runs
+independently of the CC/dv/v workflow.
 
 .. toctree::
-   :glob:
    :maxdepth: 1
 
-   ../workflow_psd/*
+   ../workflow_psd/009_compute_psd
+   ../workflow_psd/010_compute_psd_rms
+   ../workflow_psd/010_plot_psd

@@ -6,13 +6,14 @@
 Workflow: Cross-Correlation Functions
 *************************************
 
-
-This section only presents Cross-Correlation part of the workflow,
-assuming the :ref:`workflow` step has been done previously.
-
+This section presents the CC pipeline, assuming :ref:`workflow`
+(project initialisation) has been completed.
 
 .. toctree::
-   :glob:
    :maxdepth: 1
 
-   ../workflow_ccf/*
+   ../workflow_ccf/005_compute_cc
+   ../workflow_ccf/005b_plot_ccftime
+   ../workflow_ccf/006_stack
+   ../workflow_ccf/006b_plot_distance
+   ../workflow_ccf/006c_stack_refstack
