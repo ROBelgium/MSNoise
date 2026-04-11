@@ -28,7 +28,7 @@ result = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1, refst
 
 # Get the reference CCF for two stations, filter 1, ZZ component:
 ref = result.get_ref(pair="PF.FJS.00:PF.FOR.00", components="ZZ",
-                     format="xarray")
+                     )
 
 ref.plot(figsize=(8, 8))
 

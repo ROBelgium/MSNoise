@@ -38,19 +38,19 @@ mov_stack = params.stack.mov_stack[0]
 
 # Get the autocorrelation CCFs (ZZ, EE, NN) for station PF.FJS.00
 ZZ = result.get_ccf(pair="PF.FJS.00:PF.FJS.00", components="ZZ",
-                    mov_stack=mov_stack, format="dataframe")
+                    mov_stack=mov_stack)
 EE = result.get_ccf(pair="PF.FJS.00:PF.FJS.00", components="EE",
-                    mov_stack=mov_stack, format="dataframe")
+                    mov_stack=mov_stack)
 NN = result.get_ccf(pair="PF.FJS.00:PF.FJS.00", components="NN",
-                    mov_stack=mov_stack, format="dataframe")
+                    mov_stack=mov_stack)
 
 ##############################################################
 # Checking the data has the same time base (index) and joining
 
 r = "1D"
-rZZ = ZZ.resample(r).mean()
-rEE = EE.resample(r).mean()
-rNN = NN.resample(r).mean()
+rZZ = MSNoiseResult.to_dataframe(ZZ).resample(r).mean()
+rEE = MSNoiseResult.to_dataframe(EE).resample(r).mean()
+rNN = MSNoiseResult.to_dataframe(NN).resample(r).mean()
 
 merged = pd.concat({"ZZ": rZZ, "EE": rEE, "NN": rNN}, axis=0)
 merged.index.names = ["channel", "date"]

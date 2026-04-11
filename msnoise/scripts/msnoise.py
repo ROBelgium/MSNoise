@@ -2007,13 +2007,21 @@ def qc_compute_rms(ctx):
               help='ISO date (YYYY-MM-DD) for before/after split (clockplot, dailyplot)')
 @click.option('--annotate', '-a', default=None,
               help='Event annotations as DATE=LABEL,DATE=LABEL')
+@click.option('--resample-freq', '-R', default='30min', show_default=True,
+              help='Pandas offset string for time-bin resampling '
+                   '(e.g. "15min", "1h", "2h").  Default: 30min')
+@click.option('--agg-func', '-A', default='mean', show_default=True,
+              help='Aggregation method for each resampled bin: '
+                   'mean, median, max, min, std, sum, or any pandas agg string.  '
+                   'Default: mean')
 @click.option('--outfile', '-o', default=None,
               help='Base filename for saved figure(s). Type suffix is appended.')
 @click.option('--no-show', is_flag=True, default=False,
               help='Do not call plt.show() (useful in non-interactive environments)')
 @click.pass_context
 def qc_plot_psd_rms(ctx, seed_ids, psd_id, psd_rms_id, plot_type, band, scale, unit,
-                    timezone, day_start, day_end, split_date, annotate, outfile, no_show):
+                    timezone, day_start, day_end, split_date, annotate,
+                    resample_freq, agg_func, outfile, no_show):
     """Plot PSD-RMS results: time-series, clock plots, hour-maps, grid-maps.
 
     SEED_ID can be zero or more SEED identifiers (NET.STA.LOC.CHAN).  When
@@ -2029,6 +2037,8 @@ def qc_plot_psd_rms(ctx, seed_ids, psd_id, psd_rms_id, plot_type, band, scale, u
         msnoise qc plot_psd_rms --psd-id 2 --psd-rms-id 2 BE.UCC..HHZ
         msnoise qc plot_psd_rms BE.UCC..HHZ --day-start 8 --day-end 20
         msnoise qc plot_psd_rms BE.UCC..HHZ --day-start 0 --day-end 24  # disable
+        msnoise qc plot_psd_rms BE.UCC..HHZ --resample-freq 1h --agg-func median
+        msnoise qc plot_psd_rms BE.UCC..HHZ -R 15min -A max
     """
     import matplotlib
     if no_show:
@@ -2053,6 +2063,8 @@ def qc_plot_psd_rms(ctx, seed_ids, psd_id, psd_rms_id, plot_type, band, scale, u
         time_zone=timezone,
         day_start=day_start,
         day_end=day_end,
+        resample_freq=resample_freq,
+        agg_func=agg_func,
         split_date=split_date,
         annotations=annotations or None,
         outfile=outfile,

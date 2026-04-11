@@ -20,12 +20,14 @@ plt.style.use("ggplot")
 from msnoise.core.db import connect
 from msnoise.results import MSNoiseResult
 
+import matplotlib
+matplotlib.use("agg")
 
 # connect to the database
 db = connect()
 
-# Build a result object at the psd step
-result = MSNoiseResult.from_ids(db, preprocess=1, psd=1)
+# Build a result object at the psd step (psd=1 only; no preprocess needed for PSD)
+result = MSNoiseResult.from_ids(db, psd=1)
 
 def convert_to_velocity(df):
     df = df.resample("30Min").mean()
@@ -37,11 +39,10 @@ def convert_to_velocity(df):
     vamp = np.sqrt(10.0 ** (df / 10.0) / w2f ** 2)
     return vamp
 
-
-# Load PSDs via MSNoiseResult.get_psd
-Z_ds = result.get_psd(seed_id="PF.FJS.00.HHZ", format="xarray")
-E_ds = result.get_psd(seed_id="PF.FJS.00.HHE", format="xarray")
-N_ds = result.get_psd(seed_id="PF.FJS.00.HHN", format="xarray")
+# Load PSDs via MSNoiseResult.get_psd — returns xarray Dataset directly
+Z_ds = result.get_psd(seed_id="PF.FJS.00.HHZ")
+E_ds = result.get_psd(seed_id="PF.FJS.00.HHE")
+N_ds = result.get_psd(seed_id="PF.FJS.00.HHN")
 
 Z = convert_to_velocity(Z_ds.PSD.to_dataframe().unstack())
 E = convert_to_velocity(E_ds.PSD.to_dataframe().unstack())

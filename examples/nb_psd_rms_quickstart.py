@@ -133,6 +133,7 @@ fig = plot_timeseries(
     day_night=DAY_NIGHT,
     time_zone=TIMEZONE,
     resample_freq="30min",
+    agg_func="mean",
     # Optional event annotations:
     # annotations={"2024-01-15": "Maintenance", "2024-02-01": "New sensor"},
     show=False,
@@ -156,6 +157,7 @@ fig = plot_clockplot(
     day_night=DAY_NIGHT,
     time_zone=TIMEZONE,
     resample_freq="30min",
+    agg_func="mean",
     # split_date="2024-02-01",   # uncomment for before/after panels
     show=False,
 )
@@ -177,6 +179,7 @@ fig = plot_hourmap(
     day_night=DAY_NIGHT,
     time_zone=TIMEZONE,
     resample_freq="30min",
+    agg_func="mean",
     show=False,
 )
 plt.show()
@@ -196,6 +199,7 @@ fig = plot_gridmap(
     day_night=DAY_NIGHT,
     time_zone=TIMEZONE,
     resample_freq="30min",
+    agg_func="mean",
     show=False,
 )
 plt.show()
@@ -215,6 +219,7 @@ fig = plot_dailyplot(
     day_night=DAY_NIGHT,
     time_zone=TIMEZONE,
     resample_freq="30min",
+    agg_func="mean",
     # split_date="2024-02-01",
     show=False,
 )
@@ -246,6 +251,13 @@ for pt, fn in [
         funcs[pt](data, band=BAND, scale=SCALE, unit=UNIT,
                   time_zone=TIMEZONE, show=False, outfile=fn)
         print(f"Saved {fn}")
+# %% [markdown]
+# ## 11. CLI equivalent — with resample/agg options
+#
+# ```bash
+# msnoise qc plot_psd_rms BE.UCC..HHZ --type timeseries --resample-freq 1h --agg-func median
+# msnoise qc plot_psd_rms BE.UCC..HHZ --type all -R 30min -A mean --no-show
+# ```
     except Exception as e:
         print(f"Skipped {fn}: {e}")
 

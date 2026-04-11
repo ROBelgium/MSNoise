@@ -31,9 +31,10 @@ Notebook usage::
 from __future__ import annotations
 
 import datetime
+import functools
 import textwrap
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional, Union
 
 import matplotlib
 import matplotlib.patheffects as pe
@@ -248,8 +249,10 @@ def localize_tz_and_reindex(
     df: pd.DataFrame,
     freq: str = "15min",
     time_zone: str = "UTC",
+    agg_func: Union[str, Callable] = "mean",
 ) -> pd.DataFrame:
-    """Convert a UTC-indexed DataFrame to *time_zone* and resample to *freq*.
+    """Convert a UTC-indexed DataFrame to *time_zone*, resample to *freq*,
+    and aggregate with *agg_func*.
 
     Parameters
     ----------
@@ -259,6 +262,15 @@ def localize_tz_and_reindex(
         Pandas offset string for resampling (default ``"15min"``).
     time_zone:
         Target timezone string (default ``"UTC"``).
+    agg_func:
+        Aggregation function applied after resampling.  Can be:
+
+        * a string supported by :meth:`~pandas.core.resample.Resample.agg`
+          (``"mean"``, ``"median"``, ``"max"``, ``"min"``, ``"std"``, …)
+        * any callable that accepts a :class:`~pandas.Series` and returns a
+          scalar (e.g. ``np.nanmedian``, ``lambda s: s.quantile(0.1)``).
+
+        Default ``"mean"`` preserves the original behaviour.
 
     Returns
     -------
@@ -271,7 +283,7 @@ def localize_tz_and_reindex(
         .tz_convert(time_zone)
         .tz_localize(None)
         .resample(freq)
-        .mean()
+        .agg(agg_func)
     )
     return out if isinstance(out, pd.DataFrame) else out.to_frame()
 
@@ -530,6 +542,7 @@ def plot_timeseries(
     annotations: Optional[dict] = None,
     time_zone: str = "UTC",
     resample_freq: str = "30min",
+    agg_func: Union[str, Callable] = "mean",
     day_night: Optional[DayNightWindow] = None,
     logo: Optional[str] = None,
     show: bool = True,
@@ -554,6 +567,11 @@ def plot_timeseries(
         Time zone for x-axis localisation (default ``"UTC"``).
     resample_freq:
         Resampling frequency string (default ``"30min"``).
+    agg_func:
+        Aggregation function applied to each resampled bin.  Accepts a string
+        (``"mean"``, ``"median"``, ``"max"``, …) or any callable (e.g.
+        ``np.nanmedian``, ``lambda s: s.quantile(0.1)``).
+        Default ``"mean"``.
     day_night:
         :class:`DayNightWindow` defining local daytime/nighttime hours.
         Controls: (1) the daytime median overlay time window and label,
@@ -594,7 +612,7 @@ def plot_timeseries(
     all_series: list[pd.DataFrame] = []
     for sid, df in data.items():
         b = band or df.columns[0]
-        s = localize_tz_and_reindex(df[[b]], resample_freq, time_zone) * scale
+        s = localize_tz_and_reindex(df[[b]], resample_freq, time_zone, agg_func) * scale
         all_series.append(s)
         ax.plot(s.index, s.iloc[:, 0], label=sid)
         # Daytime median overlay (user-defined window)
@@ -642,6 +660,7 @@ def plot_clockplot(
     split_date: Optional[str] = None,
     time_zone: str = "UTC",
     resample_freq: str = "30min",
+    agg_func: Union[str, Callable] = "mean",
     day_night: Optional[DayNightWindow] = None,
     show: bool = True,
     outfile: Optional[str] = None,
@@ -671,6 +690,9 @@ def plot_clockplot(
         Local time zone for hour-of-day grouping (default ``"UTC"``).
     resample_freq:
         Resampling frequency string (default ``"30min"``).
+    agg_func:
+        Aggregation function for resampled bins (``"mean"``, ``"median"``,
+        callable, …).  Default ``"mean"``.
     day_night:
         :class:`DayNightWindow` for shading night sectors on the polar axes.
         Defaults to :data:`DEFAULT_DAY_NIGHT` (07:00-19:00).
@@ -691,7 +713,7 @@ def plot_clockplot(
     b = band or df.columns[0]
 
     # Localise, resample, scale into a single-column 'rms' DataFrame
-    s_full = localize_tz_and_reindex(df[[b]], resample_freq, time_zone) * scale
+    s_full = localize_tz_and_reindex(df[[b]], resample_freq, time_zone, agg_func) * scale
     s_full.columns = ["rms"]
 
     # Derive rmax from the full series so both panels share the same scale
@@ -737,6 +759,7 @@ def plot_hourmap(
     annotations: Optional[dict] = None,
     time_zone: str = "UTC",
     resample_freq: str = "30min",
+    agg_func: Union[str, Callable] = "mean",
     day_night: Optional[DayNightWindow] = None,
     show: bool = True,
     outfile: Optional[str] = None,
@@ -761,6 +784,9 @@ def plot_hourmap(
         Local time zone.
     resample_freq:
         Resampling frequency.
+    agg_func:
+        Aggregation function for resampled bins (``"mean"``, ``"median"``,
+        callable, …).  Default ``"mean"``.
     day_night:
         :class:`DayNightWindow` for shading night sectors on the polar axes.
         Defaults to :data:`DEFAULT_DAY_NIGHT` (07:00-19:00).
@@ -777,7 +803,7 @@ def plot_hourmap(
     sid = next(iter(data))
     df = data[sid]
     b = band or df.columns[0]
-    s = localize_tz_and_reindex(df[[b]], resample_freq, time_zone) * scale
+    s = localize_tz_and_reindex(df[[b]], resample_freq, time_zone, agg_func) * scale
     origin_time = s.index[0]
     origin_text = origin_time.strftime("%Y-%m-%d")
 
@@ -831,6 +857,7 @@ def plot_gridmap(
     annotations: Optional[dict] = None,
     time_zone: str = "UTC",
     resample_freq: str = "30min",
+    agg_func: Union[str, Callable] = "mean",
     day_night: Optional[DayNightWindow] = None,
     show: bool = True,
     outfile: Optional[str] = None,
@@ -854,6 +881,9 @@ def plot_gridmap(
         Local time zone.
     resample_freq:
         Resampling frequency.
+    agg_func:
+        Aggregation function for resampled bins (``"mean"``, ``"median"``,
+        callable, …).  Default ``"mean"``.
     day_night:
         :class:`DayNightWindow` for shading night bands on the hour-of-day
         y-axis.  Defaults to :data:`DEFAULT_DAY_NIGHT` (07:00-19:00).
@@ -870,7 +900,7 @@ def plot_gridmap(
     sid = next(iter(data))
     df = data[sid]
     b = band or df.columns[0]
-    s = localize_tz_and_reindex(df[[b]], resample_freq, time_zone) * scale
+    s = localize_tz_and_reindex(df[[b]], resample_freq, time_zone, agg_func) * scale
     origin_text = s.index[0].strftime("%Y-%m-%d")
 
     vmin = float(s.iloc[:, 0].quantile(0.01))
@@ -925,6 +955,7 @@ def plot_dailyplot(
     split_date: Optional[str] = None,
     time_zone: str = "UTC",
     resample_freq: str = "30min",
+    agg_func: Union[str, Callable] = "mean",
     day_night: Optional[DayNightWindow] = None,
     show: bool = True,
     outfile: Optional[str] = None,
@@ -948,6 +979,9 @@ def plot_dailyplot(
         Local time zone for hour-of-day grouping.
     resample_freq:
         Resampling frequency.
+    agg_func:
+        Aggregation function for resampled bins (``"mean"``, ``"median"``,
+        callable, …).  Default ``"mean"``.
     day_night:
         :class:`DayNightWindow` for shading night bands on the hour-of-day
         x-axis.  Defaults to :data:`DEFAULT_DAY_NIGHT` (07:00-19:00).
@@ -965,7 +999,7 @@ def plot_dailyplot(
     df = data[sid]
     b = band or df.columns[0]
 
-    s = localize_tz_and_reindex(df[[b]], resample_freq, time_zone) * scale
+    s = localize_tz_and_reindex(df[[b]], resample_freq, time_zone, agg_func) * scale
     s.columns = ["rms"]
 
     fig, ax = plt.subplots(figsize=(14, 6))

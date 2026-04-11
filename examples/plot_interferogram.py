@@ -32,7 +32,7 @@ mov_stack = params.stack.mov_stack[0]
 
 # Get the CCF for two stations, filter 1, ZZ component, first mov_stack:
 ccf = result.get_ccf(pair="PF.FJS.00:PF.FOR.00", components="ZZ",
-                     mov_stack=mov_stack, format="xarray")
+                     mov_stack=mov_stack)
 
 # Plot the interferogram
 ccf.plot(robust=True, figsize=(10, 8))
@@ -57,7 +57,7 @@ if "SPHINX_DOC_BUILD" in os.environ:
 mov_stack = params.stack.mov_stack[-1]
 
 ccf = result.get_ccf(pair="PF.FJS.00:PF.FOR.00", components="ZZ",
-                     mov_stack=mov_stack, format="xarray")
+                     mov_stack=mov_stack)
 
 # Plot and zoom to +-20 seconds lag
 ccf.loc[:, -20:20].plot(robust=True, figsize=(10, 8))
