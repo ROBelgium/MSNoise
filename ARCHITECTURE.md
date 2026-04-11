@@ -39,7 +39,7 @@ global_1 ──► preprocess_1 ──► cc_1 ──► filter_1 ──► stac
 
 **Pass-through nodes**: `filter_N` and `global_N` appear in lineage strings but have **no worker scripts** and **no jobs**. They are purely parameter namespaces. `propagate_downstream` recurses through them transparently via `_collect()`.
 
-**Canonical category order** (from `WORKFLOW_ORDER` in `msnoise_table_def.py`):
+**Canonical category order** (from `get_workflow_order()` in `core/workflow.py`, plugin-extensible):
 `global → preprocess → cc → psd → psd_rms → filter → stack → refstack → mwcs → mwcs_dtt → mwcs_dtt_dvv → stretching → stretching_dvv → wavelet → wavelet_dtt → wavelet_dtt_dvv`
 
 ---
@@ -101,7 +101,7 @@ msnoise/
                          #   ← waveform preprocessing pipeline (moved from top-level)
   msnoise_table_def.py   # declare_tables() → Config, Lineage, Job, DataSource,
                          # Station, DataAvailability, WorkflowStep, WorkflowLink
-                         # WORKFLOW_CHAINS dict, WORKFLOW_ORDER list
+                         # declare_tables(); backward-compat WORKFLOW_CHAINS/ORDER aliases
   params.py              # LayeredParams, _build_layered_params
   results.py             # MSNoiseResult (high-level result reader)
   data_structures.py     # data_structure dict (SDS/BUD/IDDS/PDF path templates)
@@ -616,6 +616,12 @@ python -m pytest /path/to/msnoise/msnoise/test/test_smoke.py::test_smoke_172_psd
 17. **Never import from `..api` inside `core/`**: `core/*.py` modules must import sibling modules directly (`from .workflow import X`, `from .signal import Y`). Importing via `..api` creates a circular dependency and was the root cause of the `get_step_successors` import failure. If a function in `workflow.py` needs another function from `workflow.py`, just call it directly — no import needed.
 
 18. **`__all__` must include every public function**: when adding a new public function to any `core/*.py` module, add its name to that module's `__all__` list. Missing entries silently break the `from .core import *` chain in `api.py` and `core/__init__.py`.
+
+20. **`WORKFLOW_CHAINS` and `WORKFLOW_ORDER` live in `core/workflow.py`** — not in `msnoise_table_def.py`. The authoritative dicts are `_BUILTIN_WORKFLOW_CHAINS` / `_BUILTIN_WORKFLOW_ORDER`. Always call `get_workflow_chains()` / `get_workflow_order()` rather than referencing the dicts directly — these functions merge plugin addenda from the `msnoise.plugins.workflow_chains` and `msnoise.plugins.workflow_order` entry point groups. `msnoise_table_def.py` keeps backward-compat literal copies for old code; `is_terminal_category(cat)` and `is_entry_category(cat)` are now callable helpers.
+
+21. **Plugin workflow extension entry points**: to add new workflow categories a plugin registers:
+    - `msnoise.plugins.workflow_chains` → callable returning `{category: {next_steps, is_entry_point, is_terminal}}`
+    - `msnoise.plugins.workflow_order` → callable returning `[category, ...]` (appended after built-in order)
 
 19. **`chunk_size` is a CLI-only parameter** (not a config CSV key): pass `--chunk-size N` to `msnoise cc compute` or `msnoise qc compute_psd`. It controls how many pairs (CC) or stations (PSD) a single worker claims per day. Default 0 = claim all (original behaviour). Only effective for `group_by="day_lineage"` steps. Do NOT add it to downstream steps (stack, MWCS, stretching) — those use `pair_lineage` and write to per-pair accumulated files where concurrent writes would corrupt data.
 
