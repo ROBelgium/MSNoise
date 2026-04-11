@@ -216,6 +216,13 @@ def main(loglevel="INFO"):
                     logger.debug(f"Could not compute interstation distance: {_e}")
 
         for component in components_to_compute:
+            # Skip component types not enabled in filter config
+            if station1 == station2:
+                _is_ac = len(component) >= 2 and component[0] == component[-1]
+                if _is_ac and not params.filter.AC:
+                    continue
+                if not _is_ac and not params.filter.SC:
+                    continue
             rolling_mode = refstack_is_rolling(params)
             ref_wct_data = None  # pre-computed ref CWT for Mode A (set below)
 

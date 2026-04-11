@@ -193,6 +193,13 @@ def main(loglevel="INFO"):
             components_to_compute = params.cc.components_to_compute
         
         for components in components_to_compute:
+            # Skip component types not enabled in filter config
+            if station1 == station2:
+                _is_ac = len(components) >= 2 and components[0] == components[-1]
+                if _is_ac and not params.filter.AC:
+                    continue
+                if not _is_ac and not params.filter.SC:
+                    continue
             station1, station2 = pair.split(":")
             rolling_mode = refstack_is_rolling(params)
 

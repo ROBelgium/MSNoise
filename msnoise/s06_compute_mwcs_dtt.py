@@ -89,6 +89,13 @@ def main(loglevel="INFO"):
         logger.info(
             "There are DTT jobs for some days to recompute for %s" % pair)
         for components in components_to_compute:
+            # Skip component types not enabled in filter config
+            if station1 == station2:
+                _is_ac = len(components) >= 2 and components[0] == components[-1]
+                if _is_ac and not params.filter.AC:
+                    continue
+                if not _is_ac and not params.filter.SC:
+                    continue
             for mov_stack in mov_stacks:
                 try:
                     ds = xr_get_mwcs(params.global_.output_folder, lineage_names,

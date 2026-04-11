@@ -130,6 +130,13 @@ def main(loglevel="INFO"):
         dist = interstations.get(dpair, 0.0)
 
         for component in components_to_compute:
+            # Skip component types not enabled in filter config
+            if station1 == station2:
+                _is_ac = len(component) >= 2 and component[0] == component[-1]
+                if _is_ac and not params.filter.AC:
+                    continue
+                if not _is_ac and not params.filter.SC:
+                    continue
             for mov_stack in mov_stacks:
                 try:
                     ds = xr_load_wct(
