@@ -89,59 +89,80 @@ def _trim(data, dttname, limits=0.1):
 
 
 def _xr_create_or_open(fn, taxis=[], name="CCF", lazy=False):
+    """Open an existing NetCDF file or create an empty template Dataset.
+
+    For **write** paths (``lazy=False``): loads the full file into memory so
+    the handle is released before ``_xr_save_and_close`` rewrites it.
+
+    For **read** paths (``lazy=True``): returns a lazily memory-mapped Dataset.
+
+    When the file does not yet exist, returns a zero-filled empty template with
+    the correct coordinates and dimensions for *name*.  The template always has
+    zero time steps — ``_xr_insert_or_update`` merges real data in immediately
+    after, so the zeros are never persisted.
+    """
     if os.path.isfile(fn):
-        # Write paths (save functions) must use load_dataset so the file handle
-        # is fully released before _xr_save_and_close writes back to the same
-        # file.  Read-only paths pass lazy=True to get a memory-mapped dataset
-        # that avoids loading all data into RAM upfront.
         if lazy:
             return xr.open_dataset(fn)
-        ds = xr.load_dataset(fn)
-        return ds
-    times = pd.date_range("2000-01-01", freq="h", periods=0)
+        return xr.load_dataset(fn)
+
+    # ── Empty-template branch (file does not exist yet) ────────────────────
+    # times is always empty (0 rows) — the template only carries coordinate
+    # metadata.  np.zeros is used explicitly (not random) to make clear that
+    # these values are never written to disk.
+    times = pd.DatetimeIndex([])
+
     if name == "CCF":
-        data = np.random.random((len(times), len(taxis)))
-        dr = xr.DataArray(data, coords=[times, taxis], dims=["times", "taxis"])
+        dr = xr.DataArray(
+            np.zeros((0, len(taxis)), dtype="float32"),
+            coords=[times, taxis], dims=["times", "taxis"],
+        )
     elif name == "REF":
-        data = np.random.random(len(taxis))
-        dr = xr.DataArray(data, coords=[taxis], dims=["taxis"])
+        dr = xr.DataArray(
+            np.zeros(len(taxis), dtype="float32"),
+            coords=[taxis], dims=["taxis"],
+        )
     elif name == "MWCS":
         keys = ["M", "EM", "MCOH"]
-        data = np.random.random((len(times), len(taxis), len(keys)))
-        dr = xr.DataArray(data, coords=[times, taxis, keys],
-                          dims=["times", "taxis", "keys"])
+        dr = xr.DataArray(
+            np.zeros((0, len(taxis), len(keys)), dtype="float32"),
+            coords=[times, taxis, keys], dims=["times", "taxis", "keys"],
+        )
     elif name == "STR":
         keys = ["Delta", "Coeff", "Error"]
-        data = np.random.random((len(times), len(keys)))
-        dr = xr.DataArray(data, coords=[times, keys],
-                          dims=["times", "keys"])
+        dr = xr.DataArray(
+            np.zeros((0, len(keys)), dtype="float32"),
+            coords=[times, keys], dims=["times", "keys"],
+        )
     elif name == "DTT":
         keys = ["m", "em", "a", "ea", "m0", "em0"]
-        data = np.random.random((len(times), len(keys)))
-        dr = xr.DataArray(data, coords=[times, keys],
-                          dims=["times", "keys"])
+        dr = xr.DataArray(
+            np.zeros((0, len(keys)), dtype="float32"),
+            coords=[times, keys], dims=["times", "keys"],
+        )
     elif name == "DVV":
         level0 = ["m", "em", "a", "ea", "m0", "em0"]
-        level1 = ['10%', '25%', '5%', '50%', '75%', '90%', '95%', 'count', 'max', 'mean',
-                  'min', 'std', 'trimmed_mean', 'trimmed_std', 'weighted_mean', 'weighted_std']
-        data = np.random.random((len(times), len(level0), len(level1)))
-        dr = xr.DataArray(data, coords=[times, level0, level1],
-                          dims=["times", "level0", "level1"])
+        level1 = ["10%", "25%", "5%", "50%", "75%", "90%", "95%",
+                  "count", "max", "mean", "min", "std",
+                  "trimmed_mean", "trimmed_std", "weighted_mean", "weighted_std"]
+        dr = xr.DataArray(
+            np.zeros((0, len(level0), len(level1)), dtype="float32"),
+            coords=[times, level0, level1], dims=["times", "level0", "level1"],
+        )
     elif name == "WCT":
-        dvv_data = np.random.random((len(times), len(taxis)))
-        err_data = np.random.random((len(times), len(taxis)))
-        coh_data = np.random.random((len(times), len(taxis)))
-
-        dvv_da = xr.DataArray(dvv_data, coords=[times, taxis], dims=['times', 'frequency'])
-        err_da = xr.DataArray(err_data, coords=[times, taxis], dims=['times', 'frequency'])
-        coh_da = xr.DataArray(coh_data, coords=[times, taxis], dims=['times', 'frequency'])
-
-        # Combine into a Dataset
-        ds = xr.Dataset({'DTT': dvv_da, 'ERR': err_da, 'COH': coh_da})
-        return ds
-
+        # WCT-DTT accumulation file: variables DTT, ERR, COH over (times, frequency)
+        empty = np.zeros((0, len(taxis)), dtype="float32")
+        return xr.Dataset({
+            "DTT": xr.DataArray(empty, coords=[times, taxis], dims=["times", "frequency"]),
+            "ERR": xr.DataArray(empty, coords=[times, taxis], dims=["times", "frequency"]),
+            "COH": xr.DataArray(empty, coords=[times, taxis], dims=["times", "frequency"]),
+        })
     else:
-        raise ValueError(f"_xr_create_or_open: unsupported name={name!r}. Expected one of CCF, REF, MWCS, STR, DTT, DVV, WCT.")
+        raise ValueError(
+            f"_xr_create_or_open: unsupported name={name!r}. "
+            "Expected one of CCF, REF, MWCS, STR, DTT, DVV, WCT."
+        )
+
     dr.name = name
     return dr.to_dataset()
 
