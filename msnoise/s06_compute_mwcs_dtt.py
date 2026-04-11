@@ -190,7 +190,23 @@ def main(loglevel="INFO"):
                 mcoh_vals  = mcoh_all[out_mask]
 
                 if len(out_times) == 0:
+                    # Free all intermediates before continuing
+                    del M, EM, MCOH, tArray, times, dtt_values, tmp, tindex
+                    del valid_mask, w_raw, w2, n_valid, good, t, y
+                    del Sw2t2, Sw2ty, m0_all, res0, chi20, em0_all
+                    del Sw2, Sw2t, Sw2y, denom, m_all, a_all
+                    del res1, chi21, scale, em_all, ea_all
+                    del coh_sum, coh_cnt, mcoh_all
+                    del out_mask, out_times
                     continue
+
+                # Free large intermediates — only the _vals arrays are still needed
+                del M, EM, MCOH, tArray, times, dtt_values, tmp, tindex
+                del valid_mask, w_raw, w2, n_valid, good, t, y
+                del Sw2t2, Sw2ty, m0_all, res0, chi20, em0_all
+                del Sw2, Sw2t, Sw2y, denom, m_all, a_all
+                del res1, chi21, scale, em_all, ea_all
+                del coh_sum, coh_cnt, mcoh_all, out_mask
 
                 # ── Build output Dataset ─────────────────────────────────
                 out_times = np.array(out_times)
@@ -211,6 +227,8 @@ def main(loglevel="INFO"):
                 )
                 xr_save_dtt(params.global_.output_folder, lineage_names, step.step_name,
                             station1, station2, components, mov_stack, ds_out)
+                del m_vals, em_vals, a_vals, ea_vals, m0_vals, em0_vals, mcoh_vals
+                del out_times, ds_out
 
         massive_update_job(db, jobs, "D")
         if not batch["params"].global_.hpc:
