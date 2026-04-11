@@ -1795,7 +1795,7 @@ def test_120011_msnoise_result_get_ref():
         pair_k, comp_k = first_key
         ds = r.get_ref(pair_k, comp_k)
         import xarray as xr
-        assert isinstance(ds, xr.Dataset)
+        assert isinstance(ds, xr.DataArray)
     db.close()
 
 
@@ -1833,7 +1833,7 @@ def test_120021_msnoise_result_get_ref_dataframe():
         pytest.skip("No REF data available")
     pair_k, comp_k = next(iter(all_refs))
     ds = r.get_ref(pair_k, comp_k)
-    assert isinstance(ds, xr.Dataset)
+    assert isinstance(ds, xr.DataArray)
     # to_dataframe() is the escape hatch for pandas users
     df = MSNoiseResult.to_dataframe(ds)
     assert isinstance(df, pd.DataFrame)
@@ -1963,7 +1963,7 @@ def test_120028_msnoise_result_default_formats():
     all_refs = r2.get_ref()
     if all_refs:
         v2 = next(iter(all_refs.values()))
-        assert isinstance(v2, xr.Dataset), "get_ref default should be xarray Dataset"
+        assert isinstance(v2, xr.DataArray), "get_ref default should be xarray DataArray"
     db.close()
 
 

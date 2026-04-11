@@ -67,7 +67,7 @@ def main(filterid, components, ampli=1, show=True, outfile=None,
 
                 try:
                     ds = result.get_ref(f"{sta1}:{sta2}", components)
-                    ref = Trace(data=ds.REF.values.copy())
+                    ref = Trace(data=ds.values.copy())
                     ref.stats.sampling_rate = cc_sampling_rate
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
