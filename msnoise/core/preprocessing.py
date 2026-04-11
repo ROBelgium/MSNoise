@@ -84,8 +84,7 @@ def apply_preprocessing_to_stream(stream, params, responses=None, logger=None):
     """
     import numpy as np
     from obspy import Stream as _Stream
-    from .signal import check_and_phase_shift, getGaps
-
+    
     if logger is None:
         logger = get_logger("msnoise.preprocessing", "INFO")
 
@@ -336,113 +335,11 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
                 stream.sort()
                 if not len(stream):
                     continue
-                logger.debug("%s Checking sample alignment" % stream[0].id)
-                for i, trace in enumerate(stream):
-                    stream[i] = check_and_phase_shift(trace, params.preprocess.preprocess_taper_length)
-
-                logger.debug("%s Checking Gaps" % stream[0].id)
-                gaps = getGaps(stream)
-                if len(gaps) > 0:
-                    logger.debug(" found %i gaps" % len(gaps))
-                    max_gap = params.preprocess.preprocess_max_gap*stream[0].stats.sampling_rate
-
-                    while len(gaps):
-                        too_long = 0
-                        for gap in gaps:
-                            if int(gap[-1]) <= max_gap:
-                                try:
-                                    stream[gap[0]] = stream[gap[0]].__add__(stream[gap[1]], method=1,
-                                                                            fill_value="interpolate")
-                                    stream.remove(stream[gap[1]])
-                                except Exception:
-                                    stream.remove(stream[gap[1]])
-
-                                break
-                            else:
-                                too_long += 1
-
-                        if too_long == len(gaps):
-                            break
-                        gaps = getGaps(stream)
-                    del gaps
-
-                stream = stream.split()
-                logger.debug("%s Checking sampling rate" % stream[0].id)
-                for tr in stream:
-                    if tr.stats.sampling_rate < (params.preprocess.cc_sampling_rate-1):
-                        logger.warning("Trace has a lower sampling rate than the cc_sampling_rate, removing!")
-                        stream.remove(tr)
-                taper_length = params.preprocess.preprocess_taper_length  # seconds
-                for trace in stream:
-                    if trace.stats.npts < (4 * taper_length * trace.stats.sampling_rate):
-                        stream.remove(trace)
-                    else:
-                        trace.detrend(type="demean")
-                        trace.detrend(type="linear")
-                        trace.taper(max_percentage=None,
-                                    max_length=taper_length,)
-
+                stream = apply_preprocessing_to_stream(
+                    stream, params, responses=responses, logger=logger)
                 if not len(stream):
                     logger.debug(" has only too small traces, skipping...")
-                    del stream
                     continue
-
-                for trace in stream:
-                    logger.debug(
-                        "%s Highpass at %.2f Hz" % (trace.id, params.preprocess.preprocess_highpass))
-                    trace.filter("highpass", freq=params.preprocess.preprocess_highpass, zerophase=True, corners=4)
-
-                    if trace.stats.sampling_rate != params.preprocess.cc_sampling_rate:
-                        logger.debug(
-                            "%s Lowpass at %.2f Hz" % (trace.id, params.preprocess.preprocess_lowpass))
-                        trace.filter("lowpass", freq=params.preprocess.preprocess_lowpass, zerophase=True, corners=8)
-
-                        if params.preprocess.resampling_method == "Resample":
-                            logger.debug("%s Downsample to %.1f Hz" %
-                                          (trace.id, params.preprocess.cc_sampling_rate))
-                            trace.data = resample(
-                                trace.data, params.preprocess.cc_sampling_rate / trace.stats.sampling_rate, 'sinc_fastest')
-
-                        elif params.preprocess.resampling_method == "Decimate":
-                            decimation_factor = trace.stats.sampling_rate / params.preprocess.cc_sampling_rate
-                            if not int(decimation_factor) == decimation_factor:
-                                raise ValueError(
-                                    "%s CANNOT be decimated by an integer factor, "
-                                    "consider using Resample or Lanczos. "
-                                    "Trace sampling rate = %i ; Desired CC sampling rate = %i"
-                                    % (trace.id, trace.stats.sampling_rate,
-                                       params.preprocess.cc_sampling_rate)
-                                )
-                            logger.debug("%s Decimate by a factor of %i" %
-                                          (trace.id, decimation_factor))
-                            trace.data = trace.data[::int(decimation_factor)]
-
-                        elif params.preprocess.resampling_method == "Lanczos":
-                            logger.debug("%s Downsample to %.1f Hz" %
-                                          (trace.id, params.preprocess.cc_sampling_rate))
-                            trace.data = np.array(trace.data)
-                            trace.interpolate(method="lanczos", sampling_rate=params.preprocess.cc_sampling_rate, a=1.0)
-
-                        trace.stats.sampling_rate = params.preprocess.cc_sampling_rate
-                    del trace
-
-                if params.preprocess.remove_response:
-                    logger.debug('%s Removing instrument response' %
-                                 stream[0].id)
-                    try:
-                        stream.attach_response(responses)
-                        stream.remove_response(pre_filt=params.preprocess.response_prefilt,
-                                               taper=False)
-                    except Exception:
-                        logger.error("Bad or no instrument response "
-                                     "information for %s, skipping" %
-                                     stream[0].id)
-                        continue
-
-                for tr in stream:
-                    tr.data = tr.data.astype(np.float32)
-                    if tr.stats.location == "":
-                        tr.stats.location = "--"
                 output += stream
                 del stream
             del files
