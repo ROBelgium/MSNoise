@@ -75,7 +75,9 @@ msnoise/
                          # get_filter_steps_for_cc_step, get_refstack_lineage_for_filter,
                          # refstack_is_rolling, refstack_needs_recompute, extend_days,
                          # compute_rolling_ref, lineage_str_to_step_names, lineage_str_to_steps
-    signal.py            # winsorizing, stack, xwt, compute_wct_dtt, get_wct_avgcoh,
+    signal.py            # winsorizing, stack,
+                         # prepare_ref_wct, apply_wct, xwt (thin wrapper),
+                         # compute_wct_dtt, get_wct_avgcoh,
                          # preload_instrument_responses, save_preprocessed_streams,
                          # get_preprocessed_stream, validate_stack_data,
                          # psd_rms, psd_df_rms,       ← pure DSP; psd_df_rms takes xarray Dataset, returns Dataset
@@ -97,6 +99,8 @@ msnoise/
                          # _write_raw_cache
     compute.py           # myCorr2, whiten, whiten2, pcc_xcorr, smooth, mwcs
                          #   ← heavy CC/MWCS math (moved from move2obspy.py)
+                         # resolve_wct_lag_min, compute_wct_dtt_batch, build_wct_dtt_dataset
+                         #   ← shared WCT-DTT helpers used by s08 (fused) and s09
     preprocessing.py     # apply_preprocessing_to_stream, preprocess
                          #   ← waveform preprocessing pipeline (moved from top-level)
   msnoise_table_def.py   # declare_tables() → Config, Lineage, Job, DataSource,
@@ -604,12 +608,9 @@ python -m pytest /path/to/msnoise/msnoise/test/test_smoke.py::test_smoke_172_psd
 
 12. **WCT-DTT variable names are uppercase**: `DTT`, `ERR`, `COH` (not `dtt`, `err`, `coh`). Test stubs must use uppercase or `xr_get_wct_dtt` will fail silently.
 
-13. **Lazy dataset handle lifetime**: all `get_*` readers in `core/io.py` use `xr.open_dataset()` (lazy). The file handle stays open until `.close()` is called or the object is garbage-collected. **Two specific readers materialise + close immediately** because their file is also a write target in the same pipeline:
-   - `xr_get_ccf` — the stacked CCF file is merged and rewritten by `xr_save_ccf` (stack worker)
-   - `xr_get_ref` — the REF file is rewritten by `xr_save_ref` (refstack worker)
-   All other lazy readers (MWCS, DTT, STR, WCT) read from files that are **never written back to by the same caller** — those handles are safe to keep lazy, but callers must `ds.close()` explicitly once done to avoid leaking handles (especially in loops over many pairs). Pattern: extract all needed `.values`, then call `ds.close()`.
+13. **Lazy dataset handle lifetime**: all `get_*` readers in `core/io.py` return lazy handles via `xr.open_dataset()`. Close with `ds.close()` once done to avoid leaking file handles in pair loops. **`xr_get_ccf` and `xr_get_ref` are also lazy** — the earlier eager-load assumption (that these files are write targets) was incorrect: `xr_save_ccf` is only called by s04 and `xr_get_ccf` only by s05/s08/s10 (disjoint steps, never concurrent). Workers that need numpy arrays call `.values` once, then let the handle be GC'd. `xr_get_ref` returns a `DataArray` directly (not a Dataset) — callers do `.values` on it, not `.REF.values`.
 
-14. **`xr_get_ccf` returns an in-memory DataArray**: despite using `open_dataset` internally, `xr_get_ccf` calls `.load()` + `.close()` before returning — the result is fully in-memory (not lazy-backed). Do not assume it needs `.load()` again.
+14. **`xr_get_ccf` returns a lazy DataArray**: the handle is open; workers materialise via `data_np = data.values` before the computation loop (one disk read). `xr_get_ref` similarly returns a lazy DataArray — call `.values` directly. Do not call `.load()` again on either.
 
 16. **`MSNoiseParams` (formerly `LayeredParams`)**: the params object is now named `MSNoiseParams` everywhere (``params.py``, ``core/config.py``, ``core/workflow.py``, etc.). If you see `LayeredParams` anywhere it is a stale reference — update it.
 
@@ -635,9 +636,11 @@ python -m pytest /path/to/msnoise/msnoise/test/test_smoke.py::test_smoke_172_psd
 
 ## 17. Deferred Work & Accepted Technical Debt
 
-*Items parked as of commit `6f815e9`. Read this before starting a new session to avoid re-deciding things already decided.*
+*Items parked as of commit `aecca25`. Read this before starting a new session to avoid re-deciding things already decided.*
 
 ### Deferred — revisit before 2.0 release
+
+**WCT fused mode** (`wct_compute_dtt=True`, default since `aecca25`): s08 now runs all downstream `wavelet_dtt_N` config sets inline and writes only DTT/ERR/COH — no intermediate WCT files. See `s08_compute_wct.py` docstring for storage comparison and multi-config details. Shared helpers `resolve_wct_lag_min`, `compute_wct_dtt_batch`, `build_wct_dtt_dataset` live in `core/compute.py`. **WCT sampling defaults revised**: `wct_nptsfreq` 300→100, `wct_vpo` 20→12 (see config_wavelet.csv docstrings for the frequency-independence argument).
 
 **Per-day MWCS/STR/WCT output files**: currently each step writes one `(pair, mov_stack, comp).nc` file accumulating all time steps. Switching to per-day files would enable `--chunk-size` parallelism for downstream steps, but requires reworking `MSNoiseResult` readers, user notebooks, and plot scripts. **Thomas is evaluating tradeoffs** — do not implement without explicit go-ahead.
 

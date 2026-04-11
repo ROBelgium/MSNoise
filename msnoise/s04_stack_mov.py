@@ -151,15 +151,18 @@ def main(stype, loglevel="INFO"):
                                           sta1, sta2, components, all_days)
                 dr = c.resample(times="1D").mean()
 
-            is_valid, message = validate_stack_data(c, "moving")
+            if wienerfilt:
+                dr = wiener_filt(dr, wiener_M, wiener_N, wiener_gap_threshold)
+
+            # Validate the resampled stack (dr), not the raw windowed data (c).
+            # dr is what gets saved — it's smaller, already averaged, and the
+            # NaN fraction here is what actually matters for downstream steps.
+            is_valid, message = validate_stack_data(dr, "moving")
             if not is_valid:
                 logger.error(f"Invalid moving stack data for {sta1}:{sta2}-{components}: {message}")
                 continue
             elif "Warning" in message:
                 logger.warning(f"{sta1}:{sta2}-{components}: {message}")
-
-            if wienerfilt:
-                dr = wiener_filt(dr, wiener_M, wiener_N, wiener_gap_threshold)
 
             excess_dates = pd.to_datetime(excess_days).values
             for mov_stack in mov_stacks:
