@@ -37,6 +37,8 @@ __all__ = [
     "get_workflow_graph",
     "get_workflow_chains",
     "get_workflow_order",
+    "get_step_abbrevs",
+    "get_category_display_info",
     "is_terminal_category",
     "is_entry_category",
 ]
@@ -59,22 +61,95 @@ from ..msnoise_table_def import Job, WorkflowStep, DataAvailability, Lineage
 #   { category: { "next_steps": [...], "is_entry_point": bool, "is_terminal": bool } }
 
 _BUILTIN_WORKFLOW_CHAINS = {
-    "global":          {"next_steps": ["preprocess", "psd"],                  "is_entry_point": True,  "is_terminal": False},
-    "preprocess":      {"next_steps": ["cc"],                                  "is_entry_point": False, "is_terminal": False},
-    "psd":             {"next_steps": ["psd_rms"],                             "is_entry_point": False, "is_terminal": False},
-    "psd_rms":         {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
-    "cc":              {"next_steps": ["filter"],                              "is_entry_point": False, "is_terminal": False},
-    "filter":          {"next_steps": ["stack"],                               "is_entry_point": False, "is_terminal": False},
-    "stack":           {"next_steps": ["refstack"],                            "is_entry_point": False, "is_terminal": False},
-    "refstack":        {"next_steps": ["mwcs", "stretching", "wavelet"],       "is_entry_point": False, "is_terminal": False},
-    "mwcs":            {"next_steps": ["mwcs_dtt"],                            "is_entry_point": False, "is_terminal": False},
-    "mwcs_dtt":        {"next_steps": ["mwcs_dtt_dvv"],                        "is_entry_point": False, "is_terminal": False},
-    "mwcs_dtt_dvv":    {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
-    "stretching":      {"next_steps": ["stretching_dvv"],                      "is_entry_point": False, "is_terminal": False},
-    "stretching_dvv":  {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
-    "wavelet":         {"next_steps": ["wavelet_dtt"],                         "is_entry_point": False, "is_terminal": False},
-    "wavelet_dtt":     {"next_steps": ["wavelet_dtt_dvv"],                     "is_entry_point": False, "is_terminal": False},
-    "wavelet_dtt_dvv": {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
+    # Keys: next_steps, is_entry_point, is_terminal
+    #       abbrev       → short tag used in plot filenames (lineage_to_plot_tag)
+    #       display_name → human label used in admin UI config-sets page
+    #       level        → depth in the DAG tree (global=0, its children=1, …)
+    #                      psd and preprocess are both level=1 (both branch off global)
+    #
+    # Plugin packages can add entries via msnoise.plugins.workflow_chains:
+    #   each callable returns a dict with the same schema.
+    "global": {
+        "next_steps": ["preprocess", "psd"],
+        "is_entry_point": True, "is_terminal": False,
+        "abbrev": "g", "display_name": "Global Parameters", "level": 0,
+    },
+    "preprocess": {
+        "next_steps": ["cc"],
+        "is_entry_point": False, "is_terminal": False,
+        "abbrev": "pre", "display_name": "Preprocessing", "level": 1,
+    },
+    "cc": {
+        "next_steps": ["filter"],
+        "is_entry_point": False, "is_terminal": False,
+        "abbrev": "cc", "display_name": "Cross-Correlation", "level": 2,
+    },
+    "filter": {
+        "next_steps": ["stack"],
+        "is_entry_point": False, "is_terminal": False,
+        "abbrev": "f", "display_name": "Filters", "level": 3,
+    },
+    "stack": {
+        "next_steps": ["refstack"],
+        "is_entry_point": False, "is_terminal": False,
+        "abbrev": "stk", "display_name": "Moving Stacks", "level": 4,
+    },
+    "refstack": {
+        "next_steps": ["mwcs", "stretching", "wavelet"],
+        "is_entry_point": False, "is_terminal": False,
+        "abbrev": "ref", "display_name": "Reference Stacks", "level": 5,
+    },
+    "mwcs": {
+        "next_steps": ["mwcs_dtt"],
+        "is_entry_point": False, "is_terminal": False,
+        "abbrev": "mwcs", "display_name": "MWCS", "level": 6,
+    },
+    "mwcs_dtt": {
+        "next_steps": ["mwcs_dtt_dvv"],
+        "is_entry_point": False, "is_terminal": False,
+        "abbrev": "dtt", "display_name": "MWCS dt/t", "level": 7,
+    },
+    "mwcs_dtt_dvv": {
+        "next_steps": [],
+        "is_entry_point": False, "is_terminal": True,
+        "abbrev": "dvv", "display_name": "MWCS dv/v Aggregate", "level": 8,
+    },
+    "stretching": {
+        "next_steps": ["stretching_dvv"],
+        "is_entry_point": False, "is_terminal": False,
+        "abbrev": "str", "display_name": "Stretching", "level": 6,
+    },
+    "stretching_dvv": {
+        "next_steps": [],
+        "is_entry_point": False, "is_terminal": True,
+        "abbrev": "sdvv", "display_name": "Stretching dv/v Aggregate", "level": 7,
+    },
+    "wavelet": {
+        "next_steps": ["wavelet_dtt"],
+        "is_entry_point": False, "is_terminal": False,
+        "abbrev": "wct", "display_name": "Wavelet", "level": 6,
+    },
+    "wavelet_dtt": {
+        "next_steps": ["wavelet_dtt_dvv"],
+        "is_entry_point": False, "is_terminal": False,
+        "abbrev": "wdtt", "display_name": "Wavelet dt/t", "level": 7,
+    },
+    "wavelet_dtt_dvv": {
+        "next_steps": [],
+        "is_entry_point": False, "is_terminal": True,
+        "abbrev": "wdvv", "display_name": "WCT dv/v Aggregate", "level": 8,
+    },
+    # ── PSD branch (also level=1: child of global, sibling of preprocess) ──
+    "psd": {
+        "next_steps": ["psd_rms"],
+        "is_entry_point": False, "is_terminal": False,
+        "abbrev": "psd", "display_name": "PSD", "level": 1,
+    },
+    "psd_rms": {
+        "next_steps": [],
+        "is_entry_point": False, "is_terminal": True,
+        "abbrev": "rms", "display_name": "PSD RMS", "level": 2,
+    },
 }
 
 # Canonical display order for UI sorting and config-set creation.
@@ -148,6 +223,75 @@ def get_workflow_order():
                 f"Failed to load workflow_order plugin {ep.name!r}: {exc}"
             )
     return order
+
+
+def get_step_abbrevs():
+    """Return a mapping of workflow category → short plot-filename abbreviation.
+
+    Merges the built-in abbreviations (from :data:`_BUILTIN_WORKFLOW_CHAINS`)
+    with any ``abbrev`` keys provided by plugin entry points via
+    ``msnoise.plugins.workflow_chains``.  Falls back to the raw category name
+    for any category without an ``abbrev`` entry.
+
+    :rtype: dict[str, str]
+    """
+    chains = get_workflow_chains()
+    return {
+        cat: entry.get("abbrev", cat) if isinstance(entry, dict) else cat
+        for cat, entry in chains.items()
+    }
+
+
+def get_category_display_info():
+    """Return ordered display metadata for all workflow categories.
+
+    Each entry is a dict with keys ``category``, ``display_name``, ``level``
+    (DAG depth: global=0, preprocess/psd=1, cc=2, …).  Ordered for UI
+    rendering: the main CC branch first (preprocess→cc→…→dvv), then the
+    PSD branch (psd→psd_rms).  Plugin categories are appended at the end.
+
+    :rtype: list[dict]
+    """
+    chains = get_workflow_chains()
+
+    # Canonical UI display order: CC branch first, PSD branch at end.
+    # This differs from WORKFLOW_ORDER (which is pipeline/topological order)
+    # but matches the tree structure users see in the admin config-sets page.
+    _UI_ORDER = [
+        "global",
+        "preprocess", "cc", "filter", "stack", "refstack",
+        "mwcs", "mwcs_dtt", "mwcs_dtt_dvv",
+        "stretching", "stretching_dvv",
+        "wavelet", "wavelet_dtt", "wavelet_dtt_dvv",
+        "psd", "psd_rms",  # ← PSD branch: level=1 like preprocess
+    ]
+
+    result = []
+    seen = set()
+    for cat in _UI_ORDER:
+        if cat not in chains:
+            continue
+        entry = chains[cat]
+        if isinstance(entry, dict):
+            result.append({
+                "category":     cat,
+                "display_name": entry.get("display_name", cat.replace("_", " ").title()),
+                "level":        entry.get("level", 0),
+            })
+        seen.add(cat)
+
+    # Append plugin-added categories not in _UI_ORDER
+    for cat, entry in chains.items():
+        if cat in seen:
+            continue
+        if isinstance(entry, dict):
+            result.append({
+                "category":     cat,
+                "display_name": entry.get("display_name", cat.replace("_", " ").title()),
+                "level":        entry.get("level", 0),
+            })
+
+    return result
 
 
 def is_terminal_category(category):

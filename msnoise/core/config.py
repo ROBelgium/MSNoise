@@ -22,23 +22,10 @@ from .db import get_logger
 from ..msnoise_table_def import Config
 
 
-_STEP_ABBREVS = {
-    "preprocess":     "pre",
-    "cc":             "cc",
-    "filter":         "f",
-    "stack":          "stk",
-    "refstack":       "ref",
-    "mwcs":           "mwcs",
-    "mwcs_dtt":       "dtt",
-    "mwcs_dtt_dvv":   "dvv",
-    "stretching":     "str",
-    "stretching_dvv": "sdvv",
-    "wavelet":        "wct",
-    "wavelet_dtt":    "wdtt",
-    "wavelet_dtt_dvv": "wdvv",
-    "psd":            "psd",
-    "psd_rms":        "rms",
-}
+def _get_step_abbrevs():
+    """Return category→abbreviation map from workflow (plugin-aware)."""
+    from .workflow import get_step_abbrevs
+    return get_step_abbrevs()
 
 
 def parse_config_key(key):
@@ -435,30 +422,19 @@ def get_config_set_details(session, set_name, set_number, format="list"):
 
 
 def get_config_categories_definition():
-    """Get the standard configuration categories with display names, order, and indent level.
+    """Return ordered display metadata for all workflow categories.
 
-    Each entry is ``(category_key, display_name, level)`` where *level* is the depth
-    relative to ``global`` (0).  Used by the config-sets admin page for visual
-    indentation that mirrors the workflow graph.
+    Each entry is a ``(category_key, display_name, level)`` tuple where *level*
+    is the DAG depth (global=0, preprocess/psd=1 — both branch off global, …).
+
+    Derived from :func:`~msnoise.core.workflow.get_category_display_info` so
+    plugin-added categories appear automatically.  The list is ordered for UI
+    rendering (CC branch first, PSD branch at end).
     """
+    from .workflow import get_category_display_info
     return [
-        # Tree order: children immediately follow their parent
-        ('global',      'Global Parameters',  0),
-        ('preprocess',  'Preprocessing',       1),
-        ('cc',          'Cross-Correlation',   2),
-        ('filter',      'Filters',             3),
-        ('stack',       'Moving Stacks',       4),
-        ('refstack',    'Reference Stacks',    5),
-        ('mwcs',          'MWCS',                    6),
-        ('mwcs_dtt',      'MWCS dt/t',               7),
-        ('mwcs_dtt_dvv',  'MWCS dv/v Aggregate',     8),
-        ('stretching',    'Stretching',               6),
-        ('stretching_dvv','Stretching dv/v Aggregate',7),
-        ('wavelet',       'Wavelet',                  6),
-        ('wavelet_dtt',   'Wavelet dt/t',             7),
-        ('wavelet_dtt_dvv',   'WCT dv/v Aggregate',       8),
-        ('psd',         'PSD',                 1),
-        ('psd_rms',     'PSD RMS',             2),
+        (d["category"], d["display_name"], d["level"])
+        for d in get_category_display_info()
     ]
 
 
@@ -599,7 +575,7 @@ def lineage_to_plot_tag(lineage_names):
             base, num = tail[0], tail[1]
         else:
             base, num = step, ""
-        abbrev = _STEP_ABBREVS.get(base, base)
+        abbrev = _get_step_abbrevs().get(base, base)
         parts.append(f"{abbrev}{num}")
     return "-".join(parts)
 

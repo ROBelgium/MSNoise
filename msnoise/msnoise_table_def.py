@@ -15,23 +15,26 @@ from sqlalchemy.sql import text
 # These aliases exist for backward compatibility only.
 # New code should use get_workflow_chains() / get_workflow_order() from
 # msnoise.core.workflow for plugin-aware access.
+# Backward-compat literal copy of the built-in topology.
+# New code should use get_workflow_chains() / get_workflow_order() /
+# get_step_abbrevs() / get_category_display_info() from msnoise.core.workflow.
 WORKFLOW_CHAINS = {
-    "global":          {"next_steps": ["preprocess", "psd"],                  "is_entry_point": True,  "is_terminal": False},
-    "preprocess":      {"next_steps": ["cc"],                                  "is_entry_point": False, "is_terminal": False},
-    "psd":             {"next_steps": ["psd_rms"],                             "is_entry_point": False, "is_terminal": False},
-    "psd_rms":         {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
-    "cc":              {"next_steps": ["filter"],                              "is_entry_point": False, "is_terminal": False},
-    "filter":          {"next_steps": ["stack"],                               "is_entry_point": False, "is_terminal": False},
-    "stack":           {"next_steps": ["refstack"],                            "is_entry_point": False, "is_terminal": False},
-    "refstack":        {"next_steps": ["mwcs", "stretching", "wavelet"],       "is_entry_point": False, "is_terminal": False},
-    "mwcs":            {"next_steps": ["mwcs_dtt"],                            "is_entry_point": False, "is_terminal": False},
-    "mwcs_dtt":        {"next_steps": ["mwcs_dtt_dvv"],                        "is_entry_point": False, "is_terminal": False},
-    "mwcs_dtt_dvv":    {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
-    "stretching":      {"next_steps": ["stretching_dvv"],                      "is_entry_point": False, "is_terminal": False},
-    "stretching_dvv":  {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
-    "wavelet":         {"next_steps": ["wavelet_dtt"],                         "is_entry_point": False, "is_terminal": False},
-    "wavelet_dtt":     {"next_steps": ["wavelet_dtt_dvv"],                     "is_entry_point": False, "is_terminal": False},
-    "wavelet_dtt_dvv": {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
+    "global":          {"next_steps": ["preprocess", "psd"],            "is_entry_point": True,  "is_terminal": False, "abbrev": "g",    "display_name": "Global Parameters",        "level": 0},
+    "preprocess":      {"next_steps": ["cc"],                            "is_entry_point": False, "is_terminal": False, "abbrev": "pre",  "display_name": "Preprocessing",            "level": 1},
+    "cc":              {"next_steps": ["filter"],                        "is_entry_point": False, "is_terminal": False, "abbrev": "cc",   "display_name": "Cross-Correlation",        "level": 2},
+    "filter":          {"next_steps": ["stack"],                         "is_entry_point": False, "is_terminal": False, "abbrev": "f",    "display_name": "Filters",                  "level": 3},
+    "stack":           {"next_steps": ["refstack"],                      "is_entry_point": False, "is_terminal": False, "abbrev": "stk",  "display_name": "Moving Stacks",            "level": 4},
+    "refstack":        {"next_steps": ["mwcs", "stretching", "wavelet"],"is_entry_point": False, "is_terminal": False, "abbrev": "ref",  "display_name": "Reference Stacks",         "level": 5},
+    "mwcs":            {"next_steps": ["mwcs_dtt"],                      "is_entry_point": False, "is_terminal": False, "abbrev": "mwcs", "display_name": "MWCS",                     "level": 6},
+    "mwcs_dtt":        {"next_steps": ["mwcs_dtt_dvv"],                  "is_entry_point": False, "is_terminal": False, "abbrev": "dtt",  "display_name": "MWCS dt/t",               "level": 7},
+    "mwcs_dtt_dvv":    {"next_steps": [],                                "is_entry_point": False, "is_terminal": True,  "abbrev": "dvv",  "display_name": "MWCS dv/v Aggregate",     "level": 8},
+    "stretching":      {"next_steps": ["stretching_dvv"],                "is_entry_point": False, "is_terminal": False, "abbrev": "str",  "display_name": "Stretching",               "level": 6},
+    "stretching_dvv":  {"next_steps": [],                                "is_entry_point": False, "is_terminal": True,  "abbrev": "sdvv", "display_name": "Stretching dv/v Aggregate","level": 7},
+    "wavelet":         {"next_steps": ["wavelet_dtt"],                   "is_entry_point": False, "is_terminal": False, "abbrev": "wct",  "display_name": "Wavelet",                  "level": 6},
+    "wavelet_dtt":     {"next_steps": ["wavelet_dtt_dvv"],               "is_entry_point": False, "is_terminal": False, "abbrev": "wdtt", "display_name": "Wavelet dt/t",             "level": 7},
+    "wavelet_dtt_dvv": {"next_steps": [],                                "is_entry_point": False, "is_terminal": True,  "abbrev": "wdvv", "display_name": "WCT dv/v Aggregate",      "level": 8},
+    "psd":             {"next_steps": ["psd_rms"],                       "is_entry_point": False, "is_terminal": False, "abbrev": "psd",  "display_name": "PSD",                      "level": 1},
+    "psd_rms":         {"next_steps": [],                                "is_entry_point": False, "is_terminal": True,  "abbrev": "rms",  "display_name": "PSD RMS",                  "level": 2},
 }
 WORKFLOW_ORDER = [
     "global", "preprocess", "cc", "psd", "psd_rms",
