@@ -392,6 +392,7 @@ def _stub_stretching(db, params, root):
 
 def _stub_wct(db, params, root):
     from ..core.io import xr_save_wct
+    import xarray as _xr
 
     def _write(batch):
         lin   = batch["lineage_names"][:-1]
@@ -399,9 +400,16 @@ def _stub_wct(db, params, root):
         for sta1, sta2 in PAIRS:
             for comp in COMPS:
                 for ms in MOV_STACKS:
-                    z = [np.zeros((len(FREQS), len(TAXIS)), "float32")] * len(TIMES)
-                    xr_save_wct(root, lin, sname, sta1, sta2, comp, ms,
-                                TAXIS, FREQS, z, z, z, list(TIMES))
+                    z = np.zeros((len(TIMES), len(FREQS), len(TAXIS)), "float32")
+                    wct_ds = _xr.Dataset({
+                        "WXamp": _xr.DataArray(z, dims=["times","freqs","taxis"],
+                                               coords={"times":TIMES,"freqs":FREQS,"taxis":TAXIS}),
+                        "Wcoh":  _xr.DataArray(z, dims=["times","freqs","taxis"],
+                                               coords={"times":TIMES,"freqs":FREQS,"taxis":TAXIS}),
+                        "WXdt":  _xr.DataArray(z, dims=["times","freqs","taxis"],
+                                               coords={"times":TIMES,"freqs":FREQS,"taxis":TAXIS}),
+                    })
+                    xr_save_wct(root, lin, sname, sta1, sta2, comp, ms, wct_ds)
 
     _run_step("wavelet", "pair_lineage", _write)
 

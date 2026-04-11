@@ -155,8 +155,7 @@ def _xr_insert_or_update(dataset, new):
 
 def _xr_save_and_close(dataset, fn, encoding=None):
     """Write *dataset* to *fn* with float32+zlib encoding by default."""
-    if not os.path.isdir(os.path.split(fn)[0]):
-        os.makedirs(os.path.split(fn)[0], exist_ok=True)
+    os.makedirs(os.path.dirname(fn), exist_ok=True)
     enc = encoding if encoding is not None else _f32_encoding(dataset)
     dataset.to_netcdf(fn, mode="w", encoding=enc, engine="netcdf4")
     dataset.close()
@@ -166,6 +165,26 @@ def _xr_save_and_close(dataset, fn, encoding=None):
 
 
 
+
+
+def _pair_output_path(root, lineage, step_name, mov_stack, components,
+                      station1, station2):
+    """Build the canonical per-pair NetCDF file path.
+
+    Saves include *step_name* (callers pass ``lineage_names`` which is the
+    full path including the current step).  Gets omit it (callers pass
+    ``lineage_names_upstream`` which excludes the current step — the path
+    therefore points to where the save wrote the file).
+
+    :param step_name: Step name string for save paths, or ``None`` for get
+        paths (the step is already excluded from *lineage* by the caller).
+    """
+    ms = f"{mov_stack[0]}_{mov_stack[1]}"
+    parts = [root, *lineage]
+    if step_name is not None:
+        parts.append(step_name)
+    parts += ["_output", ms, components, f"{station1}_{station2}.nc"]
+    return os.path.join(*parts)
 
 def xr_save_ccf(root, lineage, step_name, station1, station2, components, mov_stack, taxis, new, overwrite=False):
     path = os.path.join(root, *lineage, step_name, "_output",
@@ -363,11 +382,7 @@ def xr_save_mwcs(root, lineage, step_name, station1, station2, components, mov_s
         dims ``(times, taxis, keys)``, as built by
         :mod:`~msnoise.s05_compute_mwcs`.
     """
-    fn = os.path.join(root, *lineage, step_name, "_output",
-                        "%s_%s" % (mov_stack[0], mov_stack[1]),
-                       "%s" % components,
-                       "%s_%s.nc" % (station1, station2))
-    os.makedirs(os.path.split(fn)[0], exist_ok=True)
+    fn = _pair_output_path(root, lineage, step_name, mov_stack, components, station1, station2)
     dr = _xr_create_or_open(fn, taxis=dataset.coords.get("taxis", taxis), name="MWCS")
     rr = _xr_insert_or_update(dr, dataset)
     _xr_save_and_close(rr, fn)
@@ -381,10 +396,7 @@ def xr_get_mwcs(root, lineage, station1, station2, components, mov_stack):
         dims ``(times, taxis, keys)``.
     :raises FileNotFoundError: if the NetCDF file does not exist.
     """
-    fn = os.path.join(root, *lineage, "_output",
-                        "%s_%s" % (mov_stack[0], mov_stack[1]),
-                       "%s" % components,
-                       "%s_%s.nc" % (station1, station2))
+    fn = _pair_output_path(root, lineage, None, mov_stack, components, station1, station2)
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
     return _xr_create_or_open(fn, name="MWCS", lazy=True)
@@ -399,11 +411,7 @@ def xr_save_dtt(root, lineage, step_name, station1, station2, components, mov_st
     :param dataset: :class:`xarray.Dataset` with a ``DTT`` variable and
         dims ``(times, keys)``, as built by :mod:`~msnoise.s06_compute_mwcs_dtt`.
     """
-    fn = os.path.join(root, *lineage, step_name, "_output",
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s" % components,
-                      "%s_%s.nc" % (station1, station2))
-    os.makedirs(os.path.split(fn)[0], exist_ok=True)
+    fn = _pair_output_path(root, lineage, step_name, mov_stack, components, station1, station2)
     dr = _xr_create_or_open(fn, taxis=[], name="DTT")
     rr = _xr_insert_or_update(dr, dataset)
     _xr_save_and_close(rr, fn)
@@ -417,11 +425,7 @@ def xr_get_dtt(root, lineage, station1, station2, components, mov_stack):
         dims ``(times, keys)``.
     :raises FileNotFoundError: if the NetCDF file does not exist.
     """
-    fn = os.path.join(root, *lineage, "_output",
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      "%s" % components,
-                      "%s_%s.nc" % (station1, station2))
-
+    fn = _pair_output_path(root, lineage, None, mov_stack, components, station1, station2)
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
     return _xr_create_or_open(fn, taxis=[], name="DTT", lazy=True)
@@ -442,13 +446,7 @@ def xr_save_stretching(root, lineage, step_name, station1, station2,
         dims ``(times, keys)`` where keys = ``['Delta', 'Coeff', 'Error']``,
         as built by :mod:`~msnoise.s10_stretching`.
     """
-    fn = os.path.join(
-        root, *lineage, step_name, "_output",
-        "%s_%s" % (mov_stack[0], mov_stack[1]),
-        components,
-        "%s_%s.nc" % (station1, station2),
-    )
-    os.makedirs(os.path.dirname(fn), exist_ok=True)
+    fn = _pair_output_path(root, lineage, step_name, mov_stack, components, station1, station2)
     dr = _xr_create_or_open(fn, taxis=[], name="STR")
     rr = _xr_insert_or_update(dr, dataset)
     _xr_save_and_close(rr, fn)
@@ -462,12 +460,7 @@ def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack)
         dims ``(times, keys)`` where keys = ``['Delta', 'Coeff', 'Error']``.
     :raises FileNotFoundError: if the NetCDF file does not exist.
     """
-    fn = os.path.join(
-        root, *lineage, "_output",
-        "%s_%s" % (mov_stack[0], mov_stack[1]),
-        components,
-        "%s_%s.nc" % (station1, station2),
-    )
+    fn = _pair_output_path(root, lineage, None, mov_stack, components, station1, station2)
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
     return _xr_create_or_open(fn, taxis=[], name="STR", lazy=True)
@@ -476,90 +469,32 @@ def _xr_get_stretching(root, lineage, station1, station2, components, mov_stack)
 # ── WCT ─────────────────────────────────────────────────────
 
 
-def xr_save_wct(root, lineage, step_name, station1, station2, components, mov_stack, taxis, freqs, WXamp_list, WXcoh_list, WXdt_list, dates_list):
+def xr_save_wct(root, lineage, step_name, station1, station2, components,
+                mov_stack, dataset):
+    """Save WCT results to a NetCDF file.
+
+    :param dataset: :class:`xarray.Dataset` with variables ``WXamp``,
+        ``Wcoh``, ``WXdt`` and dims ``(times, freqs, taxis)``, as built by
+        :mod:`~msnoise.s08_compute_wct`.
     """
-    Save WCT results into an xarray Dataset and store it as a NetCDF file.
-
-    Parameters:
-    - root: str, Root output folder path
-    - lineage: list, Lineage path components
-    - step_name: str, Step name for output path
-    - station1, station2: str, Station pair
-    - components: str, Seismic component (e.g., ZZ)
-    - mov_stack: tuple, Moving stack window (e.g., ('1d', '1d'))
-    - taxis, freqs: np.array, Time axis and frequency axis
-    - WXamp_list, WXcoh_list, WXdt_list: list of np.array, WCT outputs
-    - dates_list: list of datetime, Timestamps for each WCT calculation
-    """
-
-    # Convert lists to xarray DataArrays (all WCT outputs are real-valued;
-    # cast explicitly in case intermediate complex dtype was inherited)
-    WXamp_da = xr.DataArray(
-        data=np.array(WXamp_list).real,
-        dims=["times", "freqs", "taxis"],
-        coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
-        name="WXamp"
-    )
-
-    Wcoh_da = xr.DataArray(
-        data=np.array(WXcoh_list).real,
-        dims=["times", "freqs", "taxis"],
-        coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
-        name="Wcoh"
-    )
-
-    WXdt_da = xr.DataArray(
-        data=np.array(WXdt_list).real,
-        dims=["times", "freqs", "taxis"],
-        coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
-        name="WXdt"
-    )
-
-    # Combine into an xarray Dataset
-    ds = xr.Dataset({"WXamp": WXamp_da, "Wcoh": Wcoh_da, "WXdt": WXdt_da})
-
-    # Define output directory
-    fn = os.path.join(root, *lineage, step_name, "_output",
-                      "%s_%s" % (mov_stack[0], mov_stack[1]),
-                      components, f"{station1}_{station2}.nc")
-
-    os.makedirs(os.path.dirname(fn), exist_ok=True)
-
-    # Save to NetCDF
-    _xr_save_and_close(ds, fn)
-
-
-    # Cleanup memory
-    del ds, WXamp_da, Wcoh_da, WXdt_da
+    fn = _pair_output_path(root, lineage, step_name, mov_stack, components, station1, station2)
+    _xr_save_and_close(dataset, fn)
 
 
 
 def xr_load_wct(root, lineage, station1, station2, components, mov_stack):
+    """Load WCT results from a NetCDF file.
+
+    :returns: :class:`xarray.Dataset` with variables ``WXamp``, ``Wcoh``,
+        ``WXdt`` and dims ``(times, freqs, taxis)``.
+    :raises FileNotFoundError: if the NetCDF file does not exist.
+
+    Pure read — :func:`xr_save_wct_dtt` writes to a different path, so
+    keeping this handle lazy is safe.
     """
-    Load WCT results from an xarray Dataset stored in a NetCDF file.
-
-    Parameters:
-    - root: str, Root output folder path
-    - lineage: list, Lineage path components
-    - station1, station2: str, Station pair
-    - components: str, Seismic component (e.g., ZZ)
-    - mov_stack: tuple, Moving stack window (e.g., ('1d', '1d'))
-
-    Returns:
-    - ds: xarray.Dataset containing the WCT data (WXamp, Wcoh, WXdt)
-    """
-
-    # Construct the file path
-    fn = os.path.join(root, *lineage, "_output",
-                      f"{mov_stack[0]}_{mov_stack[1]}", components,
-                      f"{station1}_{station2}.nc")
-
-    # Check if the file exists
+    fn = _pair_output_path(root, lineage, None, mov_stack, components, station1, station2)
     if not os.path.exists(fn):
-        raise FileNotFoundError(f"File not found: {fn}")
-
-    # Pure read — xr_save_wct_dtt writes to a different file path,
-    # so keeping this handle lazy is safe.
+        raise FileNotFoundError(fn)
     return xr.open_dataset(fn)
 
 
@@ -571,14 +506,10 @@ def xr_save_wct_dtt(root, lineage, step_name, station1, station2, components, mo
         ``COH`` and dims ``(times, frequency)``, as built by
         :mod:`~msnoise.s09_compute_wct_dtt`.
     """
-    fn = os.path.join(root, *lineage, step_name, "_output",
-                      f"{mov_stack[0]}_{mov_stack[1]}", components,
-                      f"{station1}_{station2}.nc")
-    os.makedirs(os.path.dirname(fn), exist_ok=True)
+    fn = _pair_output_path(root, lineage, step_name, mov_stack, components, station1, station2)
     existing_ds = _xr_create_or_open(fn, name="WCT")
     updated_ds = _xr_insert_or_update(existing_ds, dataset)
     _xr_save_and_close(updated_ds, fn)
-    logging.debug(f"Saved WCT DTT data to {fn}")
 
 
 
@@ -592,12 +523,7 @@ def xr_get_wct_dtt(root, lineage, station1, station2, components, mov_stack):
     :raises FileNotFoundError: if the NetCDF file does not exist.
     :rtype: :class:`xarray.Dataset`
     """
-    fn = os.path.join(
-        root, *lineage, "_output",
-        "%s_%s" % (mov_stack[0], mov_stack[1]),
-        components,
-        "%s_%s.nc" % (station1, station2),
-    )
+    fn = _pair_output_path(root, lineage, None, mov_stack, components, station1, station2)
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
     return xr.open_dataset(fn)

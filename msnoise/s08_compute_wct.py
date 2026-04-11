@@ -43,6 +43,7 @@ could occur with SQLite.
 
 import time
 import numpy as np
+import xarray as xr
 from .core.db import connect, get_logger
 from .core.workflow import (compute_rolling_ref, extend_days, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, refstack_is_rolling)
 from .core.signal import xwt
@@ -179,10 +180,26 @@ def main(loglevel="INFO"):
 
                 if dates_list:
                     try:
+                        wct_ds = xr.Dataset({
+                            "WXamp": xr.DataArray(
+                                np.array(WXamp_list).real,
+                                dims=["times", "freqs", "taxis"],
+                                coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
+                            ),
+                            "Wcoh": xr.DataArray(
+                                np.array(WXcoh_list).real,
+                                dims=["times", "freqs", "taxis"],
+                                coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
+                            ),
+                            "WXdt": xr.DataArray(
+                                np.array(WXdt_list).real,
+                                dims=["times", "freqs", "taxis"],
+                                coords={"times": dates_list, "freqs": freqs, "taxis": taxis},
+                            ),
+                        })
                         xr_save_wct(root, lineage_names, step.step_name,
-                                     station1, station2, component, mov_stack,
-                                     taxis, freqs, WXamp_list, WXcoh_list,
-                                     WXdt_list, dates_list)
+                                    station1, station2, component, mov_stack,
+                                    wct_ds)
                     except Exception as e:
                         logger.error(f"Error saving WCT: {str(e)}")
 
