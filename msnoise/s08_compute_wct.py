@@ -3,22 +3,24 @@ Wavelet Coherence Transform (WCT) Computation
 This script performs the computation of the Wavelet Coherence Transform (WCT), a tool used to analyze the correlation between two time series in the time-frequency domain. The script supports parallel processing and interacts with a database to manage job statuses.
 
 Filter Configuration Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-* |dtt_minlag|
-* |dtt_lag|
-* |dtt_v|
-* |dtt_width|
-* |dtt_maxdt|
-* |wct_mincoh|
-* |wct_codacycles|
-* |wct_ns|
-* |wct_nt|
-* |wct_vpo|
-* |wct_nptsfreq|
-* |wct_min_nonzero|
-* |wct_norm|
-* |hpc|
+* |wavelet.wct_freqmin|
+* |wavelet.wct_freqmax|
+* |wavelet.wct_ns|
+* |wavelet.wct_nt|
+* |wavelet.wct_vpo|
+* |wavelet.wct_nptsfreq|
+* |wavelet.wct_norm|
+* |wavelet.wavelet_type|
+* |wavelet.wct_compute_dtt|
+* |stack.mov_stack|
+* |refstack.ref_begin|
+* |refstack.ref_end|
+* |cc.cc_sampling_rate|
+* |cc.components_to_compute|
+* |cc.components_to_compute_single_station|
+* |global.hpc|
 
 This process is job-based, so it is possible to run several instances in
 parallel.

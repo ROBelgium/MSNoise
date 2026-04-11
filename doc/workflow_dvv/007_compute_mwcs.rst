@@ -3,4 +3,4 @@
 Compute MWCS (Moving Window Cross-Spectrum)
 -------------------------------------------
 
-.. automodule::  msnoise.s05compute_mwcs
+.. automodule::  msnoise.s05_compute_mwcs

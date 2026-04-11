@@ -38,6 +38,24 @@ This step also supports parallel processing:
 .. code-block:: sh
 
     $ msnoise -t 4 cc stack_refstack
+
+Configuration Parameters
+------------------------
+
+* |refstack.ref_begin|
+* |refstack.ref_end|
+* |refstack.stack_method|
+* |refstack.pws_timegate|
+* |refstack.pws_power|
+* |stack.wienerfilt|
+* |stack.wiener_mlen|
+* |stack.wiener_nlen|
+* |cc.keep_all|
+* |cc.corr_duration|
+* |cc.cc_sampling_rate|
+* |cc.components_to_compute|
+* |cc.components_to_compute_single_station|
+* |global.hpc|
 """
 
 import time

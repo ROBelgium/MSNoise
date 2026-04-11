@@ -3,4 +3,4 @@
 Compute Stretching
 ------------------
 
-.. automodule::  msnoise.stretch
+.. automodule::  msnoise.s10_stretching

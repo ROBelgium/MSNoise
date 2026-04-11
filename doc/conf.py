@@ -20,45 +20,35 @@ import sphinx_gallery
 import matplotlib
 matplotlib.use('TkAgg')
 
-import msnoise.move2obspy
-import msnoise.preprocessing
-# import sphinx_bootstrap_theme
+# msnoise.move2obspy and msnoise.preprocessing no longer exist at these paths
+# (moved to msnoise.core in 2.x) — imports removed.
 
 os.environ["SPHINX_DOC_BUILD"] = "YES"
 
+import csv
 import datetime
 import click
+import glob as _glob
 
-# If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-from msnoise.default import default
-
-grid = [ [key, default[key].default, default[key].definition] for key in default.keys() ]
-
-numcolumns = len(grid[0])
-colsizes = [max(len(r[i]) for r in grid) for i in range(numcolumns)]
-formatter = ' '.join('{:<%d}' % c for c in colsizes)
-rowsformatted = [formatter.format(*row) for row in grid]
-headformatted = formatter.format(*['Parameter Name', 'Description', 'Default Value'])
-header = formatter.format(*['=' * c for c in colsizes])
-
-output = header +'\n' + headformatted +'\n' + header + '\n' + '\n'.join(rowsformatted) + '\n' + header
-
-with open('defaults.rst', 'w') as f:
-    f.write(output)
-
-import markdown
-output = ""
-for key in default.keys():
-    descr, defvalue = default[key].definition, default[key].default
-    # descr = markdown.markdown(descr)
-    descr = descr.replace("<br>", " | ")
-    output += ".. |%s| replace:: ``%s`` : %s (default=%s)\n" % (key, key, descr,
-                                                               defvalue)
-f = open('configs.hrst', 'w')
-f.write(output)
-f.close()
+# Generate configs.hrst from the config CSV files (one per workflow category).
+# Each alias uses the format |category.param_name| so readers immediately know
+# which config set the parameter belongs to. Example:
+#   |cc.cc_sampling_rate| → ``cc.cc_sampling_rate`` : Sampling Rate... (default=20.0)
+_config_dir = os.path.join(os.path.dirname(__file__), "..", "msnoise", "config")
+_alias_lines = []
+for _fn in sorted(_glob.glob(os.path.join(_config_dir, "config_*.csv"))):
+    _cat = os.path.basename(_fn).replace("config_", "").replace(".csv", "")
+    with open(_fn) as _fh:
+        for _row in csv.DictReader(_fh):
+            _name = _row["name"].strip()
+            _defn = _row.get("definition", "").strip().replace("<br>", " | ")
+            _dflt = _row.get("default", "").strip()
+            _alias = f"{_cat}.{_name}"
+            _alias_lines.append(
+                f".. |{_alias}| replace:: ``{_alias}`` : {_defn} (default={_dflt})"
+            )
+with open("configs.hrst", "w") as _fh:
+    _fh.write("\n".join(_alias_lines) + "\n")
 
 space = " " * 4
 # Generate the help files

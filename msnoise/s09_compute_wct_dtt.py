@@ -20,6 +20,24 @@ To run this step:
 .. code-block:: sh
 
     msnoise cc dtt compute_wct_dtt
+
+Configuration Parameters
+------------------------
+
+* |wavelet_dtt.wct_dtt_freqmin|
+* |wavelet_dtt.wct_dtt_freqmax|
+* |wavelet_dtt.wct_minlag|
+* |wavelet_dtt.wct_lag|
+* |wavelet_dtt.wct_v|
+* |wavelet_dtt.wct_sides|
+* |wavelet_dtt.wct_mincoh|
+* |wavelet_dtt.wct_maxdt|
+* |wavelet_dtt.wct_codacycles|
+* |wavelet_dtt.wct_min_nonzero|
+* |stack.mov_stack|
+* |cc.components_to_compute|
+* |cc.components_to_compute_single_station|
+* |global.hpc|
 """
 
 import time

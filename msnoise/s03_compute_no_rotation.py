@@ -40,32 +40,38 @@ As of MSNoise 1.6, the ``compute`` step has been completely rewritten:
 Configuration Parameters
 ------------------------
 
-The following parameters (modifiable via ```msnoise admin```) are used for
+The following parameters (modifiable via ``msnoise admin``) are used for
 this step:
 
-* |components_to_compute|
-* |components_to_compute_single_station|
-* |cc_sampling_rate|
-* |overlap|
-* |maxlag|
-* |corr_duration|
-* |winsorizing|
-* |resampling_method|
-* |remove_response|
-* |response_path|
-* |response_prefilt|
-* |preprocess_lowpass|
-* |preprocess_highpass|
-* |preprocess_max_gap|
-* |preprocess_taper_length|
-* |keep_all|
-* |keep_days|
-* |stack_method|
-* |pws_timegate|
-* |pws_power|
-* |whitening|
-* |whitening_type|
-* |hpc|
+* |cc.components_to_compute|
+* |cc.components_to_compute_single_station|
+* |cc.cc_sampling_rate|
+* |cc.cc_normalisation|
+* |cc.cc_type|
+* |cc.cc_type_single_station_AC|
+* |cc.cc_type_single_station_SC|
+* |cc.cc_taper_fraction|
+* |cc.clip_after_whiten|
+* |cc.overlap|
+* |cc.maxlag|
+* |cc.corr_duration|
+* |cc.winsorizing|
+* |cc.whitening|
+* |cc.whitening_type|
+* |cc.keep_all|
+* |cc.keep_days|
+* |cc.stack_method|
+* |cc.pws_timegate|
+* |cc.pws_power|
+* |preprocess.resampling_method|
+* |preprocess.remove_response|
+* |global.response_path|
+* |global.response_prefilt|
+* |preprocess.preprocess_lowpass|
+* |preprocess.preprocess_highpass|
+* |preprocess.preprocess_max_gap|
+* |preprocess.preprocess_taper_length|
+* |global.hpc|
 
 .. automodule:: msnoise.preprocessing
 

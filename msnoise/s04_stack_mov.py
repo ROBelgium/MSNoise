@@ -1,4 +1,22 @@
-"""Moving and reference stack computation."""
+"""Moving stack computation.
+
+Computes moving-window stacks of cross-correlation functions, optionally
+applying a Wiener filter before stacking.
+
+Configuration Parameters
+------------------------
+
+* |stack.mov_stack|
+* |stack.wienerfilt|
+* |stack.wiener_mlen|
+* |stack.wiener_nlen|
+* |cc.keep_all|
+* |cc.corr_duration|
+* |cc.cc_sampling_rate|
+* |cc.components_to_compute|
+* |cc.components_to_compute_single_station|
+* |global.hpc|
+"""
 import datetime
 import math
 import time

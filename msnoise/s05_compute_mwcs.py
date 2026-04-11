@@ -7,17 +7,21 @@ to study the relative dephasing between Moving-Window stacks ("Current") and a
 Reference using Moving-Window Cross-Spectral analysis. The *jobs* "T"o do have
 been inserted in the datavase during the stack procedure.
 
-Filter Configuration Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Configuration Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-* ``freqmin``: The lower frequency bound of the linear regression done in
-  MWCS (in Hz)
-* ``freqmax``: The upper frequency bound of the linear regression done in
-  MWCS (in Hz)
-* ``mwcs_wlen``: Window length (in seconds) to perform MWCS
-* ``mwcs_step``: Step (in seconds) of the windowing procedure in MWCS
-
-* |hpc|
+* |mwcs.freqmin|
+* |mwcs.freqmax|
+* |mwcs.mwcs_wlen|
+* |mwcs.mwcs_step|
+* |stack.mov_stack|
+* |refstack.ref_begin|
+* |refstack.ref_end|
+* |cc.cc_sampling_rate|
+* |cc.maxlag|
+* |cc.components_to_compute|
+* |cc.components_to_compute_single_station|
+* |global.hpc|
 
 In short, both time series are sliced in several overlapping windows and
 preprocessed. The similarity of the two time-series is assessed using the

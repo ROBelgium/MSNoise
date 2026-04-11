@@ -3,25 +3,24 @@
     database and consequently, no STR calculation will be done! FIX!
 
 
-Stretching Configuration Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Configuration Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-* ``stretching_max``: Maximum stretching factor (dv/v range, e.g. 0.01 = ±1%)
-* ``stretching_nsteps``: Number of stretching steps (grid resolution)
-* ``stretching_minlag``: Minimum coda lag time (seconds), used when ``stretching_lag="static"``
-* ``stretching_width``: Width of the coda window (seconds) added to ``stretching_minlag``
-* ``stretching_lag``: ``"static"`` or ``"dynamic"`` (uses interstation distance / ``stretching_v``)
-* ``stretching_v``: Wave velocity (km/s) for dynamic lag computation
-* ``stretching_sides``: ``"both"``, ``"left"``, or ``"right"`` — which sides of the CCF to use
-
-Global / CC parameters also used:
-
-* ``cc_sampling_rate``: Sampling rate of the cross-correlations (Hz)
-* ``maxlag``: Maximum lag time (seconds)
-* ``components_to_compute``, ``components_to_compute_single_station``
-* ``mov_stack``: Moving-stack window sizes
-
-* |hpc|
+* |stretching.stretching_max|
+* |stretching.stretching_nsteps|
+* |stretching.stretching_minlag|
+* |stretching.stretching_width|
+* |stretching.stretching_lag|
+* |stretching.stretching_v|
+* |stretching.stretching_sides|
+* |stack.mov_stack|
+* |refstack.ref_begin|
+* |refstack.ref_end|
+* |cc.cc_sampling_rate|
+* |cc.maxlag|
+* |cc.components_to_compute|
+* |cc.components_to_compute_single_station|
+* |global.hpc|
 
 The output of this process is a table of delays measured at each window in the
 functions. The following is an example for lag times between -115 and -90.

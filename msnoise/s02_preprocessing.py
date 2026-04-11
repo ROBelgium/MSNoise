@@ -6,6 +6,15 @@ For local/SDS sources, waveforms are read from the archive via
 DataAvailability records.  For FDSN/EIDA sources, waveforms are fetched from
 the remote service using ``get_waveforms_bulk`` and optionally cached as raw
 files (``fdsn_keep_raw=Y``) before preprocessing.
+
+Configuration Parameters
+------------------------
+
+* |preprocess.preprocess_components|
+* |preprocess.remove_response|
+* |global.response_path|
+* |global.fdsn_keep_raw|
+* |global.hpc|
 """
 
 import time

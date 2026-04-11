@@ -3,4 +3,4 @@
 Stack
 -----
 
-.. automodule:: msnoise.s04stack
+.. automodule:: msnoise.s04_stack_mov

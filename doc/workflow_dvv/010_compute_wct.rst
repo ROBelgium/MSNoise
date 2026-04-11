@@ -3,4 +3,4 @@
 Compute WCT (Wavelet Coherence Transform)
 -----------------------------------------
 
-.. automodule::  msnoise.s08compute_wct
+.. automodule::  msnoise.s08_compute_wct

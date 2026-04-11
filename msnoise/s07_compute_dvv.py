@@ -22,6 +22,19 @@ Output files live at::
 
 where ``pair_type`` is one of ``CC``, ``SC``, ``AC``, ``ALL`` and ``comp``
 is the component pair string (e.g. ``ZZ``) or ``ALL``.
+
+Configuration Parameters
+------------------------
+
+* |mwcs_dtt_dvv.dvv_split_pair_type|
+* |mwcs_dtt_dvv.dvv_split_components|
+* |stretching_dvv.dvv_split_pair_type|
+* |stretching_dvv.dvv_split_components|
+* |wavelet_dtt_dvv.dvv_split_pair_type|
+* |wavelet_dtt_dvv.dvv_split_components|
+* |stack.mov_stack|
+* |cc.components_to_compute|
+* |cc.components_to_compute_single_station|
 """
 import time
 import numpy as np

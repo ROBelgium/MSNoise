@@ -3,4 +3,4 @@
 Compute Power Spectral Densities
 --------------------------------
 
-.. automodule::  msnoise.ppsd_compute
+.. automodule::  msnoise.s20_psd_compute

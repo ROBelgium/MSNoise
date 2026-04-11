@@ -38,6 +38,18 @@ Parallel execution:
 
     $ msnoise -t 4 qc compute_psd
 
+Configuration Parameters
+------------------------
+
+* |psd.psd_components|
+* |psd.psd_ppsd_length|
+* |psd.psd_ppsd_overlap|
+* |psd.psd_ppsd_period_smoothing_width_octaves|
+* |psd.psd_ppsd_period_step_octaves|
+* |psd.psd_ppsd_period_limits|
+* |psd.psd_ppsd_db_bins|
+* |global.hpc|
+
 .. versionadded:: 2.0
 """
 

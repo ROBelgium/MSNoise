@@ -1,3 +1,26 @@
+"""Compute dt/t from MWCS measurements using weighted linear regression.
+
+Reads the MWCS output (delay, error, coherence per lag window per time step),
+applies lag-window masking and quality thresholds, then fits a slope
+(dv/v = -dt/t) using vectorized WLS — both origin-forced and with intercept.
+
+Configuration Parameters
+------------------------
+
+* |mwcs_dtt.dtt_minlag|
+* |mwcs_dtt.dtt_width|
+* |mwcs_dtt.dtt_lag|
+* |mwcs_dtt.dtt_v|
+* |mwcs_dtt.dtt_sides|
+* |mwcs_dtt.dtt_mincoh|
+* |mwcs_dtt.dtt_maxerr|
+* |mwcs_dtt.dtt_maxdtt|
+* |stack.mov_stack|
+* |cc.components_to_compute|
+* |cc.components_to_compute_single_station|
+* |global.hpc|
+"""
+
 import time
 
 import numpy as np

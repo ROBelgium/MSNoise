@@ -12,6 +12,13 @@ The NetCDF file has two dimensions: times (one row per PPSD window)
 and bands (one column per frequency band configured in
 psd_rms_frequency_ranges).
 
+Configuration Parameters
+------------------------
+
+* |psd_rms.psd_rms_frequency_ranges|
+* |psd_rms.psd_rms_type|
+* |psd.psd_components|
+
 """
 
 import time
