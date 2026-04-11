@@ -3,4 +3,4 @@
 New Jobs
 --------
 
-.. automodule:: msnoise.s02new_jobs
+.. automodule:: msnoise.s02_new_jobs

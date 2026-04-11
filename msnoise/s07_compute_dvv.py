@@ -2,6 +2,34 @@
 DVV Aggregate Step
 ==================
 
+Aggregates per-pair dv/v time series (from ``mwcs_dtt``, ``stretching``, or
+``wavelet_dtt``) into **network-level statistics** across all station pairs.
+
+For each ``(mov_stack, component, pair_type)`` combination, the step reads
+all per-pair output files and, at each time step, computes across-pair:
+
+- **mean** and **std** (always)
+- **weighted_mean** and **weighted_std** (if ``|mwcs_dtt_dvv.dvv_weighted_mean|``
+  is ``Y``; weights = 1/σ²)
+- **trimmed_mean** and **trimmed_std** (if ``|mwcs_dtt_dvv.dvv_trimmed_mean|``
+  is ``Y``; sigma-clip at ``|mwcs_dtt_dvv.dvv_trim_limit|``)
+- **percentiles** (if ``|mwcs_dtt_dvv.dvv_percentiles|`` is set)
+
+Pairs are split by type (CC/SC/AC) when ``|mwcs_dtt_dvv.dvv_split_pair_type|``
+is ``Y``, and by component when ``|mwcs_dtt_dvv.dvv_split_components|`` is ``Y``.
+Setting either to ``N`` aggregates all pairs/components into a single ``ALL`` file.
+
+Only pairs with data quality above ``|mwcs_dtt_dvv.dvv_quality_min|`` contribute.
+If ``|mwcs_dtt_dvv.dvv_output_percent|`` is ``Y``, output is in percent (×100).
+
+To run this step:
+
+.. code-block:: sh
+
+    $ msnoise cc dtt compute_mwcs_dtt_dvv      # for MWCS
+    $ msnoise cc dtt compute_stretching_dvv    # for Stretching
+    $ msnoise cc dtt compute_wavelet_dtt_dvv   # for WCT
+
 Aggregates per-pair dv/v results (from ``mwcs_dtt``, ``stretching``, or
 ``wavelet_dtt``) into network-level statistics across station pairs.
 

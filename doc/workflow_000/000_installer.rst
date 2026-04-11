@@ -3,4 +3,4 @@
 Initialize Project
 ------------------
 
-.. automodule:: msnoise.s000installer
+.. automodule:: msnoise.s00_installer

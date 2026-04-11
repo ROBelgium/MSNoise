@@ -1,16 +1,40 @@
 """
-Compute RMS from PSD NetCDF files and save results as NetCDF.
+Compute per-frequency-band RMS from PSD NetCDF files.
 
-This step reads the per-day PSD NetCDF files written by compute_psd,
-aggregates them per station, computes per-frequency-band RMS values, and
-writes the results to a NetCDF file hierarchically below the upstream PSD
-step:
+Reads the per-day PSD NetCDF files written by :mod:`msnoise.s20_psd_compute`,
+concatenates all requested days for each station-channel, and for each
+configured frequency band computes the **RMS amplitude in displacement,
+velocity, or acceleration** (controlled by ``|psd_rms.psd_rms_type|``).
 
-    <output_folder>/<psd_step_name>/<psd_rms_step_name>/_output/<NET.STA.LOC.CHAN>/RMS.nc
+The RMS is derived by integrating the PSD over the frequency band::
 
-The NetCDF file has two dimensions: times (one row per PPSD window)
-and bands (one column per frequency band configured in
-psd_rms_frequency_ranges).
+    RMS = sqrt(integral(PSD(f) df, f_min, f_max))
+
+converted to the requested physical unit.
+
+Frequency bands are configured via ``|psd_rms.psd_rms_frequency_ranges|``
+as a list of ``(f_min, f_max)`` tuples, e.g.
+``[(1.0, 10.0), (4.0, 14.0)]``.
+
+Output is written as a NetCDF file per station-channel under the lineage
+output path::
+
+    <output_folder>/<psd_step>/<psd_rms_step>/_output/<NET.STA.LOC.CHAN>/RMS.nc
+
+The NetCDF file has two dimensions: ``times`` (one row per PPSD window)
+and ``bands`` (one column per configured frequency band).
+
+To run this step:
+
+.. code-block:: sh
+
+    $ msnoise qc compute_psd_rms
+
+Parallel processing:
+
+.. code-block:: sh
+
+    $ msnoise -t 4 qc compute_psd_rms
 
 Configuration Parameters
 ------------------------

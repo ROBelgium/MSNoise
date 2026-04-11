@@ -1,8 +1,41 @@
 """Compute dt/t from MWCS measurements using weighted linear regression.
 
-Reads the MWCS output (delay, error, coherence per lag window per time step),
-applies lag-window masking and quality thresholds, then fits a slope
-(dv/v = -dt/t) using vectorized WLS — both origin-forced and with intercept.
+Reads the per-pair MWCS NetCDF files written by :mod:`msnoise.s05_compute_mwcs`
+and, for each time step, fits a weighted linear regression of the measured delay
+the measured delay ``delta_t`` against lag time ``t``,
+where ``delta_t(t) = -(dv/v) * t + a``:
+
+Two fits are produced at each time step:
+
+- **Origin-forced** (``m0 / em0``): intercept fixed to zero, giving the
+  purest estimate of :math:`-dv/v`.
+- **With intercept** (``m / em / a / ea``): free intercept accounts for a
+  constant clock drift or instrumental offset.
+
+Before fitting, lag windows outside ``[minlag, minlag + width]`` are masked,
+values with coherence below ``|mwcs_dtt.dtt_mincoh|`` or error above
+``|mwcs_dtt.dtt_maxerr|`` are excluded, and values where
+``|delta_t / t| > |mwcs_dtt.dtt_maxdtt|`` are removed.
+
+The lag window is either static (``|mwcs_dtt.dtt_lag|`` = ``"static"``,
+using ``|mwcs_dtt.dtt_minlag|``) or dynamic (lag derived from interstation
+distance and a surface-wave velocity ``|mwcs_dtt.dtt_v|``).
+
+Output columns in the DTT NetCDF file:
+``m, em, a, ea, m0, em0, mcoh`` (slope, error, intercept, intercept error,
+origin-forced slope, origin-forced error, mean coherence).
+
+To run this step:
+
+.. code-block:: sh
+
+    $ msnoise cc dtt compute_mwcs_dtt
+
+Parallel processing:
+
+.. code-block:: sh
+
+    $ msnoise -t 4 cc dtt compute_mwcs_dtt
 
 Configuration Parameters
 ------------------------

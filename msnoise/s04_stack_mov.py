@@ -1,7 +1,35 @@
 """Moving stack computation.
 
-Computes moving-window stacks of cross-correlation functions, optionally
-applying a Wiener filter before stacking.
+Reads per-day or per-window CCF NetCDF files written by the CC step and
+produces **moving-window stacked CCFs** for every ``(pair, component,
+mov_stack)`` combination.
+
+The stacking window is defined by ``|stack.mov_stack|`` as a list of
+``(window, step)`` tuples.  For example ``('7D', '1D')`` produces a
+rolling 7-day mean, sampled daily.  Each output is written as a NetCDF file
+under the lineage output path::
+
+    OUTPUT/.../stack_N/_output/<mov_stack>/<component>/<sta1>_<sta2>.nc
+
+When ``|stack.wienerfilt|`` is ``Y``, a Wiener filter is applied to the
+CCF time series before the rolling mean, attenuating isolated spikes
+and filling short gaps.
+
+This step is **upstream of refstack**: once Done, ``propagate_downstream``
+creates both a REF sentinel job (triggering :mod:`msnoise.s04_stack_refstack`)
+and direct MWCS/stretching/wavelet T jobs for the new days.
+
+To run this step:
+
+.. code-block:: sh
+
+    $ msnoise cc stack
+
+Parallel processing:
+
+.. code-block:: sh
+
+    $ msnoise -t 4 cc stack
 
 Configuration Parameters
 ------------------------

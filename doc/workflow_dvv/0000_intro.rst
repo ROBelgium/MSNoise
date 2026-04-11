@@ -34,10 +34,11 @@ You have currently three options to compute the dv/v:
 
 
 
-3. Wavelet-based dv/v (1 step)
+3. Wavelet-based dv/v (2 steps: WCT then WCT-DTT, or fused in 1 step)
 
 .. toctree::
    :glob:
    :maxdepth: 1
 
    ../workflow_dvv/010*
+   ../workflow_dvv/009b*

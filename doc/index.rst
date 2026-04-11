@@ -39,6 +39,15 @@ Installation
 
     installation
 
+Workflow Concepts (2.x architecture)
+=====================================
+
+.. toctree::
+    :maxdepth: 2
+
+    workflow_concepts
+
+
 Workflows:
 ==========
 
