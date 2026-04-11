@@ -143,6 +143,7 @@ def main(stype, loglevel="INFO"):
                     logger.warning("No data found for %s-%s" % (sta1, sta2))
                     continue
                 dr = c.resample(times="%is" % params.cc.corr_duration).mean()
+                del c  # free raw CCF data — dr is all we need from here
 
             else:
                 logger.warning("keep_all=N is unsupported in lineage workflow; "
@@ -150,6 +151,7 @@ def main(stype, loglevel="INFO"):
                 c = xr_load_ccf_for_stack(params.global_.output_folder, lineage_names,
                                           sta1, sta2, components, all_days)
                 dr = c.resample(times="1D").mean()
+                del c  # free raw CCF data — dr is all we need from here
 
             if wienerfilt:
                 dr = wiener_filt(dr, wiener_M, wiener_N, wiener_gap_threshold)

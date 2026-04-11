@@ -106,6 +106,7 @@ def main(loglevel="INFO"):
                 continue
 
             data = xr.concat(daily_datasets, dim="times")
+            del daily_datasets  # release N lazy PSD file handles after concat
 
             try:
                 rms = psd_df_rms(data, freqs=rms_freq_ranges, output=rms_type)

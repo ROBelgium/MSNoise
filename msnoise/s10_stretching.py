@@ -3,29 +3,25 @@
     database and consequently, no STR calculation will be done! FIX!
 
 
-Filter Configuration Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Stretching Configuration Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* ``mwcs_low``: The lower frequency bound of the linear regression done in
-  MWCS (in Hz)
-* ``mwcs_high``: The upper frequency bound of the linear regression done in
-  MWCS (in Hz)
-* ``mwcs_wlen``: Window length (in seconds) to perform MWCS
-* ``mwcs_step``: Step (in seconds) of the windowing procedure in MWCS
+* ``stretching_max``: Maximum stretching factor (dv/v range, e.g. 0.01 = ±1%)
+* ``stretching_nsteps``: Number of stretching steps (grid resolution)
+* ``stretching_minlag``: Minimum coda lag time (seconds), used when ``stretching_lag="static"``
+* ``stretching_width``: Width of the coda window (seconds) added to ``stretching_minlag``
+* ``stretching_lag``: ``"static"`` or ``"dynamic"`` (uses interstation distance / ``stretching_v``)
+* ``stretching_v``: Wave velocity (km/s) for dynamic lag computation
+* ``stretching_sides``: ``"both"``, ``"left"``, or ``"right"`` — which sides of the CCF to use
+
+Global / CC parameters also used:
+
+* ``cc_sampling_rate``: Sampling rate of the cross-correlations (Hz)
+* ``maxlag``: Maximum lag time (seconds)
+* ``components_to_compute``, ``components_to_compute_single_station``
+* ``mov_stack``: Moving-stack window sizes
 
 * |hpc|
-
-In short, both time series are sliced in several overlapping windows and
-preprocessed. The similarity of the two time-series is assessed using the
-cross-coherence between energy densities in the frequency domain. The time
-delay between the two cross correlations is found in the unwrapped phase of
-the cross spectrum and is linearly proportional to frequency. This "Delay" for
-each window between two signals is the slope of a weighted linear regression
-(WLS) of the samples within the frequency band of interest.
-
-For each filter, the frequency band can be configured using ``mwcs_low``
-and ``mwcs_high``, and the window and overlap lengths using ``mwcs_wlen`` and
-``mwcs_step``.
 
 The output of this process is a table of delays measured at each window in the
 functions. The following is an example for lag times between -115 and -90.
@@ -343,6 +339,7 @@ def main(loglevel="INFO"):
                     root, lineage_names, step.step_name,
                     station1, station2, components, mov_stack, ds_out,
                 )
+                del data_values, ds_out  # free materialised CCF + output Dataset
 
         massive_update_job(db, jobs, "D")
         if not batch["params"].global_.hpc:

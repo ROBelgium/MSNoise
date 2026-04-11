@@ -227,6 +227,7 @@ def main(loglevel="INFO", chunk_size=0):
 
                 del ppsd
 
+            del st  # release stream for this station/day before moving to next job
             if job_failed:
                 failed_jobs.append(job)
             else:

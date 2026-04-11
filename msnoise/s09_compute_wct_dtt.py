@@ -145,6 +145,16 @@ def main(loglevel="INFO"):
                 to_search_d = np.array(to_search, dtype="datetime64[D]")
                 valid_mask  = np.isin(times_np, to_search_d)
 
+                # Materialise the full 3D WCT arrays once before the time loop
+                # so that each ds[var].values[i] is a cheap numpy index, not a
+                # repeated lazy read that caches the full array on first access.
+                # Consistent with s05's data_arr = data.values pattern.
+                wxamp_np = ds["WXamp"].values   # (times, freqs, taxis)
+                wcoh_np  = ds["Wcoh"].values
+                wxdt_np  = ds["WXdt"].values
+                ds.close()
+                del ds
+
                 dates_out = []
                 dtt_rows = []
                 err_rows = []
@@ -154,9 +164,9 @@ def main(loglevel="INFO"):
                     if not valid_mask[i]:
                         continue
 
-                    WXamp_i = ds["WXamp"].values[i]
-                    Wcoh_i = ds["Wcoh"].values[i]
-                    WXdt_i = ds["WXdt"].values[i]
+                    WXamp_i = wxamp_np[i]
+                    Wcoh_i  = wcoh_np[i]
+                    WXdt_i  = wxdt_np[i]
 
                     try:
                         dtt, err, coh, freqs_subset = compute_wct_dtt_batch(
@@ -174,8 +184,7 @@ def main(loglevel="INFO"):
                     err_rows.append(err)
                     coh_rows.append(coh)
 
-                ds.close()
-                del ds
+                del wxamp_np, wcoh_np, wxdt_np  # free 3D WCT arrays
 
                 if not dates_out:
                     logger.warning(

@@ -77,7 +77,6 @@ import xarray as xr
 from obspy.signal.invsim import cosine_taper
 import scipy
 import scipy.fft as sf
-from scipy.fft import next_fast_len
 import scipy.optimize
 import scipy.signal
 
@@ -128,11 +127,6 @@ def main(loglevel="INFO"):
         freqmin = params.mwcs.freqmin
         freqmax = params.mwcs.freqmax
 
-        def ww(a):
-            from .core.compute import whiten
-            n = next_fast_len(len(a))
-            return whiten(a, n, 1./params.cc.cc_sampling_rate,
-                          freqmin, freqmax, returntime=True)
         station1, station2 = pair.split(":")
 
         if station1 == station2:
