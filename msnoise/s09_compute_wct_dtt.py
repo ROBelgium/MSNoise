@@ -107,11 +107,15 @@ def main(loglevel="INFO"):
         )
 
         station1, station2 = pair.split(":")
-        components_to_compute = (
-            params.cc.components_to_compute_single_station
-            if station1 == station2
-            else params.cc.components_to_compute
-        )
+        # Respect filter CC/SC/AC flags — skip pair types never computed
+        if station1 == station2:
+            if not (params.filter.SC or params.filter.AC):
+                continue
+            components_to_compute = params.cc.components_to_compute_single_station
+        else:
+            if not params.filter.CC:
+                continue
+            components_to_compute = params.cc.components_to_compute
         mov_stacks = params.stack.mov_stack
 
         # DVV computation parameters from the wavelet_dtt step config.

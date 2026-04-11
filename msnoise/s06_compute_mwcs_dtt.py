@@ -71,9 +71,14 @@ def main(loglevel="INFO"):
 
         netsta1, netsta2 = pair.split(':')
         station1, station2 = pair.split(":")
+        # Respect filter CC/SC/AC flags — skip pair types never computed
         if station1 == station2:
+            if not (params.filter.SC or params.filter.AC):
+                continue
             components_to_compute = params.cc.components_to_compute_single_station
         else:
+            if not params.filter.CC:
+                continue
             components_to_compute = params.cc.components_to_compute
             
         n1, s1, l1 = netsta1.split(".")

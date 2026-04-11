@@ -106,7 +106,10 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
 
         # Build (sta1, sta2) pairs as NET.STA.LOC strings,
         # enumerating all configured location code combinations.
-        include_single_station = len(params.cc.components_to_compute_single_station) >= 1
+        include_single_station = (
+            len(params.cc.components_to_compute_single_station) >= 1
+            and (params.filter.SC or params.filter.AC)
+        )
         all_pairs = []
         for s1, s2 in get_station_pairs(db, include_single_station=include_single_station):
             for loc1 in (s1.locs() or ["00"]):
@@ -116,17 +119,28 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
                         f"{s2.net}.{s2.sta}.{loc2}",
                     ))
 
-        all_components = [c for c in np.unique(
-            params.cc.components_to_compute
-            + params.cc.components_to_compute_single_station
-        ) if c]  # drop empty strings
+        # Only include components that were actually computed per filter flags
+        cc_comps = [c for c in params.cc.components_to_compute if c]                    if params.filter.CC else []
+        ss_comps = [c for c in params.cc.components_to_compute_single_station if c]                    if (params.filter.SC or params.filter.AC) else []
+        all_components = list(dict.fromkeys(cc_comps + ss_comps))
 
         split_pair_type  = params.category_layer.dvv_split_pair_type
         split_components = params.category_layer.dvv_split_components
 
         # split=Y → one file per individual type/component
         # split=N → one combined ALL file
-        pair_types  = ["CC", "SC", "AC"] if split_pair_type  else ["ALL"]
+        if split_pair_type:
+            pair_types = []
+            if params.filter.CC:
+                pair_types.append("CC")
+            if params.filter.SC:
+                pair_types.append("SC")
+            if params.filter.AC:
+                pair_types.append("AC")
+            if not pair_types:
+                pair_types = ["ALL"]  # safety: if all disabled, aggregate everything
+        else:
+            pair_types = ["ALL"]
         comp_groups = list(all_components) if split_components else ["ALL"]
 
         mov_stacks = params.stack.mov_stack
