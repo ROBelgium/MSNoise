@@ -380,8 +380,8 @@ class MSNoiseResult:
     def get_ref(self, pair=None, components=None):
         """Load reference stacks. Requires 'refstack' in lineage.
 
-        :returns: :class:`xarray.Dataset` (single pair/comp) or dict of
-            Datasets keyed by ``(pair, comp)``.
+        :returns: :class:`xarray.DataArray` (single pair/comp) or dict of
+            DataArrays keyed by ``(pair, comp)``.
         """
         from .core.io import xr_get_ref
         from .core.workflow import get_t_axis

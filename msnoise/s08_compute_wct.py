@@ -112,7 +112,7 @@ def main(loglevel="INFO"):
                 try:
                     ref_data = xr_get_ref(root, lineage_names, station1, station2,
                                           component, taxis, ignore_network=True)
-                    ref = ref_data.REF.values
+                    ref = ref_data.values
                     if wct_norm:
                         ori_waveform = ref / ref.max()
                     else:

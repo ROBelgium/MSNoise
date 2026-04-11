@@ -226,23 +226,23 @@ def xr_save_ccf(root, lineage, step_name, station1, station2, components, mov_st
 def xr_get_ccf(root, lineage, station1, station2, components, mov_stack, taxis):
     """Load CCF results from a NetCDF file.
 
-    :returns: :class:`xarray.DataArray` with dims ``(times, taxis)``.
+    :returns: :class:`xarray.DataArray` with dims ``(times, taxis)``, lazily
+        memory-mapped.  Call ``.load()`` or ``.values`` when you need numpy.
     :raises FileNotFoundError: if the NetCDF file does not exist.
+
+    .. note::
+        ``xr_get_ccf`` (readers: s05/s08/s10) and ``xr_save_ccf`` (writer: s04)
+        operate on strictly disjoint workflow steps — the file is never read and
+        written concurrently, so keeping the handle lazy is safe.
     """
     path = os.path.join(root, *lineage, "_output",
                         "%s_%s" % (mov_stack[0], mov_stack[1]), "%s" % components)
     fn = "%s_%s.nc" % (station1, station2)
-
     fullpath = os.path.join(path, fn)
     if not os.path.isfile(fullpath):
         raise FileNotFoundError(fullpath)
     ds = _xr_create_or_open(fullpath, taxis, name="CCF", lazy=True)
-    # Materialise and close immediately — the stacked CCF file is also a write
-    # target in xr_save_ccf (stack worker), so holding the file handle open
-    # would block concurrent writes on Windows.
-    da = ds.CCF.load()
-    ds.close()
-    return da
+    return ds.CCF
 
 
 
@@ -282,7 +282,7 @@ def xr_get_ccf_daily(root, lineage, step_name, station1, station2, components, d
                       f"{station1}_{station2}", f"{date}.nc")
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
-    ds = xr.load_dataset(fn)
+    ds = xr.open_dataset(fn)
     return ds["CCF"]
 
 
@@ -325,12 +325,10 @@ def xr_get_ref(root, lineage, station1, station2, components, taxis, ignore_netw
             # logging.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
             raise FileNotFoundError(fullpath)
     ds = _xr_create_or_open(fullpath, taxis, name="REF", lazy=True)
-    # Materialise and close immediately — this file is also a write
-    # target (xr_save_ref), so holding the handle open would block
-    # concurrent writes on Windows and cause PermissionError on Linux.
-    da = ds.REF.load()
-    ds.close()
-    return xr.Dataset({"REF": da})
+    # xr_save_ref (writer: s04_stack_refstack) and xr_get_ref (readers: s05/s08/s10)
+    # operate on strictly disjoint workflow steps — no concurrent access, lazy is safe.
+    # Returns DataArray directly: all callers immediately do .REF.values anyway.
+    return ds.REF
 
 
 def xr_load_ccf_for_stack(root, lineage_names, station1, station2, components, dates):
@@ -595,7 +593,7 @@ def xr_get_ccf_all(root, lineage, step_name, station1, station2,
                       f"{station1}_{station2}", f"{date}.nc")
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
-    ds = xr.load_dataset(fn)
+    ds = xr.open_dataset(fn)
     return ds["CCF"]
 
 

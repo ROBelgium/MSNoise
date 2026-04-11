@@ -216,7 +216,7 @@ def main(loglevel="INFO"):
                 try:
                     ref = xr_get_ref(root, lineage_names,
                                      station1, station2, components, taxis)
-                    ref = ref.REF.values.copy()
+                    ref = ref.values.copy()
                 except FileNotFoundError as fullpath:
                     logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
                     continue
