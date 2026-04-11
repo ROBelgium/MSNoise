@@ -284,7 +284,7 @@ The data_structure.py file contains the known data archive formats. If another
 data format needs to be defined, it will be done in the ``custom.py`` file
 in the current project folder:
 
-.. seealso:: Check the "Populate Station Table" step in the :doc:`workflow/002_populate`.
+.. seealso:: Check the "Populate Station Table" step in the :doc:`workflow_000/002_populate`.
 
 
 How to have MSNoise work with 2+ data structures at the same time

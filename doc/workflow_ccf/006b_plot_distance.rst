@@ -3,3 +3,4 @@
 -----------------------------
 
 .. automodule:: msnoise.plots.distance
+   :no-index:

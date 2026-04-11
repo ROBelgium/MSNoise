@@ -3,4 +3,6 @@
 Populate Station Table
 ----------------------
 
-.. automodule:: msnoise.s002populate_station_table
+.. note::
+
+   This module was removed in MSNoise 2.0.

@@ -1,16 +1,51 @@
 name: Build Documentation
 
-on: [push]
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  run_tests:
+  build_doc:
     runs-on: ubuntu-latest
-    if: "contains(github.event.head_commit.message, '+DOCS')"
+    if: |
+      !contains(github.event.head_commit.message, '+NODOCS')
 
     steps:
-    - uses: actions/checkout@v6
-    
-    - name: Say Hello Docs
-      run: |
-        echo "Hello doc builder"
+      - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install MSNoise + doc dependencies
+        run: |
+          pip install -e .
+          pip install -r doc/requirements.txt
+
+      - name: Build HTML docs
+        working-directory: doc
+        run: |
+          sphinx-build -b html -W --keep-going -n . .build/html 2>&1 | tee build.log
+          # Fail if there are errors (sphinx-build -W promotes warnings to errors)
+          # but --keep-going lets it finish and show all issues at once
+
+      - name: Upload doc build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sphinx-build-log
+          path: doc/build.log
+
+      - name: Upload built docs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: html-docs
+          path: doc/.build/html/
+          retention-days: 14

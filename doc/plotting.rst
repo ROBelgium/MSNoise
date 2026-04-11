@@ -95,7 +95,7 @@ Distance Plot
 dv/v Plot
 ---------
 
-.. automodule:: msnoise.plots.dvv
+.. automodule:: msnoise.plots.mwcs_dtt_dvv
 
 dt/t Plot
 ---------

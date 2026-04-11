@@ -1,4 +1,5 @@
 → Plot dv/v from Stretching
 ---------------------------
 
-.. automodule:: msnoise.plots.dvvs
+.. automodule:: msnoise.plots.stretching_dvvs
+   :no-index:

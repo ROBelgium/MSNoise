@@ -2,7 +2,7 @@
 .. warning:: if using only ``mov_stack`` = 1, no MWCS jobs is inserted in the
     database and consequently, no MWCS calculation will be done! FIX!
 
-Following Clarke et al (2011), we apply the :ref:`mwcs`
+Following Clarke et al (2011), we apply the MWCS
 to study the relative dephasing between Moving-Window stacks ("Current") and a
 Reference using Moving-Window Cross-Spectral analysis. The *jobs* "T"o do have
 been inserted in the datavase during the stack procedure.

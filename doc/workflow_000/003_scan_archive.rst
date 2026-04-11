@@ -3,4 +3,4 @@
 Scan Archive
 ------------
 
-.. automodule:: msnoise.s01scan_archive
+.. automodule:: msnoise.s01_scan_archive

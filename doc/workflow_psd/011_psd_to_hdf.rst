@@ -3,4 +3,6 @@
 Merge PSDs to a HDF DataFrame
 -----------------------------
 
-.. automodule::  msnoise.psd_to_hdf
+.. note::
+
+   This module was removed in MSNoise 2.0.

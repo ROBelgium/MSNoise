@@ -66,7 +66,7 @@ this step:
 * |preprocess.resampling_method|
 * |preprocess.remove_response|
 * |global.response_path|
-* |global.response_prefilt|
+* |preprocess.response_prefilt|
 * |preprocess.preprocess_lowpass|
 * |preprocess.preprocess_highpass|
 * |preprocess.preprocess_max_gap|

@@ -2,6 +2,7 @@ Core Modules
 ============
 
 .. module:: msnoise
+   :no-index:
 
 The ``msnoise.core`` package contains all internal implementation modules.
 Plugin authors should import from :mod:`msnoise.plugins` for a stable API.

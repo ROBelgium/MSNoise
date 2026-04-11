@@ -105,7 +105,7 @@ The plugin system is now fully topology-aware.  Plugins can:
 - Import from the stable :mod:`msnoise.plugins` surface instead of
   ``msnoise.core.*``.
 
-See :ref:`plugins` for the full guide.
+See :doc:`../plugins` for the full guide.
 
 
 Removed / renamed

@@ -13,12 +13,14 @@
 import os
 
 import sys
-sys.path.append(r"C:\Program Files (x86)\Graphviz2.38\bin")
-
-import sphinx_gallery
+try:
+    import sphinx_gallery  # noqa: F401
+    _HAS_GALLERY = True
+except ImportError:
+    _HAS_GALLERY = False
 
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')  # headless-safe backend for CI
 
 # msnoise.move2obspy and msnoise.preprocessing no longer exist at these paths
 # (moved to msnoise.core in 2.x) — imports removed.
@@ -34,7 +36,8 @@ import glob as _glob
 # Each alias uses the format |category.param_name| so readers immediately know
 # which config set the parameter belongs to. Example:
 #   |cc.cc_sampling_rate| → ``cc.cc_sampling_rate`` : Sampling Rate... (default=20.0)
-_config_dir = os.path.join(os.path.dirname(__file__), "..", "msnoise", "config")
+_this_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in dir() else os.getcwd()
+_config_dir = os.path.join(_this_dir, "..", "msnoise", "config")
 _alias_lines = []
 for _fn in sorted(_glob.glob(os.path.join(_config_dir, "config_*.csv"))):
     _cat = os.path.basename(_fn).replace("config_", "").replace(".csv", "")
@@ -122,21 +125,25 @@ out.close()
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.intersphinx',
-              'sphinx.ext.autodoc',
-              'sphinx.ext.coverage',
-              'sphinx.ext.mathjax',
-              'sphinx.ext.todo',
-              'sphinx.ext.graphviz',
-              'numpydoc',
-              'sphinx_gallery.gen_gallery',]
+extensions = [
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.coverage',
+    'sphinx.ext.mathjax',
+    'sphinx.ext.todo',
+    'sphinx.ext.graphviz',
+    'numpydoc',
+    *([ 'sphinx_gallery.gen_gallery'] if _HAS_GALLERY else []),
+]
 
 sphinx_gallery_conf = {
-     'examples_dirs': '../examples',   # path to your example scripts
-     'gallery_dirs': 'auto_examples',  # path where to save gallery generated examples
+     'examples_dirs': '../examples',
+     'gallery_dirs': 'auto_examples',
      'show_memory': False,
      'thumbnail_size': (400, 400),
-}
+     # Skip jupytext-format notebooks (no sphinx-gallery docstring)
+     'ignore_pattern': r'(nb_|/conf\.py)',
+} if _HAS_GALLERY else {}
 intersphinx_cache_limit = 5
 
 math_number_all = False
@@ -203,6 +210,12 @@ pygments_style = 'sphinx'
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
 autodoc_member_order = 'bysource'
+
+# Mock modules that require a live DB connection or display at import time
+autodoc_mock_imports = []
+
+# Suppress warnings for modules that can't be imported in CI
+suppress_warnings = ['autodoc.import_object']
 
 # -- Options for HTML output ---------------------------------------------------
 
@@ -302,7 +315,7 @@ htmlhelp_basename = 'MSNoisedoc'
 
 latex_elements = {
     'preamble': '''
-\setcounter{tocdepth}{2}
+\\setcounter{tocdepth}{2}
 ''',
     # disable font inclusion
     'fontpkg': '',

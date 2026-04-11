@@ -4,3 +4,4 @@
 ------------------
 
 .. automodule:: msnoise.plots.station_map
+   :no-index:

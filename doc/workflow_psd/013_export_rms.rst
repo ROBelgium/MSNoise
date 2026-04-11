@@ -3,4 +3,6 @@
 Export RMS from H5 to CSV
 -------------------------
 
-.. automodule::  msnoise.psd_export_rms
+.. note::
+
+   This module was removed in MSNoise 2.0.

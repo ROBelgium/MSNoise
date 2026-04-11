@@ -1,7 +1,18 @@
-sphinx>=4.2.0
-sphinx_rtd_theme
+# Sphinx doc build requirements
+sphinx>=5.0
+sphinx-rtd-theme
+numpydoc
+sphinx-gallery
+# MSNoise runtime deps needed for autodoc + conf.py CLI generation
+click
+click-plugins
+click-command-tree
 matplotlib
-numpy # required by cartopy
-cython # required by cartopy
 obspy
-sphinx_gallery
+numpy
+scipy
+sqlalchemy
+xarray
+pandas
+logbook
+markdown
