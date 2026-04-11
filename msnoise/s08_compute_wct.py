@@ -45,13 +45,59 @@ import time
 import numpy as np
 import xarray as xr
 from .core.db import connect, get_logger
-from .core.workflow import (compute_rolling_ref, extend_days, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, refstack_is_rolling)
-from .core.signal import xwt, prepare_ref_wct, apply_wct, get_wavelet_type
-from .core.io import xr_get_ccf, xr_get_ref, xr_save_wct
+from .core.workflow import (compute_rolling_ref, extend_days, get_next_lineage_batch,
+                             get_step_successors, get_t_axis, is_next_job_for_step,
+                             massive_update_job, propagate_downstream,
+                             refstack_is_rolling, resolve_lineage_params)
+from .core.signal import xwt, prepare_ref_wct, apply_wct, get_wavelet_type, compute_wct_dtt, get_wct_avgcoh
+from .core.io import xr_get_ccf, xr_get_ref, xr_save_wct, xr_save_wct_dtt
 
 def main(loglevel="INFO"):
-    """
-    Main function to process WCT jobs using lineage-based approach
+    """Compute Wavelet Coherence Transform (WCT) and optionally dt/t inline.
+
+    **Frequency sampling** (``wct_nptsfreq`` and ``wct_vpo`` config parameters)
+
+    The CWT samples ``nptsfreq`` scales linearly between ``wct_freqmin`` and
+    ``wct_freqmax``.  Because the Morlet wavelet only resolves ~1/vpo octaves
+    per scale, adjacent bins are correlated — the number of *independent* scales
+    is approximately ``vpo × log2(freqmax / freqmin)``.  For the default 0.1–1.0
+    Hz band at ``vpo=12`` that is ~40 independent scales; the previous default
+    of ``nptsfreq=300`` at ``vpo=20`` computed >7× more scales than the wavelet
+    can independently resolve, tripling CWT cost with no scientific benefit.
+    Default values have been revised: ``nptsfreq=100``, ``vpo=12``.
+
+    **Fused mode** (``wct_compute_dtt=True``, the default)
+
+    In fused mode all downstream ``wavelet_dtt_N`` config sets are resolved at
+    the start of each batch.  For each day, immediately after calling
+    :func:`~msnoise.core.signal.apply_wct`, the WCT arrays (``WXamp``,
+    ``Wcoh``, ``WXdt``) are passed directly to
+    :func:`~msnoise.core.signal.compute_wct_dtt` and
+    :func:`~msnoise.core.signal.get_wct_avgcoh` for every downstream config.
+    Only the compact ``DTT/ERR/COH`` dataset (per frequency, per day) is written
+    to disk — the full 3-D WCT arrays are **never stored**.
+
+    Storage comparison (1 pair × 1 component × 1 year, default params):
+
+    * WCT file (``WXamp + Wcoh + WXdt``, 365 × 100 × 4801 samples):
+      ~700 MB raw, ~280 MB compressed (float32 + zlib-4).
+    * DTT file (``DTT + ERR + COH``, 365 × freq_subset):
+      ~150 KB compressed — roughly **2000× smaller**.
+
+    For a network with 50 pairs × 3 components × 3 mov_stacks the saving is
+    ~125 GB of intermediate WCT storage per year.
+
+    Multiple downstream ``wavelet_dtt`` config sets (e.g. ``wavelet_dtt_1``
+    with 0.1–0.5 Hz and ``wavelet_dtt_2`` with 0.5–1.0 Hz) are all computed
+    in a single pass through the data — each WCT array slice is used by all
+    configs before being discarded.
+
+    **Standard mode** (``wct_compute_dtt=False``)
+
+    The full WCT arrays are stored in NetCDF files under the ``wavelet`` step
+    output folder.  Use this when you want to re-run ``wavelet_dtt`` with
+    different parameters (freqmin, freqmax, mincoh, coda_cycles, etc.) without
+    recomputing the CWT, or when you need the 2-D WCT images for inspection.
     """
     global logger
     logger = get_logger('msnoise.wavelet', loglevel, with_pid=True)
@@ -110,8 +156,56 @@ def main(loglevel="INFO"):
 
         logger.info(f"WCT params: freqmin={freqmin} freqmax={freqmax} ns={ns} nt={nt} vpo={vpo}")
 
+        # ── Fused mode: resolve all downstream wavelet_dtt configs ───────────
+        compute_dtt_inline = bool(getattr(params.wavelet, "wct_compute_dtt", True))
+        dtt_configs = []  # list of (dtt_step, dtt_params) for all wavelet_dtt_N
+        if compute_dtt_inline:
+            for dtt_step in get_step_successors(db, step.step_id):
+                if dtt_step.category != "wavelet_dtt":
+                    continue
+                dtt_lineage = batch["lineage_names"] + [dtt_step.step_name]
+                try:
+                    _, _, dtt_params = resolve_lineage_params(db, dtt_lineage)
+                    dtt_configs.append((dtt_step, dtt_params, dtt_lineage))
+                except Exception as e:
+                    logger.warning(
+                        f"Could not resolve params for {dtt_step.step_name}: {e}; "
+                        "will fall back to storing WCT files."
+                    )
+            if dtt_configs:
+                logger.info(
+                    f"Fused mode: computing DTT inline for "
+                    f"{[d[0].step_name for d in dtt_configs]}"
+                )
+            else:
+                logger.warning(
+                    "wct_compute_dtt=True but no wavelet_dtt steps found downstream; "
+                    "falling back to storing WCT files."
+                )
+                compute_dtt_inline = False
+
         # Build the mother wavelet object once — same for all components/stacks/days
         mother = get_wavelet_type(wavelet_type)
+
+        # Pre-compute interstation distance for fused dynamic-lag DTT
+        _dist = 0.0
+        if compute_dtt_inline and dtt_configs:
+            _needs_dist = any(
+                str(d[1].wavelet_dtt.wct_lag or "static") == "dynamic"
+                for d in dtt_configs
+            )
+            if _needs_dist:
+                try:
+                    from .core.stations import get_station, get_interstation_distance
+                    n1, s1_, l1 = station1.split(".")
+                    n2, s2_, l2 = station2.split(".")
+                    _sta1 = get_station(db, n1, s1_)
+                    _sta2 = get_station(db, n2, s2_)
+                    if _sta1 and _sta2 and station1 != station2:
+                        _dist = get_interstation_distance(
+                            _sta1, _sta2, _sta1.coordinates)
+                except Exception as _e:
+                    logger.debug(f"Could not compute interstation distance: {_e}")
 
         for component in components_to_compute:
             rolling_mode = refstack_is_rolling(params)
@@ -158,6 +252,11 @@ def main(loglevel="INFO"):
                 WXcoh_list = []
                 WXdt_list = []
                 dates_list = []
+                # Fused mode: per-wavelet_dtt accumulation — {dtt_step_name: {rows}}
+                dtt_accum = {
+                    d[0].step_name: {"dtt": [], "err": [], "coh": [], "freqs_subset": None}
+                    for d in dtt_configs
+                } if compute_dtt_inline else {}
 
                 try:
                     data = xr_get_ccf(root, lineage_names_mov, station1, station2,
@@ -210,15 +309,114 @@ def main(loglevel="INFO"):
                                 int(ns), float(nt), int(vpo),
                                 freqmin, freqmax, int(nptsfreq), wavelet_type
                             )
-                        WXamp_list.append(WXamp)
-                        WXcoh_list.append(Wcoh)
-                        WXdt_list.append(WXdt)
-                        dates_list.append(date)
+                        if compute_dtt_inline and dtt_configs:
+                            # Fused: compute DTT for each downstream config now,
+                            # while WXamp/Wcoh/WXdt are hot in memory
+                            for dtt_step, dtt_params, _dtt_lin in dtt_configs:
+                                sname = dtt_step.step_name
+                                acc   = dtt_accum[sname]
+                                _fp  = dtt_params.wavelet_dtt
+                                _lag_type = str(_fp.wct_lag or "static")
+                                _lag_min  = (_dist / _fp.wct_v
+                                             if _lag_type == "dynamic" and _fp.wct_v > 0
+                                             else _fp.wct_minlag)
+                                try:
+                                    dtt_row, err_row, _ = compute_wct_dtt(
+                                        freqs, taxis,
+                                        WXamp, Wcoh, WXdt,
+                                        lag_min=_lag_min,
+                                        coda_cycles=int(_fp.wct_codacycles),
+                                        mincoh=_fp.wct_mincoh,
+                                        maxdt=_fp.wct_maxdt,
+                                        min_nonzero=_fp.wct_min_nonzero,
+                                        freqmin=_fp.wct_dtt_freqmin,
+                                        freqmax=_fp.wct_dtt_freqmax,
+                                    )
+                                    coh_row = get_wct_avgcoh(
+                                        freqs, taxis, Wcoh,
+                                        freqmin=_fp.wct_dtt_freqmin,
+                                        freqmax=_fp.wct_dtt_freqmax,
+                                        lag_min=_lag_min,
+                                        coda_cycles=int(_fp.wct_codacycles),
+                                    )
+                                    acc["dtt"].append(dtt_row)
+                                    acc["err"].append(err_row)
+                                    acc["coh"].append(coh_row)
+                                    if acc["freqs_subset"] is None:
+                                        _mask = (freqs >= _fp.wct_dtt_freqmin) & (freqs <= _fp.wct_dtt_freqmax)
+                                        acc["freqs_subset"] = freqs[_mask]
+                                except Exception as e_dtt:
+                                    logger.error(
+                                        f"Fused DTT error for {sname}/{date}: {e_dtt}"
+                                    )
+                            dates_list.append(date)
+                        else:
+                            # Standard mode: accumulate WCT arrays for file storage
+                            WXamp_list.append(WXamp)
+                            WXcoh_list.append(Wcoh)
+                            WXdt_list.append(WXdt)
+                            dates_list.append(date)
                     except Exception as e:
                         logger.error(f"Error in WCT for {date}: {str(e)}")
                         continue
 
-                if dates_list:
+                if not dates_list:
+                    continue
+
+                if compute_dtt_inline and dtt_configs:
+                    # ── Fused mode: save one WCT-DTT file per wavelet_dtt config ──
+                    dates_arr = np.array(dates_list, dtype="datetime64[ns]")
+                    sort_idx  = np.argsort(dates_arr)
+                    for dtt_step, _dtt_params, dtt_lineage in dtt_configs:
+                        sname = dtt_step.step_name
+                        acc   = dtt_accum[sname]
+                        if not acc["dtt"]:
+                            continue
+                        freqs_sub = acc["freqs_subset"]
+                        if freqs_sub is None or len(freqs_sub) == 0:
+                            logger.warning(
+                                f"No frequencies in DTT band for {sname}, skipping"
+                            )
+                            continue
+                        ds_dtt = xr.Dataset({
+                            "DTT": xr.DataArray(
+                                np.array(acc["dtt"])[sort_idx],
+                                dims=["times", "frequency"],
+                                coords={"times": dates_arr[sort_idx],
+                                        "frequency": freqs_sub},
+                            ),
+                            "ERR": xr.DataArray(
+                                np.array(acc["err"])[sort_idx],
+                                dims=["times", "frequency"],
+                                coords={"times": dates_arr[sort_idx],
+                                        "frequency": freqs_sub},
+                            ),
+                            "COH": xr.DataArray(
+                                np.array(acc["coh"])[sort_idx],
+                                dims=["times", "frequency"],
+                                coords={"times": dates_arr[sort_idx],
+                                        "frequency": freqs_sub},
+                            ),
+                        })
+                        try:
+                            # Write to the wavelet_dtt step's own output path,
+                            # using the upstream lineage (without wavelet_dtt_N)
+                            # so the path matches what s09 / wavelet_dtt_dvv expects.
+                            xr_save_wct_dtt(
+                                root, batch["lineage_names"], sname,
+                                station1, station2, component, mov_stack,
+                                taxis, ds_dtt,
+                            )
+                            logger.debug(
+                                f"Fused DTT saved: {sname}/{station1}:{station2}"
+                                f"/{component}/{mov_stack}"
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Error saving fused DTT for {sname}: {e}"
+                            )
+                else:
+                    # ── Standard mode: store full WCT arrays ─────────────────────
                     try:
                         wct_ds = xr.Dataset({
                             "WXamp": xr.DataArray(
@@ -245,6 +443,10 @@ def main(loglevel="INFO"):
 
         massive_update_job(db, jobs, "D")
         if not batch["params"].global_.hpc:
+            # In fused mode, wavelet_dtt output files are already written above.
+            # propagate_downstream still creates wavelet_dtt jobs — s09 will run
+            # and find its output already present (harmless, idempotent via
+            # _xr_insert_or_update), then propagate to wavelet_dtt_dvv.
             propagate_downstream(db, batch)
 
     db.close()

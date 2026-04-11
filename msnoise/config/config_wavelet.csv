@@ -3,7 +3,8 @@ wct_freqmin,0.1,The lower frequency bound to apply WCT,float,
 wct_freqmax,1.0,The upper frequency bound to apply WCT,float,
 wct_ns,5,Smoothing parameter in frequency,float,
 wct_nt,5,Smoothing parameter in time,float,
-wct_vpo,20,Spacing parameter between discrete scales,float,
-wct_nptsfreq,300,Number of frequency points between min and max,int,
+wct_vpo,12,Voices per octave: controls the scale resolution of the CWT. Values of 10-12 are standard in ambient-noise WCT literature and give adequate time-frequency resolution for dv/v measurements. 20 (old default) is very fine and rarely changes results while tripling computation time. Default reduced from 20 to 12.,float,
+wct_nptsfreq,100,"Number of frequency points sampled linearly between wct_freqmin and wct_freqmax. Because adjacent wavelet scales are correlated over ~1/vpo octaves, having more points than ~vpo*(log2(freqmax/freqmin)) adds no independent information. For a 0.1-1.0 Hz band at vpo=12 that is ~40 independent scales; 100 points is a safe over-sample. Default reduced from 300 (overkill).",int,
 wct_norm,True,If the REF and CCF are normalized before computing wavelet,bool,True/False
 wavelet_type,"('Morlet',6.)",Type of wavelet function used,str,
+wct_compute_dtt,True,"When True (default), compute dt/t inline during the wavelet step using ALL downstream wavelet_dtt config sets, and write only the compact DTT/ERR/COH output — no intermediate WCT files are stored on disk. This eliminates ~14000x of intermediate storage (a WCT file for a single pair/component/year is ~2.5 GB compressed vs ~175 KB for DTT). Set to False to store the full WCT arrays (WXamp, Wcoh, WXdt) for inspection or to re-run wavelet_dtt separately with different parameters without recomputing the CWT.",bool,True/False
