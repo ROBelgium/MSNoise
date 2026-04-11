@@ -8,3 +8,11 @@ msnoise.egg-info
 /.idea
 /msnoise/RELEASE-VERSION
 /data/
+
+# Sphinx generated files (created by conf.py at build time)
+doc/clickhelp/
+doc/contributors.rst
+doc/configs.hrst
+doc/defaults.rst
+doc/auto_examples/
+doc/sg_execution_times.rst
