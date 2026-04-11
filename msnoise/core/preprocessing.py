@@ -276,7 +276,7 @@ def preprocess(stations, comps, goal_day, params, responses=None, loglevel="INFO
     for istation, station in enumerate(stations):
         net, sta, loc = station.split(".")
         for comp in comps:
-            files = eval("datafiles['%s']['%s']" % (station, comp))
+            files = datafiles[station][comp]
             if len(files) != 0:
                 logger.debug("%s.%s Reading %i Files" %
                               (station, comp, len(files)))
