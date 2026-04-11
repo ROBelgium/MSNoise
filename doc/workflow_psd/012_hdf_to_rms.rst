@@ -3,4 +3,4 @@
 Compute RMS from PSDs HDF
 -------------------------
 
-.. automodule::  msnoise.psd_compute_rms
+.. automodule::  msnoise.s21_psd_compute_rms

@@ -31,7 +31,6 @@ Notebook usage::
 from __future__ import annotations
 
 import datetime
-import functools
 import textwrap
 from dataclasses import dataclass
 from typing import Callable, Optional, Union

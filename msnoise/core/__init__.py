@@ -9,7 +9,7 @@ workflow       workflow topology, job management, lineage, scheduling
 signal         DSP, preprocessing helpers, stacking, PSD RMS, Wiener filter
 io             xarray I/O for all result types (CCF/MWCS/DTT/STR/WCT/DVV/PSD)
 fdsn           FDSN/EIDA waveform fetching and DataSource helpers
-compute        core CC/whitening/MWCS computation (moved from move2obspy)
+compute        core CC/whitening/MWCS/WCT computation helpers
 preprocessing  waveform preprocessing pipeline
 
 Usage

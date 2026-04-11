@@ -855,7 +855,7 @@ def propagate_psd_rms_jobs_from_psd_done(session):
     exist.
 
     The job ``lineage`` field is set to the upstream psd step name
-    (e.g. ``"psd_1"``), so that :func:`~msnoise.psd_compute_rms.main`
+    (e.g. ``"psd_1"``), so that :func:`~msnoise.s21_psd_compute_rms.main`
     knows where to look for NC files.
 
     Called via ``msnoise new_jobs --after psd``.

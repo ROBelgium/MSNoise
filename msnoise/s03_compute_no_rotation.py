@@ -73,7 +73,7 @@ this step:
 * |preprocess.preprocess_taper_length|
 * |global.hpc|
 
-.. automodule:: msnoise.preprocessing
+.. automodule:: msnoise.core.preprocessing
 
 Computing the Cross-Correlations
 --------------------------------

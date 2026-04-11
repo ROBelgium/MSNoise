@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.fft
-from msnoise.move2obspy import myCorr
+from msnoise.core.compute import myCorr2 as myCorr
 
 
 a = np.random.random(2048)-0.5
