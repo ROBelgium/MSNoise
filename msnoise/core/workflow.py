@@ -34,7 +34,6 @@ __all__ = [
     "filter_within_daterange",
     "get_first_runnable_steps_per_branch",
     "get_step_successors",
-    "get_upstream_steps_for_step_id",
     "get_workflow_graph",
 ]
 
@@ -223,55 +222,6 @@ def _get_step_predecessors(session, step_id):
         .join(schema.WorkflowLink, schema.WorkflowStep.step_id == schema.WorkflowLink.from_step_id) \
         .filter(schema.WorkflowLink.to_step_id == step_id) \
         .filter(schema.WorkflowLink.is_active.is_(True)).all()
-
-
-
-def get_upstream_steps_for_step_id(session, step_id, topo_order=True, include_self=False):
-    """
-    Returns all upstream WorkflowStep nodes (recursive predecessors) for `step_id`.
-
-    Parameters
-    ----------
-    session : sqlalchemy.orm.session.Session
-    step_id : int
-        The step_id of the node whose upstream lineage you want.
-    topo_order : bool
-        If True (default), returns nodes in dependency order (upstream first),
-        suitable for "merge config" application.
-        If False, returns in discovery order (still de-duplicated).
-    include_self : bool
-        If True, includes the node identified by `step_id` in the returned list.
-
-    Returns
-    -------
-    list[WorkflowStep]
-        De-duplicated list of upstream steps.
-    """
-    visited = set()
-    ordered = []
-
-    def dfs(current_step_id):
-        # Direct predecessors of the current node:
-        preds = _get_step_predecessors(session, current_step_id) or []
-        for p in preds:
-            if p.step_id in visited:
-                continue
-            visited.add(p.step_id)
-            dfs(p.step_id)
-            if topo_order:
-                # post-order ensures: preprocess -> cc -> filter -> ...
-                ordered.append(p)
-            else:
-                ordered.append(p)
-
-    dfs(step_id)
-
-    if include_self:
-        self_step = session.query(WorkflowStep).filter(WorkflowStep.step_id == step_id).first()
-        if self_step is not None and self_step.step_id not in visited:
-            ordered.append(self_step)
-
-    return ordered
 
 
 
@@ -890,6 +840,11 @@ def get_next_job_for_step(
 ):
     """
     Return a claimed batch of jobs for a workflow step category.
+
+    .. note::
+        Most callers should use :func:`get_next_lineage_batch` instead, which
+        wraps this function and also resolves lineage strings, params, and
+        station-pair metadata into a ready-to-use batch dict.
 
     group_by:
       - "day": claim all jobs for the selected (step_id, jobtype, day)
