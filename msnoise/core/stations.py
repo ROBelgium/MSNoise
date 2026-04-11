@@ -301,9 +301,14 @@ def update_data_availability(session, net, sta, loc, chan, path, file, starttime
         toreturn = 1
     else:
         modified = False
-        for item in ['net', 'sta', 'loc', 'chan', 'path', 'starttime',
-                     'endtime', 'data_duration', 'gaps_duration', 'samplerate']:
-            if eval("data.%s != %s" % (item, item)):
+        local_vals = {
+            'net': net, 'sta': sta, 'loc': loc, 'chan': chan, 'path': path,
+            'starttime': starttime, 'endtime': endtime,
+            'data_duration': data_duration, 'gaps_duration': gaps_duration,
+            'samplerate': samplerate,
+        }
+        for item, val in local_vals.items():
+            if getattr(data, item) != val:
                 modified = True
                 break
         if modified:
