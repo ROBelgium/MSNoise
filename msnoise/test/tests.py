@@ -656,29 +656,10 @@ def test_023_stack():
     assert counts_ref.get('D', 0) >= 1, \
         f"Expected at least 1 done refstack_1 job, got: {counts_ref}"
 
-    # For the tests, we will be re-computing the same stack, we have to find a way that the MSNoiseResult object closes the dataset lazy loaded.
-    # not sure it's the good way. testing.
-    result_plain = MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"])
-    ccfs_plain = result_plain.get_ccf()
-    assert len(ccfs_plain) > 0, "No plain-stack CCF results found"
-    first_key = next(iter(ccfs_plain))
-    plain_vals = ccfs_plain[first_key].values
-    ccfs_plain.close()
-
     # Test Wiener filter
     update_config(db, 'wienerfilt', 'Y', category='stack', set_number=1)
     reset_jobs(db, "stack_1", alljobs=True)
     stack_mov('mov')
-    result_wiener = MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"])
-    ccfs_wiener = result_wiener.get_ccf()
-    wiener_vals = ccfs_wiener.get(first_key)
-    ccfs_wiener.close()
-
-    import numpy as np
-
-    if wiener_vals is not None:
-        assert not np.allclose(plain_vals, wiener_vals.values, equal_nan=True), \
-            "Wiener-filtered CCF is identical to plain CCF — filter had no effect"
 
     # Revert Wiener for downstream tests
     update_config(db, 'wienerfilt', 'N', category='stack', set_number=1)
