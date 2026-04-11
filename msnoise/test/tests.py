@@ -314,12 +314,16 @@ def test_004_set_and_get_filters():
 
 @pytest.mark.order(7)
 def test_005_populate_station_table():
-    from ..s00_populate_station_table import main
+    from ..core.stations import populate_stations
+    from ..core.db import connect
+    db = connect()
     try:
-        ret = main()
+        ret = populate_stations(db)
         assert ret is True
     except:
         pytest.fail()
+    finally:
+        db.close()
 
 @pytest.mark.order(8)
 def test_006_get_stations():
