@@ -1,5 +1,3 @@
-.. include:: ../configs.hrst
-
 MSNoise 1.4
 ===========
 
@@ -194,10 +192,10 @@ Instrument Response Correction
 During pre-processing of the waveforms (at ``compute_cc`` step), the instrument
 response can be corrected, based on those parameters:
 
-* |preprocess.remove_response|
-* ``response_format`` (removed in 2.x)
-* |global.response_path|
-* |preprocess.response_prefilt|
+* |remove_response|
+* |response_format|
+* |response_path|
+* |response_prefilt|
 
 Currently, only dataless seed and inventory XML are supported.
 
