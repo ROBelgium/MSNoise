@@ -46,7 +46,7 @@ import numpy as np
 import xarray as xr
 from .core.db import connect, get_logger
 from .core.workflow import (compute_rolling_ref, extend_days, get_next_lineage_batch, get_t_axis, is_next_job_for_step, massive_update_job, propagate_downstream, refstack_is_rolling)
-from .core.signal import xwt
+from .core.signal import xwt, prepare_ref_wct, apply_wct, get_wavelet_type
 from .core.io import xr_get_ccf, xr_get_ref, xr_save_wct
 
 def main(loglevel="INFO"):
@@ -101,18 +101,28 @@ def main(loglevel="INFO"):
         vpo = params.wavelet.wct_vpo
         nptsfreq = params.wavelet.wct_nptsfreq
         wct_norm = params.wavelet.wct_norm
-        wavelet_type = eval(params.wavelet.wavelet_type or "('Morlet',6.)")
+        _wt_raw = (params.wavelet.wavelet_type or "").strip()
+        try:
+            wavelet_type = tuple(eval(_wt_raw)) if _wt_raw else ("Morlet", 6.)
+        except Exception:
+            logger.warning(f"Could not parse wavelet_type {_wt_raw!r}, using Morlet(6)")
+            wavelet_type = ("Morlet", 6.)
 
         logger.info(f"WCT params: freqmin={freqmin} freqmax={freqmax} ns={ns} nt={nt} vpo={vpo}")
 
+        # Build the mother wavelet object once — same for all components/stacks/days
+        mother = get_wavelet_type(wavelet_type)
+
         for component in components_to_compute:
             rolling_mode = refstack_is_rolling(params)
+            ref_wct_data = None  # pre-computed ref CWT for Mode A (set below)
+
             if not rolling_mode:
                 # Mode A: load fixed REF from disk
                 try:
-                    ref_data = xr_get_ref(root, lineage_names, station1, station2,
-                                          component, taxis, ignore_network=True)
-                    ref = ref_data.values
+                    ref_da = xr_get_ref(root, lineage_names, station1, station2,
+                                        component, taxis, ignore_network=True)
+                    ref = ref_da.values
                     if wct_norm:
                         ori_waveform = ref / ref.max()
                     else:
@@ -126,7 +136,22 @@ def main(loglevel="INFO"):
 
                 if not len(ref):
                     continue
-            # Mode B: ori_waveform set per time-step below after data is loaded
+
+                # Pre-compute CWT + smoothed power of the reference ONCE.
+                # In Mode A the reference never changes, so we avoid repeating
+                # this O(N·S) computation for every day in the time loop.
+                try:
+                    ref_wct_data = prepare_ref_wct(
+                        ori_waveform, goal_sampling_rate,
+                        int(ns), float(nt), int(vpo),
+                        freqmin, freqmax, int(nptsfreq), mother
+                    )
+                    # Extract freqs/coi for Dataset construction later
+                    _, _, _, freqs, coi, _, _, _ = ref_wct_data
+                except Exception as e:
+                    logger.error(f"Error preparing ref WCT: {str(e)}, falling back to xwt()")
+                    ref_wct_data = None
+            # Mode B: ori_waveform and ref_wct_data set per time-step below
 
             for mov_stack in mov_stacks:
                 WXamp_list = []
@@ -153,8 +178,12 @@ def main(loglevel="INFO"):
                         data, int(params.refstack.ref_begin), int(params.refstack.ref_end)
                     )
 
+                # Materialise the full CCF array once before the time loop —
+                # avoids a disk read per iteration now that data is lazy.
+                data_np = data.values  # shape: (times, taxis)
+
                 for _i_row, date in enumerate(data.coords["times"].values):
-                    waveform = data.isel(times=_i_row).values
+                    waveform = data_np[_i_row]
                     if wct_norm:
                         new_waveform = waveform / waveform.max()
                     else:
@@ -163,13 +192,24 @@ def main(loglevel="INFO"):
                     if rolling_mode:
                         _rr = ref_rolling[_i_row]
                         ori_waveform = _rr / _rr.max() if wct_norm else _rr
+                        # Mode B: no pre-computed ref (changes every step)
+                        cur_ref_data = None
+                    else:
+                        cur_ref_data = ref_wct_data
 
                     try:
-                        WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi = xwt(
-                            ori_waveform, new_waveform, goal_sampling_rate,
-                            int(ns), float(nt), int(vpo),
-                            freqmin, freqmax, int(nptsfreq), wavelet_type
-                        )
+                        if cur_ref_data is not None:
+                            # Mode A fast path: ref CWT already computed
+                            WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi = apply_wct(
+                                cur_ref_data, new_waveform, int(ns), float(nt)
+                            )
+                        else:
+                            # Mode B or fallback: full xwt each call
+                            WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi = xwt(
+                                ori_waveform, new_waveform, goal_sampling_rate,
+                                int(ns), float(nt), int(vpo),
+                                freqmin, freqmax, int(nptsfreq), wavelet_type
+                            )
                         WXamp_list.append(WXamp)
                         WXcoh_list.append(Wcoh)
                         WXdt_list.append(WXdt)

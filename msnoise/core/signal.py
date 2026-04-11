@@ -322,9 +322,95 @@ def get_wavelet_type(wavelet_type):
 
 
 
+def prepare_ref_wct(trace_ref, fs, ns=3, nt=0.25, vpo=12,
+                    freqmin=0.1, freqmax=8.0, nptsfreq=100, mother=None):
+    """Pre-compute the CWT and smoothed power of the **reference** trace.
+
+    Call this once for a fixed reference waveform (Mode A), then pass the
+    returned tuple to :func:`apply_wct` for each current-day trace.  This
+    avoids recomputing ``cwt_reference`` and ``smoothCFS(power_ref)`` — the
+    two most expensive operations — on every iteration of the time loop.
+
+    :param trace_ref: Reference signal (1-D numpy array).
+    :param fs: Sampling frequency in Hz.
+    :param ns: Scale-axis smoothing parameter.
+    :param nt: Time-axis smoothing parameter.
+    :param vpo: Voices-per-octave.
+    :param freqmin: Lowest frequency of interest (Hz).
+    :param freqmax: Highest frequency of interest (Hz).
+    :param nptsfreq: Number of frequency points.
+    :param mother: pycwt wavelet object (from :func:`get_wavelet_type`).
+        If ``None``, defaults to ``Morlet(6)``.
+    :returns: ``(cwt_ref, cfs1, scales, freqs, coi, invscales, dt, freqlim)``
+        — an opaque tuple to pass directly to :func:`apply_wct`.
+    """
+    import pycwt as wavelet_lib
+    if mother is None:
+        mother = wavelet_lib.Morlet(6)
+    nx = np.size(trace_ref)
+    x_ref = np.transpose(trace_ref)
+    dt = 1.0 / fs
+    dj = 1.0 / vpo
+    s0 = 2 * dt
+    freqlim = np.linspace(freqmax, freqmin, num=nptsfreq, endpoint=True)
+    cwt_ref, scales, freqs, coi, _, _ = wavelet_lib.cwt(
+        x_ref, dt, dj, s0, -1, mother, freqs=freqlim)
+    scales_col = np.array([[kk] for kk in scales])
+    invscales = np.kron(np.ones((1, nx)), 1.0 / scales_col)
+    power_ref = (invscales * abs(cwt_ref) ** 2).astype(complex)
+    cfs1 = smoothCFS(power_ref, scales_col, dt, ns, nt)
+    return cwt_ref, cfs1, scales_col, freqs, coi, invscales, dt, freqlim
+
+
+def apply_wct(ref_wct_data, trace_current, ns=3, nt=0.25):
+    """Compute WCT for one current-day trace given pre-computed reference data.
+
+    :param ref_wct_data: Tuple returned by :func:`prepare_ref_wct`.
+    :param trace_current: Current-day signal (1-D numpy array, same length as ref).
+    :param ns: Scale-axis smoothing parameter (must match the value used in
+        :func:`prepare_ref_wct`).
+    :param nt: Time-axis smoothing parameter (idem).
+    :returns: ``(WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi)``
+    """
+    import pycwt as wavelet_lib
+    cwt_ref, cfs1, scales_col, freqs, coi, invscales, dt, freqlim = ref_wct_data
+    x_cur = np.transpose(trace_current)
+    # Re-derive wavelet params consistent with the reference CWT
+    dj = 1.0 / (scales_col.shape[0] - 1) if scales_col.shape[0] > 1 else 1.0
+    s0 = 2 * dt
+    nx = np.size(trace_current)
+    # Use the same freqlim from the reference call so scales are identical
+    cwt_cur, _, _, _, _, _ = wavelet_lib.cwt(
+        x_cur, dt, dj, s0, -1, wavelet_lib.Morlet(6), freqs=freqlim)
+    # Recompute invscales for current length (same as ref if length unchanged)
+    inv_cur = np.kron(np.ones((1, nx)), 1.0 / scales_col)
+    power_cur = (inv_cur * abs(cwt_cur) ** 2).astype(complex)
+    crossCFS_raw = cwt_ref * np.conj(cwt_cur)
+    WXamp = abs(crossCFS_raw)
+    cross_spectrum = (inv_cur * crossCFS_raw).astype(complex)
+    cfs2 = smoothCFS(power_cur, scales_col, dt, ns, nt)
+    crossCFS = smoothCFS(cross_spectrum, scales_col, dt, ns, nt)
+    valid_mask = (cfs1 > 0) & (cfs2 > 0)
+    WXspec = np.full_like(crossCFS, np.nan, dtype=complex)
+    Wcoh   = np.full_like(crossCFS, np.nan)
+    WXspec[valid_mask] = crossCFS[valid_mask] / (
+        np.sqrt(cfs1[valid_mask]) * np.sqrt(cfs2[valid_mask]))
+    Wcoh[valid_mask] = (abs(crossCFS[valid_mask]) ** 2
+                        / (cfs1[valid_mask] * cfs2[valid_mask]))
+    WXangle = np.angle(WXspec)
+    Wcoh = np.clip(Wcoh, 0.0, 1.0)
+    pp2 = np.array([[2 * np.pi * f] for f in freqs])
+    WXdt = WXangle / np.kron(np.ones((1, nx)), pp2)
+    return WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi
+
+
 def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12,
-         freqmin=0.1, freqmax=8.0, nptsfreq=100, wavelet_type=("Morlet", 6.)):
+        freqmin=0.1, freqmax=8.0, nptsfreq=100, wavelet_type=("Morlet", 6.)):
     """Wavelet Coherence Transform (WCT) between two time series.
+
+    Convenience wrapper around :func:`prepare_ref_wct` + :func:`apply_wct`.
+    Use those two functions directly in hot loops (Mode A fixed-REF) to avoid
+    recomputing the reference CWT on every call.
 
     :param trace_ref: Reference signal (1-D array).
     :param trace_current: Current signal (1-D array, same length).
@@ -338,45 +424,10 @@ def xwt(trace_ref, trace_current, fs, ns=3, nt=0.25, vpo=12,
     :param wavelet_type: ``(name, param)`` tuple passed to :func:`get_wavelet_type`.
     :returns: ``(WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi)``
     """
-    import pycwt as wavelet
     mother = get_wavelet_type(wavelet_type)
-    nx = np.size(trace_current)
-    x_reference = np.transpose(trace_ref)
-    x_current = np.transpose(trace_current)
-    dt = 1 / fs
-    dj = 1 / vpo
-    J = -1
-    s0 = 2 * dt
-    freqlim = np.linspace(freqmax, freqmin, num=nptsfreq, endpoint=True)
-    cwt_reference, scales, freqs, coi, fft, fftfreqs = wavelet.cwt(
-        x_reference, dt, dj, s0, J, mother, freqs=freqlim)
-    cwt_current, _, _, _, _, _ = wavelet.cwt(
-        x_current, dt, dj, s0, J, mother, freqs=freqlim)
-    scales = np.array([[kk] for kk in scales])
-    invscales = np.kron(np.ones((1, nx)), 1 / scales)
-    power_ref = (invscales * abs(cwt_reference) ** 2).astype(complex)
-    power_cur = (invscales * abs(cwt_current) ** 2).astype(complex)
-    crossCFS = cwt_reference * np.conj(cwt_current)
-    WXamp = abs(crossCFS)
-    cross_spectrum = (invscales * crossCFS).astype(complex)
-    cfs1 = smoothCFS(power_ref, scales, dt, ns, nt)
-    cfs2 = smoothCFS(power_cur, scales, dt, ns, nt)
-    crossCFS = smoothCFS(cross_spectrum, scales, dt, ns, nt)
-    mask1 = cfs1 > 0
-    mask2 = cfs2 > 0
-    valid_mask = mask1 & mask2
-    WXspec = np.full_like(crossCFS, np.nan, dtype=complex)
-    Wcoh = np.full_like(crossCFS, np.nan)
-    WXspec[valid_mask] = crossCFS[valid_mask] / (
-        np.sqrt(cfs1[valid_mask]) * np.sqrt(cfs2[valid_mask]))
-    Wcoh[valid_mask] = (abs(crossCFS[valid_mask]) ** 2
-                        / (cfs1[valid_mask] * cfs2[valid_mask]))
-    WXangle = np.angle(WXspec)
-    Wcoh = np.clip(Wcoh, 0.0, 1.0)
-    pp = 2 * np.pi * freqs
-    pp2 = np.array([[kk] for kk in pp])
-    WXdt = WXangle / np.kron(np.ones((1, nx)), pp2)
-    return WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi
+    ref_data = prepare_ref_wct(trace_ref, fs, ns, nt, vpo,
+                               freqmin, freqmax, nptsfreq, mother)
+    return apply_wct(ref_data, trace_current, ns, nt)
 
 
 
