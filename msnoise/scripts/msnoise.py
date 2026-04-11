@@ -1954,7 +1954,7 @@ def qc():
 def qc_compute_psd(ctx, chunk_size):
     """Computes the PSD jobs, saves results as NetCDF files.
        Based on New or Modified files identified by the new_jobs step."""
-    from ..psd_compute import main
+    from ..s20_psd_compute import main
     run_threaded(main, ctx, chunk_size=chunk_size)
 
 
@@ -1976,7 +1976,7 @@ def qc_plot_psd(ctx, seed_id):
 @click.pass_context
 def qc_compute_rms(ctx):
     """Computes the RMS from PSD NetCDF files."""
-    from ..psd_compute_rms import main
+    from ..s21_psd_compute_rms import main
     run_threaded(main, ctx)
 
 

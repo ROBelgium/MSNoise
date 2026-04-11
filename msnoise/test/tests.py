@@ -51,8 +51,8 @@ from ..s04_stack_refstack import main as stack_refstack_main
 from ..s05_compute_mwcs import main as compute_mwcs_main
 from ..s06_compute_mwcs_dtt import main as compute_dtt_main
 from ..s07_compute_dvv import main as compute_dvv_main
-from ..psd_compute import main as psd_compute_main
-from ..psd_compute_rms import main as compute_rms_main
+from ..s20_psd_compute import main as psd_compute_main
+from ..s21_psd_compute_rms import main as compute_rms_main
 
 from ..plots.ccftime import main as ccftime_main
 from ..plots.interferogram import main as interferogram_main

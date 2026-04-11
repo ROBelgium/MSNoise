@@ -738,7 +738,7 @@ def test_smoke_171_psd_rms_lineage(smoke_db):
 def test_smoke_172_psd_rms_params_layer(smoke_db):
     """get_next_lineage_batch for psd_rms must build MSNoiseParams with 'psd_rms' layer.
 
-    Exercises the full params.psd_rms.* access path that psd_compute_rms.py
+    Exercises the full params.psd_rms.* access path that s21_psd_compute_rms.py
     uses at runtime — verifying that the lineage fix flows through to the
     MSNoiseParams construction.
     """
