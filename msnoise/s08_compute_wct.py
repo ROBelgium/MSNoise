@@ -49,7 +49,8 @@ from .core.workflow import (compute_rolling_ref, extend_days, get_next_lineage_b
                              get_step_successors, get_t_axis, is_next_job_for_step,
                              massive_update_job, propagate_downstream,
                              refstack_is_rolling, resolve_lineage_params)
-from .core.signal import xwt, prepare_ref_wct, apply_wct, get_wavelet_type, compute_wct_dtt, get_wct_avgcoh
+from .core.signal import xwt, prepare_ref_wct, apply_wct, get_wavelet_type
+from .core.compute import compute_wct_dtt_batch, build_wct_dtt_dataset
 from .core.io import xr_get_ccf, xr_get_ref, xr_save_wct, xr_save_wct_dtt
 
 def main(loglevel="INFO"):
@@ -315,36 +316,16 @@ def main(loglevel="INFO"):
                             for dtt_step, dtt_params, _dtt_lin in dtt_configs:
                                 sname = dtt_step.step_name
                                 acc   = dtt_accum[sname]
-                                _fp  = dtt_params.wavelet_dtt
-                                _lag_type = str(_fp.wct_lag or "static")
-                                _lag_min  = (_dist / _fp.wct_v
-                                             if _lag_type == "dynamic" and _fp.wct_v > 0
-                                             else _fp.wct_minlag)
                                 try:
-                                    dtt_row, err_row, _ = compute_wct_dtt(
-                                        freqs, taxis,
-                                        WXamp, Wcoh, WXdt,
-                                        lag_min=_lag_min,
-                                        coda_cycles=int(_fp.wct_codacycles),
-                                        mincoh=_fp.wct_mincoh,
-                                        maxdt=_fp.wct_maxdt,
-                                        min_nonzero=_fp.wct_min_nonzero,
-                                        freqmin=_fp.wct_dtt_freqmin,
-                                        freqmax=_fp.wct_dtt_freqmax,
-                                    )
-                                    coh_row = get_wct_avgcoh(
-                                        freqs, taxis, Wcoh,
-                                        freqmin=_fp.wct_dtt_freqmin,
-                                        freqmax=_fp.wct_dtt_freqmax,
-                                        lag_min=_lag_min,
-                                        coda_cycles=int(_fp.wct_codacycles),
+                                    dtt_row, err_row, coh_row, freqs_sub = compute_wct_dtt_batch(
+                                        freqs, taxis, WXamp, Wcoh, WXdt,
+                                        dtt_params, dist=_dist,
                                     )
                                     acc["dtt"].append(dtt_row)
                                     acc["err"].append(err_row)
                                     acc["coh"].append(coh_row)
                                     if acc["freqs_subset"] is None:
-                                        _mask = (freqs >= _fp.wct_dtt_freqmin) & (freqs <= _fp.wct_dtt_freqmax)
-                                        acc["freqs_subset"] = freqs[_mask]
+                                        acc["freqs_subset"] = freqs_sub
                                 except Exception as e_dtt:
                                     logger.error(
                                         f"Fused DTT error for {sname}/{date}: {e_dtt}"
@@ -365,8 +346,6 @@ def main(loglevel="INFO"):
 
                 if compute_dtt_inline and dtt_configs:
                     # ── Fused mode: save one WCT-DTT file per wavelet_dtt config ──
-                    dates_arr = np.array(dates_list, dtype="datetime64[ns]")
-                    sort_idx  = np.argsort(dates_arr)
                     for dtt_step, _dtt_params, dtt_lineage in dtt_configs:
                         sname = dtt_step.step_name
                         acc   = dtt_accum[sname]
@@ -378,26 +357,10 @@ def main(loglevel="INFO"):
                                 f"No frequencies in DTT band for {sname}, skipping"
                             )
                             continue
-                        ds_dtt = xr.Dataset({
-                            "DTT": xr.DataArray(
-                                np.array(acc["dtt"])[sort_idx],
-                                dims=["times", "frequency"],
-                                coords={"times": dates_arr[sort_idx],
-                                        "frequency": freqs_sub},
-                            ),
-                            "ERR": xr.DataArray(
-                                np.array(acc["err"])[sort_idx],
-                                dims=["times", "frequency"],
-                                coords={"times": dates_arr[sort_idx],
-                                        "frequency": freqs_sub},
-                            ),
-                            "COH": xr.DataArray(
-                                np.array(acc["coh"])[sort_idx],
-                                dims=["times", "frequency"],
-                                coords={"times": dates_arr[sort_idx],
-                                        "frequency": freqs_sub},
-                            ),
-                        })
+                        ds_dtt = build_wct_dtt_dataset(
+                            dates_list, acc["dtt"], acc["err"], acc["coh"],
+                            acc["freqs_subset"],
+                        )
                         try:
                             # Write to the wavelet_dtt step's own output path,
                             # using the upstream lineage (without wavelet_dtt_N)

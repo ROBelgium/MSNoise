@@ -10,6 +10,9 @@ __all__ = [
     "smooth",
     "whiten",
     "whiten2",
+    "compute_wct_dtt_batch",
+    "resolve_wct_lag_min",
+    "build_wct_dtt_dataset",
 ]
 
 import logging
@@ -491,3 +494,106 @@ segment.
 
     return np.array([time_axis, delta_t, delta_err, delta_mcoh]).T
 
+
+
+# ── WCT-DTT helpers (shared between s08 fused mode and s09) ─────────────────
+
+
+def resolve_wct_lag_min(dtt_params, dist: float) -> float:
+    """Resolve the coda lag minimum for WCT dt/t computation.
+
+    :param dtt_params: Params object with ``wavelet_dtt`` attributes.
+    :param dist: Interstation distance in km (used for dynamic lag).
+    :returns: Lag minimum in seconds.
+    """
+    lag_type = str(getattr(dtt_params.wavelet_dtt, "wct_lag", None) or "static")
+    v = float(getattr(dtt_params.wavelet_dtt, "wct_v", 1.0) or 1.0)
+    minlag = float(getattr(dtt_params.wavelet_dtt, "wct_minlag", 5.0))
+    if lag_type == "dynamic" and v > 0:
+        return dist / v
+    return minlag
+
+
+def compute_wct_dtt_batch(freqs, taxis, WXamp, Wcoh, WXdt, dtt_params, dist: float = 0.0):
+    """Compute WCT dt/t and average coherence for one time-step.
+
+    Shared implementation used by both the fused path in s08 (where WXamp/Wcoh/WXdt
+    are freshly computed in memory) and the standalone s09 path (where they are
+    loaded from a WCT NetCDF file).
+
+    :param freqs: 1-D frequency array from the WCT (Hz).
+    :param taxis: 1-D lag-time axis array (s).
+    :param WXamp: 2-D cross-wavelet amplitude array ``(freqs, taxis)``.
+    :param Wcoh: 2-D wavelet coherence array ``(freqs, taxis)``.
+    :param WXdt: 2-D time-delay array ``(freqs, taxis)``.
+    :param dtt_params: Merged params object containing ``wavelet_dtt.*`` attributes.
+    :param dist: Interstation distance in km (for dynamic lag). Default 0.
+    :returns: Tuple ``(dtt_row, err_row, coh_row, freqs_subset)`` where
+        *dtt_row* and *err_row* are 1-D arrays over the DTT frequency subset
+        and *coh_row* is the average coherence per frequency bin.
+    """
+    from .signal import compute_wct_dtt, get_wct_avgcoh
+
+    fp = dtt_params.wavelet_dtt
+    lag_min = resolve_wct_lag_min(dtt_params, dist)
+    freqmin = fp.wct_dtt_freqmin
+    freqmax = fp.wct_dtt_freqmax
+    coda_cycles = int(fp.wct_codacycles)
+
+    dtt_row, err_row, _ = compute_wct_dtt(
+        freqs, taxis, WXamp, Wcoh, WXdt,
+        lag_min=lag_min,
+        coda_cycles=coda_cycles,
+        mincoh=fp.wct_mincoh,
+        maxdt=fp.wct_maxdt,
+        min_nonzero=fp.wct_min_nonzero,
+        freqmin=freqmin,
+        freqmax=freqmax,
+    )
+    coh_row = get_wct_avgcoh(
+        freqs, taxis, Wcoh,
+        freqmin=freqmin,
+        freqmax=freqmax,
+        lag_min=lag_min,
+        coda_cycles=coda_cycles,
+    )
+    mask = (freqs >= freqmin) & (freqs <= freqmax)
+    freqs_subset = freqs[mask]
+    return dtt_row, err_row, coh_row, freqs_subset
+
+
+def build_wct_dtt_dataset(dates_list, dtt_rows, err_rows, coh_rows, freqs_subset):
+    """Build a sorted xarray Dataset of WCT dt/t results.
+
+    Shared between the fused save path in s08 and the save path in s09.
+
+    :param dates_list: List of datetime64 timestamps.
+    :param dtt_rows: List of 1-D dt/t arrays (one per date).
+    :param err_rows: List of 1-D error arrays.
+    :param coh_rows: List of 1-D average-coherence arrays.
+    :param freqs_subset: 1-D frequency array for the DTT band.
+    :returns: :class:`xarray.Dataset` with variables ``DTT``, ``ERR``, ``COH``
+        and dims ``(times, frequency)``, sorted by ``times``.
+    """
+    import numpy as np
+    import xarray as xr
+
+    dates_arr = np.array(dates_list, dtype="datetime64[ns]")
+    sort_idx  = np.argsort(dates_arr)
+    return xr.Dataset({
+        "DTT": xr.DataArray(
+            np.array(dtt_rows)[sort_idx],
+            dims=["times", "frequency"],
+            coords={"times": dates_arr[sort_idx], "frequency": freqs_subset},
+        ),
+        "ERR": xr.DataArray(
+            np.array(err_rows)[sort_idx],
+            dims=["times", "frequency"],
+            coords={"times": dates_arr[sort_idx], "frequency": freqs_subset},
+        ),
+        "COH": xr.DataArray(
+            np.array(coh_rows)[sort_idx],
+            dims=["times", "frequency"],
+            coords={"times": dates_arr[sort_idx], "frequency": freqs_subset},
+        ),
+    })

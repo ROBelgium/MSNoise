@@ -25,12 +25,11 @@ To run this step:
 import time
 
 import numpy as np
-import xarray as xr
 
 from .core.db import connect, get_logger
 from .core.stations import get_interstation_distance, get_station_pairs
 from .core.workflow import (extend_days, get_next_lineage_batch, is_next_job_for_step, massive_update_job, propagate_downstream)
-from .core.signal import compute_wct_dtt, get_wct_avgcoh
+from .core.compute import compute_wct_dtt_batch, build_wct_dtt_dataset
 from .core.io import xr_load_wct, xr_save_wct_dtt
 
 
@@ -101,24 +100,12 @@ def main(loglevel="INFO"):
         # Fall back to wavelet-step freq bounds when dtt-specific bounds are unset.
         dtt_freqmin = params.wavelet_dtt.wct_dtt_freqmin
         dtt_freqmax = params.wavelet_dtt.wct_dtt_freqmax
-        minlag = params.wavelet_dtt.wct_minlag
-        lag_type = str(params.wavelet_dtt.wct_lag or 'static')
-        v = params.wavelet_dtt.wct_v
-        mincoh = params.wavelet_dtt.wct_mincoh
-        maxdt = params.wavelet_dtt.wct_maxdt
-        coda_cycles = int(params.wavelet_dtt.wct_codacycles)
-        min_nonzero = params.wavelet_dtt.wct_min_nonzero
 
         # Resolve interstation distance for dynamic lag
         n1, s1, _l1 = station1.split(".")
         n2, s2, _l2 = station2.split(".")
         dpair = "%s_%s_%s_%s" % (n1, s1, n2, s2)
         dist = interstations.get(dpair, 0.0)
-
-        if lag_type == "dynamic" and v > 0:
-            lag_min = dist / v
-        else:
-            lag_min = minlag
 
         for component in components_to_compute:
             for mov_stack in mov_stacks:
@@ -172,17 +159,9 @@ def main(loglevel="INFO"):
                     WXdt_i = ds["WXdt"].values[i]
 
                     try:
-                        dtt, err, _ = compute_wct_dtt(
+                        dtt, err, coh, freqs_subset = compute_wct_dtt_batch(
                             freqs, taxis, WXamp_i, Wcoh_i, WXdt_i,
-                            lag_min=lag_min, coda_cycles=coda_cycles,
-                            mincoh=mincoh, maxdt=maxdt,
-                            min_nonzero=min_nonzero,
-                            freqmin=dtt_freqmin, freqmax=dtt_freqmax,
-                        )
-                        coh = get_wct_avgcoh(
-                            freqs, taxis, Wcoh_i,
-                            freqmin=dtt_freqmin, freqmax=dtt_freqmax,
-                            lag_min=lag_min, coda_cycles=coda_cycles,
+                            params, dist=dist,
                         )
                     except Exception as e:
                         logger.error(
@@ -204,30 +183,8 @@ def main(loglevel="INFO"):
                     )
                     continue
 
-                # Build output Dataset directly — no DataFrame round-trip
-                dates_arr = np.array(dates_out, dtype="datetime64[ns]")
-                sort_idx  = np.argsort(dates_arr)
-                ds_out = xr.Dataset(
-                    {
-                        "DTT": xr.DataArray(
-                            np.array(dtt_rows)[sort_idx],
-                            dims=["times", "frequency"],
-                            coords={"times": dates_arr[sort_idx],
-                                    "frequency": freqs_subset},
-                        ),
-                        "ERR": xr.DataArray(
-                            np.array(err_rows)[sort_idx],
-                            dims=["times", "frequency"],
-                            coords={"times": dates_arr[sort_idx],
-                                    "frequency": freqs_subset},
-                        ),
-                        "COH": xr.DataArray(
-                            np.array(coh_rows)[sort_idx],
-                            dims=["times", "frequency"],
-                            coords={"times": dates_arr[sort_idx],
-                                    "frequency": freqs_subset},
-                        ),
-                    }
+                ds_out = build_wct_dtt_dataset(
+                    dates_out, dtt_rows, err_rows, coh_rows, freqs_subset,
                 )
 
                 try:
