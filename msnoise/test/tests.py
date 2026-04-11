@@ -658,21 +658,21 @@ def test_023_stack():
 
     # For the tests, we will be re-computing the same stack, we have to find a way that the MSNoiseResult object closes the dataset lazy loaded.
     # not sure it's the good way. testing.
-    with MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"]) as result_plain:
-        ccfs_plain = result_plain.get_ccf()
-        assert len(ccfs_plain) > 0, "No plain-stack CCF results found"
-        first_key = next(iter(ccfs_plain))
-        plain_vals = ccfs_plain[first_key].values
-        ccfs_plain.close()
+    result_plain = MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"])
+    ccfs_plain = result_plain.get_ccf()
+    assert len(ccfs_plain) > 0, "No plain-stack CCF results found"
+    first_key = next(iter(ccfs_plain))
+    plain_vals = ccfs_plain[first_key].values
+    ccfs_plain.close()
 
     # Test Wiener filter
     update_config(db, 'wienerfilt', 'Y', category='stack', set_number=1)
     reset_jobs(db, "stack_1", alljobs=True)
     stack_mov('mov')
-    with MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"]) as result_wiener:
-        ccfs_wiener = result_wiener.get_ccf()
-        wiener_vals = ccfs_wiener.get(first_key)
-        ccfs_wiener.close()
+    result_wiener = MSNoiseResult(db, ["preprocess_1", "cc_1", "filter_1", "stack_1"])
+    ccfs_wiener = result_wiener.get_ccf()
+    wiener_vals = ccfs_wiener.get(first_key)
+    ccfs_wiener.close()
 
     import numpy as np
 
