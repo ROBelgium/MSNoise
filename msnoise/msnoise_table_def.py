@@ -11,108 +11,34 @@ from sqlalchemy.orm import declarative_base, declared_attr, relationship, backre
 from sqlalchemy.sql import text
 # from .api import read_prefix
 
+# Workflow topology and canonical order have moved to core/workflow.py.
+# These aliases exist for backward compatibility only.
+# New code should use get_workflow_chains() / get_workflow_order() from
+# msnoise.core.workflow for plugin-aware access.
 WORKFLOW_CHAINS = {
-    'global': {
-        'next_steps': ['preprocess', 'psd'],
-        'is_entry_point': True,
-        'is_terminal': False
-    },
-    'preprocess': {
-        'next_steps': ['cc'],
-        'is_entry_point': False,
-        'is_terminal': False
-    },
-    'psd': {
-        'next_steps': ['psd_rms'],
-        'is_entry_point': False,
-        'is_terminal': False
-    },
-    'psd_rms': {
-        'next_steps': [],
-        'is_entry_point': False,
-        'is_terminal': True
-    },
-    'cc': {
-        'next_steps': ['filter'],
-        'is_entry_point': False,
-        'is_terminal': False
-    },
-    'filter': {
-        'next_steps': ['stack'],
-        'is_entry_point': False,
-        'is_terminal': False
-    },
-    'stack': {
-        'next_steps': ['refstack'],
-        'is_entry_point': False,
-        'is_terminal': False
-    },
-    'refstack': {
-        'next_steps': ['mwcs', 'stretching', 'wavelet'],
-        'is_entry_point': False,
-        'is_terminal': False
-    },
-    'mwcs': {
-        'next_steps': ['mwcs_dtt'],
-        'is_entry_point': False,
-        'is_terminal': False
-    },
-    'mwcs_dtt': {
-        'next_steps': ['mwcs_dtt_dvv'],
-        'is_entry_point': False,
-        'is_terminal': False
-    },
-    'stretching': {
-        'next_steps': ['stretching_dvv'],
-        'is_entry_point': False,
-        'is_terminal': False
-    },
-    'wavelet': {
-        'next_steps': ['wavelet_dtt'],
-        'is_entry_point': False,
-        'is_terminal': False
-    },
-    'wavelet_dtt': {
-        'next_steps': ['wavelet_dtt_dvv'],
-        'is_entry_point': False,
-        'is_terminal': False
-    },
-    'mwcs_dtt_dvv': {
-        'next_steps': [],
-        'is_entry_point': False,
-        'is_terminal': True
-    },
-    'stretching_dvv': {
-        'next_steps': [],
-        'is_entry_point': False,
-        'is_terminal': True
-    },
-    'wavelet_dtt_dvv': {
-        'next_steps': [],
-        'is_entry_point': False,
-        'is_terminal': True
-    }
+    "global":          {"next_steps": ["preprocess", "psd"],                  "is_entry_point": True,  "is_terminal": False},
+    "preprocess":      {"next_steps": ["cc"],                                  "is_entry_point": False, "is_terminal": False},
+    "psd":             {"next_steps": ["psd_rms"],                             "is_entry_point": False, "is_terminal": False},
+    "psd_rms":         {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
+    "cc":              {"next_steps": ["filter"],                              "is_entry_point": False, "is_terminal": False},
+    "filter":          {"next_steps": ["stack"],                               "is_entry_point": False, "is_terminal": False},
+    "stack":           {"next_steps": ["refstack"],                            "is_entry_point": False, "is_terminal": False},
+    "refstack":        {"next_steps": ["mwcs", "stretching", "wavelet"],       "is_entry_point": False, "is_terminal": False},
+    "mwcs":            {"next_steps": ["mwcs_dtt"],                            "is_entry_point": False, "is_terminal": False},
+    "mwcs_dtt":        {"next_steps": ["mwcs_dtt_dvv"],                        "is_entry_point": False, "is_terminal": False},
+    "mwcs_dtt_dvv":    {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
+    "stretching":      {"next_steps": ["stretching_dvv"],                      "is_entry_point": False, "is_terminal": False},
+    "stretching_dvv":  {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
+    "wavelet":         {"next_steps": ["wavelet_dtt"],                         "is_entry_point": False, "is_terminal": False},
+    "wavelet_dtt":     {"next_steps": ["wavelet_dtt_dvv"],                     "is_entry_point": False, "is_terminal": False},
+    "wavelet_dtt_dvv": {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
 }
-
-# Canonical processing order used for sorting workflow steps in the UI and
-# during step creation.  Keep in sync with WORKFLOW_CHAINS above.
 WORKFLOW_ORDER = [
-    'global',
-    'preprocess',
-    'cc',
-    'psd',
-    'psd_rms',
-    'filter',
-    'stack',
-    'refstack',
-    'mwcs',
-    'mwcs_dtt',
-    'mwcs_dtt_dvv',
-    'stretching',
-    'stretching_dvv',
-    'wavelet',
-    'wavelet_dtt',
-    'wavelet_dtt_dvv',
+    "global", "preprocess", "cc", "psd", "psd_rms",
+    "filter", "stack", "refstack",
+    "mwcs", "mwcs_dtt", "mwcs_dtt_dvv",
+    "stretching", "stretching_dvv",
+    "wavelet", "wavelet_dtt", "wavelet_dtt_dvv",
 ]
 
 

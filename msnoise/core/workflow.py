@@ -35,6 +35,10 @@ __all__ = [
     "get_first_runnable_steps_per_branch",
     "get_step_successors",
     "get_workflow_graph",
+    "get_workflow_chains",
+    "get_workflow_order",
+    "is_terminal_category",
+    "is_entry_category",
 ]
 
 import datetime
@@ -46,8 +50,144 @@ import pandas as pd
 from .db import connect, get_logger
 from .config import (get_config, get_config_set_details,
                      get_merged_params_for_lineage, get_params)
-from ..msnoise_table_def import (Job, WorkflowStep, DataAvailability,
-                                WORKFLOW_CHAINS, WORKFLOW_ORDER, Lineage)
+from ..msnoise_table_def import Job, WorkflowStep, DataAvailability, Lineage
+
+# ── Built-in workflow topology ────────────────────────────────────────────────
+# Defines the directed adjacency of workflow categories. Plugin packages can
+# extend this via the ``msnoise.plugins.workflow_chains`` entry point group.
+# Each callable registered there must return a dict with the same schema:
+#   { category: { "next_steps": [...], "is_entry_point": bool, "is_terminal": bool } }
+
+_BUILTIN_WORKFLOW_CHAINS = {
+    "global":          {"next_steps": ["preprocess", "psd"],                  "is_entry_point": True,  "is_terminal": False},
+    "preprocess":      {"next_steps": ["cc"],                                  "is_entry_point": False, "is_terminal": False},
+    "psd":             {"next_steps": ["psd_rms"],                             "is_entry_point": False, "is_terminal": False},
+    "psd_rms":         {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
+    "cc":              {"next_steps": ["filter"],                              "is_entry_point": False, "is_terminal": False},
+    "filter":          {"next_steps": ["stack"],                               "is_entry_point": False, "is_terminal": False},
+    "stack":           {"next_steps": ["refstack"],                            "is_entry_point": False, "is_terminal": False},
+    "refstack":        {"next_steps": ["mwcs", "stretching", "wavelet"],       "is_entry_point": False, "is_terminal": False},
+    "mwcs":            {"next_steps": ["mwcs_dtt"],                            "is_entry_point": False, "is_terminal": False},
+    "mwcs_dtt":        {"next_steps": ["mwcs_dtt_dvv"],                        "is_entry_point": False, "is_terminal": False},
+    "mwcs_dtt_dvv":    {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
+    "stretching":      {"next_steps": ["stretching_dvv"],                      "is_entry_point": False, "is_terminal": False},
+    "stretching_dvv":  {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
+    "wavelet":         {"next_steps": ["wavelet_dtt"],                         "is_entry_point": False, "is_terminal": False},
+    "wavelet_dtt":     {"next_steps": ["wavelet_dtt_dvv"],                     "is_entry_point": False, "is_terminal": False},
+    "wavelet_dtt_dvv": {"next_steps": [],                                      "is_entry_point": False, "is_terminal": True },
+}
+
+# Canonical display order for UI sorting and config-set creation.
+# Plugin packages can append extra categories via the
+# ``msnoise.plugins.workflow_order`` entry point group.  Each callable must
+# return a list of category name strings in the desired insertion order.
+_BUILTIN_WORKFLOW_ORDER = [
+    "global", "preprocess", "cc", "psd", "psd_rms",
+    "filter", "stack", "refstack",
+    "mwcs", "mwcs_dtt", "mwcs_dtt_dvv",
+    "stretching", "stretching_dvv",
+    "wavelet", "wavelet_dtt", "wavelet_dtt_dvv",
+]
+
+
+def get_workflow_chains():
+    """Return the full workflow adjacency map, including any plugin extensions.
+
+    Merges the built-in topology with addenda registered via the
+    ``msnoise.plugins.workflow_chains`` entry point group.  Each registered
+    callable must return a dict of the same schema as the built-in chains::
+
+        {
+            "my_step": {
+                "next_steps": ["other_step"],
+                "is_entry_point": False,
+                "is_terminal": False,
+            }
+        }
+
+    Plugin entries are merged in load order; later plugins can override
+    earlier ones for the same category key.
+
+    :rtype: dict[str, dict]
+    """
+    from importlib.metadata import entry_points
+    chains = dict(_BUILTIN_WORKFLOW_CHAINS)
+    for ep in entry_points(group="msnoise.plugins.workflow_chains"):
+        try:
+            addendum = ep.load()()
+            chains.update(addendum)
+        except Exception as exc:
+            import logging
+            logging.getLogger("msnoise.workflow").warning(
+                f"Failed to load workflow_chains plugin {ep.name!r}: {exc}"
+            )
+    return chains
+
+
+def get_workflow_order():
+    """Return the canonical category display order, including plugin extensions.
+
+    Merges the built-in order with any extra categories registered via the
+    ``msnoise.plugins.workflow_order`` entry point group.  Each registered
+    callable must return a list of category name strings in the desired
+    insertion order (appended after the built-in list).
+
+    :rtype: list[str]
+    """
+    from importlib.metadata import entry_points
+    order = list(_BUILTIN_WORKFLOW_ORDER)
+    for ep in entry_points(group="msnoise.plugins.workflow_order"):
+        try:
+            extra = ep.load()()
+            for cat in extra:
+                if cat not in order:
+                    order.append(cat)
+        except Exception as exc:
+            import logging
+            logging.getLogger("msnoise.workflow").warning(
+                f"Failed to load workflow_order plugin {ep.name!r}: {exc}"
+            )
+    return order
+
+
+def is_terminal_category(category):
+    """Return ``True`` if *category* is a terminal workflow step (no successors).
+
+    Terminal categories are those with an empty ``next_steps`` list in
+    :func:`get_workflow_chains`.  Examples: ``psd_rms``, ``mwcs_dtt_dvv``.
+
+    :param category: Workflow category string.
+    :rtype: bool
+    """
+    chains = get_workflow_chains()
+    entry = chains.get(category, {})
+    if isinstance(entry, dict):
+        return entry.get("is_terminal", not entry.get("next_steps", True))
+    return not entry  # flat list format: empty = terminal
+
+
+def is_entry_category(category):
+    """Return ``True`` if *category* is a DAG entry point (no predecessors).
+
+    Entry categories are those with ``is_entry_point: True`` in
+    :func:`get_workflow_chains`.  Currently only ``global``.
+
+    :param category: Workflow category string.
+    :rtype: bool
+    """
+    chains = get_workflow_chains()
+    entry = chains.get(category, {})
+    if isinstance(entry, dict):
+        return entry.get("is_entry_point", False)
+    return False
+
+
+# Backward-compat aliases — code that imported these from msnoise_table_def
+# (or from workflow.py directly) still works.
+WORKFLOW_CHAINS = _BUILTIN_WORKFLOW_CHAINS
+WORKFLOW_ORDER  = _BUILTIN_WORKFLOW_ORDER
+
+
 
 def get_workflow_steps(session):
     """Get all steps in a workflow"""
@@ -76,14 +216,12 @@ def get_workflow_graph(session):
     links = get_workflow_links(session)
 
     # Sort steps by workflow order (WORKFLOW_ORDER imported from msnoise_table_def)
+    _wf_order = get_workflow_order()
     def get_workflow_order_key(step):
         try:
-            category_order = WORKFLOW_ORDER.index(step.category)
+            category_order = _wf_order.index(step.category)
         except ValueError:
-            # If category not in predefined order, put it at the end
-            category_order = len(WORKFLOW_ORDER)
-
-        # Sort by category first, then by set_number
+            category_order = len(_wf_order)
         return (category_order, step.set_number or 0)
 
     sorted_steps = sorted(steps, key=get_workflow_order_key)
@@ -247,15 +385,15 @@ def create_workflow_steps_from_config_sets(session):
         ).distinct().all()
 
         # Sort by workflow order
-        def get_workflow_order(config_set):
+        _order = get_workflow_order()  # module-level function
+        def _config_set_order_key(config_set):
             category, set_number = config_set
             try:
-                return WORKFLOW_ORDER.index(category)
+                return _order.index(category)
             except ValueError:
-                # If category not in predefined order, put it at the end
-                return len(WORKFLOW_ORDER)
+                return len(_order)
 
-        config_sets = sorted(config_sets, key=get_workflow_order)
+        config_sets = sorted(config_sets, key=_config_set_order_key)
         created_count = 0
         existing_count = 0
 
@@ -317,7 +455,7 @@ def create_workflow_links_from_steps(session):
 
         # Create links based on workflow chains
         # WORKFLOW_CHAINS imported from msnoise_table_def; use simple next_steps list
-        for source_category, target_categories in WORKFLOW_CHAINS.items():
+        for source_category, target_categories in get_workflow_chains().items():
             # msnoise_table_def WORKFLOW_CHAINS values are dicts with 'next_steps'
             if isinstance(target_categories, dict):
                 target_categories = target_categories.get('next_steps', [])

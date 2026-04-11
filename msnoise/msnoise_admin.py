@@ -27,13 +27,10 @@ from wtforms.validators import Optional
 
 from .core.db import connect, get_logger
 from .core.config import get_config_categories_definition
-from .msnoise_table_def import declare_tables, WORKFLOW_CHAINS as _WC_FULL
+from .msnoise_table_def import declare_tables
+from .core.workflow import get_workflow_chains as _get_workflow_chains
 
 SafeMarkup = Markup
-# Flatten the richer msnoise_table_def format to {category: [next_step, ...]}
-# which is all the admin workflow builder needs.
-WORKFLOW_CHAINS = {k: (v['next_steps'] if isinstance(v, dict) else v)
-                   for k, v in _WC_FULL.items()}
 
 
 # Initialize Flask app and extensions
@@ -1063,7 +1060,8 @@ class WorkflowLinkView(BaseModelView):
         steps = self._step_choices()
         step_categories = {s.step_id: s.category for s in steps}
         return {
-            'workflow_chains': WORKFLOW_CHAINS,
+            'workflow_chains': {k: (v['next_steps'] if isinstance(v, dict) else v)
+                                for k, v in _get_workflow_chains().items()},
             'step_categories': step_categories,
         }
 
@@ -1101,7 +1099,9 @@ class WorkflowLinkView(BaseModelView):
         if from_step.step_id == to_step.step_id:
             to_id.errors.append("A step cannot link to itself.")
             return False
-        allowed = WORKFLOW_CHAINS.get(from_step.category, [])
+        _wc = _get_workflow_chains()
+        _entry = _wc.get(from_step.category, {})
+        allowed = _entry.get('next_steps', []) if isinstance(_entry, dict) else _entry
         if to_step.category not in allowed:
             terminal = not allowed
             hint = ("This is a terminal step — no outgoing links allowed."
