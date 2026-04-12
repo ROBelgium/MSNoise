@@ -1,9 +1,10 @@
 """
 Plots the data availability, as contained in the database. Every day which
+.. include:: /clickhelp/msnoise-plot-data_availability.rst
+
 has a least some data will be coloured in red. Days with no data remain blank.
 
 
-.. include:: clickhelp/msnoise-plot-data_availability.rst
 
 
 Example:

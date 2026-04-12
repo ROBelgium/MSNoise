@@ -8,6 +8,5 @@ MSNoise API
 
 .. automodule:: msnoise.api
    :members:
-   :undoc-members:
 
 

@@ -1,11 +1,12 @@
 """
 This plot shows the cross-correlation functions (CCF) vs time in a very similar
+.. include:: /clickhelp/msnoise-cc-plot-interferogram.rst
+
 manner as on the *ccftime* plot above, but shows an image instead of wiggles.
 The parameters allow to plot the daily or the mov-stacked CCF. Filters and
 components are selectable too. Passing ``--refilter`` allows to bandpass filter
 CCFs before plotting .
 
-.. include:: clickhelp/msnoise-cc-plot-interferogram.rst
 
 Example:
 

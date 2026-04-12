@@ -1,9 +1,10 @@
 """
 This plots a very raw station map (needs improvement). This plot requires
+.. include:: /clickhelp/msnoise-plot-station_map.rst
+
 cartopy !
 
 
-.. include:: clickhelp/msnoise-plot-station_map.rst
 
 
 Example:

@@ -1,9 +1,10 @@
 """
 This plot shows the per-pair and network-mean dt/t timeseries from the
+.. include:: /clickhelp/msnoise-cc-dtt-plot-timing.rst
+
 MWCS-DTT step, equivalent to the old ``timing`` plot but reading from the
 lineage-aware NetCDF store.
 
-.. include:: clickhelp/msnoise-cc-dtt-plot-timing.rst
 
 Example:
 

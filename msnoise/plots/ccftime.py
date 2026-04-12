@@ -1,12 +1,13 @@
 """
 This plot shows the cross-correlation functions (CCF) vs time. The parameters
+.. include:: /clickhelp/msnoise-cc-plot-ccftime.rst
+
 allow to plot the daily or the mov-stacked CCF. Filters and components are
 selectable too. The ``--ampli`` argument allows to increase the vertical scale
 of the CCFs. The ``--seismic`` shows the up-going wiggles with a black-filled
 background (very heavy !). Passing ``--refilter`` allows to bandpass filter
 CCFs before plotting .
 
-.. include:: clickhelp/msnoise-cc-plot-ccftime.rst
 
 
 Example:

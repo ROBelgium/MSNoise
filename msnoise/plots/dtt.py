@@ -1,9 +1,10 @@
 """
 This plots dt (delay time) against t (time lag) for a single day. It shows
+.. include:: /clickhelp/msnoise-cc-dtt-plot-dtt.rst
+
 the raw MWCS measurements as a scatter plot plus the M and M0 regression lines
 computed by the MWCS-DTT step.
 
-.. include:: clickhelp/msnoise-cc-dtt-plot-dtt.rst
 
 Example:
 

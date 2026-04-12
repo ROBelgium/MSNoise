@@ -107,6 +107,24 @@ PSD-RMS
 
 .. automodule:: msnoise.plots.psd_rms
    :members:
+
+Stretching dv/v
+---------------
+
+.. automodule:: msnoise.plots.stretching_dvv
+   :members:
+
+dt/t Timing
+-----------
+
+.. automodule:: msnoise.plots.timing
+   :members:
+
+PSD-RMS
+-------
+
+.. automodule:: msnoise.plots.psd_rms
+   :members:
    :undoc-members:
 
 Stretching dv/v

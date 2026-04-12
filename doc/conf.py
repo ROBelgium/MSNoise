@@ -220,6 +220,25 @@ pygments_style = 'sphinx'
 #modindex_common_prefix = []
 autodoc_member_order = 'bysource'
 
+# numpydoc: suppress the per-class member toctree and render attrs inline
+numpydoc_show_class_members = False
+numpydoc_class_members_toctree = False
+numpydoc_show_inherited_class_members = False
+numpydoc_attributes_as_param_list = True
+
+# autodoc: don't pull in undocumented members by default
+autodoc_default_options = {
+    'members': True,
+    'undoc-members': False,
+    'show-inheritance': False,
+}
+
+# autodoc: exclude SQLAlchemy internals from all classes by default
+autodoc_default_options = {
+    'exclude-members': 'metadata,registry,__init__,__mapper__,__table__',
+    'undoc-members': False,
+}
+
 # Mock modules that require a live DB connection or display at import time
 autodoc_mock_imports = []
 

@@ -5,5 +5,4 @@
 
 .. automodule:: msnoise.plots.timing
    :members:
-   :undoc-members:
    :no-index:
