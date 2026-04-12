@@ -576,10 +576,26 @@ def main(loglevel="INFO", chunk_size=0):
 
                     elif params.cc.cc_type == "PCC":
                         # Phase Cross-Correlation (v=2, FFT-accelerated).
-                        # Operates on time-domain data; amplitude is discarded
-                        # per-sample → insensitive to transients without
-                        # explicit temporal normalisation.
-                        corr = pcc_xcorr(_data,
+                        # Band-pass filter to the current filter's frequency band
+                        # before computing the analytic signal — this is what
+                        # makes each filter_N produce a distinct PCC result.
+                        # (The CC path achieves the same via whiten2's frequency
+                        # window; PCC bypasses whitening so we apply it explicitly.)
+                        _data_pcc = np.array([
+                            bandpass(tr, freqmin=filterlow, freqmax=filterhigh,
+                                     df=params.cc.cc_sampling_rate, corners=8)
+                            for tr in _data
+                        ])
+                        if params.cc.whitening != "N":
+                            # Optional: spectrally whiten within the band before
+                            # AmpNorm so the phase signal is broadband across the
+                            # full filter passband rather than dominated by the
+                            # most energetic frequency in the band.
+                            ffts_pcc = sf.fftn(_data_pcc, [nfft, ], axes=[1, ])
+                            whiten2(ffts_pcc, nfft, low, high, p1, p2, psds,
+                                    params.cc.whitening_type)  # inplace
+                            _data_pcc = np.real(sf.ifft(ffts_pcc, n=nfft, axis=1)[:, :len(_data_pcc[0])])
+                        corr = pcc_xcorr(_data_pcc,
                                          np.ceil(params.cc.maxlag / dt),
                                          None,
                                          cc_index,

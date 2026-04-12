@@ -231,13 +231,26 @@ for k, v in cc_shared.items():
 update_config(db, "cc_type", "CC", category="cc", set_number=cc1_sn)
 print(f"cc_{cc1_sn}: cc_type = CC  (standard cross-correlation)")
 
-# ── cc_2: PCC — amplitude normalisation implicit, clipping/whitening optional ─
-# PCC2 discards amplitude per-sample so temporal normalisation is less critical.
-# We keep whitening for broad spectral content but disable winsorising clipping.
+# ── cc_2: PCC (Phase Cross-Correlation v=2) ──────────────────────────────────
+#
+# What happens in the PCC branch of s03:
+#   1. The filter_N bandpass is applied to the time-domain traces so each
+#      filter produces a genuinely distinct CCF (CC does this via whiten2's
+#      frequency window; PCC needs it done explicitly).
+#   2. If whitening != "N", whiten2 is also applied within the band BEFORE
+#      AmpNorm.  This flattens the spectrum so the phase signal is broadband
+#      across the full filter passband rather than dominated by the most
+#      energetic frequency in the band ("spectrally whitened PCC",
+#      Ventosa 2019 §3.1).  With whitening="N" you get the classic PCC
+#      result whose bandwidth is set solely by the preprocessing bandpass.
+#
+# Winsorising: AmpNorm already discards all amplitude information per-sample,
+# so winsorising (clipping at N×RMS) is redundant for PCC.  Disable it.
 update_config(db, "cc_type",    "PCC", category="cc", set_number=cc2_sn)
-update_config(db, "winsorizing", "0",   category="cc", set_number=cc2_sn)  # off
+update_config(db, "winsorizing", "0",   category="cc", set_number=cc2_sn)
 print(f"cc_{cc2_sn}: cc_type = PCC (phase cross-correlation v=2)")
-print(f"          winsorizing disabled (amplitude discarded by PCC)")
+print(f"          winsorizing=0 (redundant: AmpNorm already discards amplitude)")
+print(f"          whitening=A   (spectral whitening within band before AmpNorm)")
 
 db.commit()
 
@@ -555,22 +568,33 @@ print(df.to_string(index=False))
 #
 # ### Why PCC output looks different from CC
 #
-# * **CC** peak amplitude depends on the product of the two trace energies.
-#   It is sensitive to amplitude transients (earthquakes, instrumental
-#   glitches) even after one-bit normalisation or spectral whitening.
+# * **CC** retains amplitude information: large-energy windows (earthquakes,
+#   transients) dominate the stack even after winsorising.  The CCF contains
+#   the full filter-band content weighted by window energy.
 #
 # * **PCC** (v=2) projects every sample of the analytic signal onto the unit
-#   circle before correlating, so amplitude information is discarded entirely.
-#   The output is bounded to [−1, 1] by construction.  Temporal normalisation
-#   (winsorising) is therefore largely redundant and was disabled for `cc_2`.
+#   circle before correlating — amplitude is discarded per-sample.  The output
+#   is bounded to [−1, 1] by construction.  The PCC branch in s03:
+#   (a) bandpasses to the filter_N frequencies so each filter is distinct,
+#   (b) optionally whitens within the band (controlled by `whitening` config)
+#       to give a broadband phase signal ("spectrally whitened PCC"),
+#   (c) then calls `pcc_xcorr` which computes AmpNorm + FFT cross-correlation.
+#
+# * **Winsorising** is disabled for `cc_2`: it clips amplitude extremes, which
+#   is meaningless after AmpNorm has already equalised every sample to unit
+#   amplitude.
+#
+# * **Whitening = "N" variant**: set `whitening` to `"N"` on `cc_2` for
+#   classic (non-whitened) PCC.  The result will be dominated by the most
+#   energetic frequency within the preprocessing bandpass — often visually
+#   narrower than CC.  The default (`whitening="A"`) gives a more
+#   spectrally balanced PCC that compares directly to CC.
 #
 # ### Adjusting the comparison
 #
 # * Change `FREQMIN` / `FREQMAX` in the User Settings cell and re-run from
-#   §6 onwards (filter_1 is the same config set for both branches).
-# * To compare **PCC v=1** instead of v=2, add
-#   `update_config(db, "cc_type", "PCC1", category="cc", set_number=cc2_sn)`
-#   — note that PCC1 uses the slower time-domain path.
+#   §6 onwards — both lineages share `filter_1`, so re-running the stack
+#   step is sufficient (no need to redo preprocessing or CC).
 # * The `result_cc` and `result_pcc` objects expose the full MSNoiseResult
 #   API: call `.get_mwcs()`, `.get_dvv()`, etc. after running the downstream
 #   steps on each lineage.
