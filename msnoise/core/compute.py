@@ -115,26 +115,121 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None,
         if folded_all.shape[1] >= min_len
     }
 
+def _analytic_phase(x: np.ndarray, eps_rel: float = 1e-6) -> np.ndarray:
+    """Return the amplitude-normalised analytic signal (phase signal) of *x*.
+
+    This is a direct Python translation of ``AnalyticSignal`` + ``AmpNorm``
+    from FastPCC (Ventosa et al., SRL 2019 / IEEE-TGRS 2023):
+
+    1. FFT of real *x*
+    2. Zero negative-frequency bins, double positive-frequency bins → analytic
+    3. IFFT → complex envelope  ``X_a[n] = x[n] + i·H{x[n]}``
+    4. Divide each sample by its magnitude (+ eps for numerical safety)
+       so every sample lies on the complex unit circle.
+
+    :param x: 1-D real time series.
+    :param eps_rel: Stability floor = ``eps_rel * max|X_a|``. Matches
+        FastPCC's ``AmpNormf`` (which uses ``1e-6 * sqrt(max_power)``).
+    :returns: Complex array of the same length as *x*, ``|y[n]| ≤ 1``.
+    """
+    xa = scipy.signal.hilbert(x)          # scipy Hilbert = FFT-based analytic
+    amp = np.abs(xa)
+    eps = eps_rel * max(amp.max(), 1e-30)  # guard: all-zero input
+    return xa / (amp + eps)
+
+
+def _analytic_phase_batch(X: np.ndarray, eps_rel: float = 1e-6) -> np.ndarray:
+    """Vectorised :func:`_analytic_phase` over rows of *X* (n_traces, N).
+
+    :param X: 2-D real array ``(n_traces, N)``.
+    :returns: Complex array ``(n_traces, N)`` of phase signals.
+    """
+    Xa = scipy.signal.hilbert(X, axis=1)
+    amp = np.abs(Xa)
+    row_max = amp.max(axis=1, keepdims=True)
+    eps = eps_rel * np.where(row_max > 0, row_max, 1e-30)
+    return Xa / (amp + eps)
+
+
 def pcc_xcorr(data, maxlag, energy, index, plot=False, nfft=None,
               normalized=False):
-    """
+    """Phase Cross-Correlation v=2 (PCC2) — pure NumPy/SciPy implementation.
 
-    :param data:
-    :param maxlag:
-    :param energy:
-    :param index:
-    :param plot:
-    :param nfft:
-    :param normalized:
-    :return:
+    Replaces the former dependency on the unmaintained ``phasecorr`` package
+    with a self-contained translation of the FFT-accelerated ``pcc2_set``
+    routine from FastPCC (Ventosa et al., SRL 2019; IEEE-TGRS 2023).
+
+    **Algorithm** (matches FastPCC ``pcc2_set``):
+
+    1. Compute the amplitude-normalised analytic signal (phase signal)
+       ``φ[n] = X_a[n] / |X_a[n]|`` for each trace — amplitude information
+       is discarded entirely, so the result is insensitive to amplitude
+       transients (earthquakes, glitches) without explicit temporal
+       normalisation.
+    2. Zero-pad to ``Nz = next_fast_len(N + maxlag)`` to avoid circular
+       wrap-around (linear cross-correlation).
+    3. Compute ``PCC2(lag) = IFFT(conj(FFT(φ1)) · FFT(φ2)) / (Nz · N)``
+       for every pair in *index* — O(N log N), same cost as GNCC.
+
+    :type data: :class:`numpy.ndarray`
+    :param data: 2-D **time-domain** array ``(n_stations, N)``; real-valued.
+        Unlike :func:`myCorr2`, PCC2 requires the time-domain input because
+        the Hilbert transform must be computed before any FFT.
+    :type maxlag: int or float
+    :param maxlag: Half-length of output CCF in **samples**.
+    :param energy: Unused (kept for API compatibility with :func:`myCorr2`).
+    :param index: List of ``(ccf_id, sta1_idx, sta2_idx)`` tuples.
+    :param normalized: ``"MAX"`` or ``"ABSMAX"`` to normalise output; falsy
+        for none. (``"POW"`` is meaningless for PCC2 since amplitudes are
+        discarded; it is silently ignored.)
+    :rtype: dict
+    :returns: ``{ccf_id: ccf_array}`` of length ``2*maxlag + 1`` per pair.
+
+    References
+    ----------
+    Ventosa S., Schimmel M. & E. Stutzmann, 2019.  SRL 90(4):1663-1669.
+    https://doi.org/10.1785/0220190022
+
+    Ventosa S. & M. Schimmel, 2023.  IEEE-TGRS 61:1-17.
+    https://doi.org/10.1109/TGRS.2023.3294302
     """
-    from phasecorr.phasecorr import xcorr
+    if not index:
+        return {}
+
+    ml  = int(np.round(maxlag))
+    N   = data.shape[1]
+    Nz  = sf.next_fast_len(N + ml)          # zero-pad length (avoids aliasing)
+    norm_factor = float(N)   # IFFT already divides by Nz; divide by N for unit peak
+
+    # Compute all phase signals at once (vectorised over traces) ──────────
+    phase = _analytic_phase_batch(data)      # (n_stations, N), complex
+
+    # Pre-FFT all phase signals into the padded length ───────────────────
+    PHASE = sf.fft(phase, n=Nz, axis=1)     # (n_stations, Nz), complex
+
     corr = {}
-    ml = int(maxlag)
-    for id, sta1, sta2 in index:
-        corr[id] = xcorr(data[sta1], data[sta2],
-                         lags=range(-ml, ml + 1),
-                         parallel=True)
+    for ccf_id, sta1, sta2 in index:
+        # Cross-spectrum → IFFT → real part
+        xcorr_full = np.real(sf.ifft(np.conj(PHASE[sta1]) * PHASE[sta2]))
+        xcorr_full /= norm_factor
+
+        # Unwrap lags: [0 .. N-1] is positive lags, [Nz-ml .. Nz-1] is negative
+        # Ventosa's convention: for lag<0 read from tail, for lag>=0 from head
+        pos = xcorr_full[:ml + 1]             # lags 0 … +ml
+        neg = xcorr_full[Nz - ml:Nz]         # lags -ml … -1  (reversed)
+        ccf = np.concatenate([neg[::-1], pos])  # full: -ml … 0 … +ml
+
+        if normalized == "MAX":
+            mx = ccf.max()
+            if mx != 0:
+                ccf /= mx
+        elif normalized == "ABSMAX":
+            mx = np.abs(ccf).max()
+            if mx != 0:
+                ccf /= mx
+
+        corr[ccf_id] = ccf
+
     return corr
 
 def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, returntime=False):

@@ -521,10 +521,14 @@ def main(loglevel="INFO", chunk_size=0):
                                        plot=False,
                                        nfft=nfft,
                                        normalized=params.cc.cc_normalisation)
+                        del energy, ffts
 
                     elif params.cc.cc_type_single_station_AC == "PCC":
-                        corr = pcc_xcorr(tmp, np.ceil(params.cc.maxlag / dt),
-                                         None, single_station_pair_index_ac)
+                        corr = pcc_xcorr(tmp,
+                                         np.ceil(params.cc.maxlag / dt),
+                                         None,
+                                         single_station_pair_index_ac,
+                                         normalized=params.cc.cc_normalisation)
                     else:
                         logging.error("cc_type_single_station_AC = %s not implemented, "
                               "exiting")
@@ -536,7 +540,7 @@ def main(loglevel="INFO", chunk_size=0):
                         if ccfid not in allcorr:
                             allcorr[ccfid] = {}
                         allcorr[ccfid][thistime] = corr[key]
-                    del corr, energy
+                    del corr
 
                 if len(cc_index):
                     if params.cc.cc_type == "CC":
@@ -569,6 +573,24 @@ def main(loglevel="INFO", chunk_size=0):
                                 allcorr[ccfid] = {}
                             allcorr[ccfid][thistime] = corr[key]
                         del corr, energy, ffts
+
+                    elif params.cc.cc_type == "PCC":
+                        # Phase Cross-Correlation (v=2, FFT-accelerated).
+                        # Operates on time-domain data; amplitude is discarded
+                        # per-sample → insensitive to transients without
+                        # explicit temporal normalisation.
+                        corr = pcc_xcorr(_data,
+                                         np.ceil(params.cc.maxlag / dt),
+                                         None,
+                                         cc_index,
+                                         normalized=params.cc.cc_normalisation)
+                        for key in corr:
+                            ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
+                            if ccfid not in allcorr:
+                                allcorr[ccfid] = {}
+                            allcorr[ccfid][thistime] = corr[key]
+                        del corr
+
                     else:
                         logging.error("cc_type = %s not implemented, "
                               "exiting")
@@ -606,6 +628,22 @@ def main(loglevel="INFO", chunk_size=0):
                                 allcorr[ccfid] = {}
                             allcorr[ccfid][thistime] = corr[key]
                         del corr, energy, ffts
+
+                    elif params.cc.cc_type_single_station_SC == "PCC":
+                        # Phase Cross-Correlation (v=2, FFT-accelerated).
+                        corr = pcc_xcorr(_data,
+                                         np.ceil(params.cc.maxlag / dt),
+                                         None,
+                                         single_station_pair_index_sc,
+                                         normalized=params.cc.cc_normalisation)
+                        for key in corr:
+                            ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
+                            logger.debug("CCF ID - SC PCC: %s" % ccfid)
+                            if ccfid not in allcorr:
+                                allcorr[ccfid] = {}
+                            allcorr[ccfid][thistime] = corr[key]
+                        del corr
+
                     else:
                         logging.error("cc_type_single_station_SC = %s not implemented, "
                               "exiting")
