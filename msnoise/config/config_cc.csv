@@ -12,10 +12,10 @@ stack_method,linear,Stack Method: Linear Mean or Phase Weighted Stack,str,linear
 pws_timegate,10.0,"If ``stack_method`` ='pws', width of the smoothing (in seconds)",float,
 pws_power,2.0,"If ``stack_method`` =""pws"", Power of the Weighting",float,
 components_to_compute,ZZ,List (comma separated) of components to compute between two different stations,str,
-cc_type,CC,Cross-Correlation type,str,
+cc_type,CC,"Cross-Correlation type: CC for classical FFT-based correlation ; PCC for Phase Crosse Correlation (FastPCC's PCC2, Ventosa et al)",str,CC/PCC
 components_to_compute_single_station,,"List (comma separated) of components within a single station. ZZ would be the autocorrelation of Z component, while ZE or ZN are the cross-components. Defaults to [], no single-station computations are done.",str,
-cc_type_single_station_AC,CC,Auto-Correlation type,str,
-cc_type_single_station_SC,CC,Cross-Correlation type for Cross-Components,str,
+cc_type_single_station_AC,CC,Auto-Correlation type (same as for cc_type),str,CC/PCC
+cc_type_single_station_SC,CC,Cross-Correlation type for Cross-Components (same as for cc_type: CC or PCC),str,CC/PCC
 keep_all,Y,Keep all cross-corr (length: ``corr_duration``),bool,Y/N
 keep_days,Y,Keep all daily cross-corr,bool,Y/N
 cc_taper_fraction,0.04,Fraction of each trace to taper (cosine) before cross-correlation. Applied symmetrically to both ends. Standard seismological convention is 0.04 (4%). Range: 0.0 (no taper) to 0.5 (full Hann window).,float,

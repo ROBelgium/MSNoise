@@ -37,6 +37,8 @@ As of MSNoise 1.6, the ``compute`` step has been completely rewritten:
   time that lead to perfect sinc autocorrelation functions. The windows should
   have a duration of at least "2 times the `maxlag`+1" to be computable.
 
+TODO write documentation for the PCC implementation.
+
 Configuration Parameters
 ------------------------
 
@@ -63,14 +65,7 @@ this step:
 * |cc.stack_method|
 * |cc.pws_timegate|
 * |cc.pws_power|
-* |preprocess.resampling_method|
-* |preprocess.remove_response|
 * |global.response_path|
-* |preprocess.response_prefilt|
-* |preprocess.preprocess_lowpass|
-* |preprocess.preprocess_highpass|
-* |preprocess.preprocess_max_gap|
-* |preprocess.preprocess_taper_length|
 * |global.hpc|
 
 .. automodule:: msnoise.core.preprocessing
