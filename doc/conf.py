@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: latin-1 -*-
 #
 # MSNoise documentation build configuration file, created by
 # sphinx-quickstart on Wed Oct 02 13:37:02 2013.
@@ -23,7 +23,7 @@ import matplotlib
 matplotlib.use('Agg')  # headless-safe backend for CI
 
 # msnoise.move2obspy and msnoise.preprocessing no longer exist at these paths
-# (moved to msnoise.core in 2.x) — imports removed.
+# (moved to msnoise.core in 2.x) ? imports removed.
 
 os.environ["SPHINX_DOC_BUILD"] = "YES"
 
@@ -35,7 +35,7 @@ import glob as _glob
 # Generate configs.hrst from the config CSV files (one per workflow category).
 # Each alias uses the format |category.param_name| so readers immediately know
 # which config set the parameter belongs to. Example:
-#   |cc.cc_sampling_rate| → ``cc.cc_sampling_rate`` : Sampling Rate... (default=20.0)
+#   |cc.cc_sampling_rate| ? ``cc.cc_sampling_rate`` : Sampling Rate... (default=20.0)
 _this_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in dir() else os.getcwd()
 _config_dir = os.path.join(_this_dir, "..", "msnoise", "config")
 _alias_lines = []
@@ -155,7 +155,7 @@ templates_path = ['.templates']
 source_suffix = '.rst'
 
 # The encoding of source files.
-#source_encoding = 'utf-8-sig'
+source_encoding = 'utf-8-sig'
 
 # The master toctree document.
 master_doc = 'index'
