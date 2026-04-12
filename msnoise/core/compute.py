@@ -215,9 +215,9 @@ def pcc_xcorr(data, maxlag, energy, index, plot=False, nfft=None,
 
         # Unwrap lags: [0 .. N-1] is positive lags, [Nz-ml .. Nz-1] is negative
         # Ventosa's convention: for lag<0 read from tail, for lag>=0 from head
-        pos = xcorr_full[:ml + 1]             # lags 0 … +ml
-        neg = xcorr_full[Nz - ml:Nz]         # lags -ml … -1  (reversed)
-        ccf = np.concatenate([neg[::-1], pos])  # full: -ml … 0 … +ml
+        pos = xcorr_full[:ml + 1]       # lags  0 … +ml
+        neg = xcorr_full[Nz - ml:Nz]   # lags -ml … -1
+        ccf = np.concatenate([neg, pos])  # full: -ml … 0 … +ml
 
         if normalized == "MAX":
             mx = ccf.max()

@@ -573,7 +573,14 @@ def create_workflow_steps_from_config_sets(session):
 def create_workflow_links_from_steps(session):
     """
     Create workflow links automatically between existing workflow steps,
-    following natural workflow progression.
+    following the DAG defined by :func:`get_workflow_chains`.
+
+    **Linking rule**: every step in a source category is linked to every step
+    in each of its successor categories.  Set numbers carry no topological
+    meaning — ``mwcs_1`` and ``mwcs_2`` are independent processing variants
+    that both receive input from every upstream step that feeds ``mwcs``.
+    The DAG structure is determined entirely by ``WorkflowLink`` rows, not
+    by set-number coincidence.
 
     Returns:
         tuple: (created_count, existing_count, error_message)
@@ -583,76 +590,39 @@ def create_workflow_links_from_steps(session):
     schema = declare_tables()
 
     try:
-        # Get all workflow steps
         steps = session.query(schema.WorkflowStep).all()
 
-        # Group steps by category and set_number
-        steps_by_category = {}
+        # Group steps by category (values = list, order doesn't matter)
+        steps_by_category: dict[str, list] = {}
         for step in steps:
-            category = step.category
-            if category not in steps_by_category:
-                steps_by_category[category] = {}
-            steps_by_category[category][step.set_number] = step
+            steps_by_category.setdefault(step.category, []).append(step)
 
         created_count = 0
         existing_count = 0
 
-        # Create links based on workflow chains
-        # WORKFLOW_CHAINS imported from msnoise_table_def; use simple next_steps list
-        for source_category, target_categories in get_workflow_chains().items():
-            # msnoise_table_def WORKFLOW_CHAINS values are dicts with 'next_steps'
-            if isinstance(target_categories, dict):
-                target_categories = target_categories.get('next_steps', [])
+        for source_category, chain_info in get_workflow_chains().items():
+            if isinstance(chain_info, dict):
+                target_categories = chain_info.get('next_steps', [])
+            else:
+                target_categories = chain_info
             if source_category not in steps_by_category:
                 continue
 
-            # For each source step in this category
-            for source_set_number, source_step in steps_by_category[source_category].items():
-
-                # Link to each target category
+            for source_step in steps_by_category[source_category]:
                 for target_category in target_categories:
                     if target_category not in steps_by_category:
                         continue
-
-                    # Strategy: Create links based on workflow logic
-                    target_steps_to_link = []
-
-                    if source_category == 'global':
-                        # Global steps link to all steps in target categories
-                        target_steps_to_link = list(steps_by_category[target_category].values())
-
-                    elif target_category in [
-                        'filter', 'refstack',
-                        'mwcs', 'stretching', 'wavelet',
-                        'mwcs_dtt', 'wavelet_dtt',
-                        'mwcs_dtt_dvv', 'stretching_dvv', 'wavelet_dtt_dvv',
-                    ]:
-                        # For all processing steps that can have multiple instances,
-                        # link to all target steps in the category
-                        # This includes DTT steps which can process results from multiple MWCS/wavelet sets
-                        target_steps_to_link = list(steps_by_category[target_category].values())
-
-                    else:
-                        # Default: link to matching set numbers if available, otherwise to all
-                        if source_set_number in steps_by_category[target_category]:
-                            target_steps_to_link = [steps_by_category[target_category][source_set_number]]
-                        else:
-                            target_steps_to_link = list(steps_by_category[target_category].values())
-
-                    # Create the links
-                    for target_step in target_steps_to_link:
-                        # Check if link already exists
+                    for target_step in steps_by_category[target_category]:
                         existing_link = session.query(schema.WorkflowLink).filter(
                             schema.WorkflowLink.from_step_id == source_step.step_id,
-                            schema.WorkflowLink.to_step_id == target_step.step_id
+                            schema.WorkflowLink.to_step_id == target_step.step_id,
                         ).first()
-
                         if not existing_link:
                             create_workflow_link(
                                 session,
                                 source_step.step_id,
                                 target_step.step_id,
-                                'default'
+                                'default',
                             )
                             created_count += 1
                         else:
