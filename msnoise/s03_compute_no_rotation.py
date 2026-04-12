@@ -65,7 +65,6 @@ this step:
 * |cc.stack_method|
 * |cc.pws_timegate|
 * |cc.pws_power|
-* |global.response_path|
 * |global.hpc|
 
 .. automodule:: msnoise.core.preprocessing
