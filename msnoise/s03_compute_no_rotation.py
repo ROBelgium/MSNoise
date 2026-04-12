@@ -495,25 +495,26 @@ def main(loglevel="INFO", chunk_size=0):
 
                 # First let's compute the AC and SC
                 if len(single_station_pair_index_ac):
-                    tmp = _data.copy()
-                    if params.cc.whitening == "A":
-                        # if the data isn't already filtered, we still need to
-                        # do it for the AutoCorrelation:
-                        for i, _ in enumerate(tmp):
-                            tmp[i] = bandpass(_, freqmin=filterlow,
-                                              freqmax=filterhigh,
-                                              df=params.cc.cc_sampling_rate,
-                                              corners=8)
+                    # Always bandpass to the current filter band — required for
+                    # both CC and PCC so that each filter_N produces a distinct
+                    # result.  For CC this also replaces the old whitening==A
+                    # guard which silently skipped the bandpass when whitening=N.
+                    tmp = np.array([
+                        bandpass(tr, freqmin=filterlow, freqmax=filterhigh,
+                                 df=params.cc.cc_sampling_rate, corners=8)
+                        for tr in _data
+                    ])
                     if params.cc.clip_after_whiten:
-                        # logger.debug("Winsorizing (clipping) data after bandpass (AC)")
                         tmp = winsorizing(tmp, params, input="timeseries")
 
                     if params.cc.cc_type_single_station_AC == "CC":
                         ffts = sf.fftn(tmp, [nfft, ], axes=[1, ])
+                        if params.cc.whitening != "N":
+                            whiten2(ffts, nfft, low, high, p1, p2, psds,
+                                    params.cc.whitening_type)  # inplace
                         energy = np.real(np.sqrt(np.mean(
                             sf.ifft(ffts, n=nfft, axis=1) ** 2,
                             axis=1)))
-                        # Computing standard CC
                         corr = myCorr2(ffts,
                                        np.ceil(params.cc.maxlag / dt),
                                        energy,
@@ -524,7 +525,13 @@ def main(loglevel="INFO", chunk_size=0):
                         del energy, ffts
 
                     elif params.cc.cc_type_single_station_AC == "PCC":
-                        corr = pcc_xcorr(tmp,
+                        tmp_pcc = tmp
+                        if params.cc.whitening != "N":
+                            ffts_pcc = sf.fftn(tmp, [nfft, ], axes=[1, ])
+                            whiten2(ffts_pcc, nfft, low, high, p1, p2, psds,
+                                    params.cc.whitening_type)  # inplace
+                            tmp_pcc = np.real(sf.ifft(ffts_pcc, n=nfft, axis=1)[:, :tmp.shape[1]])
+                        corr = pcc_xcorr(tmp_pcc,
                                          np.ceil(params.cc.maxlag / dt),
                                          None,
                                          single_station_pair_index_ac,
