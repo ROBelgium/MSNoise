@@ -23,6 +23,7 @@ Moving-Window Cross-Spectrum → dt/t → dv/v aggregate.
    ../workflow_dvv/007_compute_mwcs
    ../workflow_dvv/007b_plot_mwcs
    ../workflow_dvv/008_compute_dtt
+   ../workflow_dvv/008b_plot_mwcs_dtt_timing
    ../workflow_dvv/009_compute_dvv
    ../workflow_dvv/009b_plot_dvv
 

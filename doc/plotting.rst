@@ -101,3 +101,24 @@ dt/t Plot
 ---------
 
 .. automodule:: msnoise.plots.dtt
+
+PSD-RMS
+-------
+
+.. automodule:: msnoise.plots.psd_rms
+   :members:
+   :undoc-members:
+
+Stretching dv/v
+---------------
+
+.. automodule:: msnoise.plots.stretching_dvv
+   :members:
+   :undoc-members:
+
+dt/t Timing
+-----------
+
+.. automodule:: msnoise.plots.timing
+   :members:
+   :undoc-members:

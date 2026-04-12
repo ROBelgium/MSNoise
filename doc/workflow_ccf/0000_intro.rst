@@ -12,6 +12,7 @@ This section presents the CC pipeline, assuming :ref:`workflow`
 .. toctree::
    :maxdepth: 1
 
+   ../workflow_ccf/004b_preprocess
    ../workflow_ccf/005_compute_cc
    ../workflow_ccf/005b_plot_ccftime
    ../workflow_ccf/006_stack
