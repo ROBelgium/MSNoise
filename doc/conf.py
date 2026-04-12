@@ -41,7 +41,7 @@ _config_dir = os.path.join(_this_dir, "..", "msnoise", "config")
 _alias_lines = []
 for _fn in sorted(_glob.glob(os.path.join(_config_dir, "config_*.csv"))):
     _cat = os.path.basename(_fn).replace("config_", "").replace(".csv", "")
-    with open(_fn) as _fh:
+    with open(_fn, encoding='utf-8') as _fh:
         for _row in csv.DictReader(_fh):
             _name = _row["name"].strip()
             _defn = _row.get("definition", "").strip().replace("<br>", " | ")
@@ -50,7 +50,7 @@ for _fn in sorted(_glob.glob(os.path.join(_config_dir, "config_*.csv"))):
             _alias_lines.append(
                 f".. |{_alias}| replace:: ``{_alias}`` : {_defn} (default={_dflt})"
             )
-with open("configs.hrst", "w") as _fh:
+with open("configs.hrst", "w", encoding="utf-8") as _fh:
     _fh.write("\n".join(_alias_lines) + "\n")
 
 space = " " * 4
@@ -65,7 +65,7 @@ def write_click_help(fullcommand='', command='', data=''):
     out += "\n"
     # fullcommand = fullcommand.replace("msnoise ", "").replace(" %s"%command, "")
     fn = "-".join(fullcommand.split(" "))
-    f = open(os.path.join('clickhelp', fn+".rst"), "w")
+    f = open(os.path.join('clickhelp', fn+".rst"), "w", encoding='utf-8')
     out += space + "%s --help" % fullcommand
     out += "\n"
     out += "\n"
@@ -98,7 +98,7 @@ def process_command_or_group(out, commands, chain=[]):
     return chain
 
 
-out = open('clickhelp/msnoise.rst', 'w')
+out = open('clickhelp/msnoise.rst', 'w', encoding='utf-8')
 out.write('Help on the msnoise commands\n')
 out.write('============================\n\n')
 out.write('This page shows all the commands accessible from the command '
@@ -108,13 +108,13 @@ out.write('Commands with an _old suffix are only visible in the console if a .ol
 process_command_or_group(out, M.cli.commands)
 out.close()
 
-out = open('contributors.rst', 'w')
+out = open('contributors.rst', 'w', encoding='utf-8')
 out.write('Contributors\n')
 out.write('============\n\n')
 out.write('The following people have contributed to MSNoise (sorted '
           'alphabetically):\n\n')
 
-cont = open("../CONTRIBUTORS.txt", 'r')
+cont = open("../CONTRIBUTORS.txt", 'r', encoding='utf-8')
 for line in cont.readlines():
     out.write("* " + line)
 out.close()
