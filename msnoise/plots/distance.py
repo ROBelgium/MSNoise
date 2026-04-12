@@ -5,7 +5,7 @@ to bandpass filter CCFs before plotting . It is also possible to
 only draw CCFs for pairs including one station by passing ``--virtual-pair``
 followed by the desired ``NET.STA`` .
 
-.. include:: ../clickhelp/msnoise-cc-plot-distance.rst
+.. include:: clickhelp/msnoise-cc-plot-distance.rst
 
 Example:
 

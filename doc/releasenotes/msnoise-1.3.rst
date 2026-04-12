@@ -232,14 +232,14 @@ acausal parts of the CCF.
 
 New parameters have been added to the configuration:
 
-* |dtt_lag|
-* |dtt_v|
-* |dtt_minlag|
-* |dtt_width|
-* |dtt_sides|
-* |dtt_mincoh|
-* |dtt_maxerr|
-* |dtt_maxdt|
+* ``dtt_lag``
+* ``dtt_v``
+* ``dtt_minlag``
+* ``dtt_width``
+* ``dtt_sides``
+* ``dtt_mincoh``
+* ``dtt_maxerr``
+* ``dtt_maxdt``
 
 
 .. seealso:: The description of the :ref:`workflowcomputedtt` step in the

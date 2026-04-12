@@ -34,7 +34,7 @@ Aggregates per-pair dv/v results (from ``mwcs_dtt``, ``stretching``, or
 ``wavelet_dtt``) into network-level statistics across station pairs.
 
 One worker handles all three DVV step categories; the category is passed as
-an argument to :func:`main`.  Each category maps to a parent DTT step:
+an argument to ``main()``.  Each category maps to a parent DTT step:
 
 ====================  ===============
 DVV step category     Parent category

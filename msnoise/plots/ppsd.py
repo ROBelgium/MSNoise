@@ -1,7 +1,7 @@
 """
 Plots the PPSD and PSD-spectrograms
 
-.. include:: ../clickhelp/msnoise-qc-plot_psd.rst
+.. include:: clickhelp/msnoise-qc-plot_psd.rst
 
 
 Example:

@@ -6,7 +6,7 @@ of the CCFs. The ``--seismic`` shows the up-going wiggles with a black-filled
 background (very heavy !). Passing ``--refilter`` allows to bandpass filter
 CCFs before plotting .
 
-.. include:: ../clickhelp/msnoise-cc-plot-ccftime.rst
+.. include:: clickhelp/msnoise-cc-plot-ccftime.rst
 
 
 Example:

@@ -2,6 +2,7 @@ Table Definitions
 ==================
 
 .. module:: msnoise
+   :no-index:
 
 
 .. autoclass:: msnoise.msnoise_table_def.Filter

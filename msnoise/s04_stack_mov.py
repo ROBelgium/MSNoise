@@ -16,7 +16,7 @@ CCF time series before the rolling mean, attenuating isolated spikes
 and filling short gaps.
 
 This step is **upstream of refstack**: once Done, ``propagate_downstream``
-creates both a REF sentinel job (triggering :mod:`msnoise.s04_stack_refstack`)
+creates both a REF sentinel job (triggering ``s04_stack_refstack``)
 and direct MWCS/stretching/wavelet T jobs for the new days.
 
 To run this step:

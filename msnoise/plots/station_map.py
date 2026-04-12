@@ -3,7 +3,7 @@ This plots a very raw station map (needs improvement). This plot requires
 cartopy !
 
 
-.. include:: ../clickhelp/msnoise-plot-station_map.rst
+.. include:: clickhelp/msnoise-plot-station_map.rst
 
 
 Example:

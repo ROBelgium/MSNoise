@@ -71,7 +71,7 @@ MSNoise 2.0 adds a dedicated PSD quality-control pipeline, independent
 of the CC pipeline:
 
 - :mod:`msnoise.s20_psd_compute` — per-day PSD using ObsPy PPSD
-- :mod:`msnoise.s21_psd_compute_rms` — per-frequency-band RMS
+- ``msnoise.s21_psd_compute_rms`` — per-frequency-band RMS
 
 
 WCT fused mode
@@ -81,7 +81,7 @@ The Wavelet Coherence Transform step (:mod:`msnoise.s08_compute_wct`) now
 supports a **fused mode** (``|wavelet.wct_compute_dtt|`` = ``True``, default):
 dt/t results are computed and written directly inline, skipping intermediate
 WCT file storage (~2000× storage reduction per pair/year).  The standalone
-:mod:`msnoise.s09_compute_wct_dtt` step remains available for reprocessing
+``msnoise.s09_compute_wct_dtt`` step remains available for reprocessing
 existing WCT files.
 
 

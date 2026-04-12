@@ -6,7 +6,7 @@ two right panels show the mean and standard deviation per time lag of the whole
 image. The selected time lags for the dt/t calculation are presented with green
 horizontal lines, and the minimum coherence or the maximum dt are in red.
 
-.. include:: ../clickhelp/msnoise-cc-dtt-plot-mwcs.rst
+.. include:: clickhelp/msnoise-cc-dtt-plot-mwcs.rst
 
 Example:
 

@@ -143,6 +143,15 @@ sphinx_gallery_conf = {
      'thumbnail_size': (400, 400),
      # Skip jupytext-format notebooks (no sphinx-gallery docstring)
      'ignore_pattern': r'(nb_|/conf\.py)',
+     # These examples require a live MSNoise project (db.ini + data)
+     # and are expected to fail in CI without one.
+     'expected_failing_examples': [
+         '../examples/plot_ref.py',
+         '../examples/plot_interferogram.py',
+         '../examples/plot_dvv_comparison.py',
+         '../examples/plot_compute_hvsr.py',
+         '../examples/plot_compute_hvsr_psd.py',
+     ],
 } if _HAS_GALLERY else {}
 intersphinx_cache_limit = 5
 

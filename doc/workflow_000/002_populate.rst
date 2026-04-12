@@ -28,7 +28,7 @@ automatically, making instrument responses available to the preprocessing step.
 Assigning data sources
 -----------------------
 
-Each station can be assigned to a :class:`DataSource` (local SDS archive or
+Each station can be assigned to a ``DataSource`` (local SDS archive or
 remote FDSN/EIDA service).  See :ref:`workflow_concepts` for the full
 :ref:`concepts_configsets` explanation.
 

@@ -27,7 +27,7 @@ see :ref:`how to do this <emptydb>` .
 
 To run this script:
 
-.. include:: ../clickhelp/msnoise-db-init.rst
+.. include:: clickhelp/msnoise-db-init.rst
 
 
 .. warning:: The credentials will be saved in a flat text file in the current
