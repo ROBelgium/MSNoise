@@ -27,28 +27,31 @@ Moving-Window Cross-Spectrum → dt/t → dv/v aggregate.
    ../workflow_dvv/009b_plot_dvv
 
 
-Method 2 — Stretching (1 step)
---------------------------------
+Method 2 — Stretching (2 steps)
+---------------------------------
 
-Direct dv/v by cross-correlating stretched reference traces.
+Direct dv/v by cross-correlating stretched reference traces → dv/v aggregate.
 
 .. toctree::
    :maxdepth: 1
 
    ../workflow_dvv/011_compute_stretching
+   ../workflow_dvv/011c_compute_stretching_dvv
    ../workflow_dvv/011b_plot_stretching
 
 
-Method 3 — Wavelet Coherence Transform (2 steps, or fused in 1)
------------------------------------------------------------------
+Method 3 — Wavelet Coherence Transform (2 or 3 steps)
+-------------------------------------------------------
 
 WCT → dt/t → dv/v aggregate.  When ``|wavelet.wct_compute_dtt|`` is
-``True`` (default), the dt/t step runs inline inside the WCT step and no
-intermediate files are written.
+``True`` (default), the dt/t step runs inline inside the WCT step (fused,
+2 steps total).  Set it to ``False`` to run the dt/t step separately
+(3 steps total).
 
 .. toctree::
    :maxdepth: 1
 
    ../workflow_dvv/010_compute_wct
    ../workflow_dvv/010b_compute_wct_dtt
+   ../workflow_dvv/010d_compute_wct_dtt_dvv
    ../workflow_dvv/010c_plot_wct
