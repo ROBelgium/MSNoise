@@ -34,7 +34,7 @@ The classic ambient-noise cross-correlation (Shapiro & Campillo 2004;
 Bensen et al. 2007) is computed using the tiled-batch implementation
 :func:`~msnoise.core.compute.myCorr2`.
 
-**Processing chain for each time window and filter band:**
+**Shared pre-processing per time window** (all modes — CC, AC, SC):
 
 1. **Temporal normalisation** — optional Winsorising (clipping to
    ``winsorizing`` × RMS) applied either *before* whitening (default) or
@@ -44,51 +44,48 @@ Bensen et al. 2007) is computed using the tiled-batch implementation
    ``cc_taper_fraction × N`` is applied symmetrically to both ends to
    suppress spectral leakage.
 
-3. **FFT** — each trace is zero-padded to ``nfft = next_fast_len(N)`` and
-   transformed to the frequency domain:
+3. **Single bandpass per filter band** — one bandpassed copy ``_data_bp``
+   is computed from the raw tapered data at the start of each filter
+   iteration and reused by all three modes (AC, CC, SC) and both
+   algorithms (CC, PCC).  No mode bandpasses the data a second time.
 
-   .. math::
+**Processing chain — CC algorithm:**
 
-       X_i[k] = \mathcal{F}\{x_i[n]\}, \quad k = 0, \ldots, N_\text{fft}-1
+For each requested pair :math:`(i, j)` in each filter band:
 
-4. **Spectral whitening** — controlled by ``whitening`` and ``whitening_type``
-   (see :func:`~msnoise.core.compute.whiten2`).  Three modes are available:
+- ``whitening = N`` — ``_data_bp`` fed directly into the cross-spectrum:
 
-   - ``whitening = N`` — no whitening; a bandpass filter is applied in the
-     time domain instead to restrict each window to the current filter band.
-   - ``whitening = A`` — whiten all traces (including auto-correlations).
-   - ``whitening = C`` — whiten only when the two components differ.
+  .. math::
 
-   Three spectral shapes are supported via ``whitening_type``:
+      C_{ij}[k] = X_i^*[k] \cdot X_j[k], \quad
+      X_i = \mathcal{F}\{x_i^\text{bp}[n]\}
 
-   - *Brutal* (default) — sets ``|X[k]| = 1`` inside the passband with a
-     cosine taper at the edges; equivalent to retaining only the spectral
-     phase.
-   - *HANN* — Hann-weighted one-bit normalisation inside the passband.
-   - *PSD* — divides by the smoothed power spectral density, then clips
-     outlier bins at the 5th–95th percentile.
+- ``whitening ≠ N`` — raw (non-bandpassed) data fed into FFT, then
+  spectral whitening applied in-place by
+  :func:`~msnoise.core.compute.whiten2` (which itself bandlimits to
+  ``[f_\text{low}, f_\text{high}]``, making a prior bandpass redundant):
 
-5. **Cross-spectrum and IFFT** — for each requested pair :math:`(i, j)`:
+  .. math::
 
-   .. math::
+      \tilde{X}_i[k] = \operatorname{whiten2}(\mathcal{F}\{x_i[n]\})
 
-       C_{ij}[k] = X_i^*[k] \cdot X_j[k]
+  Three whitening shapes are available via ``whitening_type``:
 
-   .. math::
+  - *Brutal* (default) — ``|\tilde{X}[k]| = 1`` inside the passband
+    with a cosine-tapered transition.
+  - *HANN* — Hann-weighted one-bit normalisation inside the passband.
+  - *PSD* — divide by smoothed PSD, then clip outlier bins at the
+    5th–95th percentile.
 
-       c_{ij}[\tau] = \mathcal{F}^{-1}\{C_{ij}[k]\} \,/\, N
+The IFFT, folding and optional normalisation follow in all cases:
 
-   The output is folded so that negative lags :math:`[-\tau_\text{max}, 0)`
-   precede positive lags :math:`[0, \tau_\text{max}]`, yielding a CCF of
-   length :math:`2\,\tau_\text{max} + 1` samples.
+.. math::
 
-6. **Normalisation** — optional post-processing controlled by
-   ``cc_normalisation``:
+    c_{ij}[\tau] = \mathcal{F}^{-1}\{C_{ij}[k]\} / N
 
-   - ``POW`` — divide by the product of the per-station RMS energies
-     :math:`(e_i \cdot e_j)`.
-   - ``MAX`` — divide by the maximum value of the CCF.
-   - ``ABSMAX`` — divide by the absolute maximum.
+**Normalisation** (``cc_normalisation``): ``POW`` — divide by the
+product of RMS energies :math:`(e_i \cdot e_j)`; ``MAX`` — divide by
+the CCF maximum; ``ABSMAX`` — divide by the absolute maximum.
 
 **References**
 
@@ -119,27 +116,20 @@ normalisation such as one-bit or clipping.  MSNoise implements PCC version 2
 in :func:`~msnoise.core.compute.pcc_xcorr` and does **not** depend on the
 ``phasecorr`` or ``fastpcc`` external packages.
 
-**Algorithm**
+**Processing chain — PCC2 algorithm:**
 
-For each trace :math:`x_i[n]` of length :math:`N`:
+For each trace the shared ``_data_bp`` (already bandpassed to
+:math:`[f_\text{low}, f_\text{high}]`) is used directly:
 
-1. **Band-pass filter** — the trace is band-pass filtered (8-pole Butterworth,
-   zero-phase) to the current filter band :math:`[f_\text{low}, f_\text{high}]`
-   *before* any further processing.  This is essential: because PCC discards
-   spectral amplitudes, the filter band is the *only* mechanism that makes each
-   ``filter_N`` configuration produce a distinct cross-correlation.  (For CC,
-   the same role is played by the frequency-domain passband of ``whiten2``.)
+1. **Optional spectral whitening** — if ``whitening ≠ N``, ``_data_bp``
+   is FFT-whitened within the band and transformed back to the time domain.
+   This distributes energy evenly across the passband *before* the per-sample
+   amplitude normalisation, so the resulting phase signal reflects broadband
+   coherence rather than being dominated by the most energetic frequency.
 
-2. **Optional spectral whitening** — if ``whitening ≠ N``, the bandpass output
-   is FFT-whitened within the filter band and transformed back to the time
-   domain.  This distributes energy evenly across all frequencies inside the
-   passband *before* amplitude normalisation, so that the PCC phase signal
-   reflects broadband phase coherence rather than being dominated by the most
-   energetic frequency in the band.
-
-3. **Analytic signal and amplitude normalisation** — the complex analytic
-   signal :math:`x_i^{(a)}[n]` is computed via the Hilbert transform (FFT-based,
-   :func:`scipy.signal.hilbert`).  Each sample is then divided by its own
+2. **Analytic signal and amplitude normalisation** — the complex analytic
+   signal :math:`x_i^{(a)}[n]` is computed via the Hilbert transform
+   (:func:`scipy.signal.hilbert`).  Each sample is divided by its own
    amplitude to produce the *phase signal* :math:`\varphi_i`:
 
    .. math::
@@ -148,17 +138,15 @@ For each trace :math:`x_i[n]` of length :math:`N`:
 
    where :math:`\varepsilon = 10^{-6} \max_n |x_i^{(a)}[n]|` is a numerical
    stability floor (matching FastPCC's ``AmpNormf`` convention).
-   By construction, :math:`|\varphi_i[n]| \leq 1` for all :math:`n`, and
-   :math:`|\varphi_i[n]| \approx 1` wherever the signal is not near zero.
-   This per-sample normalisation is what makes PCC insensitive to amplitude
-   transients: a spike 1000 × larger than the ambient noise is reduced to
-   exactly the same weight as any other sample.
+   By construction :math:`|\varphi_i[n]| \leq 1`, and amplitude transients
+   (earthquakes, glitches) are reduced to exactly the same per-sample weight
+   as the ambient noise — no explicit temporal normalisation is needed.
 
-4. **Zero-padding** — each phase signal is zero-padded to
+3. **Zero-padding** — each phase signal is zero-padded to
    :math:`N_z = \text{next\_fast\_len}(N + \tau_\text{max})` to compute a
-   linear (non-circular) cross-correlation and avoid wrap-around artefacts.
+   linear (non-circular) cross-correlation.
 
-5. **FFT cross-spectrum and IFFT** — all phase signals are pre-transformed
+4. **FFT cross-spectrum and IFFT** — all phase signals are pre-transformed
    once, then for each pair :math:`(i, j)`:
 
    .. math::
@@ -167,43 +155,15 @@ For each trace :math:`x_i[n]` of length :math:`N`:
            \Phi_i^*[k] \cdot \Phi_j[k]
        \right\} \Big/ N
 
-   where :math:`\Phi_i[k] = \mathcal{F}\{\varphi_i[n]\}` (zero-padded to
-   :math:`N_z`).  Division by :math:`N` (not :math:`N_z`) gives a peak
-   amplitude of approximately 1 for identical signals, consistent with
-   PCC2 as a cross-coherence measure.
+   Division by :math:`N` (not :math:`N_z`) gives a peak amplitude of
+   approximately 1 for identical signals.
 
-6. **Lag unwrapping** — the IFFT output of length :math:`N_z` stores positive
-   lags :math:`\tau = 0, \ldots, \tau_\text{max}` at indices
-   :math:`0, \ldots, \tau_\text{max}`, and negative lags
-   :math:`\tau = -\tau_\text{max}, \ldots, -1` at indices
-   :math:`N_z - \tau_\text{max}, \ldots, N_z - 1` (Ventosa's convention).
-   The two slices are concatenated to give the final CCF of length
-   :math:`2\,\tau_\text{max} + 1`:
+5. **Lag unwrapping** — positive lags :math:`0 \ldots \tau_\text{max}`
+   come from ``full[0:\tau_\text{max}+1]``, negative lags
+   :math:`-\tau_\text{max} \ldots -1` from ``full[N_z-\tau_\text{max}:N_z]``.
 
-   .. math::
-
-       \text{PCC2}_{ij}[-\tau_\text{max}{:}\tau_\text{max}]
-       = \bigl[\text{full}[N_z - \tau_\text{max}{:}N_z],\;
-                \text{full}[0{:}\tau_\text{max}+1]\bigr]
-
-   .. note::
-
-       Because :math:`N_z > N`, the extracted CCF is **not** symmetric around
-       lag 0 even for a signal correlated with itself.  This is a mathematical
-       property of zero-padded linear correlation and does not indicate an
-       implementation error.  The self-correlation *does* have its global
-       maximum at lag 0.
-
-7. **Normalisation** — same ``cc_normalisation`` options as for CC
-   (``MAX``, ``ABSMAX``, or none).  The ``POW`` option is silently ignored
-   for PCC2 because amplitude information has already been discarded in step 3.
-
-**Computational cost**
-
-PCC2 requires one additional Hilbert transform (one FFT + IFFT per trace)
-relative to CC, but the dominant cost — :math:`O(P \cdot N_z \log N_z)` for
-:math:`P` pairs — is identical.  In practice the overhead is negligible for
-large networks.
+6. **Normalisation** — ``MAX`` or ``ABSMAX`` as for CC; ``POW`` is silently
+   ignored because amplitudes are discarded in step 2.
 
 **References**
 
@@ -402,7 +362,10 @@ slid, and per-filter results accumulated and saved.
    }
 
 **Figure 2 — Per-filter processing** shows the three parallel correlation
-modes (AC, CC, SC) and the CC/PCC2 algorithm branch within each.
+modes (AC, CC, SC) and the CC/PCC2 algorithm branch within each.  The entry
+node carries ``_data_bp`` (bandpassed once per filter iteration, shared by
+all modes) and ``_data_raw`` (used only by CC/SC with ``whitening != N``,
+where ``whiten2`` applies the spectral window itself).
 
 .. graphviz::
 
@@ -423,7 +386,7 @@ modes (AC, CC, SC) and the CC/PCC2 algorithm branch within each.
        edge [fontname="Helvetica,Arial,sans-serif" fontsize=9 color="#444444"]
 
        node [shape=oval fillcolor="#607D8B" fontcolor=white color="#607D8B"]
-       ENTRY [label="enter\n(whitened / bandpassed\n_data ready)"]
+       ENTRY [label="enter\n_data_bp  (bandpassed once)\n_data_raw (for CC+whiten path)"]
        EXIT  [label="return\n(to outer loop)"]
 
        node [shape=box fillcolor="#F0F4F8" fontcolor="#0D1B2A" color="#607D8B" style="filled,rounded"]
@@ -439,7 +402,6 @@ modes (AC, CC, SC) and the CC/PCC2 algorithm branch within each.
            D_CAW_AC [label="clip_after\nwhiten?"]
 
            node [shape=box fillcolor="#FFFDE7" fontcolor="#0D1B2A" color="#F9A825" style="filled,rounded"]
-           P_AC_BP  [label="Bandpass [f_low, f_high]\n(always, for filter separation)"]
            P_AC_CAW [label="Winsorise (time-series)"]
 
            node [shape=box fillcolor="#FFF9C4" fontcolor="#0D1B2A" color="#F9A825" style="filled,rounded"]
@@ -459,13 +421,14 @@ modes (AC, CC, SC) and the CC/PCC2 algorithm branch within each.
            D_CC     [label="CC pairs?"]
            D_CCTYPE [label="cc_type?"]
            D_CAW_CC [label="clip_after\nwhiten?"]
+           D_CC_WN  [label="whitening\n!= N?"]
 
            node [shape=box fillcolor="#E8F5E9" fontcolor="#0D1B2A" color="#2E7D32" style="filled,rounded"]
-           P_CC_W     [label="whiten2  (inplace)\nif whitening != N"]
+           P_CC_RAW   [label="FFT(_data_raw)\n→ whiten2 (inplace)"]
+           P_CC_BP_F  [label="FFT(_data_bp)"]
            P_CC_CAW   [label="Winsorise (FFT domain)"]
            P_CC_E     [label="Compute RMS energy"]
            P_CC_CORR  [label="myCorr2\n(IFFT · fold · normalise)"]
-           P_CC_BP    [label="Bandpass [f_low, f_high]\n(for filter separation)"]
            P_CC_PW    [label="FFT → whiten2 → IFFT\n(optional, whitening != N)"]
            P_CC_PCORR [label="pcc_xcorr\nHilbert → φ(t) → FFT\ncross-spec → IFFT / N"]
        }
@@ -478,20 +441,23 @@ modes (AC, CC, SC) and the CC/PCC2 algorithm branch within each.
            D_SC     [label="SC pairs?"]
            D_SCTYPE [label="cc_type\nsingle_SC?"]
            D_CAW_SC [label="clip_after\nwhiten?"]
+           D_SC_WN  [label="whitening\n!= N?"]
 
            node [shape=box fillcolor="#F3E5F5" fontcolor="#0D1B2A" color="#6A1B9A" style="filled,rounded"]
-           P_SC_W     [label="whiten2  (inplace)\nif whitening != N"]
+           P_SC_RAW   [label="FFT(_data_raw)\n→ whiten2 (inplace)"]
+           P_SC_BP_F  [label="FFT(_data_bp)"]
            P_SC_CAW   [label="Winsorise (FFT domain)"]
            P_SC_E     [label="Compute RMS energy"]
            P_SC_CORR  [label="myCorr2\n(IFFT · fold · normalise)"]
+           P_SC_PW    [label="FFT → whiten2 → IFFT\n(optional, whitening != N)"]
            P_SC_PCORR [label="pcc_xcorr\nHilbert → φ(t) → FFT\ncross-spec → IFFT / N"]
        }
 
        ENTRY -> D_AC
 
+       // AC
        D_AC     -> D_CC      [label="no"]
-       D_AC     -> P_AC_BP   [label="yes"]
-       P_AC_BP  -> D_CAW_AC
+       D_AC     -> D_CAW_AC  [label="yes"]
        D_CAW_AC -> P_AC_CAW  [label="yes"]
        D_CAW_AC -> D_ACTYPE  [label="no"]
        P_AC_CAW -> D_ACTYPE
@@ -506,31 +472,39 @@ modes (AC, CC, SC) and the CC/PCC2 algorithm branch within each.
 
        P_ACC -> D_CC
 
+       // CC
        D_CC     -> D_SC      [label="no"]
        D_CC     -> D_CCTYPE  [label="yes"]
-       D_CCTYPE -> P_CC_W    [label="CC"]
-       D_CCTYPE -> P_CC_BP   [label="PCC"]
-       P_CC_W   -> D_CAW_CC
+       D_CCTYPE -> D_CC_WN   [label="CC"]
+       D_CCTYPE -> P_CC_PW   [label="PCC"]
+       D_CC_WN  -> P_CC_RAW  [label="yes\n(_data_raw)"]
+       D_CC_WN  -> P_CC_BP_F [label="no\n(_data_bp)"]
+       P_CC_RAW -> D_CAW_CC
+       P_CC_BP_F -> D_CAW_CC
        D_CAW_CC -> P_CC_CAW  [label="yes"]
        D_CAW_CC -> P_CC_E    [label="no"]
        P_CC_CAW -> P_CC_E
        P_CC_E   -> P_CC_CORR
-       P_CC_BP  -> P_CC_PW
        P_CC_PW  -> P_CC_PCORR
        P_CC_CORR  -> P_ACC
        P_CC_PCORR -> P_ACC
 
        P_ACC -> D_SC
 
+       // SC
        D_SC     -> EXIT      [label="no"]
        D_SC     -> D_SCTYPE  [label="yes"]
-       D_SCTYPE -> P_SC_W     [label="CC"]
-       D_SCTYPE -> P_SC_PCORR [label="PCC"]
-       P_SC_W   -> D_CAW_SC
+       D_SCTYPE -> D_SC_WN   [label="CC"]
+       D_SCTYPE -> P_SC_PW   [label="PCC"]
+       D_SC_WN  -> P_SC_RAW  [label="yes\n(_data_raw)"]
+       D_SC_WN  -> P_SC_BP_F [label="no\n(_data_bp)"]
+       P_SC_RAW -> D_CAW_SC
+       P_SC_BP_F -> D_CAW_SC
        D_CAW_SC -> P_SC_CAW  [label="yes"]
        D_CAW_SC -> P_SC_E    [label="no"]
        P_SC_CAW -> P_SC_E
        P_SC_E   -> P_SC_CORR
+       P_SC_PW  -> P_SC_PCORR
        P_SC_CORR  -> P_ACC
        P_SC_PCORR -> P_ACC
        P_ACC -> EXIT [constraint=false]
@@ -852,28 +826,23 @@ def main(loglevel="INFO", chunk_size=0):
                 if high > nfft / 2:
                     high = int(nfft // 2)
 
-                # Make a copy of the original data to prevent modifying it
-                _data = data.copy()
-                if params.cc.whitening == "N":
-                    # if the data doesn't need to be whitened, we can simply
-                    # band-pass filter the traces now:
-                    for i, _ in enumerate(_data):
-                        _data[i] = bandpass(_, freqmin=filterlow,
-                                            freqmax=filterhigh,
-                                            df=params.cc.cc_sampling_rate,
-                                            corners=8)
+                # Bandpassed copy of data for this filter band.
+                # Computed once here and reused by all modes (AC, CC, SC) and
+                # algorithms (CC, PCC) to avoid redundant bandpass calls.
+                # For CC+whiten: _data_raw feeds FFT→whiten2 (whiten2 applies
+                # the spectral window itself, so no prior bandpass is needed).
+                # For PCC and AC: _data_bp is the starting point.
+                # For CC+no-whiten: _data_bp is used directly.
+                _data_raw = data.copy()
+                _data_bp = np.array([
+                    bandpass(tr, freqmin=filterlow, freqmax=filterhigh,
+                             df=params.cc.cc_sampling_rate, corners=8)
+                    for tr in _data_raw
+                ])
 
-                # First let's compute the AC and SC
+                # ── Auto-Correlation (AC) ─────────────────────────────────
                 if len(single_station_pair_index_ac):
-                    # Always bandpass to the current filter band — required for
-                    # both CC and PCC so that each filter_N produces a distinct
-                    # result.  For CC this also replaces the old whitening==A
-                    # guard which silently skipped the bandpass when whitening=N.
-                    tmp = np.array([
-                        bandpass(tr, freqmin=filterlow, freqmax=filterhigh,
-                                 df=params.cc.cc_sampling_rate, corners=8)
-                        for tr in _data
-                    ])
+                    tmp = _data_bp.copy()
                     if params.cc.clip_after_whiten:
                         tmp = winsorizing(tmp, params, input="timeseries")
 
@@ -919,22 +888,21 @@ def main(loglevel="INFO", chunk_size=0):
                         allcorr[ccfid][thistime] = corr[key]
                     del corr
 
+                # ── Cross-Correlation (CC) ────────────────────────────────
                 if len(cc_index):
                     if params.cc.cc_type == "CC":
-                        ffts = sf.fftn(_data, [nfft, ], axes=[1, ])
+                        # CC+whiten: whiten2 applies the spectral window, so
+                        # feed raw data into FFT (no prior bandpass needed).
+                        # CC+no-whiten: use the pre-bandpassed copy.
+                        _cc_src = _data_raw if params.cc.whitening != "N" else _data_bp
+                        ffts = sf.fftn(_cc_src, [nfft, ], axes=[1, ])
                         if params.cc.whitening != "N":
                             whiten2(ffts, nfft, low, high, p1, p2, psds,
                                     params.cc.whitening_type)  # inplace
                         if params.cc.clip_after_whiten:
-                            # logger.debug(
-                            #     "Winsorizing (clipping) data after whiten")
                             ffts = winsorizing(ffts, params, input="fft", nfft=nfft)
-
-                        # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
-                        energy = np.real(np.sqrt( np.mean(sf.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
-
-                        # logger.info("Pre-whitened %i traces"%(i+1))
-                        # Computing standard CC
+                        energy = np.real(np.sqrt(np.mean(
+                            sf.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
                         corr = myCorr2(ffts,
                                        np.ceil(params.cc.maxlag / dt),
                                        energy,
@@ -942,36 +910,22 @@ def main(loglevel="INFO", chunk_size=0):
                                        plot=False,
                                        nfft=nfft,
                                        normalized=params.cc.cc_normalisation)
-
                         for key in corr:
                             ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
-                            # logger.debug("CCF ID - CC: %s" % ccfid)
                             if ccfid not in allcorr:
                                 allcorr[ccfid] = {}
                             allcorr[ccfid][thistime] = corr[key]
                         del corr, energy, ffts
 
                     elif params.cc.cc_type == "PCC":
-                        # Phase Cross-Correlation (v=2, FFT-accelerated).
-                        # Band-pass filter to the current filter's frequency band
-                        # before computing the analytic signal — this is what
-                        # makes each filter_N produce a distinct PCC result.
-                        # (The CC path achieves the same via whiten2's frequency
-                        # window; PCC bypasses whitening so we apply it explicitly.)
-                        _data_pcc = np.array([
-                            bandpass(tr, freqmin=filterlow, freqmax=filterhigh,
-                                     df=params.cc.cc_sampling_rate, corners=8)
-                            for tr in _data
-                        ])
+                        # PCC: bandpass is already done (_data_bp). If whitening
+                        # is requested, whiten2 adds spectral shaping on top.
+                        _data_pcc = _data_bp.copy()
                         if params.cc.whitening != "N":
-                            # Optional: spectrally whiten within the band before
-                            # AmpNorm so the phase signal is broadband across the
-                            # full filter passband rather than dominated by the
-                            # most energetic frequency in the band.
                             ffts_pcc = sf.fftn(_data_pcc, [nfft, ], axes=[1, ])
                             whiten2(ffts_pcc, nfft, low, high, p1, p2, psds,
                                     params.cc.whitening_type)  # inplace
-                            _data_pcc = np.real(sf.ifft(ffts_pcc, n=nfft, axis=1)[:, :len(_data_pcc[0])])
+                            _data_pcc = np.real(sf.ifft(ffts_pcc, n=nfft, axis=1)[:, :_data_pcc.shape[1]])
                         corr = pcc_xcorr(_data_pcc,
                                          np.ceil(params.cc.maxlag / dt),
                                          None,
@@ -989,23 +943,19 @@ def main(loglevel="INFO", chunk_size=0):
                               "exiting")
                         exit(1)
 
+                # ── Same-station Cross-Component (SC) ─────────────────────
                 if len(single_station_pair_index_sc):
                     if params.cc.cc_type_single_station_SC == "CC":
-                        # logger.debug("Compute SC using %s" % params.cc.cc_type)
-                        ffts = sf.fftn(_data, [nfft, ], axes=[1, ])
+                        # Same logic as CC/CC above: raw → whiten2, or bp → no-whiten.
+                        _sc_src = _data_raw if params.cc.whitening != "N" else _data_bp
+                        ffts = sf.fftn(_sc_src, [nfft, ], axes=[1, ])
                         if params.cc.whitening != "N":
                             whiten2(ffts, nfft, low, high, p1, p2, psds,
                                     params.cc.whitening_type)  # inplace
                         if params.cc.clip_after_whiten:
-                            ffts = winsorizing(ffts, params, input="fft",
-                                               nfft=nfft)
-                        # energy = np.sqrt(np.sum(np.abs(ffts)**2, axis=1)/nfft)
+                            ffts = winsorizing(ffts, params, input="fft", nfft=nfft)
                         energy = np.real(np.sqrt(np.mean(
-                            sf.ifft(ffts, n=nfft, axis=1) ** 2,
-                            axis=1)))
-
-                        # logger.info("Pre-whitened %i traces"%(i+1))
-                        # Computing standard CC
+                            sf.ifft(ffts, n=nfft, axis=1) ** 2, axis=1)))
                         corr = myCorr2(ffts,
                                        np.ceil(params.cc.maxlag / dt),
                                        energy,
@@ -1013,7 +963,6 @@ def main(loglevel="INFO", chunk_size=0):
                                        plot=False,
                                        nfft=nfft,
                                        normalized=params.cc.cc_normalisation)
-
                         for key in corr:
                             ccfid = key.replace("_","+") + "+" + filter_name + "+" + thisdate
                             logger.debug("CCF ID - SC: %s" % ccfid)
@@ -1023,8 +972,14 @@ def main(loglevel="INFO", chunk_size=0):
                         del corr, energy, ffts
 
                     elif params.cc.cc_type_single_station_SC == "PCC":
-                        # Phase Cross-Correlation (v=2, FFT-accelerated).
-                        corr = pcc_xcorr(_data,
+                        # Same as CC/PCC: start from _data_bp, optionally whiten.
+                        _data_sc_pcc = _data_bp.copy()
+                        if params.cc.whitening != "N":
+                            ffts_sc_pcc = sf.fftn(_data_sc_pcc, [nfft, ], axes=[1, ])
+                            whiten2(ffts_sc_pcc, nfft, low, high, p1, p2, psds,
+                                    params.cc.whitening_type)  # inplace
+                            _data_sc_pcc = np.real(sf.ifft(ffts_sc_pcc, n=nfft, axis=1)[:, :_data_sc_pcc.shape[1]])
+                        corr = pcc_xcorr(_data_sc_pcc,
                                          np.ceil(params.cc.maxlag / dt),
                                          None,
                                          single_station_pair_index_sc,
