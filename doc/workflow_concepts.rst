@@ -212,6 +212,56 @@ Examples:
     OUTPUT/psd_1/psd_rms_1/_output/YA.UV05.00.HHZ.nc
 
 
+.. _concepts_reading_results:
+
+Reading Results
+================
+
+Once the pipeline has run you do not need to know the on-disk path layout or
+call low-level ``core.io`` functions.  The recommended interface is
+:class:`MSNoiseResult <msnoise.results.MSNoiseResult>`, a single object that:
+
+* knows which lineage branch it covers;
+* exposes **only** the ``get_*`` methods valid for that branch (invalid ones
+  raise ``AttributeError`` and are hidden from tab-completion);
+* returns :mod:`xarray` Dataset or DataArray objects that you can slice,
+  plot, or convert to pandas with one call.
+
+.. code-block:: python
+
+    from msnoise.results import MSNoiseResult
+    from msnoise.core.db import connect
+
+    db = connect()
+
+    # Stacked CCFs
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
+    da = r.get_ccf("BE.UCC..HHZ:BE.MEM..HHZ", "ZZ", ("1D", "1D"))
+
+    # Raw (pre-stack) CC outputs — only cc in lineage needed
+    r_cc = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1)
+    da = r_cc.get_ccf_raw("BE.UCC..HHZ:BE.MEM..HHZ", "ZZ",
+                           date="2023-01-01", kind="all")
+
+    # dv/v via MWCS
+    r_dvv = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                   stack=1, refstack=1,
+                                   mwcs=1, mwcs_dtt=1, mwcs_dtt_dvv=1)
+    ds = r_dvv.get_dvv(pair_type="CC", components="ZZ", mov_stack=("1D", "1D"))
+
+    # PSDs
+    r_psd = MSNoiseResult.from_ids(db, psd=1, psd_rms=1)
+    ds = r_psd.get_psd("BE.UCC..HHZ", day="2023-01-01")
+
+Every workflow step page links back to the full guide.
+
+.. seealso::
+
+   :ref:`msnoise_result` — full ``MSNoiseResult`` guide with all methods,
+   the ``kind="all"``/``"daily"`` CC output modes, branch navigation, and
+   dv/v export with provenance.
+
+
 Common recipes
 ==============
 

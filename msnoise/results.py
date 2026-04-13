@@ -1,33 +1,164 @@
 """
 MSNoiseResult — user-facing class for loading computed results.
 
-Methods are dynamically gated: only methods whose required category is present
-in the lineage are exposed.  Accessing a method whose category is absent raises
-``AttributeError`` with a clear message, and the method is absent from ``dir()``
-and tab-completion.
+``MSNoiseResult`` is the **recommended entry point** for reading any output
+produced by the MSNoise pipeline from a notebook or script.  You do not need
+to know the on-disk path layout or the low-level ``core.io`` functions: just
+build a result object for your lineage and call the appropriate ``get_*``
+method.
 
-Typical notebook usage::
+For the full reference see :class:`msnoise.results.MSNoiseResult`.
+
+Dynamic method gating
+---------------------
+
+Methods are dynamically gated: only methods whose required step category is
+present in the lineage are exposed.  Accessing an unavailable method raises
+``AttributeError`` with a clear message, and the method is absent from
+``dir()`` and tab-completion, so Jupyter's autocomplete only shows what is
+actually readable.
+
+Constructing a result object
+-----------------------------
+
+Use :meth:`MSNoiseResult.from_ids` with the integer config-set numbers for
+each step you want to include.  You only need to go as far down the pipeline
+as the data you want to read::
 
     from msnoise.results import MSNoiseResult
     from msnoise.core.db import connect
 
     db = connect()
 
-    # Build from integer step IDs (most common)
-    result = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
-                                    stack=1, refstack=1)
+    # ----- read stacked CCFs and everything downstream -----
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                               stack=1, refstack=1)
+    da = r.get_ccf("BE.UCC..HHZ:BE.MEM..HHZ", "ZZ", ("1D", "1D"))
+
+    # ----- read raw (pre-stack) CC outputs only -----
+    # Initialise only to filter level — get_ccf_raw is still available.
+    r_cc = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1)
+    da = r_cc.get_ccf_raw("BE.UCC..HHZ:BE.MEM..HHZ", "ZZ",
+                           date="2023-01-01", kind="all")
+
+    # ----- read all the way to dv/v -----
+    r_dvv = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                   stack=1, refstack=1,
+                                   mwcs=1, mwcs_dtt=1, mwcs_dtt_dvv=1)
+    ds = r_dvv.get_dvv(pair_type="CC", components="ZZ", mov_stack=("1D", "1D"))
 
     # Only methods valid for this lineage are visible
-    result.get_ccf(...)   # works — stack is in lineage
-    result.get_mwcs(...)  # AttributeError — mwcs not in lineage
+    r_cc.get_ccf(...)      # AttributeError — 'stack' not in lineage
+    r_cc.get_ccf_raw(...)  # works — 'cc' is in lineage
 
-    # Discover downstream branches (e.g. mwcs_1, stretching_1, wavelet_1)
-    for branch in result.branches():
-        print(branch.category, branch.lineage_names[-1])
+Available get_* methods
+------------------------
 
-    # Iterate all done results for a category
+.. list-table::
+   :header-rows: 1
+   :widths: 30 25 45
+
+   * - Method
+     - Requires in lineage
+     - Returns
+   * - ``get_ccf_raw``
+     - ``cc``
+     - Raw per-window or daily-stacked CCFs written by ``s03``
+   * - ``get_ccf``
+     - ``stack``
+     - Moving-stacked CCFs written by ``s04``
+   * - ``get_ref``
+     - ``refstack``
+     - Reference stacks written by ``s04_stack_refstack``
+   * - ``get_mwcs``
+     - ``mwcs``
+     - MWCS results written by ``s05``
+   * - ``get_mwcs_dtt``
+     - ``mwcs_dtt``
+     - MWCS dt/t results written by ``s06``
+   * - ``get_stretching``
+     - ``stretching``
+     - Stretching results written by ``s10``
+   * - ``get_wct``
+     - ``wavelet``
+     - Wavelet coherence results written by ``s08``
+   * - ``get_wct_dtt``
+     - ``wavelet_dtt``
+     - WCT dt/t results written by ``s09``
+   * - ``get_dvv``
+     - any dvv step
+     - Aggregated dv/v written by ``s07``
+   * - ``get_psd``
+     - ``psd``
+     - Daily PSD written by ``psd_compute``
+   * - ``get_psd_rms``
+     - ``psd_rms``
+     - PSD RMS written by ``psd_compute_rms``
+
+Reading raw CC outputs (pre-stack)
+------------------------------------
+
+``get_ccf_raw`` reads the files written directly by ``s03_compute_no_rotation``
+*before* any stacking.  Two storage layouts exist depending on the config:
+
+* ``kind="all"`` — per-window CCFs under ``_output/all/`` with dims
+  ``(times, taxis)`` where ``times`` is the window start time.
+* ``kind="daily"`` — daily-stacked CCFs under ``_output/daily/`` with dim
+  ``(taxis,)`` per file.
+
+The method only requires ``cc`` in the lineage, so you can call it on a
+filter-level result without needing ``stack`` or anything further::
+
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1)
+
+    # Single day — per-window DataArray with dims (times, taxis)
+    da = r.get_ccf_raw("BE.UCC..HHZ:BE.MEM..HHZ", "ZZ",
+                        date="2023-01-01", kind="all")
+
+    # All days for one pair, daily stacks — dict keyed by date string
+    d = r.get_ccf_raw("BE.UCC..HHZ:BE.MEM..HHZ", "ZZ", kind="daily")
+
+    # Concatenate all days into a single DataArray (times, taxis)
+    import xarray as xr
+    da_all = xr.concat(d.values(), dim="times").sortby("times")
+
+Navigating branches
+--------------------
+
+When a lineage has more than one downstream branch (e.g. ``mwcs_1`` *and*
+``stretching_1`` both follow ``refstack_1``), use :meth:`branches` to
+enumerate them::
+
+    r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                               stack=1, refstack=1)
+    for branch in r.branches():
+        print(branch)   # MSNoiseResult(category='mwcs', ...)
+
+Iterating over all completed results
+--------------------------------------
+
+:meth:`list` returns every ``MSNoiseResult`` for which at least one Done job
+exists in the given category::
+
     for r in MSNoiseResult.list(db, "mwcs_dtt"):
-        df = r.get_mwcs_dtt("YA.UV05.00:YA.UV06.00", "ZZ", ("6h", "6h"))
+        ds = r.get_mwcs_dtt("BE.UCC..HHZ:BE.MEM..HHZ", "ZZ", ("1D", "1D"))
+
+Exporting dv/v with provenance
+--------------------------------
+
+:meth:`export_dvv` writes dv/v NetCDF files that embed full provenance
+(lineage string, all config parameters, station metadata)::
+
+    r = MSNoiseResult.list(db, "mwcs_dtt_dvv")[0]
+    written = r.export_dvv("exports/")
+    for f in written:
+        print(f)  # dvv_CC_ZZ__pre1-cc1-f1-stk1-ref1-mwcs1-dtt1-dvv1__m1D-1D.nc
+
+    # Reload and inspect the embedded params
+    import xarray as xr, yaml
+    ds = xr.open_dataset(written[0])
+    params = yaml.safe_load(ds.attrs["msnoise_params"])
+    print(params["mwcs"]["mwcs_wlen"])
 """
 
 from __future__ import annotations

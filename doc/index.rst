@@ -98,6 +98,7 @@ Interacting with MSNoise
     :glob:
 
     how_tos
+    results
     auto_examples/index
     api
     core
