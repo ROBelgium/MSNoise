@@ -255,7 +255,7 @@ slid, and per-filter results accumulated and saved.
        graph [
            rankdir=LR
            fontname="Helvetica,Arial,sans-serif"
-           fontsize=11
+           fontsize=12
            nodesep=0.4
            ranksep=0.6
            bgcolor="white"
@@ -264,8 +264,8 @@ slid, and per-filter results accumulated and saved.
            labelloc=t
            labeljust=l
        ]
-       node [fontname="Helvetica,Arial,sans-serif" fontsize=10 style=filled]
-       edge [fontname="Helvetica,Arial,sans-serif" fontsize=9 color="#444444"]
+       node [fontname="Helvetica,Arial,sans-serif" fontsize=11 style=filled penwidth=1.5]
+       edge [fontname="Helvetica,Arial,sans-serif" fontsize=10 color="#444444" penwidth=1.2]
 
        node [shape=oval fillcolor="#263238" fontcolor=white color="#263238"]
        START [label="begin"]
@@ -373,7 +373,7 @@ where ``whiten2`` applies the spectral window itself).
        graph [
            rankdir=TB
            fontname="Helvetica,Arial,sans-serif"
-           fontsize=11
+           fontsize=12
            nodesep=0.4
            ranksep=0.5
            bgcolor="white"
@@ -382,8 +382,8 @@ where ``whiten2`` applies the spectral window itself).
            labelloc=t
            labeljust=l
        ]
-       node [fontname="Helvetica,Arial,sans-serif" fontsize=10 style=filled]
-       edge [fontname="Helvetica,Arial,sans-serif" fontsize=9 color="#444444"]
+       node [fontname="Helvetica,Arial,sans-serif" fontsize=11 style=filled penwidth=1.5]
+       edge [fontname="Helvetica,Arial,sans-serif" fontsize=10 color="#444444" penwidth=1.2]
 
        node [shape=oval fillcolor="#607D8B" fontcolor=white color="#607D8B"]
        ENTRY [label="enter\n_data_bp  (bandpassed once)\n_data_raw (for CC+whiten path)"]
@@ -394,7 +394,7 @@ where ``whiten2`` applies the spectral window itself).
 
        subgraph cluster_ac {
            label="Auto-Correlation (AC)" labelloc=t
-           color="#F9A825" style=rounded penwidth=1.5
+           color="#F9A825" style=rounded penwidth=2.0
 
            node [shape=diamond fillcolor="#FFF9C4" fontcolor="#0D1B2A" color="#F9A825"]
            D_AC     [label="AC pairs?"]
@@ -415,7 +415,7 @@ where ``whiten2`` applies the spectral window itself).
 
        subgraph cluster_cc {
            label="Cross-Correlation (CC)" labelloc=t
-           color="#2E7D32" style=rounded penwidth=1.5
+           color="#2E7D32" style=rounded penwidth=2.0
 
            node [shape=diamond fillcolor="#E8F5E9" fontcolor="#0D1B2A" color="#2E7D32"]
            D_CC     [label="CC pairs?"]
@@ -435,7 +435,7 @@ where ``whiten2`` applies the spectral window itself).
 
        subgraph cluster_sc {
            label="Same-station Cross-Component (SC)" labelloc=t
-           color="#6A1B9A" style=rounded penwidth=1.5
+           color="#6A1B9A" style=rounded penwidth=2.0
 
            node [shape=diamond fillcolor="#F3E5F5" fontcolor="#0D1B2A" color="#6A1B9A"]
            D_SC     [label="SC pairs?"]
