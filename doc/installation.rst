@@ -1,164 +1,273 @@
 .. _installation:
 
-******************************
+************
 Installation
-******************************
+************
 
-MSNoise is a python package that uses a database (sqlite, MySQL/MariaDB or Postgresql) for storing
-station and files metadata together with jobs. When installed, it provides a top
-level command ``msnoise`` in the console.
+MSNoise requires Python ≥ 3.10 and a database backend (SQLite for quick
+starts, PostgreSQL or MariaDB for production use).  This page covers the
+recommended path — conda-forge + MSNoiseDB — and optional notes for
+advanced users who prefer to manage their own database server.
 
-Note that MSNoise is always tested against the latest release versions of the main packages, so older installations that are not maintained/updated regularly (years) could encounter issues. Please make sure you have the latest version of Numpy and Scipy (and MKL), as performance gets better and better (especially since Anaconda Inc. released its fast MKL implementations for all users, in the conda-forge channel).
-
-To run MSNoise, you need:
-
-* A recent version of Python (3.14 recommended). We suggest using Miniconda_
-  and creating a fresh environment for running msnoise.
-  MSNoise is tested "continuously" on GitHub for the last 2 most recent python version, and the three OS.
+.. contents::
+   :local:
+   :depth: 2
 
 
-* Database: MariaDB or Postgresql: if you want to use a database,
-  you need to install and configure a dabatase Server beforehand.
-  This is not needed for sqlite. Read :ref:`aboutdbandperformances` for
-  more information. We recommend using a database server when the number of
-  stations/jobs is large, as parallelism of the workflow will allow you to
-  process more data at once, compared with using sqlite.
+Step 1 — Install MSNoise
+=========================
+
+We recommend `Miniconda <https://docs.anaconda.com/free/miniconda/>`_ and a
+dedicated conda environment.  All dependencies are available on
+**conda-forge**.
+
+Create the environment
+-----------------------
+
+Save the following as ``environment.yml`` — this is the exact file used by
+MSNoise's own GitHub CI:
+
+.. code-block:: yaml
+
+    name: msnoise
+    channels:
+      - conda-forge
+    dependencies:
+      - numpy
+      - scipy
+      - obspy>=1.4.1
+      - sqlalchemy
+      - sqlalchemy-utils
+      - flask
+      - flask-admin<2
+      - flask-wtf
+      - flask-babel
+      - markdown
+      - wtforms<3.2
+      - logbook
+      - pytables
+      - click
+      - click-plugins
+      - pandas
+      - folium
+      - pymysql
+      - xarray
+      - netCDF4
+      - pooch
+      - pip
+      - pip:
+          - git+https://github.com/regeirk/pycwt
+
+Then create and activate it:
+
+.. code-block:: sh
+
+    conda env create -f environment.yml
+    conda activate msnoise
+
+Install MSNoise
+---------------
+
+The latest stable release from conda-forge:
+
+.. code-block:: sh
+
+    conda install -c conda-forge msnoise
+
+Or directly from GitHub (development version, not recommended for production):
+
+.. code-block:: sh
+
+    pip install git+https://github.com/ROBelgium/MSNoise.git
+
+Verify the installation:
+
+.. code-block:: sh
+
+    msnoise --version
+    msnoise utils bugreport -s -m
 
 
-MSNoise's best friend: MSNoiseDB
---------------------------------
+Step 2 — Set up a database with MSNoiseDB
+==========================================
 
-Let's be honest, installing MySQL or else has ALWAYS been a pain for new users, and even if it's relatively simple,
-it has been one of the most common complain about msnoise. So, to simplify your life, I've created MSNoiseDB, the
-database minion. It's a full package, that sets up a local, user-run postgresql server (without security), that
-you can immediately use.
+Setting up MySQL or PostgreSQL from scratch has always been a friction point
+for new users.  **MSNoiseDB** eliminates that: it bundles a self-contained,
+user-run PostgreSQL server that requires no system privileges, no passwords,
+and no server administration.
 
-Check https://github.com/ROBelgium/msnoise-db to install & set up you database server. Once create, you'll be able
-to create new databases, and directly connect any new msnoise project to it:
+.. note::
 
-$ msnoise db init
+   MSNoiseDB is the recommended database backend for all new MSNoise
+   projects.  SQLite remains available for quick local tests (see
+   :ref:`sqlite_option` below) but has limitations when running many
+   parallel workers.
 
-Then : choose postgresql, the hostname was provided when you started msnoisedb, default to localhost:5050.
-
-Voilà!
-
-
-
-OLD INFO: CHECK IF WE NEED TO KEEP OR GET RID OF:
-Full Installation
+Install MSNoiseDB
 -----------------
 
-1. Download and install Miniconda_ for your machine, make sure Miniconda's Python
-   is the default python for your user
+.. code-block:: sh
+
+    pip install msnoisedb
+
+or via conda-forge (once available):
+
+.. code-block:: sh
+
+    conda install -c conda-forge msnoisedb
+
+See `github.com/ROBelgium/msnoise-db <https://github.com/ROBelgium/msnoise-db>`_
+for the full documentation.
+
+Start the database server
+--------------------------
+
+.. important::
+
+   MSNoiseDB creates its database files **in the current working directory**
+   the first time it starts.  Always run it from the **same dedicated folder**
+   every time.  If you start it from a different directory, it will create a
+   new, empty database there instead.
+
+Choose or create a permanent home for MSNoiseDB — separate from your MSNoise
+projects:
+
+.. code-block:: sh
+
+    mkdir ~/msnoisedb
+    cd ~/msnoisedb
+    msnoisedb start
+
+The first run initialises the PostgreSQL cluster inside ``~/msnoisedb/``.
+Subsequent runs just start the server.  The command prints the connection
+details, for example:
+
+.. code-block:: text
+
+    MSNoiseDB started.
+    Host : localhost
+    Port : 5050
+
+Keep this terminal open (or run it in the background) while MSNoise is
+processing.  To stop the server:
+
+.. code-block:: sh
+
+    cd ~/msnoisedb
+    msnoisedb stop
+
+Create a new MSNoise project
+-----------------------------
+
+In a **separate** folder (your project folder, not the MSNoiseDB folder):
+
+.. code-block:: sh
+
+    mkdir ~/my_msnoise_project
+    cd ~/my_msnoise_project
+    msnoise db init
+
+When prompted, select **postgresql** and use the host and port printed by
+MSNoiseDB (``localhost:5050`` by default).  MSNoise will create a new
+database automatically.  You are ready to go!
+
+.. code-block:: sh
+
+    msnoise admin   # opens the web configurator at http://localhost:5000
 
 
-2. Execute the following command to install the missing packages:
-   
-   .. code-block:: sh
+Step 3 — Verify
+================
 
-        conda install -c conda-forge flask-admin flask-wtf markdown folium pymysql logbook pandas pytables pip xarray
-        conda install -c conda-forge obspy
-        conda install -c conda-forge msnoise
+Run the fast smoke-test suite from your project folder to confirm everything
+is wired up correctly:
 
+.. code-block:: sh
 
-3. Prepare a portable database server:
+    msnoise utils test --fast
 
-   * The following instructions are for MariaDB similar to https://www.mariadb.education/install-portable, but can be replicated easily for postgresql.
-   * Download the zip/tarball version of MariaDB portable (MariaDBs_)
-   * Extract the zip/tarball in a folder and open a console into the folder:
+All 32 tests should pass in under 30 seconds.  If any fail, run:
 
-   * Navigate to the bin/ directory (Windows) or scripts/ directory (Linux)
-   * execute the ``mariadb-install-db.exe`` (Windows) or ``mariadb-install-db`` (Linux)
-   * test the server by running the ``bin/mysqld --console``  command, you should see the server starting.
-   * Keep the server running for now (later you'll use CTRL-C to kill the server)
+.. code-block:: sh
 
+    msnoise utils bugreport -a
 
-4. Create a database:
+and check the output for missing dependencies.
 
-   * In a new (!!) console (so keep the server running in the other console)
-   * Go to the ``bin/`` directory and execute ``mysqladmin -u root  flush-privileges password "SECRET"`` where SECRET is a password (not very important to make it secure here)
-   * test the connection with ``mysql -u root -p`` where you should be prompted for the password
-   * the prompt should look like ``MariaDB [(none)]>`` now.
-   * execute the command ``CREATE DATABASE msnoise;`` (the ; semicolumn is important)
-   * List the databases with ``SHOW DATABASES;`` which should show the native MariaDB dbs, and our msnoise db.
-   * From here, we can continue using the root user, or create a msnoise user, but this is not essential (see https://phoenixnap.com/kb/how-to-create-mariadb-user-grant-privileges) for instructions.
-   * Close the connection by executing the ``quit;`` command.
+Proceed to the :ref:`workflow_000` section to start your first MSNoise run!
 
 
-5. Check which required packages you are still missing by executing the
-   ``msnoise utils bugreport`` command. (See :ref:`testing`)
+.. _sqlite_option:
+
+Advanced — SQLite (quick local tests only)
+==========================================
+
+SQLite requires no server setup and is useful for exploring MSNoise on a
+laptop or running the test suite without MSNoiseDB:
+
+.. code-block:: sh
+
+    mkdir ~/msnoise_sqlite_test
+    cd ~/msnoise_sqlite_test
+    msnoise db init   # choose sqlite when prompted
+
+.. warning::
+
+   SQLite does not support concurrent writes.  Running more than one worker
+   (``msnoise -t 2 cc compute``) on an SQLite project will cause database
+   lock errors.  Use PostgreSQL via MSNoiseDB for any real processing.
 
 
-6. To be sure all is running OK, one could start the ``msnoise utils test`` command.
-   This will start the standard MSNoise test suite, which should end with a
-   "Ran xx tests in yy seconds : OK".
+Advanced — Self-managed MariaDB / PostgreSQL
+=============================================
 
+If your institution already runs a database server, or you need multi-user
+access to a shared MSNoise database, you can connect directly.
 
-7. Proceed to the :ref:`Workflow` description to start MSNoise!
+MariaDB / MySQL
+---------------
 
-Done !
+1. Create a database and user on your server:
 
+   .. code-block:: sql
 
-Database Structure - Tables
-----------------------------
-MSNoise will create the tables automatically upon running the installer script
-(see :ref:`Workflow`).
+       CREATE DATABASE msnoise;
+       CREATE USER 'msnoise'@'localhost' IDENTIFIED BY 'secret';
+       GRANT ALL PRIVILEGES ON msnoise.* TO 'msnoise'@'localhost';
+       FLUSH PRIVILEGES;
+
+2. Run ``msnoise db init`` and choose **mysql** with your server's host,
+   port, user and password.
+
+PostgreSQL
+----------
+
+.. code-block:: sh
+
+    createdb msnoise
+
+Then run ``msnoise db init`` and choose **postgresql**.
+
+See :ref:`aboutdbandperformances` for guidance on when a dedicated server
+pays off over MSNoiseDB.
 
 
 Building this documentation
----------------------------
-
-To build this documentation, some modules are required:
+============================
 
 .. code-block:: sh
 
-    conda install -c conda-forge "sphinx<6" sphinx_bootstrap_theme numpydoc sphinx-gallery
-    pip install "sphinx_rtd_theme>1"
-    pip install pillow==9.0.0
-
-If you plan to build the interaction examples, you'll need to download this link:
-
-.. todo:: ADD LINK TO THE BIG DATA REPO
-
-and define an environment variable ``MSNOISE_DOC`` with the path to where that data has been extracted.
-
-Then, this should simply work:
-
-.. code-block:: sh
-
+    conda install -c conda-forge sphinx sphinx-rtd-theme numpydoc sphinx-gallery
+    cd doc/
     make html
-    
-it will create a .build/html folder containing the documentation.
 
-You can also build the doc to Latex and then use your favorite Latex-to-PDF
-tool.
+The built documentation appears in ``doc/_build/html/``.
 
-
-Using the development version
------------------------------
-
-This is not recommended, but users willing to test the latest development
-(hopefully stable) version of MSNoise can:
+To include the gallery examples, define:
 
 .. code-block:: sh
 
-    pip uninstall msnoise
-    pip install http://msnoise.org/master.zip
-
-Please note this version most probably uses the very latest version of every
-package: Release versions of `numpy`, `scipy`, etc obtained from conda-forge
-and "master" version of `obspy`. The development version (master) of obspy can
-be installed from github: (warning regular Windows users, you might not be able to build the obspy package)
-
-.. code-block:: sh
-
-    pip uninstall obspy
-    pip install https://github.com/obspy/obspy/archive/master.zip
-
-If you are using the master version, please use the issue tracker of github to
-communicate about bugs and not the mailing list, preferably used for Releases.
+    export MSNOISE_DOC=/path/to/example/data
 
 
-.. _obspy: http://www.obspy.org
-.. _Miniconda: https://docs.anaconda.com/free/miniconda/#latest-miniconda-installer-links
-.. _MariaDBs: https://mariadb.org/download/?t=mariadb&p=mariadb&r=10.11.6&os=windows&cpu=x86_64&pkg=zip&m=serverion
+.. _Miniconda: https://docs.anaconda.com/free/miniconda/
