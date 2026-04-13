@@ -375,6 +375,153 @@ class MSNoiseResult:
             return {k[2]: v for k, v in results.items()}
         return results
 
+    @_lineage_method("cc")
+    def get_ccf_raw(self, pair=None, components=None, date=None, kind="all"):
+        """Load raw CC step outputs (per-window or daily-stacked CCFs).
+
+        Reads the files written by ``s03_compute_no_rotation`` **before**
+        stacking.  Requires only ``'cc'`` in the lineage, so a result
+        initialised down to ``filter_N`` (e.g.
+        ``MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1)``) exposes
+        this method.
+
+        Path layout on disk::
+
+            <o> / preprocess_1 / cc_1 / filter_1 / _output / all|daily
+                         / <comp> / <sta1>_<sta2> / <YYYY-MM-DD>.nc
+
+        Parameters
+        ----------
+        pair : str or None
+            Station pair in ``"NET.STA.LOC:NET.STA.LOC"`` format.
+            When *None* all available pairs are returned.
+        components : str or None
+            Component string, e.g. ``"ZZ"``.  *None* = all.
+        date : str or None
+            ISO date ``"YYYY-MM-DD"``.  *None* = all available dates.
+        kind : {"all", "daily"}
+            ``"all"``   — per-window CCFs (``_output/all/``), dims
+            ``(times, taxis)`` per file.
+            ``"daily"`` — daily-stacked CCFs (``_output/daily/``), dim
+            ``(taxis,)`` per file, expanded with a ``times`` coordinate so
+            results can be concatenated by the caller.
+
+        Returns
+        -------
+        xarray.DataArray
+            When *pair*, *components* **and** *date* are all specified.
+        dict
+            Otherwise: keys are ``(pair_key, comp, date_str)`` tuples,
+            collapsed to 1-tuples for any dimension fixed by the caller.
+
+        Raises
+        ------
+        ValueError
+            If no ``cc_*`` or filter step is found in the lineage.
+
+        Example::
+
+            r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1)
+
+            # Single file — per-window DataArray (times, taxis)
+            da = r.get_ccf_raw("BE.UCC..HHZ:BE.MEM..HHZ", "ZZ",
+                                date="2023-01-01", kind="all")
+
+            # All dates for one pair/comp — daily stacks
+            d = r.get_ccf_raw("BE.UCC..HHZ:BE.MEM..HHZ", "ZZ", kind="daily")
+            # d is {date_str: DataArray(times=[T], taxis=...)}
+        """
+        import os
+        import glob as _glob
+
+        import pandas as _pd
+        from .core.io import xr_get_ccf_all, xr_get_ccf_daily
+
+        # ── derive cc_lineage and filter_step ────────────────────────────────
+        cc_idx = next(
+            (i for i, n in enumerate(self.lineage_names) if n.startswith("cc_")),
+            None,
+        )
+        if cc_idx is None:
+            raise ValueError("No 'cc_*' step found in lineage_names.")
+        cc_lineage = self.lineage_names[: cc_idx + 1]   # e.g. ['preprocess_1', 'cc_1']
+        if cc_idx + 1 >= len(self.lineage_names):
+            raise ValueError(
+                "No filter step found after cc_* in lineage_names. "
+                "CC outputs are stored under the filter step name; "
+                "initialise with at least filter=1."
+            )
+        filter_step = self.lineage_names[cc_idx + 1]    # e.g. 'filter_1'
+
+        root = self.output_folder
+        loader = xr_get_ccf_all if kind == "all" else xr_get_ccf_daily
+
+        # ── fast path: fully specified ────────────────────────────────────────
+        if pair is not None and components is not None and date is not None:
+            sta1, sta2 = pair.split(":")
+            return loader(root, cc_lineage, filter_step, sta1, sta2, components, date)
+
+        # ── discovery ────────────────────────────────────────────────────────
+        kind_dir = os.path.join(root, *cc_lineage, filter_step, "_output", kind)
+        comp_list = (
+            [components] if components is not None
+            else [os.path.basename(p)
+                  for p in sorted(_glob.glob(os.path.join(kind_dir, "*")))
+                  if os.path.isdir(p)]
+        )
+
+        results = {}
+        for comp in comp_list:
+            if pair is not None:
+                sta1_raw, sta2_raw = pair.split(":")
+                pair_dirs = [os.path.join(kind_dir, comp, f"{sta1_raw}_{sta2_raw}")]
+            else:
+                pair_dirs = sorted(
+                    p for p in _glob.glob(os.path.join(kind_dir, comp, "*"))
+                    if os.path.isdir(p)
+                )
+
+            for pair_dir in pair_dirs:
+                if not os.path.isdir(pair_dir):
+                    continue
+                dir_name = os.path.basename(pair_dir)
+                sta1, sta2 = dir_name.split("_", 1)
+                pair_key = f"{sta1}:{sta2}"
+
+                date_files = (
+                    [os.path.join(pair_dir, f"{date}.nc")]
+                    if date is not None
+                    else sorted(_glob.glob(os.path.join(pair_dir, "*.nc")))
+                )
+
+                for fpath in date_files:
+                    if not os.path.isfile(fpath):
+                        continue
+                    date_str = os.path.splitext(os.path.basename(fpath))[0]
+                    try:
+                        da = loader(root, cc_lineage, filter_step,
+                                    sta1, sta2, comp, date_str)
+                        if kind == "daily":
+                            # Expand so callers can xr.concat along times
+                            da = da.expand_dims(
+                                {"times": [_pd.Timestamp(date_str)]}
+                            )
+                        results[(pair_key, comp, date_str)] = da
+                    except Exception:
+                        pass
+
+        # ── collapse fixed dimensions ─────────────────────────────────────────
+        if pair is not None and components is not None:
+            # Only date varies → {date_str: DataArray}
+            return {k[2]: v for k, v in results.items()}
+        if pair is not None and date is not None:
+            # Only comp varies → {comp: DataArray}
+            return {k[1]: v for k, v in results.items()}
+        if components is not None and date is not None:
+            # Only pair varies → {pair_key: DataArray}
+            return {k[0]: v for k, v in results.items()}
+        return results
+
     @_lineage_method("refstack")
     def get_ref(self, pair=None, components=None):
         """Load reference stacks. Requires 'refstack' in lineage.
