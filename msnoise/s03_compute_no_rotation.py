@@ -1,43 +1,254 @@
-""" This code is responsible for the computation of the cross-correlation
-functions.
+r"""Computation of inter-station and single-station cross-correlation functions.
 
-This script will group *jobs* marked "T"odo in the database by day and process
-them using the following scheme. As soon as one day is selected, the
-corresponding jobs are marked "I"n Progress in the database. This allows
-running several instances of this script in parallel.
+This module implements the ``msnoise cc compute`` worker.  It groups *jobs*
+marked **T**odo in the database by day, marks them **I**n-progress, processes
+all sliding windows and filters for that day, then marks them **D**one.
+Multiple instances can run in parallel because each worker atomically claims
+its own batch of jobs.
 
-As of MSNoise 1.6, the ``compute`` step has been completely rewritten:
 
-* The ``compute_cc`` step has been completely rewritten to make use of 2D arrays
-  holding the data, processing them "in place" for the different steps (FFT,
-  whitening, etc). This results in much more efficient computation. The process
-  slides on time windows and computes the correlations using indexes in a 2D
-  array, therefore avoiding an exponential number of identical operations on
-  data windows.
+Overview
+--------
 
-* This new code is the default ``compute_cc``, and it doesn't allow computing
-  rotated components. For users needing ``R`` or ``T`` components, there are two
-  options: either use the old code, now named ``compute_cc_rot``, or compute the
-  full (6 components actually are enough) tensor using the new code, and rotate
-  the components afterwards. From initial tests, this latter solution is a lot
-  faster than the first, thanks to the new processing in 2D.
+The worker operates on 2-D arrays of shape ``(n_stations, N)`` — one row per
+pre-processed trace, one column per sample — and processes all station pairs
+simultaneously for each time window.  Two independent correlation algorithms
+are available:
 
-* It is now possible to do the Cross-Correlation (classic "CC"), the Auto-
-  Correlation ("AC") or the Cross-Components within the same station ("SC").
-  To achieve this, we removed the `ZZ`, `ZT`, etc parameters from the
-  configuration and replaced it with ``components_to_compute`` which takes a
-  list: e.g. `ZZ,ZE,ZN,EZ,EE,EN,NZ,NE,NN` for the full non-rotated tensor
-  between stations. Adding components to the new
-  ``components_to_compute_single_station`` will allow computing the
-  cross-components (SC) or auto-correlation (AC) of each station.
+* **CC** — classic Generalised Normalised Cross-Correlation (GNCC), computed
+  in the frequency domain via FFT (see `Cross-Correlation (CC)`_ below).
+* **PCC** — Phase Cross-Correlation v2 (PCC2), a transient-robust
+  alternative that operates in the time domain before taking any FFT (see
+  `Phase Cross-Correlation (PCC2)`_ below).
 
-* The cross-correlation is done on sliding windows on the available data. For
-  each window, if one trace contains a gap, it is eliminated from the
-  computation. This corrects previous errors linked with gaps synchronised in
-  time that lead to perfect sinc autocorrelation functions. The windows should
-  have a duration of at least "2 times the `maxlag`+1" to be computable.
+The algorithm is selected per correlation mode through three independent
+configuration parameters: ``cc_type`` (inter-station CC),
+``cc_type_single_station_AC`` (auto-correlation) and
+``cc_type_single_station_SC`` (same-station cross-component).
 
-TODO write documentation for the PCC implementation.
+
+Cross-Correlation (CC)
+----------------------
+
+The classic ambient-noise cross-correlation (Shapiro & Campillo 2004;
+Bensen et al. 2007) is computed using the tiled-batch implementation
+:func:`~msnoise.core.compute.myCorr2`.
+
+**Processing chain for each time window and filter band:**
+
+1. **Temporal normalisation** — optional Winsorising (clipping to
+   ``winsorizing`` × RMS) applied either *before* whitening (default) or
+   *after* (``clip_after_whiten = Y``).
+
+2. **Time-domain taper** — a cosine (Hann) taper of width
+   ``cc_taper_fraction × N`` is applied symmetrically to both ends to
+   suppress spectral leakage.
+
+3. **FFT** — each trace is zero-padded to ``nfft = next_fast_len(N)`` and
+   transformed to the frequency domain:
+
+   .. math::
+
+       X_i[k] = \mathcal{F}\{x_i[n]\}, \quad k = 0, \ldots, N_\text{fft}-1
+
+4. **Spectral whitening** — controlled by ``whitening`` and ``whitening_type``
+   (see :func:`~msnoise.core.compute.whiten2`).  Three modes are available:
+
+   - ``whitening = N`` — no whitening; a bandpass filter is applied in the
+     time domain instead to restrict each window to the current filter band.
+   - ``whitening = A`` — whiten all traces (including auto-correlations).
+   - ``whitening = C`` — whiten only when the two components differ.
+
+   Three spectral shapes are supported via ``whitening_type``:
+
+   - *Brutal* (default) — sets ``|X[k]| = 1`` inside the passband with a
+     cosine taper at the edges; equivalent to retaining only the spectral
+     phase.
+   - *HANN* — Hann-weighted one-bit normalisation inside the passband.
+   - *PSD* — divides by the smoothed power spectral density, then clips
+     outlier bins at the 5th–95th percentile.
+
+5. **Cross-spectrum and IFFT** — for each requested pair :math:`(i, j)`:
+
+   .. math::
+
+       C_{ij}[k] = X_i^*[k] \cdot X_j[k]
+
+   .. math::
+
+       c_{ij}[\tau] = \mathcal{F}^{-1}\{C_{ij}[k]\} \,/\, N
+
+   The output is folded so that negative lags :math:`[-\tau_\text{max}, 0)`
+   precede positive lags :math:`[0, \tau_\text{max}]`, yielding a CCF of
+   length :math:`2\,\tau_\text{max} + 1` samples.
+
+6. **Normalisation** — optional post-processing controlled by
+   ``cc_normalisation``:
+
+   - ``POW`` — divide by the product of the per-station RMS energies
+     :math:`(e_i \cdot e_j)`.
+   - ``MAX`` — divide by the maximum value of the CCF.
+   - ``ABSMAX`` — divide by the absolute maximum.
+
+**References**
+
+Bensen, G. D., Ritzwoller, M. H., Barmin, M. P., Levshin, A. L., Lin, F.,
+Moschetti, M. P., Shapiro, N. M., & Yang, Y. (2007).
+Processing seismic ambient noise data to obtain reliable broad-band surface
+wave dispersion measurements.
+*Geophysical Journal International*, 169(3), 1239–1260.
+https://doi.org/10.1111/j.1365-246X.2007.03374.x
+
+Shapiro, N. M., & Campillo, M. (2004).
+Emergence of broadband Rayleigh waves from correlations of the ambient
+seismic noise.
+*Geophysical Research Letters*, 31(7), L07614.
+https://doi.org/10.1029/2004GL019491
+
+
+Phase Cross-Correlation (PCC2)
+------------------------------
+
+Phase Cross-Correlation (Schimmel 1999; Schimmel et al. 2011) is an
+alternative to the classic GNCC that discards amplitude information entirely
+at every sample, making it intrinsically robust against transient noise
+(earthquakes, instrumental glitches) *without* requiring explicit temporal
+normalisation such as one-bit or clipping.  MSNoise implements PCC version 2
+(PCC2), the FFT-accelerated formulation introduced by Ventosa et al. (2019,
+2023) as part of the FastPCC package.  The implementation is self-contained
+in :func:`~msnoise.core.compute.pcc_xcorr` and does **not** depend on the
+``phasecorr`` or ``fastpcc`` external packages.
+
+**Algorithm**
+
+For each trace :math:`x_i[n]` of length :math:`N`:
+
+1. **Band-pass filter** — the trace is band-pass filtered (8-pole Butterworth,
+   zero-phase) to the current filter band :math:`[f_\text{low}, f_\text{high}]`
+   *before* any further processing.  This is essential: because PCC discards
+   spectral amplitudes, the filter band is the *only* mechanism that makes each
+   ``filter_N`` configuration produce a distinct cross-correlation.  (For CC,
+   the same role is played by the frequency-domain passband of ``whiten2``.)
+
+2. **Optional spectral whitening** — if ``whitening ≠ N``, the bandpass output
+   is FFT-whitened within the filter band and transformed back to the time
+   domain.  This distributes energy evenly across all frequencies inside the
+   passband *before* amplitude normalisation, so that the PCC phase signal
+   reflects broadband phase coherence rather than being dominated by the most
+   energetic frequency in the band.
+
+3. **Analytic signal and amplitude normalisation** — the complex analytic
+   signal :math:`x_i^{(a)}[n]` is computed via the Hilbert transform (FFT-based,
+   :func:`scipy.signal.hilbert`).  Each sample is then divided by its own
+   amplitude to produce the *phase signal* :math:`\varphi_i`:
+
+   .. math::
+
+       \varphi_i[n] = \frac{x_i^{(a)}[n]}{|x_i^{(a)}[n]| + \varepsilon}
+
+   where :math:`\varepsilon = 10^{-6} \max_n |x_i^{(a)}[n]|` is a numerical
+   stability floor (matching FastPCC's ``AmpNormf`` convention).
+   By construction, :math:`|\varphi_i[n]| \leq 1` for all :math:`n`, and
+   :math:`|\varphi_i[n]| \approx 1` wherever the signal is not near zero.
+   This per-sample normalisation is what makes PCC insensitive to amplitude
+   transients: a spike 1000 × larger than the ambient noise is reduced to
+   exactly the same weight as any other sample.
+
+4. **Zero-padding** — each phase signal is zero-padded to
+   :math:`N_z = \text{next\_fast\_len}(N + \tau_\text{max})` to compute a
+   linear (non-circular) cross-correlation and avoid wrap-around artefacts.
+
+5. **FFT cross-spectrum and IFFT** — all phase signals are pre-transformed
+   once, then for each pair :math:`(i, j)`:
+
+   .. math::
+
+       \text{PCC2}_{ij}[\tau] = \mathcal{F}^{-1}\!\left\{
+           \Phi_i^*[k] \cdot \Phi_j[k]
+       \right\} \Big/ N
+
+   where :math:`\Phi_i[k] = \mathcal{F}\{\varphi_i[n]\}` (zero-padded to
+   :math:`N_z`).  Division by :math:`N` (not :math:`N_z`) gives a peak
+   amplitude of approximately 1 for identical signals, consistent with
+   PCC2 as a cross-coherence measure.
+
+6. **Lag unwrapping** — the IFFT output of length :math:`N_z` stores positive
+   lags :math:`\tau = 0, \ldots, \tau_\text{max}` at indices
+   :math:`0, \ldots, \tau_\text{max}`, and negative lags
+   :math:`\tau = -\tau_\text{max}, \ldots, -1` at indices
+   :math:`N_z - \tau_\text{max}, \ldots, N_z - 1` (Ventosa's convention).
+   The two slices are concatenated to give the final CCF of length
+   :math:`2\,\tau_\text{max} + 1`:
+
+   .. math::
+
+       \text{PCC2}_{ij}[-\tau_\text{max}{:}\tau_\text{max}]
+       = \bigl[\text{full}[N_z - \tau_\text{max}{:}N_z],\;
+                \text{full}[0{:}\tau_\text{max}+1]\bigr]
+
+   .. note::
+
+       Because :math:`N_z > N`, the extracted CCF is **not** symmetric around
+       lag 0 even for a signal correlated with itself.  This is a mathematical
+       property of zero-padded linear correlation and does not indicate an
+       implementation error.  The self-correlation *does* have its global
+       maximum at lag 0.
+
+7. **Normalisation** — same ``cc_normalisation`` options as for CC
+   (``MAX``, ``ABSMAX``, or none).  The ``POW`` option is silently ignored
+   for PCC2 because amplitude information has already been discarded in step 3.
+
+**Computational cost**
+
+PCC2 requires one additional Hilbert transform (one FFT + IFFT per trace)
+relative to CC, but the dominant cost — :math:`O(P \cdot N_z \log N_z)` for
+:math:`P` pairs — is identical.  In practice the overhead is negligible for
+large networks.
+
+**References**
+
+Schimmel, M. (1999).
+Phase cross-correlations: design, comparisons, and applications.
+*Bulletin of the Seismological Society of America*, 89(5), 1366–1378.
+https://doi.org/10.1785/BSSA0890051366
+
+Schimmel, M., Stutzmann, E., & Gallart, J. (2011).
+Using instantaneous phase coherence for signal extraction from ambient noise
+data at a local to a global scale.
+*Geophysical Journal International*, 184(1), 494–506.
+https://doi.org/10.1111/j.1365-246X.2010.04861.x
+
+Ventosa, S., Schimmel, M., & Stutzmann, E. (2019).
+Towards the processing of large data volumes with phase cross-correlation.
+*Seismological Research Letters*, 90(4), 1663–1669.
+https://doi.org/10.1785/0220190022
+
+Ventosa, S., & Schimmel, M. (2023).
+FastPCC: Fast phase cross-correlation algorithm for large seismic datasets.
+*IEEE Transactions on Geoscience and Remote Sensing*, 61, 1–17.
+https://doi.org/10.1109/TGRS.2023.3294302
+
+
+Stacking daily windows
+-----------------------
+
+For each ``corr_duration``-long window, and for each configured filter, the
+CCF (CC or PCC2) is computed and accumulated.  If ``keep_all = Y`` the
+individual window CCFs are written to disk.  By default (``keep_days = Y``),
+all windows for the day are stacked into a single daily CCF using either a
+linear mean or Phase-Weighted Stack (PWS; Schimmel & Paulssen 1997):
+
+.. note::
+
+    PWS is provided as an experimental option.  It has not been
+    systematically cross-validated.  Use with caution.
+
+Schimmel, M., & Paulssen, H. (1997).
+Noise reduction and detection of weak, coherent signals through
+phase-weighted stacks.
+*Geophysical Journal International*, 130(2), 497–505.
+https://doi.org/10.1111/j.1365-246X.1997.tb05664.x
+
 
 Configuration Parameters
 ------------------------
@@ -67,7 +278,6 @@ this step:
 * |cc.pws_power|
 * |global.hpc|
 
-.. automodule:: msnoise.core.preprocessing
 
 Computing the Cross-Correlations
 --------------------------------
@@ -84,60 +294,6 @@ Processing using ``msnoise cc compute_cc``
 .. image:: ../.static/MyCorr2.png
     :align: center
 
-Processing using ``msnoise cc compute_cc_rot``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Once all traces are preprocessed, station pairs are processed sequentially.
-If a component different from *ZZ* is to be computed, the traces are first
-rotated. This supposes the user has provided the station coordinates in the
-*station* table. The rotation is computed for Radial and Transverse components.
-
-Then, for each ``corr_duration`` window in the signal, and for each filter
-configured in the database, the traces are clipped to ``winsorizing`` times
-the RMS (or 1-bit converted) and then whitened in the frequency domain
-(see :ref:`whiten`) between the frequency bounds. The whitening procedure can be
-skipped by setting the ``whitening`` configuration to `None`. The two other
-``whitening`` modes are "[A]ll except for auto-correlation" or "Only if
-[C]omponents are different". This allows skipping the whitening when, for
-example, computing ZZ components for very close by stations (much closer than
-the wavelength sampled), leading to spatial autocorrelation issues.
-
-When both traces are ready, the cross-correlation function is computed
-(see :ref:`mycorr`). The function returned contains data for time lags
-corresponding to ``maxlag`` in the acausal (negative lags) and causal
-(positive lags) parts.
-
-Saving Results (stacking the daily correlations)
-------------------------------------------------
-
-If configured (setting ``keep_all`` to 'Y'), each ``corr_duration`` CCF is
-saved to the hard disk in the ``output_folder``. By default, the ``keep_days``
-setting is set to True and so "N = 1 day / corr_duration" CCF are stacked to
-produce a daily cross-correlation function, which is saved to the hard disk in
-the ``STACKS/001_DAYS`` folder.
-
-.. note:: Currently, the keep-all data (every CCF) are not used by next steps.
-
-If ``stack_method`` is 'linear', then a simple mean CCF of all windows is saved
-as the daily CCF. On the other hand, if ``stack_method`` is 'pws', then
-all the Phase Weighted Stack (PWS) is computed and saved as the daily CCF. The
-PWS is done in two steps: first the mean coherence between the instataneous
-phases of all windows is calculated, and eventually serves a weighting factor
-on the mean. The smoothness of this weighting array is defined using the
-``pws_timegate`` parameter in the configuration. The weighting array is the
-power of the mean coherence array. If ``pws_power`` is equal to 0, a linear
-stack is done (then it's faster to do set ``stack_method`` = 'linear'). Usual
-value is 2.
-
-.. warning:: PWS is largely untested, not cross-validated. It looks good, but
-    that doesn't mean a lot, does it? Use with Caution! And if you
-    cross-validate it, please let us know!!
-
-    Schimmel, M. and Paulssen H., "Noise reduction and detection
-    of weak, coherent signals through phase-weighted stacks". Geophysical
-    Journal International 130, 2 (1997): 497-505.
-
-Once done, each job is marked "D"one in the database.
 
 Usage
 -----
@@ -175,7 +331,7 @@ could occur with SQLite.
     slower previous code, now called ``compute_cc_rot``.
 
 """
-#TODO docstring
+
 import itertools
 import logging
 import os
@@ -208,28 +364,6 @@ def main(loglevel="INFO", chunk_size=0):
     # Connection to the DB
     db = connect()
 
-    # if len(get_filters(db, all=False)) == 0:
-    #     logger.info("NO FILTERS DEFINED, exiting")
-    #     sys.exit()
-
-    # Get Configuration
-    # filters = get_filters(db, all=False)
-    # logger.info("Will compute [%s] for different stations" % " ".join(params.cc.components_to_compute))
-    # logger.info("Will compute [%s] for single stations" % " ".join(params.cc.components_to_compute_single_station))
-
-    # if "R" in ''.join(params.cc.components_to_compute) or "T" in ''.join(params.cc.components_to_compute):
-    #     logger.info("You seem to have configured R and/or T components, thus rotations ARE needed. You should therefore use the 'msnoise compute_cc_rot' instead.")
-    #     return()
-    #
-    # if params.cc.whitening not in ["A", "N"]:
-    #     logger.info("The 'whitening' parameter is set to '%s', which is not supported by this process. Set it to 'A' or 'N', or use the 'msnoise compute_cc_rot' instead." % params.cc.whitening)
-    #     return ()
-    #
-    # if params.preprocess.remove_response:
-    #     logger.debug('Pre-loading all instrument response')
-    #     responses = preload_instrument_responses(db, return_format="inventory")
-    # else:
-    #     responses = None
     logger.debug("Checking if there are jobs to do")
     if chunk_size > 0:
         logger.info(f"CC chunk_size={chunk_size}: each worker claims up to {chunk_size} pairs per day")
