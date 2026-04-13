@@ -151,6 +151,7 @@ sphinx_gallery_conf = {
          '../examples/plot_dvv_comparison.py',
          '../examples/plot_compute_hvsr.py',
          '../examples/plot_compute_hvsr_psd.py',
+        '../examples/plot_cc_vs_pcc.py',
      ],
 } if _HAS_GALLERY else {}
 intersphinx_cache_limit = 5

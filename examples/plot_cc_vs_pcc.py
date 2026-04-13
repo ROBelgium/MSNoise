@@ -1,49 +1,49 @@
 # ---
 # jupyter:
 #   jupytext:
-#     formats: py:percent
 #     text_representation:
 #       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.16.0
+#       format_name: sphinx
+#       format_version: '1.1'
+#       jupytext_version: 1.19.1
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
 
-# %% [markdown]
-# # CC vs PCC — Side-by-side Comparison
-#
-# This notebook builds a minimal MSNoise project from scratch and runs two
-# parallel correlation lineages on the same dataset:
-#
-# | Step name       | Method | Notes                              |
-# |-----------------|--------|------------------------------------|
-# | `preprocess_1`  | —      | shared preprocessing               |
-# | `cc_1`          | CC     | standard geometrically-normalised  |
-# | `cc_2`          | PCC    | phase cross-correlation (v=2)      |
-# | `filter_1`      | —      | shared band-pass filter            |
-# | `stack_1`       | linear | shared stacking config             |
-#
-# Both `cc_1` and `cc_2` feed the same `filter_1` → `stack_1` steps.
-# The final section retrieves stacked CCFs from both lineages and plots
-# them side-by-side for a direct comparison.
-#
-# ## Prerequisites
-#
-# * MSNoise installed (with the PCC patch applied).
-# * A one-day MiniSEED dataset for **at least two stations**.
-#   The classic MSNoise tutorial dataset (network `YA`, stations `UV05`,
-#   `UV06`, `UV10`, day 2010-09-01 / Julian day 244, stored in PDF layout)
-#   is used as the reference, but **any SDS or PDF archive works** — just
-#   adjust the USER SETTINGS cell below.
+"""
+# CC vs PCC — Side-by-side Comparison
 
-# %% [markdown]
+This notebook builds a minimal MSNoise project from scratch and runs two
+parallel correlation lineages on the same dataset:
+
+| Step name       | Method | Notes                              |
+|-----------------|--------|------------------------------------|
+| `preprocess_1`  | —      | shared preprocessing               |
+| `cc_1`          | CC     | standard geometrically-normalised  |
+| `cc_2`          | PCC    | phase cross-correlation (v=2)      |
+| `filter_1`      | —      | shared band-pass filter            |
+| `stack_1`       | linear | shared stacking config             |
+
+Both `cc_1` and `cc_2` feed the same `filter_1` → `stack_1` steps.
+The final section retrieves stacked CCFs from both lineages and plots
+them side-by-side for a direct comparison.
+
+## Prerequisites
+
+* MSNoise installed (with the PCC patch applied).
+* A one-day MiniSEED dataset for **at least two stations**.
+  The classic MSNoise tutorial dataset (network `YA`, stations `UV05`,
+  `UV06`, `UV10`, day 2010-09-01 / Julian day 244, stored in PDF layout)
+  is used as the reference, but **any SDS or PDF archive works** — just
+  adjust the USER SETTINGS cell below.
+"""
+
+###############################################################################
 # ## 0 · Imports
 
-# %%
+# %matplotlib inline
 import os
 import shutil
 import logging
@@ -51,23 +51,21 @@ import tempfile
 
 import numpy as np
 import matplotlib
-matplotlib.use("Agg")          # headless — switch to "Qt5Agg" for interactive
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import xarray as xr
+
 
 # MSNoise core
-from msnoise.core.db import connect, create_database_inifile, get_engine
+from msnoise.core.db import connect, create_database_inifile
 from msnoise.core.config import (
-    create_config_set, update_config, get_config, get_params,
-    get_config_set_details,
+    create_config_set, update_config
 )
 from msnoise.core.stations import update_station
 from msnoise.core.workflow import (
     create_workflow_steps_from_config_sets,
     create_workflow_links_from_steps,
-    create_workflow_step,
-    create_workflow_link,
     get_workflow_steps,
+    reset_jobs
 )
 from msnoise.msnoise_table_def import declare_tables, DataAvailability
 from msnoise.results import MSNoiseResult
@@ -81,7 +79,7 @@ from msnoise.s04_stack_mov import main as stack_mov
 
 logging.basicConfig(level=logging.WARNING)   # suppress INFO noise in notebook
 
-# %% [markdown]
+###############################################################################
 # ## 1 · User Settings
 #
 # **Edit this cell to match your dataset.**
@@ -89,11 +87,10 @@ logging.basicConfig(level=logging.WARNING)   # suppress INFO noise in notebook
 # The defaults match the classic MSNoise tutorial dataset (YA network,
 # stations UV05/UV06/UV10, PDF archive layout).
 
-# %%
 # ── Path to your waveform archive ────────────────────────────────────────────
 # Can be an absolute path or relative.
 # The installer will store it verbatim in the DataSource table.
-DATA_PATH = "/path/to/your/data"          # ← EDIT THIS
+DATA_PATH = r"C:\Users\tlecocq\AppData\Local\msnoise-testdata\msnoise-testdata\Cache\1.1\classic\data"
 
 # ── Archive layout ────────────────────────────────────────────────────────────
 # "PDF"  →  YEAR/STA/CHAN.D/NET.STA.LOC.CHAN.D.YEAR.JDAY
@@ -124,20 +121,19 @@ COMPONENTS       = "ZZ"
 
 # ── Filter passband ───────────────────────────────────────────────────────────
 FREQMIN = 0.1   # Hz
-FREQMAX = 1.0   # Hz
+FREQMAX = 4.0   # Hz
 
 # ── Stack config ──────────────────────────────────────────────────────────────
-MOV_STACK = "(('1D','1D'),)"   # one 1-day stack
+MOV_STACK = "(('1h','1h'),)"   # 1-hour stack
 
 # ── Working directory (project folder) ───────────────────────────────────────
 # A fresh temporary directory is created automatically.
 # Set to a fixed path if you want a persistent project between kernel restarts.
 WORK_DIR = None   # None → auto temp dir
 
-# %% [markdown]
+###############################################################################
 # ## 2 · Create Project Directory and MSNoise Database
 
-# %%
 if WORK_DIR is None:
     WORK_DIR = tempfile.mkdtemp(prefix="msnoise_ccvspcc_")
     print(f"Created temporary project directory: {WORK_DIR}")
@@ -160,13 +156,12 @@ declare_tables().Base.metadata.create_all(db.get_bind())
 
 print("Database created:", os.path.join(WORK_DIR, "msnoise.sqlite"))
 
-# %% [markdown]
+###############################################################################
 # ## 3 · Create Default Config Sets and Workflow Skeleton
 #
 # We create **one** config set for every category except `cc`, for which we
 # will create **two** (cc_1 = CC, cc_2 = PCC).
 
-# %%
 ALL_CATEGORIES = [
     "global", "preprocess", "filter", "stack", "refstack",
     "mwcs", "mwcs_dtt", "mwcs_dtt_dvv",
@@ -189,10 +184,9 @@ print(f"  cc_{cc2_sn} created  ← PCC")
 
 db.commit()
 
-# %% [markdown]
+###############################################################################
 # ## 4 · Configure Global Parameters
 
-# %%
 OUTPUT_FOLDER = os.path.join(WORK_DIR, "OUTPUT")
 
 global_params = {
@@ -205,10 +199,9 @@ for k, v in global_params.items():
     update_config(db, k, v, category="global", set_number=1)
     print(f"  global.{k} = {v!r}")
 
-# %% [markdown]
+###############################################################################
 # ## 5 · Configure the Two CC Sets
 
-# %%
 # ── Shared CC parameters ──────────────────────────────────────────────────────
 cc_shared = {
     "cc_sampling_rate":  str(CC_SAMPLING_RATE),
@@ -229,6 +222,7 @@ for k, v in cc_shared.items():
 
 # ── cc_1: standard CC ─────────────────────────────────────────────────────────
 update_config(db, "cc_type", "CC", category="cc", set_number=cc1_sn)
+update_config(db, "whitening", "A",   category="cc", set_number=cc1_sn)
 print(f"cc_{cc1_sn}: cc_type = CC  (standard cross-correlation)")
 
 # ── cc_2: PCC (Phase Cross-Correlation v=2) ──────────────────────────────────
@@ -247,17 +241,21 @@ print(f"cc_{cc1_sn}: cc_type = CC  (standard cross-correlation)")
 # Winsorising: AmpNorm already discards all amplitude information per-sample,
 # so winsorising (clipping at N×RMS) is redundant for PCC.  Disable it.
 update_config(db, "cc_type",    "PCC", category="cc", set_number=cc2_sn)
-update_config(db, "winsorizing", "0",   category="cc", set_number=cc2_sn)
+update_config(db, "winsorizing", "0", category="cc", set_number=cc2_sn)
+update_config(db, "whitening", "A", category="cc", set_number=cc2_sn)
 print(f"cc_{cc2_sn}: cc_type = PCC (phase cross-correlation v=2)")
 print(f"          winsorizing=0 (redundant: AmpNorm already discards amplitude)")
 print(f"          whitening=A   (spectral whitening within band before AmpNorm)")
 
 db.commit()
 
-# %% [markdown]
+""
+reset_jobs(db, "cc_1", alljobs=True)
+reset_jobs(db, "cc_2", alljobs=True)
+
+###############################################################################
 # ## 6 · Configure Filter and Stack
 
-# %%
 update_config(db, "freqmin", str(FREQMIN), category="filter", set_number=1)
 update_config(db, "freqmax", str(FREQMAX), category="filter", set_number=1)
 update_config(db, "CC",      "Y",          category="filter", set_number=1)
@@ -270,10 +268,9 @@ db.commit()
 print(f"filter_1: {FREQMIN}–{FREQMAX} Hz")
 print(f"stack_1:  {MOV_STACK}")
 
-# %% [markdown]
+###############################################################################
 # ## 7 · Configure DataSource and Station Table
 
-# %%
 # Create the default DataSource (the installer normally does this; when
 # initialising the DB manually we must insert it ourselves).
 DataSource = declare_tables().DataSource
@@ -298,7 +295,7 @@ for net, sta, lon, lat, elev in STATIONS:
 
 db.commit()
 
-# %% [markdown]
+###############################################################################
 # ## 8 · Build the Workflow Graph
 #
 # The topology we want:
@@ -310,7 +307,6 @@ db.commit()
 #
 # Both cc steps feed the **same** filter_1 and stack_1.
 
-# %%
 # Create WorkflowSteps from all config sets (auto-discovers preprocess_1,
 # cc_1, cc_2, filter_1, stack_1, …)
 created, existing, err = create_workflow_steps_from_config_sets(db)
@@ -326,10 +322,9 @@ print(f"Workflow links: {created_links} created, {existing_links} already existe
 steps = {s.step_name: s for s in get_workflow_steps(db)}
 print("\nWorkflow steps present:", sorted(steps.keys()))
 
-# %% [markdown]
+###############################################################################
 # ## 9 · Scan Archive and Seed Jobs
 
-# %%
 # Scan the waveform archive → populate DataAvailability table
 scan_archive(init=True, threads=1)
 
@@ -356,13 +351,12 @@ _db3.close()
 # Seed initial jobs (creates preprocess_1 T-jobs)
 new_jobs(init=True)
 
-# %% [markdown]
+###############################################################################
 # ## 10 · Run the Pipeline
 #
 # Steps run sequentially in-process.  For large datasets use `msnoise` CLI
 # or HPC submission instead.
 
-# %%
 print("── preprocess ─────────────────────────────────────────────────────")
 preprocess()
 
@@ -383,10 +377,9 @@ new_jobs(after="stack")
 
 print("Done.")
 
-# %% [markdown]
+###############################################################################
 # ## 11 · Gather MSNoiseResult Objects
 
-# %%
 db = connect()
 
 # Lineage for CC branch:  preprocess_1 / cc_1 / filter_1 / stack_1
@@ -409,10 +402,9 @@ result_pcc = MSNoiseResult.from_ids(
 )
 print("PCC lineage:", result_pcc.lineage_names)
 
-# %% [markdown]
+###############################################################################
 # ## 12 · Compare Stacked CCFs
 
-# %%
 # Retrieve all stacked CCFs for both lineages
 ccfs_cc  = result_cc.get_ccf()
 ccfs_pcc = result_pcc.get_ccf()
@@ -424,10 +416,9 @@ for key in sorted(ccfs_cc):
     pair, comp, ms = key
     print(f"  {pair}  {comp}  {ms[0]}–{ms[1]}")
 
-# %% [markdown]
+###############################################################################
 # ## 13 · Plot: CC vs PCC per Pair
 
-# %%
 fig_dir = os.path.join(WORK_DIR, "figures")
 os.makedirs(fig_dir, exist_ok=True)
 
@@ -488,10 +479,22 @@ else:
     plt.show()
     print(f"Saved: {outfig}")
 
-# %% [markdown]
+""
+import numpy as np
+A = np.fft.fft(ccf_cc)
+f = np.fft.fftfreq(len(A), d=1/20.)[:len(A)//2]
+A /= A.max()
+B = np.fft.fft(ccf_pcc)
+B /= B.max()
+plt.figure(figsize=(15,5))
+plt.plot(f, abs(A[:len(A)//2]))
+plt.plot(f, abs(B[:len(B)//2]))
+# plt.ylim(0,0.15)
+plt.xlim(0,5)
+
+###############################################################################
 # ## 14 · Overlay: CC vs PCC on the same axes (one panel per pair)
 
-# %%
 if common_keys:
     fig2, axes2 = plt.subplots(1, len(common_keys),
                                figsize=(6 * len(common_keys), 4),
@@ -537,10 +540,9 @@ if common_keys:
     plt.show()
     print(f"Saved: {outfig2}")
 
-# %% [markdown]
+###############################################################################
 # ## 15 · Summary Table
 
-# %%
 import pandas as pd
 
 rows = []
@@ -554,8 +556,8 @@ for key in common_keys:
         "Pair":        pair,
         "Component":   comp,
         "Mov. stack":  f"{ms[0]}–{ms[1]}",
-        "CC peak":     f"{np.abs(cc_arr).max():.4f}",
-        "PCC peak":    f"{np.abs(pcc_arr).max():.4f}",
+        "CC peak":     f"{np.abs(cc_arr).max():.4g}",
+        "PCC peak":    f"{np.abs(pcc_arr).max():.4g}",
         "CC  lag@peak (s)":  f"{np.where(np.abs(cc_arr)  == np.abs(cc_arr).max())[0][0] - len(cc_arr)//2:.1f}",
         "PCC lag@peak (s)":  f"{np.where(np.abs(pcc_arr) == np.abs(pcc_arr).max())[0][0] - len(pcc_arr)//2:.1f}",
     })
@@ -563,7 +565,7 @@ for key in common_keys:
 df = pd.DataFrame(rows)
 print(df.to_string(index=False))
 
-# %% [markdown]
+###############################################################################
 # ## Notes
 #
 # ### Why PCC output looks different from CC
