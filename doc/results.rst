@@ -236,6 +236,7 @@ Reading dv/v results
 
     :doc:`workflow_dvv/009_compute_dvv` — MWCS-based dv/v aggregation.
     :doc:`workflow_dvv/011c_compute_stretching_dvv` — stretching-based dv/v.
+    :doc:`workflow_dvv/010d_compute_wct_dtt_dvv` — wavelet-based dv/v.
 
 
 Reading PSD results
