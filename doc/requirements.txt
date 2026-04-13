@@ -1,6 +1,7 @@
 # Sphinx doc build requirements
 sphinx>=5.0
 sphinx-rtd-theme
+graphviz
 numpydoc
 sphinx-gallery
 # MSNoise runtime deps needed for autodoc + conf.py CLI generation

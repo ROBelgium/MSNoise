@@ -280,19 +280,237 @@ this step:
 
 
 Computing the Cross-Correlations
---------------------------------
+---------------------------------
 
-Processing using ``msnoise cc compute_cc``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The following two diagrams describe the complete execution flow of
+``msnoise cc compute_cc``.  Both are rendered from the DOT source embedded
+below, so they stay in sync with the code automatically.
 
-.. todo:: We still need to describe the workflow in plain text, but the
-    following graph should help you understand how the code is structured
+**Figure 1 — Outer job loop** shows how days are consumed, time windows
+slid, and per-filter results accumulated and saved.
 
-.. image:: ../.static/compute_cc.png
-    :align: center
+.. graphviz::
 
-.. image:: ../.static/MyCorr2.png
-    :align: center
+   digraph cc_outer {
+       graph [
+           rankdir=LR
+           fontname="Helvetica,Arial,sans-serif"
+           fontsize=11
+           nodesep=0.5
+           ranksep=0.7
+           bgcolor="white"
+           pad=0.35
+           label="Figure 1 – Outer job loop (s03_compute_no_rotation)"
+           labelloc=t
+           labeljust=l
+       ]
+       node [fontname="Helvetica,Arial,sans-serif" fontsize=10 style=filled]
+       edge [fontname="Helvetica,Arial,sans-serif" fontsize=9 color="#444444"]
+
+       node [shape=oval fillcolor="#263238" fontcolor=white color="#263238"]
+       START [label="begin"]
+       END   [label="end"]
+
+       node [shape=diamond fillcolor="#E3F2FD" fontcolor="#0D1B2A" color="#1565C0"]
+       D_JOB   [label="New CC\njob?"]
+       D_SLIDE [label="Next time\nwindow?"]
+       D_GAPS  [label="Any trace\nhas gaps?"]
+       D_SHORT [label="All traces\ntoo short?"]
+       D_WTYPE [label="whitening_type\n== PSD?"]
+       D_WMODE [label="whitening\n!= N?"]
+       D_FILTER[label="Next filter\nband?"]
+
+       node [shape=diamond fillcolor="#E8EAF6" fontcolor="#0D1B2A" color="#283593"]
+       D_KEEPALL [label="keep_all?"]
+       D_KEEPDAY [label="keep_days?"]
+
+       node [shape=box fillcolor="#FAFAFA" fontcolor="#0D1B2A" color="#607D8B" style="filled,rounded"]
+       P_STREAM [label="Load preprocessed\nstreams for day"]
+       P_SLIDE  [label="Slide window\n(corr_duration, overlap)"]
+       P_RMGAP  [label="Remove gapped\ntraces"]
+       P_PREP   [label="Detrend / demean\nWinsorise (if !clip_after_whiten)\nCosine taper (cc_taper_fraction %)"]
+       P_PSD    [label="Precompute Welch\nPSD per station"]
+       P_BP_N   [label="Bandpass _data\n[f_low, f_high]"]
+       P_FIDX   [label="Build pair indices\n(AC · CC · SC)\nfor this filter band"]
+       P_ACC    [label="Accumulate window CCF\ninto allcorr dict"]
+
+       node [shape=box fillcolor="#FFF8E1" fontcolor="#0D1B2A" color="#F9A825" style="filled,rounded,bold"]
+       P_PERFILTER [label="▶  Per-filter processing\n(see Figure 2)"]
+
+       node [shape=box fillcolor="#E8EAF6" fontcolor="#0D1B2A" color="#283593" style="filled,rounded"]
+       P_KEEPALL_S [label="Save all-window CCFs\n(xr_save_ccf_all)"]
+       P_STACK     [label="Stack windows\n(linear or PWS)"]
+       P_SAVEDAY   [label="Save daily CCF\n(xr_save_ccf_daily)"]
+       P_JOBS      [label="massive_update_job → Done\npropagate_downstream"]
+
+       START    -> D_JOB
+       D_JOB    -> END          [label="no"]
+       D_JOB    -> P_STREAM     [label="yes"]
+       P_STREAM -> D_SLIDE
+       D_SLIDE  -> D_KEEPALL    [label="no more\nwindows"]
+       D_SLIDE  -> P_SLIDE      [label="yes"]
+       P_SLIDE  -> P_RMGAP
+       P_RMGAP  -> D_GAPS
+       D_GAPS   -> D_SLIDE      [label="yes"]
+       D_GAPS   -> D_SHORT      [label="no"]
+       D_SHORT  -> D_SLIDE      [label="yes"]
+       D_SHORT  -> P_PREP       [label="no"]
+       P_PREP   -> D_WTYPE
+       D_WTYPE  -> P_PSD        [label="yes (PSD)"]
+       D_WTYPE  -> P_FIDX       [label="no"]
+       P_PSD    -> P_FIDX
+       P_FIDX   -> D_FILTER
+       D_FILTER -> D_KEEPALL    [label="no more filters"]
+       D_FILTER -> D_WMODE      [label="yes"]
+       D_WMODE  -> P_BP_N       [label="no (whitening=N)"]
+       D_WMODE  -> P_PERFILTER  [label="yes"]
+       P_BP_N   -> P_PERFILTER
+       P_PERFILTER -> P_ACC
+       P_ACC    -> D_FILTER
+       D_KEEPALL   -> P_KEEPALL_S [label="yes"]
+       D_KEEPALL   -> D_KEEPDAY   [label="no"]
+       P_KEEPALL_S -> D_KEEPDAY
+       D_KEEPDAY   -> P_STACK     [label="yes"]
+       D_KEEPDAY   -> P_JOBS      [label="no"]
+       P_STACK     -> P_SAVEDAY
+       P_SAVEDAY   -> P_JOBS
+       P_JOBS      -> D_JOB
+   }
+
+**Figure 2 — Per-filter processing** shows the three parallel correlation
+modes (AC, CC, SC) and the CC/PCC2 algorithm branch within each.
+
+.. graphviz::
+
+   digraph cc_perfilter {
+       graph [
+           rankdir=TB
+           fontname="Helvetica,Arial,sans-serif"
+           fontsize=11
+           nodesep=0.4
+           ranksep=0.5
+           bgcolor="white"
+           pad=0.4
+           label="Figure 2 – Per-filter processing (each time window × filter band)"
+           labelloc=t
+           labeljust=l
+       ]
+       node [fontname="Helvetica,Arial,sans-serif" fontsize=10 style=filled]
+       edge [fontname="Helvetica,Arial,sans-serif" fontsize=9 color="#444444"]
+
+       node [shape=oval fillcolor="#607D8B" fontcolor=white color="#607D8B"]
+       ENTRY [label="enter\n(whitened / bandpassed\n_data ready)"]
+       EXIT  [label="return\n(to outer loop)"]
+
+       node [shape=box fillcolor="#F0F4F8" fontcolor="#0D1B2A" color="#607D8B" style="filled,rounded"]
+       P_ACC [label="Accumulate CCF\ninto allcorr"]
+
+       subgraph cluster_ac {
+           label="Auto-Correlation (AC)" labelloc=t
+           color="#F9A825" style=rounded penwidth=1.5
+
+           node [shape=diamond fillcolor="#FFF9C4" fontcolor="#0D1B2A" color="#F9A825"]
+           D_AC     [label="AC pairs?"]
+           D_ACTYPE [label="cc_type\nsingle_AC?"]
+           D_CAW_AC [label="clip_after\nwhiten?"]
+
+           node [shape=box fillcolor="#FFFDE7" fontcolor="#0D1B2A" color="#F9A825" style="filled,rounded"]
+           P_AC_BP  [label="Bandpass [f_low, f_high]\n(always, for filter separation)"]
+           P_AC_CAW [label="Winsorise (time-series)"]
+
+           node [shape=box fillcolor="#FFF9C4" fontcolor="#0D1B2A" color="#F9A825" style="filled,rounded"]
+           P_AC_CC_F  [label="FFT → nfft"]
+           P_AC_CC_W  [label="whiten2  (inplace)\nif whitening != N"]
+           P_AC_CC_E  [label="Compute RMS energy"]
+           P_AC_CC_C  [label="myCorr2\n(IFFT · fold · normalise)"]
+           P_AC_PCC_W [label="FFT → whiten2 → IFFT\n(optional, whitening != N)"]
+           P_AC_PCC_C [label="pcc_xcorr\nHilbert → φ(t) → FFT\ncross-spec → IFFT / N"]
+       }
+
+       subgraph cluster_cc {
+           label="Cross-Correlation (CC)" labelloc=t
+           color="#2E7D32" style=rounded penwidth=1.5
+
+           node [shape=diamond fillcolor="#E8F5E9" fontcolor="#0D1B2A" color="#2E7D32"]
+           D_CC     [label="CC pairs?"]
+           D_CCTYPE [label="cc_type?"]
+           D_CAW_CC [label="clip_after\nwhiten?"]
+
+           node [shape=box fillcolor="#E8F5E9" fontcolor="#0D1B2A" color="#2E7D32" style="filled,rounded"]
+           P_CC_W     [label="whiten2  (inplace)\nif whitening != N"]
+           P_CC_CAW   [label="Winsorise (FFT domain)"]
+           P_CC_E     [label="Compute RMS energy"]
+           P_CC_CORR  [label="myCorr2\n(IFFT · fold · normalise)"]
+           P_CC_BP    [label="Bandpass [f_low, f_high]\n(for filter separation)"]
+           P_CC_PW    [label="FFT → whiten2 → IFFT\n(optional, whitening != N)"]
+           P_CC_PCORR [label="pcc_xcorr\nHilbert → φ(t) → FFT\ncross-spec → IFFT / N"]
+       }
+
+       subgraph cluster_sc {
+           label="Same-station Cross-Component (SC)" labelloc=t
+           color="#6A1B9A" style=rounded penwidth=1.5
+
+           node [shape=diamond fillcolor="#F3E5F5" fontcolor="#0D1B2A" color="#6A1B9A"]
+           D_SC     [label="SC pairs?"]
+           D_SCTYPE [label="cc_type\nsingle_SC?"]
+           D_CAW_SC [label="clip_after\nwhiten?"]
+
+           node [shape=box fillcolor="#F3E5F5" fontcolor="#0D1B2A" color="#6A1B9A" style="filled,rounded"]
+           P_SC_W     [label="whiten2  (inplace)\nif whitening != N"]
+           P_SC_CAW   [label="Winsorise (FFT domain)"]
+           P_SC_E     [label="Compute RMS energy"]
+           P_SC_CORR  [label="myCorr2\n(IFFT · fold · normalise)"]
+           P_SC_PCORR [label="pcc_xcorr\nHilbert → φ(t) → FFT\ncross-spec → IFFT / N"]
+       }
+
+       ENTRY -> D_AC
+
+       D_AC     -> D_CC      [label="no"]
+       D_AC     -> P_AC_BP   [label="yes"]
+       P_AC_BP  -> D_CAW_AC
+       D_CAW_AC -> P_AC_CAW  [label="yes"]
+       D_CAW_AC -> D_ACTYPE  [label="no"]
+       P_AC_CAW -> D_ACTYPE
+       D_ACTYPE -> P_AC_CC_F  [label="CC"]
+       D_ACTYPE -> P_AC_PCC_W [label="PCC"]
+       P_AC_CC_F  -> P_AC_CC_W
+       P_AC_CC_W  -> P_AC_CC_E
+       P_AC_CC_E  -> P_AC_CC_C
+       P_AC_PCC_W -> P_AC_PCC_C
+       P_AC_CC_C  -> P_ACC
+       P_AC_PCC_C -> P_ACC
+
+       P_ACC -> D_CC
+
+       D_CC     -> D_SC      [label="no"]
+       D_CC     -> D_CCTYPE  [label="yes"]
+       D_CCTYPE -> P_CC_W    [label="CC"]
+       D_CCTYPE -> P_CC_BP   [label="PCC"]
+       P_CC_W   -> D_CAW_CC
+       D_CAW_CC -> P_CC_CAW  [label="yes"]
+       D_CAW_CC -> P_CC_E    [label="no"]
+       P_CC_CAW -> P_CC_E
+       P_CC_E   -> P_CC_CORR
+       P_CC_BP  -> P_CC_PW
+       P_CC_PW  -> P_CC_PCORR
+       P_CC_CORR  -> P_ACC
+       P_CC_PCORR -> P_ACC
+
+       P_ACC -> D_SC
+
+       D_SC     -> EXIT      [label="no"]
+       D_SC     -> D_SCTYPE  [label="yes"]
+       D_SCTYPE -> P_SC_W     [label="CC"]
+       D_SCTYPE -> P_SC_PCORR [label="PCC"]
+       P_SC_W   -> D_CAW_SC
+       D_CAW_SC -> P_SC_CAW  [label="yes"]
+       D_CAW_SC -> P_SC_E    [label="no"]
+       P_SC_CAW -> P_SC_E
+       P_SC_E   -> P_SC_CORR
+       P_SC_CORR  -> P_ACC
+       P_SC_PCORR -> P_ACC
+       P_ACC -> EXIT [constraint=false]
+   }
 
 
 Usage
