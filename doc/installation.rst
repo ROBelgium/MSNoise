@@ -146,7 +146,7 @@ details, for example:
 
     MSNoiseDB started.
     Host : localhost
-    Port : 5050
+    Port : 5099
 
 Keep this terminal open (or run it in the background) while MSNoise is
 processing.  To stop the server:
@@ -156,45 +156,30 @@ processing.  To stop the server:
     cd ~/msnoisedb
     msnoisedb stop
 
-Create a new MSNoise project
------------------------------
-
-In a **separate** folder (your project folder, not the MSNoiseDB folder):
+You can list or create databases at any time with:
 
 .. code-block:: sh
 
-    mkdir ~/my_msnoise_project
-    cd ~/my_msnoise_project
-    msnoise db init
+    msnoisedb list-db
+    msnoisedb create-db msnoise_myproject
 
-When prompted, select **postgresql** and use the host and port printed by
-MSNoiseDB (``localhost:5050`` by default).  MSNoise will create a new
-database automatically.  You are ready to go!
-
-.. code-block:: sh
-
-    msnoise admin   # opens the web configurator at http://localhost:5000
+Creating the database and initialising the project folder are covered in
+:doc:`/workflow_000/000_installer`.
 
 
-Step 3 — Verify
-================
+Step 3 — Verify the installation
+==================================
 
-Run the fast smoke-test suite from your project folder to confirm everything
-is wired up correctly:
+Check that all required packages are present:
 
 .. code-block:: sh
 
-    msnoise utils test --fast
+    msnoise utils bugreport -s -m
 
-All 32 tests should pass in under 30 seconds.  If any fail, run:
+No project folder is needed for this — it runs wherever you are.
 
-.. code-block:: sh
-
-    msnoise utils bugreport -a
-
-and check the output for missing dependencies.
-
-Proceed to the :ref:`workflow_000` section to start your first MSNoise run!
+Once satisfied, head to :doc:`/workflow_000/000_installer` to create your
+first MSNoise project and connect it to MSNoiseDB.
 
 
 .. _sqlite_option:

@@ -1,6 +1,8 @@
 .. include:: ../configs.hrst
 
-Initialize Project
-------------------
+.. _workflow_000:
+
+Initialize a Project
+====================
 
 .. automodule:: msnoise.s00_installer
