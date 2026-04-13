@@ -95,8 +95,12 @@ The script asks a few questions.  For a typical MSNoiseDB setup:
 
 .. code-block:: text
 
-    What database technology do you want to use? [sqlite/mysql/postgresql]: postgresql
-    Hostname (default 127.0.0.1, or hostname:port): localhost:5099
+    What database technology do you want to use?
+     [1] sqlite
+     [2] mysql
+     [3] postgresql
+    Choice: 3
+    Hostname [localhost:5099] (hostname or hostname:port, e.g. localhost:5099 for MSNoiseDB): localhost:5099
     Database name [msnoise]: msnoise_myproject
     Username [msnoise]: msnoise
     Password: msnoise
@@ -202,6 +206,7 @@ DEFAULT_INPUTS = {
         'sqlite_filename': 'msnoise.sqlite',
         'table_prefix': '',
         'mysql_host': 'localhost',
+        'pg_host': 'localhost:5099',   # MSNoiseDB default
         'mysql_db': 'msnoise',
         'mysql_user': 'msnoise',
         }
@@ -308,37 +313,36 @@ def main(tech=None, hostname=None, username=None, password=None,
             password = None
         elif tech == 2:
             if hostname is None:
-                hostname = ask('Server: [{}]: ', DEFAULT_INPUTS['mysql_host'])
+                hostname = ask('Hostname [{}]: ', DEFAULT_INPUTS['mysql_host'])
             if database is None:
-                database = ask('Database: [{}]: ', DEFAULT_INPUTS['mysql_db'])
+                database = ask('Database name [{}]: ', DEFAULT_INPUTS['mysql_db'])
             if username is None:
-                username = ask('Username: [{}]: ', DEFAULT_INPUTS['mysql_user'])
+                username = ask('Username [{}]: ', DEFAULT_INPUTS['mysql_user'])
             if password is None:
                 password = ''
                 while not password:
-                    password = ask('Password (not shown as you type): ',
-                                   '', getpass)
+                    password = ask('Password: ', '', getpass)
                     if not password:
                         print('Sorry, you must define a password.')
             if prefix is None:
-                prefix = ask('Table prefix: [{}]: ',
+                prefix = ask('Table prefix [{}]: ',
                              DEFAULT_INPUTS['table_prefix'])
         else:
             if hostname is None:
-                hostname = ask('Server: [{}]: ', DEFAULT_INPUTS['mysql_host'])
+                hostname = ask('Hostname [{}] (hostname or hostname:port, e.g. localhost:5099 for MSNoiseDB): ',
+                               DEFAULT_INPUTS['pg_host'])
             if database is None:
-                database = ask('Database: [{}]: ', DEFAULT_INPUTS['mysql_db'])
+                database = ask('Database name [{}]: ', DEFAULT_INPUTS['mysql_db'])
             if username is None:
-                username = ask('Username: [{}]: ', DEFAULT_INPUTS['mysql_user'])
+                username = ask('Username [{}]: ', DEFAULT_INPUTS['mysql_user'])
             if password is None:
                 password = ''
                 while not password:
-                    password = ask('Password (not shown as you type): ',
-                                   '', getpass)
+                    password = ask('Password: ', '', getpass)
                     if not password:
                         print('Sorry, you must define a password.')
             if prefix is None:
-                prefix = ask('Table prefix: [{}]: ',
+                prefix = ask('Table prefix [{}]: ',
                              DEFAULT_INPUTS['table_prefix'])
     else:
         tech = int(tech)
