@@ -97,8 +97,8 @@ Interacting with MSNoise
     :maxdepth: 2
     :glob:
 
-    how_tos
     results
+    how_tos
     auto_examples/index
     api
     core

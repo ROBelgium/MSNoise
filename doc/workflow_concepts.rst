@@ -214,8 +214,8 @@ Examples:
 
 .. _concepts_reading_results:
 
-Reading Results
-================
+Reading Results: MSNoiseResult
+==============================
 
 Once the pipeline has run you do not need to know the on-disk path layout or
 call low-level ``core.io`` functions.  The recommended interface is

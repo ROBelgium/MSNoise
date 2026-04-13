@@ -4,7 +4,6 @@ Compute PSD RMS
 ===============
 
 .. automodule:: msnoise.s21_psd_compute_rms
-   :no-index:
 
 .. seealso::
 
