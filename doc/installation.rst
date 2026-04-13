@@ -4,7 +4,7 @@
 Installation
 ******************************
 
-MSNoise is a python package that uses a database (sqlite or MySQL) for storing
+MSNoise is a python package that uses a database (sqlite, MySQL/MariaDB or Postgresql) for storing
 station and files metadata together with jobs. When installed, it provides a top
 level command ``msnoise`` in the console.
 
@@ -12,9 +12,9 @@ Note that MSNoise is always tested against the latest release versions of the ma
 
 To run MSNoise, you need:
 
-* A recent version of Python (3.11 recommended). We suggest using Miniconda_
+* A recent version of Python (3.14 recommended). We suggest using Miniconda_
   and creating a fresh environment for running msnoise.
-  MSNoise is tested "continuously" on GitHub for the last 3 most recent python version, and the three OS.
+  MSNoise is tested "continuously" on GitHub for the last 2 most recent python version, and the three OS.
 
 
 * Database: MariaDB or Postgresql: if you want to use a database,
@@ -25,6 +25,26 @@ To run MSNoise, you need:
   process more data at once, compared with using sqlite.
 
 
+MSNoise's best friend: MSNoiseDB
+--------------------------------
+
+Let's be honest, installing MySQL or else has ALWAYS been a pain for new users, and even if it's relatively simple,
+it has been one of the most common complain about msnoise. So, to simplify your life, I've created MSNoiseDB, the
+database minion. It's a full package, that sets up a local, user-run postgresql server (without security), that
+you can immediately use.
+
+Check https://github.com/ROBelgium/msnoise-db to install & set up you database server. Once create, you'll be able
+to create new databases, and directly connect any new msnoise project to it:
+
+$ msnoise db init
+
+Then : choose postgresql, the hostname was provided when you started msnoisedb, default to localhost:5050.
+
+Voilà!
+
+
+
+OLD INFO: CHECK IF WE NEED TO KEEP OR GET RID OF:
 Full Installation
 -----------------
 

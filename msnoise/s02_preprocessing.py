@@ -15,6 +15,9 @@ Configuration Parameters
 * |global.response_path|
 * |global.fdsn_keep_raw|
 * |global.hpc|
+
+.. automodule:: msnoise.core.preprocessing
+
 """
 
 import time
