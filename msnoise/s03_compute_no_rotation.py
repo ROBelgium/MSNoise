@@ -870,6 +870,7 @@ def main(loglevel="INFO", chunk_size=0):
                             whiten2(ffts_pcc, nfft, low, high, p1, p2, psds,
                                     params.cc.whitening_type)  # inplace
                             tmp_pcc = np.real(sf.ifft(ffts_pcc, n=nfft, axis=1)[:, :tmp.shape[1]])
+                            del ffts_pcc
                         corr = pcc_xcorr(tmp_pcc,
                                          np.ceil(params.cc.maxlag / dt),
                                          None,
@@ -886,7 +887,9 @@ def main(loglevel="INFO", chunk_size=0):
                         if ccfid not in allcorr:
                             allcorr[ccfid] = {}
                         allcorr[ccfid][thistime] = corr[key]
-                    del corr
+                    del corr, tmp
+                    # tmp_pcc is either an alias of tmp or a whitened copy;
+                    # both are released above (tmp) or go out of scope here.
 
                 # ── Cross-Correlation (CC) ────────────────────────────────
                 if len(cc_index):
@@ -926,6 +929,7 @@ def main(loglevel="INFO", chunk_size=0):
                             whiten2(ffts_pcc, nfft, low, high, p1, p2, psds,
                                     params.cc.whitening_type)  # inplace
                             _data_pcc = np.real(sf.ifft(ffts_pcc, n=nfft, axis=1)[:, :_data_pcc.shape[1]])
+                            del ffts_pcc
                         corr = pcc_xcorr(_data_pcc,
                                          np.ceil(params.cc.maxlag / dt),
                                          None,
@@ -936,7 +940,7 @@ def main(loglevel="INFO", chunk_size=0):
                             if ccfid not in allcorr:
                                 allcorr[ccfid] = {}
                             allcorr[ccfid][thistime] = corr[key]
-                        del corr
+                        del corr, _data_pcc
 
                     else:
                         logging.error("cc_type = %s not implemented, "
@@ -979,6 +983,7 @@ def main(loglevel="INFO", chunk_size=0):
                             whiten2(ffts_sc_pcc, nfft, low, high, p1, p2, psds,
                                     params.cc.whitening_type)  # inplace
                             _data_sc_pcc = np.real(sf.ifft(ffts_sc_pcc, n=nfft, axis=1)[:, :_data_sc_pcc.shape[1]])
+                            del ffts_sc_pcc
                         corr = pcc_xcorr(_data_sc_pcc,
                                          np.ceil(params.cc.maxlag / dt),
                                          None,
@@ -990,12 +995,13 @@ def main(loglevel="INFO", chunk_size=0):
                             if ccfid not in allcorr:
                                 allcorr[ccfid] = {}
                             allcorr[ccfid][thistime] = corr[key]
-                        del corr
+                        del corr, _data_sc_pcc
 
                     else:
                         logging.error("cc_type_single_station_SC = %s not implemented, "
                               "exiting")
                         exit(1)
+                del _data_raw, _data_bp
             del psds
 
         if params.cc.keep_all:
