@@ -296,10 +296,10 @@ slid, and per-filter results accumulated and saved.
            rankdir=LR
            fontname="Helvetica,Arial,sans-serif"
            fontsize=11
-           nodesep=0.5
-           ranksep=0.7
+           nodesep=0.4
+           ranksep=0.6
            bgcolor="white"
-           pad=0.35
+           pad=0.4
            label="Figure 1 – Outer job loop (s03_compute_no_rotation)"
            labelloc=t
            labeljust=l
@@ -325,14 +325,14 @@ slid, and per-filter results accumulated and saved.
        D_KEEPDAY [label="keep_days?"]
 
        node [shape=box fillcolor="#FAFAFA" fontcolor="#0D1B2A" color="#607D8B" style="filled,rounded"]
-       P_STREAM [label="Load preprocessed\nstreams for day"]
-       P_SLIDE  [label="Slide window\n(corr_duration, overlap)"]
-       P_RMGAP  [label="Remove gapped\ntraces"]
-       P_PREP   [label="Detrend / demean\nWinsorise (if !clip_after_whiten)\nCosine taper (cc_taper_fraction %)"]
-       P_PSD    [label="Precompute Welch\nPSD per station"]
-       P_BP_N   [label="Bandpass _data\n[f_low, f_high]"]
-       P_FIDX   [label="Build pair indices\n(AC · CC · SC)\nfor this filter band"]
-       P_ACC    [label="Accumulate window CCF\ninto allcorr dict"]
+       P_STREAM    [label="Load preprocessed\nstreams for day"]
+       P_SLIDE     [label="Slide window\n(corr_duration, overlap)"]
+       P_RMGAP     [label="Remove gapped\ntraces"]
+       P_PREP      [label="Detrend / demean\nWinsorise (if !clip_after_whiten)\nCosine taper (cc_taper_fraction %)"]
+       P_PSD       [label="Precompute Welch\nPSD per station"]
+       P_BP_N      [label="Bandpass _data\n[f_low, f_high]"]
+       P_FIDX      [label="Build pair indices\n(AC · CC · SC)"]
+       P_ACC       [label="Accumulate window CCF\ninto allcorr dict"]
 
        node [shape=box fillcolor="#FFF8E1" fontcolor="#0D1B2A" color="#F9A825" style="filled,rounded,bold"]
        P_PERFILTER [label="▶  Per-filter processing\n(see Figure 2)"]
@@ -343,30 +343,54 @@ slid, and per-filter results accumulated and saved.
        P_SAVEDAY   [label="Save daily CCF\n(xr_save_ccf_daily)"]
        P_JOBS      [label="massive_update_job → Done\npropagate_downstream"]
 
+       // Force two rows via an invisible break node
+       node [shape=point width=0 height=0 style=invis]
+       BREAK
+
+       // Row 1: start → window loop → prep/whitening
+       { rank=same; START; D_JOB; END }
+       { rank=same; P_STREAM; D_SLIDE }
+       { rank=same; P_SLIDE; P_RMGAP; D_GAPS; D_SHORT }
+       { rank=same; P_PREP; D_WTYPE; P_PSD }
+
+       // Row break sentinel — pin BREAK at same rank as P_FIDX
+       // Row 2: filter loop → per-filter → save
+       { rank=same; P_FIDX; D_FILTER }
+       { rank=same; BREAK; D_WMODE; P_BP_N; P_PERFILTER; P_ACC }
+       { rank=same; D_KEEPALL; P_KEEPALL_S; D_KEEPDAY; P_STACK; P_SAVEDAY; P_JOBS }
+
+       // Invisible structural edge to force rank break after row 1
+       D_WTYPE -> BREAK [style=invis]
+       BREAK -> D_WMODE [style=invis]
+
        START    -> D_JOB
        D_JOB    -> END          [label="no"]
        D_JOB    -> P_STREAM     [label="yes"]
        P_STREAM -> D_SLIDE
-       D_SLIDE  -> D_KEEPALL    [label="no more\nwindows"]
+
+       D_SLIDE  -> D_KEEPALL    [label="no more\nwindows" constraint=false]
        D_SLIDE  -> P_SLIDE      [label="yes"]
        P_SLIDE  -> P_RMGAP
        P_RMGAP  -> D_GAPS
-       D_GAPS   -> D_SLIDE      [label="yes"]
+       D_GAPS   -> D_SLIDE      [label="yes" constraint=false]
        D_GAPS   -> D_SHORT      [label="no"]
-       D_SHORT  -> D_SLIDE      [label="yes"]
+       D_SHORT  -> D_SLIDE      [label="yes" constraint=false]
        D_SHORT  -> P_PREP       [label="no"]
+
        P_PREP   -> D_WTYPE
        D_WTYPE  -> P_PSD        [label="yes (PSD)"]
        D_WTYPE  -> P_FIDX       [label="no"]
        P_PSD    -> P_FIDX
+
        P_FIDX   -> D_FILTER
-       D_FILTER -> D_KEEPALL    [label="no more filters"]
+       D_FILTER -> D_KEEPALL    [label="no more filters" constraint=false]
        D_FILTER -> D_WMODE      [label="yes"]
-       D_WMODE  -> P_BP_N       [label="no (whitening=N)"]
+       D_WMODE  -> P_BP_N       [label="no\n(whitening=N)"]
        D_WMODE  -> P_PERFILTER  [label="yes"]
        P_BP_N   -> P_PERFILTER
        P_PERFILTER -> P_ACC
-       P_ACC    -> D_FILTER
+       P_ACC    -> D_FILTER     [constraint=false]
+
        D_KEEPALL   -> P_KEEPALL_S [label="yes"]
        D_KEEPALL   -> D_KEEPDAY   [label="no"]
        P_KEEPALL_S -> D_KEEPDAY
@@ -374,7 +398,7 @@ slid, and per-filter results accumulated and saved.
        D_KEEPDAY   -> P_JOBS      [label="no"]
        P_STACK     -> P_SAVEDAY
        P_SAVEDAY   -> P_JOBS
-       P_JOBS      -> D_JOB
+       P_JOBS      -> D_JOB       [constraint=false]
    }
 
 **Figure 2 — Per-filter processing** shows the three parallel correlation

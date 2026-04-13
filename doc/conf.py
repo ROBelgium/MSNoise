@@ -157,6 +157,32 @@ intersphinx_cache_limit = 5
 
 math_number_all = False
 todo_include_todos = True
+
+# -- Graphviz ----------------------------------------------------------------
+# Locate the dot executable robustly across platforms.
+# On Windows, Graphviz is often installed to C:\Program Files\Graphviz\bin\
+# but that directory is frequently absent from the PATH seen by the Sphinx
+# subprocess even after `setx PATH ...` (requires a full shell restart).
+# We probe the standard install locations directly so the build works without
+# manual PATH configuration.
+def _find_dot() -> str:
+    import shutil
+    found = shutil.which("dot")
+    if found:
+        return found
+    if sys.platform == "win32":
+        import pathlib
+        _win_candidates = [
+            pathlib.Path(r"C:\Program Files\Graphviz\bin\dot.exe"),
+            pathlib.Path(r"C:\Program Files (x86)\Graphviz\bin\dot.exe"),
+            pathlib.Path(r"C:\Graphviz\bin\dot.exe"),
+        ]
+        for _p in _win_candidates:
+            if _p.is_file():
+                return str(_p)
+    return "dot"   # fallback: let Sphinx emit its own error
+
+graphviz_dot = _find_dot()
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['.templates']
 
