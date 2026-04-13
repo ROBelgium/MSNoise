@@ -51,7 +51,3 @@ WorkflowLink
 
 .. autoclass:: msnoise.msnoise_table_def.WorkflowLink
 
-Filter
-------
-
-.. autoclass:: msnoise.msnoise_table_def.Filter
