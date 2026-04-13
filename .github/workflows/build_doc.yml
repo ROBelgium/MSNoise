@@ -40,14 +40,14 @@ jobs:
 
       - name: Upload doc build log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sphinx-build-log
           path: doc/build.log
 
       - name: Upload built docs
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: html-docs
           path: doc/.build/html/
