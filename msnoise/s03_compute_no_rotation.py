@@ -530,22 +530,6 @@ will start 4 instances of the code (after 1 second delay to avoid database
 conflicts). This works both with SQLite and MySQL but be aware problems
 could occur with SQLite.
 
-    The Instrument Response removal & The Phase Weighted Stack &
-    Parallel Processing
-
-    The Obspy Lanczos resampling method, gives similar results as the
-    scikits.samplerate package, thus removing the requirement for it.
-    This method is defined by default.
-
-    The preprocessing routine is separated from the compute_cc and can be called
-    by external plugins.
-
-    The compute_cc has been completely rewritten to be much faster, taking
-    advantage from 2D FFT computation and in-place array modifications.
-    The standard compute_cc does process CC, AC and SC in the same code. Only
-    if users need to compute R and/or T components, they will have to use the
-    slower previous code, now called ``compute_cc_rot``.
-
 """
 
 import itertools
