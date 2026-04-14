@@ -136,6 +136,7 @@ def main(stype, loglevel="INFO"):
             days = [day if isinstance(day, datetime.datetime) else datetime.datetime.strptime(day, '%Y-%m-%d') for day in days]
             day_diffs = np.diff(days)
             gaps = [i+1 for i, diff in enumerate(day_diffs) if diff.days > 1] #get index of days with gaps
+            del day_diffs  # no longer needed; free timedelta array
             gaps.insert(0,0) #zero index also 'gap' (need previous data for stacking)
 
             all_days = list(days)
@@ -208,6 +209,7 @@ def main(stype, loglevel="INFO"):
             is_valid, message = validate_stack_data(dr, "moving")
             if not is_valid:
                 logger.error(f"Invalid moving stack data for {sta1}:{sta2}-{components}: {message}")
+                del dr
                 continue
             elif "Warning" in message:
                 logger.warning(f"{sta1}:{sta2}-{components}: {message}")
@@ -244,6 +246,9 @@ def main(stype, loglevel="INFO"):
                 xr_save_ccf(params.global_.output_folder, lineage_names, step.step_name,
                             sta1, sta2, components, mov_stack, taxis, xx_cleaned, overwrite=False)
                 del xx, xx_cleaned
+
+            del dr          # free resampled CCF dataset before next component
+            del excess_dates, all_days, excess_days, wiener_extra_days
 
         massive_update_job(db, jobs, "D")
         if not batch["params"].global_.hpc:

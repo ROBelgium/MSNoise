@@ -283,7 +283,9 @@ def xr_get_ccf_daily(root, lineage, step_name, station1, station2, components, d
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
     ds = xr.open_dataset(fn)
-    return ds["CCF"]
+    da = ds["CCF"].load()   # materialise into RAM before closing the file handle
+    ds.close()
+    return da
 
 
 
@@ -298,7 +300,8 @@ def xr_save_ref(root, lineage, step_name, station1, station2, components, taxis,
         dr = _xr_create_or_open(fullpath, taxis, name="REF")
         dr = _xr_insert_or_update(dr, new)
         _xr_save_and_close(dr, fullpath)
-        return dr
+        # _xr_save_and_close closes and deletes dr; callers never used the
+        # return value (xr_save_ref is write-only from s04_stack_refstack).
 
 
 
@@ -594,7 +597,9 @@ def xr_get_ccf_all(root, lineage, step_name, station1, station2,
     if not os.path.isfile(fn):
         raise FileNotFoundError(fn)
     ds = xr.open_dataset(fn)
-    return ds["CCF"]
+    da = ds["CCF"].load()   # materialise into RAM before closing the file handle
+    ds.close()
+    return da
 
 
 

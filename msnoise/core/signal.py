@@ -908,11 +908,15 @@ def wiener_filt(data, M, N, gap_threshold):
     ccfs = data["CCF"]
     segments = find_segments(ccfs, gap_threshold)
 
-    filtered_ccfs = ccfs.copy(deep=True)
+    # Work on a single numpy array (one allocation) rather than two deep
+    # DataArray/Dataset copies; peak memory is now ~2× CCF instead of ~3×.
+    filtered_values = ccfs.values.copy()
     for segment in segments:
-        segment_data = ccfs[segment, :].values
-        filtered_ccfs[segment, :] = _wiener(segment_data, (M, N))
+        filtered_values[segment, :] = _wiener(ccfs.values[segment, :], (M, N))
 
-    filtered_data = data.copy(deep=True)
-    filtered_data["CCF"] = filtered_ccfs
+    filtered_data = data.copy(deep=False)   # shallow: copies Dataset shell only
+    filtered_data["CCF"] = xr.DataArray(
+        filtered_values, coords=ccfs.coords, dims=ccfs.dims, attrs=ccfs.attrs
+    )
+    del filtered_values
     return filtered_data
