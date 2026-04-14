@@ -904,6 +904,7 @@ def wiener_filt(data, M, N, gap_threshold):
     :returns: Copy of *data* with the filtered ``CCF`` variable.
     """
     from scipy.signal import wiener as _wiener
+    import xarray as xr
 
     ccfs = data["CCF"]
     segments = find_segments(ccfs, gap_threshold)
