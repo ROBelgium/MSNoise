@@ -1,34 +1,21 @@
 MSNoise - Documentation
 =======================
 
-Originally, MSNoise was a "Python Package for Monitoring Seismic Velocity
-Changes using Ambient Seismic Noise". With the release of MSNoise 1.4, and
-because of the Plugin Support, we could call MSNoise: "Measuring with Seismic
-Noise".
+MSNoise is a Python package for monitoring seismic velocity changes using
+ambient seismic noise.  It automates the full pipeline from raw seismic
+archives to dv/v curves: cross-correlations, stacking, reference computation,
+and relative velocity estimation via MWCS, stretching, or wavelet methods.
 
-The current release version of MSNoise is **MSNoise 2.0** and is a
-Python 3 version only.
+MSNoise 2.x is a full rewrite built on xarray, with a config-set / lineage
+architecture that makes it easy to run the same data through multiple
+parameter branches without reprocessing from scratch.  Plugins can extend
+or replace any step.
 
-The standard MSNoise workflow is designed to go from seismic data archives to
-dv/v curves. The monitoring is achieved by computing the cross-correlation of
-continuous seismic records for each pair of a network and by studying the
-changes in the cross-correlation function relative to a reference.
+If you use MSNoise for your research, please cite:
 
-The goal of the "suite" is to provide researchers with an efficient processing
-tool, while keeping the need for coding to a minimum and avoiding being a black
-box. Moreover, as long as the in- and outputs of each step are respected, they
-can easily be replaced with one's own codes ! (See :ref:`workflow`).
-
-Plugins can be added and extend the standard workflow from any steps, e.g.
-using MSNoise as a cross-correlation toolbox until the `stack` step, and then
-branching to the workflow provided by one's plugin.
-
-
-If you use MSNoise for your research and prepare publications, please consider
-citing MSNoise:
-**Lecocq, T., C. Caudron, et F. Brenguier (2014)**, MSNoise, a Python Package
-for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
-*Seismological Research Letters*, 85(3), 715‑726, doi:10.1785/0220130073.
+| **Lecocq, T., C. Caudron, et F. Brenguier (2014)**, MSNoise, a Python Package
+| for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
+| *Seismological Research Letters*, 85(3), 715–726, doi:10.1785/0220130073.
 
 
 .. toctree::
@@ -37,6 +24,9 @@ for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
 
     installation
     workflow_concepts
+
+Install MSNoise and learn the 2.x concepts — config sets, lineages, and
+jobs — before running anything.
 
 
 .. toctree::
@@ -48,6 +38,9 @@ for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
     workflow_dvv/0000_intro.rst
     workflow_psd/0000_intro.rst
 
+Step-by-step guides from project initialisation to dv/v and PSD outputs,
+with the exact commands at each stage.
+
 
 .. toctree::
     :maxdepth: 2
@@ -56,6 +49,9 @@ for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
     results
     how_tos
     auto_examples/index
+
+How to read and work with computed results in notebooks and scripts, plus
+recipes for common tasks and a gallery of worked examples.
 
 
 .. toctree::
@@ -67,12 +63,17 @@ for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
     table_def
     plugins
 
+Full reference for the Python API, internal modules, database schema, and
+the plugin system.
+
 
 .. toctree::
     :maxdepth: 1
     :caption: CLI Reference
 
     clickhelp/msnoise
+
+Every ``msnoise`` command, its arguments, and options.
 
 
 .. toctree::
