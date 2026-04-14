@@ -379,6 +379,7 @@ def propagate_refstack_jobs_from_stack_done(session):
                         bumped += 1
                     continue
 
+                lineage_id = _get_or_create_lineage_id(session, refstack_lineage)
                 session.add(Job(
                     day="REF",
                     pair=pair,
@@ -388,6 +389,7 @@ def propagate_refstack_jobs_from_stack_done(session):
                     priority=0,
                     lastmod=now,
                     lineage=refstack_lineage,
+                    lineage_id=lineage_id
                 ))
                 created += 1
 
