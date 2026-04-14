@@ -7,6 +7,13 @@ to know the on-disk path layout or the low-level ``core.io`` functions: just
 build a result object for your lineage and call the appropriate ``get_*``
 method.
 
+Two construction paths exist depending on whether a database is available:
+
+* **DB-connected** (active project): use :meth:`~MSNoiseResult.from_ids`,
+  :meth:`~MSNoiseResult.from_names`, or :meth:`~MSNoiseResult.list`.
+* **DB-free** (portable bundle): use :meth:`~MSNoiseResult.from_bundle` —
+  no database, no ``msnoise install``, works anywhere MSNoise is installed.
+
 For the full reference see :class:`msnoise.results.MSNoiseResult`.
 
 Dynamic method gating
@@ -18,8 +25,8 @@ present in the lineage are exposed.  Accessing an unavailable method raises
 ``dir()`` and tab-completion, so Jupyter's autocomplete only shows what is
 actually readable.
 
-Constructing a result object
------------------------------
+Constructing a result object (DB-connected)
+--------------------------------------------
 
 Use :meth:`MSNoiseResult.from_ids` with the integer config-set numbers for
 each step you want to include.  You only need to go as far down the pipeline
@@ -134,6 +141,10 @@ enumerate them::
     for branch in r.branches():
         print(branch)   # MSNoiseResult(category='mwcs', ...)
 
+``branches()`` works identically on bundle-loaded results — it uses the DAG
+topology from :func:`~msnoise.core.workflow.get_workflow_chains` and confirms
+each branch by checking for an ``_output`` subdirectory on disk.
+
 Iterating over all completed results
 --------------------------------------
 
@@ -155,10 +166,96 @@ Exporting dv/v with provenance
         print(f)  # dvv_CC_ZZ__pre1-cc1-f1-stk1-ref1-mwcs1-dtt1-dvv1__m1D-1D.nc
 
     # Reload and inspect the embedded params
-    import xarray as xr, yaml
+    import xarray as xr
+    from msnoise.params import MSNoiseParams
     ds = xr.open_dataset(written[0])
-    params = yaml.safe_load(ds.attrs["msnoise_params"])
-    print(params["mwcs"]["mwcs_wlen"])
+    params = MSNoiseParams.from_yaml_string(ds.attrs["msnoise_params"])
+    print(params.mwcs.mwcs_wlen)
+
+Portable bundles — HPC to laptop, or journal supplementary data
+----------------------------------------------------------------
+
+:meth:`export_bundle` packages a selectable slice of the computed ``_output/``
+tree into a self-describing directory (or ``.zip``), together with
+``params.yaml`` (full lineage config) and ``MANIFEST.json`` (sha256 per file,
+station list, original output path).  The bundle can be read on any machine
+with MSNoise installed — **no database required**.
+
+**Selecting what to include** with the ``from_step=`` argument:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - ``from_step=``
+     - What is copied
+   * - ``"stack"``
+     - Moving-stacked CCFs + all downstream steps (large)
+   * - ``"refstack"``
+     - Reference stacks + all dv/v branches (moderate; **default for CC workflows**)
+   * - ``"mwcs_dtt_dvv"``
+     - Only the final MWCS dv/v aggregates (small; ideal for paper supplements)
+   * - ``"psd"``
+     - PSD daily files + RMS (moderate; **default for PSD-only workflows**)
+   * - ``"cc"`` / ``"filter"``
+     - Raw per-window CCFs + everything downstream (very large; opt-in)
+   * - ``None``
+     - Earliest step with ``_output`` in the lineage (auto-detected)
+
+The full lineage directory nesting is preserved verbatim inside the bundle
+root, so :meth:`from_bundle` can set ``output_folder = bundle_root`` and all
+:func:`~msnoise.core.io.xr_get_*` calls resolve paths identically — nothing
+in ``core/io.py`` needed to change.
+
+**Typical HPC → laptop workflow**::
+
+    # ── On the HPC (has DB) ───────────────────────────────────────────────
+    from msnoise.results import MSNoiseResult
+    from msnoise.core.db import connect
+
+    db = connect()
+    r = MSNoiseResult.list(db, "mwcs_dtt_dvv")[0]
+
+    # Export reference stacks + all dv/v branches as a zip:
+    bundle = r.export_bundle(
+        "belgium_2023/",
+        from_step="refstack",
+        compress=True,          # → belgium_2023.zip  (~50 MB typical network)
+    )
+
+    # Export only the final dv/v for a journal data-availability statement:
+    r.export_bundle("paper_SI/", from_step="mwcs_dtt_dvv", compress=True)
+
+    # ── rsync to local machine ────────────────────────────────────────────
+    # rsync -avz hpc:/scratch/user/msnoise/belgium_2023.zip ./
+
+    # ── On the laptop / at the reviewer's machine (no DB needed) ─────────
+    from msnoise.results import MSNoiseResult
+
+    r2 = MSNoiseResult.from_bundle("belgium_2023.zip")
+
+    # Optional integrity check (recommended for published data):
+    r2.verify()
+    # OK — 347 files verified.
+
+    # Full MSNoiseResult API works immediately:
+    ds  = r2.get_dvv("CC", "ZZ", ("1D", "1D"))
+    da  = r2.get_ccf("BE.UCC..HHZ:BE.MEM..HHZ", "ZZ", ("1D", "1D"))
+    ref = r2.get_ref("BE.UCC..HHZ:BE.MEM..HHZ", "ZZ")
+
+    # Navigate branches (folder scan — no DB):
+    for branch in r2.branches():
+        print(branch)
+    # MSNoiseResult(category='mwcs_dtt_dvv', lineage='...', available_methods=[...])
+    # MSNoiseResult(category='stretching_dvv', lineage='...', available_methods=[...])
+
+    # Inspect the exact parameters that produced the result:
+    print(r2.params.mwcs.mwcs_wlen)        # → 10.0
+    print(r2.params.cc.cc_sampling_rate)   # → 20.0
+
+    # params.yaml is also preserved in MANIFEST.json alongside the original
+    # HPC output_folder path, msnoise version, and generation timestamp —
+    # sufficient for a data-availability or reproducibility statement.
 """
 
 from __future__ import annotations
