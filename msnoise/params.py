@@ -178,16 +178,15 @@ class MSNoiseParams:
             fh.write(self.to_yaml_string())
 
     @classmethod
-    def from_yaml(cls, path: str) -> "MSNoiseParams":
-        """Reconstruct a :class:`MSNoiseParams` from a YAML file.
+    def _from_doc(cls, doc: dict) -> "MSNoiseParams":
+        """Reconstruct a :class:`MSNoiseParams` from a parsed YAML document.
 
-        Does *not* require a database connection — useful for offline
-        reproducibility checks.
+        Shared implementation used by :meth:`from_yaml` and
+        :meth:`from_yaml_string`.
+
+        :param doc: Dict as returned by ``yaml.safe_load``.
+        :returns: Populated :class:`MSNoiseParams`.
         """
-        import yaml
-        with open(path, encoding="utf-8") as fh:
-            doc = yaml.safe_load(fh)
-
         p = cls()
         lineage = doc.get("lineage", "")
         p._set_lineage_names(lineage.split("/") if lineage else [])
@@ -200,6 +199,44 @@ class MSNoiseParams:
                 p._add_layer(key, AttribDict(value))
 
         return p
+
+    @classmethod
+    def from_yaml(cls, path: str) -> "MSNoiseParams":
+        """Reconstruct a :class:`MSNoiseParams` from a YAML file.
+
+        Does *not* require a database connection — useful for offline
+        reproducibility checks.
+
+        :param path: Path to a YAML file written by :meth:`to_yaml`.
+        :returns: Populated :class:`MSNoiseParams`.
+        """
+        import yaml
+        with open(path, encoding="utf-8") as fh:
+            doc = yaml.safe_load(fh)
+        return cls._from_doc(doc)
+
+    @classmethod
+    def from_yaml_string(cls, s: str) -> "MSNoiseParams":
+        """Reconstruct a :class:`MSNoiseParams` from a YAML string.
+
+        Equivalent to :meth:`from_yaml` but reads from a string rather than
+        a file.  Useful for loading params embedded in NetCDF ``attrs``, e.g.
+        the ``msnoise_params`` attribute written by
+        :meth:`~msnoise.results.MSNoiseResult.export_dvv`.
+
+        :param s: YAML string as produced by :meth:`to_yaml_string`.
+        :returns: Populated :class:`MSNoiseParams`.
+
+        Example::
+
+            import xarray as xr
+            ds = xr.open_dataset("dvv_CC_ZZ__....nc")
+            params = MSNoiseParams.from_yaml_string(ds.attrs["msnoise_params"])
+            print(params.mwcs.mwcs_wlen)
+        """
+        import yaml
+        doc = yaml.safe_load(s)
+        return cls._from_doc(doc)
 
     def __repr__(self) -> str:
         cats = list(object.__getattribute__(self, "_layers"))

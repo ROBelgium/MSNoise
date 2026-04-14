@@ -239,11 +239,14 @@ class MSNoiseResult:
         Root output folder.
     """
 
-    def __init__(self, db, lineage_names: list):
-        from .core.workflow import resolve_lineage_params
-        self._db = db
+    def __init__(self, db, lineage_names: list, _params=None):
+        self._db = db  # None in bundle / DB-free mode
         self.lineage_names: list = list(lineage_names)
-        _, _, self.params = resolve_lineage_params(db, lineage_names)
+        if _params is not None:
+            self.params = _params
+        else:
+            from .core.workflow import resolve_lineage_params
+            _, _, self.params = resolve_lineage_params(db, lineage_names)
         self.output_folder: str = self.params.global_.output_folder
         self.category: str = _step_prefix(lineage_names[-1]) if lineage_names else ""
         self._present_categories: frozenset = frozenset(
@@ -291,6 +294,100 @@ class MSNoiseResult:
                 results.append(cls(db, names))
         return results
 
+    @classmethod
+    def from_bundle(cls, path: str) -> "MSNoiseResult":
+        """Load a read-only :class:`MSNoiseResult` from a bundle directory or
+        ``.zip`` file produced by :meth:`export_bundle`.
+
+        No database connection is required.  All ``get_*`` methods work
+        immediately after construction.  :meth:`branches` uses a folder scan
+        rather than the DB.
+
+        :param path: Path to a bundle directory **or** a ``.zip`` file.
+        :returns: :class:`MSNoiseResult` with ``_db=None``.
+        :raises FileNotFoundError: if ``params.yaml`` is absent from the bundle.
+
+        Example — directory bundle::
+
+            r = MSNoiseResult.from_bundle("/data/msnoise_bundle/")
+            ds = r.get_dvv("CC", "ZZ", ("1D", "1D"))
+
+        Example — zip bundle::
+
+            r = MSNoiseResult.from_bundle("/data/bundle.zip")
+            da = r.get_ccf("BE.UCC..HHZ:BE.MEM..HHZ", "ZZ", ("1D", "1D"))
+            r.verify()
+        """
+        import os
+        import zipfile as _zf
+        import tempfile as _tmp
+
+        # ── normalise: zip → extract to temp dir ──────────────────────────
+        _tmpdir = None  # TemporaryDirectory — kept alive on the instance
+
+        if isinstance(path, str) and path.endswith(".zip") and os.path.isfile(path):
+            _tmpdir = _tmp.TemporaryDirectory(prefix="msnoise_bundle_")
+            with _zf.ZipFile(path) as zf:
+                zf.extractall(_tmpdir.name)
+            # params.yaml may be at the zip root or one level inside a
+            # top-level directory (the common "zip contains a single folder"
+            # pattern produced by export_bundle compress=True).
+            if os.path.isfile(os.path.join(_tmpdir.name, "params.yaml")):
+                bundle_root = _tmpdir.name
+            else:
+                candidates = [
+                    os.path.join(_tmpdir.name, d)
+                    for d in os.listdir(_tmpdir.name)
+                    if os.path.isfile(
+                        os.path.join(_tmpdir.name, d, "params.yaml")
+                    )
+                ]
+                if not candidates:
+                    raise FileNotFoundError(
+                        "params.yaml not found inside the zip bundle."
+                    )
+                bundle_root = candidates[0]
+        else:
+            bundle_root = os.path.abspath(path)
+
+        # ── load params.yaml ──────────────────────────────────────────────
+        yaml_path = os.path.join(bundle_root, "params.yaml")
+        if not os.path.isfile(yaml_path):
+            raise FileNotFoundError(
+                f"params.yaml not found at {yaml_path!r}. "
+                "Is this a valid MSNoise bundle directory?"
+            )
+
+        from .params import MSNoiseParams
+        from obspy.core.util.attribdict import AttribDict
+
+        params = MSNoiseParams.from_yaml(yaml_path)
+
+        # Override output_folder with the bundle's actual location on this
+        # machine.  The original HPC path is preserved in MANIFEST.json
+        # (output_folder_original) for provenance.
+        layers = object.__getattribute__(params, "_layers")
+        if "global" in layers:
+            global_dict = dict(layers["global"])
+            global_dict["output_folder"] = bundle_root
+            layers["global"] = AttribDict(global_dict)
+
+        # ── construct without DB ──────────────────────────────────────────
+        inst = cls.__new__(cls)
+        inst._db = None
+        inst._bundle_root = bundle_root
+        inst._tmpdir = _tmpdir        # keeps TemporaryDirectory alive
+        inst.lineage_names = list(params.lineage_names)
+        inst.params = params
+        inst.output_folder = bundle_root
+        inst.category = (
+            _step_prefix(inst.lineage_names[-1]) if inst.lineage_names else ""
+        )
+        inst._present_categories = frozenset(
+            _step_prefix(n) for n in inst.lineage_names
+        )
+        return inst
+
     # ── dynamic gating ────────────────────────────────────────────────────────
 
     def __dir__(self) -> list:
@@ -325,7 +422,16 @@ class MSNoiseResult:
     # ── navigation ────────────────────────────────────────────────────────────
 
     def branches(self, include_empty: bool = False) -> list:
-        """Return downstream MSNoiseResult objects one step below this lineage."""
+        """Return downstream MSNoiseResult objects one step below this lineage.
+
+        In bundle / DB-free mode (``_db is None``) the DAG topology is taken
+        from :func:`~msnoise.core.workflow.get_workflow_chains` and child
+        directories are checked for the presence of an ``_output`` subdirectory
+        to confirm they were actually computed.
+        """
+        if self._db is None:
+            return self._branches_from_folders(include_empty=include_empty)
+
         from .msnoise_table_def import declare_tables
         schema = declare_tables()
         Job = schema.Job
@@ -373,6 +479,131 @@ class MSNoiseResult:
                     continue
             results.append(MSNoiseResult(self._db, child_names))
         return results
+
+    def _branches_from_folders(self, include_empty: bool = False) -> list:
+        """Discover child MSNoiseResult objects via folder scan (no DB).
+
+        Uses :func:`~msnoise.core.workflow.get_workflow_chains` for DAG
+        topology, then checks whether each expected child directory contains
+        an ``_output`` subdirectory to confirm it was actually computed.
+        """
+        import os
+        from .core.workflow import get_workflow_chains
+
+        chains = get_workflow_chains()
+        terminal_cat = self.category
+        next_cats = chains.get(terminal_cat, {}).get("next_steps", [])
+        if not next_cats:
+            return []
+
+        # Infer set number from the terminal step name, e.g. "refstack_1" → "1".
+        # All steps in a single exported lineage share the same set number, so
+        # this is reliable for bundles.  For mixed-set lineages the folder
+        # existence check is the safety net.
+        terminal_name = self.lineage_names[-1]
+        set_num = terminal_name.rsplit("_", 1)[-1]
+
+        results = []
+        for child_cat in next_cats:
+            child_step_name = f"{child_cat}_{set_num}"
+            child_names = self.lineage_names + [child_step_name]
+            child_dir = os.path.join(self.output_folder, *child_names)
+
+            # Fallback: if the inferred name doesn't exist, glob for any
+            # matching category directory (handles mixed set numbers).
+            if not os.path.isdir(child_dir):
+                import glob as _glob
+                pattern = os.path.join(
+                    self.output_folder, *self.lineage_names,
+                    f"{child_cat}_*",
+                )
+                matches = sorted(
+                    d for d in _glob.glob(pattern) if os.path.isdir(d)
+                )
+                if not matches:
+                    if include_empty:
+                        # Emit a placeholder with the inferred name
+                        pass
+                    else:
+                        continue
+                else:
+                    child_dir = matches[0]
+                    child_step_name = os.path.basename(child_dir)
+                    child_names = self.lineage_names + [child_step_name]
+
+            child_output = os.path.join(child_dir, "_output")
+            if not include_empty and not os.path.isdir(child_output):
+                continue
+
+            child = MSNoiseResult.__new__(MSNoiseResult)
+            child._db = None
+            child._bundle_root = getattr(self, "_bundle_root", self.output_folder)
+            child._tmpdir = getattr(self, "_tmpdir", None)
+            child.lineage_names = child_names
+            child.params = self.params          # shared MSNoiseParams (immutable)
+            child.output_folder = self.output_folder
+            child.category = child_cat
+            child._present_categories = frozenset(
+                _step_prefix(n) for n in child_names
+            )
+            results.append(child)
+        return results
+
+    def verify(self, verbose: bool = False) -> bool:
+        """Verify bundle integrity against ``MANIFEST.json``.
+
+        Re-hashes every file listed in the manifest and compares to the stored
+        sha256 digest.  Prints a summary line; returns ``True`` if all pass.
+
+        :param verbose: If ``True``, print every file path as it is checked.
+        :returns: ``True`` if all checksums match, ``False`` otherwise.
+        :raises FileNotFoundError: if ``MANIFEST.json`` is absent (not a
+            bundle, or loaded via :meth:`from_ids` / :meth:`from_names`).
+
+        Example::
+
+            r = MSNoiseResult.from_bundle("/data/bundle/")
+            assert r.verify(), "Bundle integrity check failed"
+        """
+        import hashlib
+        import json
+
+        manifest_path = os.path.join(self.output_folder, "MANIFEST.json")
+        if not os.path.isfile(manifest_path):
+            raise FileNotFoundError(
+                f"MANIFEST.json not found at {manifest_path!r}. "
+                "verify() is only available for bundles loaded via from_bundle()."
+            )
+        with open(manifest_path, encoding="utf-8") as fh:
+            manifest = json.load(fh)
+
+        failures = []
+        entries = manifest.get("files", [])
+        for entry in entries:
+            fpath = os.path.join(self.output_folder, entry["path"])
+            if not os.path.isfile(fpath):
+                failures.append((entry["path"], "file missing"))
+                continue
+            h = hashlib.sha256()
+            with open(fpath, "rb") as fh:
+                for chunk in iter(lambda: fh.read(1 << 20), b""):
+                    h.update(chunk)
+            digest = h.hexdigest()
+            if digest != entry["sha256"]:
+                failures.append(
+                    (entry["path"], f"sha256 mismatch (got {digest[:12]}…)")
+                )
+            elif verbose:
+                print(f"  OK  {entry['path']}")
+
+        total = len(entries)
+        if failures:
+            print(f"FAILED {len(failures)}/{total} files:")
+            for path, reason in failures:
+                print(f"  FAIL  {path}: {reason}")
+            return False
+        print(f"OK — {total} files verified.")
+        return True
 
     def __repr__(self) -> str:
         valid = [m for m in sorted(_METHOD_CATEGORIES) if m in dir(self)]
@@ -878,6 +1109,251 @@ class MSNoiseResult:
         return results
 
     # ── helpers ───────────────────────────────────────────────────────────────
+
+    def export_bundle(
+        self,
+        dest: str,
+        from_step: str = None,
+        compress: bool = False,
+        overwrite: bool = False,
+    ) -> str:
+        """Export a portable, self-describing bundle of computed results.
+
+        Copies the selected portion of the ``_output/`` tree together with
+        ``params.yaml`` and ``MANIFEST.json`` (sha256 per file) into *dest*.
+        The result can be read on any machine with MSNoise installed using
+        :meth:`from_bundle` — no database connection required.
+
+        The full lineage directory nesting is preserved verbatim, so that
+        :meth:`from_bundle` can set ``output_folder = bundle_root`` and all
+        existing :func:`~msnoise.core.io.xr_get_*` calls resolve paths
+        identically.
+
+        Parameters
+        ----------
+        dest:
+            Output directory path.  Created if absent.  If *compress* is
+            ``True``, a ``<dest>.zip`` file is written instead and the
+            temporary directory is removed on success.
+        from_step:
+            Category name of the first step whose ``_output/`` to include.
+            Must be present in the lineage.  All downstream steps are
+            included automatically; ancestor directory names are created as
+            empty path components to preserve the full nesting.
+
+            Accepted values (examples): ``"stack"``, ``"refstack"``,
+            ``"mwcs_dtt_dvv"``, ``"psd"``.  ``"cc"`` advances
+            automatically to ``"filter"`` because raw CCFs are physically
+            stored under the filter-step directory.
+
+            ``None`` (default) picks the earliest step in the lineage that
+            has an ``_output`` directory (``"stack"`` for CC workflows,
+            ``"psd"`` for PSD-only workflows).
+        compress:
+            If ``True``, zip the bundle directory after writing and return
+            the ``.zip`` path.  The directory is removed on success.
+        overwrite:
+            If ``True``, overwrite an existing *dest* directory or ``.zip``.
+
+        Returns
+        -------
+        str
+            Absolute path to the bundle directory or ``.zip`` file written.
+
+        Raises
+        ------
+        ValueError
+            If *from_step* is not found in the lineage.
+        FileExistsError
+            If *dest* (or ``<dest>.zip``) already exists and *overwrite*
+            is ``False``.
+        FileNotFoundError
+            If the source directory for *from_step* does not exist on disk.
+
+        Examples
+        --------
+        Export from refstack downwards, compressed::
+
+            db = connect()
+            r = MSNoiseResult.list(db, "mwcs_dtt_dvv")[0]
+            path = r.export_bundle(
+                "belgium_2023/",
+                from_step="refstack",
+                compress=True,
+            )
+            # → belgium_2023.zip
+
+        Read on another machine::
+
+            r2 = MSNoiseResult.from_bundle("belgium_2023.zip")
+            r2.verify()
+            ds = r2.get_dvv("CC", "ZZ", ("1D", "1D"))
+
+        Journal supplementary data (dvv only)::
+
+            r.export_bundle(
+                "paper_SI/",
+                from_step="mwcs_dtt_dvv",
+                compress=True,
+            )
+        """
+        import datetime
+        import hashlib
+        import json
+        import shutil
+        import zipfile
+
+        try:
+            import msnoise as _ms
+            _version = _ms.__version__
+        except Exception:
+            _version = "unknown"
+
+        dest = os.path.abspath(dest)
+        zip_path = dest + ".zip" if compress else None
+
+        # ── guard existing output ─────────────────────────────────────────
+        if os.path.exists(dest) and not overwrite:
+            raise FileExistsError(
+                f"{dest!r} already exists.  Pass overwrite=True to replace it."
+            )
+        if zip_path and os.path.exists(zip_path) and not overwrite:
+            raise FileExistsError(
+                f"{zip_path!r} already exists.  Pass overwrite=True to replace it."
+            )
+
+        # ── resolve from_step ─────────────────────────────────────────────
+        # Steps that write _output directly under their own step folder.
+        # "cc" is special: its raw CCFs land under the filter-step folder,
+        # so we advance from_step to "filter" to include that _output.
+        _steps_with_output = frozenset({
+            "filter", "stack", "refstack",
+            "mwcs", "mwcs_dtt", "mwcs_dtt_dvv",
+            "stretching", "stretching_dvv",
+            "wavelet", "wavelet_dtt", "wavelet_dtt_dvv",
+            "psd", "psd_rms",
+        })
+
+        if from_step is None:
+            for name in self.lineage_names:
+                cat = _step_prefix(name)
+                if cat in _steps_with_output:
+                    from_step = cat
+                    break
+
+        if from_step is None:
+            raise ValueError(
+                "Could not determine from_step — lineage has no exportable steps."
+            )
+
+        # "cc" advances to "filter" so that raw CCFs (stored under
+        # filter_step/_output/all|daily/) are included.
+        effective_from = "filter" if from_step == "cc" else from_step
+
+        # Validate from_step exists in lineage
+        found = any(
+            _step_prefix(n) in (from_step, effective_from)
+            for n in self.lineage_names
+        )
+        if not found:
+            raise ValueError(
+                f"from_step={from_step!r} not found in lineage "
+                f"{'/'.join(self.lineage_names)!r}."
+            )
+
+        # ── determine source directory ────────────────────────────────────
+        # lineage_through(effective_from) gives the path segment list up to
+        # and including the from-step.  Everything at and below that directory
+        # is the data we copy — child step folders live inside it.
+        lineage_to_copy = self._lineage_through(effective_from)
+        src_dir = os.path.join(self.output_folder, *lineage_to_copy)
+        if not os.path.isdir(src_dir):
+            raise FileNotFoundError(
+                f"Source directory not found: {src_dir!r}.  "
+                f"Has the pipeline been run up to '{from_step}'?"
+            )
+
+        # ── copy _output tree ─────────────────────────────────────────────
+        if os.path.exists(dest) and overwrite:
+            shutil.rmtree(dest)
+        os.makedirs(dest)
+
+        # Mirror full lineage nesting so output_folder = bundle_root works.
+        dest_step_dir = os.path.join(dest, *lineage_to_copy)
+        shutil.copytree(src_dir, dest_step_dir)
+
+        # ── params.yaml ───────────────────────────────────────────────────
+        self.params.to_yaml(os.path.join(dest, "params.yaml"))
+
+        # ── provenance: stations + data_sources ───────────────────────────
+        from .core.stations import get_station_pairs
+        _station_ids: set = set()
+        if self._db is not None:
+            try:
+                for _sta1, _sta2 in get_station_pairs(self._db):
+                    _station_ids.add(f"{_sta1.net}.{_sta1.sta}")
+                    _station_ids.add(f"{_sta2.net}.{_sta2.sta}")
+            except Exception:
+                pass
+        data_sources_yaml, stations_yaml = _build_datasource_provenance(
+            self._db, sorted(_station_ids)
+        )
+
+        import yaml as _yaml
+
+        # ── MANIFEST.json ─────────────────────────────────────────────────
+        generated = (
+            datetime.datetime.now(datetime.timezone.utc)
+            .isoformat(timespec="seconds") + "Z"
+        )
+        file_entries: list = []
+        total_bytes = 0
+
+        for dirpath, _dirs, filenames in os.walk(dest_step_dir):
+            for fname in sorted(filenames):
+                fpath = os.path.join(dirpath, fname)
+                rel = os.path.relpath(fpath, dest).replace(os.sep, "/")
+                size = os.path.getsize(fpath)
+                total_bytes += size
+                h = hashlib.sha256()
+                with open(fpath, "rb") as fh:
+                    for chunk in iter(lambda: fh.read(1 << 20), b""):
+                        h.update(chunk)
+                file_entries.append({
+                    "path":       rel,
+                    "sha256":     h.hexdigest(),
+                    "size_bytes": size,
+                })
+
+        manifest = {
+            "msnoise_bundle_version":  1,
+            "msnoise_version":         _version,
+            "generated":               generated,
+            "lineage":                 "/".join(self.lineage_names),
+            "export_from_step":        from_step,
+            "output_folder_original":  self.output_folder,
+            "stations":    _yaml.safe_load(stations_yaml) if stations_yaml else [],
+            "data_sources":_yaml.safe_load(data_sources_yaml) if data_sources_yaml else [],
+            "files":           file_entries,
+            "total_size_bytes": total_bytes,
+            "total_files":      len(file_entries),
+        }
+        with open(os.path.join(dest, "MANIFEST.json"), "w", encoding="utf-8") as fh:
+            json.dump(manifest, fh, indent=2)
+
+        # ── optional zip ──────────────────────────────────────────────────
+        if compress:
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for dirpath, _dirs, filenames in os.walk(dest):
+                    for fname in filenames:
+                        fpath = os.path.join(dirpath, fname)
+                        # arcname: bundle dir name + relative path inside
+                        arcname = os.path.relpath(fpath, os.path.dirname(dest))
+                        zf.write(fpath, arcname)
+            shutil.rmtree(dest)
+            return zip_path
+
+        return dest
 
     @staticmethod
     def to_dataframe(ds):
