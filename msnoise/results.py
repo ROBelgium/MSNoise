@@ -12,7 +12,8 @@ Two construction paths exist depending on whether a database is available:
 * **DB-connected** (active project): use :meth:`~MSNoiseResult.from_ids`,
   :meth:`~MSNoiseResult.from_names`, or :meth:`~MSNoiseResult.list`.
 * **DB-free** (portable bundle): use :meth:`~MSNoiseResult.from_bundle` —
-  no database, no ``msnoise install``, works anywhere MSNoise is installed.
+  no database, no ``msnoise db init``, works anywhere the msnoise package is
+  installed.
 
 For the full reference see :class:`msnoise.results.MSNoiseResult`.
 
