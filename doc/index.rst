@@ -31,92 +31,54 @@ for Monitoring Seismic Velocity Changes Using Ambient Seismic Noise,
 *Seismological Research Letters*, 85(3), 715‑726, doi:10.1785/0220130073.
 
 
-Installation
-============
-
 .. toctree::
     :maxdepth: 2
+    :caption: Getting Started
 
     installation
-
-Workflow Concepts (2.x architecture)
-=====================================
-
-.. toctree::
-    :maxdepth: 2
-
     workflow_concepts
 
 
-Workflows:
-==========
-
-Initializing and Configuring a Project
---------------------------------------
-Commands in this workflow have the ``msnoise <command>`` form.
-
 .. toctree::
     :maxdepth: 2
+    :caption: Workflows
 
     workflow_000/0000_intro.rst
-
-
-Cross-Correlation Functions
----------------------------
-Commands in this workflow have the ``msnoise cc <command>`` form.
-
-.. toctree::
-    :maxdepth: 2
-
     workflow_ccf/0000_intro.rst
-
-Computing Relative Velocity Variations
---------------------------------------
-Commands in this workflow have the ``msnoise cc dtt <command>`` form.
-
-.. toctree::
-    :maxdepth: 2
-
     workflow_dvv/0000_intro.rst
-
-Computing Power Spectral Densities (Quality Control)
-----------------------------------------------------
-Commands in this workflow have the ``msnoise qc <command>`` form.
-
-.. toctree::
-    :maxdepth: 2
-
     workflow_psd/0000_intro.rst
 
 
-Interacting with MSNoise
-========================
-
-
 .. toctree::
     :maxdepth: 2
-    :glob:
+    :caption: Using MSNoise
 
     results
     how_tos
     auto_examples/index
-    api
-    core
-    plugins
-    
 
-.. toctree::
-    :maxdepth: 1
-
-    clickhelp/msnoise
-
-Development & Miscellaneous
-===========================
 
 .. toctree::
     :maxdepth: 2
+    :caption: API Reference
 
+    core
+    api
     table_def
+    plugins
+
+
+.. toctree::
+    :maxdepth: 1
+    :caption: CLI Reference
+
+    clickhelp/msnoise
+
+
+.. toctree::
+    :maxdepth: 2
+    :caption: Development
+
     about_db_performances
     references
     contributors

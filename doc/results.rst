@@ -1,8 +1,8 @@
 .. _msnoise_result:
 
-**************
-MSNoiseResult
-**************
+**********************************
+Reading outputs with MSNoiseResult
+**********************************
 
 .. automodule:: msnoise.results
    :members:
