@@ -1410,7 +1410,7 @@ def plot_data_availability(ctx, chan, show, outfile):
 @outfile_option
 @click.pass_context
 def plot_station_map(ctx, show, outfile):
-    """Plots the station map (very very basic)"""
+    """Plots the station map"""
     if ctx.obj['MSNOISE_custom']:
         from station_map import main # NOQA
     else:
