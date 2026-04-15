@@ -52,7 +52,6 @@ dependencies = [
     "flask-wtf",
     "markdown",
     "folium",
-    "pygmt",
     "wtforms<3.2",        # flask-admin compat: wtforms>=3.2 breaks form rendering
     "jinja2",
     # "scandir",            # Python 2 backport; os.scandir is stdlib since Python 3.5
