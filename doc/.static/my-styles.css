@@ -33,7 +33,7 @@ body { font-size: 15px; color: var(--text); -webkit-font-smoothing: antialiased;
     border-radius: 4px;
     border: 1px solid rgba(255,255,255,0.25);
     background: rgba(255,255,255,0.12);
-    color: #fff;
+    color: #000;
 }
 
 /* Nav links */
