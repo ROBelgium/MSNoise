@@ -42,7 +42,7 @@ Adding a second filter band
        msnoise db upgrade
 
    This creates ``filter_2`` as a new WorkflowStep and wires it:
-   ``cc_1 → filter_2 → stack_1 → …``
+   ``cc_1 → filter_2 → stack_1`` and ``cc_1 → filter_2 → refstack_1`` (siblings)
 
 3. Run the CC step as usual.  Both filter branches are processed:
 

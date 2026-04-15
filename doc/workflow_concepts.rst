@@ -80,13 +80,15 @@ The topology follows the canonical order:
 .. code-block:: text
 
     global_1
-    ├── preprocess_1  →  cc_1  →  filter_1  →  stack_1  →  refstack_1
-    │                              filter_2  →  stack_1 ↗
-    │                                         ↓
-    │                                 mwcs_1  →  mwcs_dtt_1  →  mwcs_dtt_dvv_1
-    │                                 stretching_1            →  stretching_dvv_1
-    │                                 wavelet_1  →  wavelet_dtt_1  →  wavelet_dtt_dvv_1
+    ├── preprocess_1  →  cc_1  →  filter_1  →  stack_1    ─────────────────────────────┐
+    │                              filter_2  →  stack_2    (siblings of refstack)        │
+    │                                        └─ refstack_1  →  mwcs_1     →  mwcs_dtt_1  →  mwcs_dtt_dvv_1
+    │                                                         stretching_1               →  stretching_dvv_1
+    │                                                         wavelet_1   →  wavelet_dtt_1  →  wavelet_dtt_dvv_1
     └── psd_1  →  psd_rms_1
+
+    stack_N and refstack_M are **siblings** (both children of filter).
+    mwcs jobs encode both parents: …/stack_N/refstack_M/mwcs_1
 
 Steps are created automatically from config sets.  The admin web UI
 (``msnoise admin``) lets you view and edit the workflow graph.
@@ -109,7 +111,8 @@ It is stored as a ``/``-separated string of step names:
 
 .. code-block:: text
 
-    preprocess_1/cc_1/filter_1/stack_1/refstack_1/mwcs_1
+    preprocess_1/cc_1/filter_1/refstack_1          ← refstack (sibling of stack)
+    preprocess_1/cc_1/filter_1/stack_1/refstack_1/mwcs_1   ← mwcs encodes both parents
 
 Every job carries a lineage ID that resolves to this string.  The lineage
 serves two purposes:
@@ -206,8 +209,8 @@ Examples:
 
     OUTPUT/preprocess_1/cc_1/filter_1/_output/all/ZZ/YA.UV05.00_YA.UV06.00/2024-01-01.nc
     OUTPUT/preprocess_1/cc_1/filter_1/stack_1/_output/1D_1D/ZZ/YA.UV05.00_YA.UV06.00.nc
-    OUTPUT/preprocess_1/cc_1/filter_1/stack_1/refstack_1/_output/REF/ZZ/YA.UV05.00_YA.UV06.00.nc
-    OUTPUT/preprocess_1/cc_1/filter_2/stack_1/refstack_1/mwcs_1/_output/1D_1D/ZZ/YA.UV05.00_YA.UV06.00.nc
+    OUTPUT/preprocess_1/cc_1/filter_1/refstack_1/_output/REF/ZZ/YA.UV05.00_YA.UV06.00.nc   ← refstack folder (no stack_N prefix)
+    OUTPUT/preprocess_1/cc_1/filter_1/stack_1/refstack_1/mwcs_1/_output/1D_1D/ZZ/YA.UV05.00_YA.UV06.00.nc   ← mwcs encodes both
     OUTPUT/psd_1/_output/daily/YA.UV05.00.HHZ/2024-01-01.nc
     OUTPUT/psd_1/psd_rms_1/_output/YA.UV05.00.HHZ.nc
 

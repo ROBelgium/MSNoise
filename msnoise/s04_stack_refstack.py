@@ -2,17 +2,19 @@
 Reference Stack computation for MSNoise 2.x configsets workflow.
 
 This step computes (or validates) the REF stack for a ``refstack`` configset.
-It is positioned downstream of the MOV ``stack`` step and upstream of
-``mwcs`` / ``stretching`` / ``wavelet``.
+Refstack is a **sibling** of ``stack`` — both are children of the ``filter``
+pass-through node.  It is a prerequisite for ``mwcs`` / ``stretching`` /
+``wavelet``, which are only created once both a Done refstack REF sentinel
+and Done stack days exist for the pair.
 
 Two modes are supported, determined by ``ref_begin`` in the refstack configset:
 
 **Mode A — Fixed REF** (``ref_begin`` is a date or ``"1970-01-01"``)
-    Reads daily CCFs from the upstream ``stack_N`` output folder, stacks the
-    windows falling within ``[ref_begin, ref_end]``, and writes a single REF
-    NetCDF file under the ``refstack_M`` step folder::
+    Reads daily CCFs from the filter-level output folder, stacks the windows
+    falling within ``[ref_begin, ref_end]``, and writes a single REF NetCDF
+    file under the ``refstack_M`` step folder::
 
-        OUTPUT/.../stack_N/refstack_M/_output/REF/<components>/sta1_sta2.nc
+        OUTPUT/.../filter_N/refstack_M/_output/REF/<components>/sta1_sta2.nc
 
 **Mode B — Rolling REF** (``ref_begin`` is a negative integer string, e.g. ``"-5"``)
     No file is written.  The job validates that MOV data exists for the pair
