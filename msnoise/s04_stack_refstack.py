@@ -93,13 +93,13 @@ def main(loglevel="INFO"):
         jobs        = batch["jobs"]
         pair        = batch["pair"]
         params      = batch["params"]
-        # lineage_names_upstream ends with stack_N (current step refstack_M excluded)
+        # lineage_names_upstream ends at filter_N (refstack is now a sibling of
+        # stack, not its child). This is also the cc_lineage_prefix used when
+        # locating sibling stack jobs (e.g. refstack_needs_recompute).
         lineage_names = batch["lineage_names_upstream"]
-        # lineage_names_cc strips stack_N too, ending at filter_N
-        # where raw daily CC h5 files live under filter_N/_output/all/...
-        # Note: cannot use lineage_names_mov here — that strips refstack_* entries
-        # which don't exist at this level; we need to strip stack_N explicitly.
-        lineage_names_cc = lineage_names[:-1]
+        # lineage_names_cc == lineage_names: both end at filter_N, which is
+        # exactly where raw daily CCF files live under filter_N/_output/...
+        lineage_names_cc = lineage_names
         step          = batch["step"]
         lineage_str   = batch["lineage_str"]
 
@@ -120,12 +120,9 @@ def main(loglevel="INFO"):
 
         # ── Mode A: fixed-date REF ──
 
-        # Check whether any Done stack days for this pair fall inside
-        # the configured ref_begin..ref_end window.  If none do, the
-        # reference waveform is unaffected by the new data — skip the
-        # heavy computation and mark Done immediately.  Downstream
-        # mwcs/stretching/wavelet T jobs were already created by
-        # propagate_downstream (stack category) so they can start right away.
+        # Check whether any Done stack days (sibling branch) for this pair
+        # fall inside the configured ref_begin..ref_end window.  If none do,
+        # the reference is unaffected — skip recomputation and mark Done.
         if not refstack_is_rolling(params):
             if not refstack_needs_recompute(db, pair, batch["lineage_names_upstream"], params):
                 logger.info(

@@ -85,59 +85,68 @@ _BUILTIN_WORKFLOW_CHAINS = {
         "abbrev": "cc", "display_name": "Cross-Correlation", "level": 2,
     },
     "filter": {
-        "next_steps": ["stack"],
+        "next_steps": ["stack", "refstack"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "f", "display_name": "Filters", "level": 3,
     },
     "stack": {
-        "next_steps": ["refstack"],
+        # Stack is now a sibling of refstack (both children of filter).
+        # It has no direct downstream workers — mwcs/stretching/wavelet jobs
+        # are created by propagate_downstream on refstack completion, once
+        # BOTH a Done refstack REF AND Done stack days exist for the pair.
+        "next_steps": [],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "stk", "display_name": "Moving Stacks", "level": 4,
     },
     "refstack": {
+        # Sibling of stack (both children of filter/cc pass-through).
+        # Acts as the gateway to dv/v steps: mwcs jobs are created when
+        # both the refstack REF is Done and stack days are Done for the pair.
+        # Lineage convention: mwcs jobs use  …/stack_N/refstack_M/mwcs_1
+        # so that lineage_names_mov (strip refstack) resolves the CCF path.
         "next_steps": ["mwcs", "stretching", "wavelet"],
         "is_entry_point": False, "is_terminal": False,
-        "abbrev": "ref", "display_name": "Reference Stacks", "level": 5,
+        "abbrev": "ref", "display_name": "Reference Stacks", "level": 4,
     },
     "mwcs": {
         "next_steps": ["mwcs_dtt"],
         "is_entry_point": False, "is_terminal": False,
-        "abbrev": "mwcs", "display_name": "MWCS", "level": 6,
+        "abbrev": "mwcs", "display_name": "MWCS", "level": 5,
     },
     "mwcs_dtt": {
         "next_steps": ["mwcs_dtt_dvv"],
         "is_entry_point": False, "is_terminal": False,
-        "abbrev": "dtt", "display_name": "MWCS dt/t", "level": 7,
+        "abbrev": "dtt", "display_name": "MWCS dt/t", "level": 6,
     },
     "mwcs_dtt_dvv": {
         "next_steps": [],
         "is_entry_point": False, "is_terminal": True,
-        "abbrev": "dvv", "display_name": "MWCS dv/v Aggregate", "level": 8,
+        "abbrev": "dvv", "display_name": "MWCS dv/v Aggregate", "level": 7,
     },
     "stretching": {
         "next_steps": ["stretching_dvv"],
         "is_entry_point": False, "is_terminal": False,
-        "abbrev": "str", "display_name": "Stretching", "level": 6,
+        "abbrev": "str", "display_name": "Stretching", "level": 5,
     },
     "stretching_dvv": {
         "next_steps": [],
         "is_entry_point": False, "is_terminal": True,
-        "abbrev": "sdvv", "display_name": "Stretching dv/v Aggregate", "level": 7,
+        "abbrev": "sdvv", "display_name": "Stretching dv/v Aggregate", "level": 6,
     },
     "wavelet": {
         "next_steps": ["wavelet_dtt"],
         "is_entry_point": False, "is_terminal": False,
-        "abbrev": "wct", "display_name": "Wavelet", "level": 6,
+        "abbrev": "wct", "display_name": "Wavelet", "level": 5,
     },
     "wavelet_dtt": {
         "next_steps": ["wavelet_dtt_dvv"],
         "is_entry_point": False, "is_terminal": False,
-        "abbrev": "wdtt", "display_name": "Wavelet dt/t", "level": 7,
+        "abbrev": "wdtt", "display_name": "Wavelet dt/t", "level": 6,
     },
     "wavelet_dtt_dvv": {
         "next_steps": [],
         "is_entry_point": False, "is_terminal": True,
-        "abbrev": "wdvv", "display_name": "WCT dv/v Aggregate", "level": 8,
+        "abbrev": "wdvv", "display_name": "WCT dv/v Aggregate", "level": 7,
     },
     # ── PSD branch (also level=1: child of global, sibling of preprocess) ──
     "psd": {
@@ -747,34 +756,25 @@ def propagate_downstream(session, batch: dict) -> int:
             session.commit()
         return n_cc
 
-    if category == "stack":
-        # Two things happen when stack completes:
-        #
-        # 1. Create a day="REF" sentinel per pair so refstack can check
-        #    whether the reference window needs recomputing.
-        #
-        # 2. ALSO directly create mwcs/stretching/wavelet T jobs for the
-        #    new (pair, day) tuples in this batch.  These jobs can run
-        #    immediately if the reference is already up-to-date (the
-        #    common daily-operations case where new days fall outside the
-        #    fixed ref_begin..ref_end window).
-        #
-        # Refstack will check whether any Done stack days fall inside
-        # ref_begin..ref_end.  If none do, it marks the REF job Done
-        # without recomputing — the mwcs jobs created here are already
-        # waiting.  If the window IS affected, refstack recomputes the
-        # reference and propagate_downstream fires again from refstack,
-        # bumping existing mwcs T jobs (idempotent) or creating new ones.
-        from ..s02_new_jobs import (propagate_refstack_jobs_from_stack_done,
-                                     propagate_mwcs_jobs_from_refstack_done)
-        total  = propagate_refstack_jobs_from_stack_done(session)
-        # Direct propagation for the new days — bypasses the refstack gate
-        # when the reference is already up-to-date.
-        total += propagate_mwcs_jobs_from_refstack_done(session)
+    if category == "cc":
+        # cc Done → create both stack AND refstack T jobs (siblings under filter).
+        # Stack: one per (pair, day). Refstack: one REF sentinel per pair.
+        from ..s02_new_jobs import (propagate_stack_jobs_from_cc_done,
+                                     propagate_refstack_jobs_from_cc_done)
+        total  = propagate_stack_jobs_from_cc_done(session)
+        total += propagate_refstack_jobs_from_cc_done(session)
         return total
 
+    if category == "stack":
+        # Stack is a sibling of refstack (both children of filter/cc pass-through).
+        # No direct downstream workers — mwcs jobs are gated on refstack Done.
+        # If refstack REF is already Done for this pair, create mwcs jobs now.
+        from ..s02_new_jobs import propagate_mwcs_jobs_from_refstack_done
+        return propagate_mwcs_jobs_from_refstack_done(session)
+
     if category == "refstack":
-        # Looks up MOV stack days and creates per-(pair,day) mwcs/str/wct jobs
+        # REF Done — create mwcs/stretching/wavelet for all (pair, day) combos
+        # where Done stack jobs also exist (join logic inside the function).
         from ..s02_new_jobs import propagate_mwcs_jobs_from_refstack_done
         return propagate_mwcs_jobs_from_refstack_done(session)
 
@@ -1795,26 +1795,32 @@ def refstack_is_rolling(params):
 
 
 
-def refstack_needs_recompute(session, pair, lineage_names_upstream, params):
+def refstack_needs_recompute(session, pair, cc_lineage_prefix, params):
     """Return True if the REF stack needs to be recomputed for this pair.
 
-    Queries the Done ``stack`` jobs for *pair* and checks whether any of their
-    dates fall inside the configured ``[ref_begin, ref_end]`` window.  If no
-    Done stack day falls inside the window, the reference waveform is unaffected
-    by the new data and the refstack step can skip recomputation.
+    Queries Done ``stack`` jobs for *pair* across all active stack_N steps
+    whose lineage starts with *cc_lineage_prefix* (e.g.
+    ``["preprocess_1", "cc_1", "filter_1"]``), and checks whether any date
+    falls inside the configured ``[ref_begin, ref_end]`` window.
 
-    Should only be called for Mode A (fixed-date) refstack jobs — always returns
-    True for rolling mode (though the caller should not reach this path then).
+    Stack and refstack are now siblings (both children of filter/cc), so the
+    refstack worker no longer has a stack step in its upstream lineage.
+    Instead, the cc/filter prefix is shared by both branches and is used here
+    to locate the sibling stack jobs.
+
+    Should only be called for Mode A (fixed-date) refstack jobs.
 
     :param session: SQLAlchemy session.
     :param pair: Station pair string ``"NET.STA.LOC:NET.STA.LOC"``.
-    :param lineage_names_upstream: Lineage name list ending with the stack step
-        name (i.e. ``batch["lineage_names_upstream"]``).
+    :param cc_lineage_prefix: Lineage name list up to (but not including) the
+        stack/refstack level, e.g. ``["preprocess_1", "cc_1", "filter_1"]``.
+        Pass ``batch["lineage_names_upstream"]`` from the refstack worker —
+        that list ends at filter_N (the pass-through above refstack).
     :param params: :class:`~msnoise.params.MSNoiseParams` for this lineage.
     :rtype: bool
     """
     import datetime as _dt
-    from ..msnoise_table_def import declare_tables
+    from ..msnoise_table_def import declare_tables, Lineage as _Lineage
 
     ref_start, ref_end, _ = build_ref_datelist(params, session)
 
@@ -1822,37 +1828,46 @@ def refstack_needs_recompute(session, pair, lineage_names_upstream, params):
     Job = schema.Job
     WorkflowStep = schema.WorkflowStep
 
-    stack_step_name = lineage_names_upstream[-1] if lineage_names_upstream else None
-    if not stack_step_name:
-        return True  # can't determine — assume recompute needed
-
-    stack_step = (
+    # Find all active stack steps (any set number).
+    stack_steps = (
         session.query(WorkflowStep)
-        .filter(WorkflowStep.step_name == stack_step_name)
-        .first()
-    )
-    if stack_step is None:
-        return True
-
-    stack_lin_id = _lineage_id_for(session, "/".join(lineage_names_upstream))
-
-    done_days = (
-        session.query(Job.day)
-        .filter(Job.step_id == stack_step.step_id)
-        .filter(Job.pair == pair)
-        .filter(Job.flag == "D")
-        .filter(Job.day != "REF")
-        .filter(Job.lineage_id == stack_lin_id)
+        .filter(WorkflowStep.category == "stack")
+        .filter(WorkflowStep.is_active.is_(True))
         .all()
     )
+    if not stack_steps:
+        return True  # no stack steps — assume recompute needed
 
-    for (day_str,) in done_days:
-        try:
-            day = _dt.datetime.strptime(day_str, "%Y-%m-%d").date()
-        except ValueError:
-            continue
-        if ref_start <= day <= ref_end:
-            return True
+    # Build expected lineage prefix for each stack_N:
+    # e.g. "preprocess_1/cc_1/filter_1/stack_1"
+    prefix_str = "/".join(cc_lineage_prefix) if cc_lineage_prefix else ""
+
+    for stack_step in stack_steps:
+        expected_lineage = (
+            f"{prefix_str}/{stack_step.step_name}" if prefix_str
+            else stack_step.step_name
+        )
+        stack_lin_id = _lineage_id_for(session, expected_lineage)
+        if stack_lin_id is None:
+            continue  # this stack_N has no jobs with this lineage
+
+        done_days = (
+            session.query(Job.day)
+            .filter(Job.step_id == stack_step.step_id)
+            .filter(Job.pair == pair)
+            .filter(Job.flag == "D")
+            .filter(Job.day != "REF")
+            .filter(Job.lineage_id == stack_lin_id)
+            .all()
+        )
+
+        for (day_str,) in done_days:
+            try:
+                day = _dt.datetime.strptime(day_str, "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            if ref_start <= day <= ref_end:
+                return True
 
     return False
 
