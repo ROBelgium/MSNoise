@@ -262,7 +262,10 @@ def propagate_stack_jobs_from_cc_done(session):
             })
         else:
             ref, flag = existing
-            if flag != "T":
+            # Only bump F (failed) jobs — D (done) jobs are intentionally left
+            # alone. Re-bumping Done stack jobs on every new cc day would cause
+            # cascading recomputation of all days, breaking idempotency.
+            if flag == "F":
                 to_bump_refs.append(ref)
 
     logger.info(f"[--after cc] to_insert={len(to_insert)}, to_bump={len(to_bump_refs)}")

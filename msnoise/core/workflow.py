@@ -395,8 +395,32 @@ def get_workflow_graph(session):
         edges.append({
             "from": link.from_step_id,
             "to": link.to_step_id,
-            "type": link.link_type
+            "type": link.link_type,
+            "virtual": False,
         })
+
+    # Add virtual edges from each stack_N to the dvv steps reachable via
+    # refstack siblings.  Stack and refstack are siblings (both children of
+    # filter) but mwcs jobs encode both in their lineage (convention A1).
+    # Virtual edges make this implicit dependency visible in the graph.
+    _dvv_cats = {"mwcs", "stretching", "wavelet"}
+    steps_by_cat: dict = {}
+    for step in steps:
+        steps_by_cat.setdefault(step.category, []).append(step)
+
+    existing_edge_pairs = {(e["from"], e["to"]) for e in edges}
+    for stack_step in steps_by_cat.get("stack", []):
+        for dvv_cat in _dvv_cats:
+            for dvv_step in steps_by_cat.get(dvv_cat, []):
+                pair = (stack_step.step_id, dvv_step.step_id)
+                if pair not in existing_edge_pairs:
+                    edges.append({
+                        "from": stack_step.step_id,
+                        "to": dvv_step.step_id,
+                        "type": "virtual",
+                        "virtual": True,
+                    })
+                    existing_edge_pairs.add(pair)
 
     return {"nodes": nodes, "edges": edges}
 

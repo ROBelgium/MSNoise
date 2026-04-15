@@ -484,12 +484,12 @@
         // ── Static layout: compute positions once, no physics engine ──────
         assignHierarchicalPositions(workflowData.nodes, width, height);
 
-        // Create links
+        // Create links — virtual edges (stack→dvv via refstack) rendered dashed
         link = container.append("g")
-            .selectAll(".link")
+            .selectAll("path")
             .data(validEdges)
             .join("path")
-            .attr("class", "link");
+            .attr("class", e => e.virtual ? "link-virtual" : "link");
 
         // Create nodes — draggable but no simulation behind them
         node = container.append("g")
@@ -649,10 +649,10 @@
         const levels = {
             'global': 0, 'preprocess': 1, 'psd': 1,
             'cc': 2, 'psd_rms': 2,
-            'filter': 3, 'stack': 4, 'refstack': 5,
-            'mwcs': 6, 'stretching': 6, 'wavelet': 6,
-            'mwcs_dtt': 7, 'wavelet_dtt': 7,
-            'mwcs_dtt_dvv': 8, 'stretching_dvv': 8, 'wavelet_dtt_dvv': 8,
+            'filter': 3, 'stack': 4, 'refstack': 4,
+            'mwcs': 5, 'stretching': 5, 'wavelet': 5,
+            'mwcs_dtt': 6, 'wavelet_dtt': 6,
+            'mwcs_dtt_dvv': 7, 'stretching_dvv': 7, 'wavelet_dtt_dvv': 7,
         };
         const levelCounts = {};
         nodes.forEach(n => {
