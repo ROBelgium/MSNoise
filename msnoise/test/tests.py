@@ -246,11 +246,11 @@ def test_002c_verify_workflow():
         assert name in step_names, f"Workflow step '{name}' not found"
     links = get_workflow_links(db)
     assert len(links) > 0, "No workflow links created"
-    # Verify key refstack links: stack_1→refstack_1, refstack_1→mwcs_1
+    # Verify key refstack links: filter_1→refstack_1 (sibling of stack), refstack_1→mwcs_1
     step_map = {s.step_name: s.step_id for s in steps}
     link_pairs = {(lk.from_step_id, lk.to_step_id) for lk in links}
-    assert (step_map['stack_1'], step_map['refstack_1']) in link_pairs, \
-        "Missing link stack_1 → refstack_1"
+    assert (step_map['filter_1'], step_map['refstack_1']) in link_pairs, \
+        "Missing link filter_1 → refstack_1 (refstack is now a sibling of stack)"
     assert (step_map['refstack_1'], step_map['mwcs_1']) in link_pairs, \
         "Missing link refstack_1 → mwcs_1"
     db.close()
@@ -635,10 +635,12 @@ def test_023c_stack_mov():
 
 @pytest.mark.order(21)
 def test_023d_new_jobs_after_stack_and_refstack():
-    """Propagate stack→refstack and run refstack."""
-    new_jobs_main(after='stack')
+    """Run refstack. Refstack T jobs were already created when cc was propagated
+    (--after cc now creates both stack AND refstack jobs, since they are siblings).
+    --after stack triggers mwcs if refstack is already Done (join gate)."""
     db = connect()
-    _assert_min_jobs(db, 'refstack_1', 'T', 1, 'new_jobs --after stack must create refstack T jobs')
+    # refstack T jobs should already exist from the cc propagation step
+    _assert_min_jobs(db, 'refstack_1', 'T', 1, 'refstack T jobs must exist (created by --after cc)')
     db.close()
     stack_refstack_main()
     db = connect()
@@ -1932,16 +1934,15 @@ def test_120026_msnoise_result_get_psd_formats():
 
 @pytest.mark.order(120027)
 def test_120027_msnoise_result_branches_from_stack():
-    """MSNoiseResult.branches() from stack returns refstack children."""
+    """MSNoiseResult.branches() from stack — stack is now a leaf (no_steps=[]).
+    Branches returns an empty list; refstack hangs off filter, not stack."""
     db = connect()
     from ..results import MSNoiseResult
     r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1, stack=1)
     children = r.branches()
     assert isinstance(children, list)
-    for child in children:
-        assert child.category in ('refstack',), \
-            f"Unexpected category from stack: {child.category}"
-        assert child.lineage_names[:-1] == r.lineage_names
+    assert len(children) == 0, \
+        f"Stack is a leaf in new topology — expected no branches, got {[c.category for c in children]}"
     db.close()
 
 

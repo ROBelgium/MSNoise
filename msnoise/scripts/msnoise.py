@@ -2217,11 +2217,24 @@ def utils_export_params(ctx, lineage, preprocessid, ccid, filterid, stackid,
     if lineage:
         lin_str = lineage
     else:
-        # Build from integer IDs
-        parts = [f"preprocess_{preprocessid}", f"cc_{ccid}",
-                 f"filter_{filterid}", f"stack_{stackid}"]
-        if refstackid:
-            parts.append(f"refstack_{refstackid}")
+        # Build from integer IDs.
+        # Lineage convention (A1): mwcs jobs encode both parents as
+        # …/stack_N/refstack_M/mwcs_1.  A standalone refstack export
+        # (no downstream dvv step) uses …/filter_N/refstack_M instead.
+        _has_dvv = any([mwcsid, mwcsdttid, stretchingid, stretchingdvvid, wctid, wctdttid, waveletdvvid])
+        parts = [f"preprocess_{preprocessid}", f"cc_{ccid}", f"filter_{filterid}"]
+        if _has_dvv:
+            # Full dvv lineage: stack and refstack both encoded
+            parts.append(f"stack_{stackid}")
+            if refstackid:
+                parts.append(f"refstack_{refstackid}")
+        else:
+            # Stack-only or refstack-only export
+            parts.append(f"stack_{stackid}")
+            if refstackid:
+                # Standalone refstack: hangs directly off filter, not stack
+                # Replace stack with filter-rooted refstack path
+                parts = parts[:-1] + [f"refstack_{refstackid}"]
         if mwcsid:
             parts.append(f"mwcs_{mwcsid}")
         if mwcsdttid:

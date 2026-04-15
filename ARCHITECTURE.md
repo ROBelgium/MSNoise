@@ -23,21 +23,20 @@
 MSNoise uses a directed acyclic graph (DAG) of **WorkflowSteps** connected by **WorkflowLinks**.
 
 ```
-global_1 ──► preprocess_1 ──► cc_1 ──► filter_1 ──► stack_1
-                                                         │
-         ──► psd_1 ──► psd_rms_1           ┌─────────────┼─────────────┐
-                                           │             │             │
-                                      REF sentinel   (direct)     (direct)
-                                           │             │             │
-                                      refstack_1     mwcs_1      stretching_1
-                                           │         wavelet_1       │
-                                    (re-propagates)     │        str_dvv_1
-                                                     dtt_1
-                                                        │
-                                                     dvv_1
+global_1 ──► preprocess_1 ──► cc_1 ──► filter_1 ──► stack_1    ─────────────────────────────┐
+                                                  │                                           │
+                                                  └► refstack_1 ──► mwcs_1 / stretching_1 / wavelet_1
+                                                                         │
+         ──► psd_1 ──► psd_rms_1                                    dtt_1 → dvv_1
 ```
 
-**Pass-through nodes**: `filter_N` and `global_N` appear in lineage strings but have **no worker scripts** and **no jobs**. They are purely parameter namespaces. `propagate_downstream` recurses through them transparently via `_collect()`.
+**stack and refstack are siblings** — both children of `filter_N` (pass-through). They are NOT in a parent/child relationship.
+
+**Mwcs lineage convention (A1)**: mwcs/stretching/wavelet jobs encode both parents in the lineage string: `…/stack_N/refstack_M/mwcs_1`. `lineage_names_mov` (strips `refstack_*`) resolves to the stack CCF folder; the full lineage resolves to the refstack REF folder.
+
+**Mwcs job creation gate**: a mwcs job is only created when BOTH a Done `refstack_M` REF sentinel AND Done `stack_N` days exist for the pair — the join is performed in `propagate_mwcs_jobs_from_refstack_done`.
+
+**Pass-through nodes**: `filter_N` and `global_N` appear in lineage strings but have **no worker scripts** and **no jobs**. They are purely parameter namespaces.
 
 **Canonical category order** (from `get_workflow_order()` in `core/workflow.py`, plugin-extensible):
 `global → preprocess → cc → psd → psd_rms → filter → stack → refstack → mwcs → mwcs_dtt → mwcs_dtt_dvv → stretching → stretching_dvv → wavelet → wavelet_dtt → wavelet_dtt_dvv`
@@ -178,11 +177,12 @@ Every job carries a `lineage_id` FK → `Lineage(lineage_str)`. The string is a 
 ```
 preprocess_1
 preprocess_1/cc_1
-preprocess_1/cc_1/filter_1/stack_1      ← filter_1 is pass-through but appears in path!
-preprocess_1/cc_1/filter_1/stack_1/refstack_1
+preprocess_1/cc_1/filter_1/stack_1         ← stack: sibling child of filter_1
+preprocess_1/cc_1/filter_1/refstack_1      ← refstack: sibling child of filter_1 (REF sentinel jobs)
+preprocess_1/cc_1/filter_1/stack_1/refstack_1/mwcs_1   ← mwcs encodes BOTH parents (A1 convention)
 preprocess_1/cc_1/filter_1/stack_1/refstack_1/mwcs_1/mwcs_dtt_1/mwcs_dtt_dvv_1
 psd_1
-psd_1/psd_rms_1                         ← psd_rms must include its own step name
+psd_1/psd_rms_1                            ← psd_rms must include its own step name
 ```
 
 **Deduplication**: multiple jobs share the same `Lineage` row. The `before_insert` event on `Job` resolves `lineage_str` → `lineage_id` via raw SQL (not ORM session) to avoid re-entrant flush.
@@ -231,27 +231,33 @@ while is_next_job_for_step(db, step_category="cc"):
 
 After marking jobs Done in hpc=False mode, `propagate_downstream(session, batch)` fires.
 
-### The stack → downstream split (KEY DESIGN DECISION)
+### The cc → stack + refstack split (KEY DESIGN DECISION)
 
-When stack completes, **two things happen simultaneously**:
+When cc completes, **two things happen simultaneously**:
 
-1. **REF sentinel** (`day="REF"`) created per pair → triggers refstack
-2. **Direct mwcs/stretching/wavelet T jobs** created for the new (pair, day) tuples
+1. **Stack T jobs** created per (pair, day) → mov stack computation
+2. **Refstack REF sentinels** (`day="REF"`) created per pair × refstack_N → reference stack computation
 
-This dual propagation enables the common observatory case where new days fall **outside** the fixed `ref_begin..ref_end` window. In that case:
-- Refstack picks up the REF job, checks the window, finds no days inside → **skips recomputation**, marks REF Done immediately
-- MWCS/stretching/wavelet T jobs were already waiting → start immediately on the new data
+Both are triggered by `propagate_downstream` on cc completion (or `--after cc`).
 
-If a new day DOES fall inside the ref window, refstack recomputes and `propagate_downstream` fires again from refstack — the existing mwcs T jobs are bumped (idempotent upsert).
+**Mwcs join gate**: a mwcs/stretching/wavelet job is only created when BOTH sides are Done:
+- A Done `refstack_M` REF sentinel for the pair
+- Done `stack_N` days for the pair
+
+`propagate_mwcs_jobs_from_refstack_done` is called from BOTH stack completion AND refstack completion. It performs the cross-branch join: for each Done refstack REF, find sibling stack steps sharing the same cc/filter lineage prefix, then create mwcs jobs for all Done (stack_N × refstack_M × day) combinations.
+
+The common observatory case (new days outside `ref_begin..ref_end`):
+- Refstack REF job created at cc time → refstack runs → skips recomputation (no days in window) → marks Done → join fires → mwcs jobs created
+- Stack jobs also Done by this point → mwcs starts immediately
 
 ### Full dispatch table
 
 | Completed category | `s02_new_jobs.py` function | Notes |
 |---|---|---|
-| `preprocess` | `propagate_stack_jobs_from_cc_done` | Fan-out: 1 station → N pairs |
-| `cc` (and pass-throughs) | `propagate_first_runnable_from_category` | Crosses filter_1 transparently via `_collect()` |
-| `stack` | `propagate_refstack_jobs_from_stack_done` + `propagate_mwcs_jobs_from_refstack_done` | Dual: REF sentinel + direct mwcs/str/wavelet jobs |
-| `refstack` | `propagate_mwcs_jobs_from_refstack_done` | REF just changed: re-propagate all days |
+| `preprocess` | `create_cc_jobs_from_preprocess` | Fan-out: 1 station → N pairs |
+| `cc` | `propagate_stack_jobs_from_cc_done` + `propagate_refstack_jobs_from_cc_done` | Creates both stack T jobs AND refstack REF sentinels (siblings) |
+| `stack` | `propagate_mwcs_jobs_from_refstack_done` | Join-gated: creates mwcs only if refstack REF already Done |
+| `refstack` | `propagate_mwcs_jobs_from_refstack_done` | Join-gated: creates mwcs for all Done stack days × this REF |
 | `mwcs_dtt`/`stretching`/`wavelet_dtt` | `propagate_dvv_jobs_from_dtt_done` | Creates `day="DVV", pair="ALL"` sentinel |
 | `psd` | `propagate_psd_rms_jobs_from_psd_done` | Single-station passthrough |
 
@@ -276,7 +282,7 @@ if not refstack_is_rolling(params):
 compute_ref_stack(); write_ref_file(); mark_done(); propagate_downstream()
 ```
 
-`refstack_needs_recompute(session, pair, lineage_names_upstream, params)` lives in `core/workflow.py`. It queries Done stack jobs for the pair, resolves their lineage, and returns `True` if any date falls inside `[ref_begin, ref_end]`. It uses `declare_tables()` internally (not the module-level `WorkflowStep`) so it is session-safe.
+`refstack_needs_recompute(session, pair, cc_lineage_prefix, params)` lives in `core/workflow.py`. It takes `batch["lineage_names_upstream"]` from the refstack worker — which now ends at `filter_N` (the pass-through above refstack). It queries ALL active `stack_N` steps whose lineage matches `cc_lineage_prefix/stack_N`, checks Done days for the pair, and returns `True` if any fall inside `[ref_begin, ref_end]`. Cross-branch lookup: refstack and stack are siblings, not parent/child.
 
 **Mode B (rolling ref)**: `ref_begin` is a negative integer (e.g. `"-5"` = last 5 days). No REF file written; reference computed on-the-fly in MWCS/stretching/WCT. The Mode B path marks Done and calls `propagate_downstream` immediately (in `hpc=False`) — downstream MWCS/stretching/wavelet jobs are created inline, not via `new_jobs --after refstack`.
 

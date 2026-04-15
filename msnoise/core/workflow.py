@@ -1610,17 +1610,16 @@ def get_next_lineage_batch(
 
 
 def get_refstack_lineage_for_filter(session, filterid, refstack_set_number=1):
-    """Get the full lineage path through a filter step down to its refstack.
+    """Get the full lineage path from root through a filter step to its refstack.
 
-    Extends :func:`get_stack_lineage_for_filter` by also appending the
-    ``refstack_M`` step that is immediately downstream of the stack step.
-    This is the correct lineage to pass to :func:`xr_get_ref`, since REF
-    files now live under the refstack step folder.
+    Refstack is now a sibling of stack (both children of the filter pass-through).
+    Returns the path ending at ``refstack_M`` directly downstream of
+    ``filter_{filterid}`` — suitable for :func:`xr_get_ref`.
 
     Example for the default single-pipeline::
 
         get_refstack_lineage_for_filter(db, 1)
-        # → ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']
+        # → ['preprocess_1', 'cc_1', 'filter_1', 'refstack_1']
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :type filterid: int
@@ -1629,38 +1628,71 @@ def get_refstack_lineage_for_filter(session, filterid, refstack_set_number=1):
     :param refstack_set_number: Which refstack set to use (default 1).
     :rtype: list of str
     """
-    path = _get_stack_lineage_for_filter(session, filterid)
-    if not path:
-        return path
+    # Get the path up to and including the filter step (without the stack child).
+    filter_path = _get_filter_lineage(session, filterid)
+    if not filter_path:
+        return filter_path
 
     steps = get_workflow_steps(session)
     links = get_workflow_links(session)
 
-    # Find the stack step at the end of the path
-    stack_step_name = path[-1]
-    stack_step = next(
-        (s for s in steps if s.step_name == stack_step_name), None
+    filter_step = next(
+        (s for s in steps if s.category == 'filter' and s.set_number == filterid),
+        None,
     )
-    if stack_step is None:
-        return path
+    if filter_step is None:
+        return filter_path
 
-    # Find the refstack step downstream of this stack step
-    # Prefer the requested refstack_set_number; fall back to the first available
+    # Find refstack steps directly linked from this filter step.
     refstack_steps = [
         s for s in steps
         if s.category == 'refstack'
-        and any(lk.from_step_id == stack_step.step_id and lk.to_step_id == s.step_id
+        and any(lk.from_step_id == filter_step.step_id and lk.to_step_id == s.step_id
                 for lk in links)
     ]
     if not refstack_steps:
-        return path  # no refstack in this workflow, return stack-level lineage
+        return filter_path  # no refstack in this workflow
 
-    # Pick requested set_number if available, else first
     refstack_step = next(
         (s for s in refstack_steps if s.set_number == refstack_set_number),
-        refstack_steps[0]
+        refstack_steps[0],
     )
-    return path + [refstack_step.step_name]
+    return filter_path + [refstack_step.step_name]
+
+
+def _get_filter_lineage(session, filterid):
+    """Walk upstream from filter_{filterid} to root; return path including filter.
+
+    Unlike :func:`_get_stack_lineage_for_filter`, this does NOT append a
+    downstream step — it stops at the filter node.  Used by
+    :func:`get_refstack_lineage_for_filter` now that refstack hangs directly
+    off filter rather than off stack.
+    """
+    steps = get_workflow_steps(session)
+    links = get_workflow_links(session)
+    step_map = {s.step_id: s for s in steps}
+
+    filter_step = next(
+        (s for s in steps if s.category == 'filter' and s.set_number == filterid),
+        None,
+    )
+    if filter_step is None:
+        return []
+
+    parent_map = {link.to_step_id: link.from_step_id for link in links}
+    path = [filter_step.step_name]
+    current_id = filter_step.step_id
+    visited = set()
+    while current_id in parent_map:
+        if current_id in visited:
+            break
+        visited.add(current_id)
+        parent_id = parent_map[current_id]
+        parent_step = step_map[parent_id]
+        if parent_step.category != 'global':
+            path.insert(0, parent_step.step_name)
+        current_id = parent_id
+    return path
 
 # ============================================================
 

@@ -550,6 +550,16 @@ class MSNoiseResult:
             .filter(WorkflowLink.is_active.is_(True))
             .all()
         )
+        # When branching from a refstack result to mwcs/stretching/wavelet, the
+        # actual job lineage encodes both parents: …/stack_N/refstack_M/dvv_step.
+        # (lineage convention A1 — refstack and stack are siblings, both children
+        # of filter, but the mwcs lineage string contains both to distinguish
+        # which stack CCFs were used alongside which reference.)
+        # We look up the sibling stack step(s) via WorkflowLinks from the same
+        # filter parent, then enumerate all (stack_N, dvv_step) combinations.
+        terminal_cat = terminal_step.category
+        _dvv_cats = {"mwcs", "stretching", "wavelet"}
+
         results = []
         for link in links:
             child_step = (
@@ -559,23 +569,68 @@ class MSNoiseResult:
             )
             if child_step is None:
                 continue
-            child_names = self.lineage_names + [child_step.step_name]
-            if not include_empty:
-                from .msnoise_table_def import Lineage as _Lineage
-                from sqlalchemy.orm import aliased as _aliased
-                _lin_alias = _aliased(_Lineage)
-                _lin_str = "/".join(child_names)
-                has_done = (
-                    self._db.query(Job.ref)
-                    .filter(Job.step_id == child_step.step_id)
-                    .join(_lin_alias, Job.lineage_id == _lin_alias.lineage_id)
-                    .filter(_lin_alias.lineage_str == _lin_str)
-                    .filter(Job.flag == "D")
-                    .first()
+
+            # Build candidate lineage(s) for this child step.
+            if terminal_cat == "refstack" and child_step.category in _dvv_cats:
+                # Find sibling stack steps: shared filter parent → stack children.
+                # The filter step is the parent of refstack in the new topology.
+                filter_parent_ids = (
+                    self._db.query(WorkflowLink.from_step_id)
+                    .filter(WorkflowLink.to_step_id == terminal_step.step_id)
+                    .filter(WorkflowLink.is_active.is_(True))
+                    .all()
                 )
-                if has_done is None:
-                    continue
-            results.append(MSNoiseResult(self._db, child_names))
+                sibling_stack_names = []
+                for (fp_id,) in filter_parent_ids:
+                    fp_step = self._db.query(WorkflowStep).filter(
+                        WorkflowStep.step_id == fp_id).first()
+                    if fp_step and fp_step.category == "filter":
+                        # Stack steps linked from this filter
+                        stk_links = (
+                            self._db.query(WorkflowLink)
+                            .filter(WorkflowLink.from_step_id == fp_id)
+                            .filter(WorkflowLink.is_active.is_(True))
+                            .all()
+                        )
+                        for sl in stk_links:
+                            s = self._db.query(WorkflowStep).filter(
+                                WorkflowStep.step_id == sl.to_step_id).first()
+                            if s and s.category == "stack":
+                                sibling_stack_names.append(s.step_name)
+
+                if not sibling_stack_names:
+                    # Fallback: no stack sibling found, use direct lineage
+                    candidate_lineages = [self.lineage_names + [child_step.step_name]]
+                else:
+                    # One branch per stack_N sibling
+                    candidate_lineages = []
+                    filter_prefix = self.lineage_names[:-1]  # strip refstack_M
+                    for stk_name in sibling_stack_names:
+                        candidate_lineages.append(
+                            filter_prefix + [stk_name,
+                                             terminal_step.step_name,
+                                             child_step.step_name]
+                        )
+            else:
+                candidate_lineages = [self.lineage_names + [child_step.step_name]]
+
+            for child_names in candidate_lineages:
+                if not include_empty:
+                    from .msnoise_table_def import Lineage as _Lineage
+                    from sqlalchemy.orm import aliased as _aliased
+                    _lin_alias = _aliased(_Lineage)
+                    _lin_str = "/".join(child_names)
+                    has_done = (
+                        self._db.query(Job.ref)
+                        .filter(Job.step_id == child_step.step_id)
+                        .join(_lin_alias, Job.lineage_id == _lin_alias.lineage_id)
+                        .filter(_lin_alias.lineage_str == _lin_str)
+                        .filter(Job.flag == "D")
+                        .first()
+                    )
+                    if has_done is None:
+                        continue
+                results.append(MSNoiseResult(self._db, child_names))
         return results
 
     def _branches_from_folders(self, include_empty: bool = False) -> list:

@@ -199,7 +199,7 @@ def declare_tables(prefix=None):
         """Normalised lineage-string table.
 
         Each distinct lineage path (e.g.
-        ``"preprocess_1/cc_1/filter_1/stack_1/refstack_1/mwcs_1/mwcs_dtt_1"``)
+        ``"preprocess_1/cc_1/filter_1/stack_1/refstack_1/mwcs_1/mwcs_dtt_1"`` (mwcs lineage encodes both stack and refstack parents))
         is stored exactly once.  :class:`Job` rows reference it via a small
         integer foreign key instead of repeating the full string across
         potentially millions of rows (~20× storage saving for the column).
