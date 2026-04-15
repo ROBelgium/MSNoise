@@ -91,13 +91,11 @@ _BUILTIN_WORKFLOW_CHAINS = {
         "abbrev": "f", "display_name": "Filters", "level": 3,
     },
     "stack": {
-        # Stack can feed dv/v steps directly (no refstack) OR via refstack.
-        # Both topologies are supported via WorkflowLinks:
-        #   filter_N -> stack_N -> mwcs_N          (stack-only, no reference)
-        #   filter_N -> stack_N -> refstack_M -> mwcs_N  (with reference)
-        # create_workflow_links_from_steps creates same-set-number links by
-        # default; extra cross-links can be added manually via the admin UI.
-        "next_steps": ["mwcs", "stretching", "wavelet", "refstack"],
+        # Stack feeds refstack by default. Direct stack→mwcs links (no refstack)
+        # are supported but must be added manually via the admin UI — they are NOT
+        # auto-created by db upgrade to avoid spurious direct jobs when a refstack
+        # step is present in the same chain.
+        "next_steps": ["refstack"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "stk", "display_name": "Moving Stacks", "level": 4,
     },
