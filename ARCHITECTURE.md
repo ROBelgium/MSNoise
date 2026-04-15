@@ -217,6 +217,7 @@ while is_next_job_for_step(db, step_category="cc"):
 - `lineage_names` — full list including current step name
 - `lineage_names_upstream` — `lineage_names[:-1]` (for output paths — excludes current step)
 - `lineage_names_mov` — upstream with any `refstack_*` entries stripped (for reading MOV CCFs in mwcs/wct/stretching)
+- `lineage_names_ref` — upstream with any `stack_*` entries stripped (for reading REF files via `xr_get_ref`; REF lives under `…/filter_N/refstack_M/_output/REF/`, not under `stack_N`)
 - `days`, `refs`
 - `step_params` — raw `AttribDict` for the current step's config set
 - `params` — `LayeredParams` (access global config as `params.global_.hpc`)
@@ -594,7 +595,9 @@ python -m pytest /path/to/msnoise/msnoise/test/test_smoke.py::test_smoke_172_psd
 
 2. **Session cache staleness**: After commits from other sessions or `massive_update_job`, call `db.expire_all()` OR use a fresh `connect()` for subsequent queries. `bulk_insert_mappings` bypasses ORM events entirely — lineage strings must be resolved to IDs BEFORE the call.
 
-3. **`propagate_downstream` is idempotent**: calling twice for the same batch is safe — existing T/I jobs are left unchanged; existing D/F jobs are bumped to T (upstream changed semantics).
+3. **`propagate_stack_jobs_from_cc_done` only re-queues `F` (failed) stack jobs** — `D` (done) stack jobs are intentionally left alone when new cc data arrives. Re-bumping Done stack jobs on every cc completion would cascade recomputation of all historical days. Only failed jobs are retried.
+
+4. **`propagate_downstream` is idempotent**: calling twice for the same batch is safe — existing T/I jobs are left unchanged; existing D/F jobs are bumped to T (upstream changed semantics).
 
 4. **`new_jobs --after X` in hpc=False**: logs a debug message and runs anyway (reconciliation pass). Does NOT block. This preserves backward compatibility.
 
