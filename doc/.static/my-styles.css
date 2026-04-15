@@ -1,171 +1,263 @@
-/* ── Layout & typography ─────────────────────────────────────────────────── */
-body {
-    font-size: 16px;
+/* =============================================================================
+   MSNoise Documentation — RTD theme refinements
+   Goal: clean, light, readable. Scientific but not dramatic.
+   No dark backgrounds. Subtle blue accents only.
+   ============================================================================= */
+
+
+:root {
+    --blue: #2563a8;
+    --blue-soft: #4a7ab5;
+    /* --blue-pale: #e8f0fa; */
+    /* --blue-ghost: #f4f7fd; */
+    /* --navy: #4c6cbc; */
+    /* --teal: #0e7a8a; */
+    /* --green: #276727; */
+    --text: #1c2733;
+    --muted: #555e6d;
+    --border: #dde4ed;
+    --mono:       "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
-.wy-nav-content {
-    max-width: none;
+/* ── Body & layout ──────────────────────────────────────────────────────────── */
+body { font-size: 15px; color: var(--text); -webkit-font-smoothing: antialiased; }
+
+.wy-nav-content-wrap { background: #fff; }
+.wy-nav-content      { background: #fff; max-width: none; }
+
+/* ── Sidebar — keep RTD structure, refine colours ───────────────────────────── */
+.wy-nav-side       { background: #f8f9fc; border-right: 1px solid var(--border); }
+.wy-side-nav-search > a { color: #fff !important; font-weight: 600; }
+
+.wy-side-nav-search input[type="text"] {
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.12);
+    color: #fff;
 }
 
-#right-column {
-    padding: 20px 0;
-    margin-left: 300px;
-    background-color: #fff;
-    max-width: none;
-}
+/* Nav links */
+.wy-menu-vertical a { color: #3a4a5c; font-size: 0.87em; }
+.wy-menu-vertical a:hover { background: var(--blue-pale); color: var(--blue); }
 
-h2 {
-    border-top: solid 1px silver;
-    margin-top: 20px;
-    padding-top: 10px;
-}
-
-a {
-    color: #006bbe;
-}
-
-blockquote p {
-    font-size: 0.8em;
-}
-
-div .section p {
-    margin-left: 5px;
-}
-
-div .section h2 {
-    text-decoration: underline;
-}
-
-/* ── Function / class signatures ─────────────────────────────────────────── */
-/* Clean pill-style signature bar — replaces the gray box */
-dt.sig.sig-object.py {
-    background: linear-gradient(to right, #e8f0f8, #f4f8fc);
-    border-left: 3px solid #4a7ab5;
-    border-radius: 0 4px 4px 0;
-    padding: 6px 10px;
-    margin-bottom: 4px;
-    font-size: 0.95em;
-    color: #1a1a2e;
-    box-shadow: none;
-}
-
-dt.sig.sig-object.py:hover {
-    background: linear-gradient(to right, #dce8f5, #eaf2fb);
-}
-
-/* Module/class prefix — slightly muted */
-.sig-prename.descclassname {
-    color: #666;
-    font-weight: 400;
-}
-
-/* Function name — bold and coloured */
-.sig-name.descname {
-    color: #2c5f9e;
+.wy-menu-vertical li.current > a,
+.wy-menu-vertical li.current > a:hover {
+    background: var(--blue-pale);
+    color: var(--blue);
+    border-right: 3px solid var(--blue-soft);
     font-weight: 600;
 }
 
-/* Parameters in signature — italic */
-.sig-param {
-    font-style: italic;
-    color: #444;
-}
-
-/* ── Parameter / return tables ────────────────────────────────────────────── */
-/* Remove the ugly gray boxes from field labels */
-dl.field-list > dt {
-    background: none;
-    border: none;
-    border-radius: 0;
-    padding: 2px 0;
-    font-size: 0.88em;
-    font-weight: 600;
-    color: #555;
+/* Top-level sections — small caps labels */
+.wy-menu-vertical p.caption,
+.wy-menu-vertical p.caption > span {
+    color: var(--blue-soft) !important;
+    font-size: 1.0em;
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    padding-top: 12px;
+    padding-left: 5px;
+    margin-bottom: 10px;
+}
+
+/* ── Headings ───────────────────────────────────────────────────────────────── */
+.rst-content h1 {
+    font-size: 1.8em;
+    color: var(--navy);
+    font-weight: 700;
+    border-bottom: 2px solid var(--blue-soft);
+    padding-bottom: 8px;
+    margin-bottom: 1.2em;
+    text-decoration: none;
+}
+
+.rst-content h2 {
+    font-size: 1.25em;
+    color: var(--navy);
+    font-weight: 600;
+    border-top: 1px solid var(--border);
+    border-bottom: none;
+    margin-top: 2em;
+    padding-top: 12px;
+    text-decoration: none;
+}
+
+/* Override legacy underline rule */
+div .section h2 { text-decoration: none; }
+
+.rst-content h3 {
+    font-size: 1.05em;
+    color: var(--blue);
+    font-weight: 600;
+    margin-top: 1.5em;
+}
+
+.rst-content h4 {
+    font-size: 0.9em;
+    color: var(--muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ── Links ──────────────────────────────────────────────────────────────────── */
+a, .rst-content a { color: var(--blue); }
+a:hover, .rst-content a:hover { color: var(--teal); text-decoration: underline; }
+
+/* ── Inline code ────────────────────────────────────────────────────────────── */
+.rst-content code, .rst-content tt, code {
+    font-family: var(--mono);
+    font-size: 0.95em;
+    background: var(--blue-ghost);
+    color: #1a3a5c;
+    border: 1px solid var(--blue-pale);
+    border-radius: 3px;
+    padding: 1px 5px;
+}
+
+/* ── Code blocks — light, not dark ─────────────────────────────────────────── */
+.rst-content pre, .highlight pre {
+    background: #f6f8fa;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 0.85em;
+    line-height: 1.55;
+    color: #1c2733;
+    padding: 14px 18px;
     box-shadow: none;
 }
 
-dl.field-list > dd {
-    margin-left: 12px;
-    padding-left: 8px;
-    border-left: 2px solid #e0e8f0;
+div.highlight {
+    background: #f6f8fa;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    margin: 1em 0;
+}
+
+/* ── Admonitions — light coloured strips ────────────────────────────────────── */
+.rst-content .admonition {
+    border-radius: 4px;
+    border-left-width: 4px;
+    padding: 10px 14px;
+    margin: 1.2em 0;
+    box-shadow: none;
+}
+
+.rst-content .note    { background: #eef4fb; border-color: var(--blue-soft); }
+.rst-content .warning { background: #fdf5ec; border-color: #c97a06; }
+.rst-content .tip,
+.rst-content .seealso { background: #edf7f0; border-color: #2a7a3b; }
+.rst-content .important { background: #fdf0f0; border-color: #c53030; }
+
+.rst-content .admonition-title {
+    font-size: 0.8em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: transparent;
+    color: var(--navy);
+    padding: 0 0 4px;
     margin-bottom: 6px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
 }
 
-/* ── Nested class attributes / methods ────────────────────────────────────── */
-dl .attribute,
-dl .method,
-dl .classmethod,
-dl .staticmethod {
-    margin-left: 50px;
-}
-
-/* Attribute/method signatures — lighter than top-level functions */
-dl dl > dt.sig.sig-object.py {
-    background: #f7f9fb;
-    border-left: 2px solid #9ab3d0;
+/* ── Tables ─────────────────────────────────────────────────────────────────── */
+.rst-content table.docutils {
+    border-collapse: collapse;
+    border: 1px solid var(--border);
+    border-radius: 4px;
     font-size: 0.9em;
+    width: 100%;
+    margin: 1.2em 0;
+    overflow: hidden;
 }
 
-.property {
-    font-weight: 100;
-    padding-right: 2px;
+.rst-content table.docutils thead th {
+    background: var(--blue-ghost);
+    color: var(--navy);
+    padding: 8px 12px;
+    font-size: 0.82em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid var(--border);
 }
 
-dd > p {
-    padding-left: 20px;
+.rst-content table.docutils tbody td {
+    padding: 7px 12px;
+    border-top: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.5;
 }
 
-/* ── Admonitions ──────────────────────────────────────────────────────────── */
-.admonition {
-    background-color: #FFE3E3;
-    border-color: #FFC4C4;
-    color: #555555;
+.rst-content table.docutils tbody tr:nth-child(even) td { background: var(--blue-ghost); }
+.rst-content table.docutils tbody tr:hover td {
+    background: var(--blue-pale);
+    transition: background 0.1s;
 }
 
-/* ── Footer layout ────────────────────────────────────────────────────────── */
-#centerer {
-    max-width: 800px;
-    margin: auto;
-    text-align: center;
+/* ── API signatures ─────────────────────────────────────────────────────────── */
+dt.sig.sig-object.py {
+    background: var(--blue-ghost);
+    border-left: 3px solid var(--blue-soft);
+    border-radius: 0 4px 4px 0;
+    padding: 7px 12px;
+    margin-bottom: 2px;
+    font-size: 0.93em;
+    box-shadow: none;
+    color: var(--navy);
+}
+dt.sig.sig-object.py:hover { background: var(--blue-pale); }
+
+dl dl > dt.sig.sig-object.py {
+    background: #f9fafb;
+    border-left: 2px solid #9ab3d0;
+    font-size: 0.88em;
 }
 
-#half_footer {
-    max-width: 50%;
-    float: left;
-    padding-bottom: 40px;
-    text-align: center;
-    display: table-cell;
-}
+.sig-prename.descclassname { color: #7a95b0; font-weight: 400; }
+.sig-name.descname { color: var(--blue); font-weight: 700; }
+.sig-param { font-style: italic; color: var(--muted); }
 
-div .third_footer {
-    max-width: 33%;
-    float: left;
-    padding-bottom: 40px;
-    text-align: center;
-    display: table-cell;
+/* ── Field lists ────────────────────────────────────────────────────────────── */
+dl.field-list > dt {
+    background: none; border: none; border-radius: 0;
+    padding: 2px 0; font-size: 0.8em; font-weight: 700;
+    color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.05em; box-shadow: none;
 }
-
-#clear {
-    clear: both;
+dl.field-list > dd {
+    margin-left: 12px; padding-left: 10px;
+    border-left: 2px solid var(--blue-pale); margin-bottom: 8px;
 }
+dl .attribute, dl .method, dl .classmethod, dl .staticmethod { margin-left: 40px; }
+.property { font-weight: 100; padding-right: 3px; }
+dd > p { padding-left: 20px; }
 
-/* ── Sphinx Gallery thumbnails ────────────────────────────────────────────── */
-.sphx-glr-thumbcontainer {
-    min-height: 320px !important;
-    margin: 20px !important;
+/* ── Misc ───────────────────────────────────────────────────────────────────── */
+blockquote p { font-size: 0.88em; }
+
+/* ── Footer ─────────────────────────────────────────────────────────────────── */
+#centerer { max-width: 800px; margin: auto; text-align: center; }
+#half_footer { max-width: 50%; float: left; padding-bottom: 40px; text-align: center; display: table-cell; }
+div .third_footer { max-width: 33%; float: left; padding-bottom: 40px; text-align: center; display: table-cell; }
+#clear { clear: both; }
+
+/* ── Sphinx Gallery ─────────────────────────────────────────────────────────── */
+.sphx-glr-thumbcontainer { min-height: 320px !important; margin: 20px !important; border-radius: 5px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.sphx-glr-thumbcontainer .figure { width: 250px !important; }
+.sphx-glr-thumbcontainer img { max-height: 250px !important; width: 250px !important; }
+.sphx-glr-thumbcontainer a.internal { padding: 270px 10px 0 !important; }
+
+/* ── Config reference page ──────────────────────────────────────────────────── */
+#configuration-parameter-reference h2 {
+    border-left: 4px solid var(--blue-soft);
+    border-top: 1px solid var(--border);
+    padding-left: 12px;
+    font-size: 1.05em;
+    margin-top: 2.2em;
 }
-
-.sphx-glr-thumbcontainer .figure {
-    width: 250px !important;
-}
-
-.sphx-glr-thumbcontainer img {
-    max-height: 250px !important;
-    width: 250px !important;
-}
-
-.sphx-glr-thumbcontainer a.internal {
-    padding: 270px 10px 0 !important;
+.wy-side-nav-search {
+    background-color: ;
 }
