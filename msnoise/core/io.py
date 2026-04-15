@@ -102,9 +102,24 @@ def _xr_create_or_open(fn, taxis=[], name="CCF", lazy=False):
     after, so the zeros are never persisted.
     """
     if os.path.isfile(fn):
-        if lazy:
-            return xr.open_dataset(fn)
-        return xr.load_dataset(fn)
+        try:
+            if lazy:
+                return xr.open_dataset(fn)
+            return xr.load_dataset(fn)
+        except (ValueError, OverflowError, OSError) as e:
+            # File exists but is corrupt or has time values outside the range
+            # supported by the current xarray/pandas version (e.g. INT64_MIN
+            # sentinel written by an older run).  Delete and recreate fresh.
+            import logging as _log
+            _log.getLogger("msnoise").warning(
+                f"Corrupt/unreadable NetCDF file {fn!r}: {e}. "
+                "Deleting and recreating."
+            )
+            try:
+                os.remove(fn)
+            except OSError:
+                pass
+            # Fall through to the empty-template branch below
 
     # ── Empty-template branch (file does not exist yet) ────────────────────
     # times is always empty (0 rows) — the template only carries coordinate
