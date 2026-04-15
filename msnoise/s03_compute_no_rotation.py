@@ -34,7 +34,7 @@ The classic ambient-noise cross-correlation (Shapiro & Campillo 2004;
 Bensen et al. 2007) is computed using the tiled-batch implementation
 :func:`~msnoise.core.compute.myCorr2`.
 
-**Shared pre-processing per time window** (all modes — CC, AC, SC):
+**Shared pre-processing per time window** (CC and SC modes — NOT AC):
 
 1. **Temporal normalisation** — optional Winsorising (clipping to
    ``winsorizing`` × RMS) applied either *before* whitening (default) or
@@ -46,7 +46,7 @@ Bensen et al. 2007) is computed using the tiled-batch implementation
 
 3. **Single bandpass per filter band** — one bandpassed copy ``_data_bp``
    is computed from the raw tapered data at the start of each filter
-   iteration and reused by all three modes (AC, CC, SC) and both
+   iteration and reused by CC and SC modes. AC always uses _data_bp
    algorithms (CC, PCC).  No mode bandpasses the data a second time.
 
 **Processing chain — CC algorithm:**
@@ -825,16 +825,22 @@ def main(loglevel="INFO", chunk_size=0):
                 ])
 
                 # ── Auto-Correlation (AC) ─────────────────────────────────
+                # Whitening must NOT be applied before AC: spectral whitening
+                # forces |X[k]| = 1, so X[k]*conj(X[k]) = 1 for all k and the
+                # IFFT gives a perfect sinc — the CCF is then identical to the
+                # reference and dv/v ≡ 0 by construction.  Always use the
+                # bandpassed (non-whitened) copy for AC.
                 if len(single_station_pair_index_ac):
                     tmp = _data_bp.copy()
-                    if params.cc.clip_after_whiten:
+                    if not params.cc.clip_after_whiten:
+                        # Pre-whitening clipping path: winsorise on raw timeseries
+                        pass  # already applied above if clip_after_whiten=N
+                    else:
                         tmp = winsorizing(tmp, params, input="timeseries")
 
                     if params.cc.cc_type_single_station_AC == "CC":
+                        # No whitening for AC — use bandpassed data directly
                         ffts = sf.fftn(tmp, [nfft, ], axes=[1, ])
-                        if params.cc.whitening != "N":
-                            whiten2(ffts, nfft, low, high, p1, p2, psds,
-                                    params.cc.whitening_type)  # inplace
                         energy = np.real(np.sqrt(np.mean(
                             sf.ifft(ffts, n=nfft, axis=1) ** 2,
                             axis=1)))
@@ -848,14 +854,8 @@ def main(loglevel="INFO", chunk_size=0):
                         del energy, ffts
 
                     elif params.cc.cc_type_single_station_AC == "PCC":
-                        tmp_pcc = tmp
-                        if params.cc.whitening != "N":
-                            ffts_pcc = sf.fftn(tmp, [nfft, ], axes=[1, ])
-                            whiten2(ffts_pcc, nfft, low, high, p1, p2, psds,
-                                    params.cc.whitening_type)  # inplace
-                            tmp_pcc = np.real(sf.ifft(ffts_pcc, n=nfft, axis=1)[:, :tmp.shape[1]])
-                            del ffts_pcc
-                        corr = pcc_xcorr(tmp_pcc,
+                        # No whitening for AC — PCC on bandpassed timeseries
+                        corr = pcc_xcorr(tmp,
                                          np.ceil(params.cc.maxlag / dt),
                                          None,
                                          single_station_pair_index_ac,
