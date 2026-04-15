@@ -203,6 +203,7 @@ out.close()
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
+    'sphinxcontrib.jquery',  # re-injects jQuery for RTD theme (Sphinx 8+/RTD 3+ dropped it)
     'sphinx.ext.intersphinx',
     'sphinx.ext.autodoc',
     'sphinx.ext.coverage',

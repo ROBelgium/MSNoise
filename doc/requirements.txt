@@ -17,3 +17,4 @@ xarray
 pandas
 logbook
 markdown
+sphinxcontrib-jquery
