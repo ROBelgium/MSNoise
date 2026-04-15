@@ -1,0 +1,125 @@
+name: Publish to PyPI
+
+# Triggered on every published GitHub Release.
+#
+# Routing logic:
+#   - ALL releases  → TestPyPI  (alphas, betas, RCs, final)
+#   - Stable only   → PyPI      (tags matching vN.N.N exactly, e.g. v1.2.3)
+#
+# "Stable" is defined by the regex  ^v[0-9]+\.[0-9]+\.[0-9]+$
+# Pre-releases (v1.0.0a1, v1.0.0rc2, v1.0.0.post1, …) go to TestPyPI only.
+#
+# No API tokens required — OIDC trusted publishing handles authentication.
+#
+# One-time setup (already done):
+#   PyPI    → Trusted Publisher: ROBelgium/MSNoise, publish.yml, env=pypi
+#   TestPyPI→ Trusted Publisher: ROBelgium/MSNoise, publish.yml, env=testpypi
+#   GitHub  → Settings → Environments → "pypi" + "testpypi" created
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. Build sdist + wheel ────────────────────────────────────────────────
+  build:
+    name: Build distribution packages
+    runs-on: ubuntu-latest
+
+    outputs:
+      is_stable: ${{ steps.check_tag.outputs.is_stable }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # setuptools-scm needs full history for version
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build twine
+
+      - name: Check whether this is a stable release tag (N.N.N)
+        id: check_tag
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "Tag: $TAG"
+          if [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "is_stable=true" >> "$GITHUB_OUTPUT"
+            echo "→ stable release, will publish to PyPI"
+          else
+            echo "is_stable=false" >> "$GITHUB_OUTPUT"
+            echo "→ pre-release tag, TestPyPI only"
+          fi
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Check dist contents
+        run: |
+          twine check dist/*
+          ls -lh dist/
+
+      - name: Upload dist as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  # ── 2. Publish to TestPyPI (every release) ───────────────────────────────
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/msnoise
+
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          print-hash: true
+
+  # ── 3. Publish to PyPI (stable releases only: vN.N.N) ────────────────────
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build, publish-testpypi]
+    if: needs.build.outputs.is_stable == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/msnoise
+
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          print-hash: true
