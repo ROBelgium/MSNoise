@@ -399,28 +399,46 @@ def get_workflow_graph(session):
             "virtual": False,
         })
 
-    # Add virtual edges from each stack_N to the dvv steps reachable via
-    # refstack siblings.  Stack and refstack are siblings (both children of
-    # filter) but mwcs jobs encode both in their lineage (convention A1).
-    # Virtual edges make this implicit dependency visible in the graph.
+    # Add virtual edges from each stack_N to the mwcs/stretching/wavelet steps
+    # reachable via its sibling refstack on the same filter branch.
+    # stack_N and refstack_N share the same filter parent; refstack_N links to
+    # mwcs_N.  We follow: filter → refstack → mwcs and mirror that as a virtual
+    # edge from stack → mwcs, scoped to the same filter branch only.
     _dvv_cats = {"mwcs", "stretching", "wavelet"}
-    steps_by_cat: dict = {}
-    for step in steps:
-        steps_by_cat.setdefault(step.category, []).append(step)
+    # Build parent map: step_id -> list of parent step_ids (from WorkflowLinks)
+    _parent_map: dict = {}
+    _children_map: dict = {}
+    for lnk in links:
+        _children_map.setdefault(lnk.from_step_id, []).append(lnk.to_step_id)
+        _parent_map.setdefault(lnk.to_step_id, []).append(lnk.from_step_id)
+    _step_by_id = {s.step_id: s for s in steps}
 
     existing_edge_pairs = {(e["from"], e["to"]) for e in edges}
-    for stack_step in steps_by_cat.get("stack", []):
-        for dvv_cat in _dvv_cats:
-            for dvv_step in steps_by_cat.get(dvv_cat, []):
-                pair = (stack_step.step_id, dvv_step.step_id)
-                if pair not in existing_edge_pairs:
-                    edges.append({
-                        "from": stack_step.step_id,
-                        "to": dvv_step.step_id,
-                        "type": "virtual",
-                        "virtual": True,
-                    })
-                    existing_edge_pairs.add(pair)
+    for stack_step in [s for s in steps if s.category == "stack"]:
+        # Find the filter parent(s) of this stack step
+        for filter_id in _parent_map.get(stack_step.step_id, []):
+            filter_step = _step_by_id.get(filter_id)
+            if not filter_step or filter_step.category != "filter":
+                continue
+            # Find refstack siblings (children of the same filter)
+            for refstack_id in _children_map.get(filter_id, []):
+                refstack_step = _step_by_id.get(refstack_id)
+                if not refstack_step or refstack_step.category != "refstack":
+                    continue
+                # Find mwcs/stretching/wavelet children of this refstack
+                for dvv_id in _children_map.get(refstack_id, []):
+                    dvv_step = _step_by_id.get(dvv_id)
+                    if not dvv_step or dvv_step.category not in _dvv_cats:
+                        continue
+                    pair = (stack_step.step_id, dvv_step.step_id)
+                    if pair not in existing_edge_pairs:
+                        edges.append({
+                            "from": stack_step.step_id,
+                            "to":   dvv_step.step_id,
+                            "type": "virtual",
+                            "virtual": True,
+                        })
+                        existing_edge_pairs.add(pair)
 
     return {"nodes": nodes, "edges": edges}
 
