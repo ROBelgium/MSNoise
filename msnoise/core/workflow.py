@@ -27,6 +27,7 @@ __all__ = [
     "massive_update_job",
     "propagate_downstream",
     "refstack_is_rolling",
+    "_strip_stack_from_lineage",
     "refstack_needs_recompute",
     "reset_jobs",
     "resolve_lineage_params",
@@ -1589,6 +1590,13 @@ def get_next_lineage_batch(
     # Derived lineage lists — no manual slicing needed in callers
     lineage_names_upstream = lineage_names[:-1] if lineage_names else []
     lineage_names_mov = _strip_refstack_from_lineage(lineage_names_upstream)
+    # lineage_names_ref: path to the REF file folder.
+    # Strips stack_* entries from lineage_names_upstream so that xr_get_ref
+    # resolves to …/filter_N/refstack_M/_output/REF/ — where refstack writes.
+    # (In convention A1 the mwcs lineage encodes stack_N before refstack_M,
+    # but the REF file lives under the refstack step's own folder, not under
+    # the stack_N parent.)
+    lineage_names_ref = _strip_stack_from_lineage(lineage_names_upstream)
 
     logger.info(f"New {step_category.upper()} batch: pair={pair} n={len(jobs)} group_by={group_by} lineage={lineage_str}")
 
@@ -1601,6 +1609,7 @@ def get_next_lineage_batch(
         "lineage_names": lineage_names,
         "lineage_names_upstream": lineage_names_upstream,
         "lineage_names_mov": lineage_names_mov,
+        "lineage_names_ref": lineage_names_ref,
         "refs": refs,
         "days": days,
         "step_params": step_params,
@@ -1950,6 +1959,29 @@ def compute_rolling_ref(data, ref_begin, ref_end):
 
     return refs
 
+
+
+def _strip_stack_from_lineage(lineage_names):
+    """Return a copy of ``lineage_names`` with any ``stack_*`` entries removed.
+
+    Used to build ``lineage_names_ref`` — the path for :func:`xr_get_ref`,
+    which lives under the ``refstack_M`` step folder.  In convention A1 the
+    mwcs lineage string encodes both parents as ``…/stack_N/refstack_M/mwcs_1``,
+    but the REF file is written by the refstack worker under
+    ``…/filter_N/refstack_M/_output/REF/`` — i.e. without the ``stack_N``
+    prefix that appears in the mwcs lineage.
+
+    Example::
+
+        _strip_stack_from_lineage(
+            ['preprocess_1', 'cc_1', 'filter_1', 'stack_1', 'refstack_1']
+        )
+        # → ['preprocess_1', 'cc_1', 'filter_1', 'refstack_1']
+
+    :type lineage_names: list of str
+    :rtype: list of str
+    """
+    return [n for n in lineage_names if not n.startswith("stack_")]
 
 
 def _strip_refstack_from_lineage(lineage_names):

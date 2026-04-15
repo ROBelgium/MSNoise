@@ -113,6 +113,7 @@ def main(loglevel="INFO"):
         params = batch["params"]
         lineage_names = batch["lineage_names_upstream"]
         lineage_names_mov = batch["lineage_names_mov"]
+        lineage_names_ref = batch["lineage_names_ref"]
         lineage_str = batch["lineage_str"]
         step = batch["step"]
 
@@ -155,7 +156,7 @@ def main(loglevel="INFO"):
             if not rolling_mode:
                 # Mode A: load fixed REF from disk (under refstack_M folder)
                 try:
-                    ref = xr_get_ref(params.global_.output_folder, lineage_names,
+                    ref = xr_get_ref(params.global_.output_folder, lineage_names_ref,
                                      station1, station2, components, taxis)
                     ref = ref.values
                 except FileNotFoundError as fullpath:

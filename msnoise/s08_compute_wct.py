@@ -123,6 +123,7 @@ def main(loglevel="INFO"):
         days = batch["days"]
         params = batch["params"]
         lineage_names = batch["lineage_names_upstream"]
+        lineage_names_ref = batch["lineage_names_ref"]
         lineage_names_mov = batch["lineage_names_mov"]
         lineage_str = batch["lineage_str"]
         step = batch["step"]
@@ -231,7 +232,7 @@ def main(loglevel="INFO"):
             if not rolling_mode:
                 # Mode A: load fixed REF from disk
                 try:
-                    ref_da = xr_get_ref(root, lineage_names, station1, station2,
+                    ref_da = xr_get_ref(root, lineage_names_ref, station1, station2,
                                         component, taxis, ignore_network=True)
                     ref = ref_da.values
                     if wct_norm:

@@ -862,68 +862,14 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
         )
         lid_to_str = {r.lineage_id: r.lineage_str for r in rows}
 
-    # --- Hoist invariant work: graph paths and filter config ------------------
-    child_paths = get_lineages_to_step_id(session, step_id=child_step.step_id, include_self=True)
     child_priority = getattr(child_step, "priority", 0) or 0
 
-    # Cache filter gating: filter_step_name -> (allow_cross, allow_auto)
-    _filter_cache: dict = {}
-
-    def _filter_allowed(lin_names, is_auto):
-        filter_name = None
-        for name in reversed(lin_names):
-            if name.startswith("filter_"):
-                filter_name = name
-                break
-        if not filter_name:
-            return True
-        if filter_name not in _filter_cache:
-            filt_step = (
-                session.query(schema.WorkflowStep)
-                .filter(schema.WorkflowStep.step_name == filter_name)
-                .first()
-            )
-            if filt_step is None:
-                raise ValueError(f"Lineage references filter step '{filter_name}' which cannot be resolved")
-            filt_cfg = get_config_set_details(session, filt_step.category, filt_step.set_number, format="AttribDict")
-            allow_cc = bool(getattr(filt_cfg, "CC", False))
-            allow_ac = bool(getattr(filt_cfg, "AC", False))
-            allow_sc = bool(getattr(filt_cfg, "SC", False))
-            _filter_cache[filter_name] = (allow_cc, allow_ac or allow_sc)
-        allow_cross, allow_auto = _filter_cache[filter_name]
-        return allow_auto if is_auto else allow_cross
-
-    # Pre-build: (parent_lineage_str, is_auto) -> list of (child_lin, child_lid)
-    # Constant across all jobs with the same lineage+pair-type — computed once.
-    _prefix_to_children: dict = {}
-
-    def _build_children_for_prefix(parent_lineage_str, is_auto):
-        parent_names = [n for n in lineage_str_to_step_names(parent_lineage_str, sep="/") if "global" not in n]
-        if not parent_names:
-            raise ValueError("Parent job has empty lineage (v2 assumption)")
-        results = []
-        seen = set()
-        for path in child_paths:
-            lin_names = [s.step_name for s in path if s.step_name and "global" not in s.step_name]
-            if len(lin_names) < len(parent_names):
-                continue
-            if lin_names[:len(parent_names)] != parent_names:
-                continue
-            if not _filter_allowed(lin_names, is_auto):
-                continue
-            child_lin = "/".join(lin_names)
-            if child_lin not in seen:
-                seen.add(child_lin)
-                lid = _get_or_create_lineage_id(session, child_lin)
-                results.append((child_lin, lid))
-        if not results:
-            raise ValueError(
-                f"No valid lineage for passthrough {parent_step.step_name} -> {child_step.step_name} "
-                f"from parent_lineage='{parent_lineage_str}' is_auto={is_auto}"
-            )
-        return results
-
-    # Build desired set in pure Python
+    # Build desired set: child lineage = parent lineage + child step name.
+    # This is correct for all direct-successor transitions (mwcs→mwcs_dtt,
+    # wavelet→wavelet_dtt, etc.) where there are no pass-through nodes between
+    # parent and child.  The old graph-walk approach via get_lineages_to_step_id
+    # broke when mwcs job lineages contain stack_N/refstack_M prefixes that
+    # don't exist as WorkflowLink paths (convention A1 diverges from graph).
     desired: dict = {}  # (step_id, day, pair, lineage_id) -> child_lid
 
     for row in done_parent_rows:
@@ -931,16 +877,11 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
         if not parent_lineage_str:
             raise ValueError("DONE parent job has empty lineage (v2 assumption)")
 
-        is_auto = ":" in row.pair and row.pair.split(":")[0] == row.pair.split(":")[1]
-
-        cache_key = (parent_lineage_str, is_auto)
-        if cache_key not in _prefix_to_children:
-            _prefix_to_children[cache_key] = _build_children_for_prefix(parent_lineage_str, is_auto)
-
-        for (child_lin, child_lid) in _prefix_to_children[cache_key]:
-            key = (child_step.step_id, row.day, row.pair, child_lid)
-            if key not in desired:
-                desired[key] = child_lid
+        child_lin = parent_lineage_str + "/" + child_step.step_name
+        child_lid = _get_or_create_lineage_id(session, child_lin)
+        key = (child_step.step_id, row.day, row.pair, child_lid)
+        if key not in desired:
+            desired[key] = child_lid
 
     if not desired:
         return 0
