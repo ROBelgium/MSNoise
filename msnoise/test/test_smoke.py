@@ -560,26 +560,26 @@ def test_smoke_04_preprocess(smoke_db):
 
 @pytest.mark.order(5)
 def test_smoke_05_cc(smoke_db):
-    """CC stub marks jobs Done; propagate_downstream creates stack_1 T jobs
-    via the filter_1 pass-through."""
+    """CC stub marks jobs Done; propagate_downstream creates BOTH stack_1 AND
+    refstack_1 T jobs (now siblings under filter_1)."""
     db, params, root = smoke_db
     _assert_min(db, "cc_1", "T", 1)
     _stub_cc(db, params, root)
-    _assert_min(db, "cc_1",     "D", 6, "cc must be Done")
-    # propagate_downstream must cross the filter_1 pass-through
-    _assert_min(db, "stack_1",  "T", 1,
-                "propagate_downstream must cross filter_1 → stack_1 T jobs")
+    _assert_min(db, "cc_1",      "D", 6, "cc must be Done")
+    _assert_min(db, "stack_1",   "T", 1,
+                "propagate_downstream must create stack_1 T jobs")
+    _assert_min(db, "refstack_1","T", 1,
+                "propagate_downstream must create refstack_1 REF T jobs (sibling of stack)")
 
 
 @pytest.mark.order(6)
 def test_smoke_06_stack(smoke_db):
-    """Stack stub marks jobs Done; propagate_downstream creates refstack_1 T jobs."""
+    """Stack stub marks jobs Done. Stack is now a leaf — refstack T jobs were
+    already created by cc (test_05). Mwcs jobs appear only after refstack Done."""
     db, params, root = smoke_db
     _assert_min(db, "stack_1", "T", 1)
     _stub_stack(db, params, root)
-    _assert_min(db, "stack_1",   "D", 1)
-    _assert_min(db, "refstack_1","T", 1,
-                "propagate_downstream must create refstack T jobs")
+    _assert_min(db, "stack_1", "D", 1)
 
 
 @pytest.mark.order(7)
