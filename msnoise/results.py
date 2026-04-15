@@ -71,31 +71,31 @@ Available get_* methods
      - Returns
    * - ``get_ccf_raw``
      - ``cc``
-     - Raw per-window or daily-stacked CCFs written by ``s03``
+     - Raw per-window or daily-stacked CCFs written by ``compute_cc``
    * - ``get_ccf``
      - ``stack``
-     - Moving-stacked CCFs written by ``s04``
+     - Moving-stacked CCFs written by ``stack``
    * - ``get_ref``
      - ``refstack``
-     - Reference stacks written by ``s04_stack_refstack``
+     - Reference stacks written by ``stack_refstack``
    * - ``get_mwcs``
      - ``mwcs``
-     - MWCS results written by ``s05``
+     - MWCS results written by ``compute_mwcs``
    * - ``get_mwcs_dtt``
      - ``mwcs_dtt``
-     - MWCS dt/t results written by ``s06``
+     - MWCS dt/t results written by ``compute_mwcs_dtt``
    * - ``get_stretching``
      - ``stretching``
-     - Stretching results written by ``s10``
+     - Stretching results written by ``compute_stretching``
    * - ``get_wct``
      - ``wavelet``
-     - Wavelet coherence results written by ``s08``
+     - Wavelet coherence results written by ``compute_wavelet``
    * - ``get_wct_dtt``
      - ``wavelet_dtt``
-     - WCT dt/t results written by ``s09``
+     - WCT dt/t results written by ``compute_wavelet_dtt``
    * - ``get_dvv``
      - any dvv step
-     - Aggregated dv/v written by ``s07``
+     - Aggregated dv/v written by ``compute_<method>_dvv``
    * - ``get_psd``
      - ``psd``
      - Daily PSD written by ``psd_compute``
