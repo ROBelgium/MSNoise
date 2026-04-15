@@ -505,8 +505,37 @@ def propagate_mwcs_jobs_from_stack_done(session):
 
     desired: dict = {}
 
+    # Pre-build: for each stack step, find refstack steps linked from it.
+    # Used to exclude dvv steps already reachable via refstack (those are
+    # handled by propagate_mwcs_jobs_from_refstack_done, not here).
+    _refstack_targets_by_stack: dict = {}  # stack_step_id -> set of mwcs step_ids reachable via refstack
     for stack_step in stack_steps:
-        # Only proceed if this stack step has direct links to dvv categories
+        via_refstack_mwcs_ids: set = set()
+        refstack_links = (
+            session.query(WorkflowStep)
+            .join(schema.WorkflowLink, schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
+            .filter(schema.WorkflowLink.from_step_id == stack_step.step_id)
+            .filter(schema.WorkflowLink.is_active.is_(True))
+            .filter(WorkflowStep.category == "refstack")
+            .all()
+        )
+        for ref_step in refstack_links:
+            mwcs_via_ref = (
+                session.query(WorkflowStep.step_id)
+                .join(schema.WorkflowLink, schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
+                .filter(schema.WorkflowLink.from_step_id == ref_step.step_id)
+                .filter(schema.WorkflowLink.is_active.is_(True))
+                .filter(WorkflowStep.category.in_(_dvv_cats))
+                .all()
+            )
+            via_refstack_mwcs_ids.update(sid for (sid,) in mwcs_via_ref)
+        _refstack_targets_by_stack[stack_step.step_id] = via_refstack_mwcs_ids
+
+    for stack_step in stack_steps:
+        # Find direct stack→dvv links, but skip any dvv step already reachable
+        # via a refstack intermediate — those jobs are created by
+        # propagate_mwcs_jobs_from_refstack_done with the correct joined lineage.
+        via_refstack = _refstack_targets_by_stack.get(stack_step.step_id, set())
         dvv_successors = (
             session.query(WorkflowStep)
             .join(schema.WorkflowLink, schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
@@ -515,6 +544,8 @@ def propagate_mwcs_jobs_from_stack_done(session):
             .filter(WorkflowStep.category.in_(_dvv_cats))
             .all()
         )
+        # Exclude dvv steps reachable via refstack — handled by the refstack propagator
+        dvv_successors = [s for s in dvv_successors if s.step_id not in via_refstack]
         if not dvv_successors:
             continue
 
