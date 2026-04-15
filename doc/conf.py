@@ -52,6 +52,83 @@ for _fn in sorted(_glob.glob(os.path.join(_config_dir, "config_*.csv"))):
             )
 with open("configs.hrst", "w", encoding="utf-8") as _fh:
     _fh.write("\n".join(_alias_lines) + "\n")
+# ?? Generate config_reference.rst ????????????????????????????????????????????
+# One grid table per workflow category, sourced from config CSVs at build time.
+_REF_CATEGORY_ORDER = [
+    "global", "preprocess", "cc", "filter",
+    "stack", "refstack",
+    "mwcs", "mwcs_dtt", "mwcs_dtt_dvv",
+    "stretching", "stretching_dvv",
+    "wavelet", "wavelet_dtt", "wavelet_dtt_dvv",
+    "psd", "psd_rms",
+]
+_REF_DISPLAY_NAMES = {
+    "global": "Global", "preprocess": "Preprocessing",
+    "cc": "Cross-Correlation", "filter": "Filters",
+    "stack": "Moving Stack", "refstack": "Reference Stack",
+    "mwcs": "MWCS", "mwcs_dtt": "MWCS dt/t",
+    "mwcs_dtt_dvv": "MWCS dv/v Aggregate",
+    "stretching": "Stretching", "stretching_dvv": "Stretching dv/v Aggregate",
+    "wavelet": "Wavelet Coherence", "wavelet_dtt": "Wavelet dt/t",
+    "wavelet_dtt_dvv": "Wavelet dv/v Aggregate",
+    "psd": "PSD", "psd_rms": "PSD RMS",
+}
+
+def _ref_esc(s):
+    return str(s or "").strip().replace("|", r"\|").replace("*", r"\*")
+
+def _ref_table(headers, rows):
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            widths[i] = max(widths[i], len(str(cell)))
+    sep  = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
+    hsep = "+" + "+".join("=" * (w + 2) for w in widths) + "+"
+    def fmt(cells):
+        return "|" + "|".join(f" {str(c):<{widths[i]}} " for i, c in enumerate(cells)) + "|"
+    lines = [sep, fmt(headers), hsep]
+    for row in rows:
+        lines += [fmt(row), sep]
+    return "\n".join(lines)
+
+_ref_lines = [
+    ".. _config_reference:", "",
+    "Configuration Parameter Reference",
+    "==================================", "",
+    "All MSNoise configuration parameters, auto-generated from",
+    "``msnoise/config/config_*.csv`` at documentation build time.",
+    "Grouped by workflow category in pipeline order.", "",
+    ".. contents::", "   :local:", "   :depth: 1", "",
+]
+for _cat in _REF_CATEGORY_ORDER:
+    _fn = os.path.join(_config_dir, f"config_{_cat}.csv")
+    if not os.path.exists(_fn):
+        continue
+    with open(_fn, encoding="utf-8") as _fh:
+        _rows_raw = list(csv.DictReader(_fh))
+    if not _rows_raw:
+        continue
+    _title = _REF_DISPLAY_NAMES.get(_cat, _cat)
+    _ref_lines += [
+        "", f".. _{_cat}_params:", "", _title, "-" * len(_title), "",
+        f"Configuration set category: ``{_cat}``", "",
+    ]
+    _table_rows = []
+    for _r in _rows_raw:
+        _name = _ref_esc(_r.get("name", ""))
+        _dflt = _ref_esc(_r.get("default", ""))
+        _typ  = _ref_esc(_r.get("type", "str"))
+        _defn = _ref_esc(_r.get("definition", "").replace("<br>", " "))
+        _poss = (_r.get("possible_values") or "").strip()
+        if _poss:
+            _defn += f" *[{_ref_esc(_poss)}]*"
+        _table_rows.append([f"``{_name}``", _dflt, _typ, _defn])
+    _ref_lines.append(_ref_table(["Parameter", "Default", "Type", "Description"], _table_rows))
+    _ref_lines.append("")
+with open("config_reference.rst", "w", encoding="utf-8") as _fh:
+    _fh.write("\n".join(_ref_lines) + "\n")
+# ?????????????????????????????????????????????????????????????????????????????
+
 
 space = " " * 4
 # Generate the help files

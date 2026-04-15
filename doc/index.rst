@@ -24,6 +24,7 @@ If you use MSNoise for your research, please cite:
 
     installation
     workflow_concepts
+    config_reference
 
 Install MSNoise and learn the 2.x concepts — config sets, lineages, and
 jobs — before running anything.
