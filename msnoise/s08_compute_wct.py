@@ -230,21 +230,25 @@ def main(loglevel="INFO"):
             ref_wct_data = None  # pre-computed ref CWT for Mode A (set below)
 
             if not rolling_mode:
-                # Mode A: load fixed REF from disk
-                try:
-                    ref_da = xr_get_ref(root, lineage_names_ref, station1, station2,
-                                        component, taxis, ignore_network=True)
-                    ref = ref_da.values
-                    if wct_norm:
-                        ori_waveform = ref / ref.max()
-                    else:
-                        ori_waveform = ref
-                except FileNotFoundError as fp:
-                    logger.error(f"FILE DOES NOT EXIST: {fp}, skipping")
-                    continue
-                except Exception as e:
-                    logger.error(f"Error getting reference waveform: {str(e)}")
-                    continue
+                # Mode A: load fixed REF from disk (skip if no refstack in lineage)
+                if lineage_names_ref is None:
+                    ref = None
+                    ori_waveform = None
+                else:
+                    try:
+                        ref_da = xr_get_ref(root, lineage_names_ref, station1, station2,
+                                            component, taxis, ignore_network=True)
+                        ref = ref_da.values
+                        if wct_norm:
+                            ori_waveform = ref / ref.max()
+                        else:
+                            ori_waveform = ref
+                    except FileNotFoundError as fp:
+                        logger.error(f"FILE DOES NOT EXIST: {fp}, skipping")
+                        continue
+                    except Exception as e:
+                        logger.error(f"Error getting reference waveform: {str(e)}")
+                        continue
 
                 if not len(ref):
                     continue

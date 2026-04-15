@@ -91,20 +91,21 @@ _BUILTIN_WORKFLOW_CHAINS = {
         "abbrev": "f", "display_name": "Filters", "level": 3,
     },
     "stack": {
-        # Stack is now a sibling of refstack (both children of filter).
-        # It has no direct downstream workers — mwcs/stretching/wavelet jobs
-        # are created by propagate_downstream on refstack completion, once
-        # BOTH a Done refstack REF AND Done stack days exist for the pair.
-        "next_steps": [],
+        # Stack can feed dv/v steps directly (no refstack) OR via refstack.
+        # Both topologies are supported via WorkflowLinks:
+        #   filter_N -> stack_N -> mwcs_N          (stack-only, no reference)
+        #   filter_N -> stack_N -> refstack_M -> mwcs_N  (with reference)
+        # create_workflow_links_from_steps creates same-set-number links by
+        # default; extra cross-links can be added manually via the admin UI.
+        "next_steps": ["mwcs", "stretching", "wavelet", "refstack"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "stk", "display_name": "Moving Stacks", "level": 4,
     },
     "refstack": {
-        # Sibling of stack (both children of filter/cc pass-through).
-        # Acts as the gateway to dv/v steps: mwcs jobs are created when
-        # both the refstack REF is Done and stack days are Done for the pair.
-        # Lineage convention: mwcs jobs use  …/stack_N/refstack_M/mwcs_1
+        # Sibling of stack AND optional intermediate between stack and mwcs.
+        # Lineage convention A1: mwcs jobs use  …/stack_N/refstack_M/mwcs_1
         # so that lineage_names_mov (strip refstack) resolves the CCF path.
+        # If stack links directly to mwcs (no refstack), lineage is …/stack_N/mwcs_1.
         "next_steps": ["mwcs", "stretching", "wavelet"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "ref", "display_name": "Reference Stacks", "level": 4,
@@ -396,49 +397,10 @@ def get_workflow_graph(session):
             "from": link.from_step_id,
             "to": link.to_step_id,
             "type": link.link_type,
-            "virtual": False,
         })
 
-    # Add virtual edges from each stack_N to the mwcs/stretching/wavelet steps
-    # reachable via its sibling refstack on the same filter branch.
-    # stack_N and refstack_N share the same filter parent; refstack_N links to
-    # mwcs_N.  We follow: filter → refstack → mwcs and mirror that as a virtual
-    # edge from stack → mwcs, scoped to the same filter branch only.
-    _dvv_cats = {"mwcs", "stretching", "wavelet"}
-    # Build parent map: step_id -> list of parent step_ids (from WorkflowLinks)
-    _parent_map: dict = {}
-    _children_map: dict = {}
-    for lnk in links:
-        _children_map.setdefault(lnk.from_step_id, []).append(lnk.to_step_id)
-        _parent_map.setdefault(lnk.to_step_id, []).append(lnk.from_step_id)
-    _step_by_id = {s.step_id: s for s in steps}
-
-    existing_edge_pairs = {(e["from"], e["to"]) for e in edges}
-    for stack_step in [s for s in steps if s.category == "stack"]:
-        # Find the filter parent(s) of this stack step
-        for filter_id in _parent_map.get(stack_step.step_id, []):
-            filter_step = _step_by_id.get(filter_id)
-            if not filter_step or filter_step.category != "filter":
-                continue
-            # Find refstack siblings (children of the same filter)
-            for refstack_id in _children_map.get(filter_id, []):
-                refstack_step = _step_by_id.get(refstack_id)
-                if not refstack_step or refstack_step.category != "refstack":
-                    continue
-                # Find mwcs/stretching/wavelet children of this refstack
-                for dvv_id in _children_map.get(refstack_id, []):
-                    dvv_step = _step_by_id.get(dvv_id)
-                    if not dvv_step or dvv_step.category not in _dvv_cats:
-                        continue
-                    pair = (stack_step.step_id, dvv_step.step_id)
-                    if pair not in existing_edge_pairs:
-                        edges.append({
-                            "from": stack_step.step_id,
-                            "to":   dvv_step.step_id,
-                            "type": "virtual",
-                            "virtual": True,
-                        })
-                        existing_edge_pairs.add(pair)
+    # No virtual edges needed — stack→mwcs links are now real WorkflowLinks
+    # created by create_workflow_links_from_steps (set-number matched).
 
     return {"nodes": nodes, "edges": edges}
 
@@ -628,11 +590,10 @@ def create_workflow_links_from_steps(session):
     following the DAG defined by :func:`get_workflow_chains`.
 
     **Linking rule**: every step in a source category is linked to every step
-    in each of its successor categories.  Set numbers carry no topological
-    meaning — ``mwcs_1`` and ``mwcs_2`` are independent processing variants
-    that both receive input from every upstream step that feeds ``mwcs``.
-    The DAG structure is determined entirely by ``WorkflowLink`` rows, not
-    by set-number coincidence.
+    in each of its successor categories (ALL×ALL).  Set numbers carry no
+    topological meaning — all combinations are created and the user removes
+    unwanted links via the admin UI.  The DAG is determined entirely by
+    ``WorkflowLink`` rows.
 
     Returns:
         tuple: (created_count, existing_count, error_message)
@@ -809,11 +770,16 @@ def propagate_downstream(session, batch: dict) -> int:
         return total
 
     if category == "stack":
-        # Stack is a sibling of refstack (both children of filter/cc pass-through).
-        # No direct downstream workers — mwcs jobs are gated on refstack Done.
-        # If refstack REF is already Done for this pair, create mwcs jobs now.
-        from ..s02_new_jobs import propagate_mwcs_jobs_from_refstack_done
-        return propagate_mwcs_jobs_from_refstack_done(session)
+        # Stack can feed mwcs either:
+        #   a) via refstack (join gate: both Done stack days + Done refstack REF)
+        #   b) directly (no refstack): stack Done → mwcs T
+        # Both are triggered here; each function checks WorkflowLinks to decide
+        # which paths apply.
+        from ..s02_new_jobs import (propagate_mwcs_jobs_from_refstack_done,
+                                     propagate_mwcs_jobs_from_stack_done)
+        total  = propagate_mwcs_jobs_from_refstack_done(session)
+        total += propagate_mwcs_jobs_from_stack_done(session)
+        return total
 
     if category == "refstack":
         # REF Done — create mwcs/stretching/wavelet for all (pair, day) combos
@@ -1633,12 +1599,14 @@ def get_next_lineage_batch(
     lineage_names_upstream = lineage_names[:-1] if lineage_names else []
     lineage_names_mov = _strip_refstack_from_lineage(lineage_names_upstream)
     # lineage_names_ref: path to the REF file folder.
-    # Strips stack_* entries from lineage_names_upstream so that xr_get_ref
-    # resolves to …/filter_N/refstack_M/_output/REF/ — where refstack writes.
-    # (In convention A1 the mwcs lineage encodes stack_N before refstack_M,
-    # but the REF file lives under the refstack step's own folder, not under
-    # the stack_N parent.)
-    lineage_names_ref = _strip_stack_from_lineage(lineage_names_upstream)
+    # - If refstack is in the lineage (convention A1: …/stack_N/refstack_M/mwcs_1):
+    #   strip stack_* → resolves to …/filter_N/refstack_M/_output/REF/
+    # - If no refstack in lineage (direct stack→mwcs: …/stack_N/mwcs_1):
+    #   set to None — workers must skip REF loading for this topology.
+    _has_refstack = any(n.startswith("refstack_") for n in lineage_names_upstream)
+    lineage_names_ref = (
+        _strip_stack_from_lineage(lineage_names_upstream) if _has_refstack else None
+    )
 
     logger.info(f"New {step_category.upper()} batch: pair={pair} n={len(jobs)} group_by={group_by} lineage={lineage_str}")
 

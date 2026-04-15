@@ -152,8 +152,11 @@ def main(loglevel="INFO"):
                     continue
                 if not _is_ac and not params.filter.SC:
                     continue
-            rolling_mode = refstack_is_rolling(params)
-            if not rolling_mode:
+            # No REF when lineage has no refstack (direct stack→mwcs)
+            rolling_mode = lineage_names_ref is not None and refstack_is_rolling(params)
+            if lineage_names_ref is None:
+                ref = None  # no reference correction for direct stack→mwcs topology
+            elif not rolling_mode:
                 # Mode A: load fixed REF from disk (under refstack_M folder)
                 try:
                     ref = xr_get_ref(params.global_.output_folder, lineage_names_ref,

@@ -220,14 +220,17 @@ def main(loglevel="INFO"):
             nstr = params.stretching.stretching_nsteps
 
             if not rolling_mode:
-                # ── Mode A: load fixed REF from disk ─────────────────────────
-                try:
-                    ref = xr_get_ref(root, lineage_names_ref,
-                                     station1, station2, components, taxis)
-                    ref = ref.values.copy()
-                except FileNotFoundError as fullpath:
-                    logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
-                    continue
+                # ── Mode A: load fixed REF from disk (skip if no refstack) ───
+                if lineage_names_ref is None:
+                    ref = None
+                else:
+                    try:
+                        ref = xr_get_ref(root, lineage_names_ref,
+                                         station1, station2, components, taxis)
+                        ref = ref.values.copy()
+                    except FileNotFoundError as fullpath:
+                        logger.error("FILE DOES NOT EXIST: %s, skipping" % fullpath)
+                        continue
 
                 # Zero data outside the lag window on the fixed reference
                 ref[mid - int(minlag * goal_sampling_rate):mid + int(minlag * goal_sampling_rate)] = 0.
