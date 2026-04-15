@@ -11,6 +11,7 @@ __all__ = [
     "xr_get_ccf_daily",
     "xr_get_dtt",
     "xr_get_dvv_agg",
+    "xr_get_dvv_pairs",
     "xr_get_mwcs",
     "xr_get_ref",
     "xr_get_wct_dtt",
@@ -23,6 +24,7 @@ __all__ = [
     "xr_save_ccf_daily",
     "xr_save_dtt",
     "xr_save_dvv_agg",
+    "xr_save_dvv_pairs",
     "xr_save_mwcs",
     "xr_save_psd",
     "xr_save_ref",
@@ -784,6 +786,42 @@ def xr_get_dvv_agg(root, lineage, step_name, mov_stack,
 
 
 
+def xr_save_dvv_pairs(root, lineage, step_name, mov_stack,
+                      pair_type: str, component: str, dataset):
+    """Save per-pair dv/v time series to a NetCDF file.
+
+    Path layout::
+
+        <root>/<lineage>/<step_name>/_output/<mov_stack>/dvv_pairs_<pair_type>_<component>.nc
+
+    :param dataset: :class:`xarray.Dataset` with dims ``(pair, times)`` and
+        variables ``dvv`` and ``err``, as built by :func:`aggregate_dvv_pairs`.
+    """
+    ms_str = "%s_%s" % (mov_stack[0], mov_stack[1])
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                      ms_str, f"dvv_pairs_{pair_type}_{component}.nc")
+    os.makedirs(os.path.dirname(fn), exist_ok=True)
+    _xr_save_and_close(dataset, fn)
+
+
+def xr_get_dvv_pairs(root, lineage, step_name, mov_stack,
+                     pair_type: str, component: str):
+    """Load per-pair dv/v time series from a NetCDF file.
+
+    :returns: :class:`xarray.Dataset` with dims ``(pair, times)`` and
+        variables ``dvv`` and ``err``.
+    :raises FileNotFoundError: if the file does not exist.
+    """
+    ms_str = "%s_%s" % (mov_stack[0], mov_stack[1])
+    fn = os.path.join(root, *lineage, step_name, "_output",
+                      ms_str, f"dvv_pairs_{pair_type}_{component}.nc")
+    if not os.path.isfile(fn):
+        raise FileNotFoundError(fn)
+    return xr.open_dataset(fn)
+
+
+
+
 def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
                         parent_category: str, mov_stack, component: str,
                         pair_type: str, pairs, params) -> xr.Dataset:
@@ -831,7 +869,8 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
         wct_freq_agg = str(params.category_layer.dvv_freq_agg)
 
     # ── 1. Collect per-pair 1-D time series ─────────────────────────────
-    pair_dvv  = []   # list of (times_array, dv_array, err_array)
+    pair_dvv    = []   # list of (times_array, dv_array, err_array)
+    pair_labels = []   # list of "sta1:sta2" strings
 
     for sta1, sta2 in pairs:
         # Filter by pair_type
@@ -901,6 +940,7 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
         dv    = da_dv.values.astype(float)
         err   = da_err.values.astype(float)
         pair_dvv.append((times, dv, err))
+        pair_labels.append(f"{sta1}:{sta2}")
 
     if not pair_dvv:
         raise ValueError(
@@ -997,7 +1037,33 @@ def aggregate_dvv_pairs(root, parent_lineage, parent_step_name,
             "created":         str(np.datetime64("now")),
         }
     )
-    return ds_out
+    # ── 5. Build per-pair Dataset ───────────────────────────────────────
+    pair_coords = np.array(pair_labels, dtype=str)
+    ds_pairs = xr.Dataset(
+        {
+            "dvv": xr.DataArray(
+                dv_mat, dims=["pair", "times"],
+                coords={"pair": pair_coords, "times": all_times_sorted},
+                attrs={"long_name": "dv/v per pair",
+                       "units": "percent" if out_percent else "fraction"},
+            ),
+            "err": xr.DataArray(
+                err_mat, dims=["pair", "times"],
+                coords={"pair": pair_coords, "times": all_times_sorted},
+                attrs={"long_name": "dv/v error per pair"},
+            ),
+        },
+        attrs={
+            "parent_category": parent_category,
+            "parent_step":     parent_step_name,
+            "pair_type":       pair_type,
+            "component":       component,
+            "mov_stack":       "%s_%s" % (mov_stack[0], mov_stack[1]),
+            "dvv_unit":        "percent" if out_percent else "fraction",
+            "created":         str(np.datetime64("now")),
+        },
+    )
+    return ds_out, ds_pairs
 
 # ============================================================
 

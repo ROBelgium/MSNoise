@@ -70,7 +70,7 @@ import numpy as np
 from .core.db import connect, get_logger
 from .core.stations import get_station_pairs
 from .core.workflow import get_next_lineage_batch, is_next_job_for_step, massive_update_job
-from .core.io import aggregate_dvv_pairs, xr_save_dvv_agg
+from .core.io import aggregate_dvv_pairs, xr_save_dvv_agg, xr_save_dvv_pairs
 
 # Maps DVV step category → parent DTT step category
 PARENT_CATEGORY = {
@@ -177,7 +177,7 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
             for pt in pair_types:
                 for comp in comp_groups:
                     try:
-                        ds_out = aggregate_dvv_pairs(
+                        ds_out, ds_pairs = aggregate_dvv_pairs(
                             root=root,
                             parent_lineage=parent_lineage,
                             parent_step_name=parent_step_name,
@@ -200,9 +200,14 @@ def main(step_category: str = "mwcs_dtt_dvv", loglevel: str = "INFO"):
                             root, dvv_lineage, dvv_step_name,
                             mov_stack, pt, comp, ds_out,
                         )
+                        xr_save_dvv_pairs(
+                            root, dvv_lineage, dvv_step_name,
+                            mov_stack, pt, comp, ds_pairs,
+                        )
                         logger.info(
                             f"Saved dvv_{pt}_{comp} mov_stack={mov_stack} "
-                            f"({ds_out.sizes['times']} time steps)"
+                            f"({ds_out.sizes['times']} time steps, "
+                            f"{ds_pairs.sizes['pair']} pairs)"
                         )
                     except Exception as e:
                         logger.error(

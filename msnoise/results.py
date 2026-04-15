@@ -1172,6 +1172,75 @@ class MSNoiseResult:
             return {(k[0], k[1]): v for k, v in results.items()}
         return results
 
+    @_lineage_method(["mwcs_dtt_dvv", "stretching_dvv", "wavelet_dtt_dvv"])
+    def get_dvv_pairs(self, pair_type="ALL", components=None, mov_stack=None):
+        """Load per-pair dv/v time series. Requires a DVV step in lineage.
+
+        Returns a Dataset with dims ``(pair, times)`` and variables ``dvv``
+        and ``err``, containing the standardised dv/v for every pair that was
+        included in the aggregate — useful for per-pair QC, selection, and
+        rejection.
+
+        Same signature as :meth:`get_dvv`.  Returns ``None`` for any
+        combination where the pairs file was not yet produced (e.g. results
+        computed before this feature was added).
+
+        :returns: :class:`xarray.Dataset` or dict of Datasets keyed by
+            ``(pair_type, comp, mov_stack)``.
+
+        Example::
+
+            r = MSNoiseResult.from_ids(db, preprocess=1, cc=1, filter=1,
+                                       stack=1, refstack=1, mwcs=1,
+                                       mwcs_dtt=1, mwcs_dtt_dvv=1)
+            ds = r.get_dvv_pairs("CC", "ZZ", ("1D", "1D"))
+            # ds["dvv"].sel(pair="PF.FOR.00:PF.CSS.00").plot()
+            # mask bad pairs and re-aggregate:
+            good = ds["dvv"].where(ds["err"] < 0.01).mean("pair")
+        """
+        from .core.io import xr_get_dvv_pairs
+        dvv_cat   = self.category
+        lineage   = self._lineage_upstream_of(dvv_cat)
+        step_name = self._step_name_for(dvv_cat)
+        root      = self.output_folder
+        if components is not None and mov_stack is not None:
+            try:
+                return xr_get_dvv_pairs(root, lineage, step_name, mov_stack,
+                                        pair_type, components)
+            except FileNotFoundError:
+                return None
+        base = os.path.join(root, *lineage, step_name, "_output")
+        results = {}
+        ms_dirs = (
+            [os.path.join(base, "%s_%s" % (mov_stack[0], mov_stack[1]))]
+            if mov_stack is not None
+            else [p for p in self._discover(os.path.join(base, "*")) if os.path.isdir(p)]
+        )
+        for ms_dir in ms_dirs:
+            ms_str   = os.path.basename(ms_dir)
+            ms_tuple = tuple(ms_str.split("_", 1))
+            pattern  = (f"dvv_pairs_{pair_type}_*.nc" if components is None
+                        else f"dvv_pairs_{pair_type}_{components}.nc")
+            for nc_file in self._discover(os.path.join(ms_dir, pattern)):
+                fname = os.path.splitext(os.path.basename(nc_file))[0]
+                # filename: dvv_pairs_<pt>_<comp>
+                parts = fname.split("_", 3)
+                if len(parts) < 4:
+                    continue
+                _, _, pt, comp = parts
+                try:
+                    results[(pt, comp, ms_tuple)] = xr_get_dvv_pairs(
+                        root, lineage, step_name, ms_tuple, pt, comp)
+                except Exception:
+                    pass
+        if components is not None and mov_stack is not None:
+            return {k[0]: v for k, v in results.items()}
+        if components is not None:
+            return {(k[0], k[2]): v for k, v in results.items()}
+        if mov_stack is not None:
+            return {(k[0], k[1]): v for k, v in results.items()}
+        return results
+
     @_lineage_method("wavelet")
     def get_wct(self, pair=None, components=None, mov_stack=None):
         """Load WCT results. Requires 'wavelet' in lineage.
