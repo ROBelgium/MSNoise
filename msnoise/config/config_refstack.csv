@@ -2,5 +2,8 @@ name,default,definition,type,possible_values
 ref_begin,1970-01-01,Start of REF period. Absolute date (YYYY-MM-DD) OR negative integer for rolling-index mode (e.g. -5 means 5 windows before current),str,
 ref_end,2100-01-01,End of REF period. Absolute date (YYYY-MM-DD) OR negative integer (e.g. -1 means exclude self). Must be > ref_begin when both are negative.,str,
 stack_method,linear,Stack method for REF computation (Mode A only),str,linear/pws
-pws_timegate,10.0,"If stack_method=pws: smoothing width in seconds (Mode A only)",float,
-pws_power,2.0,"If stack_method=pws: power of the weighting (Mode A only)",float,
+pws_timegate,10.0,If stack_method=pws: smoothing width in seconds (Mode A only),float,
+pws_power,2.0,If stack_method=pws: power of the weighting (Mode A only),float,
+wienerfilt,N,Apply Wiener filter to daily CCFs before REF stacking (Mode A only). Y/N,bool,Y/N
+wiener_mlen,24h,"Wiener smoothing along date axis (time delta, e.g. 24h)",str,
+wiener_nlen,0.5s,"Wiener smoothing along lag-time axis (time delta, e.g. 0.5s)",str,

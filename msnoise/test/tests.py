@@ -658,15 +658,13 @@ def test_023_stack():
     assert counts_ref.get('D', 0) >= 1, \
         f"Expected at least 1 done refstack_1 job, got: {counts_ref}"
 
-    # Test Wiener filter
-    update_config(db, 'wienerfilt', 'Y', category='stack', set_number=1)
-    reset_jobs(db, "stack_1", alljobs=True)
-    stack_mov('mov')
+    # Test Wiener filter — Wiener params now live on refstack configset
+    update_config(db, 'wienerfilt', 'Y', category='refstack', set_number=1)
+    reset_jobs(db, "refstack_1", alljobs=True)
+    stack_refstack_main()
 
     # Revert Wiener for downstream tests
-    update_config(db, 'wienerfilt', 'N', category='stack', set_number=1)
-    reset_jobs(db, "stack_1", alljobs=True)
-    stack_mov('mov')
+    update_config(db, 'wienerfilt', 'N', category='refstack', set_number=1)
     reset_jobs(db, "refstack_1", alljobs=True)
     stack_refstack_main()
     db.close()

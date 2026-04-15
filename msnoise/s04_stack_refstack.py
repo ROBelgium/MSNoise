@@ -47,9 +47,9 @@ Configuration Parameters
 * |refstack.stack_method|
 * |refstack.pws_timegate|
 * |refstack.pws_power|
-* |stack.wienerfilt|
-* |stack.wiener_mlen|
-* |stack.wiener_nlen|
+* |refstack.wienerfilt|
+* |refstack.wiener_mlen|
+* |refstack.wiener_nlen|
 * |cc.keep_all|
 * |cc.corr_duration|
 * |cc.cc_sampling_rate|
@@ -141,22 +141,24 @@ def main(loglevel="INFO"):
         sta1, sta2 = pair.split(":")
 
         # Wiener filter parameters (reuse stack logic if configured)
-        wienerfilt  = params.stack.wienerfilt
+        # Wiener params now live on the refstack configset (params.refstack.*),
+        # since refstack is no longer a child of stack and has no stack layer.
+        wienerfilt  = params.refstack.wienerfilt
         wiener_M    = None
         wiener_N    = None
         gap_threshold = None
         if wienerfilt:
             wiener_M = int(
-                pd.to_timedelta(params.stack.wiener_mlen).total_seconds()
+                pd.to_timedelta(params.refstack.wiener_mlen).total_seconds()
                 / params.cc.corr_duration
             )
             wiener_N = int(
-                pd.to_timedelta(params.stack.wiener_nlen).total_seconds()
+                pd.to_timedelta(params.refstack.wiener_nlen).total_seconds()
                 * params.cc.cc_sampling_rate
             )
             gap_threshold = (
                 wiener_M if params.cc.keep_all
-                else pd.to_timedelta(params.stack.wiener_mlen).days
+                else pd.to_timedelta(params.refstack.wiener_mlen).days
             )
             logger.info("Wiener filter enabled for REF stack")
 
