@@ -2673,6 +2673,188 @@ def utils_import_stationxml(ctx, source, data_source_id, no_save):
 
 
 
+@utils.command(name="run_workflow")
+@click.option("-t", "--threads", default=1, show_default=True,
+              help="Number of parallel workers per step.")
+@click.option("--hpc", is_flag=True, default=None,
+              help="Force HPC mode: insert 'new_jobs --after' between steps "
+                   "(overrides db config).")
+@click.option("--from", "from_category", default=None, metavar="CATEGORY",
+              help="Start from this category (skip earlier steps).")
+@click.option("--until", "until_category", default=None, metavar="CATEGORY",
+              help="Stop after this category.")
+@click.option("--on-failure", "on_failure",
+              type=click.Choice(["stop", "continue"]), default="stop",
+              show_default=True,
+              help="What to do when a step exits non-zero.")
+@click.option("--chunk-size", "chunk_size", default=0, show_default=True,
+              help="--chunk-size passed to 'cc compute' and 'qc compute_psd'.")
+@click.option("--dry-run", is_flag=True,
+              help="Print the execution plan without running anything.")
+@click.option("--export-script", "export_script", default=None,
+              metavar="PATH",
+              help="Write a shell script to PATH instead of executing.")
+@click.pass_context
+def utils_run_workflow(ctx, threads, hpc, from_category, until_category,
+                       on_failure, chunk_size, dry_run, export_script):
+    """Run all workflow steps in topological order.
+
+    Discovers active steps from the database, sorts them by dependency order,
+    and executes the appropriate ``msnoise`` sub-command for each category.
+    Stops (or continues, see --on-failure) if any step fails.
+
+    Examples:
+
+    \b
+      msnoise utils run_workflow                    # run everything, 1 worker
+      msnoise utils run_workflow -t 8               # 8 parallel workers
+      msnoise utils run_workflow --from stack        # resume from stack
+      msnoise utils run_workflow --until mwcs_dtt    # stop after mwcs_dtt
+      msnoise utils run_workflow --dry-run           # preview plan
+      msnoise utils run_workflow --export-script run.sh  # write shell script
+    """
+    import subprocess
+    import datetime as _dt
+    from ..core.db import connect
+    from ..core.workflow import run_workflow_plan, get_params
+
+    session = connect()
+
+    # Resolve HPC: CLI flag wins; otherwise read from config
+    hpc_mode = hpc
+    if hpc_mode is None:
+        try:
+            params = get_params(session)
+            hpc_mode = bool(getattr(getattr(params, "global_", None), "hpc", False))
+        except Exception:
+            hpc_mode = False
+
+    plan = run_workflow_plan(
+        session,
+        threads=threads,
+        hpc=hpc_mode,
+        from_category=from_category,
+        until_category=until_category,
+        chunk_size=chunk_size,
+    )
+    session.close()
+
+    if not plan:
+        click.echo("No runnable steps found in the active workflow.")
+        return
+
+    # ── Build the command list for each step ──────────────────────────────
+    # Each entry: (display_label, [full argv list], hpc_after bool)
+    msnoise_exe = [sys.executable, "-m", "msnoise"]
+
+    def _step_argv(step):
+        """Full argv for a RunStep.  -t N is a top-level msnoise flag."""
+        base = msnoise_exe + (["-t", str(threads)] if threads != 1 else [])
+        return base + step.cmd_tokens
+
+    def _hpc_argv(category):
+        return msnoise_exe + ["new_jobs", "--after", category]
+
+    # ── Dry-run / export-script mode ─────────────────────────────────────
+    def _fmt_cmd(argv):
+        """Human-readable command, using 'msnoise' instead of python -m.
+        argv already contains -t N (if set), so just strip the python -m prefix.
+        """
+        tokens = argv[argv.index("-m") + 2:]   # strip 'python -m msnoise'
+        return "msnoise " + " ".join(tokens)
+
+    if dry_run or export_script:
+        lines = []
+        if export_script:
+            ts = _dt.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+            cwd = os.getcwd()
+            lines += [
+                "#!/bin/bash",
+                f"# MSNoise workflow script — generated {ts}",
+                f"# Project: {cwd}",
+                f"# Steps: {' '.join(s.category for s in plan)}",
+                "set -e" if on_failure == "stop" else "# set -e  (--on-failure=continue)",
+                "",
+            ]
+
+        for i, step in enumerate(plan, 1):
+            tag = f"[{i:02d}/{len(plan):02d}] {step.category}"
+            jobs_hint = f"  # {step.job_count} T jobs" if step.job_count else ""
+            cmd_str = _fmt_cmd(_step_argv(step))
+            if export_script:
+                lines.append(f"echo '{tag}'")
+                lines.append(cmd_str + jobs_hint)
+                if step.hpc_after:
+                    hpc_str = _fmt_cmd(_hpc_argv(step.category))
+                    lines.append(f"echo '    [HPC] new_jobs --after {step.category}'")
+                    lines.append(hpc_str)
+                lines.append("")
+            else:
+                click.echo(f"{tag:<30} {cmd_str}{jobs_hint}")
+                if step.hpc_after:
+                    hpc_str = _fmt_cmd(_hpc_argv(step.category))
+                    click.echo(f"{'':30} {hpc_str}  # HPC propagation")
+
+        if export_script:
+            script_text = "\n".join(lines) + "\n"
+            with open(export_script, "w") as fh:
+                fh.write(script_text)
+            os.chmod(export_script, 0o755)
+            click.echo(f"✓ Script written to: {export_script}")
+        return
+
+    # ── Execute ──────────────────────────────────────────────────────────
+    results = []   # (category, status, elapsed, detail)
+    t_total_start = time.time()
+    failed_cats = []
+
+    for i, step in enumerate(plan, 1):
+        n = len(plan)
+        jobs_hint = f" ({step.job_count} T jobs)" if step.job_count else " (0 T jobs — may be a no-op)"
+        click.echo(f"\n[{i:02d}/{n:02d}] {step.category}{jobs_hint}")
+
+        argv = _step_argv(step)
+        click.echo(f"      → {_fmt_cmd(argv)}")
+
+        t0 = time.time()
+        result = subprocess.run(argv, cwd=os.getcwd())
+        elapsed = time.time() - t0
+
+        if result.returncode == 0:
+            click.echo(f"      ✓ done in {elapsed:.1f}s")
+            results.append((step.category, "ok", elapsed, None))
+        else:
+            detail = f"exit {result.returncode}"
+            click.echo(f"      ✗ FAILED ({detail}) in {elapsed:.1f}s", err=True)
+            results.append((step.category, "fail", elapsed, detail))
+            failed_cats.append(step.category)
+            if on_failure == "stop":
+                click.echo("      Stopping (--on-failure=stop).", err=True)
+                break
+
+        # HPC propagation step
+        if step.hpc_after and (result.returncode == 0 or on_failure == "continue"):
+            hpc_argv = _hpc_argv(step.category)
+            click.echo(f"      → {_fmt_cmd(hpc_argv)}  [HPC propagation]")
+            hpc_result = subprocess.run(hpc_argv, cwd=os.getcwd())
+            if hpc_result.returncode != 0:
+                click.echo(f"      ✗ new_jobs --after {step.category} failed", err=True)
+                failed_cats.append(f"new_jobs --after {step.category}")
+
+    # ── Summary ──────────────────────────────────────────────────────────
+    total_elapsed = time.time() - t_total_start
+    n_ok   = sum(1 for _, s, _, _ in results if s == "ok")
+    n_fail = sum(1 for _, s, _, _ in results if s == "fail")
+    n_skip = len(plan) - len(results)
+
+    click.echo(f"\n{'═' * 54}")
+    click.echo(f" Run complete in {total_elapsed:.1f}s: "
+               f"{n_ok} ✓  {n_fail} ✗  {n_skip} skipped")
+    if failed_cats:
+        click.echo(f" Failed: {', '.join(failed_cats)}", err=True)
+        ctx.exit(1)
+
+
 def run():
     try:
         cli(obj={})

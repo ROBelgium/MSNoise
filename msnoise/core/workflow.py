@@ -46,8 +46,12 @@ __all__ = [
     "query_active_steps",
     "resolve_lineage_ids",
     "bulk_upsert_jobs",
+    # Workflow runner
+    "get_category_cli_command",
+    "run_workflow_plan",
 ]
 
+import collections
 import datetime
 import time
 
@@ -80,6 +84,8 @@ _BUILTIN_WORKFLOW_CHAINS = {
     #       display_name → human label used in admin UI config-sets page
     #       level        → depth in the DAG tree (global=0, its children=1, …)
     #                      psd and preprocess are both level=1 (both branch off global)
+    #       cli          → msnoise sub-command token list to run this category's worker
+    #                      None for pass-through categories (filter, global) — no jobs
     #
     # Plugin packages can add entries via msnoise.plugins.workflow_chains:
     #   each callable returns a dict with the same schema.
@@ -87,21 +93,25 @@ _BUILTIN_WORKFLOW_CHAINS = {
         "next_steps": ["preprocess", "psd"],
         "is_entry_point": True, "is_terminal": False,
         "abbrev": "g", "display_name": "Global Parameters", "level": 0,
+        "cli": None,
     },
     "preprocess": {
         "next_steps": ["cc"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "pre", "display_name": "Preprocessing", "level": 1,
+        "cli": ["compute", "preprocess"],
     },
     "cc": {
         "next_steps": ["filter"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "cc", "display_name": "Cross-Correlation", "level": 2,
+        "cli": ["cc", "compute"],
     },
     "filter": {
         "next_steps": ["stack", "refstack"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "f", "display_name": "Filters", "level": 3,
+        "cli": None,
     },
     "stack": {
         # Stack feeds refstack by default. Direct stack→mwcs links (no refstack)
@@ -111,6 +121,7 @@ _BUILTIN_WORKFLOW_CHAINS = {
         "next_steps": ["refstack"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "stk", "display_name": "Moving Stacks", "level": 4,
+        "cli": ["cc", "stack", "-m"],
     },
     "refstack": {
         # Sibling of stack AND optional intermediate between stack and mwcs.
@@ -120,57 +131,68 @@ _BUILTIN_WORKFLOW_CHAINS = {
         "next_steps": ["mwcs", "stretching", "wavelet"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "ref", "display_name": "Reference Stacks", "level": 4,
+        "cli": ["cc", "stack_refstack"],
     },
     "mwcs": {
         "next_steps": ["mwcs_dtt"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "mwcs", "display_name": "MWCS", "level": 5,
+        "cli": ["cc", "dtt", "compute_mwcs"],
     },
     "mwcs_dtt": {
         "next_steps": ["mwcs_dtt_dvv"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "dtt", "display_name": "MWCS dt/t", "level": 6,
+        "cli": ["cc", "dtt", "compute_mwcs_dtt"],
     },
     "mwcs_dtt_dvv": {
         "next_steps": [],
         "is_entry_point": False, "is_terminal": True,
         "abbrev": "dvv", "display_name": "MWCS dv/v Aggregate", "level": 7,
+        "cli": ["cc", "dtt", "dvv", "compute_mwcs_dtt_dvv"],
     },
     "stretching": {
         "next_steps": ["stretching_dvv"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "str", "display_name": "Stretching", "level": 5,
+        "cli": ["cc", "stretching", "compute"],
     },
     "stretching_dvv": {
         "next_steps": [],
         "is_entry_point": False, "is_terminal": True,
         "abbrev": "sdvv", "display_name": "Stretching dv/v Aggregate", "level": 6,
+        "cli": ["cc", "stretching", "compute_dvv"],
     },
     "wavelet": {
         "next_steps": ["wavelet_dtt"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "wct", "display_name": "Wavelet", "level": 5,
+        "cli": ["cc", "wct", "compute"],
     },
     "wavelet_dtt": {
         "next_steps": ["wavelet_dtt_dvv"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "wdtt", "display_name": "Wavelet dt/t", "level": 6,
+        "cli": ["cc", "wct", "compute_dtt"],
     },
     "wavelet_dtt_dvv": {
         "next_steps": [],
         "is_entry_point": False, "is_terminal": True,
         "abbrev": "wdvv", "display_name": "WCT dv/v Aggregate", "level": 7,
+        "cli": ["cc", "wct", "dvv", "compute_dvv"],
     },
     # ── PSD branch (also level=1: child of global, sibling of preprocess) ──
     "psd": {
         "next_steps": ["psd_rms"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "psd", "display_name": "PSD", "level": 1,
+        "cli": ["qc", "compute_psd"],
     },
     "psd_rms": {
         "next_steps": [],
         "is_entry_point": False, "is_terminal": True,
         "abbrev": "rms", "display_name": "PSD RMS", "level": 2,
+        "cli": ["qc", "compute_psd_rms"],
     },
 }
 
@@ -185,7 +207,6 @@ _BUILTIN_WORKFLOW_ORDER = [
     "stretching", "stretching_dvv",
     "wavelet", "wavelet_dtt", "wavelet_dtt_dvv",
 ]
-
 
 def get_workflow_chains():
     """Return the full workflow adjacency map, including any plugin extensions.
@@ -245,6 +266,205 @@ def get_workflow_order():
                 f"Failed to load workflow_order plugin {ep.name!r}: {exc}"
             )
     return order
+
+
+def get_category_cli_command(category: str) -> list | None:
+    """Return the ``msnoise`` sub-command token list for *category*, or None.
+
+    Reads the ``"cli"`` key from :func:`get_workflow_chains` so that the
+    mapping stays in the single source of truth.  ``None`` means the category
+    is a pass-through (no worker, no jobs).
+
+    Plugin packages extend the mapping by adding a ``"cli"`` key to the dict
+    returned by their ``msnoise.plugins.workflow_chains`` entry point — no
+    separate entry point is needed.
+
+    :param category: Workflow category string (e.g. ``"cc"``, ``"stack"``).
+    :rtype: list[str] or None
+    """
+    chains = get_workflow_chains()
+    entry = chains.get(category, {})
+    if isinstance(entry, dict):
+        return entry.get("cli", None)
+    return None
+
+
+# Named tuple for a single step in the execution plan.
+RunStep = collections.namedtuple(
+    "RunStep",
+    ["category", "step_names", "cmd_tokens", "job_count", "hpc_after"],
+)
+"""
+A single entry in the workflow execution plan.
+
+:param category:   Workflow category string (e.g. ``"cc"``).
+:param step_names: List of active step names in this category (e.g. ``["cc_1"]``).
+:param cmd_tokens: ``msnoise`` sub-command tokens (e.g. ``["cc", "compute"]``),
+                   or ``None`` if pass-through.
+:param job_count:  Number of ``T`` jobs waiting at plan-generation time.
+:param hpc_after:  ``True`` if a ``msnoise new_jobs --after <category>`` call
+                   should be inserted after this step (HPC mode).
+"""
+
+
+def run_workflow_plan(
+    session,
+    *,
+    threads: int = 1,
+    hpc: bool | None = None,
+    from_category: str | None = None,
+    until_category: str | None = None,
+    chunk_size: int = 0,
+) -> list:
+    """Build an ordered execution plan for all active workflow steps.
+
+    Performs a topological sort of active ``WorkflowStep`` categories via
+    ``WorkflowLink`` rows and returns an ordered list of :class:`RunStep`
+    namedtuples.  Pass-through categories (``filter``, ``global``) are
+    omitted.  Categories with no runnable command (see
+    :func:`get_category_cli_command`) are also omitted.
+
+    The returned plan is pure data — no subprocesses are started.  The CLI
+    command ``msnoise utils run_workflow`` drives the actual execution.
+
+    :param session: SQLAlchemy session.
+    :param threads: Number of parallel worker threads/processes (``-t N``).
+    :param hpc: Override ``hpc`` flag from config.  If ``None``, reads from
+        ``params.global_.hpc``.
+    :param from_category: Skip all categories before this one (inclusive start).
+    :param until_category: Stop after this category (inclusive end).
+    :param chunk_size: ``--chunk-size`` value passed to ``cc compute`` and
+        ``qc compute_psd``.
+    :returns: Ordered list of :class:`RunStep` namedtuples.
+    :rtype: list[RunStep]
+    """
+    from sqlalchemy import func as _func
+
+    # -- Resolve HPC flag -----------------------------------------------------
+    if hpc is None:
+        params = get_params(session)
+        hpc = bool(getattr(getattr(params, "global_", None), "hpc", False))
+
+    # -- Load active steps and links ------------------------------------------
+    all_steps = get_workflow_steps(session)
+    all_links = get_workflow_links(session)
+
+    if not all_steps:
+        return []
+
+    # -- Topological sort at CATEGORY level -----------------------------------
+    # Build category adjacency from active links.
+    step_to_cat = {s.step_id: s.category for s in all_steps}
+    cat_deps: dict = {}   # category -> set of predecessor categories
+    active_cats = {s.category for s in all_steps}
+
+    for cat in active_cats:
+        cat_deps.setdefault(cat, set())
+
+    for lk in all_links:
+        src_cat = step_to_cat.get(lk.from_step_id)
+        tgt_cat = step_to_cat.get(lk.to_step_id)
+        if src_cat and tgt_cat and src_cat != tgt_cat:
+            cat_deps.setdefault(tgt_cat, set()).add(src_cat)
+
+    # Kahn's algorithm — tie-break by _BUILTIN_WORKFLOW_ORDER so the CC chain
+    # runs before the independent PSD branch when both are ready simultaneously.
+    _wf_order = get_workflow_order()
+    def _order_key(cat):
+        try:
+            return _wf_order.index(cat)
+        except ValueError:
+            return len(_wf_order)
+
+    in_degree = {cat: len(deps) for cat, deps in cat_deps.items()}
+    queue = sorted([c for c, d in in_degree.items() if d == 0], key=_order_key)
+    topo_order = []
+    while queue:
+        cat = queue.pop(0)
+        topo_order.append(cat)
+        for other, deps in cat_deps.items():
+            if cat in deps:
+                in_degree[other] -= 1
+                if in_degree[other] == 0:
+                    queue.append(other)
+                    queue.sort(key=_order_key)
+
+    # -- Filter: skip pass-throughs and no-command categories -----------------
+    PASSTHROUGH = frozenset({"filter", "global"})
+    runnable_order = [
+        cat for cat in topo_order
+        if cat not in PASSTHROUGH
+        and get_category_cli_command(cat) is not None
+    ]
+
+    # -- Apply --from / --until ------------------------------------------------
+    if from_category and from_category in runnable_order:
+        idx = runnable_order.index(from_category)
+        runnable_order = runnable_order[idx:]
+    if until_category and until_category in runnable_order:
+        idx = runnable_order.index(until_category)
+        runnable_order = runnable_order[:idx + 1]
+
+    # -- Build per-category step lists and job counts -------------------------
+    schema = _declare_tables()
+    Job = schema.Job
+
+    steps_by_cat: dict = {}
+    for s in all_steps:
+        steps_by_cat.setdefault(s.category, []).append(s.step_name)
+
+    # Categories that feed into the next step in HPC mode (need new_jobs --after)
+    # = all non-terminal runnable categories
+    chains = get_workflow_chains()
+
+    plan: list = []
+    for cat in runnable_order:
+        cmd_tokens = list(get_category_cli_command(cat))
+
+        # Inject --chunk-size for cc and psd (day_lineage steps)
+        if chunk_size > 0 and cat in ("cc", "psd"):
+            cmd_tokens += ["--chunk-size", str(chunk_size)]
+
+        # Inject --threads (msnoise -t N is a top-level flag, handled by caller)
+
+        step_names = sorted(steps_by_cat.get(cat, []))
+
+        # Count T jobs for this category
+        step_ids = [
+            s.step_id for s in all_steps if s.category == cat
+        ]
+        if step_ids:
+            row = (
+                session.query(_func.count(Job.ref))
+                .filter(Job.step_id.in_(step_ids))
+                .filter(Job.flag == "T")
+                .scalar()
+            )
+            job_count = row or 0
+        else:
+            job_count = 0
+
+        # HPC: insert new_jobs --after unless this is the last runnable step
+        cat_info = chains.get(cat, {})
+        next_cats = cat_info.get("next_steps", []) if isinstance(cat_info, dict) else []
+        has_runnable_successor = any(
+            get_category_cli_command(nc) is not None
+            for nc in next_cats
+            if nc not in PASSTHROUGH
+        )
+        hpc_after = hpc and has_runnable_successor
+
+        plan.append(RunStep(
+            category=cat,
+            step_names=step_names,
+            cmd_tokens=cmd_tokens,
+            job_count=job_count,
+            hpc_after=hpc_after,
+        ))
+
+    return plan
+
+
 
 
 def get_step_abbrevs():
