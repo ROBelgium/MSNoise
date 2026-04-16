@@ -44,12 +44,19 @@ import pandas as pd
 from .core.db import connect, get_logger
 from .core.config import get_config, get_config_set_details, get_params
 from .core.stations import get_new_files, get_stations, mark_data_availability
-from .core.workflow import (build_movstack_datelist, _lineage_id_for, _get_or_create_lineage_id, filter_within_daterange, get_lineages_to_step_id, get_workflow_chains, get_workflow_order, get_workflow_steps, lineage_str_to_step_names, massive_insert_job, update_job)
+from .core.workflow import (build_movstack_datelist, _get_or_create_lineage_id, filter_within_daterange, get_lineages_to_step_id, get_workflow_chains, get_workflow_order, get_workflow_steps, lineage_str_to_step_names, massive_insert_job, update_job, query_active_steps, resolve_lineage_ids, bulk_upsert_jobs)
 
 
 # Module-level logger used by propagation functions (propagate_stack_jobs_from_cc_done, etc.)
 # that are called before main() has a chance to configure a logger.
 logger = get_logger('msnoise.new_jobs', loglevel="INFO")
+
+# Module-level schema — declare_tables() is idempotent and cheap after the first call.
+from .msnoise_table_def import declare_tables as _declare_tables  # noqa: E402
+_schema = _declare_tables()
+_Job = _schema.Job
+_WorkflowStep = _schema.WorkflowStep
+_WorkflowLink = _schema.WorkflowLink
 
 def propagate_stack_jobs_from_cc_done(session):
     """
@@ -67,31 +74,13 @@ def propagate_stack_jobs_from_cc_done(session):
     bulk SELECT to find existing STACK jobs, then bulk_insert_mappings +
     a single UPDATE … WHERE ref IN (…) for bumps.  No per-job DB round-trips.
     """
-    from .msnoise_table_def import declare_tables
-
-    schema = declare_tables()
-    Job = schema.Job
-    WorkflowStep = schema.WorkflowStep
+    Job = _Job
+    WorkflowStep = _WorkflowStep
 
     now = datetime.datetime.now(datetime.timezone.utc)
-    created = 0
-    bumped = 0
 
-    cc_category_names = {"cc", "crosscorrelation", "cross-correlation"}
-    stack_category_names = {"stack", "stacking"}
-
-    cc_steps = (
-        session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active.is_(True))
-        .filter(WorkflowStep.category.in_(sorted(cc_category_names)))
-        .all()
-    )
-    stack_steps = (
-        session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active.is_(True))
-        .filter(WorkflowStep.category.in_(sorted(stack_category_names)))
-        .all()
-    )
+    cc_steps   = query_active_steps(session, {"cc", "crosscorrelation", "cross-correlation"})
+    stack_steps = query_active_steps(session, {"stack", "stacking"})
 
     logger.info(f"[--after cc] active cc_steps={len(cc_steps)} active stack_steps={len(stack_steps)}")
 
@@ -192,15 +181,7 @@ def propagate_stack_jobs_from_cc_done(session):
 
         # Build a map lineage_id -> lineage_str for all CC jobs at once
         cc_lineage_ids = {row.lineage_id for row in done_cc_rows if row.lineage_id is not None}
-        from .msnoise_table_def import Lineage as _Lineage
-        lid_to_str: dict = {}
-        if cc_lineage_ids:
-            rows = (
-                session.query(_Lineage.lineage_id, _Lineage.lineage_str)
-                .filter(_Lineage.lineage_id.in_(cc_lineage_ids))
-                .all()
-            )
-            lid_to_str = {r.lineage_id: r.lineage_str for r in rows}
+        lid_to_str = resolve_lineage_ids(session, cc_lineage_ids)
 
         for row in done_cc_rows:
             lineage_str = lid_to_str.get(row.lineage_id, "")
@@ -270,26 +251,7 @@ def propagate_stack_jobs_from_cc_done(session):
 
     logger.info(f"[--after cc] to_insert={len(to_insert)}, to_bump={len(to_bump_refs)}")
 
-    # --- Bulk insert new jobs -------------------------------------------------
-    if to_insert:
-        session.bulk_insert_mappings(Job, to_insert)
-        created = len(to_insert)
-
-    # --- Bulk bump existing non-T jobs back to T ------------------------------
-    if to_bump_refs:
-        from sqlalchemy import update as sa_update
-        # Chunk to avoid hitting SQLite/MySQL parameter limits
-        _CHUNK = 900
-        for i in range(0, len(to_bump_refs), _CHUNK):
-            chunk = to_bump_refs[i:i + _CHUNK]
-            session.execute(
-                sa_update(Job)
-                .where(Job.ref.in_(chunk))
-                .values(flag="T", lastmod=now)
-                .execution_options(synchronize_session=False)
-            )
-        bumped = len(to_bump_refs)
-
+    created, bumped = bulk_upsert_jobs(session, to_insert, to_bump_refs, now)
     session.commit()
     logger.info(f"[--after cc] MOV STACK jobs: created={created}, bumped_to_T={bumped}")
     return created + bumped
@@ -310,34 +272,18 @@ def propagate_refstack_jobs_from_cc_done(session):
 
     Called via msnoise new_jobs --after cc (and propagate_downstream on cc).
     """
-    from .msnoise_table_def import declare_tables, Lineage as _Lineage
-
-    schema = declare_tables()
-    Job = schema.Job
-    WorkflowStep = schema.WorkflowStep
+    Job = _Job
 
     now = datetime.datetime.now(datetime.timezone.utc)
     created = 0
     bumped = 0
 
-    # All active refstack steps — these now hang off filter (sibling of stack).
-    refstack_steps = (
-        session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active.is_(True))
-        .filter(WorkflowStep.category == "refstack")
-        .all()
-    )
+    refstack_steps = query_active_steps(session, "refstack")
     if not refstack_steps:
         logger.warning("[--after cc] No active refstack steps found.")
         return 0
 
-    # Collect all Done CC jobs: (pair, lineage_str)
-    cc_steps = (
-        session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active.is_(True))
-        .filter(WorkflowStep.category == "cc")
-        .all()
-    )
+    cc_steps = query_active_steps(session, "cc")
     if not cc_steps:
         logger.warning("[--after cc] No active CC steps found.")
         return 0
@@ -359,16 +305,7 @@ def propagate_refstack_jobs_from_cc_done(session):
         logger.info("[--after cc] REFSTACK jobs: created=0, bumped_to_T=0")
         return 0
 
-    # Resolve lineage_ids -> strings in one query
-    cc_lids = {r.lineage_id for r in done_cc_rows if r.lineage_id is not None}
-    lid_to_str: dict = {}
-    if cc_lids:
-        rows = (
-            session.query(_Lineage.lineage_id, _Lineage.lineage_str)
-            .filter(_Lineage.lineage_id.in_(cc_lids))
-            .all()
-        )
-        lid_to_str = {r.lineage_id: r.lineage_str for r in rows}
+    lid_to_str = resolve_lineage_ids(session, {r.lineage_id for r in done_cc_rows})
 
     # For each (pair, cc_lineage) × refstack_step, build the refstack lineage.
     # Refstack lineage = cc_lineage + "/filter_N/refstack_M" when filter is a
@@ -446,23 +383,7 @@ def propagate_refstack_jobs_from_cc_done(session):
             if flag != "T":
                 to_bump_refs.append(ref_pk)
 
-    if to_insert:
-        session.bulk_insert_mappings(Job, to_insert)
-        created = len(to_insert)
-
-    if to_bump_refs:
-        from sqlalchemy import update as sa_update
-        _CHUNK = 900
-        for i in range(0, len(to_bump_refs), _CHUNK):
-            chunk = to_bump_refs[i:i + _CHUNK]
-            session.execute(
-                sa_update(Job)
-                .where(Job.ref.in_(chunk))
-                .values(flag="T", lastmod=now)
-                .execution_options(synchronize_session=False)
-            )
-        bumped = len(to_bump_refs)
-
+    created, bumped = bulk_upsert_jobs(session, to_insert, to_bump_refs, now)
     session.commit()
     logger.info(f"[--after cc] REFSTACK jobs: created={created}, bumped_to_T={bumped}")
     return created + bumped
@@ -481,25 +402,18 @@ def propagate_mwcs_jobs_from_stack_done(session):
 
     Performance: fully batched — no per-job DB round-trips.
     """
-    from .msnoise_table_def import declare_tables, Lineage as _Lineage
-
-    schema = declare_tables()
-    Job = schema.Job
-    WorkflowStep = schema.WorkflowStep
+    Job = _Job
+    WorkflowStep = _WorkflowStep
 
     now = datetime.datetime.now(datetime.timezone.utc)
     created = 0
 
-    _dvv_cats = set(get_workflow_chains().get("stack", {}).get("next_steps", [])) &                 {"mwcs", "stretching", "wavelet"}
+    _dvv_cats = set(get_workflow_chains().get("stack", {}).get("next_steps", [])) & \
+                {"mwcs", "stretching", "wavelet"}
     if not _dvv_cats:
         return 0
 
-    stack_steps = (
-        session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active.is_(True))
-        .filter(WorkflowStep.category == "stack")
-        .all()
-    )
+    stack_steps = query_active_steps(session, "stack")
     if not stack_steps:
         return 0
 
@@ -509,22 +423,23 @@ def propagate_mwcs_jobs_from_stack_done(session):
     # Used to exclude dvv steps already reachable via refstack (those are
     # handled by propagate_mwcs_jobs_from_refstack_done, not here).
     _refstack_targets_by_stack: dict = {}  # stack_step_id -> set of mwcs step_ids reachable via refstack
+    WFLink = _WorkflowLink
     for stack_step in stack_steps:
         via_refstack_mwcs_ids: set = set()
         refstack_links = (
             session.query(WorkflowStep)
-            .join(schema.WorkflowLink, schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
-            .filter(schema.WorkflowLink.from_step_id == stack_step.step_id)
-            .filter(schema.WorkflowLink.is_active.is_(True))
+            .join(WFLink, WFLink.to_step_id == WorkflowStep.step_id)
+            .filter(WFLink.from_step_id == stack_step.step_id)
+            .filter(WFLink.is_active.is_(True))
             .filter(WorkflowStep.category == "refstack")
             .all()
         )
         for ref_step in refstack_links:
             mwcs_via_ref = (
                 session.query(WorkflowStep.step_id)
-                .join(schema.WorkflowLink, schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
-                .filter(schema.WorkflowLink.from_step_id == ref_step.step_id)
-                .filter(schema.WorkflowLink.is_active.is_(True))
+                .join(WFLink, WFLink.to_step_id == WorkflowStep.step_id)
+                .filter(WFLink.from_step_id == ref_step.step_id)
+                .filter(WFLink.is_active.is_(True))
                 .filter(WorkflowStep.category.in_(_dvv_cats))
                 .all()
             )
@@ -532,15 +447,12 @@ def propagate_mwcs_jobs_from_stack_done(session):
         _refstack_targets_by_stack[stack_step.step_id] = via_refstack_mwcs_ids
 
     for stack_step in stack_steps:
-        # Find direct stack→dvv links, but skip any dvv step already reachable
-        # via a refstack intermediate — those jobs are created by
-        # propagate_mwcs_jobs_from_refstack_done with the correct joined lineage.
         via_refstack = _refstack_targets_by_stack.get(stack_step.step_id, set())
         dvv_successors = (
             session.query(WorkflowStep)
-            .join(schema.WorkflowLink, schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
-            .filter(schema.WorkflowLink.from_step_id == stack_step.step_id)
-            .filter(schema.WorkflowLink.is_active.is_(True))
+            .join(WFLink, WFLink.to_step_id == WorkflowStep.step_id)
+            .filter(WFLink.from_step_id == stack_step.step_id)
+            .filter(WFLink.is_active.is_(True))
             .filter(WorkflowStep.category.in_(_dvv_cats))
             .all()
         )
@@ -560,16 +472,7 @@ def propagate_mwcs_jobs_from_stack_done(session):
         if not done_rows:
             continue
 
-        # Resolve lineage strings
-        lids = {r.lineage_id for r in done_rows if r.lineage_id}
-        lid_to_str: dict = {}
-        if lids:
-            rows = (
-                session.query(_Lineage.lineage_id, _Lineage.lineage_str)
-                .filter(_Lineage.lineage_id.in_(lids))
-                .all()
-            )
-            lid_to_str = {r.lineage_id: r.lineage_str for r in rows}
+        lid_to_str = resolve_lineage_ids(session, {r.lineage_id for r in done_rows})
 
         for row in done_rows:
             stack_lineage = lid_to_str.get(row.lineage_id, "")
@@ -597,21 +500,16 @@ def propagate_mwcs_jobs_from_stack_done(session):
     for r in existing_rows:
         existing_keys.add((r.step_id, r.day, r.pair, r.lineage_id))
 
-    to_insert = []
-    for key, (jobtype, priority) in desired.items():
-        if key in existing_keys:
-            continue
-        step_id, day, pair, lid = key
-        to_insert.append({
-            "day": day, "pair": pair, "jobtype": jobtype,
-            "step_id": step_id, "priority": priority,
-            "flag": "T", "lastmod": now, "lineage_id": lid,
-        })
+    to_insert = [
+        {"day": day, "pair": pair, "jobtype": jobtype,
+         "step_id": step_id, "priority": priority,
+         "flag": "T", "lastmod": now, "lineage_id": lid}
+        for key, (jobtype, priority) in desired.items()
+        if key not in existing_keys
+        for step_id, day, pair, lid in [key]
+    ]
 
-    if to_insert:
-        session.bulk_insert_mappings(Job, to_insert)
-        created = len(to_insert)
-
+    created, _ = bulk_upsert_jobs(session, to_insert, [], now)
     session.commit()
     logger.info(f"[stack->mwcs direct] MWCS/stretching/wavelet jobs created: {created}")
     return created
@@ -641,39 +539,25 @@ def propagate_mwcs_jobs_from_refstack_done(session):
 
     Performance: fully batched — no per-job DB round-trips.
     """
-    from .msnoise_table_def import declare_tables, Lineage as _Lineage
-
-    schema = declare_tables()
-    Job = schema.Job
-    WorkflowStep = schema.WorkflowStep
+    Job = _Job
+    WorkflowStep = _WorkflowStep
+    WFLink = _WorkflowLink
 
     now = datetime.datetime.now(datetime.timezone.utc)
     created = 0
 
-    refstack_steps = (
-        session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active.is_(True))
-        .filter(WorkflowStep.category == "refstack")
-        .all()
-    )
+    refstack_steps = query_active_steps(session, "refstack")
     if not refstack_steps:
         logger.warning("[--after refstack] No active refstack steps found.")
         return 0
 
-    stack_steps = (
-        session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active.is_(True))
-        .filter(WorkflowStep.category == "stack")
-        .all()
-    )
+    stack_steps = query_active_steps(session, "stack")
     if not stack_steps:
         logger.warning("[--after refstack] No active stack steps found.")
         return 0
 
-    # Resolve Done refstack REF jobs: (ref_step_id, pair) -> refstack_lineage_str
-    # We need the lineage_str to derive the cc/filter prefix shared with stack.
     ref_lineage_ids_all: set = set()
-    done_ref_by_step: dict = {}  # ref_step_id -> list[(pair, lineage_id)]
+    done_ref_by_step: dict = {}
     for ref_step in refstack_steps:
         rows = (
             session.query(Job.pair, Job.lineage_id)
@@ -691,17 +575,9 @@ def propagate_mwcs_jobs_from_refstack_done(session):
         logger.info("[--after refstack] No Done REF jobs found.")
         return 0
 
-    ref_lid_to_str: dict = {}
-    if ref_lineage_ids_all:
-        rows = (
-            session.query(_Lineage.lineage_id, _Lineage.lineage_str)
-            .filter(_Lineage.lineage_id.in_(ref_lineage_ids_all))
-            .all()
-        )
-        ref_lid_to_str = {r.lineage_id: r.lineage_str for r in rows}
+    ref_lid_to_str = resolve_lineage_ids(session, ref_lineage_ids_all)
 
-    # Resolve Done stack day jobs: stack_step_id -> {pair -> set(day)}
-    stack_days_by_step_pair: dict = {}  # stack_step_id -> {pair -> set(day)}
+    stack_days_by_step_pair: dict = {}
     stack_lin_ids_all: set = set()
     for stack_step in stack_steps:
         rows = (
@@ -718,26 +594,17 @@ def propagate_mwcs_jobs_from_refstack_done(session):
         if by_pair:
             stack_days_by_step_pair[stack_step.step_id] = by_pair
 
-    stack_lid_to_str: dict = {}
-    if stack_lin_ids_all:
-        rows = (
-            session.query(_Lineage.lineage_id, _Lineage.lineage_str)
-            .filter(_Lineage.lineage_id.in_(stack_lin_ids_all))
-            .all()
-        )
-        stack_lid_to_str = {r.lineage_id: r.lineage_str for r in rows}
+    stack_lid_to_str = resolve_lineage_ids(session, stack_lin_ids_all)
 
-    # desired: (dvv_step_id, day, pair, lineage_id) -> (jobtype, priority)
     desired: dict = {}
-
     dvv_categories = set(get_workflow_chains().get("refstack", {}).get("next_steps", []))
 
     for ref_step in refstack_steps:
         dvv_successors = (
             session.query(WorkflowStep)
-            .join(schema.WorkflowLink, schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
-            .filter(schema.WorkflowLink.from_step_id == ref_step.step_id)
-            .filter(schema.WorkflowLink.is_active.is_(True))
+            .join(WFLink, WFLink.to_step_id == WorkflowStep.step_id)
+            .filter(WFLink.from_step_id == ref_step.step_id)
+            .filter(WFLink.is_active.is_(True))
             .filter(WorkflowStep.category.in_(dvv_categories))
             .all()
         )
@@ -754,14 +621,9 @@ def propagate_mwcs_jobs_from_refstack_done(session):
             if not refstack_lineage:
                 continue
 
-            # The refstack lineage looks like:
-            #   preprocess_1/cc_1/filter_1/refstack_M
-            # The cc/filter prefix is everything except the last element (refstack_M).
             refstack_names = [n for n in refstack_lineage.split("/") if n and "global" not in n]
-            cc_filter_prefix = refstack_names[:-1]  # e.g. ["preprocess_1","cc_1","filter_1"]
-            cc_filter_prefix_str = "/".join(cc_filter_prefix)
+            cc_filter_prefix = refstack_names[:-1]
 
-            # Find stack steps whose Done jobs share the same cc/filter prefix.
             for stack_step in stack_steps:
                 by_pair = stack_days_by_step_pair.get(stack_step.step_id, {})
                 pair_lids = by_pair.get(pair, {})
@@ -773,16 +635,10 @@ def propagate_mwcs_jobs_from_refstack_done(session):
                     if not stack_lineage:
                         continue
                     stack_names = [n for n in stack_lineage.split("/") if n and "global" not in n]
-
-                    # Stack lineage prefix (without stack_N) must equal cc_filter_prefix
                     if stack_names[:-1] != cc_filter_prefix:
                         continue
 
-                    # Build mwcs lineage: …/stack_N/refstack_M/mwcs_step
-                    # This encodes both parents; lineage_names_mov strips refstack_M
-                    # to get the CCF path; full lineage gets the REF path.
                     joint_prefix = stack_lineage + "/" + ref_step.step_name
-
                     for day in days:
                         for dvv_step in dvv_successors:
                             dvv_lineage = joint_prefix + "/" + dvv_step.step_name
@@ -796,7 +652,6 @@ def propagate_mwcs_jobs_from_refstack_done(session):
         session.commit()
         return 0
 
-    # Bulk fetch existing jobs
     dvv_step_ids = list({k[0] for k in desired})
     existing_keys: set = set()
     existing_rows = (
@@ -809,26 +664,16 @@ def propagate_mwcs_jobs_from_refstack_done(session):
     for r in existing_rows:
         existing_keys.add((r.step_id, r.day, r.pair, r.lineage_id))
 
-    to_insert = []
-    for key, (jobtype, priority) in desired.items():
-        if key in existing_keys:
-            continue
-        step_id, day, pair, lid = key
-        to_insert.append({
-            "day":        day,
-            "pair":       pair,
-            "jobtype":    jobtype,
-            "step_id":    step_id,
-            "priority":   priority,
-            "flag":       "T",
-            "lastmod":    now,
-            "lineage_id": lid,
-        })
+    to_insert = [
+        {"day": day, "pair": pair, "jobtype": jobtype,
+         "step_id": step_id, "priority": priority,
+         "flag": "T", "lastmod": now, "lineage_id": lid}
+        for key, (jobtype, priority) in desired.items()
+        if key not in existing_keys
+        for step_id, day, pair, lid in [key]
+    ]
 
-    if to_insert:
-        session.bulk_insert_mappings(Job, to_insert)
-        created = len(to_insert)
-
+    created, _ = bulk_upsert_jobs(session, to_insert, [], now)
     session.commit()
     logger.info(f"[--after refstack] MWCS/stretching/wavelet jobs created: {created}")
     return created
@@ -861,22 +706,14 @@ def propagate_dvv_jobs_from_dtt_done(session, source_category: str) -> int:
             f"Expected a DTT-like category with a terminal DVV successor."
         )
 
-    from sqlalchemy import update as sa_update
-    from .msnoise_table_def import declare_tables
-
-    schema = declare_tables()
-    Job = schema.Job
-    WorkflowStep = schema.WorkflowStep
+    Job = _Job
+    WorkflowStep = _WorkflowStep
+    WFLink = _WorkflowLink
 
     now = datetime.datetime.now(datetime.timezone.utc)
     created = 0
 
-    parent_steps = (
-        session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active.is_(True))
-        .filter(WorkflowStep.category == source_category)
-        .all()
-    )
+    parent_steps = query_active_steps(session, source_category)
 
     # desired: dvv_lineage_str -> (dvv_step_id, dvv_step_name, dvv_lineage_id)
     desired: dict = {}
@@ -884,10 +721,9 @@ def propagate_dvv_jobs_from_dtt_done(session, source_category: str) -> int:
     for parent_step in parent_steps:
         dvv_steps = (
             session.query(WorkflowStep)
-            .join(schema.WorkflowLink,
-                  schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
-            .filter(schema.WorkflowLink.from_step_id == parent_step.step_id)
-            .filter(schema.WorkflowLink.is_active.is_(True))
+            .join(WFLink, WFLink.to_step_id == WorkflowStep.step_id)
+            .filter(WFLink.from_step_id == parent_step.step_id)
+            .filter(WFLink.is_active.is_(True))
             .filter(WorkflowStep.category == target_category)
             .all()
         )
@@ -951,26 +787,12 @@ def propagate_dvv_jobs_from_dtt_done(session, source_category: str) -> int:
             if flag != "T":
                 to_bump_refs.append(ref)
 
-    if to_insert:
-        session.bulk_insert_mappings(Job, to_insert)
-        created = len(to_insert)
-
-    if to_bump_refs:
-        _CHUNK = 900
-        for i in range(0, len(to_bump_refs), _CHUNK):
-            chunk = to_bump_refs[i:i + _CHUNK]
-            session.execute(
-                sa_update(Job)
-                .where(Job.ref.in_(chunk))
-                .values(flag="T", lastmod=now)
-                .execution_options(synchronize_session=False)
-            )
-
+    created, bumped = bulk_upsert_jobs(session, to_insert, to_bump_refs, now)
     session.commit()
     logger.info(
-        f"[--after {source_category}] DVV aggregate jobs created: {created}, bumped: {len(to_bump_refs)}"
+        f"[--after {source_category}] DVV aggregate jobs created: {created}, bumped: {bumped}"
     )
-    return created + len(to_bump_refs)
+    return created + bumped
 
 
 def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
@@ -982,15 +804,11 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
     Performance: fully batched — lineage paths and filter gating computed once,
     existing jobs fetched in one query, inserts via bulk_insert_mappings.
     """
-    from .msnoise_table_def import declare_tables
-
-    schema = declare_tables()
-    Job = schema.Job
+    Job = _Job
 
     now = datetime.datetime.now(datetime.timezone.utc)
     created = 0
 
-    # Fetch only the columns we need
     done_parent_rows = (
         session.query(Job.day, Job.pair, Job.lineage_id)
         .filter(Job.step_id == parent_step.step_id)
@@ -1002,17 +820,7 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
     if not done_parent_rows:
         return 0
 
-    # Resolve all parent lineage_ids to strings in one query
-    parent_lids = {r.lineage_id for r in done_parent_rows if r.lineage_id is not None}
-    from .msnoise_table_def import Lineage as _Lineage
-    lid_to_str: dict = {}
-    if parent_lids:
-        rows = (
-            session.query(_Lineage.lineage_id, _Lineage.lineage_str)
-            .filter(_Lineage.lineage_id.in_(parent_lids))
-            .all()
-        )
-        lid_to_str = {r.lineage_id: r.lineage_str for r in rows}
+    lid_to_str = resolve_lineage_ids(session, {r.lineage_id for r in done_parent_rows})
 
     child_priority = getattr(child_step, "priority", 0) or 0
 
@@ -1048,26 +856,16 @@ def create_passthrough_jobs_from_done_parent(session, parent_step, child_step):
     for r in existing_rows:
         existing_keys.add((r.step_id, r.day, r.pair, r.lineage_id))
 
-    to_insert = []
-    for key, child_lid in desired.items():
-        if key in existing_keys:
-            continue
-        step_id, day, pair, lid = key
-        to_insert.append({
-            "day":        day,
-            "pair":       pair,
-            "jobtype":    child_step.step_name,
-            "step_id":    step_id,
-            "priority":   child_priority,
-            "flag":       "T",
-            "lastmod":    now,
-            "lineage_id": child_lid,
-        })
+    to_insert = [
+        {"day": day, "pair": pair, "jobtype": child_step.step_name,
+         "step_id": step_id, "priority": child_priority,
+         "flag": "T", "lastmod": now, "lineage_id": lid}
+        for key, child_lid in desired.items()
+        if key not in existing_keys
+        for step_id, day, pair, lid in [key]
+    ]
 
-    if to_insert:
-        session.bulk_insert_mappings(Job, to_insert)
-        created = len(to_insert)
-
+    created, _ = bulk_upsert_jobs(session, to_insert, [], now)
     return created
 def propagate_psd_rms_jobs_from_psd_done(session):
     """Create TODO psd_rms jobs from DONE psd jobs.
@@ -1088,21 +886,14 @@ def propagate_psd_rms_jobs_from_psd_done(session):
     :returns: Number of jobs created.
     :rtype: int
     """
-    from .msnoise_table_def import declare_tables
-
-    schema = declare_tables()
-    Job = schema.Job
-    WorkflowStep = schema.WorkflowStep
+    Job = _Job
+    WorkflowStep = _WorkflowStep
+    WFLink = _WorkflowLink
 
     now = datetime.datetime.now(datetime.timezone.utc)
     created = 0
 
-    psd_steps = (
-        session.query(WorkflowStep)
-        .filter(WorkflowStep.is_active.is_(True))
-        .filter(WorkflowStep.category == "psd")
-        .all()
-    )
+    psd_steps = query_active_steps(session, "psd")
 
     if not psd_steps:
         logger.warning("[--after psd] No active psd steps found.")
@@ -1114,10 +905,9 @@ def propagate_psd_rms_jobs_from_psd_done(session):
     for psd_step in psd_steps:
         psd_rms_steps = (
             session.query(WorkflowStep)
-            .join(schema.WorkflowLink,
-                  schema.WorkflowLink.to_step_id == WorkflowStep.step_id)
-            .filter(schema.WorkflowLink.from_step_id == psd_step.step_id)
-            .filter(schema.WorkflowLink.is_active.is_(True))
+            .join(WFLink, WFLink.to_step_id == WorkflowStep.step_id)
+            .filter(WFLink.from_step_id == psd_step.step_id)
+            .filter(WFLink.is_active.is_(True))
             .filter(WorkflowStep.category == "psd_rms")
             .all()
         )
@@ -1162,26 +952,16 @@ def propagate_psd_rms_jobs_from_psd_done(session):
     for r in existing_rows:
         existing_keys.add((r.step_id, r.day, r.pair, r.lineage_id))
 
-    to_insert = []
-    for key, (jobtype, priority) in desired.items():
-        if key in existing_keys:
-            continue
-        step_id, day, pair, lid = key
-        to_insert.append({
-            "day":        day,
-            "pair":       pair,
-            "jobtype":    jobtype,
-            "step_id":    step_id,
-            "priority":   priority,
-            "flag":       "T",
-            "lastmod":    now,
-            "lineage_id": lid,
-        })
+    to_insert = [
+        {"day": day, "pair": pair, "jobtype": jobtype,
+         "step_id": step_id, "priority": priority,
+         "flag": "T", "lastmod": now, "lineage_id": lid}
+        for key, (jobtype, priority) in desired.items()
+        if key not in existing_keys
+        for step_id, day, pair, lid in [key]
+    ]
 
-    if to_insert:
-        session.bulk_insert_mappings(Job, to_insert)
-        created = len(to_insert)
-
+    created, _ = bulk_upsert_jobs(session, to_insert, [], now)
     session.commit()
     logger.info(f"[--after psd] PSD_RMS jobs created: {created}")
     return created
@@ -1196,11 +976,8 @@ def propagate_first_runnable_from_category(session, source_category, skip_catego
     if skip_categories is None:
         skip_categories = {"filter"}
 
-    from .msnoise_table_def import declare_tables
-
-    schema = declare_tables()
     from .core.workflow import get_first_runnable_steps_per_branch
-    WorkflowStep = schema.WorkflowStep
+    WorkflowStep = _WorkflowStep
 
     parent_steps = (
         session.query(WorkflowStep)
@@ -1234,13 +1011,11 @@ def create_cc_jobs_from_preprocess(session):
     This function looks for preprocess jobs marked as 'D'one and creates
     corresponding CC jobs based on workflow links and CC step configurations.
     """
-    from .msnoise_table_def import declare_tables
     from .core.config import get_config_set_details
     from .core.workflow import get_step_successors
 
-    schema = declare_tables()
-    Job = schema.Job
-    WorkflowStep = schema.WorkflowStep
+    Job = _Job
+    WorkflowStep = _WorkflowStep
 
     logger.info('Creating CC jobs from completed preprocess jobs')
 

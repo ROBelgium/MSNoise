@@ -42,6 +42,10 @@ __all__ = [
     "get_category_display_info",
     "is_terminal_category",
     "is_entry_category",
+    # Job-propagation helpers (used by s02_new_jobs propagators)
+    "query_active_steps",
+    "resolve_lineage_ids",
+    "bulk_upsert_jobs",
 ]
 
 import datetime
@@ -54,6 +58,15 @@ from .db import connect, get_logger
 from .config import (get_config, get_config_set_details,
                      get_merged_params_for_lineage, get_params)
 from ..msnoise_table_def import Job, WorkflowStep, DataAvailability, Lineage
+
+# Module-level schema — declare_tables() is idempotent; this gives us WorkflowLink
+# and Config without scattering local declare_tables() calls everywhere.
+# §10: class identity is safe here because msnoise_table_def itself calls
+# declare_tables() at module level, so all calls return the same cached classes.
+from ..msnoise_table_def import declare_tables as _declare_tables
+_schema = _declare_tables()
+WorkflowLink = _schema.WorkflowLink
+Config       = _schema.Config
 
 # ── Built-in workflow topology ────────────────────────────────────────────────
 # Defines the directed adjacency of workflow categories. Plugin packages can
@@ -344,22 +357,22 @@ WORKFLOW_ORDER  = _BUILTIN_WORKFLOW_ORDER
 
 def get_workflow_steps(session):
     """Get all steps in a workflow"""
-    from ..msnoise_table_def import declare_tables
-    schema = declare_tables()
-
-    return session.query(schema.WorkflowStep) \
-        .filter(schema.WorkflowStep.is_active.is_(True)) \
-        .order_by(schema.WorkflowStep.step_name).all()
+    return (
+        session.query(WorkflowStep)
+        .filter(WorkflowStep.is_active.is_(True))
+        .order_by(WorkflowStep.step_name)
+        .all()
+    )
 
 
 
 def get_workflow_links(session):
     """Get all links in a workflow"""
-    from ..msnoise_table_def import declare_tables
-    schema = declare_tables()
-
-    return session.query(schema.WorkflowLink) \
-        .filter(schema.WorkflowLink.is_active.is_(True)).all()
+    return (
+        session.query(WorkflowLink)
+        .filter(WorkflowLink.is_active.is_(True))
+        .all()
+    )
 
 
 
@@ -406,16 +419,10 @@ def get_workflow_graph(session):
 
 def create_workflow_step(session, step_name, category, set_number, description=None):
     """Create a new workflow step"""
-    from ..msnoise_table_def import declare_tables
-    schema = declare_tables()
-
-    step = schema.WorkflowStep(
-        step_name=step_name,
-        category=category,
-        set_number=set_number,
-        description=description
+    step = WorkflowStep(
+        step_name=step_name, category=category,
+        set_number=set_number, description=description,
     )
-
     session.add(step)
     session.commit()
     return step
@@ -424,24 +431,13 @@ def create_workflow_step(session, step_name, category, set_number, description=N
 
 def create_workflow_link(session, from_step_id, to_step_id, link_type="default"):
     """Create a link between two workflow steps"""
-    from ..msnoise_table_def import declare_tables
-    schema = declare_tables()
-
-    # Check if link already exists
-    existing = session.query(schema.WorkflowLink).filter(
-        schema.WorkflowLink.from_step_id == from_step_id,
-        schema.WorkflowLink.to_step_id == to_step_id
+    existing = session.query(WorkflowLink).filter(
+        WorkflowLink.from_step_id == from_step_id,
+        WorkflowLink.to_step_id == to_step_id,
     ).first()
-
     if existing:
         return existing
-
-    link = schema.WorkflowLink(
-        from_step_id=from_step_id,
-        to_step_id=to_step_id,
-        link_type=link_type
-    )
-
+    link = WorkflowLink(from_step_id=from_step_id, to_step_id=to_step_id, link_type=link_type)
     session.add(link)
     session.commit()
     return link
@@ -450,13 +446,13 @@ def create_workflow_link(session, from_step_id, to_step_id, link_type="default")
 
 def get_step_successors(session, step_id):
     """Get all steps that this step feeds into"""
-    from ..msnoise_table_def import declare_tables
-    schema = declare_tables()
-
-    return session.query(schema.WorkflowStep) \
-        .join(schema.WorkflowLink, schema.WorkflowStep.step_id == schema.WorkflowLink.to_step_id) \
-        .filter(schema.WorkflowLink.from_step_id == step_id) \
-        .filter(schema.WorkflowLink.is_active.is_(True)).all()
+    return (
+        session.query(WorkflowStep)
+        .join(WorkflowLink, WorkflowStep.step_id == WorkflowLink.to_step_id)
+        .filter(WorkflowLink.from_step_id == step_id)
+        .filter(WorkflowLink.is_active.is_(True))
+        .all()
+    )
 
 
 
@@ -509,13 +505,13 @@ def get_first_runnable_steps_per_branch(session, source_step_id, skip_categories
 
 def _get_step_predecessors(session, step_id):
     """Get all steps that feed into this step"""
-    from ..msnoise_table_def import declare_tables
-    schema = declare_tables()
-
-    return session.query(schema.WorkflowStep) \
-        .join(schema.WorkflowLink, schema.WorkflowStep.step_id == schema.WorkflowLink.from_step_id) \
-        .filter(schema.WorkflowLink.to_step_id == step_id) \
-        .filter(schema.WorkflowLink.is_active.is_(True)).all()
+    return (
+        session.query(WorkflowStep)
+        .join(WorkflowLink, WorkflowStep.step_id == WorkflowLink.from_step_id)
+        .filter(WorkflowLink.to_step_id == step_id)
+        .filter(WorkflowLink.is_active.is_(True))
+        .all()
+    )
 
 
 
@@ -527,49 +523,32 @@ def create_workflow_steps_from_config_sets(session):
     Returns:
         tuple: (created_count, existing_count, error_message)
     """
-    from ..msnoise_table_def import declare_tables
-
-    schema = declare_tables()
-
     try:
-        # Get all unique category+set_number combinations
         config_sets = session.query(
-            schema.Config.category,
-            schema.Config.set_number
-        ).filter(
-            schema.Config.set_number.isnot(None)  # Exclude global configs
-        ).distinct().all()
+            Config.category, Config.set_number,
+        ).filter(Config.set_number.isnot(None)).distinct().all()
 
-        # Sort by workflow order
-        _order = get_workflow_order()  # module-level function
-        def _config_set_order_key(config_set):
-            category, set_number = config_set
+        _order = get_workflow_order()
+        def _key(cs):
             try:
-                return _order.index(category)
+                return _order.index(cs[0])
             except ValueError:
                 return len(_order)
 
-        config_sets = sorted(config_sets, key=_config_set_order_key)
+        config_sets = sorted(config_sets, key=_key)
         created_count = 0
         existing_count = 0
 
         for category, set_number in config_sets:
-            # Check if step already exists
-            existing_step = session.query(schema.WorkflowStep).filter(
-                schema.WorkflowStep.category == category,
-                schema.WorkflowStep.set_number == set_number,
+            existing_step = session.query(WorkflowStep).filter(
+                WorkflowStep.category == category,
+                WorkflowStep.set_number == set_number,
             ).first()
 
             if not existing_step:
-                step_name = f"{category}_{set_number}"
-                description = f"Auto-generated step for {category} configuration set {set_number}"
-
                 create_workflow_step(
-                    session,
-                    step_name,
-                    category,
-                    set_number,
-                    description
+                    session, f"{category}_{set_number}", category, set_number,
+                    f"Auto-generated step for {category} configuration set {set_number}",
                 )
                 created_count += 1
             else:
@@ -596,14 +575,8 @@ def create_workflow_links_from_steps(session):
     Returns:
         tuple: (created_count, existing_count, error_message)
     """
-    from ..msnoise_table_def import declare_tables
-
-    schema = declare_tables()
-
     try:
-        steps = session.query(schema.WorkflowStep).all()
-
-        # Group steps by category (values = list, order doesn't matter)
+        steps = session.query(WorkflowStep).all()
         steps_by_category: dict[str, list] = {}
         for step in steps:
             steps_by_category.setdefault(step.category, []).append(step)
@@ -612,29 +585,20 @@ def create_workflow_links_from_steps(session):
         existing_count = 0
 
         for source_category, chain_info in get_workflow_chains().items():
-            if isinstance(chain_info, dict):
-                target_categories = chain_info.get('next_steps', [])
-            else:
-                target_categories = chain_info
+            target_categories = chain_info.get('next_steps', []) if isinstance(chain_info, dict) else chain_info
             if source_category not in steps_by_category:
                 continue
-
             for source_step in steps_by_category[source_category]:
                 for target_category in target_categories:
                     if target_category not in steps_by_category:
                         continue
                     for target_step in steps_by_category[target_category]:
-                        existing_link = session.query(schema.WorkflowLink).filter(
-                            schema.WorkflowLink.from_step_id == source_step.step_id,
-                            schema.WorkflowLink.to_step_id == target_step.step_id,
+                        existing_link = session.query(WorkflowLink).filter(
+                            WorkflowLink.from_step_id == source_step.step_id,
+                            WorkflowLink.to_step_id == target_step.step_id,
                         ).first()
                         if not existing_link:
-                            create_workflow_link(
-                                session,
-                                source_step.step_id,
-                                target_step.step_id,
-                                'default',
-                            )
+                            create_workflow_link(session, source_step.step_id, target_step.step_id, 'default')
                             created_count += 1
                         else:
                             existing_count += 1
@@ -711,6 +675,87 @@ def _lineage_str_from_id(session, lineage_id):
     with session.no_autoflush:
         row = session.query(Lineage).filter(Lineage.lineage_id == lineage_id).first()
     return row.lineage_str if row else None
+
+
+def query_active_steps(session, categories):
+    """Return all active WorkflowStep rows whose category is in *categories*.
+
+    :param categories: A single category string or an iterable of strings.
+    :rtype: list[WorkflowStep]
+    """
+    if isinstance(categories, str):
+        categories = [categories]
+    categories = list(categories)
+    if len(categories) == 1:
+        return (
+            session.query(WorkflowStep)
+            .filter(WorkflowStep.is_active.is_(True))
+            .filter(WorkflowStep.category == categories[0])
+            .all()
+        )
+    return (
+        session.query(WorkflowStep)
+        .filter(WorkflowStep.is_active.is_(True))
+        .filter(WorkflowStep.category.in_(categories))
+        .all()
+    )
+
+
+def resolve_lineage_ids(session, lids):
+    """Batch-resolve a set of lineage_ids to their lineage strings.
+
+    :param lids: Iterable of integer lineage_ids (``None`` values are skipped).
+    :returns: ``{lineage_id: lineage_str}`` for every id that exists in the DB.
+    :rtype: dict[int, str]
+    """
+    lids = {lid for lid in lids if lid is not None}
+    if not lids:
+        return {}
+    rows = (
+        session.query(Lineage.lineage_id, Lineage.lineage_str)
+        .filter(Lineage.lineage_id.in_(lids))
+        .all()
+    )
+    return {r.lineage_id: r.lineage_str for r in rows}
+
+
+def bulk_upsert_jobs(session, to_insert, to_bump_refs, now, *, bump_flag_filter=None):
+    """Bulk-insert new jobs and bump existing ones back to ``"T"``.
+
+    :param to_insert: List of job dicts (keys: day, pair, jobtype, step_id,
+        priority, flag, lastmod, lineage_id).
+    :param to_bump_refs: List of ``Job.ref`` primary-key values to reset to T.
+    :param now: ``datetime`` used for ``lastmod`` on bumped rows.
+    :param bump_flag_filter: If given, only rows whose current flag equals this
+        value are bumped.  Pass ``None`` to bump unconditionally.
+    :returns: ``(n_inserted, n_bumped)``
+    :rtype: tuple[int, int]
+    """
+    from sqlalchemy import update as _sa_update
+
+    created = 0
+    bumped = 0
+    _CHUNK = 900
+
+    if to_insert:
+        session.bulk_insert_mappings(Job, to_insert)
+        created = len(to_insert)
+
+    if to_bump_refs:
+        for i in range(0, len(to_bump_refs), _CHUNK):
+            chunk = to_bump_refs[i : i + _CHUNK]
+            stmt = (
+                _sa_update(Job)
+                .where(Job.ref.in_(chunk))
+                .values(flag="T", lastmod=now)
+                .execution_options(synchronize_session=False)
+            )
+            if bump_flag_filter is not None:
+                stmt = stmt.where(Job.flag == bump_flag_filter)
+            session.execute(stmt)
+        bumped = len(to_bump_refs)
+
+    return created, bumped
 
 
 def propagate_downstream(session, batch: dict) -> int:
@@ -799,39 +844,32 @@ def propagate_downstream(session, batch: dict) -> int:
     # For cc→filter(→stack), mwcs→dtt, wavelet→wct_dtt, etc.
     # The completed batch's (pair, day) tuples are used directly.
 
-    from ..msnoise_table_def import declare_tables as _dt
-    schema   = _dt()
-    Job      = schema.Job
-    WFStep   = schema.WorkflowStep
-    WFLink   = schema.WorkflowLink
-
     completed_names = batch["lineage_names"]
-    days  = list(dict.fromkeys(batch["days"]))           # unique, order-preserving
+    days  = list(dict.fromkeys(batch["days"]))
     pairs = list(dict.fromkeys(j.pair for j in batch["jobs"]))
 
     PASSTHROUGH = frozenset({"filter", "global"})
 
     successors = (
-        session.query(WFStep)
-        .join(WFLink, WFStep.step_id == WFLink.to_step_id)
-        .filter(WFLink.from_step_id == completed_step.step_id)
-        .filter(WFLink.is_active.is_(True))
+        session.query(WorkflowStep)
+        .join(WorkflowLink, WorkflowStep.step_id == WorkflowLink.to_step_id)
+        .filter(WorkflowLink.from_step_id == completed_step.step_id)
+        .filter(WorkflowLink.is_active.is_(True))
         .all()
     )
 
     now = datetime.datetime.now(datetime.timezone.utc)
 
     for succ in successors:
-        # Collect worker steps reachable through pass-throughs
         worker_targets: list = []
 
         def _collect(step, intermediates):
             if step.category in PASSTHROUGH:
                 nxt = (
-                    session.query(WFStep)
-                    .join(WFLink, WFStep.step_id == WFLink.to_step_id)
-                    .filter(WFLink.from_step_id == step.step_id)
-                    .filter(WFLink.is_active.is_(True))
+                    session.query(WorkflowStep)
+                    .join(WorkflowLink, WorkflowStep.step_id == WorkflowLink.to_step_id)
+                    .filter(WorkflowLink.from_step_id == step.step_id)
+                    .filter(WorkflowLink.is_active.is_(True))
                     .all()
                 )
                 for ns in nxt:
@@ -857,6 +895,7 @@ def propagate_downstream(session, batch: dict) -> int:
             }
 
             to_insert = []
+            to_bump   = []
             for pair in pairs:
                 for day in days:
                     ej = existing.get((pair, day))
@@ -872,13 +911,10 @@ def propagate_downstream(session, batch: dict) -> int:
                             "lineage_id": downstream_lid,
                         })
                     elif ej.flag not in ("T", "I"):
-                        ej.flag    = "T"
-                        ej.lastmod = now
-                        total += 1
+                        to_bump.append(ej.ref)
 
-            if to_insert:
-                session.bulk_insert_mappings(Job, to_insert)
-                total += len(to_insert)
+            n_ins, n_bump = bulk_upsert_jobs(session, to_insert, to_bump, now)
+            total += n_ins + n_bump
 
     if total:
         session.commit()
@@ -1031,37 +1067,95 @@ def massive_update_job(session, jobs, flag="D"):
 
 
 
-def reset_jobs(session, jobtype, alljobs=False, reset_i=True, reset_e=True):
-    """Reset jobs with the given ``jobtype`` string back to "T"odo.
+def reset_jobs(session, jobtype, alljobs=False, reset_i=True, reset_e=True,
+               downstream=False):
+    """Reset jobs back to ``"T"``odo.
 
-    Works with the v2 workflow model where ``jobtype`` is a step name such
-    as ``"cc_1"`` or ``"refstack_1"``.
+    *jobtype* can be:
+
+    - A specific step name, e.g. ``"cc_1"`` — resets only that step.
+    - A category name, e.g. ``"cc"`` — resets **all** active steps in that
+      category (``cc_1``, ``cc_2``, …).
+
+    If *downstream* is ``True``, all steps reachable via ``WorkflowLink``
+    from the resolved step(s) are also reset (breadth-first, respects
+    ``is_active``).
 
     :type session: :class:`sqlalchemy.orm.session.Session`
     :param session: A :class:`~sqlalchemy.orm.session.Session` object
     :type jobtype: str
-    :param jobtype: Step name to reset (e.g. ``"cc_1"``)
+    :param jobtype: Step name **or** category name to reset.
     :type alljobs: bool
     :param alljobs: If True reset all jobs regardless of current flag;
-        otherwise only resets "I" and/or "E" flagged jobs.
+        otherwise only resets ``"I"`` and/or ``"F"`` flagged jobs.
     :type reset_i: bool
-    :param reset_i: Reset "I"n-progress jobs (default True)
+    :param reset_i: Reset ``"I"``n-progress jobs (default True).
     :type reset_e: bool
-    :param reset_e: Reset "E"rror/failed jobs (default True)
+    :param reset_e: Reset ``"E"``rror/failed jobs (default True).
+    :type downstream: bool
+    :param downstream: Also reset every step reachable downstream via active
+        ``WorkflowLink`` rows (default False).
     """
     from sqlalchemy import update as sa_update
-    q = sa_update(Job).where(Job.jobtype == jobtype)
-    if alljobs:
-        session.execute(q.values(flag='T'))
+
+    # -- Resolve jobtype to a list of step objects ----------------------------
+    all_steps = get_workflow_steps(session)
+    step_by_name = {s.step_name: s for s in all_steps}
+    steps_by_cat = {}
+    for s in all_steps:
+        steps_by_cat.setdefault(s.category, []).append(s)
+
+    if jobtype in step_by_name:
+        seed_steps = [step_by_name[jobtype]]
+    elif jobtype in steps_by_cat:
+        seed_steps = steps_by_cat[jobtype]
     else:
-        flags = []
+        raise ValueError(
+            f"Unknown step name or category: {jobtype!r}. "
+            f"Expected e.g. 'cc_1' (step) or 'cc' (category)."
+        )
+
+    # -- Optionally expand to all downstream steps ----------------------------
+    if downstream:
+        all_links = get_workflow_links(session)
+        link_map: dict = {}
+        for lk in all_links:
+            link_map.setdefault(lk.from_step_id, []).append(lk.to_step_id)
+        step_by_id = {s.step_id: s for s in all_steps}
+
+        visited: set = set()
+        queue = list(seed_steps)
+        target_steps = []
+        while queue:
+            step = queue.pop(0)
+            if step.step_id in visited:
+                continue
+            visited.add(step.step_id)
+            target_steps.append(step)
+            for child_id in link_map.get(step.step_id, []):
+                child = step_by_id.get(child_id)
+                if child and child.step_id not in visited:
+                    queue.append(child)
+    else:
+        target_steps = seed_steps
+
+    # -- Reset flags ----------------------------------------------------------
+    flags = []
+    if not alljobs:
         if reset_i:
             flags.append('I')
         if reset_e:
             flags.append('F')
-        if flags:
+
+    for step in target_steps:
+        q = sa_update(Job).where(Job.jobtype == step.step_name)
+        if alljobs:
+            session.execute(q.values(flag='T'))
+        elif flags:
             session.execute(q.where(Job.flag.in_(flags)).values(flag='T'))
+
     session.commit()
+    return [s.step_name for s in target_steps]
 
 
 
@@ -1120,12 +1214,7 @@ def get_next_job_for_step(
       ``chunk_size=0`` (default) claims everything — identical to the original
       behaviour.
     """
-    from ..msnoise_table_def import declare_tables
     from sqlalchemy import update
-
-    schema = declare_tables()
-    Job = schema.Job
-    WorkflowStep = schema.WorkflowStep
 
     # refstack jobs always have day="REF"; all other categories never do.
     if step_category == "refstack":
@@ -1214,28 +1303,17 @@ def is_next_job_for_step(session, step_category="preprocess", flag='T'):
     :rtype: bool
     :returns: True if at least one Job matches the criteria, False otherwise.
     """
-    from ..msnoise_table_def import declare_tables
-
-    schema = declare_tables()
-    Job = schema.Job
-    WorkflowStep = schema.WorkflowStep
-
     if step_category == "refstack":
         day_filter = (Job.day == "REF")
     else:
         day_filter = (Job.day != "REF")
 
-    job = session.query(Job) \
+    return session.query(Job) \
         .join(WorkflowStep, Job.jobtype == WorkflowStep.step_name) \
         .filter(WorkflowStep.category == step_category) \
         .filter(Job.flag == flag) \
         .filter(day_filter) \
-        .first()
-
-    if job is None:
-        return False
-    else:
-        return True
+        .first() is not None
 
 
 
@@ -1645,45 +1723,37 @@ def get_refstack_lineage_for_filter(session, filterid, refstack_set_number=1):
     :param refstack_set_number: Which refstack set to use (default 1).
     :rtype: list of str
     """
-    # Get the path up to and including the filter step (without the stack child).
-    filter_path = _get_filter_lineage(session, filterid)
-    if not filter_path:
-        return filter_path
-
-    steps = get_workflow_steps(session)
-    links = get_workflow_links(session)
-
-    filter_step = next(
-        (s for s in steps if s.category == 'filter' and s.set_number == filterid),
-        None,
-    )
-    if filter_step is None:
-        return filter_path
+    filter_step, step_map, links, path = _walk_upstream_from_filter(session, filterid)
+    if filter_step is None or not path:
+        return path or []
 
     # Find refstack steps directly linked from this filter step.
     refstack_steps = [
-        s for s in steps
-        if s.category == 'refstack'
-        and any(lk.from_step_id == filter_step.step_id and lk.to_step_id == s.step_id
-                for lk in links)
+        step_map[lk.to_step_id]
+        for lk in links
+        if lk.from_step_id == filter_step.step_id
+        and lk.to_step_id in step_map
+        and step_map[lk.to_step_id].category == 'refstack'
     ]
     if not refstack_steps:
-        return filter_path  # no refstack in this workflow
+        return path  # no refstack in this workflow
 
     refstack_step = next(
         (s for s in refstack_steps if s.set_number == refstack_set_number),
         refstack_steps[0],
     )
-    return filter_path + [refstack_step.step_name]
+    return path + [refstack_step.step_name]
 
 
-def _get_filter_lineage(session, filterid):
-    """Walk upstream from filter_{filterid} to root; return path including filter.
+def _walk_upstream_from_filter(session, filterid):
+    """Walk upstream from ``filter_{filterid}`` to the DAG root.
 
-    Unlike :func:`_get_stack_lineage_for_filter`, this does NOT append a
-    downstream step — it stops at the filter node.  Used by
-    :func:`get_refstack_lineage_for_filter` now that refstack hangs directly
-    off filter rather than off stack.
+    Returns ``(filter_step, step_map, links, path)`` where *path* is the
+    ordered list of step-name strings from root → filter (global nodes
+    excluded).  Returns ``(None, {}, [], [])`` if the filter step is not found.
+
+    This is the shared kernel for :func:`_get_filter_lineage` and
+    :func:`_get_stack_lineage_for_filter`.
     """
     steps = get_workflow_steps(session)
     links = get_workflow_links(session)
@@ -1694,7 +1764,7 @@ def _get_filter_lineage(session, filterid):
         None,
     )
     if filter_step is None:
-        return []
+        return None, {}, [], []
 
     parent_map = {link.to_step_id: link.from_step_id for link in links}
     path = [filter_step.step_name]
@@ -1709,6 +1779,19 @@ def _get_filter_lineage(session, filterid):
         if parent_step.category != 'global':
             path.insert(0, parent_step.step_name)
         current_id = parent_id
+
+    return filter_step, step_map, links, path
+
+
+def _get_filter_lineage(session, filterid):
+    """Walk upstream from filter_{filterid} to root; return path including filter.
+
+    Unlike :func:`_get_stack_lineage_for_filter`, this does NOT append a
+    downstream step — it stops at the filter node.  Used by
+    :func:`get_refstack_lineage_for_filter` now that refstack hangs directly
+    off filter rather than off stack.
+    """
+    _, _, _, path = _walk_upstream_from_filter(session, filterid)
     return path
 
 # ============================================================
@@ -1869,21 +1952,10 @@ def refstack_needs_recompute(session, pair, cc_lineage_prefix, params):
     :rtype: bool
     """
     import datetime as _dt
-    from ..msnoise_table_def import declare_tables, Lineage as _Lineage
 
     ref_start, ref_end, _ = build_ref_datelist(params, session)
 
-    schema = declare_tables()
-    Job = schema.Job
-    WorkflowStep = schema.WorkflowStep
-
-    # Find all active stack steps (any set number).
-    stack_steps = (
-        session.query(WorkflowStep)
-        .filter(WorkflowStep.category == "stack")
-        .filter(WorkflowStep.is_active.is_(True))
-        .all()
-    )
+    stack_steps = query_active_steps(session, "stack")
     if not stack_steps:
         return True  # no stack steps — assume recompute needed
 
@@ -2040,31 +2112,9 @@ def _get_stack_lineage_for_filter(session, filterid):
     :param filterid: The filter set_number (e.g. 1 for filter_1).
     :rtype: list of str
     """
-    steps = get_workflow_steps(session)
-    links = get_workflow_links(session)
-    step_map = {s.step_id: s for s in steps}
-
-    filter_step = next(
-        (s for s in steps if s.category == 'filter' and s.set_number == filterid),
-        None,
-    )
+    filter_step, step_map, links, path = _walk_upstream_from_filter(session, filterid)
     if filter_step is None:
         return []
-
-    # Walk upstream from filter to the root step, skipping global config steps
-    parent_map = {link.to_step_id: link.from_step_id for link in links}
-    path = [filter_step.step_name]
-    current_id = filter_step.step_id
-    visited = set()
-    while current_id in parent_map:
-        if current_id in visited:
-            break  # guard against cycles
-        visited.add(current_id)
-        parent_id = parent_map[current_id]
-        parent_step = step_map[parent_id]
-        if parent_step.category != 'global':
-            path.insert(0, parent_step.step_name)
-        current_id = parent_id
 
     # Append the stack step immediately downstream of this filter (if any)
     for link in links:

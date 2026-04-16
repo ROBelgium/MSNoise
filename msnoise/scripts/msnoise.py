@@ -1284,12 +1284,27 @@ def create_workflow_links(verbose):
 
 @cli.command()
 @click.argument('jobtype')
-@click.option('-a', '--all', is_flag=True, help='Reset all jobs')
-@click.option('-r', '--rule', help='Reset job that match this SQL rule')
-def reset(jobtype, all, rule):
-    """Resets the jobs to "T"odo. JOBTYPE is the step name (e.g. cc_1, stack_1).
-    By default only resets jobs "I"n progress. --all resets all jobs, whatever
-    the flag value."""
+@click.option('-a', '--all', 'alljobs', is_flag=True,
+              help='Reset all jobs regardless of flag (default: only I and F).')
+@click.option('-d', '--downstream', is_flag=True,
+              help='Also reset all steps reachable downstream from JOBTYPE.')
+@click.option('-r', '--rule', help='Reset jobs matching this SQL rule (legacy).')
+def reset(jobtype, alljobs, downstream, rule):
+    """Reset jobs to "T"odo.
+
+    JOBTYPE can be a step name (e.g. cc_1) or a category (e.g. cc, stack).
+    A category resets all active steps of that category.
+    --downstream additionally resets every step reachable via WorkflowLinks.
+
+    Examples:
+
+    \b
+      msnoise reset cc_1          # reset in-progress cc_1 jobs
+      msnoise reset cc            # reset all cc_N steps
+      msnoise reset cc_1 -a       # reset all cc_1 jobs (any flag)
+      msnoise reset cc_1 -a -d    # reset cc_1 and everything downstream
+      msnoise reset cc -a -d      # reset all cc_N and everything downstream
+    """
     from ..core.db import connect, read_db_inifile
     from ..core.workflow import reset_jobs
     dbini = read_db_inifile()
@@ -1298,7 +1313,18 @@ def reset(jobtype, all, rule):
     if jobtype == "DA":
         session.execute(text("UPDATE {0}data_availability SET flag='M'"
                         .format(prefix)))
-    reset_jobs(session, jobtype, all, rule)
+        session.commit()
+        session.close()
+        return
+    try:
+        reset_steps = reset_jobs(session, jobtype, alljobs=alljobs,
+                                 downstream=downstream)
+        if downstream:
+            click.echo(f"Reset {len(reset_steps)} step(s): {', '.join(reset_steps)}")
+        else:
+            click.echo(f"Reset step(s): {', '.join(reset_steps)}")
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
     session.close()
 
 
