@@ -27,13 +27,20 @@ body { font-size: 15px; color: var(--text); -webkit-font-smoothing: antialiased;
 
 /* ── Sidebar — keep RTD structure, refine colours ───────────────────────────── */
 .wy-nav-side       { background: #f8f9fc; border-right: 1px solid var(--border); }
-.wy-side-nav-search > a { color: #fff !important; font-weight: 600; }
+.wy-side-nav-search > a { color: #000 !important; font-weight: 600; }
 
 .wy-side-nav-search input[type="text"] {
     border-radius: 4px;
     border: 1px solid rgba(255,255,255,0.25);
     background: rgba(255,255,255,0.12);
     color: #000;
+}
+
+.wy-side-nav-search>div.version {
+    margin-top: -.4045em;
+    margin-bottom: .809em;
+    font-weight: 400;
+     color: #000;
 }
 
 /* Nav links */
