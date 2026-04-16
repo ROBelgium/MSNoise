@@ -76,7 +76,10 @@ msnoise/
                          # compute_rolling_ref, lineage_str_to_step_names, lineage_str_to_steps,
                          # query_active_steps,   ← batch-fetch active steps by category
                          # resolve_lineage_ids,  ← batch lid→str lookup
-                         # bulk_upsert_jobs      ← shared insert+bump helper for propagators
+                         # bulk_upsert_jobs,     ← shared insert+bump helper for propagators
+                         # get_category_cli_command, ← "cli" key from get_workflow_chains()
+                         # run_workflow_plan,    ← topological execution plan (returns RunStep list)
+                         # RunStep              ← namedtuple(category, step_names, cmd_tokens, job_count, hpc_after)
     signal.py            # winsorizing, stack,
                          # prepare_ref_wct, apply_wct, xwt (thin wrapper),
                          # compute_wct_dtt, get_wct_avgcoh,
@@ -501,23 +504,40 @@ msnoise utils create_preprocess_jobs --date 2026-03-28        # FDSN bypass
 msnoise utils create_preprocess_jobs --date_range START END   # FDSN bypass, range
 msnoise utils create_psd_jobs --date 2026-03-28               # PSD jobs for FDSN station
 msnoise utils create_psd_jobs --date_range START END --set-number 1
+msnoise utils run_workflow                                     # run all steps in topo order
+msnoise utils run_workflow -t 8                                # 8 parallel workers per step
+msnoise utils run_workflow -t 8 --chunk-size 50               # + 50 pairs/day for CC/PSD
+msnoise utils run_workflow --from stack                        # resume from stack onwards
+msnoise utils run_workflow --until mwcs_dtt                    # stop after mwcs_dtt
+msnoise utils run_workflow --dry-run                           # preview plan, don't execute
+msnoise utils run_workflow --export-script run.sh              # write executable shell script
+msnoise utils run_workflow --hpc                               # force HPC mode (inserts new_jobs --after)
+msnoise utils run_workflow --on-failure continue               # keep going if a step fails
 ```
 
 `msnoise reset` accepts either a step name (`cc_1`) or a category (`cc`). Category mode resets all active steps of that category. `--downstream` (`-d`) walks `WorkflowLink` from the seed step(s) and resets every reachable step in BFS order.
+
+`msnoise utils run_workflow` discovers active steps from the DB, performs a topological sort (tie-broken by `_BUILTIN_WORKFLOW_ORDER`), and runs each category's worker in sequence. The `"cli"` key on each entry in `_BUILTIN_WORKFLOW_CHAINS` maps the category to its CLI command tokens — plugin categories just add a `"cli"` key to their `msnoise.plugins.workflow_chains` entry. `--export-script` writes a standalone `.sh` file with all commands in order, suitable for HPC submission or sharing.
 
 `create_preprocess_jobs` and `create_psd_jobs` create T jobs directly without scanning DataAvailability — essential when adding a new FDSN-sourced station. For local/SDS sources they only create jobs where DA records already exist.
 
 **Compute workers**:
 ```sh
-msnoise cc compute                       # runs s03_compute_no_rotation
-msnoise cc compute --chunk-size 50       # claim 50 pairs/day (large networks, ≥50 stations)
-msnoise -t 8 cc compute --chunk-size 50  # 8 parallel workers × 50 pairs each
-msnoise qc compute_psd --chunk-size 20   # claim 20 stations/day for PSD
+msnoise cc preprocess                    # preprocessing
+msnoise cc compute_cc                    # cross-correlation
+msnoise cc compute_cc --chunk-size 50   # claim 50 pairs/day (large networks, ≥50 stations)
+msnoise -t 8 cc compute_cc --chunk-size 50  # 8 parallel workers × 50 pairs each
+msnoise qc compute_psd --chunk-size 20  # claim 20 stations/day for PSD
 msnoise cc stack -m                      # moving stack
 msnoise cc stack_refstack                # reference stack
 msnoise cc dtt compute_mwcs             # MWCS
 msnoise cc dtt compute_mwcs_dtt         # MWCS DTT
-msnoise cc dtt dvv compute_mwcs_dtt_dvv # DVV aggregate
+msnoise cc dtt dvv compute_mwcs_dtt_dvv # MWCS DVV aggregate
+msnoise cc dtt compute_stretching       # Stretching
+msnoise cc dtt dvv compute_stretching_dvv # Stretching DVV aggregate
+msnoise cc dtt compute_wct              # Wavelet coherence
+msnoise cc dtt compute_wct_dtt          # Wavelet DTT
+msnoise cc dtt dvv compute_wavelet_dtt_dvv # WCT DVV aggregate
 msnoise qc compute_psd                  # PSD
 msnoise qc compute_psd_rms              # PSD RMS
 msnoise -t 4 qc compute_psd             # parallel (4 workers)
@@ -659,6 +679,8 @@ python -m pytest /path/to/msnoise/msnoise/test/test_smoke.py::test_smoke_172_psd
     - `bulk_upsert_jobs(session, to_insert, to_bump_refs, now)` — bulk insert new jobs + chunked `UPDATE … WHERE ref IN (…)` for bumping, handles the 900-row SQLite limit automatically.
 
 23. **`reset_jobs` accepts category names**: `reset_jobs(session, "cc")` resets all active steps in category `cc` (e.g. `cc_1`, `cc_2`). Pass a step name (`"cc_1"`) for single-step reset. `downstream=True` BFS-walks `WorkflowLink` from the seed and resets everything reachable. The function now returns the list of step names actually reset.
+
+24. **`_BUILTIN_WORKFLOW_CHAINS` is the single source of truth for CLI commands**: the `"cli"` key on each chain entry maps the category to its `msnoise` sub-command token list (e.g. `["cc", "compute_cc"]`). `get_category_cli_command(category)` reads this key. Plugin packages adding new workflow categories via the `msnoise.plugins.workflow_chains` entry point must include a `"cli"` key — no separate entry point is needed. Pass-through categories (``filter``, ``global``) use `"cli": None`.
 
 ---
 

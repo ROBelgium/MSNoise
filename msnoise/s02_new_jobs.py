@@ -13,27 +13,43 @@ To run it from the console:
 
 Upon first run, if you expect the number of jobs to be large (many days,
 many stations), pass the ``--init`` parameter to optimize the insert. Only use
-this flag once, otherwise problems will arise from duplicate entries in
-the jobs table.
+this flag once, otherwise problems will arise from duplicate entries in the
+jobs table.
 
 .. code-block:: sh
 
     $ msnoise new_jobs --init
+
+Running the full workflow
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To run every step in the right order automatically:
+
+.. code-block:: sh
+
+    $ msnoise utils run_workflow -t 8
+
+See ``msnoise utils run_workflow --help`` for options (``--from``, ``--until``,
+``--dry-run``, ``--export-script``, ``--on-failure``).
 
 Performance / running on HPC
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 By setting the ``hpc`` configuration parameter to ``Y``, you will disable the
 automatic creation of jobs during the workflow, to avoid numerous
-interactions with the database (select & update or insert). The jobs have
-then to be inserted manually:
+interactions with the database (select & update or insert). The jobs then
+need to be inserted manually between steps:
 
 .. code-block:: sh
 
-    $ msnoise new_jobs --hpc CC:STACK
+    $ msnoise new_jobs --after cc
 
-should be run after the ``msnoise compute_cc`` step in order to create the
-``STACK`` jobs.
+should be run after the ``msnoise cc compute_cc`` step in order to create the
+stack and refstack jobs.  All ``--after`` values correspond to workflow
+category names (e.g. ``cc``, ``stack``, ``refstack``, ``mwcs``, ``psd``).
+
+In HPC mode, ``msnoise utils run_workflow --hpc`` inserts these propagation
+calls automatically between steps.
 """
 from .msnoise_table_def import Lineage
 

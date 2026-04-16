@@ -181,8 +181,24 @@ Job lifecycle
     propagate_downstream      →  creates T jobs for the next step(s)
     worker raises exception   →  I → F
 
-    msnoise reset cc_1        →  resets I/F jobs back to T
+    msnoise reset cc_1        →  resets I/F jobs back to T  (step name)
+    msnoise reset cc          →  resets all cc_N steps      (category name)
     msnoise reset cc_1 --all  →  resets ALL cc_1 jobs to T (including D)
+    msnoise reset cc -a -d    →  resets cc_1 + all downstream steps
+
+Run the full pipeline
+~~~~~~~~~~~~~~~~~~~~~~
+
+After seeding jobs, run every step in dependency order with one command:
+
+.. code-block:: sh
+
+    msnoise utils run_workflow              # sequential, 1 worker
+    msnoise utils run_workflow -t 8         # 8 parallel workers per step
+    msnoise utils run_workflow --dry-run    # preview without executing
+    msnoise utils run_workflow --export-script run.sh   # write a shell script
+
+See :ref:`run_workflow` in the how-to guide for the full option reference.
 
 HPC mode
 ---------
@@ -190,6 +206,7 @@ HPC mode
 When ``|global.hpc|`` is ``Y``, ``propagate_downstream`` is **not** called
 inline by workers.  Instead, the operator runs ``msnoise new_jobs --after X``
 manually between steps to trigger downstream job creation.
+``msnoise utils run_workflow --hpc`` handles this automatically.
 
 
 .. _concepts_output_paths:

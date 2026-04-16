@@ -127,7 +127,8 @@ msnoise.plugins.workflow_chains
 Adds new categories to the workflow DAG.  The callable must return a dict
 with the same schema as :data:`msnoise.core.workflow._BUILTIN_WORKFLOW_CHAINS`.
 Once registered, the category is automatically valid in ``msnoise new_jobs
---after``, in job propagation, and in ``MSNoiseResult``:
+--after``, in job propagation, ``MSNoiseResult``, and
+``msnoise utils run_workflow``:
 
 .. code-block:: python
 
@@ -141,6 +142,7 @@ Once registered, the category is automatically valid in ``msnoise new_jobs
                 "abbrev":        "mdtt",
                 "display_name":  "My dt/t",
                 "level":         7,
+                "cli":           ["plugin", "myplugin", "compute_dtt"],  # ← required for run_workflow
             },
             "my_dtt_dvv": {
                 "next_steps":    [],
@@ -149,8 +151,16 @@ Once registered, the category is automatically valid in ``msnoise new_jobs
                 "abbrev":        "mdvv",
                 "display_name":  "My dv/v Aggregate",
                 "level":         8,
+                "cli":           ["plugin", "myplugin", "compute_dvv"],  # ← required for run_workflow
             },
         }
+
+.. note::
+
+    The ``"cli"`` key maps the category to the ``msnoise`` sub-command token
+    list used by ``msnoise utils run_workflow``.  Pass-through categories
+    (no worker, no jobs) should use ``"cli": None``.  If omitted, the category
+    is silently skipped by ``run_workflow``.
 
 
 msnoise.plugins.workflow_order

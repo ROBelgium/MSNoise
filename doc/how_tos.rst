@@ -50,15 +50,50 @@ This recipe is a kind of "let's check this data rapidly":
     # or
     msnoise db execute "insert into filters (ref, low, mwcs_low, high, mwcs_high, mwcs_wlen, mwcs_step, used) values (1, 0.1, 0.1, 1.0, 1.0, 12.0, 4.0, 1)"
 
+    # Option A: run all steps automatically (recommended)
+    msnoise utils run_workflow
+
+    # Option B: step by step
     msnoise cc compute_cc
-    msnoise cc stack -r
-    msnoise reset STACK
+    msnoise cc stack_refstack
     msnoise cc stack -m
     msnoise cc dtt compute_mwcs
-    msnoise cc dtt compute_dtt
-    msnoise cc dtt compute_dvv
+    msnoise cc dtt compute_mwcs_dtt
+    msnoise cc dtt dvv compute_mwcs_dtt_dvv
     msnoise cc dtt plot dvv
 
+
+.. _run_workflow:
+
+Run the full workflow automatically
+-------------------------------------
+
+After seeding jobs (``msnoise new_jobs``) or resetting steps, you can run
+the entire pipeline in one command:
+
+.. code-block:: sh
+
+    msnoise utils run_workflow              # run everything, 1 worker
+    msnoise utils run_workflow -t 8         # 8 parallel workers per step
+    msnoise utils run_workflow -t 8 --chunk-size 50   # + 50 pairs/day for CC/PSD
+    msnoise utils run_workflow --from stack            # resume from stack onwards
+    msnoise utils run_workflow --until mwcs_dtt        # stop after mwcs_dtt
+    msnoise utils run_workflow --on-failure continue   # keep going if a step fails
+    msnoise utils run_workflow --dry-run               # preview plan without running
+    msnoise utils run_workflow --export-script run.sh  # write a portable shell script
+
+The command discovers active steps from the database, sorts them by
+dependency order (topological sort, CC chain before PSD branch), and
+executes each category's worker in sequence. Failed steps are reported in a
+summary. ``--export-script`` writes an executable ``.sh`` file suitable for
+submission to an HPC scheduler or sharing with collaborators.
+
+In HPC mode (``|global.hpc|`` = Y), pass ``--hpc`` to insert
+``msnoise new_jobs --after <category>`` calls automatically between steps:
+
+.. code-block:: sh
+
+    msnoise utils run_workflow --hpc -t 20
 
 Run MSNoise using lots of cores on a HPC
 ----------------------------------------
@@ -84,18 +119,23 @@ Commands and actions with ``hpc`` = N :
 * ``msnoise new_jobs``: creates the CC jobs
 * ``msnoise cc compute_cc``: processes the CC jobs and creates the STACK jobs
 * ``msnoise cc stack -m``: processes the STACK jobs and creates the MWCS jobs
-* etc...
+* etc…
+
+.. tip::
+
+    In ``hpc=N`` mode you can let :ref:`run_workflow` orchestrate the full
+    pipeline automatically: ``msnoise utils run_workflow -t 16``.
 
 Commands and actions with ``hpc`` = Y :
 
 * ``msnoise new_jobs``: creates the CC jobs
 * ``msnoise cc compute_cc``: processes the CC jobs
-* ``msnoise new_jobs --hpc CC:STACK``: creates the STACK jobs based on the CC 
-  jobs marked "D"one
+* ``msnoise new_jobs --after cc``: creates the STACK + REFSTACK jobs
+* ``msnoise cc stack_refstack``: computes the reference stacks
 * ``msnoise cc stack -m``: processes the STACK jobs
-* ``msnoise new_jobs --hpc STACK:MWCS``: creates the MWCS jobs based on the 
-  STACK jobs marked "D"one
-* etc...
+* ``msnoise new_jobs --after stack``: creates the MWCS jobs
+* ``msnoise cc dtt compute_mwcs``: computes MWCS
+* … (or use ``msnoise utils run_workflow --hpc`` to handle all of this)
 
 Set up the HPC
 ~~~~~~~~~~~~~~
@@ -200,9 +240,9 @@ reprocess all CC jobs, but not for filters already existing. The recipe is:
 * Add a new filter, be sure to mark 'used'=1
 * Set all other filters 'used' value to 0
 * Redefine the flag of the CC jobs, from 'D'one to 'T'odo with the following:
-* Run ``msnoise reset CC --all``
+* Run ``msnoise reset cc --all`` (resets all cc_N steps)
 * Run ``msnoise cc compute_cc``
-* Run next commands if needed (stack, mwcs, dtt)
+* Run next commands if needed (stack, mwcs, dtt), or ``msnoise utils run_workflow --from stack``
 * Set back the other filters 'used' value to 1
 
 The compute_cc will only compute the CC's for the new filter(s) and
@@ -219,15 +259,15 @@ re-computed:
 
 .. code-block:: sh
 
-    msnoise reset STACK --all
-    msnoise cc stack -r
+    msnoise reset refstack --all  # resets all refstack_N steps
+    msnoise cc stack_refstack
 
 The REF will then be re-output, and you probably should reset the MWCS jobs to
 recompute daily correlations against this new ref:
 
 .. code-block:: sh
 
-    msnoise reset MWCS --all
+    msnoise reset mwcs --all  # resets all mwcs_N steps
     msnoise cc dtt compute_mwcs
 
 
@@ -239,7 +279,7 @@ reprocessed:
 
 .. code-block:: sh
 
-    msnoise reset MWCS --all
+    msnoise reset mwcs --all  # resets all mwcs_N steps
     msnoise cc dtt compute_mwcs
 
 shoud do the trick.
@@ -250,8 +290,8 @@ When changing the dt/t parameters
 
 .. code-block:: sh
 
-    msnoise reset DTT --all
-    msnoise cc dtt compute_dtt
+    msnoise reset mwcs_dtt --all  # resets all mwcs_dtt_N steps
+    msnoise cc dtt compute_mwcs_dtt
 
 
 Recompute only the specific days
@@ -261,7 +301,7 @@ You want to recompute CC jobs after a certain date only, for whatever reason:
 
 .. code-block:: sh
 
-    msnoise reset CC --rule="day>='2019-01-01'"
+    msnoise reset cc --rule="day>='2019-01-01'"
 
 SQL experts can also use the ``msnoise db execute`` command (with caution!):
 
@@ -273,7 +313,7 @@ If you want to only reprocess one day:
 
 .. code-block:: sh
 
-    msnoise reset CC --rule="day='2019-01-15'"
+    msnoise reset cc --rule="day='2019-01-15'"
 
 
 
