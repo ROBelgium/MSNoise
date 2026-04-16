@@ -1,6 +1,6 @@
 name,default,definition,type,possible_values
 wct_dtt_freqmin,0.1,The lower frequency bound to compute the dv/v from the WCT,float,
-wct_dtt_freqmax,2.0,The upper frequency bound to compute the dv/v from the WCT,float,
+wct_dtt_freqmax,1.0,The upper frequency bound to compute the dv/v from the WCT,float,
 wct_minlag,5.0,Minimum lag time,float,
 wct_width,30.0,Width of the time lag window,float,
 wct_lag,static,How is the lag window defined for WCT,str,static/dynamic
