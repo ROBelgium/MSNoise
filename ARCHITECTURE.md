@@ -73,7 +73,10 @@ msnoise/
                          # get_t_axis, build_movstack_datelist,
                          # get_filter_steps_for_cc_step, get_refstack_lineage_for_filter,
                          # refstack_is_rolling, refstack_needs_recompute, extend_days,
-                         # compute_rolling_ref, lineage_str_to_step_names, lineage_str_to_steps
+                         # compute_rolling_ref, lineage_str_to_step_names, lineage_str_to_steps,
+                         # query_active_steps,   ← batch-fetch active steps by category
+                         # resolve_lineage_ids,  ← batch lid→str lookup
+                         # bulk_upsert_jobs      ← shared insert+bump helper for propagators
     signal.py            # winsorizing, stack,
                          # prepare_ref_wct, apply_wct, xwt (thin wrapper),
                          # compute_wct_dtt, get_wct_avgcoh,
@@ -192,6 +195,7 @@ psd_1/psd_rms_1                            ← psd_rms must include its own step
 - `_lineage_id_for(session, str)` — read-only, returns None if not found
 - `_lineage_str_from_id(session, id)` — reverse lookup, safe after session.commit() expiry
 - `get_lineages_to_step_id(session, step_id)` — DFS returning all upstream paths to a step
+- `resolve_lineage_ids(session, lids)` — batch-resolve a set of lineage_ids → `{id: str}` (used by propagators)
 
 **Origin steps** (no upstream): `preprocess_N` and `psd_N` use `lineage = step.step_name` (e.g. `"psd_1"`). All downstream steps use the full path. `psd_rms_N` jobs must use `"psd_1/psd_rms_1"` — if only `"psd_1"` is stored, `get_next_lineage_batch` builds `LayeredParams(['global','psd'])` and `params.psd_rms.*` raises `AttributeError`.
 
@@ -257,7 +261,7 @@ The common observatory case (new days outside `ref_begin..ref_end`):
 |---|---|---|
 | `preprocess` | `create_cc_jobs_from_preprocess` | Fan-out: 1 station → N pairs |
 | `cc` | `propagate_stack_jobs_from_cc_done` + `propagate_refstack_jobs_from_cc_done` | Creates both stack T jobs AND refstack REF sentinels (siblings) |
-| `stack` | `propagate_mwcs_jobs_from_refstack_done` | Join-gated: creates mwcs only if refstack REF already Done |
+| `stack` | `propagate_mwcs_jobs_from_refstack_done` + `propagate_mwcs_jobs_from_stack_done` | Join-gated via refstack (default) OR direct stack→mwcs if no refstack link |
 | `refstack` | `propagate_mwcs_jobs_from_refstack_done` | Join-gated: creates mwcs for all Done stack days × this REF |
 | `mwcs_dtt`/`stretching`/`wavelet_dtt` | `propagate_dvv_jobs_from_dtt_done` | Creates `day="DVV", pair="ALL"` sentinel |
 | `psd` | `propagate_psd_rms_jobs_from_psd_done` | Single-station passthrough |
@@ -354,6 +358,8 @@ from msnoise.msnoise_table_def import declare_tables
 schema = declare_tables()
 Job = schema.Job
 ```
+
+Exception: `core/workflow.py` uses a module-level `_schema = declare_tables()` to expose `WorkflowLink` and `Config` without repeating `declare_tables()` in every function. This is safe because `msnoise_table_def` itself calls `declare_tables()` at its own module level (line 685), so all calls in the same process return the same cached class objects.
 
 | Table | Key columns |
 |---|---|
@@ -486,12 +492,18 @@ Entry point: `msnoise` (maps to `scripts/msnoise.py:run`).
 ```sh
 msnoise new_jobs                         # scan DA + create preprocess/cc/stack jobs
 msnoise new_jobs --after psd             # propagate psd→psd_rms
-msnoise reset cc_1 --all                 # reset all cc_1 jobs to T
+msnoise reset cc_1                       # reset in-progress/failed cc_1 jobs to T
+msnoise reset cc_1 --all                 # reset all cc_1 jobs to T (any flag)
+msnoise reset cc --all                   # reset all cc_N steps (category mode)
+msnoise reset cc_1 --all --downstream    # reset cc_1 + every downstream step
+msnoise reset cc --all --downstream      # reset all cc_N + everything downstream
 msnoise utils create_preprocess_jobs --date 2026-03-28        # FDSN bypass
 msnoise utils create_preprocess_jobs --date_range START END   # FDSN bypass, range
 msnoise utils create_psd_jobs --date 2026-03-28               # PSD jobs for FDSN station
 msnoise utils create_psd_jobs --date_range START END --set-number 1
 ```
+
+`msnoise reset` accepts either a step name (`cc_1`) or a category (`cc`). Category mode resets all active steps of that category. `--downstream` (`-d`) walks `WorkflowLink` from the seed step(s) and resets every reachable step in BFS order.
 
 `create_preprocess_jobs` and `create_psd_jobs` create T jobs directly without scanning DataAvailability — essential when adding a new FDSN-sourced station. For local/SDS sources they only create jobs where DA records already exist.
 
@@ -640,6 +652,13 @@ python -m pytest /path/to/msnoise/msnoise/test/test_smoke.py::test_smoke_172_psd
     - `msnoise.plugins.workflow_order` → callable returning `[category, ...]` (appended after built-in order)
 
 19. **`chunk_size` is a CLI-only parameter** (not a config CSV key): pass `--chunk-size N` to `msnoise cc compute` or `msnoise qc compute_psd`. It controls how many pairs (CC) or stations (PSD) a single worker claims per day. Default 0 = claim all (original behaviour). Only effective for `group_by="day_lineage"` steps. Do NOT add it to downstream steps (stack, MWCS, stretching) — those use `pair_lineage` and write to per-pair accumulated files where concurrent writes would corrupt data.
+
+22. **Propagator shared helpers in `core/workflow.py`**: all `propagate_*` functions in `s02_new_jobs.py` use three shared utilities — do not inline these patterns again:
+    - `query_active_steps(session, categories)` — returns active `WorkflowStep` rows for one or more category strings.
+    - `resolve_lineage_ids(session, lids)` — batch `{lineage_id → lineage_str}` lookup (one query, no per-job round-trips).
+    - `bulk_upsert_jobs(session, to_insert, to_bump_refs, now)` — bulk insert new jobs + chunked `UPDATE … WHERE ref IN (…)` for bumping, handles the 900-row SQLite limit automatically.
+
+23. **`reset_jobs` accepts category names**: `reset_jobs(session, "cc")` resets all active steps in category `cc` (e.g. `cc_1`, `cc_2`). Pass a step name (`"cc_1"`) for single-step reset. `downstream=True` BFS-walks `WorkflowLink` from the seed and resets everything reachable. The function now returns the list of step names actually reset.
 
 ---
 
