@@ -99,13 +99,13 @@ _BUILTIN_WORKFLOW_CHAINS = {
         "next_steps": ["cc"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "pre", "display_name": "Preprocessing", "level": 1,
-        "cli": ["compute", "preprocess"],
+        "cli": ["cc", "preprocess"],
     },
     "cc": {
         "next_steps": ["filter"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "cc", "display_name": "Cross-Correlation", "level": 2,
-        "cli": ["cc", "compute"],
+        "cli": ["cc", "compute_cc"],
     },
     "filter": {
         "next_steps": ["stack", "refstack"],
@@ -155,31 +155,31 @@ _BUILTIN_WORKFLOW_CHAINS = {
         "next_steps": ["stretching_dvv"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "str", "display_name": "Stretching", "level": 5,
-        "cli": ["cc", "stretching", "compute"],
+        "cli": ["cc", "dtt", "compute_stretching"],
     },
     "stretching_dvv": {
         "next_steps": [],
         "is_entry_point": False, "is_terminal": True,
         "abbrev": "sdvv", "display_name": "Stretching dv/v Aggregate", "level": 6,
-        "cli": ["cc", "stretching", "compute_dvv"],
+        "cli": ["cc", "dtt", "dvv", "compute_stretching_dvv"],
     },
     "wavelet": {
         "next_steps": ["wavelet_dtt"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "wct", "display_name": "Wavelet", "level": 5,
-        "cli": ["cc", "wct", "compute"],
+        "cli": ["cc", "dtt", "compute_wct"],
     },
     "wavelet_dtt": {
         "next_steps": ["wavelet_dtt_dvv"],
         "is_entry_point": False, "is_terminal": False,
         "abbrev": "wdtt", "display_name": "Wavelet dt/t", "level": 6,
-        "cli": ["cc", "wct", "compute_dtt"],
+        "cli": ["cc", "dtt", "compute_wct_dtt"],
     },
     "wavelet_dtt_dvv": {
         "next_steps": [],
         "is_entry_point": False, "is_terminal": True,
         "abbrev": "wdvv", "display_name": "WCT dv/v Aggregate", "level": 7,
-        "cli": ["cc", "wct", "dvv", "compute_dvv"],
+        "cli": ["cc", "dtt", "dvv", "compute_wavelet_dtt_dvv"],
     },
     # ── PSD branch (also level=1: child of global, sibling of preprocess) ──
     "psd": {
