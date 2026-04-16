@@ -2745,7 +2745,12 @@ def utils_run_workflow(ctx, threads, hpc, from_category, until_category,
 
     # ── Build the command list for each step ──────────────────────────────
     # Each entry: (display_label, [full argv list], hpc_after bool)
-    msnoise_exe = [sys.executable, "-m", "msnoise"]
+    import shutil
+    _msnoise_bin = shutil.which("msnoise")
+    if _msnoise_bin is None:
+        import pathlib
+        _msnoise_bin = str(pathlib.Path(sys.executable).parent / "msnoise")
+    msnoise_exe = [_msnoise_bin]
 
     def _step_argv(step):
         """Full argv for a RunStep.  -t N is a top-level msnoise flag."""
@@ -2757,10 +2762,9 @@ def utils_run_workflow(ctx, threads, hpc, from_category, until_category,
 
     # ── Dry-run / export-script mode ─────────────────────────────────────
     def _fmt_cmd(argv):
-        """Human-readable command, using 'msnoise' instead of python -m.
-        argv already contains -t N (if set), so just strip the python -m prefix.
-        """
-        tokens = argv[argv.index("-m") + 2:]   # strip 'python -m msnoise'
+        """Human-readable command: replace the full msnoise path with 'msnoise'."""
+        tokens = argv[1:]   # strip the msnoise binary path
+        return "msnoise " + " ".join(tokens)
         return "msnoise " + " ".join(tokens)
 
     if dry_run or export_script:
