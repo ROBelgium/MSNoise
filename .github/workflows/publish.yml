@@ -39,7 +39,7 @@ jobs:
           fetch-depth: 0        # setuptools-scm needs full history for version
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
