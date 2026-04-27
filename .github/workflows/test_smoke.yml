@@ -46,7 +46,7 @@ jobs:
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
         shell: bash
 
-      - uses: conda-incubator/setup-miniconda@v3.3.0
+      - uses: conda-incubator/setup-miniconda@v4.0.1
         with:
           activate-environment: test${{ matrix.python-version }}
           python-version: ${{ matrix.python-version }}
