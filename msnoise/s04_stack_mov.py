@@ -219,6 +219,9 @@ def main(stype, loglevel="INFO"):
                 _t0 = time.time()
                 c = xr_load_ccf_for_stack(params.global_.output_folder, lineage_names,
                                           sta1, sta2, components, all_days)
+                if not len(c):
+                    logger.warning("No data found for %s-%s" % (sta1, sta2))
+                    continue
                 logger.debug(f"  [timing] load CCF keep_days ({len(all_days)} days): {time.time()-_t0:.2f}s")
                 _t0 = time.time()
                 dr = c.resample(times="1D").mean()

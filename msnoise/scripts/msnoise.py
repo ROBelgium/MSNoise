@@ -469,11 +469,10 @@ def db_da_stations_update_loc_chan(ctx):
     session = connect()
     stations = get_stations(session)
     for sta in stations:
-        data = session.query(DataAvailability). \
+        data = session.query(DataAvailability.loc, DataAvailability.chan). \
             filter(text("net=:net")). \
             filter(text("sta=:sta")). \
-            group_by(DataAvailability.net, DataAvailability.sta,
-                     DataAvailability.loc, DataAvailability.chan). \
+            group_by(DataAvailability.loc, DataAvailability.chan). \
             params(net=sta.net, sta=sta.sta).all()
         locids = list(set(sorted([d.loc for d in data])))
         chans = list(set(sorted([d.chan for d in data])))
@@ -1460,10 +1459,10 @@ def populate(ctx, fromda):
     with known archive structures, or with a custom code provided by the user.
     """
     loglevel = ctx.obj['MSNOISE_verbosity']
+    db = connect()
     if fromda:
         logger.info("Populating the Station table")
         logger.info("Overriding workflow...")
-        db = connect()
         stations = db.query(DataAvailability.net, DataAvailability.sta). \
             group_by(DataAvailability.net, DataAvailability.sta)
 
