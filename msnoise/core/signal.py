@@ -273,6 +273,11 @@ def _conv2(x, y, mode="same"):
 def smoothCFS(cfs, scales, dt, ns, nt):
     """Smooth CWT coefficients along both time and scale axes.
 
+    Time-axis smoothing is a Gaussian applied in the Fourier domain, with a
+    width proportional to the (dt-normalised) scale of *that* row.  Scale-axis
+    smoothing is a length-``ns`` moving average across rows.  Port of MATLAB
+    ``wcoherence``'s ``smoothCFS``.
+
     :param cfs: CWT coefficient array, shape ``(n_scales, n_times)``.
     :param scales: 1-D array of wavelet scales.
     :param dt: Sampling interval in seconds.
@@ -290,10 +295,10 @@ def smoothCFS(cfs, scales, dt, ns, nt):
     omega_2 = np.concatenate((omega_2, omega_save), axis=None)
     omega = np.concatenate((omega_2, -omega[0]), axis=None)
     normscales = scales / dt
-    for kk in range(0, cfs.shape[0]):
+    for kk in range(cfs.shape[0]):
         F = np.exp(-nt * (normscales[kk] ** 2) * omega ** 2)
-        smooth = np.fft.ifft(F * np.fft.fft(cfs[kk - 1], npad))
-        cfs[kk - 1] = smooth[0:N]
+        smooth = np.fft.ifft(F * np.fft.fft(cfs[kk], npad))
+        cfs[kk] = smooth[0:N]
     H = 1 / ns * np.ones((ns, 1))
     cfs = _conv2(cfs, H)
     return cfs
