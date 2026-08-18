@@ -8,6 +8,33 @@ Major:
 * changes to the schema: Station (and TODO Filter too)
 * support for PostgreSQL databases. TODO: check if removing index_hints really affect performances (should not)
 
+Bugfixes:
+
+ - msnoise.core.signal (wavelet / WCT):
+  * smoothCFS: fixed a long-standing off-by-one inherited from the original
+    MATLAB (``wcoherence``) port. The loop ran over ``range(0, n_scales)`` but
+    kept the 1-indexed row access ``cfs[kk - 1]`` while using ``normscales[kk]``,
+    so every row was smoothed in time with the scale of the NEXT row, and the
+    last (lowest-frequency) row was smoothed with the FIRST (smallest) scale.
+    Every row was still written exactly once, so nothing was skipped or
+    double-smoothed — only the smoothing width was wrong. Reported in #444.
+    IMPACT: Wcoh and WXdt change slightly with respect to any run made before
+    this fix. The error is small in the mid-band and grows toward the
+    low-frequency end of ``wct_freqmin..wct_freqmax`` (mean |dWcoh| ~ 0.003,
+    max ~ 0.10 on a 0.1-8 Hz / nptsfreq=100 / ns=3 / nt=0.25 test case, with
+    the largest deviations in the lowest few frequency rows). Published dv/v
+    obtained through the wavelet pipeline should be re-run before comparison.
+  * apply_wct: the mother wavelet chosen via the ``wavelet_type`` config was
+    applied to the reference CWT only — the current-day CWT was hardcoded to
+    ``Morlet(6)``. Since scales are derived as ``1/(mother.flambda()*f)``, the
+    two CWTs lived on different scale grids. ``mother`` is now carried in the
+    tuple returned by prepare_ref_wct and reused by apply_wct. IMPACT: only
+    affects projects setting ``wavelet_type`` to something other than the
+    default ``('Morlet', 6.)``; those results were wrong and must be re-run
+    (self-coherence of a trace with itself dropped to 0.27 for Morlet(4),
+    0.006 for Paul(4) and 0.0001 for DOG(2), instead of 1.0).
+
+
 Changes:
  - msnoise
   * drop Continuous Integrations for Python 2.7. Only test on 3.7, 3.8 and 3.9

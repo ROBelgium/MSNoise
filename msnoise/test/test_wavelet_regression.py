@@ -257,12 +257,37 @@ class TestWCTPipeline:
         assert np.all(np.diff(freqs) < 0)
 
     def test_default_mother_is_morlet6(self):
-        from ..core.signal import prepare_ref_wct
+        from ..core.signal import _Morlet, prepare_ref_wct
         rng      = np.random.default_rng(7)
         ref_data = prepare_ref_wct(rng.standard_normal(256), fs=50.,
                                    freqmin=1., freqmax=20., nptsfreq=10,
                                    mother=None)
         assert ref_data is not None
+        assert isinstance(ref_data[8], _Morlet)
+        assert ref_data[8].f0 == 6
+
+    @pytest.mark.parametrize("wtype", [("Morlet", 6), ("Morlet", 4),
+                                       ("Paul", 4), ("DOG", 2)])
+    def test_mother_is_carried_to_apply_wct(self, wtype):
+        """apply_wct must use the SAME mother as prepare_ref_wct.
+
+        Regression guard: apply_wct previously hardcoded ``_Morlet(6)`` for
+        the current-day CWT.  Since scales are ``1/(mother.flambda()*f)``, a
+        mismatch puts cwt_ref and cwt_cur on different scale grids, so a
+        trace correlated with itself no longer gives coherence 1 / zero lag.
+        """
+        from ..core.signal import apply_wct, get_wavelet_type, prepare_ref_wct
+        rng    = np.random.default_rng(11)
+        sig    = rng.standard_normal(512)
+        mother = get_wavelet_type(wtype)
+        ref_data = prepare_ref_wct(sig, fs=50., freqmin=1., freqmax=20.,
+                                   nptsfreq=20, mother=mother)
+        assert ref_data[8] is mother
+        _, _, _, Wcoh, WXdt, _, _ = apply_wct(ref_data, sig)
+        # self-coherence is identically 1 and the lag identically 0 only if
+        # both CWTs used the same mother wavelet
+        assert np.nanmin(np.abs(Wcoh)) == pytest.approx(1.0, abs=1e-6)
+        assert np.nanmax(np.abs(WXdt)) == pytest.approx(0.0, abs=1e-9)
 
 
 class TestTfPWSStack:

@@ -270,7 +270,8 @@ def main(loglevel="INFO"):
                         freqmin, freqmax, int(nptsfreq), mother
                     )
                     # Extract freqs/coi for Dataset construction later
-                    _, _, _, freqs, coi, _, _, _ = ref_wct_data
+                    # (index, not fixed-width unpack: the tuple is opaque)
+                    freqs, coi = ref_wct_data[3], ref_wct_data[4]
                 except Exception as e:
                     logger.error(f"Error preparing ref WCT: {str(e)}, falling back to xwt()")
                     ref_wct_data = None

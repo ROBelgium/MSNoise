@@ -497,8 +497,10 @@ def prepare_ref_wct(trace_ref, fs, ns=3, nt=0.25, vpo=12,
     :param nptsfreq: Number of frequency points.
     :param mother: Wavelet instance from :func:`get_wavelet_type`.
         If ``None``, defaults to ``_Morlet(6)``.
-    :returns: ``(cwt_ref, cfs1, scales, freqs, coi, invscales, dt, freqlim)``
-        — an opaque tuple to pass directly to :func:`apply_wct`.
+    :returns: ``(cwt_ref, cfs1, scales, freqs, coi, invscales, dt, freqlim,
+        mother)`` — an opaque tuple to pass directly to :func:`apply_wct`.
+        Treat it as opaque: unpack by index, not by fixed-width tuple
+        assignment, so future additions do not break callers.
     """
     if mother is None:
         mother = _Morlet(6)
@@ -514,7 +516,8 @@ def prepare_ref_wct(trace_ref, fs, ns=3, nt=0.25, vpo=12,
     invscales = np.kron(np.ones((1, nx)), 1.0 / scales_col)
     power_ref = (invscales * abs(cwt_ref) ** 2).astype(complex)
     cfs1 = smoothCFS(power_ref, scales_col, dt, ns, nt)
-    return cwt_ref, cfs1, scales_col, freqs, coi, invscales, dt, freqlim
+    return (cwt_ref, cfs1, scales_col, freqs, coi, invscales, dt, freqlim,
+            mother)
 
 
 def apply_wct(ref_wct_data, trace_current, ns=3, nt=0.25):
@@ -531,13 +534,16 @@ def apply_wct(ref_wct_data, trace_current, ns=3, nt=0.25):
     :param nt: Time-axis smoothing parameter (idem).
     :returns: ``(WXamp, WXspec, WXangle, Wcoh, WXdt, freqs, coi)``
     """
-    cwt_ref, cfs1, scales_col, freqs, coi, invscales, dt, freqlim = ref_wct_data
+    (cwt_ref, cfs1, scales_col, freqs, coi, invscales, dt, freqlim,
+     mother) = ref_wct_data
     x_cur = np.transpose(trace_current)
-    dj = 1.0 / (scales_col.shape[0] - 1) if scales_col.shape[0] > 1 else 1.0
-    s0 = 2 * dt
     nx = np.size(trace_current)
+    # ``freqs=freqlim`` overrides dj/s0/J inside _cwt, so they are unused here.
+    # The mother wavelet MUST be the same one used for the reference: the
+    # scales are derived as 1/(mother.flambda()*f), so a mismatch would make
+    # cwt_ref and cwt_cur live on different scale grids.
     cwt_cur, _, _, _, _, _ = _cwt(
-        x_cur, dt, dj, s0, -1, _Morlet(6), freqs=freqlim)
+        x_cur, dt, 1.0 / 12, -1, -1, mother, freqs=freqlim)
     # Recompute invscales for current length (same as ref if length unchanged)
     inv_cur = np.kron(np.ones((1, nx)), 1.0 / scales_col)
     power_cur = (inv_cur * abs(cwt_cur) ** 2).astype(complex)
