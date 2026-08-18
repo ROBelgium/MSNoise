@@ -1460,10 +1460,10 @@ def populate(ctx, fromda):
     with known archive structures, or with a custom code provided by the user.
     """
     loglevel = ctx.obj['MSNOISE_verbosity']
+    db = connect()
     if fromda:
         logger.info("Populating the Station table")
         logger.info("Overriding workflow...")
-        db = connect()
         stations = db.query(DataAvailability.net, DataAvailability.sta). \
             group_by(DataAvailability.net, DataAvailability.sta)
 
