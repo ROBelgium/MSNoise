@@ -37,6 +37,9 @@ import pandas as pd
 
 from .config import get_config
 
+logger = logging.getLogger(__name__)
+
+
 def validate_stack_data(dataset, stack_type="reference"):
     """Validates stack data before processing
 
@@ -108,7 +111,7 @@ def check_and_phase_shift(trace, taper_length=20.0):
         else:
             dt = (trace.stats.delta - dt)
 #            direction = "right"
-        logging.debug("correcting time by %.6fs"%dt)
+        logger.debug("correcting time by %.6fs"%dt)
         trace.detrend(type="demean")
         trace.detrend(type="simple")
         trace.taper(max_percentage=None, max_length=1.0)
@@ -358,22 +361,10 @@ class _Morlet:
         """e-Folding time (T&C Table 1)."""
         return 1.0 / np.sqrt(2)
 
-    def smooth(self, W, dt, dj, scales):
-        """Smooth CWT coefficients (time + scale axes) for coherence."""
-        from scipy.signal import convolve2d
-        m, n = W.shape
-        N = int(2 ** np.ceil(np.log2(n)))
-        k = 2 * np.pi * np.fft.fftfreq(N)
-        snorm = scales / dt
-        F = np.exp(-0.5 * (snorm[:, np.newaxis] ** 2) * k ** 2)
-        T = np.fft.ifft(F * np.fft.fft(W, n=N, axis=1), axis=1)[:, :n]
-        if np.isreal(W).all():
-            T = T.real
-        wsize = self.deltaj0 / dj * 2
-        win = np.ones(max(1, int(np.round(wsize))))
-        win /= win.sum()
-        T = convolve2d(T, win[:, np.newaxis], "same")
-        return T
+    # NOTE: a ``smooth()`` method used to live here.  Nothing called it — the
+    # WCT pipeline uses the standalone :func:`smoothCFS` — and it silently
+    # degraded to a no-op scale smoothing for any f0 != 6, because deltaj0 is
+    # only tabulated for f0 = 6 and is -1 otherwise.  Removed.
 
 
 class _Paul:
@@ -488,12 +479,22 @@ def get_wavelet_type(wavelet_type):
         raise ValueError(f"Unknown wavelet type: {name!r}")
     param = float(wavelet_type[1]) if len(wavelet_type) == 2 else defaults[name]
     if name == "Morlet":
+        if param != 6:
+            logger.warning(
+                "get_wavelet_type: Torrence & Compo only tabulate cdelta, "
+                "gamma and deltaj0 for Morlet f0=6; they are set to -1 for "
+                "f0=%s.", param)
         return _Morlet(param)
     elif name == "Paul":
         return _Paul(int(param))
     elif name == "DOG":
         return _DOG(int(param))
     elif name == "MexicanHat":
+        if len(wavelet_type) == 2 and int(param) != 2:
+            logger.warning(
+                "get_wavelet_type: MexicanHat is DOG with m=2; the requested "
+                "parameter %s is ignored. Use ('DOG', %s) instead.",
+                wavelet_type[1], wavelet_type[1])
         return _MexicanHat()
 
 
@@ -637,6 +638,11 @@ def compute_wct_dtt(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20
     :param freqmin: Lower frequency bound for regression.
     :param freqmax: Upper frequency bound for regression.
     :returns: Tuple of (dt/t, err, weighting_function).
+
+    .. warning::
+
+        The first element returned is **dt/t**, not dv/v.  Callers must
+        negate it (``dv/v = -dt/t``), exactly as the ``mwcs_dtt`` path does.
     """
     import warnings
     from scipy.optimize import OptimizeWarning
@@ -646,9 +652,37 @@ def compute_wct_dtt(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20
     dvv = np.zeros(len(inx[0]))
     err = np.zeros(len(inx[0]))
 
-    weight_func = np.log(np.abs(WXamp)) / np.log(np.abs(WXamp)).max()
-    zero_idx = np.where((Wcoh < mincoh) | (delta_t > maxdt))
-    wf = (weight_func + abs(np.nanmin(weight_func))) / weight_func.max()
+    # Never mutate the caller's array: s09 hands in a WXdt read straight from
+    # a NetCDF, and s08 reuses its in-memory copy for get_wct_avgcoh.
+    delta_t = np.array(delta_t, dtype=float, copy=True)
+
+    # Amplitude weighting, log-scaled and min-max normalised to [0, 1].
+    #
+    # This used to be  w = log|WXamp| / log|WXamp|.max()  followed by
+    # (w + |w.min()|) / w.max().  Dividing by the max of a LOG makes the
+    # result depend on the absolute amplitude scale: when every |WXamp| < 1
+    # (the normal case for CCFs, which run around 1e-12..1e-8) all logs are
+    # negative and the max is the least-negative one, so the ordering flips
+    # and the largest amplitudes receive the SMALLEST weights.  Measured
+    # correlation between log|WXamp| and the weight was -1.000 for CCF-scale
+    # amplitudes and +1.000 for amplitudes above 1.
+    #
+    # Min-max normalising the log is invariant to the amplitude unit (a
+    # rescale shifts every log by the same constant) and always increasing
+    # in amplitude.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        log_amp = np.log(np.abs(WXamp))
+    log_amp = np.where(np.isfinite(log_amp), log_amp, np.nan)
+    lo, hi = np.nanmin(log_amp), np.nanmax(log_amp)
+    if np.isfinite(lo) and np.isfinite(hi) and hi > lo:
+        wf = (log_amp - lo) / (hi - lo)
+    else:
+        wf = np.ones_like(log_amp)
+    wf = np.nan_to_num(wf, nan=0.0, posinf=0.0, neginf=0.0)
+    # |delta_t|, not delta_t: the one-sided test let arbitrarily large
+    # NEGATIVE delays through with full weight while rejecting positive ones,
+    # biasing dt/t (and hence dv/v) towards one sign.
+    zero_idx = np.where((Wcoh < mincoh) | (np.abs(delta_t) > maxdt))
     wf[zero_idx] = 0
 
     problematic_freqs = []
@@ -659,7 +693,11 @@ def compute_wct_dtt(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20
             ((tvec >= -lag_max) & (tvec <= -lag_min)) |
             ((tvec >= lag_min) & (tvec <= lag_max))
         )[0]
-        if len(tvec) > 2:
+        # len(tindex), not len(tvec): the coda window can be empty (or nearly
+        # so) when lag_min exceeds the lag axis — with dynamic lag and a long
+        # interstation distance, for instance — and the nzc_perc division
+        # below then raised ZeroDivisionError.
+        if len(tindex) > 2:
             if not np.any(delta_t[ifreq]):
                 continue
             delta_t[ifreq][tindex] = np.nan_to_num(delta_t[ifreq][tindex])
@@ -676,8 +714,10 @@ def compute_wct_dtt(freqs, tvec, WXamp, Wcoh, delta_t, lag_min=5, coda_cycles=20
                 dvv[ii], err[ii] = m, em
             else:
                 dvv[ii], err[ii] = np.nan, np.nan
+        else:
+            dvv[ii], err[ii] = np.nan, np.nan
     if problematic_freqs:
-        logging.warning(
+        logger.warning(
             f"Covariance issues at {min(problematic_freqs):.2f}-{max(problematic_freqs):.2f} Hz: "
             f"consider adjusting min_nonzero={min_nonzero}, mincoh={mincoh}, "
             f"maxdt={maxdt}, coda_cycles={coda_cycles}"
@@ -708,7 +748,7 @@ def get_wct_avgcoh(freqs, tvec, wcoh, freqmin, freqmax, lag_min=5, coda_cycles=2
             ((tvec >= -lag_max) & (tvec <= -lag_min)) |
             ((tvec >= lag_min) & (tvec <= lag_max))
         )[0]
-        if len(tvec) > 2:
+        if len(tindex) > 2:   # was len(tvec) — see compute_wct_dtt
             if not np.any(wcoh[ifreq]) or wcoh[ifreq][tindex].size == 0:
                 coh[ii] = np.nan
                 continue
@@ -741,12 +781,12 @@ def preload_instrument_responses(session, return_format="dataframe"):
     """
     from obspy.core.inventory import Inventory
     from obspy import read_inventory, UTCDateTime
-    logging.debug('Preloading instrument response')
+    logger.debug('Preloading instrument response')
     files = glob.glob(os.path.join(get_config(session, 'response_path'), "*"))
     channels = []
     all_inv = Inventory()
     for file in files:
-        logging.debug("Processing %s" % file)
+        logger.debug("Processing %s" % file)
         try:
             inv = read_inventory(file)
 
@@ -765,7 +805,7 @@ def preload_instrument_responses(session, return_format="dataframe"):
                             resp = inv.get_response(seed_id, cha.start_date + 10)
                             polezerostage = resp.get_paz()
                         except Exception as e:
-                            logging.warning(
+                            logger.warning(
                                 'Failed to get PAZ for SEED ID "%s", this '
                                 'SEED ID will have an empty dictionary '
                                 'for Poles and Zeros '
@@ -785,7 +825,7 @@ def preload_instrument_responses(session, return_format="dataframe"):
                             lon = sta.longitude
                             elevation = sta.elevation
                         if lat is None or lon is None or elevation is None:
-                            logging.error(
+                            logger.error(
                                 'Failed to look up coordinates for SEED '
                                 'ID: %s' % seed_id)
                         channels.append([seed_id, cha.start_date,
@@ -793,10 +833,10 @@ def preload_instrument_responses(session, return_format="dataframe"):
                                          pzdict, lat, lon, elevation])
 
         except Exception as e:
-            logging.error('Failed to process file %s: %s' % (file, str(e)))
+            logger.error('Failed to process file %s: %s' % (file, str(e)))
 
 
-    logging.debug('Finished Loading instrument responses')
+    logger.debug('Finished Loading instrument responses')
     if return_format == "inventory":
         return all_inv
 
@@ -1229,7 +1269,7 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
         (non-NaN) traces are present.
     """
     if len(data) == 0:
-        logging.debug("No data to stack.")
+        logger.debug("No data to stack.")
         return []
     data = data[~np.isnan(data).any(axis=1)]
     # NOTE: a correlation-coefficient "sanitize" block used to sit here behind
@@ -1240,12 +1280,12 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
     if len(data) == 0:
         return []
     if stack_method == "linear":
-        # logging.debug("Doing a linear stack")
+        # logger.debug("Doing a linear stack")
         corr = data.mean(axis=0)
 
     elif stack_method == "pws":
         import scipy.signal as ss
-        # logging.debug("Doing a PWS stack")
+        # logger.debug("Doing a PWS stack")
         corr = np.zeros(data.shape[1], dtype='f8')
         phasestack = np.zeros(data.shape[1], dtype='c8')
         for i in range(data.shape[0]):
@@ -1272,7 +1312,7 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
         )
 
     else:
-        logging.warning(f"Unknown stack_method {stack_method!r}; falling back to linear.")
+        logger.warning(f"Unknown stack_method {stack_method!r}; falling back to linear.")
         corr = data.mean(axis=0)
 
     return corr

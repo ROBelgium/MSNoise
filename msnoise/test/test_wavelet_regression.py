@@ -334,3 +334,154 @@ class TestTfPWSStack:
         lin   = traces[~np.isnan(traces).any(axis=1)].mean(axis=0)
         bogus = stack(traces, stack_method="bogus_method", goal_sampling_rate=50.)
         assert np.allclose(bogus, lin, atol=1e-12)
+
+
+# ── Batch-3 review: WCT dt/t -> dv/v correctness ────────────────────────────
+
+
+class TestWctDttScience:
+    """compute_wct_dtt + the io.py dv/v sign convention."""
+
+    @staticmethod
+    def _synthetic(dtt_true=0.01, fs=20.0, n=4000, seed=1):
+        """Reference CCF plus a uniformly stretched 'current' CCF.
+
+        ``dtt_true = +0.01`` means arrivals are 1 % LATER, i.e. the medium
+        slowed down and the true dv/v is -0.01.
+        """
+        import scipy.signal
+        rng = np.random.default_rng(seed)
+        sos = scipy.signal.butter(4, [0.5, 4.0], btype="band", fs=fs,
+                                  output="sos")
+        ref = scipy.signal.sosfilt(sos, rng.standard_normal(n))
+        taxis = (np.arange(n) - n // 2) / fs
+        cur = np.interp(taxis / (1 + dtt_true), taxis, ref)
+        return ref, cur, taxis, fs
+
+    def _wct(self, dtt_true=0.01):
+        from ..core.signal import xwt
+        ref, cur, taxis, fs = self._synthetic(dtt_true)
+        WXamp, _, _, Wcoh, WXdt, freqs, _ = xwt(
+            ref, cur, fs, ns=3, nt=0.25, vpo=12,
+            freqmin=0.5, freqmax=4.0, nptsfreq=40)
+        return freqs, taxis, WXamp, Wcoh, WXdt
+
+    def test_dtt_has_same_sign_convention_as_mwcs(self):
+        """Both use ref*conj(cur): a delayed current gives a positive dt/t."""
+        from ..core.compute import mwcs
+        from ..core.signal import compute_wct_dtt
+        freqs, taxis, WXamp, Wcoh, WXdt = self._wct(0.01)
+        dtt, _, _ = compute_wct_dtt(freqs, taxis, WXamp, Wcoh, WXdt,
+                                    lag_min=5, coda_cycles=20, mincoh=0.5,
+                                    maxdt=0.5, min_nonzero=0.1,
+                                    freqmin=0.8, freqmax=3.0)
+        ref, cur, taxis_m, fs = self._synthetic(0.01)
+        r = mwcs(cur, ref, 0.8, 3.0, fs, taxis_m[0], 10.0, 5.0)
+        sel = (np.abs(r[:, 0]) > 5) & (np.abs(r[:, 0]) < 40)
+        mwcs_dtt = np.nanmedian(r[sel, 1] / r[sel, 0])
+        assert np.nanmedian(dtt) == pytest.approx(0.01, abs=2e-3)
+        assert np.nanmedian(dtt) * mwcs_dtt > 0          # same sign
+        assert np.nanmedian(dtt) == pytest.approx(mwcs_dtt, abs=2e-3)
+
+    def test_freq_average_wct_negates_to_give_dvv(self):
+        """wavelet_dtt_dvv used to come out with the sign of dt/t."""
+        import xarray as xr
+
+        from ..core.io import _freq_average_wct
+        from ..core.signal import compute_wct_dtt
+        freqs, taxis, WXamp, Wcoh, WXdt = self._wct(0.01)
+        dtt, err, _ = compute_wct_dtt(freqs, taxis, WXamp, Wcoh, WXdt,
+                                      lag_min=5, coda_cycles=20, mincoh=0.5,
+                                      maxdt=0.5, min_nonzero=0.1,
+                                      freqmin=0.8, freqmax=3.0)
+        mask = (freqs >= 0.8) & (freqs <= 3.0)
+        t = np.array(["2020-01-01"], dtype="datetime64[ns]")
+        ds = xr.Dataset({
+            name: xr.DataArray(arr[None, :], dims=["times", "frequency"],
+                               coords={"times": t, "frequency": freqs[mask]})
+            for name, arr in [("DTT", dtt), ("ERR", err),
+                              ("COH", np.ones(mask.sum()))]
+        })
+        dv, _ = _freq_average_wct(ds, 0.8, 3.0, 0.0, "mean")
+        assert float(dv.values[0]) == pytest.approx(-0.01, abs=2e-3)
+
+    def test_weight_increases_with_amplitude(self):
+        """log|WXamp| / log|WXamp|.max() inverted the ordering when |A| < 1."""
+        from ..core.signal import compute_wct_dtt
+        freqs, taxis, WXamp, Wcoh, WXdt = self._wct(0.01)
+        # CCF-scale amplitudes: every |WXamp| far below 1
+        WXamp = WXamp * 1e-12 / np.abs(WXamp).max()
+        _, _, wf = compute_wct_dtt(freqs, taxis, WXamp, Wcoh, WXdt,
+                                   lag_min=5, coda_cycles=20, mincoh=0.0,
+                                   maxdt=10.0, min_nonzero=0.0,
+                                   freqmin=0.8, freqmax=3.0)
+        good = np.isfinite(wf) & (wf > 0)
+        corr = np.corrcoef(np.log(np.abs(WXamp))[good], wf[good])[0, 1]
+        assert corr > 0.99
+        assert wf.min() >= 0.0 and wf.max() <= 1.0
+
+    def test_weight_is_invariant_to_amplitude_scale(self):
+        from ..core.signal import compute_wct_dtt
+        freqs, taxis, WXamp, Wcoh, WXdt = self._wct(0.01)
+        kw = {"lag_min": 5, "coda_cycles": 20, "mincoh": 0.0, "maxdt": 10.0,
+              "min_nonzero": 0.0, "freqmin": 0.8, "freqmax": 3.0}
+        _, _, w_small = compute_wct_dtt(freqs, taxis, WXamp * 1e-12,
+                                        Wcoh, WXdt, **kw)
+        _, _, w_large = compute_wct_dtt(freqs, taxis, WXamp * 1e+6,
+                                        Wcoh, WXdt, **kw)
+        assert np.allclose(w_small, w_large)
+
+    def test_maxdt_rejection_is_two_sided(self):
+        """`delta_t > maxdt` let large NEGATIVE delays through at full weight."""
+        from ..core.signal import compute_wct_dtt
+        freqs, taxis, WXamp, Wcoh, WXdt = self._wct(0.01)
+        half = WXdt.shape[1] // 2
+        delta = np.zeros_like(WXdt)
+        delta[:, :half] = -5.0
+        delta[:, half:] = +5.0
+        _, _, wf = compute_wct_dtt(freqs, taxis, WXamp, np.ones_like(Wcoh),
+                                   delta, lag_min=5, coda_cycles=20,
+                                   mincoh=0.0, maxdt=0.2, min_nonzero=0.0,
+                                   freqmin=0.8, freqmax=3.0)
+        assert np.count_nonzero(wf[:, :half]) == 0
+        assert np.count_nonzero(wf[:, half:]) == 0
+
+    def test_does_not_mutate_the_delay_array(self):
+        from ..core.signal import compute_wct_dtt
+        freqs, taxis, WXamp, Wcoh, WXdt = self._wct(0.01)
+        before = WXdt.copy()
+        compute_wct_dtt(freqs, taxis, WXamp, Wcoh, WXdt, lag_min=5,
+                        coda_cycles=20, mincoh=0.5, maxdt=0.5,
+                        min_nonzero=0.1, freqmin=0.8, freqmax=3.0)
+        assert np.allclose(before, WXdt, equal_nan=True)
+
+    def test_empty_coda_window_does_not_raise(self):
+        """lag_min beyond the lag axis used to give ZeroDivisionError."""
+        from ..core.signal import compute_wct_dtt, get_wct_avgcoh
+        freqs, taxis, WXamp, Wcoh, WXdt = self._wct(0.01)
+        dtt, err, _ = compute_wct_dtt(freqs, taxis, WXamp, Wcoh, WXdt,
+                                      lag_min=10000, coda_cycles=1,
+                                      mincoh=0.5, maxdt=0.5, min_nonzero=0.1,
+                                      freqmin=0.8, freqmax=3.0)
+        assert np.all(np.isnan(dtt)) and np.all(np.isnan(err))
+        coh = get_wct_avgcoh(freqs, taxis, Wcoh, freqmin=0.8, freqmax=3.0,
+                             lag_min=10000, coda_cycles=1)
+        assert np.all(np.isnan(coh))
+
+
+class TestWaveletTypeWarnings:
+    def test_morlet_no_longer_has_dead_smooth(self):
+        from ..core.signal import _Morlet
+        assert not hasattr(_Morlet(6), "smooth")
+
+    def test_mexicanhat_param_warns(self, caplog):
+        from ..core.signal import get_wavelet_type
+        with caplog.at_level("WARNING"):
+            get_wavelet_type(("MexicanHat", 4))
+        assert "ignored" in caplog.text
+
+    def test_non_default_morlet_warns(self, caplog):
+        from ..core.signal import get_wavelet_type
+        with caplog.at_level("WARNING"):
+            get_wavelet_type(("Morlet", 8))
+        assert "deltaj0" in caplog.text

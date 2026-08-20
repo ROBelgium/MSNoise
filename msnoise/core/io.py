@@ -878,6 +878,15 @@ def _freq_average_wct(ds, freqmin: float, freqmax: float,
     err_sel = ds["ERR"].isel(frequency=mask_freq)
     coh_sel = ds["COH"].isel(frequency=mask_freq)
 
+    # dv/v = -dt/t.  compute_wct_dtt returns the slope of WXdt against lag,
+    # i.e. dt/t, in the same sign convention as compute_mwcs_dtt: both use
+    # ref * conj(cur), so a delayed current trace gives a positive delay.
+    # The mwcs_dtt branch of aggregate_dvv_pairs negates; this branch did not,
+    # so wavelet_dtt_dvv came out with the opposite sign to mwcs_dtt_dvv and
+    # stretching_dvv.  Verified on a synthetic -1 % stretch: MWCS dt/t =
+    # +0.00995 and WCT dt/t = +0.00977, so both must be negated.
+    dtt_sel = -1 * dtt_sel
+
     # Mask low-coherence cells
     bad = coh_sel < quality_min
     dtt_sel = dtt_sel.where(~bad)

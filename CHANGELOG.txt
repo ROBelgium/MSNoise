@@ -171,6 +171,57 @@ Bugfixes:
     40-point fit. IMPACT: the ERR column of core.compute.mwcs only; the
     production s05 path already used the correct form.
 
+ - msnoise.core.io / msnoise.core.signal (wavelet dt/t -> dv/v):
+  * CRITICAL SIGN ERROR: wavelet_dtt_dvv produced dv/v with the OPPOSITE sign
+    to mwcs_dtt_dvv and stretching_dvv. compute_wct_dtt returns dt/t (the
+    slope of WXdt against lag) in exactly the same convention as
+    compute_mwcs_dtt — both build the cross-spectrum as ref * conj(cur), so a
+    delayed current trace yields a positive delay — but _freq_average_wct
+    passed DTT straight through as dv/v while the mwcs_dtt branch of
+    aggregate_dvv_pairs correctly negates it. Verified on a synthetic uniform
+    -1 % velocity change: MWCS dt/t = +0.00995, WCT dt/t = +0.00977, and
+    _freq_average_wct now returns -0.00976 against a true -0.01000. IMPACT:
+    every wavelet_dtt_dvv series ever produced has the wrong sign and must be
+    recomputed.
+  * compute_wct_dtt amplitude weighting was scale-dependent and, for real
+    CCFs, INVERTED. The weight was log|WXamp| / log|WXamp|.max(): when every
+    |WXamp| < 1 — the normal case, CCF cross-wavelet amplitudes run around
+    1e-12..1e-8 — all logs are negative and the max is the least-negative one,
+    so dividing by it flips the ordering and the largest amplitudes got the
+    smallest weights. Measured correlation between log|WXamp| and the weight
+    was -1.000 for CCF-scale amplitudes and +1.000 for amplitudes above 1.
+    The weight is now the min-max normalisation of log|WXamp| onto [0, 1],
+    which is invariant to the amplitude unit and monotonically increasing.
+    IMPACT: wavelet dt/t values change; the weighting now actually favours
+    high-amplitude coda.
+  * compute_wct_dtt rejected outliers with ``delta_t > maxdt`` rather than
+    ``abs(delta_t) > maxdt``, so arbitrarily large NEGATIVE delays passed the
+    filter at full weight while equally large positive ones were zeroed —
+    a one-sided rejection that biases dt/t, and hence dv/v, toward one sign.
+  * compute_wct_dtt and get_wct_avgcoh gated on ``len(tvec) > 2`` where they
+    meant ``len(tindex) > 2``. When the coda window is empty (lag_min beyond
+    the lag axis, e.g. dynamic lag with a long interstation distance) the
+    subsequent ``/ len(tindex)`` raised ZeroDivisionError; both now return NaN
+    for that frequency.
+  * compute_wct_dtt overwrote the caller's delay array in place via
+    ``delta_t[ifreq][tindex] = np.nan_to_num(...)``. s09 hands in a WXdt read
+    straight from a NetCDF and s08 reuses its in-memory copy for
+    get_wct_avgcoh, so it now works on a copy.
+  * _Morlet.smooth() removed: nothing called it (the WCT pipeline uses the
+    standalone smoothCFS) and it silently degraded to a no-op scale smoothing
+    for any f0 != 6, since deltaj0 is only tabulated for f0 = 6.
+  * get_wavelet_type now warns when ('MexicanHat', m) is given a parameter
+    (MexicanHat is DOG with m=2; the value was silently discarded) and when a
+    non-6 Morlet f0 is requested (cdelta, gamma and deltaj0 are only tabulated
+    by Torrence & Compo for f0=6 and fall back to -1).
+  * Audited and confirmed correct, no change needed: the Paul factorial
+    normalisation ``2**m / sqrt(m * prod(arange(2, 2*m)))`` is exactly
+    T&C's ``2**m / sqrt(m (2m-1)!)``; the DOG ``-(1j**m)`` prefactor differs
+    from T&C's ``-(-1j)**m`` only for odd m and is a constant phase that
+    cancels in W_ref * conj(W_cur) anyway; _cwt's ``sqrt(sj * ftfreqs[1] * N)``
+    is T&C's ``sqrt(2*pi*s/dt)`` normalisation; and the COI expression matches
+    T&C eq. 12.
+
 Changes:
  - msnoise
   * drop Continuous Integrations for Python 2.7. Only test on 3.7, 3.8 and 3.9
