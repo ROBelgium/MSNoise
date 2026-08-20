@@ -567,14 +567,14 @@ def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step,
     .. math::
 
         e_m = \\sqrt{
-            \\sum_j \\left(
-                \\frac{w_j\\,\\nu_j}{\\sum_i w_i\\,\\nu_i^2}
-            \\right)^2 \\sigma_\\phi^2
+            \\frac{\\hat{\\sigma}^2}{\\sum_j w_j^2\\,\\nu_j^2}
         }, \\qquad
-        \\sigma_\\phi^2 = \\frac{\\sum_j (\\phi_j - m\\,\\nu_j)^2}{N-1}
+        \\hat{\\sigma}^2 =
+            \\frac{\\sum_j w_j^2\\,(\\phi_j - m\\,\\nu_j)^2}{N-1}
 
-    where :math:`w_j` are the per-sample weights and :math:`\\nu_j` are the
-    cross-coherences.
+    where :math:`w_j` are the per-sample weights (in the
+    :math:`1/\\sigma` convention used by ObsPy's ``linear_regression``) and
+    :math:`\\nu_j` are the angular frequencies.
 
     Returns one row per moving window: central lag time, :math:`\\delta t`,
     error, and mean coherence.
@@ -716,17 +716,24 @@ def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step,
         phi = np.unwrap(np.angle(X)[index_range])
 
         # Calculate the slope with a weighted least square linear regression
-        # forced through the origin
-        # weights for the WLS must be the variance !
+        # forced through the origin.  obspy takes weights = 1/sigma.
         m, em = linear_regression(v, phi, w)
 
         delta_t.append(m)
 
-        # print phi.shape, v.shape, w.shape
-        e = np.sum((phi - m * v) ** 2) / (np.size(v) - 1)
-        s2x2 = np.sum(v ** 2 * w ** 2)
-        sx2 = np.sum(w * v ** 2)
-        e = np.sqrt(e * s2x2 / sx2 ** 2)
+        # Slope error for a WLS forced through the origin.  ObsPy's
+        # linear_regression() takes ``weights = 1/sigma`` and minimises
+        # sum((w*(phi - m*v))**2), for which var(m) = sigma_hat^2 / sum(w^2 v^2)
+        # with sigma_hat^2 = sum(w^2 (phi - m v)^2) / (N - 1).
+        # The previous expression mixed conventions — it used an UNWEIGHTED
+        # residual variance and sum(w*v^2) (a 1/sigma^2-weight form) in the
+        # denominator — and so disagreed with both obspy's own std_slope and
+        # the vectorised implementation in s05_compute_mwcs (1.44x on a
+        # synthetic 40-point fit).
+        s2x2 = np.sum(w ** 2 * v ** 2)
+        chi2 = np.sum(w ** 2 * (phi - m * v) ** 2)
+        e = np.sqrt(chi2 / (np.size(v) - 1) / s2x2) if s2x2 > 0 else np.nan
+        sx2 = s2x2   # retained for the `del` below
 
         delta_err.append(e)
         delta_mcoh.append(np.real(mcoh))

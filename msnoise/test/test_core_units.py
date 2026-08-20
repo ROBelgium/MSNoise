@@ -283,13 +283,30 @@ class TestFindSegments:
         assert len(segs) == 1
         assert len(segs[0]) == 10
 
-    def test_null_rows_reset_tracking(self):
+    def test_gap_longer_than_threshold_splits(self):
         from ..core.signal import find_segments
-        # Null rows reset prev_idx to None; the subsequent non-null row has
-        # prev_idx=None so the gap check is skipped → stays in same segment.
+        # Two all-NaN rows is a gap of 3 index steps > gap_threshold=1.
+        # This used to return a single segment: the old implementation reset
+        # prev_idx on every null row, so the gap test could never fire.
         da = self._make_da(nan_rows=[4, 5])
         segs = find_segments(da, gap_threshold=1)
-        assert len(segs) == 1   # gap not triggered after null rows
+        assert len(segs) == 2
+        assert segs[0] == [0, 1, 2, 3]
+        assert segs[1] == [6, 7, 8, 9]
+
+    def test_gap_shorter_than_threshold_is_bridged(self):
+        from ..core.signal import find_segments
+        da = self._make_da(nan_rows=[4, 5])
+        segs = find_segments(da, gap_threshold=5)
+        assert len(segs) == 1
+        assert segs[0] == [0, 1, 2, 3, 6, 7, 8, 9]
+
+    def test_long_gap_always_splits(self):
+        from ..core.signal import find_segments
+        da = self._make_da(n_times=100, nan_rows=list(range(20, 60)))
+        segs = find_segments(da, gap_threshold=5)
+        assert len(segs) == 2
+        assert segs[0][-1] == 19 and segs[1][0] == 60
 
     def test_all_nan(self):
         from ..core.signal import find_segments
@@ -1021,3 +1038,132 @@ class TestMwcsBandUnwrap:
         cur, ref = self._pair(0.02, 0)
         with pytest.raises(ValueError, match="FFT bin"):
             mwcs(cur, ref, 9.99, 9.995, 20.0, -300.0, 12.0, 4.0)
+
+
+# ── Regression guards for the core/signal.py DSP review (batch 2) ───────────
+
+
+class TestPsdDfRmsUnits:
+    """PPSD reports an acceleration PSD per unit FREQUENCY on a PERIOD axis."""
+
+    @staticmethod
+    def _flat_psd(db=-120.0, n_times=3):
+        periods = np.logspace(-2, 2, 200)
+        data = np.full((n_times, len(periods)), db)
+        return xr.DataArray(
+            data, coords=[np.arange(n_times), periods],
+            dims=["times", "periods"], name="PSD",
+        ).to_dataset(), periods
+
+    @pytest.mark.parametrize("output,omega_power", [("ACC", 0), ("VEL", 2),
+                                                    ("DISP", 4)])
+    def test_matches_seismorms_reference(self, output, omega_power):
+        from ..core.signal import psd_df_rms
+        ds, periods = self._flat_psd()
+        fmin, fmax = 1.0, 20.0
+        got = psd_df_rms(ds, [(fmin, fmax)], output=output)["RMS"].values[0, 0]
+
+        # Reference: integrate over FREQUENCY, omega = 2*pi*f (SeismoRMS)
+        f = np.sort(1.0 / periods)
+        f = f[(f >= fmin) & (f <= fmax)]
+        amp = 10.0 ** (-120.0 / 10.0)
+        integrand = np.full_like(f, amp) / (2 * np.pi * f) ** omega_power
+        ref = np.sqrt(np.trapezoid(integrand, f))
+        assert got == pytest.approx(ref, rel=1e-9)
+
+    def test_band_labels_are_backward_compatible(self):
+        from ..core.signal import psd_df_rms
+        ds, _ = self._flat_psd()
+        out = psd_df_rms(ds, [(1.0, 20.0), (4.0, 14.0), (4.0, 9.0)])
+        assert list(out.bands.values) == ["1.0-20.0", "4.0-14.0", "4.0-9.0"]
+
+    def test_sub_decimal_bands_do_not_collide(self):
+        """(0.05, 0.1) and (0.06, 0.1) both formatted as '0.1-0.1' before."""
+        from ..core.signal import psd_df_rms
+        ds, _ = self._flat_psd()
+        out = psd_df_rms(ds, [(0.05, 0.1), (0.06, 0.1)])
+        assert len(out.bands) == 2
+        assert len(set(out.bands.values.tolist())) == 2
+
+
+class TestMorletScaleMapping:
+    """tfpws_stack assumes f = w*fs/(2*pi*s); the wavelet must honour it."""
+
+    @pytest.mark.parametrize("f_req", [1.0, 2.0, 5.0, 8.0])
+    def test_centre_frequency_matches_requested(self, f_req):
+        import scipy.signal
+
+        from ..core.signal import _morlet_wavelet
+        fs, W = 20.0, 5.0
+        s = W / (2.0 * np.pi * f_req / fs)
+        M = max(int(10 * s), 3) | 1
+        wav = _morlet_wavelet(M, s, w=W)
+
+        probes = np.linspace(0.2, 10.0, 200)
+        t = np.arange(4096) / fs
+        resp = [
+            np.abs(scipy.signal.fftconvolve(
+                np.cos(2 * np.pi * fp * t), wav[::-1].conj(),
+                mode="same")[1000:3000]).mean()
+            for fp in probes
+        ]
+        peak = probes[int(np.argmax(resp))]
+        # the old linspace(-10, 10, M) abscissa made this scale as 1/s**2:
+        # 1 Hz landed at 0.13 Hz and 8 Hz at ~10 Hz
+        assert peak == pytest.approx(f_req, rel=0.06)
+
+    def test_envelope_is_s_samples_wide(self):
+        from ..core.signal import _morlet_wavelet
+        s, M = 8.0, 81
+        env = np.abs(_morlet_wavelet(M, s, w=5.0))
+        x = np.arange(M) - (M - 1) / 2.0
+        sigma = np.sqrt((env ** 2 * x ** 2).sum() / (env ** 2).sum())
+        assert sigma == pytest.approx(s / np.sqrt(2.0), rel=0.05)
+
+
+class TestGetWindowNormalisation:
+    @pytest.mark.parametrize("window", ["boxcar", "hanning"])
+    def test_sums_to_one(self, window):
+        from ..core.signal import get_window
+        assert get_window(window, 5).sum().real == pytest.approx(1.0)
+
+    def test_mwcs_coherence_is_invariant_to_window_scale(self):
+        """The smoothing constant cancels in |X| / (dref*dcur)."""
+        import scipy.signal as ss
+        rng = np.random.default_rng(0)
+        f1 = rng.standard_normal(256) + 1j * rng.standard_normal(256)
+        f2 = rng.standard_normal(256) + 1j * rng.standard_normal(256)
+
+        def coh(scale):
+            w = ss.windows.hann(11) * scale
+            X = ss.fftconvolve(f1 * f2.conj(), w, mode="same")
+            d1 = np.sqrt(ss.fftconvolve(np.abs(f1) ** 2, w, mode="same"))
+            d2 = np.sqrt(ss.fftconvolve(np.abs(f2) ** 2, w, mode="same"))
+            return np.abs(X) / (d1 * d2)
+
+        assert np.allclose(coh(1.0 / 11), coh(1.0 / ss.windows.hann(11).sum()))
+
+
+class TestMwcsSlopeError:
+    def test_matches_obspy_std_slope(self):
+        """The manual error used an unweighted residual + a 1/sigma^2 form."""
+        import scipy.fft as sf
+        import scipy.signal
+        from obspy.signal.regression import linear_regression
+
+        from ..core.compute import mwcs
+        fs, n = 20.0, 6000
+        rng = np.random.default_rng(3)
+        sos = scipy.signal.butter(4, [1.0, 4.0], btype="band", fs=fs,
+                                  output="sos")
+        ref = scipy.signal.sosfilt(sos, rng.standard_normal(n))
+        f = sf.fftfreq(n, 1.0 / fs)
+        cur = np.real(sf.ifft(sf.fft(ref) * np.exp(-2j * np.pi * f * 0.02)))
+        cur = cur + 0.02 * ref.std() * rng.standard_normal(n)
+        res = mwcs(cur, ref, 1.0, 4.0, fs, -300.0, 12.0, 4.0)
+        assert res.shape[1] == 4
+        assert np.all(np.isfinite(res[:, 2]))
+        assert np.median(res[:, 1]) == pytest.approx(0.02, abs=1e-3)
+        # sanity: the reported error must be far below the measured delay
+        assert np.median(res[:, 2]) < 0.1 * abs(np.median(res[:, 1]))
+        assert linear_regression is not None

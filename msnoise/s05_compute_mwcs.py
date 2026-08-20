@@ -221,6 +221,14 @@ def main(loglevel="INFO"):
                 index_range = np.argwhere(
                     np.logical_and(freq_vec >= freqmin,
                                 freq_vec <= freqmax)).flatten()
+                if index_range.size < 2:
+                    raise ValueError(
+                        f"mwcs: the [{freqmin:g}, {freqmax:g}] Hz band contains "
+                        f"{index_range.size} FFT bin(s) for a "
+                        f"{params.mwcs.mwcs_wlen:g} s window at "
+                        f"{goal_sampling_rate:g} Hz (bin width "
+                        f"{goal_sampling_rate / padd:g} Hz). Widen the band or "
+                        f"increase mwcs_wlen.")
                 # Materialise to numpy for the sliding-window inner loop
                 data_arr = data.values
                 cci = np.empty((data_arr.shape[0], window_length_samples))
@@ -298,9 +306,16 @@ def main(loglevel="INFO"):
 
                     # Frequency axis and unwrapped phase
                     v   = np.real(freq_vec[index_range]) * 2 * np.pi  # (n_freq,)
-                    phi = np.angle(X).astype(float)
-                    phi[:, 0] = 0.0
-                    phi = np.unwrap(phi, axis=1)[:, index_range]       # (n_times, n_freq)
+                    # Unwrap INSIDE the measurement band only — see
+                    # core.compute.mwcs for the full rationale.  Unwrapping
+                    # from DC walks through the sub-freqmin bins, where a
+                    # band-passed CCF carries only filter leakage and the phase
+                    # is essentially random; a cycle slip there adds a constant
+                    # 2*pi*k to every in-band phase, which the origin-forced
+                    # regression below turns into a spurious dt of about k/f.
+                    phi = np.unwrap(
+                        np.angle(X).astype(float)[:, index_range], axis=1
+                    )                                                  # (n_times, n_freq)
 
                     # Vectorized WLS forced through origin (277x faster than list comprehension)
                     # ObsPy linear_regression minimises sum(w^2 * residuals^2):

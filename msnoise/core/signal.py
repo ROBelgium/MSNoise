@@ -117,8 +117,10 @@ def check_and_phase_shift(trace, taper_length=20.0):
         FFTdata = sf.fft(trace.data, n=n)
         fftfreq = sf.fftfreq(n, d=trace.stats.delta)
         FFTdata = FFTdata * np.exp(1j * 2. * np.pi * fftfreq * dt)
-        FFTdata = FFTdata.astype(np.complex64)
-        sf.ifft(FFTdata, n=n, overwrite_x=True)
+        # scipy's overwrite_x is only a hint, never a guarantee: relying on
+        # it and dropping the return value would silently leave FFTdata in
+        # the frequency domain on any build that declines to overwrite.
+        FFTdata = sf.ifft(FFTdata, n=n)
         trace.data = np.real(FFTdata[:len(trace.data)]).astype(float)
         trace.stats.starttime += dt
         del FFTdata, fftfreq
@@ -198,7 +200,16 @@ def winsorizing(data, params, input="timeseries", nfft=0):
         data = data.reshape(-1, data.shape[0])
         input1D = True
     if input == "fft":
-        data = sf.ifftn(data, [nfft, ], axes=[1, ]).astype(float)
+        # np.real(), not .astype(float): casting a complex array to float
+        # discards the imaginary part behind a ComplexWarning.  The input is
+        # Hermitian (whiten2 enforces it) so the imaginary part is numerical
+        # noise, but the intent should be explicit.
+        # NOTE: the array is nfft long while the trace is only npts long, so
+        # the trailing zero-padding slightly dilutes the RMS below and makes
+        # the clip threshold marginally tighter than the clip_after_whiten=N
+        # path.  next_fast_len keeps nfft/npts under ~1.05, so the effect is
+        # under ~2.5 % on the threshold.
+        data = np.real(sf.ifftn(data, [nfft, ], axes=[1, ]))
     for i in range(data.shape[0]):
         if params.cc.winsorizing == -1:
             np.sign(data[i], data[i])  # inplace
@@ -219,6 +230,15 @@ def get_window(window="boxcar", half_win=3):
     :param window: ``"boxcar"`` (default) or ``"hanning"``.
     :param half_win: Half-width in samples (full window = ``2*half_win+1``).
     :returns: Complex numpy array of length ``2*half_win+1``, sum-normalised.
+
+    .. note::
+
+        The normalisation used to be ``w / window_len``, which sum-normalises
+        a boxcar but leaves a Hann window summing to about 0.45.  The
+        constant cancels exactly in the MWCS coherence (numerator and
+        denominator are smoothed with the same window) and in the
+        origin-forced WLS slope and its error, so this is a consistency fix
+        with :func:`~msnoise.core.compute.smooth`, not a numerical change.
     """
     import scipy.signal
     window_len = 2 * half_win + 1
@@ -226,7 +246,7 @@ def get_window(window="boxcar", half_win=3):
         w = scipy.signal.windows.boxcar(window_len).astype("complex")
     else:
         w = scipy.signal.windows.hann(window_len).astype("complex")
-    return w / window_len
+    return w / w.sum()
 
 
 
@@ -874,6 +894,16 @@ def psd_rms(s, f):
     return np.sqrt(np.trapezoid(s, f))
 
 
+def _band_label(v):
+    """Format a band edge, preferring the historical one-decimal form.
+
+    Returns ``"%.1f" % v`` when that is exact (so existing band names such as
+    ``"1.0-20.0"`` are unchanged) and a lossless ``"%g"`` otherwise.
+    """
+    one_dp = f"{v:.1f}"
+    return one_dp if float(one_dp) == float(v) else f"{v:g}"
+
+
 def psd_df_rms(d, freqs, output="VEL"):
     """Compute per-frequency-band RMS from PSD data.
 
@@ -896,19 +926,32 @@ def psd_df_rms(d, freqs, output="VEL"):
         ix = np.where((periods >= pmin) & (periods <= pmax))[0]
         if ix.size == 0:
             continue
-        f    = periods[ix]
-        w2f  = 2.0 * np.pi * f
-        amp  = 10.0 ** (da.values[:, ix] / 10.0)   # (times, n_periods)
+        # ObsPy's PPSD reports an acceleration PSD **per unit frequency**
+        # against a PERIOD axis.  Both the omega factor and the integration
+        # variable must therefore be frequencies:
+        #     rms^2 = int S(f) df,   S_vel = S_acc / (2*pi*f)^2
+        # The previous code passed ``periods`` in as ``f``, so it used
+        # omega = 2*pi*T instead of 2*pi/T and integrated dT instead of df.
+        fq    = 1.0 / periods[ix]                  # Hz
+        order = np.argsort(fq)                     # trapezoid needs ascending x
+        fq    = fq[order]
+        w2f   = 2.0 * np.pi * fq
+        amp   = 10.0 ** (da.values[:, ix][:, order] / 10.0)   # (times, n_freq)
         if output == "ACC":
-            vals = np.sqrt(np.trapezoid(amp, f, axis=1))
+            vals = np.sqrt(np.trapezoid(amp, fq, axis=1))
         elif output == "VEL":
             vamp = amp / w2f ** 2
-            vals = np.sqrt(np.trapezoid(vamp, f, axis=1))
+            vals = np.sqrt(np.trapezoid(vamp, fq, axis=1))
         else:
             vamp = amp / w2f ** 2
             damp = vamp / w2f ** 2
-            vals = np.sqrt(np.trapezoid(damp, f, axis=1))
-        rms_bands[f"{fmin:.1f}-{fmax:.1f}"] = vals
+            vals = np.sqrt(np.trapezoid(damp, fq, axis=1))
+        # "%.1f" is lossy below 0.05 Hz: (0.05, 0.1) and (0.06, 0.1) both
+        # label as "0.1-0.1" and the second silently overwrites the first.
+        # Keep the historical one-decimal label whenever it round-trips
+        # exactly (all round-numbered bands, e.g. "1.0-20.0") and fall back
+        # to a lossless one otherwise.
+        rms_bands[f"{_band_label(fmin)}-{_band_label(fmax)}"] = vals
 
     bands = list(rms_bands.keys())
     data  = np.column_stack(list(rms_bands.values())) if bands else np.empty((len(times), 0))
@@ -970,12 +1013,26 @@ def make_same_length(st):
 def _morlet_wavelet(M, s, w=5.0):
     """Complex Morlet wavelet (L2-normalised) for use in :func:`tfpws_stack`.
 
-    :param M: Number of samples.
-    :param s: Scale parameter (controls dilation).
+    The abscissa is the **sample offset** from the centre of the window, so
+    the wavelet has a centre frequency of ``w / (2*pi*s)`` cycles per sample
+    and a Gaussian envelope of standard deviation ``s`` samples — which is
+    what :func:`tfpws_stack`'s ``scales = w / (2*pi*f/fs)`` mapping assumes.
+
+    .. note::
+
+        This used to be ``x = np.linspace(-10, 10, M)``, i.e. a fixed
+        abscissa independent of *M* and *s*.  The sample spacing was then
+        ``20/(M-1) ~ 2/s``, making the actual centre frequency scale as
+        ``1/s**2`` and the envelope width as ``s**2/2``.  The scale set
+        requested by :func:`tfpws_stack` therefore analysed a completely
+        different frequency band from the one asked for.
+
+    :param M: Number of samples (odd).
+    :param s: Scale parameter in samples (controls dilation).
     :param w: Central angular frequency (default 5.0).
     :returns: Complex 1-D array of length *M*.
     """
-    x = np.linspace(-10, 10, M)
+    x = np.arange(M) - (M - 1) / 2.0        # sample offsets from the centre
     wav = np.exp(1j * w * x / s) * np.exp(-0.5 * (x / s) ** 2)
     return wav / (np.pi ** 0.25 * np.sqrt(s))
 
@@ -1175,17 +1232,10 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
         logging.debug("No data to stack.")
         return []
     data = data[~np.isnan(data).any(axis=1)]
-    sanitize = False
-    # TODO clean sanitize function, add param to config and make sure not to
-    # kill the data[i] if all data are corrcoeff >0.9 (either very stable
-    # corr or autocorr, then this sanitize should not occur.
-    if len(data) != 1 and sanitize:
-        threshold = 0.99
-        corr = data.mean(axis=0)
-        corrcoefs = np.array([np.corrcoef(di, corr)[1][0] for di in data])
-        toolarge = np.where(corrcoefs >= threshold)[0]
-        if len(toolarge):
-            data = data[np.where(corrcoefs <= threshold)[0]]
+    # NOTE: a correlation-coefficient "sanitize" block used to sit here behind
+    # a hardcoded ``sanitize = False``.  It was never reachable and its own
+    # TODO flagged that it would wrongly discard stable pairs and
+    # autocorrelations, so it has been removed rather than wired in.
 
     if len(data) == 0:
         return []
@@ -1206,7 +1256,7 @@ def stack(data, stack_method="linear", pws_timegate=10.0, pws_power=2,
             phasestack.imag += np.sin(phase)
         coh = 1. / data.shape[0] * np.abs(phasestack)
 
-        timegate_samples = int(pws_timegate * goal_sampling_rate)
+        timegate_samples = max(1, int(pws_timegate * goal_sampling_rate))
         coh = np.convolve(ss.windows.boxcar(timegate_samples) /
                           timegate_samples, coh, 'same')
         coh = np.power(coh, pws_power)
@@ -1234,6 +1284,8 @@ def find_segments(data, gap_threshold):
 
     :param data: 2-D xarray DataArray (times × lags).
     :param gap_threshold: Maximum index gap before treating as a new segment.
+        A run of ``> gap_threshold`` consecutive all-NaN rows starts a new
+        segment; shorter runs are bridged.
     :returns: List of lists of row indices forming each continuous segment.
     """
     current_segment = []
@@ -1242,13 +1294,17 @@ def find_segments(data, gap_threshold):
 
     for i in range(data.shape[0]):
         if not data[i, :].isnull().all():
+            # NOTE: an ``else: prev_idx = None`` branch used to reset the
+            # tracker on every all-NaN row.  Because ``i`` is a contiguous
+            # range, ``i - prev_idx`` was then always 1 on the next valid row
+            # and the gap test could never fire — find_segments always
+            # returned a single segment and wiener_filt smeared straight
+            # across data gaps, which is exactly what it exists to prevent.
             if prev_idx is not None and (i - prev_idx > gap_threshold):
                 continuous_segments.append(current_segment)
                 current_segment = []
             current_segment.append(i)
             prev_idx = i
-        else:
-            prev_idx = None
 
     if current_segment:
         continuous_segments.append(current_segment)

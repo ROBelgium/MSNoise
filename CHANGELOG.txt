@@ -95,6 +95,82 @@ Bugfixes:
     nperseg (which would have returned npts//2+1 bins and misaligned the
     division inside whiten2).
 
+ - msnoise.s05_compute_mwcs:
+  * CRITICAL: the vectorised MWCS in this worker is the code the pipeline
+    actually runs — core.compute.mwcs is only the reference/plugin entry point
+    — and it carried the SAME DC-anchored phase unwrap that was fixed in
+    core.compute.mwcs one release earlier. The phase is now unwrapped inside
+    [freqmin, freqmax] only, so the fix finally reaches production dv/v. See
+    the core.compute.mwcs entry below for the mechanism and the measured
+    effect (13.4% of windows off by >10 ms, worst case 0.76 s, on a synthetic
+    1-4 Hz test). IMPACT: all mwcs / mwcs_dtt / mwcs_dtt_dvv results change —
+    the spikes disappear, well-measured windows are untouched.
+  * a measurement band containing fewer than two FFT bins now raises a clear
+    ValueError instead of failing later with "`ydata` must not be empty!".
+
+ - msnoise.core.signal:
+  * find_segments: an ``else: prev_idx = None`` branch reset the gap tracker on
+    every all-NaN row. Since the row index is a contiguous range, ``i -
+    prev_idx`` was then always 1 on the next valid row and the gap test could
+    NEVER fire: find_segments always returned one single segment whatever
+    gap_threshold was set to. wiener_filt therefore smoothed straight across
+    data gaps — exactly what it exists to prevent. IMPACT: with
+    ``wienerfilt=Y``, CCFs adjacent to a gap are no longer contaminated by data
+    from the other side of it; datasets without gaps are unaffected.
+  * psd_df_rms: ObsPy's PPSD reports an acceleration PSD *per unit frequency*
+    against a *period* axis. The code passed the period array in as ``f``, so
+    it used omega = 2*pi*T instead of 2*pi/T AND integrated over dT instead of
+    df. Both are now frequencies (with the band re-sorted ascending for
+    trapezoid). On a flat -120 dB PSD over 1-20 Hz the VEL RMS was 4.5x too
+    large; the error is band- and spectrum-shape dependent, so it is not a
+    constant rescale. IMPACT: all psd_rms outputs were wrong in ACC, VEL and
+    DISP and must be recomputed.
+  * psd_df_rms: band labels formatted with "%.1f" are lossy below 0.05 Hz —
+    (0.05, 0.1) and (0.06, 0.1) both became "0.1-0.1" and the second silently
+    overwrote the first. Labels now fall back to a lossless form only when the
+    one-decimal version is inexact, so every round-numbered band keeps its
+    historical name ("1.0-20.0", "4.0-14.0", ...).
+  * _morlet_wavelet / tfpws_stack: the wavelet was built on a fixed abscissa
+    ``np.linspace(-10, 10, M)`` independent of M and s. The sample spacing was
+    then ~2/s, making the actual centre frequency scale as 1/s**2 and the
+    envelope width as s**2/2, so tfpws_stack's ``scales = w/(2*pi*f/fs)``
+    mapping analysed a completely different band from the one requested:
+    1 Hz landed at 0.13 Hz, 2 Hz at 0.52 Hz, 8 Hz at ~10 Hz. The abscissa is
+    now the sample offset from the window centre, and the measured centre
+    frequency matches the request to better than 2% across 1-8 Hz. IMPACT:
+    ``stack_method=tfpws`` results change and must be recomputed; linear and
+    pws stacks are unaffected.
+  * get_window: normalised by ``window_len`` rather than by the window sum, so
+    a Hann window summed to ~0.45 instead of 1 despite the docstring. The
+    constant cancels exactly in the MWCS coherence and in the origin-forced
+    WLS slope and its error (verified), so this is a consistency fix with
+    core.compute.smooth, not a numerical change.
+  * check_and_phase_shift: the sub-sample time shift called
+    ``sf.ifft(..., overwrite_x=True)`` and discarded the return value. scipy
+    documents overwrite_x as a hint, not a guarantee; on any build that
+    declined to overwrite, the trace would have been silently replaced by the
+    real part of its own spectrum. The return value is now used.
+  * winsorizing(input="fft"): ``.astype(float)`` on the complex inverse FFT
+    discarded the imaginary part behind a ComplexWarning; replaced by an
+    explicit np.real(). Documented that the RMS is measured over the
+    zero-padded nfft, which tightens the clip threshold by up to ~2.5%
+    relative to the clip_after_whiten=N path.
+  * stack: removed the unreachable correlation-coefficient "sanitize" block
+    (guarded by a hardcoded ``sanitize = False``, and flagged by its own TODO
+    as discarding stable pairs and autocorrelations); guarded the PWS
+    time-gate against a zero-length boxcar when
+    ``pws_timegate * goal_sampling_rate < 1``.
+
+ - msnoise.core.compute:
+  * mwcs: the slope error mixed conventions — an UNWEIGHTED residual variance
+    combined with a sum(w*v**2) denominator, which is the 1/sigma**2-weight
+    form — while ObsPy's linear_regression takes weights as 1/sigma. It now
+    uses var(m) = sum(w^2 (phi - m v)^2) / ((N-1) * sum(w^2 v^2)), matching
+    both ObsPy's own std_slope and the vectorised implementation in
+    s05_compute_mwcs. The old expression was 1.44x too large on a synthetic
+    40-point fit. IMPACT: the ERR column of core.compute.mwcs only; the
+    production s05 path already used the correct form.
+
 Changes:
  - msnoise
   * drop Continuous Integrations for Python 2.7. Only test on 3.7, 3.8 and 3.9
