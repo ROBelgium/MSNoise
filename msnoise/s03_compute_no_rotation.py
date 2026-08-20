@@ -759,9 +759,17 @@ def main(loglevel="INFO", chunk_size=0):
                         channel_index[netsta] = {}
                     channel_index[netsta][c1[-1]] = i
 
-                    freqs, pxx = scipy.signal.welch(tmp[i].data,
+                    # Welch on the SAME array that is about to be whitened
+                    # (``data`` is already winsorized and cosine-tapered),
+                    # not on the untouched ObsPy trace.  ``nfft=nfft`` with
+                    # ``nperseg=npts`` zero-pads instead of letting welch
+                    # silently clamp nperseg, which would return
+                    # ``npts//2+1`` bins and no longer line up with
+                    # ``fft[i][:nfft//2+1]`` inside whiten2().
+                    freqs, pxx = scipy.signal.welch(data[i],
                                                fs=tmp[i].stats.sampling_rate,
-                                               nperseg=nfft,
+                                               nperseg=data.shape[1],
+                                               nfft=nfft,
                                                detrend='constant')
                     psds.append(np.sqrt(pxx))
                 psds = np.asarray(psds)

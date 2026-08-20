@@ -35,6 +35,66 @@ Bugfixes:
     0.006 for Paul(4) and 0.0001 for DOG(2), instead of 1.0).
 
 
+ - msnoise.core.compute (cross-correlation / whitening / MWCS):
+  * mwcs: the cross-spectrum phase is now unwrapped INSIDE the
+    ``[freqmin, freqmax]`` measurement band only. It used to be unwrapped from
+    DC across the whole padded spectrum before being restricted to the band.
+    Below ``freqmin`` a band-passed CCF carries only filter leakage, so the
+    phase there is essentially random and ``np.unwrap`` performs a random walk;
+    any cycle slip it picks up shifts EVERY in-band phase by a constant 2*pi*k,
+    and since the regression is forced through the origin that offset becomes a
+    spurious dt of about k/f. This is the mechanism behind isolated MWCS
+    outliers. On a synthetic 1-4 Hz test with a known dt = 20 ms, 13.4% of
+    windows were off by more than 10 ms (worst case 0.76 s); after the fix, 0%
+    (worst case 20.4 ms). The median is unchanged, so only the outliers are
+    removed. Anchoring on the first in-band bin assumes |dt| < 1/(2*freqmin)
+    (0.5 s for freqmin = 1 Hz), verified numerically — orders of magnitude
+    above any dv/v measurement. IMPACT: dv/v time series computed through
+    mwcs/mwcs_dtt lose their spurious spikes; well-measured windows are
+    unaffected.
+  * mwcs: the frequency axis and band index are now built once before the
+    window loop instead of per window, and a band containing fewer than two
+    FFT bins raises a clear ValueError naming the bin width and mwcs_wlen
+    instead of failing later with "`ydata` must not be empty!".
+  * mwcs: replaced a "last window was too small" warning that could never fire
+    (the loop exits as soon as maxind > len(current)) with a debug message
+    reporting the number of trailing samples actually dropped.
+  * whiten2, whitening_type=PSD: the 5th/95th percentiles, the outlier mask
+    and the clip were all applied to the COMPLEX spectrum. NumPy resolves these
+    lexicographically on the real part without raising, and np.clip() replaced
+    every out-of-range bin by the real scalar +/-rms — zeroing the imaginary
+    part and destroying the phase of exactly the bins the spike suppression
+    targets. Percentiles and clipping now act on the magnitude and preserve
+    arg(X), as the docstring always described. IMPACT: whitening_type=PSD
+    results were wrong and must be re-run; B (default) and HANN are unaffected.
+  * whiten2, whitening_type=PSD: removed a stray ``taper *= taper`` that made
+    the PSD-branch spectral window cos^4 while whiten() and the brutal branch
+    use cos^2. IMPACT: slightly wider effective passband for PSD whitening.
+  * whiten / whiten2: the Hermitian-symmetry assignment assumed an even Nfft
+    and left the first negative-frequency bin unset for odd Nfft (next_fast_len
+    can return 9, 15, 25, 27, 45, 75, 81, 125 ...). Rewritten in terms of
+    (Nfft-1)//2 so it is correct for both; whiten()'s positive-frequency vector
+    was extended for the same reason.
+  * whiten: an empty passband now raises a ValueError naming the band, the bin
+    width and the Nyquist frequency instead of an IndexError on ``J[0]``.
+  * myCorr2: the ``maxlag == Nt`` branch sized the output buffer at 2*Nt while
+    the folded CCF is 2*Nt-1 samples, so it raised a broadcast error. The
+    branch is gone; maxlag is clamped to Nt-1 with a warning and a single code
+    path is used throughout.
+  * myCorr2, pcc_xcorr: documented the amplitude-scale conventions — myCorr2
+    divides by nfft twice (once inside ifft), so CCF amplitude scales as
+    1/nfft^2 and depends on the per-window npts; pcc_xcorr uses the fixed 1/N
+    biased estimator, giving a (N-|lag|)/N triangular taper across the lag
+    window. No numerical change.
+
+ - msnoise.s03_compute_no_rotation:
+  * the PSD used by whitening_type=PSD is now computed from the array that is
+    actually whitened (winsorized + cosine-tapered) rather than from the
+    untouched ObsPy trace, and welch is called with nperseg=npts, nfft=nfft so
+    it zero-pads to the expected nfft//2+1 bins instead of silently clamping
+    nperseg (which would have returned npts//2+1 bins and misaligned the
+    division inside whiten2).
+
 Changes:
  - msnoise
   * drop Continuous Integrations for Python 2.7. Only test on 3.7, 3.8 and 3.9

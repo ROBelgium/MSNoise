@@ -865,3 +865,159 @@ mwcs_dtt_1:
 
         # default values should NOT appear (only_non_defaults=True)
         assert "maxlag" not in doc.get("cc_1", {})
+
+
+# ── Regression guards for the core/compute.py maths review ──────────────────
+
+
+class TestWhiten2PsdBranch:
+    """``whitening_type='PSD'`` must clip the MAGNITUDE and keep the phase."""
+
+    def _spiky(self, nfft=2048, seed=0):
+        import scipy.fft as sf
+        rng = np.random.default_rng(seed)
+        F = sf.fft(rng.standard_normal((2, nfft)), nfft, axis=1)
+        for b in (300, 301, 500):          # strong monochromatic spikes
+            F[:, b] *= 60.0
+        return F, np.ones((2, nfft // 2 + 1))
+
+    def test_clipping_preserves_phase(self):
+        from ..core.compute import whiten2
+        nfft = 2048
+        F, psds = self._spiky(nfft)
+        before = F.copy()
+        whiten2(F, nfft, 20, 900, 120, 800, psds, "PSD")
+        band = slice(120, 800)
+        amp_b, amp_a = np.abs(before[0, band]), np.abs(F[0, band])
+        clipped = np.where(amp_a < amp_b - 1e-9)[0]
+        assert clipped.size > 0, "the spikes should have been clipped"
+        # np.clip() on the complex array used to leave imag == 0 exactly
+        assert not np.any(np.abs(F[0, band].imag[clipped]) < 1e-18)
+        dphi = np.angle(F[0, band])[clipped] - np.angle(before[0, band])[clipped]
+        assert np.abs(np.angle(np.exp(1j * dphi))).max() < 1e-9
+
+    def test_taper_is_cos_squared_not_cos_fourth(self):
+        from ..core.compute import whiten2
+        nfft, low, porte1 = 2048, 20, 120
+        G = np.ones((1, nfft), dtype=complex)
+        whiten2(G, nfft, low, 900, porte1, 800,
+                np.ones((1, nfft // 2 + 1)), "PSD")
+        mid = (low + porte1) // 2
+        frac = (mid - low) / (porte1 - low)
+        expected = np.cos(np.pi / 2 * (1 - frac)) ** 2
+        assert abs(np.abs(G[0, mid]) - expected) < 0.02
+        assert abs(np.abs(G[0, mid]) - expected ** 2) > 0.2
+
+    @pytest.mark.parametrize("nfft", [1024, 9, 15, 25, 27, 45, 81, 125])
+    def test_hermitian_symmetry_even_and_odd_nfft(self, nfft):
+        import scipy.fft as sf
+
+        from ..core.compute import whiten2
+        rng = np.random.default_rng(nfft)
+        F = sf.fft(rng.standard_normal((1, nfft)), nfft, axis=1)
+        whiten2(F, nfft, 1, nfft // 2, 2, nfft // 2 - 1,
+                np.ones((1, nfft // 2 + 1)), "B")
+        nneg = (nfft - 1) // 2
+        assert np.allclose(F[0, nfft - nneg:],
+                           np.conj(F[0, 1:nneg + 1])[::-1])
+        # a Hermitian spectrum must inverse-transform to a real signal
+        assert np.abs(sf.ifft(F[0], nfft).imag).max() < 1e-12
+
+
+class TestWhitenGuards:
+    @pytest.mark.parametrize("nfft", [1024, 9, 15, 25, 27, 45, 81, 125])
+    def test_hermitian_symmetry_even_and_odd_nfft(self, nfft):
+        import scipy.fft as sf
+
+        from ..core.compute import whiten
+        rng = np.random.default_rng(nfft)
+        F = whiten(rng.standard_normal(min(nfft, 64)), nfft, 0.05, 1.0, 4.0)
+        nneg = (nfft - 1) // 2
+        assert np.allclose(F[nfft - nneg:], np.conj(F[1:nneg + 1])[::-1])
+        assert np.abs(sf.ifft(F, nfft).imag).max() < 1e-12
+
+    def test_empty_passband_raises_readable_error(self):
+        from ..core.compute import whiten
+        rng = np.random.default_rng(0)
+        with pytest.raises(ValueError, match="passband"):
+            whiten(rng.standard_normal(256), 256, 0.05, 50.0, 60.0)
+
+
+class TestMyCorr2LagWindow:
+    def _ffts(self, Nt=64, seed=1):
+        import scipy.fft as sf
+        rng = np.random.default_rng(seed)
+        return sf.fft(rng.standard_normal((2, Nt)), Nt, axis=1)
+
+    @pytest.mark.parametrize("maxlag,expected", [(10, 21), (63, 127)])
+    def test_output_length(self, maxlag, expected):
+        from ..core.compute import myCorr2
+        out = myCorr2(self._ffts(), maxlag, np.ones(2), [("a", 0, 1)], nfft=64)
+        assert out["a"].shape == (expected,)
+
+    @pytest.mark.parametrize("maxlag", [64, 69])
+    def test_maxlag_at_or_beyond_nfft_clamps(self, maxlag):
+        """Used to raise a broadcast error (out_len was 2*Nt, folded is 2*Nt-1)."""
+        from ..core.compute import myCorr2
+        out = myCorr2(self._ffts(), maxlag, np.ones(2), [("a", 0, 1)], nfft=64)
+        assert out["a"].shape == (127,)
+
+    def test_zero_lag_is_centred(self):
+        """A trace correlated with itself must peak exactly at the centre."""
+        import scipy.fft as sf
+
+        from ..core.compute import myCorr2
+        rng = np.random.default_rng(2)
+        x = rng.standard_normal(256)
+        F = sf.fft(np.vstack([x, x]), 256, axis=1)
+        ccf = myCorr2(F, 40, np.ones(2), [("a", 0, 1)], nfft=256)["a"]
+        assert np.argmax(ccf) == 40
+
+
+class TestMwcsBandUnwrap:
+    """MWCS must not inherit cycle slips from the incoherent sub-freqmin bins."""
+
+    @staticmethod
+    def _pair(dt_true, seed, df=20.0, n=6000, noise=0.02):
+        import scipy.fft as sf
+        import scipy.signal
+        rng = np.random.default_rng(seed)
+        sos = scipy.signal.butter(4, [1.0, 4.0], btype="band", fs=df,
+                                  output="sos")
+        ref = scipy.signal.sosfilt(sos, rng.standard_normal(n))
+        f = sf.fftfreq(n, 1.0 / df)
+        cur = np.real(sf.ifft(sf.fft(ref) * np.exp(-2j * np.pi * f * dt_true)))
+        cur = cur + noise * ref.std() * rng.standard_normal(n)
+        return cur, ref
+
+    def test_no_cycle_slip_outliers(self):
+        from ..core.compute import mwcs
+        dt_true, out = 0.02, []
+        for seed in range(10):
+            cur, ref = self._pair(dt_true, seed)
+            out.append(mwcs(cur, ref, 1.0, 4.0, 20.0, -300.0, 12.0, 4.0)[:, 1])
+        v = np.concatenate(out)
+        assert abs(np.median(v) - dt_true) < 1e-3
+        # DC-anchored unwrap produced ~13% outliers here, up to |dt| = 0.76 s
+        assert np.mean(np.abs(v - dt_true) > 0.01) < 0.01
+        assert np.abs(v).max() < 0.5 / 1.0   # < 1/(2*freqmin)
+
+    @pytest.mark.parametrize("dt_true", [0.02, 0.2, 0.45])
+    def test_recovers_dt_within_validity_limit(self, dt_true):
+        """Band-anchored unwrap is valid while |dt| < 1/(2*freqmin) = 0.5 s."""
+        from ..core.compute import mwcs
+        cur, ref = self._pair(dt_true, 7, noise=0.0)
+        v = mwcs(cur, ref, 1.0, 4.0, 20.0, -300.0, 12.0, 4.0)[:, 1]
+        assert abs(np.median(v) - dt_true) < 5e-3
+
+    def test_returns_four_columns(self):
+        from ..core.compute import mwcs
+        cur, ref = self._pair(0.02, 0)
+        res = mwcs(cur, ref, 1.0, 4.0, 20.0, -300.0, 12.0, 4.0)
+        assert res.ndim == 2 and res.shape[1] == 4
+
+    def test_band_with_too_few_bins_raises(self):
+        from ..core.compute import mwcs
+        cur, ref = self._pair(0.02, 0)
+        with pytest.raises(ValueError, match="FFT bin"):
+            mwcs(cur, ref, 9.99, 9.995, 20.0, -300.0, 12.0, 4.0)

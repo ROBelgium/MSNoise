@@ -29,6 +29,8 @@ from obspy.signal.regression import linear_regression
 from .signal import getCoherence
 
 
+logger = logging.getLogger(__name__)
+
 _MYCORR2_CHUNK = 64  # pairs per tile — tuned for L2 cache locality
 
 
@@ -56,6 +58,21 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None,
     :param normalized: ``"POW"``, ``"MAX"``, ``"ABSMAX"``, or falsy for none.
     :rtype: dict
     :returns: ``{ccf_id: ccf_array}`` for every pair in *index*.
+
+    .. note::
+
+        **Amplitude scale.** ``sf.ifft`` already applies its own ``1/nfft``,
+        and the result is divided by ``Nt == nfft`` a second time, so the CCF
+        amplitude scales as ``1/nfft**2``.  This is the historical MSNoise
+        convention and is kept for backward compatibility, but it means the
+        absolute CCF amplitude depends on the FFT length.  Since ``nfft =
+        next_fast_len(npts)`` is recomputed per window in
+        :mod:`~msnoise.s03_compute_no_rotation`, two windows of a day with
+        different ``npts`` enter the daily stack at slightly different
+        amplitudes.  This is irrelevant for every dv/v method (MWCS, WCT and
+        stretching are all scale-invariant) and for any
+        ``cc_normalisation`` other than ``NO``, but it does affect raw CCF
+        amplitudes.
     """
     if not index:
         return {}
@@ -67,13 +84,20 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None,
     sta2s   = np.array([item[2] for item in index], dtype=int)
     n_pairs = len(ids)
 
-    # Lag-window index (same for all pairs)
-    if maxlag != Nt:
-        tcorr = np.arange(-(Nt - 1), Nt)
-        dN    = np.where(np.abs(tcorr) <= maxlag)[0]
-    else:
-        dN = None
-    out_len = len(dN) if dN is not None else 2 * Nt
+    # Lag-window index (same for all pairs).  ``folded`` below is
+    # ``[raw[1:Nt], raw[0:Nt]]`` → 2*Nt - 1 samples spanning lags
+    # -(Nt-1) … +(Nt-1), so maxlag cannot exceed Nt-1.  The old code had a
+    # separate ``maxlag == Nt`` branch that sized the output buffer at 2*Nt
+    # and therefore raised a broadcast error; clamping instead keeps a single
+    # code path and always returns a usable CCF.
+    if maxlag > Nt - 1:
+        logger.warning(
+            "myCorr2: maxlag=%i exceeds the %i available lags for nfft=%i; "
+            "clamping to %i", maxlag, Nt - 1, Nt, Nt - 1)
+        maxlag = Nt - 1
+    tcorr   = np.arange(-(Nt - 1), Nt)
+    dN      = np.where(np.abs(tcorr) <= maxlag)[0]
+    out_len = len(dN)
     min_len = 2 * maxlag + 1
 
     folded_all = np.empty((n_pairs, out_len), dtype=np.float64)
@@ -107,7 +131,7 @@ def myCorr2(data, maxlag, energy, index, plot=False, nfft=None,
             folded /= mx
 
         # Lag trim
-        folded_all[start:end] = folded[:, dN] if dN is not None else folded
+        folded_all[start:end] = folded[:, dN]
 
     return {
         ids[k]: folded_all[k]
@@ -184,6 +208,15 @@ def pcc_xcorr(data, maxlag, energy, index, plot=False, nfft=None,
         discarded; it is silently ignored.)
     :rtype: dict
     :returns: ``{ccf_id: ccf_array}`` of length ``2*maxlag + 1`` per pair.
+
+    .. note::
+
+        **Biased estimator.** The sum is divided by the fixed ``N`` rather
+        than by the ``N - |lag|`` samples that actually overlap, so PCC2
+        carries a triangular taper of ``(N - |lag|) / N`` across the lag
+        window (≈3 % at ``maxlag = 0.03 N``).  This matches the fixed
+        ``1/nfft`` used by :func:`myCorr2`, so CC and PCC remain directly
+        comparable.
 
     .. rubric:: References
 
@@ -274,8 +307,16 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, returntime=False):
 
     Napod = 100
     Nfft = int(Nfft)
-    freqVec = sf.fftfreq(Nfft, d=delta)[:Nfft // 2]
+    # Positive-frequency bins are 0 … (Nfft-1)//2 — which is Nfft//2 - 1 for
+    # even Nfft but Nfft//2 for odd Nfft (next_fast_len can return 9, 15, 25,
+    # 27, 45, 75, 81, 125 …), hence (Nfft - 1) // 2 + 1 rather than Nfft // 2.
+    freqVec = sf.fftfreq(Nfft, d=delta)[:(Nfft - 1) // 2 + 1]
     J = np.where((freqVec >= freqmin) & (freqVec <= freqmax))[0]
+    if J.size == 0:
+        raise ValueError(
+            f"whiten: no FFT bin falls inside the [{freqmin:g}, {freqmax:g}] Hz "
+            f"passband (Nfft={Nfft}, delta={delta:g} s → bin width "
+            f"{1.0 / (Nfft * delta):g} Hz, Nyquist {0.5 / delta:g} Hz)")
     low = J[0] - Napod
     if low <= 0:
         low = 1
@@ -306,10 +347,14 @@ def whiten(data, Nfft, delta, freqmin, freqmax, plot=False, returntime=False):
     FFTRawSign[porte2:high] = np.cos(
         np.linspace(0., np.pi / 2., high - porte2)) ** 2 * np.exp(
         1j * np.angle(FFTRawSign[porte2:high]))
-    FFTRawSign[high:Nfft + 1] *= 0
+    FFTRawSign[high:] *= 0
 
-    # Hermitian symmetry (because the input is real)
-    FFTRawSign[-(Nfft // 2) + 1:] = FFTRawSign[1:(Nfft // 2)].conjugate()[::-1]
+    # Hermitian symmetry (because the input is real): X[Nfft-k] = conj(X[k])
+    # for k = 1 … (Nfft-1)//2.  Writing it in terms of (Nfft-1)//2 rather than
+    # Nfft//2 keeps it correct for odd Nfft, where the old slice left the
+    # first negative-frequency bin untouched.
+    nneg = (Nfft - 1) // 2
+    FFTRawSign[Nfft - nneg:] = FFTRawSign[1:nneg + 1].conjugate()[::-1]
 
     if plot:
         plt.subplot(413)
@@ -397,21 +442,35 @@ def whiten2(fft, Nfft, low, high, porte1, porte2, psds, whiten_type):
     taper[porte2:high] *= np.cos(
         np.linspace(0., np.pi / 2., high - porte2)) ** 2
     taper[high:] *= 0
-    taper *= taper
+    # NOTE: a stray ``taper *= taper`` used to sit here, making the PSD-branch
+    # taper cos^4 while whiten() and the brutal branch use cos^2.  Removed so
+    # all three whitening shapes share the same spectral window.
 
     hann = scipy.signal.windows.hann(porte2 - porte1 + 1)  # / float(porte2-porte1)
+    nneg = (Nfft - 1) // 2   # number of negative-frequency bins
 
     for i in range(fft.shape[0]):
         if whiten_type == "PSD":
             fft[i][:Nfft // 2 + 1] /= psds[i]
             fft[i][:Nfft // 2 + 1] *= taper
             tmp = fft[i, porte1:porte2]
-            imin = scoreatpercentile(tmp, 5)
-            imax = scoreatpercentile(tmp, 95)
-            not_outliers = np.where((tmp >= imin) & (tmp <= imax))[0]
-            rms = tmp[not_outliers].std() * 1.0
-            np.clip(fft[i, porte1:porte2], -rms, rms,
-                    fft[i, porte1:porte2])  # inplace
+            # Percentiles, the outlier mask and the clip must all be taken on
+            # the MAGNITUDE.  Applied to the complex array (as they were),
+            # numpy resolves them lexicographically on the real part, and
+            # np.clip() replaces every out-of-range bin by the real scalar
+            # +/-rms — i.e. it zeroes the imaginary part and destroys the phase
+            # of exactly the bins the spike suppression is aimed at.
+            amp = np.abs(tmp)
+            imin = scoreatpercentile(amp, 5)
+            imax = scoreatpercentile(amp, 95)
+            not_outliers = np.where((amp >= imin) & (amp <= imax))[0]
+            # std() of a (zero-mean) complex spectrum == RMS of its magnitudes,
+            # which is the "A" of the docstring formula.
+            rms = float(tmp[not_outliers].std()) if not_outliers.size else 0.0
+            if rms > 0:
+                scale = np.ones_like(amp)
+                np.divide(rms, amp, out=scale, where=amp > rms)
+                fft[i, porte1:porte2] = tmp * scale
             fft[i, 0:low] *= 0
             fft[i, high:] *= 0
         elif whiten_type == "HANN":
@@ -434,8 +493,9 @@ def whiten2(fft, Nfft, low, high, porte1, porte2, psds, whiten_type):
                 1j * np.angle(fft[i, porte2:high]))
             fft[i, high:] *= 0
 
-        # Hermitian symmetry (because the input is real)
-        fft[i, -(Nfft // 2) + 1:] = np.conjugate(fft[i, 1:(Nfft // 2)])[::-1]
+        # Hermitian symmetry (because the input is real): X[Nfft-k] =
+        # conj(X[k]) for k = 1 … (Nfft-1)//2 — correct for odd Nfft too.
+        fft[i, Nfft - nneg:] = np.conjugate(fft[i, 1:nneg + 1])[::-1]
 
 def smooth(x, window='boxcar', half_win=3):
     """Smooth a 1-D array with a symmetric window.
@@ -525,6 +585,15 @@ def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step,
     They should be band-pass filtered around the `freqmin`-`freqmax` band of
     interest beforehand.
 
+.. warning::
+
+    The phase is unwrapped **inside** ``[freqmin, freqmax]`` only. This is
+    valid as long as :math:`|\\delta t| < 1 / (2\\,f_\\text{min})`, which holds
+    by many orders of magnitude for dv/v monitoring. Before MSNoise 2.0 the
+    unwrap started at DC, which let cycle slips in the incoherent sub-``freqmin``
+    bins add a constant :math:`2\\pi k` to the whole band and produce isolated
+    spurious ``dt`` values.
+
 :type current: :class:`numpy.ndarray`
 :param current: The "Current" timeseries
 :type reference: :class:`numpy.ndarray`
@@ -566,6 +635,19 @@ def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step,
     from .signal import nextpow2
     padd = int(2 ** (nextpow2(window_length_samples) + 2))
     # padd = next_fast_len(window_length_samples)
+
+    # Frequency axis and measurement band are loop-invariant: build them once
+    # and fail early with a readable message rather than deep inside the loop.
+    freq_vec = sf.fftfreq(padd, 1. / df)[:padd // 2]
+    index_range = np.argwhere(np.logical_and(freq_vec >= freqmin,
+                                             freq_vec <= freqmax)).flatten()
+    if index_range.size < 2:
+        raise ValueError(
+            f"mwcs: the [{freqmin:g}, {freqmax:g}] Hz band contains "
+            f"{index_range.size} FFT bin(s) for a {window_length:g} s window "
+            f"at {df:g} Hz (bin width {df / padd:g} Hz). Widen the band or "
+            f"increase mwcs_wlen.")
+
     count = 0
     tp = cosine_taper(window_length_samples, 0.85)
     minind = 0
@@ -603,11 +685,6 @@ def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step,
 
         dcs = np.abs(X)
 
-        # Find the values the frequency range of interest
-        freq_vec = sf.fftfreq(len(X) * 2, 1. / df)[:padd // 2]
-        index_range = np.argwhere(np.logical_and(freq_vec >= freqmin,
-                                                 freq_vec <= freqmax))
-
         # Get Coherence and its mean value
         coh = getCoherence(dcs, dref, dcur)
         mcoh = np.mean(coh[index_range])
@@ -621,16 +698,27 @@ def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step,
         # Frequency array:
         v = np.real(freq_vec[index_range]) * 2 * np.pi
 
-        # Phase:
-        phi = np.angle(X)
-        phi[0] = 0.
-        phi = np.unwrap(phi)
-        phi = phi[index_range]
+        # Phase — unwrapped INSIDE the measurement band only.
+        #
+        # Unwrapping from DC (as this used to do) walks through the bins below
+        # ``freqmin``, where a band-passed CCF carries only filter leakage and
+        # the phase is essentially random.  np.unwrap then performs a random
+        # walk there, and any cycle slip it picks up shifts EVERY in-band phase
+        # by a constant 2*pi*k.  Because the regression below is forced through
+        # the origin, that constant offset maps directly into a spurious
+        # dt ≈ k / f — the classic isolated MWCS outlier.
+        #
+        # Anchoring the unwrap on the first in-band bin instead assumes only
+        # |dt| < 1 / (2 * freqmin) (e.g. 0.5 s for freqmin = 1 Hz), which is
+        # orders of magnitude above any dv/v measurement.  Within the band the
+        # bin-to-bin phase step is 2*pi*dt*df/padd, so continuity there is
+        # never in question.
+        phi = np.unwrap(np.angle(X)[index_range])
 
         # Calculate the slope with a weighted least square linear regression
         # forced through the origin
         # weights for the WLS must be the variance !
-        m, em = linear_regression(v.flatten(), phi.flatten(), w.flatten())
+        m, em = linear_regression(v, phi, w)
 
         delta_t.append(m)
 
@@ -647,12 +735,20 @@ def mwcs(current, reference, freqmin, freqmax, df, tmin, window_length, step,
 
         del fcur, fref
         del X
-        del freq_vec
-        del index_range
         del w, v, e, s2x2, sx2, m, em
 
-    if maxind > len(current) + step * df:
-        logging.warning("The last window was too small, but was computed")
+    # The loop only emits complete windows; report whatever tail was dropped.
+    # (The previous check could never fire: the loop exits as soon as
+    # maxind > len(current), so maxind <= len(current) + step_samples always.)
+    if count:
+        used = (count - 1) * step_samples + window_length_samples
+    else:
+        used = 0
+    tail = len(current) - used
+    if tail > 0:
+        logger.debug(
+            "mwcs: %i trailing sample(s) did not fill a complete %i-sample "
+            "window and were not used", tail, window_length_samples)
 
     return np.array([time_axis, delta_t, delta_err, delta_mcoh]).T
 
