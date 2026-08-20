@@ -1167,3 +1167,104 @@ class TestMwcsSlopeError:
         # sanity: the reported error must be far below the measured delay
         assert np.median(res[:, 2]) < 0.1 * abs(np.median(res[:, 1]))
         assert linear_regression is not None
+
+
+# ── Batch-4 review: s10_stretching ──────────────────────────────────────────
+
+
+class TestStretching:
+    @staticmethod
+    def _ccf(fs=20.0, maxlag=120.0, seed=0):
+        import scipy.signal
+        n = int(2 * maxlag * fs) + 1
+        mid = int(fs * maxlag)
+        rng = np.random.default_rng(seed)
+        sos = scipy.signal.butter(4, [0.5, 4.0], btype="band", fs=fs,
+                                  output="sos")
+        ref = scipy.signal.sosfilt(sos, rng.standard_normal(n))
+        taxis = (np.arange(n) - mid) / fs
+        return ref, taxis, n, mid, fs
+
+    def _measure(self, dvv_true, str_range=0.02, nstr=1001):
+        from ..s10_stretching import _hwhm_errors, stretch_mat_creation
+        ref, taxis, n, _, _ = self._ccf()
+        # dv/v < 0 (slower medium) => arrivals later => cur(t) = ref(t/(1+dt/t))
+        cur = np.interp(taxis / (1 - dvv_true), taxis, ref)
+        M, strvec = stretch_mat_creation(ref, str_range=str_range, nstr=nstr)
+        Mn = (M - M.mean(axis=1, keepdims=True)) / M.std(axis=1, keepdims=True)
+        cn = (cur - cur.mean()) / cur.std()
+        cc = Mn @ cn / n
+        k = int(np.argmax(cc))
+        err = _hwhm_errors(cc.reshape(nstr, 1))[0]
+        return strvec[k], cc[k], err
+
+    @pytest.mark.parametrize("dvv_true", [-0.01, -0.003, 0.0, 0.003, 0.01])
+    def test_delta_minus_one_is_signed_dvv(self, dvv_true):
+        """aggregate_dvv_pairs uses ``Delta - 1`` directly as dv/v."""
+        delta, coeff, _ = self._measure(dvv_true)
+        assert delta - 1.0 == pytest.approx(dvv_true, abs=1e-4)
+        assert coeff > 0.99
+
+    def test_error_converts_to_dvv_units(self):
+        """The stored Error must share units with Delta - 1, not be an index."""
+        from ..s10_stretching import hwhm_to_dvv
+        str_range, nstr = 0.02, 1001
+        _, _, raw_hwhm = self._measure(-0.01, str_range, nstr)
+        converted = hwhm_to_dvv(raw_hwhm, str_range, nstr)
+        assert raw_hwhm > 1.0                 # index units: tens
+        assert converted < 0.01               # dv/v units: sub-percent
+        assert converted == pytest.approx(raw_hwhm * 4e-5, rel=1e-9)
+
+    def test_hwhm_to_dvv_is_the_stretch_step(self):
+        from ..s10_stretching import hwhm_to_dvv, stretch_mat_creation
+        ref, _, _, _, _ = self._ccf()
+        str_range, nstr = 0.02, 101
+        _, strvec = stretch_mat_creation(ref, str_range=str_range, nstr=nstr)
+        # one index == one step of strvec
+        assert hwhm_to_dvv(1.0, str_range, nstr) == pytest.approx(
+            strvec[1] - strvec[0])
+
+    def test_hwhm_returns_nan_when_curve_never_drops_to_half(self):
+        from ..s10_stretching import _hwhm_errors
+        n = 101
+        c = np.linspace(0.0, 1.0, n)
+        c[-1] = 0.5                            # peak at n-2, no left crossing
+        assert np.isnan(_hwhm_errors(c.reshape(n, 1))[0])
+
+    def test_hwhm_matches_analytic_gaussian(self):
+        from ..s10_stretching import _hwhm_errors
+        n = 101
+        x = np.arange(n)
+        c = np.exp(-0.5 * ((x - 50) / 5.0) ** 2)
+        expected = 5.0 * np.sqrt(2 * np.log(2))
+        assert _hwhm_errors(c.reshape(n, 1))[0] == pytest.approx(expected,
+                                                                 rel=1e-3)
+
+    def test_coda_mask_is_two_sided_and_identical_for_1d_and_2d(self):
+        """The current-CCF mask used to zero one column, not the whole tail."""
+        from ..s10_stretching import apply_coda_mask
+        _, taxis, n, mid, fs = self._ccf()
+        minlag, maxlag2 = 5.0, 45.0
+
+        cur = apply_coda_mask(np.ones((3, n)), mid, minlag, maxlag2, fs)
+        ref = apply_coda_mask(np.ones(n), mid, minlag, maxlag2, fs)
+
+        # the 2-D (current) and 1-D (reference) paths must agree exactly
+        assert np.array_equal(cur[0], ref)
+        # nothing survives outside minlag <= |lag| <= maxlag2 ...
+        keep = (np.abs(taxis) >= minlag) & (np.abs(taxis) <= maxlag2)
+        assert np.count_nonzero(ref[~keep]) == 0
+        # ... and both lobes survive
+        assert np.count_nonzero(ref[taxis < 0]) > 0
+        assert np.count_nonzero(ref[taxis > 0]) > 0
+
+    def test_stretch_matrix_shape_and_symmetry(self):
+        from ..s10_stretching import stretch_mat_creation
+        ref, _, n, _, _ = self._ccf()
+        M, strvec = stretch_mat_creation(ref, str_range=0.02, nstr=101)
+        assert M.shape == (101, n)
+        assert strvec[0] == pytest.approx(0.98)
+        assert strvec[-1] == pytest.approx(1.02)
+        assert strvec[50] == pytest.approx(1.0)
+        # the unstretched row must reproduce the reference
+        assert np.corrcoef(M[50], ref)[0, 1] > 0.999

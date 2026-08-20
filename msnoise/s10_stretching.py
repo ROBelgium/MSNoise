@@ -136,6 +136,12 @@ def _hwhm_errors(corr_coeffs):
         left = peak
         while left > 0 and c_pos[left] > half:
             left -= 1
+        if c_pos[left] > half:
+            # Walk hit index 0 without ever dropping to half-max: the curve
+            # does not decay inside the search range, so interpolating here
+            # would extrapolate to a negative index and fabricate a width.
+            allerrs[day_idx] = np.nan
+            continue
         # Sub-sample left crossing via linear interpolation
         denom_l = c_pos[left + 1] - c_pos[left]
         left_sub = left + (half - c_pos[left]) / denom_l if denom_l != 0.0 else left
@@ -143,12 +149,64 @@ def _hwhm_errors(corr_coeffs):
         right = peak
         while right < nstr - 1 and c_pos[right] > half:
             right += 1
+        if c_pos[right] > half:
+            allerrs[day_idx] = np.nan
+            continue
         # Sub-sample right crossing via linear interpolation
         denom_r = c_pos[right - 1] - c_pos[right]
         right_sub = (right - 1 + (c_pos[right - 1] - half) / denom_r
                      if denom_r != 0.0 else right)
         allerrs[day_idx] = (right_sub - left_sub) / 2.0
     return allerrs
+
+
+def apply_coda_mask(data, mid, minlag, maxlag2, sampling_rate):
+    """Zero everything outside the two-sided coda window, in place.
+
+    Keeps only ``minlag <= |lag| <= maxlag2`` on both sides of zero lag.
+    The reference and the current CCFs MUST be masked identically, otherwise
+    the correlation coefficient is diluted and the z-scoring of the current
+    trace is skewed — the negative-lag branch used to zero a single column
+    instead of the whole tail, which is exactly what this helper prevents.
+
+    :param data: 1-D ``(n_samples,)`` or 2-D ``(n_days, n_samples)`` array;
+        modified in place and also returned.
+    :param mid: Index of the zero-lag sample.
+    :param minlag: Inner edge of the coda window, in seconds.
+    :param maxlag2: Outer edge of the coda window, in seconds.
+    :param sampling_rate: CCF sampling rate in Hz.
+    :returns: *data*, masked.
+    """
+    sr   = int(sampling_rate)
+    lo   = mid - int(minlag * sr)
+    hi   = mid + int(minlag * sr)
+    lo2  = mid - int(maxlag2 * sr)
+    hi2  = mid + int(maxlag2 * sr)
+    if data.ndim == 1:
+        data[lo:hi] = 0.0
+        data[:lo2]  = 0.0
+        data[hi2:]  = 0.0
+    else:
+        data[:, lo:hi] = 0.0
+        data[:, :lo2]  = 0.0
+        data[:, hi2:]  = 0.0
+    return data
+
+
+def hwhm_to_dvv(hwhm, str_range, nstr):
+    """Convert a HWHM from stretch-index units to dv/v units.
+
+    :func:`_hwhm_errors` measures the half-width of the correlation peak in
+    row indices of the stretch matrix (0 .. ``nstr-1``).  The Delta column is
+    a stretch factor and :func:`~msnoise.core.io.aggregate_dvv_pairs` reads
+    Error as the uncertainty on ``Delta - 1``, so the two must share a unit.
+
+    :param hwhm: Half-width in stretch-index units (scalar or array).
+    :param str_range: ``stretching_max`` — the one-sided stretch range.
+    :param nstr: ``stretching_nsteps`` — number of stretch steps.
+    :returns: The same value expressed in dv/v units.
+    """
+    return hwhm * (2.0 * float(str_range) / (nstr - 1))
 
 
 def stretch_mat_creation(refcc, str_range=0.01, nstr=1001):
@@ -176,6 +234,19 @@ def stretch_mat_creation(refcc, str_range=0.01, nstr=1001):
     :param nstr: Number of stretching steps (total).
     :returns: ``(strrefmat, strvec)`` where ``strrefmat`` is ``(nstr, len(refcc))``
         and ``strvec`` holds the stretch factors.
+
+    .. note::
+
+        ``strvec`` is deliberately **reversed** relative to the time grid used
+        to build the rows: row *k* resamples on ``samples_idx / strvec[-1-k]``
+        while the caller reports ``strvec[k]``.  Since ``strvec`` is symmetric
+        about 1, that is equivalent to reporting ``2 - eps_k``, which turns
+        the best-matching dilation ``eps = 1 - dv/v`` into a reported value of
+        ``1 + dv/v``.  This is what makes ``Delta - 1`` a correctly signed
+        dv/v downstream: verified numerically to give exactly -0.010, -0.003,
+        0.000, +0.003 and +0.010 for those true dv/v values.  Do not "tidy"
+        the reversal away without also flipping the sign in
+        :func:`~msnoise.core.io.aggregate_dvv_pairs`.
     """
     n = len(refcc)
     samples_idx = np.arange(n) - n // 2
@@ -274,9 +345,7 @@ def main(loglevel="INFO"):
                         continue
 
                 # Zero data outside the lag window on the fixed reference
-                ref[mid - int(minlag * goal_sampling_rate):mid + int(minlag * goal_sampling_rate)] = 0.
-                ref[:mid - int(maxlag2 * goal_sampling_rate)] = 0.
-                ref[mid + int(maxlag2 * goal_sampling_rate):] = 0.
+                apply_coda_mask(ref, mid, minlag, maxlag2, goal_sampling_rate)
 
                 # Pre-build the full stretched-reference matrix (nstr x n_samples)
                 ref_stretched, deltas = stretch_mat_creation(ref, str_range=str_range, nstr=nstr)
@@ -300,10 +369,13 @@ def main(loglevel="INFO"):
 
                 # Materialise to numpy, then apply zero-lag windowing in-place
                 data_values = data.values.copy()
-                sr = int(params.cc.cc_sampling_rate)
-                data_values[:, mid - int(minlag * sr):mid + int(minlag * sr)] = 0.
-                data_values[:, mid - int(maxlag2 * sr)] = 0.
-                data_values[:, mid + int(maxlag2 * sr):] = 0.
+                # Same mask as the reference above.  This used to be written
+                # out inline and zeroed a SINGLE column instead of the whole
+                # negative-lag tail, so the current CCFs kept every sample
+                # between -maxlag and -maxlag2 while the reference had zeros
+                # there — an asymmetric coda window.
+                apply_coda_mask(data_values, mid, minlag, maxlag2,
+                                params.cc.cc_sampling_rate)
                 num_days = data_values.shape[0]
 
                 if rolling_mode:
@@ -315,17 +387,10 @@ def main(loglevel="INFO"):
 
                     # ── Mode B: vectorise masking + normalisation, keep
                     # per-row stretch call (each row has a different rolling ref)
-                    _sr      = int(goal_sampling_rate)
-                    _lo      = mid - int(minlag  * _sr)
-                    _hi      = mid + int(minlag  * _sr)
-                    _lo2     = mid - int(maxlag2 * _sr)
-                    _hi2     = mid + int(maxlag2 * _sr)
-
-                    # Batch zero-lag masking on all rolling refs at once
-                    refs_masked = ref_rolling.copy()
-                    refs_masked[:, _lo:_hi] = 0.
-                    refs_masked[:, :_lo2]   = 0.
-                    refs_masked[:, _hi2:]   = 0.
+                    # Batch coda masking on all rolling refs at once
+                    refs_masked = apply_coda_mask(
+                        ref_rolling.copy(), mid, minlag, maxlag2,
+                        goal_sampling_rate)
 
                     # Normalise current data (all rows at once)
                     cur_mean = data_values.mean(axis=1, keepdims=True)
@@ -378,6 +443,16 @@ def main(loglevel="INFO"):
                     # Vectorized error estimate: direct HWHM scan on the
                     # correlation-coefficient curve, ~134x faster than curve_fit.
                     allerrs   = _hwhm_errors(corr_coeffs)
+
+                # _hwhm_errors returns a half-width in STRETCH-INDEX units
+                # (0 .. nstr-1).  The Delta column is a stretch factor and
+                # aggregate_dvv_pairs reads Error as the error on
+                # ``Delta - 1``, i.e. in dv/v units, so the two must share a
+                # unit.  Without this conversion the stored error was
+                # (nstr-1)/(2*stretching_max) times too large — 25000x for
+                # the defaults (nstr=1001, stretching_max=0.02).
+                allerrs = hwhm_to_dvv(allerrs, str_range, nstr)
+
                 # Build xarray Dataset directly — no DataFrame round-trip
                 ds_out = xr.Dataset(
                     {

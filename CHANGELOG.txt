@@ -10,55 +10,11 @@ Major:
 
 Bugfixes:
 
- - msnoise.core.signal (wavelet / WCT):
-  * smoothCFS: fixed a long-standing off-by-one inherited from the original
-    MATLAB (``wcoherence``) port. The loop ran over ``range(0, n_scales)`` but
-    kept the 1-indexed row access ``cfs[kk - 1]`` while using ``normscales[kk]``,
-    so every row was smoothed in time with the scale of the NEXT row, and the
-    last (lowest-frequency) row was smoothed with the FIRST (smallest) scale.
-    Every row was still written exactly once, so nothing was skipped or
-    double-smoothed — only the smoothing width was wrong. Reported in #444.
-    IMPACT: Wcoh and WXdt change slightly with respect to any run made before
-    this fix. The error is small in the mid-band and grows toward the
-    low-frequency end of ``wct_freqmin..wct_freqmax`` (mean |dWcoh| ~ 0.003,
-    max ~ 0.10 on a 0.1-8 Hz / nptsfreq=100 / ns=3 / nt=0.25 test case, with
-    the largest deviations in the lowest few frequency rows). Published dv/v
-    obtained through the wavelet pipeline should be re-run before comparison.
-  * apply_wct: the mother wavelet chosen via the ``wavelet_type`` config was
-    applied to the reference CWT only — the current-day CWT was hardcoded to
-    ``Morlet(6)``. Since scales are derived as ``1/(mother.flambda()*f)``, the
-    two CWTs lived on different scale grids. ``mother`` is now carried in the
-    tuple returned by prepare_ref_wct and reused by apply_wct. IMPACT: only
-    affects projects setting ``wavelet_type`` to something other than the
-    default ``('Morlet', 6.)``; those results were wrong and must be re-run
-    (self-coherence of a trace with itself dropped to 0.27 for Morlet(4),
-    0.006 for Paul(4) and 0.0001 for DOG(2), instead of 1.0).
-
-
- - msnoise.core.compute (cross-correlation / whitening / MWCS):
-  * mwcs: the cross-spectrum phase is now unwrapped INSIDE the
-    ``[freqmin, freqmax]`` measurement band only. It used to be unwrapped from
-    DC across the whole padded spectrum before being restricted to the band.
-    Below ``freqmin`` a band-passed CCF carries only filter leakage, so the
-    phase there is essentially random and ``np.unwrap`` performs a random walk;
-    any cycle slip it picks up shifts EVERY in-band phase by a constant 2*pi*k,
-    and since the regression is forced through the origin that offset becomes a
-    spurious dt of about k/f. This is the mechanism behind isolated MWCS
-    outliers. On a synthetic 1-4 Hz test with a known dt = 20 ms, 13.4% of
-    windows were off by more than 10 ms (worst case 0.76 s); after the fix, 0%
-    (worst case 20.4 ms). The median is unchanged, so only the outliers are
-    removed. Anchoring on the first in-band bin assumes |dt| < 1/(2*freqmin)
-    (0.5 s for freqmin = 1 Hz), verified numerically — orders of magnitude
-    above any dv/v measurement. IMPACT: dv/v time series computed through
-    mwcs/mwcs_dtt lose their spurious spikes; well-measured windows are
-    unaffected.
-  * mwcs: the frequency axis and band index are now built once before the
-    window loop instead of per window, and a band containing fewer than two
-    FFT bins raises a clear ValueError naming the bin width and mwcs_wlen
-    instead of failing later with "`ydata` must not be empty!".
-  * mwcs: replaced a "last window was too small" warning that could never fire
-    (the loop exits as soon as maxind > len(current)) with a debug message
-    reporting the number of trailing samples actually dropped.
+ - msnoise.core.compute — cross-correlation and whitening:
+  * myCorr2: the ``maxlag == Nt`` branch sized the output buffer at 2*Nt while
+    the folded CCF is 2*Nt-1 samples, so it raised a broadcast error. The
+    branch is gone; maxlag is clamped to Nt-1 with a warning and a single code
+    path is used throughout.
   * whiten2, whitening_type=PSD: the 5th/95th percentiles, the outlier mask
     and the clip were all applied to the COMPLEX spectrum. NumPy resolves these
     lexicographically on the real part without raising, and np.clip() replaced
@@ -77,25 +33,13 @@ Bugfixes:
     was extended for the same reason.
   * whiten: an empty passband now raises a ValueError naming the band, the bin
     width and the Nyquist frequency instead of an IndexError on ``J[0]``.
-  * myCorr2: the ``maxlag == Nt`` branch sized the output buffer at 2*Nt while
-    the folded CCF is 2*Nt-1 samples, so it raised a broadcast error. The
-    branch is gone; maxlag is clamped to Nt-1 with a warning and a single code
-    path is used throughout.
   * myCorr2, pcc_xcorr: documented the amplitude-scale conventions — myCorr2
     divides by nfft twice (once inside ifft), so CCF amplitude scales as
     1/nfft^2 and depends on the per-window npts; pcc_xcorr uses the fixed 1/N
     biased estimator, giving a (N-|lag|)/N triangular taper across the lag
     window. No numerical change.
 
- - msnoise.s03_compute_no_rotation:
-  * the PSD used by whitening_type=PSD is now computed from the array that is
-    actually whitened (winsorized + cosine-tapered) rather than from the
-    untouched ObsPy trace, and welch is called with nperseg=npts, nfft=nfft so
-    it zero-pads to the expected nfft//2+1 bins instead of silently clamping
-    nperseg (which would have returned npts//2+1 bins and misaligned the
-    division inside whiten2).
-
- - msnoise.s05_compute_mwcs:
+ - msnoise.core.compute / msnoise.s05_compute_mwcs — MWCS:
   * CRITICAL: the vectorised MWCS in this worker is the code the pipeline
     actually runs — core.compute.mwcs is only the reference/plugin entry point
     — and it carried the SAME DC-anchored phase unwrap that was fixed in
@@ -105,63 +49,22 @@ Bugfixes:
     effect (13.4% of windows off by >10 ms, worst case 0.76 s, on a synthetic
     1-4 Hz test). IMPACT: all mwcs / mwcs_dtt / mwcs_dtt_dvv results change —
     the spikes disappear, well-measured windows are untouched.
-  * a measurement band containing fewer than two FFT bins now raises a clear
-    ValueError instead of failing later with "`ydata` must not be empty!".
-
- - msnoise.core.signal:
-  * find_segments: an ``else: prev_idx = None`` branch reset the gap tracker on
-    every all-NaN row. Since the row index is a contiguous range, ``i -
-    prev_idx`` was then always 1 on the next valid row and the gap test could
-    NEVER fire: find_segments always returned one single segment whatever
-    gap_threshold was set to. wiener_filt therefore smoothed straight across
-    data gaps — exactly what it exists to prevent. IMPACT: with
-    ``wienerfilt=Y``, CCFs adjacent to a gap are no longer contaminated by data
-    from the other side of it; datasets without gaps are unaffected.
-  * psd_df_rms: ObsPy's PPSD reports an acceleration PSD *per unit frequency*
-    against a *period* axis. The code passed the period array in as ``f``, so
-    it used omega = 2*pi*T instead of 2*pi/T AND integrated over dT instead of
-    df. Both are now frequencies (with the band re-sorted ascending for
-    trapezoid). On a flat -120 dB PSD over 1-20 Hz the VEL RMS was 4.5x too
-    large; the error is band- and spectrum-shape dependent, so it is not a
-    constant rescale. IMPACT: all psd_rms outputs were wrong in ACC, VEL and
-    DISP and must be recomputed.
-  * psd_df_rms: band labels formatted with "%.1f" are lossy below 0.05 Hz —
-    (0.05, 0.1) and (0.06, 0.1) both became "0.1-0.1" and the second silently
-    overwrote the first. Labels now fall back to a lossless form only when the
-    one-decimal version is inexact, so every round-numbered band keeps its
-    historical name ("1.0-20.0", "4.0-14.0", ...).
-  * _morlet_wavelet / tfpws_stack: the wavelet was built on a fixed abscissa
-    ``np.linspace(-10, 10, M)`` independent of M and s. The sample spacing was
-    then ~2/s, making the actual centre frequency scale as 1/s**2 and the
-    envelope width as s**2/2, so tfpws_stack's ``scales = w/(2*pi*f/fs)``
-    mapping analysed a completely different band from the one requested:
-    1 Hz landed at 0.13 Hz, 2 Hz at 0.52 Hz, 8 Hz at ~10 Hz. The abscissa is
-    now the sample offset from the window centre, and the measured centre
-    frequency matches the request to better than 2% across 1-8 Hz. IMPACT:
-    ``stack_method=tfpws`` results change and must be recomputed; linear and
-    pws stacks are unaffected.
-  * get_window: normalised by ``window_len`` rather than by the window sum, so
-    a Hann window summed to ~0.45 instead of 1 despite the docstring. The
-    constant cancels exactly in the MWCS coherence and in the origin-forced
-    WLS slope and its error (verified), so this is a consistency fix with
-    core.compute.smooth, not a numerical change.
-  * check_and_phase_shift: the sub-sample time shift called
-    ``sf.ifft(..., overwrite_x=True)`` and discarded the return value. scipy
-    documents overwrite_x as a hint, not a guarantee; on any build that
-    declined to overwrite, the trace would have been silently replaced by the
-    real part of its own spectrum. The return value is now used.
-  * winsorizing(input="fft"): ``.astype(float)`` on the complex inverse FFT
-    discarded the imaginary part behind a ComplexWarning; replaced by an
-    explicit np.real(). Documented that the RMS is measured over the
-    zero-padded nfft, which tightens the clip threshold by up to ~2.5%
-    relative to the clip_after_whiten=N path.
-  * stack: removed the unreachable correlation-coefficient "sanitize" block
-    (guarded by a hardcoded ``sanitize = False``, and flagged by its own TODO
-    as discarding stable pairs and autocorrelations); guarded the PWS
-    time-gate against a zero-length boxcar when
-    ``pws_timegate * goal_sampling_rate < 1``.
-
- - msnoise.core.compute:
+  * mwcs: the cross-spectrum phase is now unwrapped INSIDE the
+    ``[freqmin, freqmax]`` measurement band only. It used to be unwrapped from
+    DC across the whole padded spectrum before being restricted to the band.
+    Below ``freqmin`` a band-passed CCF carries only filter leakage, so the
+    phase there is essentially random and ``np.unwrap`` performs a random walk;
+    any cycle slip it picks up shifts EVERY in-band phase by a constant 2*pi*k,
+    and since the regression is forced through the origin that offset becomes a
+    spurious dt of about k/f. This is the mechanism behind isolated MWCS
+    outliers. On a synthetic 1-4 Hz test with a known dt = 20 ms, 13.4% of
+    windows were off by more than 10 ms (worst case 0.76 s); after the fix, 0%
+    (worst case 20.4 ms). The median is unchanged, so only the outliers are
+    removed. Anchoring on the first in-band bin assumes |dt| < 1/(2*freqmin)
+    (0.5 s for freqmin = 1 Hz), verified numerically — orders of magnitude
+    above any dv/v measurement. IMPACT: dv/v time series computed through
+    mwcs/mwcs_dtt lose their spurious spikes; well-measured windows are
+    unaffected.
   * mwcs: the slope error mixed conventions — an UNWEIGHTED residual variance
     combined with a sum(w*v**2) denominator, which is the 1/sigma**2-weight
     form — while ObsPy's linear_regression takes weights as 1/sigma. It now
@@ -170,8 +73,17 @@ Bugfixes:
     s05_compute_mwcs. The old expression was 1.44x too large on a synthetic
     40-point fit. IMPACT: the ERR column of core.compute.mwcs only; the
     production s05 path already used the correct form.
+  * mwcs: the frequency axis and band index are now built once before the
+    window loop instead of per window, and a band containing fewer than two
+    FFT bins raises a clear ValueError naming the bin width and mwcs_wlen
+    instead of failing later with "`ydata` must not be empty!".
+  * a measurement band containing fewer than two FFT bins now raises a clear
+    ValueError instead of failing later with "`ydata` must not be empty!".
+  * mwcs: replaced a "last window was too small" warning that could never fire
+    (the loop exits as soon as maxind > len(current)) with a debug message
+    reporting the number of trailing samples actually dropped.
 
- - msnoise.core.io / msnoise.core.signal (wavelet dt/t -> dv/v):
+ - msnoise.core.signal / msnoise.core.io — wavelet, WCT and dv/v:
   * CRITICAL SIGN ERROR: wavelet_dtt_dvv produced dv/v with the OPPOSITE sign
     to mwcs_dtt_dvv and stretching_dvv. compute_wct_dtt returns dt/t (the
     slope of WXdt against lag) in exactly the same convention as
@@ -198,6 +110,28 @@ Bugfixes:
     ``abs(delta_t) > maxdt``, so arbitrarily large NEGATIVE delays passed the
     filter at full weight while equally large positive ones were zeroed —
     a one-sided rejection that biases dt/t, and hence dv/v, toward one sign.
+  * smoothCFS: fixed a long-standing off-by-one inherited from the original
+    MATLAB (``wcoherence``) port. The loop ran over ``range(0, n_scales)`` but
+    kept the 1-indexed row access ``cfs[kk - 1]`` while using ``normscales[kk]``,
+    so every row was smoothed in time with the scale of the NEXT row, and the
+    last (lowest-frequency) row was smoothed with the FIRST (smallest) scale.
+    Every row was still written exactly once, so nothing was skipped or
+    double-smoothed — only the smoothing width was wrong. Reported in #444.
+    IMPACT: Wcoh and WXdt change slightly with respect to any run made before
+    this fix. The error is small in the mid-band and grows toward the
+    low-frequency end of ``wct_freqmin..wct_freqmax`` (mean |dWcoh| ~ 0.003,
+    max ~ 0.10 on a 0.1-8 Hz / nptsfreq=100 / ns=3 / nt=0.25 test case, with
+    the largest deviations in the lowest few frequency rows). Published dv/v
+    obtained through the wavelet pipeline should be re-run before comparison.
+  * apply_wct: the mother wavelet chosen via the ``wavelet_type`` config was
+    applied to the reference CWT only — the current-day CWT was hardcoded to
+    ``Morlet(6)``. Since scales are derived as ``1/(mother.flambda()*f)``, the
+    two CWTs lived on different scale grids. ``mother`` is now carried in the
+    tuple returned by prepare_ref_wct and reused by apply_wct. IMPACT: only
+    affects projects setting ``wavelet_type`` to something other than the
+    default ``('Morlet', 6.)``; those results were wrong and must be re-run
+    (self-coherence of a trace with itself dropped to 0.27 for Morlet(4),
+    0.006 for Paul(4) and 0.0001 for DOG(2), instead of 1.0).
   * compute_wct_dtt and get_wct_avgcoh gated on ``len(tvec) > 2`` where they
     meant ``len(tindex) > 2``. When the coda window is empty (lag_min beyond
     the lag axis, e.g. dynamic lag with a long interstation distance) the
@@ -221,6 +155,100 @@ Bugfixes:
     cancels in W_ref * conj(W_cur) anyway; _cwt's ``sqrt(sj * ftfreqs[1] * N)``
     is T&C's ``sqrt(2*pi*s/dt)`` normalisation; and the COI expression matches
     T&C eq. 12.
+
+ - msnoise.core.signal — stacking and Wiener filtering:
+  * find_segments: an ``else: prev_idx = None`` branch reset the gap tracker on
+    every all-NaN row. Since the row index is a contiguous range, ``i -
+    prev_idx`` was then always 1 on the next valid row and the gap test could
+    NEVER fire: find_segments always returned one single segment whatever
+    gap_threshold was set to. wiener_filt therefore smoothed straight across
+    data gaps — exactly what it exists to prevent. IMPACT: with
+    ``wienerfilt=Y``, CCFs adjacent to a gap are no longer contaminated by data
+    from the other side of it; datasets without gaps are unaffected.
+  * _morlet_wavelet / tfpws_stack: the wavelet was built on a fixed abscissa
+    ``np.linspace(-10, 10, M)`` independent of M and s. The sample spacing was
+    then ~2/s, making the actual centre frequency scale as 1/s**2 and the
+    envelope width as s**2/2, so tfpws_stack's ``scales = w/(2*pi*f/fs)``
+    mapping analysed a completely different band from the one requested:
+    1 Hz landed at 0.13 Hz, 2 Hz at 0.52 Hz, 8 Hz at ~10 Hz. The abscissa is
+    now the sample offset from the window centre, and the measured centre
+    frequency matches the request to better than 2% across 1-8 Hz. IMPACT:
+    ``stack_method=tfpws`` results change and must be recomputed; linear and
+    pws stacks are unaffected.
+  * stack: removed the unreachable correlation-coefficient "sanitize" block
+    (guarded by a hardcoded ``sanitize = False``, and flagged by its own TODO
+    as discarding stable pairs and autocorrelations); guarded the PWS
+    time-gate against a zero-length boxcar when
+    ``pws_timegate * goal_sampling_rate < 1``.
+
+ - msnoise.core.signal — PSD / RMS:
+  * psd_df_rms: ObsPy's PPSD reports an acceleration PSD *per unit frequency*
+    against a *period* axis. The code passed the period array in as ``f``, so
+    it used omega = 2*pi*T instead of 2*pi/T AND integrated over dT instead of
+    df. Both are now frequencies (with the band re-sorted ascending for
+    trapezoid). On a flat -120 dB PSD over 1-20 Hz the VEL RMS was 4.5x too
+    large; the error is band- and spectrum-shape dependent, so it is not a
+    constant rescale. IMPACT: all psd_rms outputs were wrong in ACC, VEL and
+    DISP and must be recomputed.
+  * psd_df_rms: band labels formatted with "%.1f" are lossy below 0.05 Hz —
+    (0.05, 0.1) and (0.06, 0.1) both became "0.1-0.1" and the second silently
+    overwrote the first. Labels now fall back to a lossless form only when the
+    one-decimal version is inexact, so every round-numbered band keeps its
+    historical name ("1.0-20.0", "4.0-14.0", ...).
+
+ - msnoise.core.signal / msnoise.s03_compute_no_rotation — preprocessing helpers:
+  * check_and_phase_shift: the sub-sample time shift called
+    ``sf.ifft(..., overwrite_x=True)`` and discarded the return value. scipy
+    documents overwrite_x as a hint, not a guarantee; on any build that
+    declined to overwrite, the trace would have been silently replaced by the
+    real part of its own spectrum. The return value is now used.
+  * winsorizing(input="fft"): ``.astype(float)`` on the complex inverse FFT
+    discarded the imaginary part behind a ComplexWarning; replaced by an
+    explicit np.real(). Documented that the RMS is measured over the
+    zero-padded nfft, which tightens the clip threshold by up to ~2.5%
+    relative to the clip_after_whiten=N path.
+  * the PSD used by whitening_type=PSD is now computed from the array that is
+    actually whitened (winsorized + cosine-tapered) rather than from the
+    untouched ObsPy trace, and welch is called with nperseg=npts, nfft=nfft so
+    it zero-pads to the expected nfft//2+1 bins instead of silently clamping
+    nperseg (which would have returned npts//2+1 bins and misaligned the
+    division inside whiten2).
+  * get_window: normalised by ``window_len`` rather than by the window sum, so
+    a Hann window summed to ~0.45 instead of 1 despite the docstring. The
+    constant cancels exactly in the MWCS coherence and in the origin-forced
+    WLS slope and its error (verified), so this is a consistency fix with
+    core.compute.smooth, not a numerical change.
+
+ - msnoise.s10_stretching:
+  * the negative-lag coda mask on the CURRENT CCFs zeroed a single column
+    (``data_values[:, mid - int(maxlag2*sr)] = 0.``) instead of the whole tail
+    (``[:, :mid - ...]``). The reference was masked with a proper slice, so
+    the current traces kept every sample between -maxlag and -maxlag2 while
+    the reference had zeros there: 1500 stray samples for a 120 s / 20 Hz /
+    45 s-window configuration. That asymmetry both diluted the correlation
+    coefficient and skewed the z-scoring of the current trace. IMPACT: all
+    stretching results change and must be recomputed. The masking is now a
+    shared ``apply_coda_mask()`` helper used by the fixed reference, the
+    rolling references and the current CCFs, so the three cannot drift apart
+    again.
+  * the Error column was written in stretch-INDEX units while Delta is a
+    stretch factor and aggregate_dvv_pairs reads Error as the error on
+    ``Delta - 1``, i.e. in dv/v units. _hwhm_errors' own docstring gives the
+    conversion (``hwhm * 2 * stretching_max / (nsteps - 1)``) but nothing
+    applied it, so every stretching error bar was (nsteps-1)/(2*stretching_max)
+    times too large — 25000x for the defaults. On a synthetic -1 % change the
+    stored error was 28.6 instead of 1.14e-3. The conversion now lives in a
+    ``hwhm_to_dvv()`` helper. IMPACT: stretching_dvv error bars were
+    meaningless; dv/v values themselves were unaffected by this one.
+  * _hwhm_errors extrapolated past the array edge when the correlation curve
+    never dropped to half-maximum on one side of the peak, fabricating a
+    width from a negative or out-of-range crossing index. It now returns NaN,
+    matching the existing guard for a peak sitting on the boundary.
+  * documented the deliberate ``strvec[::-1]`` in stretch_mat_creation: row k
+    is built from ``strvec[-1-k]`` while the caller reports ``strvec[k]``,
+    which is what makes ``Delta - 1`` a correctly signed dv/v downstream.
+    Verified numerically: true dv/v of -0.010, -0.003, 0.000, +0.003 and
+    +0.010 are recovered exactly. Audited, no change needed.
 
 Changes:
  - msnoise
