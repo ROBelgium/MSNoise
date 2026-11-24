@@ -432,16 +432,23 @@ def create_project_from_yaml(session, yaml_path):
             create_workflow_link(session, from_step.step_id, to_step.step_id)
 
     # Pass 3: data sources
+    # The first declared data source overwrites the installer default
+    # (ref=1), which is what populate/scan_archive use when stations have no
+    # explicit data_source_id. Further entries are added as new sources.
     created_ds_ids = []
-    for ds_dict in doc.get("data_sources", []):
-        from ..core.stations import add_data_source
-        ds = add_data_source(
-            session,
+    from ..core.stations import (add_data_source, get_data_source,
+                                 update_data_source)
+    for i, ds_dict in enumerate(doc.get("data_sources", []) or []):
+        fields = dict(
             name=ds_dict["name"],
             uri=ds_dict.get("uri", ""),
             data_structure=ds_dict.get("data_structure", "SDS"),
             auth_env=ds_dict.get("auth_env", "MSNOISE"),
         )
+        if i == 0 and get_data_source(session, id=1) is not None:
+            ds = update_data_source(session, 1, **fields)
+        else:
+            ds = add_data_source(session, **fields)
         created_ds_ids.append(ds.ref)
 
     # Pass 4: stations — endpoint fetch (level=response recommended so that
