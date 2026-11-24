@@ -469,14 +469,14 @@ def db_da_stations_update_loc_chan(ctx):
     session = connect()
     stations = get_stations(session)
     for sta in stations:
-        data = session.query(DataAvailability). \
-            filter(text("net=:net")). \
-            filter(text("sta=:sta")). \
-            group_by(DataAvailability.net, DataAvailability.sta,
-                     DataAvailability.loc, DataAvailability.chan). \
-            params(net=sta.net, sta=sta.sta).all()
-        locids = list(set(sorted([d.loc for d in data])))
-        chans = list(set(sorted([d.chan for d in data])))
+        # Select only the grouped columns (DISTINCT) so the query is valid
+        # on strict SQL backends (PostgreSQL) as well as SQLite/MySQL.
+        data = session.query(DataAvailability.loc, DataAvailability.chan). \
+            filter(DataAvailability.net == sta.net). \
+            filter(DataAvailability.sta == sta.sta). \
+            distinct().all()
+        locids = sorted(set(d.loc for d in data))
+        chans = sorted(set(d.chan for d in data))
         # logger.info("%s.%s has locids:%s and chans:%s" % (sta.net, sta.sta,
         #                                                   locids, chans))
         sta.used_location_codes = ",".join(locids)
