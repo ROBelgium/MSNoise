@@ -67,8 +67,6 @@ def main(stype, loglevel="INFO"):
     ----------
     stype : {'mov', 'ref'}
         Defines which of the REF or Moving-window stacks must be exported
-    interval : float, optional
-        Number of days before now to search for modified CC jobs
 
     """
     logger = get_logger('msnoise.stack', loglevel, with_pid=True)
