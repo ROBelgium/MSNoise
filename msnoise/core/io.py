@@ -1321,12 +1321,10 @@ def xr_save_psd(root, lineage, step_name, seed_id, day, dataset):
 def xr_load_psd(root, lineage, step_name, seed_id, day):
     """Load a daily PSD NetCDF written by :func:`xr_save_psd`.
 
-    Parameters
-    ----------
-    format : str
-        ``"dataframe"`` returns a :class:`~pandas.DataFrame`
-        or ``None`` if file not found.
-        ``"dataset"`` (default) returns an :class:`xarray.Dataset` or ``None``.
+    Returns
+    -------
+    :class:`xarray.Dataset` or None
+        The stored dataset, or ``None`` if the file does not exist.
     """
     day_str = day if isinstance(day, str) else day.strftime("%Y-%m-%d")
     fn = os.path.join(
@@ -1390,12 +1388,10 @@ def xr_save_rms(root, lineage, step_name, seed_id, dataframe):
 def xr_load_rms(root, lineage, step_name, seed_id):
     """Load per-station PSD RMS results from a NetCDF file.
 
-    Parameters
-    ----------
-    format : str
-        ``"dataframe"`` returns a :class:`~pandas.DataFrame`
-        or ``None`` if file not found.
-        ``"dataset"`` (default) returns an :class:`xarray.Dataset` or ``None``.
+    Returns
+    -------
+    :class:`xarray.Dataset` or None
+        The stored dataset, or ``None`` if the file does not exist.
     """
     fn = os.path.join(root, *lineage, step_name, "_output", seed_id, "RMS.nc")
     if not os.path.isfile(fn):
